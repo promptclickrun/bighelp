@@ -71,6 +71,9 @@ extension DirectHermesConversationClient {
         voiceReplyUnavailable = false
         queuedVoiceAwaitingTurn = false
         pendingID = submission.id
+        // The files are uploaded: from here the prompt is pending like any other. Left set, the
+        // upload's mark held Send off until the turn ended, so a turn with a file couldn't be steered.
+        if preparingAttachmentID == submission.id { preparingAttachmentID = nil }
         pendingTurnID = nil
         promptSentAt = command || !Telemetry.isRecording ? nil : monotonicNow()
         admissionOverlapped = false

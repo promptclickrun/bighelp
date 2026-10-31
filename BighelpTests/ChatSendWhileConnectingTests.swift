@@ -211,6 +211,41 @@ struct ChatSendWhileConnectingTests {
         #expect(!fixture.model.takesMessageNow)
     }
 
+    /// A turn started by a message with a photo or a file steers like any other (#720): Send stays
+    /// on while the agent works, and the next message steers it. Hermes answers `prompt.submit`
+    /// with `streaming`, so the send waits until the turn ends.
+    @Test(.timeLimit(.minutes(1)), arguments: [true, false])
+    func aTurnStartedWithAPhotoOrFileStillSteers(photo: Bool) async throws {
+        let fixture = try ConnectingFixture()
+        defer { fixture.close() }
+        try await fixture.client.recover(epoch: "epoch")
+        let attachment = photo
+            ? try ChatAttachment(id: "attachment_steer_photo", fileName: "photo.png", mimeType: "image/png",
+                                 data: try #require(Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZ1kAAAAASUVORK5CYII=")))
+            : try ChatAttachment(id: "attachment_steer_file", fileName: "notes.txt", mimeType: "text/plain",
+                                 data: Data("notes".utf8))
+        fixture.model.draft = "Look at this"
+        try fixture.model.addDraftAttachment(attachment)
+        let first = Task { await fixture.model.send() }
+        defer { first.cancel() }
+        try await fixture.waitUntil { !fixture.rpc.submits.isEmpty }
+        #expect(fixture.rpc.uploads == [photo ? "image.attach_bytes" : "file.attach"])
+        fixture.emit("message.start", [:])
+        try await fixture.waitUntil { fixture.model.isMidSessionTurnLive }
+
+        fixture.model.draft = "Also check the date"
+        #expect(fixture.model.canSend, "Send stays on while the agent works on a message with a file")
+        #expect(fixture.model.sendUnavailableReason == nil)
+        await fixture.model.send()
+        try await fixture.waitUntil { !fixture.rpc.steers.isEmpty }
+        #expect(fixture.rpc.steers == ["Also check the date"])
+        #expect(fixture.model.stagedSends.isEmpty)
+
+        fixture.emit("message.complete", ["text": .string("Done"), "status": .string("complete")])
+        fixture.emit("session.info", ["running": .boolean(false)])
+        try await fixture.waitUntil { !fixture.model.isSending }
+    }
+
     /// A command is read by the connection (`/…`), so it waits in the box until the chat connects.
     @Test func aCommandWaitsInTheBox() {
         let model = ChatModel(conversationID: "connecting", client: NativeWorkspaceUnavailableClient(), initialItems: [])
@@ -258,6 +293,7 @@ private final class ConnectingRPC: DirectHermesRPC {
     var holdsActivation = false
     private(set) var submits: [String] = []
     private(set) var steers: [String] = []
+    private(set) var uploads: [String] = []
     private var heldActivation: CheckedContinuation<Void, Never>?
     var isHoldingActivation: Bool { heldActivation != nil }
 
@@ -279,6 +315,16 @@ private final class ConnectingRPC: DirectHermesRPC {
         case "prompt.submit":
             if case .string(let text) = params["text"] { submits.append(text) }
             return .object(["status": .string("streaming"), "user_row_id": .integer(41 + submits.count)])
+        case "image.attach_bytes":
+            uploads.append(method)
+            return .object(["attached": .boolean(true), "path": .string("/fixture/images/photo.png"),
+                            "name": .string("photo.png"), "count": .integer(1), "bytes": .integer(68),
+                            "text": .string("[User attached image: photo.png]")])
+        case "file.attach":
+            uploads.append(method)
+            let path = "/fixture/attachments/" + (params["name"]?.string ?? "notes.txt")
+            return .object(["attached": .boolean(true), "uploaded": .boolean(true), "name": .string("notes.txt"),
+                            "path": .string(path), "ref_path": .string(path), "ref_text": .string("@file:`\(path)`")])
         case "session.steer":
             // Stock Hermes confirms a steer with `queued`.
             if case .string(let text) = params["text"] { steers.append(text) }

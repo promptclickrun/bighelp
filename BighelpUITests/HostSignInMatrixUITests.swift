@@ -153,8 +153,26 @@ final class HostSignInMatrixUITests: BighelpUITestCase {
     /// A plain tap on Send while a tool runs steers the turn: the message
     /// leaves the composer at once, and the agent gets it when the tool ends.
     @MainActor func testSteerSendsWhileAToolRuns() throws {
-        let app = try beginSetup(mode: "tools")
+        try steerWhileAToolRuns()
+    }
+
+    /// The same when the message that started the turn had a photo or a file (#720): Send stays
+    /// on while the agent works, and the steer gets to it.
+    @MainActor func testSteerSendsAfterAPhotoWhileAToolRuns() throws {
+        try steerWhileAToolRuns(attachment: "photo")
+    }
+
+    @MainActor func testSteerSendsAfterAFileWhileAToolRuns() throws {
+        try steerWhileAToolRuns(attachment: "file")
+    }
+
+    @MainActor private func steerWhileAToolRuns(attachment: String? = nil) throws {
+        let app = try beginSetup(mode: "tools", extraArguments: attachment.map { ["-test-draft-attachments", $0] } ?? [])
         let composer = try openFirstChat(app)
+        if attachment != nil {
+            XCTAssertTrue(app.descendants(matching: .any)["chat.draft-attachments"].firstMatch.waitForExistence(timeout: 10),
+                          "The \(attachment ?? "") waits in the message box")
+        }
         send("long tool test", composer: composer, in: app)
         XCTAssertTrue(app.buttons["chat.stop"].waitForExistence(timeout: 20), "The turn is running")
         // Let the 20-second command start.
@@ -163,14 +181,17 @@ final class HostSignInMatrixUITests: BighelpUITestCase {
         composer.typeText("steer fixture note")
         let sendButton = app.descendants(matching: .any)["chat.send"].firstMatch
         XCTAssertTrue(sendButton.waitForExistence(timeout: 5))
+        let prefix = attachment.map { "tools-\($0)" } ?? "tools"
+        save(prefix + "-2-steer-typed", app)
+        XCTAssertTrue(sendButton.isEnabled, "Send is on while the agent works")
         sendButton.tap()
         let left = expectation(for: NSPredicate(format: "NOT (value CONTAINS %@)", "steer fixture note"),
                                evaluatedWith: composer)
         wait(for: [left], timeout: 5)
-        save("tools-3-steered", app)
+        save(prefix + "-3-steered", app)
         XCTAssertTrue(text("Steer received: steer fixture note", in: app).waitForExistence(timeout: 60),
                       "The agent got the steer after the tool finished")
-        save("tools-4-steer-received", app)
+        save(prefix + "-4-steer-received", app)
     }
 
     /// Tapping the Dynamic Island (or a notification) while the agent waits on

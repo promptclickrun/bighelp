@@ -119,27 +119,12 @@ final class ChatModel {
     /// Messages sent before the chat could take them, oldest first (`stage`). Each waits at the
     /// bottom of the chat with "Sending…" under it and goes out in order once the chat can take it.
     internal(set) var stagedSends: [ChatStagedSend] = []
-    @ObservationIgnored var stagedSendDrain: Task<Void, Never>?
+    @ObservationIgnored var stagedSendDrain: (id: UUID, task: Task<Void, Never>)?
     /// The chat has gone without a connection for `connectionGrace` while the app was open
     /// (`ChatConnectionGrace`). Only then does Send go off, until the chat connects again.
     var connectionIsOverdue = false
     /// How long Send stays on without a connection, and how long a staged message waits.
     @ObservationIgnored var connectionGrace: Duration = .seconds(25)
-    /// An open under way (`ShellFeatureStore.startNavigationHydration`) while the chat shows its saved copy.
-    private(set) var isOpening = false
-    @ObservationIgnored private var openingToken: UUID?
-
-    func beginOpening(_ token: UUID) {
-        openingToken = token
-        isOpening = true
-    }
-
-    /// Ends the open `token` began; a newer one stays.
-    func endOpening(_ token: UUID) {
-        guard openingToken == token else { return }
-        openingToken = nil
-        isOpening = false
-    }
     var isSending = false {
         didSet {
             // The runtime controls are the authority for whether a model or

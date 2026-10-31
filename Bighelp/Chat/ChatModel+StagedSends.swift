@@ -6,6 +6,8 @@ import SwiftUI
 struct ChatStagedSend: Identifiable {
     let item: TimelineItem
     let outgoing: ChatOutgoingMessage
+    /// Picked from Send's choices (steer, queue, interrupt), for a turn still running when it goes.
+    let midSessionBehavior: MidSessionChatBehavior?
     var id: String { item.id }
 }
 
@@ -13,13 +15,19 @@ struct ChatStagedSend: Identifiable {
 /// computer that's still connecting, or catches up with what Hermes saved, a message goes into the
 /// chat at once and waits there, then goes out the moment the chat can take it. Only a connection
 /// missing for `connectionGrace` turns Send off.
+///
+/// Waiting messages live in memory: closing the app while one waits loses it.
 extension ChatModel {
     /// The chat has no working connection yet: back from the background, a computer still
-    /// connecting, or a chat still opening or catching up with what Hermes saved.
+    /// connecting, or a chat still opening or catching up with what Hermes saved. A connected chat
+    /// still sorting out a lost message (`needsRecovery`) isn't connecting: Send stays off there.
     var lacksConnection: Bool {
         guard !isBotMode else { return false }
+        #if DEBUG && (targetEnvironment(simulator) || targetEnvironment(macCatalyst))
+        if ChatConnectingPreview.isConnecting { return true }
+        #endif
         if client is NativeWorkspaceUnavailableClient { return true }
-        return nativeConversationClient.map { !$0.hasAuthoritativeEventCoverage } ?? false
+        return nativeConversationClient.map { !$0.connected || $0.isHydrating } ?? false
     }
 
     /// Without a connection, but not for long enough to give up on it.
@@ -35,54 +43,76 @@ extension ChatModel {
         return isSending && nativeConversationClient?.sessionActionsAreRunning == false
     }
 
+    /// Hermes can take a message now, the way Send would send it: a new turn, or a steer of a live one.
+    var takesMessageNow: Bool {
+        guard !lacksConnection else { return false }
+        guard isSending else { return directTransportIsReady }
+        return isMidSessionTurnLive && !hasExclusiveMidSessionSubmission
+            && nativeConversationClient?.preparingAttachmentID == nil
+    }
+
     /// Moves the box into the chat, where the message waits for `drainStagedSends`; the box
     /// clears for the next one.
-    func stageComposerMessage() {
+    func stageComposerMessage(midSessionBehavior: MidSessionChatBehavior? = nil) {
         let outgoing = ChatOutgoingMessage(composerOf: self)
         guard !outgoing.message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 || !outgoing.orderedAttachments.isEmpty else { return }
         let item = humanItem(content: outgoing.message, attachments: outgoing.attachments)
-        stagedSends.append(ChatStagedSend(item: item, outgoing: outgoing.staged(as: item)))
+        stagedSends.append(ChatStagedSend(item: item, outgoing: outgoing.staged(as: item),
+                                          midSessionBehavior: midSessionBehavior))
         failureMessage = nil
         draft = ""
         replyDraft = nil
         draftAttachments = []
         orderedDraftAttachments = []
-        guard stagedSendDrain == nil else { return }
-        stagedSendDrain = Task { [weak self] in
-            await self?.drainStagedSends()
-            self?.stagedSendDrain = nil
-        }
+        drainStagedSendsIfNeeded()
     }
 
-    /// The staged row a send goes out as; it leaves the staged list in the same step it joins
-    /// the chat, so it never shows twice or blinks out.
+    /// The staged row a send goes out as. It leaves the staged list in the same step it joins the
+    /// chat, so it never shows twice or blinks out, and it takes the chat's next order: a reload
+    /// while it waited may have moved the order on, or (rarely) given its ID to a reloaded row.
     func takeStagedItem(of outgoing: ChatOutgoingMessage) -> TimelineItem? {
         guard let item = outgoing.stagedItem,
               let index = stagedSends.firstIndex(where: { $0.id == item.id }) else { return nil }
         stagedSends.remove(at: index)
-        return item
+        guard itemIndexByID[item.id] == nil else {
+            return humanItem(content: outgoing.message, attachments: outgoing.attachments)
+        }
+        return item.ordered(takeTranscriptOrder())
+    }
+
+    /// How a staged message goes into a running turn. Files go only in the queue.
+    func stagedMidSessionBehavior(_ staged: ChatStagedSend) -> MidSessionChatBehavior {
+        guard staged.outgoing.attachments.isEmpty else { return .queued }
+        return staged.midSessionBehavior ?? midSessionBehavior()
+    }
+
+    private func drainStagedSendsIfNeeded() {
+        guard stagedSendDrain == nil else { return }
+        let id = UUID()
+        stagedSendDrain = (id, Task { [weak self] in await self?.drainStagedSends(id) })
     }
 
     /// Sends the staged messages in order, each the way Send would once the chat can take it: a
-    /// new turn, or a steer while the agent works. If the chat gives up on its connection first,
-    /// they go back in the box.
-    private func drainStagedSends() async {
+    /// new turn, or into the running one. If the chat gives up first, they go back in the box.
+    private func drainStagedSends(_ id: UUID) async {
+        defer { if stagedSendDrain?.id == id { stagedSendDrain = nil } }
         while let next = stagedSends.first {
             guard await waitForConnection(until: { takesMessageNow }), stagedSends.first?.id == next.id else {
                 returnStagedSendsToBox()
                 return
             }
             if isSending {
-                await sendMidSession(next.outgoing, using: defaultMidSessionBehavior)
+                await sendMidSession(next.outgoing, using: stagedMidSessionBehavior(next))
                 returnStagedSendsToBox(ifStillWaiting: next)
             } else {
-                // A turn runs until it ends; the next message steers it meanwhile.
-                Task { [weak self] in
-                    await self?.send(next.outgoing)
-                    self?.returnStagedSendsToBox(ifStillWaiting: next)
-                }
-                _ = await waitForConnection(until: { stagedSends.first?.id != next.id })
+                // The turn runs until it ends, so the messages after it get a drain of their own and
+                // go into it. It starts in this same step, so nothing gets in between.
+                stagedSendDrain = nil
+                drainStagedSendsIfNeeded()
+                await send(next.outgoing)
+                returnStagedSendsToBox(ifStillWaiting: next)
+                return
             }
         }
     }
@@ -93,25 +123,17 @@ extension ChatModel {
         if stagedSends.first?.id == staged.id { returnStagedSendsToBox() }
     }
 
-    /// Hermes can take a message now, the way Send would send it: a new turn, or a steer of a live one.
-    var takesMessageNow: Bool {
-        guard !lacksConnection else { return false }
-        guard isSending else { return directTransportIsReady }
-        return isMidSessionTurnLive && !hasExclusiveMidSessionSubmission
-            && nativeConversationClient?.preparingAttachmentID == nil
-    }
-
-    /// Waits until `condition` holds. False if the chat gives up first: its connection stays away
-    /// past `connectionGrace` while the app is open (`connectionIsOverdue`), or, connected, it
-    /// still can't take the message after that long.
+    /// Waits until `condition` holds. False if the chat gives up first: Send went off
+    /// (`connectionIsOverdue`), or `connectionGrace` of time with the app open went by. Time away
+    /// doesn't count, so a message sent just before the phone locks goes once the chat is back.
     func waitForConnection(until condition: () -> Bool) async -> Bool {
-        var deadline = ContinuousClock.now + connectionGrace
+        let step = Duration.milliseconds(100)
+        var waited = Duration.zero
         while !condition() {
-            guard !Task.isCancelled, !connectionIsOverdue, !referenceOwnerRetired else { return false }
-            // Time without a connection counts only while the app is open, which `connectionIsOverdue` follows.
-            if lacksConnection { deadline = .now + connectionGrace }
-            else if ContinuousClock.now >= deadline { return false }
-            try? await Task.sleep(for: .milliseconds(100))
+            guard !Task.isCancelled, !connectionIsOverdue, !referenceOwnerRetired, waited < connectionGrace
+            else { return false }
+            try? await Task.sleep(for: step)
+            if retryScheduling.appIsActive() { waited += step }
         }
         return true
     }
@@ -122,32 +144,56 @@ extension ChatModel {
         let staged = stagedSends
         guard !staged.isEmpty else { return }
         stagedSends = []
-        draft = (staged.map(\.outgoing.message) + [draft])
-            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-            .joined(separator: "\n\n")
-        draftAttachments = staged.flatMap(\.outgoing.attachments) + draftAttachments
-        orderedDraftAttachments = staged.flatMap(\.outgoing.orderedAttachments) + orderedDraftAttachments
+        putBackInBox(staged.map(\.outgoing.message)
+                        .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                        .joined(separator: "\n\n"),
+                     attachments: staged.flatMap(\.outgoing.attachments),
+                     orderedAttachments: staged.flatMap(\.outgoing.orderedAttachments))
         // A send that stopped on its own (an attachment the chat can't send) already said why.
         guard failureMessage == nil else { return }
-        failureMessage = staged.count == 1
-            ? "Your computer didn't answer, so your message is back in the message box."
-            : "Your computer didn't answer, so your messages are back in the message box."
+        let messages = staged.count == 1 ? "your message is" : "your messages are"
+        failureMessage = lacksConnection
+            ? "Your computer didn't answer, so \(messages) back in the message box."
+            : "Hermes couldn't take it yet, so \(messages) back in the message box."
+    }
+
+    /// Puts an unsent message back in the box, before anything typed since, so neither is lost.
+    func putBackInBox(_ message: String, attachments: [ChatAttachment], orderedAttachments: [ChatDraftAttachment]) {
+        draft = [message, draft].filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: "\n\n")
+        draftAttachments = attachments + draftAttachments
+        orderedDraftAttachments = orderedAttachments + orderedDraftAttachments
     }
 }
 
 /// Counts how long the chat on screen goes without a connection while the app is open, and turns
 /// Send off (`connectionIsOverdue`) once that passes `connectionGrace`. Time away from the app
 /// doesn't count: coming back starts the count again, so Send is on the moment the app opens.
+/// Pulling down Control Center or a notification doesn't restart it.
 struct ChatConnectionGrace: ViewModifier {
     let model: ChatModel
     @Environment(\.scenePhase) private var scenePhase
 
     func body(content: Content) -> some View {
-        content.task(id: model.lacksConnection && scenePhase == .active) {
+        content.task(id: model.lacksConnection && scenePhase != .background) {
             model.connectionIsOverdue = false
-            guard model.lacksConnection, scenePhase == .active else { return }
+            guard model.lacksConnection, scenePhase != .background else { return }
             try? await Task.sleep(for: model.connectionGrace)
             if !Task.isCancelled { model.connectionIsOverdue = true }
         }
     }
 }
+
+#if DEBUG && (targetEnvironment(simulator) || targetEnvironment(macCatalyst))
+/// "-test-chat-connecting <seconds>": demo chats act as if their computer were still connecting for
+/// that long after the first chat shows, so screenshots show Send staying on and a message waiting.
+enum ChatConnectingPreview {
+    private static let until: Date? = {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-test-chat-connecting"), arguments.indices.contains(index + 1),
+              let seconds = TimeInterval(arguments[index + 1]) else { return nil }
+        return Date(timeIntervalSinceNow: seconds)
+    }()
+    static var isConnecting: Bool { until.map { Date() < $0 } ?? false }
+}
+#endif

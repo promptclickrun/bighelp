@@ -121,6 +121,61 @@ struct ChatSendWhileConnectingTests {
         #expect(model.failureMessage == "Your computer didn't answer, so your messages are back in the message box.")
     }
 
+    /// A reload while messages wait resets the chat's counts. The waiting rows keep IDs of their
+    /// own, and the one that goes out sorts after the reloaded history, not into it.
+    @Test func aReloadWhileMessagesWaitKeepsThemApartAndLast() async throws {
+        let fixture = try ConnectingFixture()
+        defer { fixture.close() }
+        try await fixture.client.recover(epoch: "epoch")
+        let model = ChatModel(conversationID: fixture.client.conversationID, client: NativeWorkspaceUnavailableClient(),
+                              initialItems: [])
+        model.draft = "First"
+        await model.send()
+        var saved = SessionRecord(id: model.conversationID, kind: .direct, agentIDs: ["default"], title: "Chat",
+                                  hasAcceptedMessage: true)
+        model.beginHistoryHydration(from: saved)
+        saved.items = [TimelineItem(id: "hermes:saved:answer", role: .assistant,
+                                    sender: .agent(id: "default", snapshot: .init(name: "Juno")),
+                                    content: .message("An earlier answer"),
+                                    metadata: .init(source: "Hermes", delivery: "Saved", sourceOrder: 20))]
+        model.reconcileHydratedSession(saved)
+        model.finishHistoryHydration()
+        model.draft = "Second"
+        await model.send()
+        #expect(Set(model.stagedSends.map(\.id)).count == 2, "Two waiting rows may never share an ID")
+
+        model.client = fixture.client
+        fixture.client.model = model
+        try await fixture.waitUntil { !fixture.rpc.submits.isEmpty }
+        #expect(model.transcriptEntries.last?.id == ChatTranscriptEntry.message(
+            model.items.first { $0.content == .message("First") }!).id)
+    }
+
+    @Test func aWaitingNewChatShowsItsMessageNotTheWelcome() async {
+        let model = ChatModel(conversationID: "connecting", client: NativeWorkspaceUnavailableClient(), initialItems: [])
+        #expect(model.shouldShowNewConversationWelcome)
+        model.draft = "Hello there"
+        await model.send()
+        #expect(!model.shouldShowNewConversationWelcome)
+    }
+
+    /// Files go into a running turn only through the queue, whatever Send's choice was.
+    @Test func aWaitingFileGoesIntoTheQueue() throws {
+        let model = ChatModel(conversationID: "connecting", client: NativeWorkspaceUnavailableClient(), initialItems: [])
+        let file = try ChatAttachment(id: "attachment_waiting_file", fileName: "notes.txt", mimeType: "text/plain", data: Data("notes".utf8))
+        model.draft = "Look at this"
+        model.draftAttachments = [file]
+        model.orderedDraftAttachments = [.attachment(file)]
+        let withFile = ChatStagedSend(item: model.humanItem(content: "Look at this", attachments: [file]),
+                                      outgoing: ChatOutgoingMessage(composerOf: model), midSessionBehavior: .steer)
+        #expect(model.stagedMidSessionBehavior(withFile) == .queued)
+        model.draftAttachments = []
+        model.orderedDraftAttachments = []
+        let plain = ChatStagedSend(item: model.humanItem(content: "Look at this"),
+                                   outgoing: ChatOutgoingMessage(composerOf: model), midSessionBehavior: .interruptAndSend)
+        #expect(model.stagedMidSessionBehavior(plain) == .interruptAndSend)
+    }
+
     /// A command is read by the connection (`/…`), so it waits in the box until the chat connects.
     @Test func aCommandWaitsInTheBox() {
         let model = ChatModel(conversationID: "connecting", client: NativeWorkspaceUnavailableClient(), initialItems: [])
@@ -156,7 +211,7 @@ private final class ConnectingFixture {
 
     func close() {
         rpc.releaseActivation()
-        model.stagedSendDrain?.cancel()
+        model.stagedSendDrain?.task.cancel()
         client.suspend()
         try? FileManager.default.removeItem(at: root)
     }

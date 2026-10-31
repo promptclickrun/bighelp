@@ -206,6 +206,7 @@ extension ChatModel {
     var shouldShowNewConversationWelcome: Bool {
         !isBotMode
             && transcriptEntries.isEmpty
+            && stagedSends.isEmpty
             && !isHydratingHistory
             && !isSending
             && !hasPreviousHistory

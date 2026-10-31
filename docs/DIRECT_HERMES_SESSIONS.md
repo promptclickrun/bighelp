@@ -131,7 +131,9 @@ another agent sent an agent replaced its Bot Chat.
 - **A failed open** shows the saved copy without a connection of its own. The chat opens again by itself while it
   is on screen (`ShellFeatureStore.failedOpenRetryDelays`) and when the person comes back to it, so Send works
   again without restarting the app.
-- **Catch-up before Send** waits at most `ChatModel.catchUpTimeout` (30 seconds); the message stays in the box.
+- **Send while connecting** never waits in the box: the message waits in the chat with "Sending…" under it
+  (`ChatModel.stagedSends`) and goes out once the chat can take it. After `ChatModel.connectionGrace` (25 seconds)
+  without a connection while the app is open, Send goes off and waiting messages go back in the box.
 
 Edits of a saved chat go through `DirectHermesSessionEditor`. Current Hermes answers the dashboard's `PATCH` and
 `DELETE /api/sessions/{id}` with 404 `not_found` for chats the app made over the socket, so hide and unhide

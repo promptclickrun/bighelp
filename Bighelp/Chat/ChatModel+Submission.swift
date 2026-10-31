@@ -415,6 +415,11 @@ extension ChatModel {
             failureMessage = "Attachments can be queued after this turn. Your draft is unchanged."
             return
         }
+        // Picked from Send's choices before the turn is live, or behind messages still waiting.
+        if stagesComposerMessage, !stagedSends.isEmpty || !takesMessageNow {
+            stageComposerMessage(midSessionBehavior: behavior)
+            return
+        }
         await sendMidSession(ChatOutgoingMessage(composerOf: self), using: behavior)
     }
 
@@ -780,9 +785,7 @@ extension ChatModel {
         removeItem(id: human.id)
         removeProjectedMessage(id: human.id)
         if restoresDraft {
-            draft = message
-            draftAttachments = attachments
-            orderedDraftAttachments = attachments.map(ChatDraftAttachment.attachment)
+            putBackInBox(message, attachments: attachments, orderedAttachments: attachments.map(ChatDraftAttachment.attachment))
         }
         persistSession()
     }
@@ -795,7 +798,8 @@ extension ChatModel {
         content: String,
         attachments: [ChatAttachment] = []
     ) -> TimelineItem {
-        let existingIDs = Set(items.map(\.id))
+        // A reload resets the count, so a message still waiting in the chat may hold the next ID.
+        let existingIDs = Set(items.map(\.id) + stagedSends.map(\.id))
         while existingIDs.contains("\(conversationID)-human-\(nextHumanSequence)") {
             nextHumanSequence += 1
         }

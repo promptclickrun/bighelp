@@ -262,6 +262,15 @@ final class LiveVoiceModel {
         peer?.setMuted(muted)
     }
 
+    /// Nerd Mode's report of where this call's sound goes on the device; nil for a call without one (GPT-Live).
+    func audioReport() -> String? { (peer as? LiveVoiceAudioReporting)?.audioReport() }
+
+    /// Cheap to ask on every redraw, unlike the report itself.
+    var keepsAudioReport: Bool { peer is LiveVoiceAudioReporting }
+
+    /// Nerd Mode's Restart sound: stops and starts the call's player only.
+    func restartPlayback() { (peer as? LiveVoiceAudioReporting)?.restartPlayback() }
+
     func setSpeakerMuted(_ muted: Bool) {
         guard canControlAudio else { return }
         isSpeakerMuted = muted

@@ -53,6 +53,15 @@ GPT-Live gets from `poll`, so `NativeLiveVoiceSession` routes work the same way:
 
 A Gemini session lasts up to 30 minutes from its token; the call ends when Gemini closes the socket.
 
+Voice processing makes a configuration change right after the engine starts, on iPhone and in the simulator. The
+engine stops, and the peer starts it again (`GeminiLiveAudioPeer.restart`). The player stops first: started
+again while it still said it was playing, it took every piece of Gemini's voice and played none, until Gemini
+cut itself off and the player stopped. In Nerd Mode the call screen shows a call audio report, once a second:
+what Gemini sent, what was scheduled and finished, the main mixer's output level, the engine, the session and
+the route, and each change with its time (`GeminiLiveAudioDiagnostics`, also in the `LiveVoiceAudio` log). Copy
+report puts it on the clipboard; Restart sound stops and starts the player only. Bots mode's voice bar has both
+in its menu.
+
 ## Team call
 
 A group chat with two or more members can start a team call from its header (`Bighelp/TeamCall/`). It is turn-based

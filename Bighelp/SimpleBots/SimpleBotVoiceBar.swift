@@ -16,6 +16,7 @@ struct SimpleBotVoiceBar: View {
     @State private var levels = Array(repeating: 0.0, count: SimpleBotVoiceVisualizer.barCount)
     @State private var speaker = SimpleBotVoiceVisualizer.Speaker.nobody
     @Environment(\.companionAgentScope) private var scope
+    @AppStorage("loopdy.settings.nerd-mode") private var nerdMode = false
     @BighelpThemeReader private var theme
 
     var body: some View {
@@ -102,6 +103,13 @@ struct SimpleBotVoiceBar: View {
                    systemImage: isAgentMuted ? "speaker.wave.2" : "speaker.slash") {
                 if let live = presentation.liveModel { live.setSpeakerMuted(!live.isSpeakerMuted) }
                 else { presentation.model.toggleAgentAudio() }
+            }
+            // Nerd Mode: where the call's sound goes on this device (see LiveVoiceView).
+            if nerdMode, let live = presentation.liveModel, live.keepsAudioReport {
+                Button("Copy call audio report", systemImage: "doc.on.doc") {
+                    UIPasteboard.general.string = live.audioReport()
+                }
+                Button("Restart sound", systemImage: "arrow.clockwise") { live.restartPlayback() }
             }
         } label: {
             circle("gearshape", tint: theme.primaryText)

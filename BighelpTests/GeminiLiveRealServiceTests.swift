@@ -62,6 +62,10 @@ struct GeminiLiveRealServiceTests {
         for _ in 0..<150 where !log.has("transcript_done", role: "assistant") { try await Task.sleep(for: .milliseconds(100)) }
         let stats = try await peer.statistics()
         print("GEMINI-REAL states=\(log.states) kinds=\(log.events.compactMap { $0["kind"]?.string }) sent=\(stats.bytesSent) received=\(stats.bytesReceived) running=\(stats.audioDeviceRunning)")
+        // Gemini's voice has to play, not only arrive: it once arrived and never played (#692).
+        for _ in 0..<60 where peer.audioCounts.finishedBuffers == 0 { try await Task.sleep(for: .milliseconds(100)) }
+        print("GEMINI-REPORT\n\(peer.audioReport())")
+        #expect(peer.audioCounts.finishedBuffers > 0, "Gemini's voice played")
 
         #expect(log.states.contains(.connected))
         #expect(log.has("started"))

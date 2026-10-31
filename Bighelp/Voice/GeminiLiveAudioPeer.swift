@@ -311,6 +311,7 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
         case .stopPlayback:
             player.stop()
             playbackEndsAt = Date()
+            uplink.agentPlays(until: playbackEndsAt)
             // play() on a stopped engine raises an exception Swift can't catch.
             if engine.isRunning { player.play() }
         case let .answer(id, name, response, silent):
@@ -338,6 +339,7 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
         let now = Date()
         outputLevel = (Double(peak), now)
         playbackEndsAt = max(now, playbackEndsAt).addingTimeInterval(Double(count) / GeminiLiveWire.outputSampleRate)
+        uplink.agentPlays(until: playbackEndsAt)
         player.scheduleBuffer(buffer)
         if !player.isPlaying { player.play() }
     }
@@ -440,6 +442,9 @@ final class GeminiLiveUplink: @unchecked Sendable {
     private var level = 0.0
     private var bytes: UInt64 = 0
     private var frames: UInt64 = 0
+    private var echoGate = GeminiLiveEchoGate()
+    /// When the agent's voice already scheduled stops playing (`timeIntervalSinceReferenceDate`).
+    private var agentPlaysUntil = 0.0
 
     var counters: (bytes: UInt64, frames: UInt64, level: Double, muted: Bool) {
         lock.lock()
@@ -480,6 +485,13 @@ final class GeminiLiveUplink: @unchecked Sendable {
         if muted { pending.removeAll() }
     }
 
+    /// The agent's voice plays until then; the echo it leaves in the room fades a moment after.
+    func agentPlays(until end: Date) {
+        lock.lock()
+        defer { lock.unlock() }
+        agentPlaysUntil = end.timeIntervalSinceReferenceDate + GeminiLiveEchoGate.echoTail
+    }
+
     /// Built here, outside the main actor: the engine calls it on its realtime thread.
     static func tap(_ uplink: GeminiLiveUplink) -> AVAudioNodeTapBlock {
         { buffer, _ in uplink.push(buffer) }
@@ -505,14 +517,29 @@ final class GeminiLiveUplink: @unchecked Sendable {
         }
         guard failure == nil, output.frameLength > 0, let samples = output.int16ChannelData?[0] else { return }
         pending.append(Data(bytes: samples, count: Int(output.frameLength) * 2))
+        let playing = Date().timeIntervalSinceReferenceDate < agentPlaysUntil
         while pending.count >= Self.chunkBytes {
-            let chunk = pending.prefix(Self.chunkBytes)
+            let chunk = Data(pending.prefix(Self.chunkBytes))
             pending.removeFirst(Self.chunkBytes)
-            bytes &+= UInt64(chunk.count)
-            frames &+= 1
-            let frame = String(decoding: GeminiLiveWire.audio(Data(chunk)), as: UTF8.self)
-            socket.send(.string(frame)) { _ in }
+            for piece in echoGate.pass(chunk, level: Self.level(of: chunk), agentPlaying: playing) {
+                bytes &+= UInt64(piece.count)
+                frames &+= 1
+                socket.send(.string(String(decoding: GeminiLiveWire.audio(piece), as: UTF8.self))) { _ in }
+            }
         }
+    }
+
+    /// RMS of 16-bit little-endian samples, 0–1.
+    private static func level(of pcm: Data) -> Double {
+        let count = pcm.count / 2
+        guard count > 0 else { return 0 }
+        let sum = pcm.withUnsafeBytes { raw in
+            (0..<count).reduce(0.0) { total, index in
+                let sample = Double(Int16(littleEndian: raw.loadUnaligned(fromByteOffset: index * 2, as: Int16.self))) / 32_768
+                return total + sample * sample
+            }
+        }
+        return (sum / Double(count)).squareRoot()
     }
 
     private static func level(of buffer: AVAudioPCMBuffer) -> Double {
@@ -520,5 +547,52 @@ final class GeminiLiveUplink: @unchecked Sendable {
         var sum: Float = 0
         for index in 0..<Int(buffer.frameLength) { sum += channel[index] * channel[index] }
         return Double((sum / Float(buffer.frameLength)).squareRoot())
+    }
+}
+
+/// The microphone while the agent's voice plays, one 100 ms chunk at a time. Echo cancelling never
+/// takes all of the agent's voice out of the microphone, and Gemini stops talking for its own voice
+/// however faint (and for a room that starts talking under a reply), so the first replies of a call,
+/// before echo cancelling settles, were cut off before they could be heard. While the agent plays, Gemini
+/// gets silence unless the person talks over it: two chunks in a row clearly louder than the room was
+/// while the agent was quiet. Then the microphone stays open half a second after the last loud chunk,
+/// and the first loud chunk goes too, so Gemini hears the start of the words. Measured on the real
+/// service: the agent's echo and a TV under its reply no longer cut it off; talking over it still does.
+struct GeminiLiveEchoGate {
+    /// The quietest talking over the agent that opens the microphone, above the loudest echo measured.
+    static let minimumLevel = 0.06
+    /// How much louder than the room the person must be.
+    static let roomFactor = 2.5
+    static let echoTail: TimeInterval = 0.3
+    private static let openChunks = 5
+    private static let roomChunks = 20
+
+    private var room: [Double] = []
+    private var loudRun = 0
+    private var openFor = 0
+    private var held: Data?
+
+    /// What to send for `chunk`, whose RMS is `level`: the chunk, silence, or the held chunk and this one.
+    mutating func pass(_ chunk: Data, level: Double, agentPlaying: Bool) -> [Data] {
+        if !agentPlaying {
+            room.append(level)
+            if room.count > Self.roomChunks { room.removeFirst(room.count - Self.roomChunks) }
+        }
+        let roomLevel = room.isEmpty ? 0 : room.sorted()[Int(0.3 * Double(room.count - 1))]
+        let loud = level >= max(Self.minimumLevel, Self.roomFactor * roomLevel)
+        loudRun = loud ? loudRun + 1 : 0
+        let previous = held
+        held = loud ? chunk : nil
+        if loudRun >= 2 {
+            let opening = openFor == 0
+            openFor = Self.openChunks
+            if opening, agentPlaying, let previous { return [previous, chunk] }
+            return [chunk]
+        }
+        if openFor > 0 {
+            openFor -= 1
+            return [chunk]
+        }
+        return agentPlaying ? [Data(count: chunk.count)] : [chunk]
     }
 }

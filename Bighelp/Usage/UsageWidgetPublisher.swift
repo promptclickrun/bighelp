@@ -147,7 +147,24 @@ enum UsageWidgetPublisher {
     }
 
     /// A plan was given a name. The widgets put the names on themselves, so they only need drawing again.
-    static func namesChanged() {
+    /// Files from before plans carried their key get one first, or the name would wait for the next read.
+    static func namesChanged(directory: URL? = BighelpUsageSnapshot.directory) {
+        let stem = String(BighelpUsageSnapshot.fileName.dropLast(".json".count))
+        if let directory, let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path) {
+            for name in names where name.hasPrefix(stem) && name.hasSuffix(".json") {
+                let url = directory.appendingPathComponent(name, isDirectory: false)
+                guard let data = try? Data(contentsOf: url), data.count <= 131_072,
+                      var snapshot = try? JSONDecoder.bighelpWidget.decode(BighelpUsageSnapshot.self, from: data),
+                      snapshot.plans?.contains(where: { $0.key == nil }) == true else { continue }
+                snapshot.plans = snapshot.plans?.map { plan in
+                    var plan = plan
+                    plan.key = plan.key ?? ProviderUsagePreferences.key(for: plan.id)
+                    return plan
+                }
+                try? JSONEncoder.bighelpWidget.encode(snapshot)
+                    .write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            }
+        }
         WidgetCenter.shared.reloadTimelines(ofKind: BighelpUsageSnapshot.kind)
     }
 

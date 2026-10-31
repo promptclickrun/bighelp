@@ -188,6 +188,46 @@ struct BighelpUsageWorkflowsWidgetTests {
         #expect(snapshot.named(gateway: studio, names: names).plans?.map(\.name) == ["Claude", "Codex"])
     }
 
+    @Test func aRemovedGatewaysNamesAreForgotten() throws {
+        let suite = "usage-names-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let home = UUID().uuidString, gone = UUID().uuidString
+        var names = BighelpPlanNames.setting("Personal Claude", of: "claude", gateway: home, in: "")
+        names = BighelpPlanNames.setting("Old Claude", of: "claude", gateway: gone, in: names)
+        names = BighelpPlanNames.setting("Demo Claude", of: "claude", gateway: "current", in: names)
+        defaults.set(names, forKey: BighelpPlanNames.key)
+        BighelpPlanNames.keep(gateways: [home], in: defaults)
+        let kept = defaults.string(forKey: BighelpPlanNames.key) ?? ""
+        #expect(BighelpPlanNames.name(of: "claude", gateway: home, in: kept) == "Personal Claude")
+        #expect(BighelpPlanNames.name(of: "claude", gateway: gone, in: kept) == nil)
+        #expect(BighelpPlanNames.name(of: "claude", gateway: "current", in: kept) == "Demo Claude",
+                "Only gateways bighelp lists can be gone")
+    }
+
+    @Test func aRenameReachesFilesFromBeforePlansHadKeys() throws {
+        let folder = try temporaryFolder(), home = UUID().uuidString
+        // The release before wrote plans without a key; the host calls this one "codex-hermes".
+        let old = #"{"days":30,"generatedAt":0,"models":[],"daily":[],"plans":[{"id":"codex-hermes","name":"Codex","limits":[],"facts":[],"inUse":false}]}"#
+        let url = try #require(BighelpUsageSnapshot.fileURL(gateway: home, in: folder))
+        try Data(old.utf8).write(to: url)
+        #expect(BighelpUsageSnapshot.load(gateway: home, in: folder).plans?.first?.key == nil, "Old files still read")
+        UsageWidgetPublisher.namesChanged(directory: folder)
+        let key = try #require(BighelpUsageSnapshot.load(gateway: home, in: folder).plans?.first?.key)
+        #expect(key == ProviderUsagePreferences.key(for: "codex-hermes"))
+        let names = BighelpPlanNames.setting("Work Codex", of: key, gateway: home, in: "")
+        #expect(BighelpUsageSnapshot.load(gateway: home, in: folder).named(gateway: home, names: names).plans?.first?.name
+                == "Work Codex")
+    }
+
+    @Test func aWidgetSetToOnePlanBeforeKeepsIt() {
+        var intent = UsageWidgetIntent()
+        intent.plan = UsageWidgetPlan(id: "claude", name: "Claude")
+        #expect(intent.planIDs == ["claude"])
+        intent.plans = [UsageWidgetPlan(id: "codex", name: "Codex"), UsageWidgetPlan(id: "claude", name: "Claude")]
+        #expect(intent.planIDs == ["codex", "claude"], "Plans, once set, wins")
+    }
+
     @Test func chosenPlansShowInTheOrderPicked() {
         let preview = UsageWidgetEntry.preview
         let picked = UsageWidgetEntry(date: .now, snapshot: preview.snapshot, palette: .empty, content: .plans,
@@ -237,9 +277,13 @@ struct BighelpUsageWorkflowsWidgetTests {
     @Test func everyLayoutRendersInBothModes() throws {
         let palette = BighelpWidgetSnapshot.preview
         let out = ProcessInfo.processInfo.environment["BIGHELP_WIDGET_RENDER_DIR"].map(URL.init(fileURLWithPath:))
+        // The largest widgets, and the narrowest (iPhone mini and SE).
         let families: [(String, WidgetFamily, CGSize)] = [("small", .systemSmall, .init(width: 170, height: 170)),
                                                           ("medium", .systemMedium, .init(width: 364, height: 170)),
-                                                          ("large", .systemLarge, .init(width: 364, height: 382))]
+                                                          ("large", .systemLarge, .init(width: 364, height: 382)),
+                                                          ("small-narrow", .systemSmall, .init(width: 141, height: 141)),
+                                                          ("medium-narrow", .systemMedium, .init(width: 292, height: 141)),
+                                                          ("large-narrow", .systemLarge, .init(width: 292, height: 311))]
         let emptyRuns = WorkflowsWidgetEntry(date: .now, snapshot: .init(runs: [], isAvailable: true, generatedAt: .now),
                                              palette: palette)
         for scheme in [ColorScheme.light, .dark] {

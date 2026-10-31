@@ -164,6 +164,20 @@ enum BighelpPlanNames {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         all[gateway, default: [:]][plan] = trimmed.isEmpty ? nil : String(name.prefix(maximumLength))
         if all[gateway]?.isEmpty == true { all[gateway] = nil }
+        return encode(all)
+    }
+
+    /// Forgets the names given on gateways taken out of bighelp.
+    static func keep(gateways ids: Set<String>, in defaults: UserDefaults? = defaults) {
+        guard let defaults else { return }
+        var all = decode(defaults.string(forKey: key) ?? "")
+        let gone = all.keys.filter { UUID(uuidString: $0) != nil && !ids.contains($0) }
+        guard !gone.isEmpty else { return }
+        for id in gone { all[id] = nil }
+        defaults.set(encode(all), forKey: key)
+    }
+
+    private static func encode(_ all: [String: [String: String]]) -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         guard !all.isEmpty, let data = try? encoder.encode(all) else { return "" }
@@ -247,6 +261,17 @@ struct UsageWidgetIntent: WidgetConfigurationIntent {
     @Parameter(title: "Plans", description: "Leave it empty to show every plan.",
                size: [.systemSmall: 4, .systemMedium: 6, .systemLarge: 8])
     var plans: [UsageWidgetPlan]?
+
+    /// The one plan a widget could show before Plans took several. Left out of the summary, so it no longer
+    /// shows; a widget set to a plan then keeps it until Plans is set.
+    @Parameter(title: "Plan")
+    var plan: UsageWidgetPlan?
+
+    /// The plans to show, in their order; none shows every plan.
+    var planIDs: [String] {
+        let picked = (plans ?? []).map(\.id)
+        return picked.isEmpty ? plan.map { [$0.id] } ?? [] : picked
+    }
 
     // Style only draws Plans and limits.
     static var parameterSummary: some ParameterSummary {
@@ -348,7 +373,7 @@ struct UsageWidgetProvider: AppIntentTimelineProvider {
         let hostID = configuration.gateway?.hostID
         return UsageWidgetEntry(date: .now, snapshot: .shown(gateway: hostID), palette: .load(gateway: hostID),
                                 content: configuration.content, style: configuration.style,
-                                planIDs: (configuration.plans ?? []).map(\.id), hostID: hostID)
+                                planIDs: configuration.planIDs, hostID: hostID)
     }
 }
 
@@ -392,7 +417,7 @@ struct BighelpUsageWidgetView: View {
             } else {
                 VStack(alignment: .leading, spacing: family == .systemSmall ? 6 : 10) {
                     // Four gauges fill a small widget on their own.
-                    if !(family == .systemSmall && entry.content == .plans && entry.style.isGauge && snapshot.hasData) {
+                    if !(family == .systemSmall && entry.content == .plans && entry.style.isGauge && !entry.plans.isEmpty) {
                         header
                     }
                     if !snapshot.hasData {
@@ -430,6 +455,8 @@ struct BighelpUsageWidgetView: View {
             Spacer(minLength: 0)
             if entry.content != .plans, snapshot.totals != nil {
                 Text("\(snapshot.days) days").font(.caption2).foregroundStyle(colors.secondary).lineLimit(1)
+            } else if entry.content == .plans, entry.plans.count > plansDrawn {
+                Text("+\(entry.plans.count - plansDrawn) more").font(.caption2).foregroundStyle(colors.secondary).lineLimit(1)
             }
         }
     }
@@ -526,9 +553,19 @@ struct BighelpUsageWidgetView: View {
         }
     }
 
+    /// How many plans the style has room for at this size; the header counts the rest.
+    private var plansDrawn: Int {
+        switch entry.style {
+        case .bars: family == .systemSmall ? 4 : family == .systemMedium ? 6 : 8
+        case .barsWithLimits: entry.plans.count == 1 ? 1 : family == .systemLarge ? 4 : 2
+        case .rings, .dials: family == .systemLarge ? 8 : 4
+        case .stackedRings: family == .systemSmall ? 2 : family == .systemMedium ? 3 : 6
+        }
+    }
+
     /// Bars: one line for each plan, its tightest limit.
     @ViewBuilder private func planLines(_ shown: [BighelpUsageSnapshot.Plan]) -> some View {
-        let lines = Array(shown.prefix(family == .systemSmall ? 4 : family == .systemMedium ? 6 : 8))
+        let lines = Array(shown.prefix(plansDrawn))
         if family == .systemMedium, lines.count > 3 {
             let left = (lines.count + 1) / 2
             HStack(alignment: .top, spacing: 14) {
@@ -571,10 +608,10 @@ struct BighelpUsageWidgetView: View {
             planCard(shown[0], limit: family == .systemLarge ? 4 : 2, showsReset: family != .systemSmall)
         } else if family == .systemSmall {
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(shown.prefix(2)) { plan in planCard(plan, limit: 1, showsReset: false) }
+                ForEach(shown.prefix(plansDrawn)) { plan in planCard(plan, limit: 1, showsReset: false) }
             }
         } else {
-            let rows = Self.rows(Array(shown.prefix(family == .systemMedium ? 2 : 4)), columns: 2)
+            let rows = Self.rows(Array(shown.prefix(plansDrawn)), columns: 2)
             VStack(alignment: .leading, spacing: 14) {
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                     HStack(alignment: .top, spacing: 16) {
@@ -592,7 +629,8 @@ struct BighelpUsageWidgetView: View {
         stride(from: 0, to: items.count, by: columns).map { Array(items[$0..<min($0 + columns, items.count)]) }
     }
 
-    /// Rings or dials: each plan's tightest limit, the share left in the middle.
+    /// Rings or dials: each plan's tightest limit, the share left in the middle. `size` is the most a gauge
+    /// takes; on a smaller iPhone's widget they shrink to fit.
     private func gauges(_ shown: [BighelpUsageSnapshot.Plan], dials: Bool) -> some View {
         let columns = family == .systemSmall ? 2 : family == .systemMedium ? 4 : 3
         let size: CGFloat = switch family {
@@ -600,8 +638,8 @@ struct BighelpUsageWidgetView: View {
         case .systemMedium: dials ? 74 : 62
         default: dials ? 80 : 62
         }
-        let rows = Self.rows(Array(shown.prefix(family == .systemLarge ? 8 : 4)), columns: columns)
-        return VStack(spacing: family == .systemLarge ? 14 : family == .systemSmall ? 8 : 0) {
+        let rows = Self.rows(Array(shown.prefix(plansDrawn)), columns: columns)
+        return VStack(spacing: family == .systemLarge ? 14 : family == .systemSmall ? 4 : 0) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 HStack(alignment: .top, spacing: 8) {
                     ForEach(row) { plan in gaugeTile(plan, dial: dials, size: size).frame(maxWidth: .infinity) }
@@ -628,10 +666,11 @@ struct BighelpUsageWidgetView: View {
                 Text(middle)
                     .font(family == .systemSmall ? .caption.weight(.bold) : .callout.weight(.bold))
                     .monospacedDigit().foregroundStyle(tint)
-                    .lineLimit(1).minimumScaleFactor(0.5)
-                    .padding(.horizontal, line + 3)
+                    .lineLimit(1).minimumScaleFactor(0.4)
+                    .padding(.horizontal, line + 1)
             }
-            .frame(width: size, height: dial ? size / 2 + line / 2 + 1 : size)
+            .aspectRatio(dial ? size / (size / 2 + line / 2 + 1) : 1, contentMode: .fit)
+            .frame(maxWidth: size, maxHeight: dial ? size / 2 + line / 2 + 1 : size)
             Text(plan.name).font(.caption2.weight(.semibold)).lineLimit(1)
             if family != .systemSmall, let detail = gaugeDetail(plan) {
                 Text(detail).font(.caption2).foregroundStyle(colors.secondary).lineLimit(1)
@@ -650,13 +689,13 @@ struct BighelpUsageWidgetView: View {
 
     private static func spoken(_ plan: BighelpUsageSnapshot.Plan) -> String {
         let limits = plan.limits.map { "\($0.label), \(UsageWidgetFormat.percent($0.leftPercent)) left" }
-        return ([plan.name] + (limits.isEmpty ? [withoutLimits(plan)] : limits)).joined(separator: ", ")
+        return ([plan.name] + (limits.isEmpty ? [withoutLimits(plan)] : limits)).filter { !$0.isEmpty }.joined(separator: ", ")
     }
 
     /// Stacked rings: a plan's first limit outside, its second inside.
     @ViewBuilder private func stackedRings(_ shown: [BighelpUsageSnapshot.Plan]) -> some View {
         if family == .systemLarge {
-            let rows = Self.rows(Array(shown.prefix(6)), columns: 2)
+            let rows = Self.rows(Array(shown.prefix(plansDrawn)), columns: 2)
             VStack(alignment: .leading, spacing: 14) {
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                     HStack(alignment: .center, spacing: 12) {
@@ -689,7 +728,7 @@ struct BighelpUsageWidgetView: View {
                 }
             }
         } else {
-            let count = family == .systemSmall ? 2 : 3
+            let count = plansDrawn
             HStack(alignment: .top, spacing: 8) {
                 ForEach(shown.prefix(count)) { plan in
                     VStack(spacing: 3) {
@@ -723,13 +762,16 @@ struct BighelpUsageWidgetView: View {
             ring(plan.limits.first)
             if plan.limits.count > 1 { ring(plan.limits[1]).padding(line + 2.5) }
         }
-        .frame(width: size, height: size)
+        .aspectRatio(1, contentMode: .fit)
+        .frame(maxWidth: size, maxHeight: size)
     }
 
     @ViewBuilder private var plansFallback: some View {
         Text(snapshot.plansNote ?? (snapshot.plans == nil
              ? snapshot.note ?? "Your plans show here once bighelp reads them."
-             : "No plans found on your computer."))
+             : entry.planIDs.isEmpty || snapshot.plans?.isEmpty == true
+                ? "No plans found on your computer."
+                : "The plans picked for this widget aren't on this computer now."))
             .font(.caption).foregroundStyle(colors.secondary)
     }
 

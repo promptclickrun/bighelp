@@ -135,9 +135,13 @@ change in both repos.
 - **Demo mode:** `-use-demo-fixtures -disable-demo-delays` runs the app with sample data and no host. Fixture clients
   are in `Bighelp/App/AppFixtureClients.swift` and `AppFixtureSetup.swift`. New host features need a demo client too,
   so UI tests and screenshots work without a host.
-- **Simulators:**
+- **Simulators and the shared Mac:**
   - Never run two `xcodebuild test` sessions on one simulator.
-  - Give parallel builds their own `-derivedDataPath`.
+  - Give each worktree its own `-derivedDataPath`, and reuse it for every run there. A fresh one each run is a
+    cold build.
+  - Run heavy builds, tests and archives through `Scripts/with-build-lock.sh`, so only one runs on the machine
+    at a time.
+  - Use one simulator per session, and shut down the ones you booted when you stop.
   - Run long suites in the background so you can keep working.
 - **Known failures:** some tests fail on untouched `main` too, for example
   `DirectHermesVoiceMediaTests.nativePCMSilenceActuallySchedulesAndDrains` (simulator audio) and a few old UI tests.
@@ -864,6 +868,13 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
 - Never call `/api/gateway/restart` on a test host. On macOS it reaps every gateway process on the machine.
 - Ask the maintainer before running anything against their real hosts.
 
+## Many sessions at once
+
+When several agent sessions work on bighelp together, the maintainer names one the **release captain**. It is the
+only session that merges, bumps versions, writes release notes and ships. The others are factory sessions: each
+owns one issue, opens its PR and hands the link to the captain. Two sessions never build the same feature. The
+whole process is in [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md).
+
 ## Git, commits and releases
 
 - **Commits:**
@@ -874,11 +885,11 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
 - **Pull requests:**
   - Explain the visible behavior and any trust-boundary impact.
   - List what you tested, and where: demo, real host or device.
-  - The maintainer merges.
+  - The maintainer merges, or the release captain session the maintainer names. Factory sessions never merge.
 - **Versions** live in `project.yml`: `MARKETING_VERSION`, and `CURRENT_PROJECT_VERSION` in every target. Regenerate
   after bumping.
 - **Releases are batched.** Merge pull requests whenever they're ready; releasing is a separate step the
-  maintainer starts:
+  maintainer starts, or the release captain runs for them:
   - Internal TestFlight builds can go out whenever they're useful.
   - Public TestFlight builds go out only when the maintainer says so. They cover everything since the last public
     build, with one set of notes, because every build notifies every tester.

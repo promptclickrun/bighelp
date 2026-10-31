@@ -118,9 +118,10 @@ extension RegistryFleetReader {
     func usage(_ hostID: UUID, name: String, days: Int, refresh: Bool) async -> HostUsage {
         do {
             return try await withWorkspace(hostID) { workspace, owner, current, _ in
-                let rows = (try? await DirectHermesAgentProfileService(
+                // Without its agents, the read would have only the default agent's numbers.
+                let rows = try await DirectHermesAgentProfileService(
                     workspace: workspace, owner: owner, currentOwner: current
-                ).rows()) ?? []
+                ).rows()
                 return await HostUsageLoader.read(hostID: hostID.uuidString, hostName: name,
                                                   agents: rows.map { ($0.id, $0.name) }, workspace: workspace,
                                                   owner: owner, days: days, limits: true, refresh: refresh)

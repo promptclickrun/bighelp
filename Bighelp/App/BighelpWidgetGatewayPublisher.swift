@@ -21,10 +21,14 @@ enum BighelpWidgetGatewayPublisher {
         }
     }
 
-    /// Widget copies of gateways that aren't in the list anymore.
+    /// Widget copies of gateways that aren't in the list anymore, and the Usage widget's single file
+    /// from before each gateway had its own.
     static func removeCopies(keeping ids: Set<String>, in directory: URL?) {
         guard let directory,
               let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { return }
+        if names.contains(BighelpUsageSnapshot.fileName) {
+            try? FileManager.default.removeItem(at: directory.appendingPathComponent(BighelpUsageSnapshot.fileName))
+        }
         for prefix in [BighelpWidgetSnapshot.gatewayFilePrefix, BighelpUsageSnapshot.gatewayFilePrefix] {
             for name in names where name.hasPrefix(prefix) && name.hasSuffix(".json") {
                 let id = String(name.dropFirst(prefix.count).dropLast(".json".count))

@@ -54,6 +54,8 @@ enum UsageWidgetPublisher {
         for id in targets {
             guard !Task.isCancelled else { break }
             if let last = lastRead[id], ContinuousClock.now - last < interval { continue }
+            // From when the read started, so the next 15-minute tick reads again.
+            let started = ContinuousClock.now
             let host: HostUsage
             if id == inUse {
                 host = await sources.readInUse()
@@ -66,7 +68,7 @@ enum UsageWidgetPublisher {
             }
             guard !Task.isCancelled else { break }
             var snapshot = BighelpUsageSnapshot.load(gateway: id, in: directory)
-            if apply(host, to: &snapshot, hidden: currentHidden()) { lastRead[id] = .now }
+            if apply(host, to: &snapshot, hidden: currentHidden()) { lastRead[id] = started }
             if save(snapshot, gateway: id, in: directory) { wrote = true }
         }
         if wrote { WidgetCenter.shared.reloadTimelines(ofKind: BighelpUsageSnapshot.kind) }

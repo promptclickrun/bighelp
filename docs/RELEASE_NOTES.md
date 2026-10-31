@@ -3,6 +3,16 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.39
+
+### Full Duplex voice
+
+- **New name:** live voice is now **Full Duplex**. You can talk over the agent, and it keeps talking while it works.
+- **The agent talks as itself:** on a call, the agent uses its own name and character. It says "I am on it" and "I finished it". It does not talk about "your agent". This needs bighelp's plugin version 3.37.0 or later on the computer.
+- **Gemini Live:** you can now use Gemini Live for Full Duplex. The agent needs a Gemini API key on the computer (`GEMINI_API_KEY`). Free Google AI Studio keys work. Gemini Live needs bighelp's plugin version 3.37.0 or later.
+- **A provider and a voice for each agent:** open a bot's profile, tap **Default Voice**, and select **Full Duplex**. Select a **Provider** and a **Voice**. They are only for that bot. **Settings › Voice** sets them for all other agents.
+- **News during the call:** when work that you started on a Gemini call finishes, the agent tells you at once. If the agent cannot confirm the work, it does not say that the work finished.
+
 ## 2.6.38
 
 ### Credential Vault

@@ -3,6 +3,16 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.44
+
+### Fixed
+
+- **Gemini Live voice:** you hear the agent from the first reply. Before, the agent's words showed on the screen, but its voice did not play.
+
+### Nerd Mode
+
+- **Call sound report:** with Nerd Mode on, a Gemini Live call shows what the phone received and played. Tap **Copy report** to share it. In Bots mode, **Copy report** is in the voice bar's gear menu.
+
 ## 2.6.43
 
 ### Usage widgets

@@ -33,6 +33,7 @@ extension BighelpRealtimeAudioPeer: LiveVoiceAudioPeer {}
 @MainActor
 protocol LiveVoiceLocalSession: AnyObject {
     var onEvent: (@MainActor ([String: BighelpJSONValue]) -> Void)? { get set }
+    /// News for the voice model, said when nobody is speaking.
     func sendText(_ text: String)
     func answerFunction(id: String, name: String, response: [String: BighelpJSONValue])
 }
@@ -158,7 +159,8 @@ final class LiveVoiceModel {
         self.voice = voice
     }
 
-    /// No auto-start in onAppear. A Start tap is the sole microphone/auth gate.
+    /// The call screen starts it as it opens: the person's tap on the voice button is the
+    /// microphone/auth gate. Never started again by itself after it ends or fails.
     func start() {
         guard canStart else { return }
         Telemetry.featureUsed(.voiceLive)

@@ -24,6 +24,8 @@ enum GeminiLiveWire {
         case interrupted
         case turnComplete
         case functionCalls([FunctionCall])
+        /// Gemini's own speech detection: the person started (true) or stopped talking.
+        case userActivity(Bool)
         case goAway
     }
 
@@ -57,6 +59,11 @@ enum GeminiLiveWire {
             }
             if !parsed.isEmpty { messages.append(.functionCalls(parsed)) }
         }
+        switch frame["voiceActivity"]?.object?["type"]?.string {
+        case "ACTIVITY_START": messages.append(.userActivity(true))
+        case "ACTIVITY_END": messages.append(.userActivity(false))
+        default: break
+        }
         if frame["goAway"] != nil { messages.append(.goAway) }
         return messages
     }
@@ -76,10 +83,12 @@ enum GeminiLiveWire {
         encode(["realtimeInput": .object(["text": .string(text)])])
     }
 
-    static func functionResponse(id: String, name: String, response: [String: BighelpJSONValue]) -> Data {
-        encode(["toolResponse": .object(["functionResponses": .array([.object([
-            "id": .string(id), "name": .string(name), "response": .object(response),
-        ])])])])
+    /// `silent` asks Gemini not to speak about the answer: it already did, in the same turn.
+    static func functionResponse(id: String, name: String, response: [String: BighelpJSONValue],
+                                 silent: Bool = false) -> Data {
+        var answer: [String: BighelpJSONValue] = ["id": .string(id), "name": .string(name), "response": .object(response)]
+        if silent { answer["scheduling"] = .string("SILENT") }
+        return encode(["toolResponse": .object(["functionResponses": .array([.object(answer)])])])
     }
 
     private static func encode(_ frame: [String: BighelpJSONValue]) -> Data {
@@ -94,7 +103,7 @@ struct GeminiLiveTranslator {
         case event([String: BighelpJSONValue])
         case play(Data)
         case stopPlayback
-        case answer(id: String, name: String, response: [String: BighelpJSONValue])
+        case answer(id: String, name: String, response: [String: BighelpJSONValue], silent: Bool = false)
     }
 
     static let startWork = "start_work"
@@ -105,6 +114,10 @@ struct GeminiLiveTranslator {
     private var user = ""
     private var assistant = ""
     private var turnHasOutput = false
+    private(set) var isUserSpeaking = false
+
+    /// Gemini is generating a reply. Its audio may still be playing after this turns false.
+    var isReplying: Bool { turnHasOutput || !assistant.isEmpty }
 
     mutating func outputs(for message: GeminiLiveWire.Message) -> [Output] {
         switch message {
@@ -135,13 +148,19 @@ struct GeminiLiveTranslator {
             turnHasOutput = false
             return outputs
         case .functionCalls(let calls):
-            return calls.flatMap(outputs(for:))
+            // Answered after its own spoken line ("On it"), a call is answered silently; otherwise
+            // Gemini acknowledges the answer too, and the person hears "On it" twice.
+            let spoke = isReplying
+            return calls.flatMap { outputs(for: $0, spoke: spoke) }
+        case .userActivity(let speaking):
+            isUserSpeaking = speaking
+            return []
         case .goAway:
             return []
         }
     }
 
-    private func outputs(for call: GeminiLiveWire.FunctionCall) -> [Output] {
+    private func outputs(for call: GeminiLiveWire.FunctionCall, spoke: Bool) -> [Output] {
         switch call.name {
         case Self.startWork:
             let request = (call.arguments["request"]?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -150,7 +169,7 @@ struct GeminiLiveTranslator {
             }
             // Gemini waits for an answer before it speaks again, so it gets one now; the work's own
             // result arrives later as an UPDATE text.
-            return [.answer(id: call.id, name: call.name, response: ["status": .string("started")]),
+            return [.answer(id: call.id, name: call.name, response: ["status": .string("started")], silent: spoke),
                     .event(["kind": .string("delegation"), "id": .string(call.id), "text": .string(request)])]
         case Self.checkWork:
             return [.event(["kind": .string("tool"), "name": .string(call.name), "id": .string(call.id)])]

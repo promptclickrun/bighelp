@@ -26,6 +26,12 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
     private var state: BighelpRealtimeAudioPeer.ConnectionState = .idle
     private var received = (bytes: UInt64(0), frames: UInt64(0))
     private var outputLevel = (value: 0.0, at: Date.distantPast)
+    /// When the audio already scheduled finishes playing: Gemini sends it faster than it plays.
+    private var playbackEndsAt = Date.distantPast
+    /// News for the voice model, waiting for a quiet moment (`sendText`).
+    private var pendingTexts: [String] = []
+    private var awaitingReplySince: Date?
+    private var quietDelivery: Task<Void, Never>?
     private var closed = false
 
     init(sessionCoordinator: VoiceAudioSessionCoordinator = .shared) {
@@ -70,12 +76,42 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
 
     // MARK: LiveVoiceLocalSession
 
+    /// Text goes in as the person's turn, and Gemini answers it at once, cutting off whatever it is
+    /// saying. So news waits until nobody is speaking and the phone has played what it already has,
+    /// and goes one at a time: a result never talks over another one, or over the person.
     func sendText(_ text: String) {
-        send(GeminiLiveWire.text(text))
+        pendingTexts.append(text)
+        guard quietDelivery == nil else { return }
+        quietDelivery = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self, !self.closed, !self.pendingTexts.isEmpty else { break }
+                self.deliverIfQuiet()
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+            self?.quietDelivery = nil
+        }
     }
 
     func answerFunction(id: String, name: String, response: [String: BighelpJSONValue]) {
         send(GeminiLiveWire.functionResponse(id: id, name: name, response: response))
+    }
+
+    /// Nobody is speaking: Gemini isn't generating, its audio has finished playing (with a short
+    /// pause after it), the person isn't talking, and the last news already got its reply started.
+    nonisolated static func isQuiet(replying: Bool, personSpeaking: Bool, now: Date, playbackEndsAt: Date,
+                                    awaitingReplySince: Date?) -> Bool {
+        guard !replying, !personSpeaking, now >= playbackEndsAt.addingTimeInterval(0.6) else { return false }
+        guard let awaitingReplySince else { return true }
+        return now.timeIntervalSince(awaitingReplySince) > 5
+    }
+
+    private func deliverIfQuiet() {
+        if translator.isReplying { awaitingReplySince = nil }
+        guard Self.isQuiet(replying: translator.isReplying, personSpeaking: translator.isUserSpeaking, now: Date(),
+                           playbackEndsAt: playbackEndsAt, awaitingReplySince: awaitingReplySince),
+              !pendingTexts.isEmpty else { return }
+        awaitingReplySince = Date()
+        send(GeminiLiveWire.text(pendingTexts.removeFirst()))
     }
 
     // MARK: Audio controls
@@ -130,6 +166,8 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
     func close() {
         guard !closed else { return }
         closed = true
+        quietDelivery?.cancel()
+        pendingTexts.removeAll()
         receiver?.cancel()
         receiver = nil
         uplink.detach()
@@ -229,9 +267,11 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
         case .play(let pcm): play(pcm)
         case .stopPlayback:
             player.stop()
+            playbackEndsAt = Date()
             // play() on a stopped engine raises an exception Swift can't catch.
             if engine.isRunning { player.play() }
-        case let .answer(id, name, response): answerFunction(id: id, name: name, response: response)
+        case let .answer(id, name, response, silent):
+            send(GeminiLiveWire.functionResponse(id: id, name: name, response: response, silent: silent))
         }
     }
 
@@ -252,7 +292,9 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
         }
         received.bytes &+= UInt64(pcm.count)
         received.frames &+= 1
-        outputLevel = (Double(peak), Date())
+        let now = Date()
+        outputLevel = (Double(peak), now)
+        playbackEndsAt = max(now, playbackEndsAt).addingTimeInterval(Double(count) / GeminiLiveWire.outputSampleRate)
         player.scheduleBuffer(buffer)
         if !player.isPlaying { player.play() }
     }

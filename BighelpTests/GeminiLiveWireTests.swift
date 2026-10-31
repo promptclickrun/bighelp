@@ -16,7 +16,7 @@ struct GeminiLiveWireTests {
         #expect(messages == [.audio(audio), .userText("What's the weather"), .assistantText("It's clear"), .turnComplete])
         #expect(GeminiLiveWire.decode(frame(#"{"setupComplete":{}}"#)) == [.setupComplete])
         #expect(GeminiLiveWire.decode(frame(#"{"serverContent":{"interrupted":true}}"#)) == [.interrupted])
-        #expect(GeminiLiveWire.decode(frame(#"{"voiceActivity":{"type":"ACTIVITY_START"}}"#)).isEmpty)
+        #expect(GeminiLiveWire.decode(frame(#"{"usageMetadata":{"totalTokenCount":12}}"#)).isEmpty)
         #expect(GeminiLiveWire.decode(frame("not json")).isEmpty)
     }
 
@@ -80,7 +80,7 @@ struct GeminiLiveWireTests {
         #expect(translator.outputs(for: .turnComplete).isEmpty)
 
         let empty = GeminiLiveWire.FunctionCall(id: "c2", name: "start_work", arguments: [:])
-        guard case .answer(_, _, let response)? = translator.outputs(for: .functionCalls([empty])).first else {
+        guard case .answer(_, _, let response, _)? = translator.outputs(for: .functionCalls([empty])).first else {
             Issue.record("An empty request must be answered")
             return
         }
@@ -91,6 +91,51 @@ struct GeminiLiveWireTests {
         let unknown = GeminiLiveWire.FunctionCall(id: "c4", name: "delete_everything", arguments: [:])
         #expect(translator.outputs(for: .functionCalls([unknown])) == [
             .answer(id: "c4", name: "delete_everything", response: ["error": .string("Unknown function.")])])
+    }
+
+    @Test func aCallAfterItsOwnSpokenLineIsAnsweredSilently() throws {
+        // Recorded: "I'm on it." then start_work; a plain answer made Gemini say "On it." again.
+        var translator = GeminiLiveTranslator()
+        _ = translator.outputs(for: .audio(Data([0, 1])))
+        _ = translator.outputs(for: .assistantText("I'm on it."))
+        let call = GeminiLiveWire.FunctionCall(id: "c1", name: "start_work", arguments: ["request": .string("Check Monday")])
+        #expect(translator.outputs(for: .functionCalls([call])).first
+                == .answer(id: "c1", name: "start_work", response: ["status": .string("started")], silent: true))
+        #expect(try json(GeminiLiveWire.functionResponse(id: "c1", name: "start_work", response: [:], silent: true))
+                .object?["toolResponse"]?.object?["functionResponses"]?.array?.first?.object?["scheduling"] == .string("SILENT"))
+
+        // A call made before saying anything gets a plain answer, so Gemini still says it's on it.
+        var quiet = GeminiLiveTranslator()
+        #expect(quiet.outputs(for: .functionCalls([call])).first
+                == .answer(id: "c1", name: "start_work", response: ["status": .string("started")], silent: false))
+    }
+
+    @Test func geminisSpeechDetectionSaysWhenThePersonTalks() {
+        #expect(GeminiLiveWire.decode(frame(#"{"voiceActivity":{"type":"ACTIVITY_START","audioOffset":"0.160s"}}"#))
+                == [.userActivity(true)])
+        #expect(GeminiLiveWire.decode(frame(#"{"voiceActivity":{"type":"ACTIVITY_END"}}"#)) == [.userActivity(false)])
+        var translator = GeminiLiveTranslator()
+        _ = translator.outputs(for: .userActivity(true))
+        #expect(translator.isUserSpeaking)
+        _ = translator.outputs(for: .userActivity(false))
+        #expect(!translator.isUserSpeaking)
+    }
+
+    @Test func newsWaitsUntilNobodyIsSpeaking() {
+        let now = Date()
+        func quiet(replying: Bool = false, speaking: Bool = false, playsFor: TimeInterval = -1,
+                   awaiting: TimeInterval? = nil) -> Bool {
+            GeminiLiveAudioPeer.isQuiet(replying: replying, personSpeaking: speaking, now: now,
+                                        playbackEndsAt: now.addingTimeInterval(playsFor),
+                                        awaitingReplySince: awaiting.map { now.addingTimeInterval(-$0) })
+        }
+        #expect(quiet())
+        #expect(!quiet(replying: true), "Gemini is still generating its answer")
+        #expect(!quiet(playsFor: 3), "Monday's results are still playing")
+        #expect(!quiet(playsFor: -0.3), "A short pause after the voice stops")
+        #expect(!quiet(speaking: true), "The person is talking")
+        #expect(!quiet(awaiting: 1), "The last news hasn't been answered yet")
+        #expect(quiet(awaiting: 6), "An unanswered news item doesn't block the next one forever")
     }
 
     @Test func onlyGeminisOwnEndpointAndATokenAreAccepted() throws {

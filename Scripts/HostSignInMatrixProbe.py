@@ -72,6 +72,7 @@ TESTS = {
                  "testAccessToken", "testBrowserSignInThroughHermesLoginPage"],
     "sso": ["testSingleSignOnThroughIdentityProvider"],
     "tools": ["testSecureInputPopUpSavesTheValue", "testSteerSendsWhileAToolRuns",
+              "testSteerSendsAfterAPhotoWhileAToolRuns", "testSteerSendsAfterAFileWhileAToolRuns",
               "testWaitingQuestionOpensFocusedWhenReturningToTheApp"],
     "widgets": ["WidgetLinkHostUITests/testRecentChatAndNewChatWidgetLinksOpenChats"],
     "features": ["ProjectsAndBoardHostUITests/testBoardFeedbackAndProjectsOnARealHost",

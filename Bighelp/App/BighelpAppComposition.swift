@@ -327,6 +327,13 @@ struct BighelpAppComposition {
         ])
         // Demo mode never asks iOS for real data. Location answers from a made-up place.
         let demoLocation = usesFixtures ? DeviceLocationTool(provider: DemoDeviceLocationProvider()) : nil
+        // A voice call's rough place, only while Device access › Location is on (`LiveVoicePlace`).
+        if usesFixtures {
+            LiveVoicePlace.shared.provider = DemoDeviceLocationProvider()
+        } else {
+            LiveVoicePlace.shared.provider = LiveDeviceLocationProvider()
+            LiveVoicePlace.shared.lastKnown = { LiveVoicePlace.systemLastKnown() }
+        }
         let deviceToolPermissions = DeviceToolPermissions(
             status: { kind in
                 if kind == .location, let demoLocation { return await demoLocation.status() }
@@ -382,6 +389,9 @@ struct BighelpAppComposition {
             }
         )
         let permissionCenter = PermissionCenter(deviceTools: deviceToolPermissions)
+        LiveVoicePlace.shared.isAllowed = { [weak deviceToolPermissions] in
+            deviceToolPermissions?.isUsable(.location) == true
+        }
         // Music cards in chat show artwork and play only while Music is on in Device access.
         BighelpCardObjectAccess.musicEnabled = { [weak deviceToolPermissions] in
             deviceToolPermissions?.isEnabled(.music) == true

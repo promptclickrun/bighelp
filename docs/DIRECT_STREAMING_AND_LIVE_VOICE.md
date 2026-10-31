@@ -14,7 +14,12 @@ State-backed relay clients explicitly negotiate `state-backed-presentation-v1`. 
 
 ## Voice
 
-Live voice is called **Full Duplex** in the app. Each agent has one voice type (TTS or Full Duplex), provider and
+Live voice is called **Full Duplex** in the app. On plugins that list `native-voice-context-v1`, the offer
+also carries who is talking and where (`LiveVoiceCallContext`): the agent's name as the app shows it, the
+person's saved name, the phone's time zone and, only while Device access › Location is usable, a coarse place
+(`LiveVoicePlace`; city, region, country from the last known fix, never coordinates, at most 1 s of waiting).
+The plugin's brief uses them, keeps the phone's language until the person asks in words for another, and
+treats each field as untrusted text. Each agent has one voice type (TTS or Full Duplex), provider and
 voice, kept on the device for its computer (`AgentVoiceChoices`). Settings › Voice, the bot's Default Voice in Bots
 mode and the chat's voice button all read and change the same choice; with no computer connected, Settings › Voice
 edits the defaults. The voice button starts the call at once, in both voice types, and End goes back to the chat.

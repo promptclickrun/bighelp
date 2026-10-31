@@ -13,6 +13,8 @@ final class NativeLiveVoiceSession {
     typealias Operation = @MainActor (WorkspaceOperation, [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue]
     typealias CloseCleanupFactory = @MainActor (String) -> (@MainActor () async -> Void)?
     typealias Submit = @MainActor (String) async throws -> String
+    /// Who is talking and where (`LiveVoiceCallContext.fields`), for a computer that lists `native-voice-context-v1`.
+    typealias Context = @MainActor () async -> [String: BighelpJSONValue]
 
     /// What a request came back with, and whether the chat confirmed it at all.
     private struct Outcome: Sendable {
@@ -44,6 +46,7 @@ final class NativeLiveVoiceSession {
     private let isCurrent: @MainActor () -> Bool
     private let closeCleanupFactory: CloseCleanupFactory?
     private let submit: Submit
+    private let context: Context?
     private var call: Call?
     private var pollTask: Task<Void, Never>?
     private weak var model: LiveVoiceModel?
@@ -53,12 +56,14 @@ final class NativeLiveVoiceSession {
     init(owner: LiveVoiceOwner, operation: @escaping Operation,
          isCurrent: @escaping @MainActor () -> Bool,
          closeCleanupFactory: CloseCleanupFactory? = nil,
-         submit: @escaping Submit) {
+         submit: @escaping Submit,
+         context: Context? = nil) {
         self.owner = owner
         self.operation = operation
         self.isCurrent = isCurrent
         self.closeCleanupFactory = closeCleanupFactory
         self.submit = submit
+        self.context = context
     }
 
     func makeModel(
@@ -97,6 +102,10 @@ final class NativeLiveVoiceSession {
             // including an offer that returns late after retirement.
             next.closeCleanup = closeCleanupFactory?(id)
             do {
+                // The phone's context rides in the offer; the offer's own fields win.
+                var fields = fields
+                if let context { fields.merge(await context()) { own, _ in own } }
+                guard call === next else { throw LiveVoiceControlError.wrongOwner }
                 let result = try await request(local ? .nativeVoiceGeminiOffer : .nativeVoiceOffer, fields)
                 guard call === next else { throw LiveVoiceControlError.wrongOwner }
                 // Gemini's events arrive on the phone's own connection; the host has none to poll.

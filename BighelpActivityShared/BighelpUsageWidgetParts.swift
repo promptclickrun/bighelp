@@ -142,12 +142,15 @@ struct UsageWidgetLogo: View {
     var body: some View {
         Group {
             if let name = plan.logo, UIImage(named: name) != nil {
-                if ink.isFullColor {
-                    Image(name).resizable().scaledToFit()
-                } else {
-                    Image(name).renderingMode(.template).resizable().scaledToFit()
-                        .foregroundStyle(ink.brand(plan))
+                Group {
+                    if ink.isFullColor {
+                        Image(name).resizable().scaledToFit()
+                    } else {
+                        Image(name).renderingMode(.template).resizable().scaledToFit()
+                            .foregroundStyle(ink.brand(plan))
+                    }
                 }
+                .scaleEffect(plan.logoScale ?? 1)
             } else {
                 Text(String(plan.name.first ?? "•").uppercased())
                     .font(.system(size: size * 0.62, weight: .bold, design: .rounded))
@@ -229,12 +232,18 @@ struct UsageWidgetCountdown: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// A live timer only for less than a day: a day or more reads "1d 22h", like every other reset
+    /// here, where a timer would say 46:12:03.
+    static func ticks(until: Date, now: Date, reduceMotion: Bool) -> Bool {
+        !reduceMotion && until > now && until.timeIntervalSince(now) < 24 * 60 * 60
+    }
+
     var body: some View {
         Group {
-            if reduceMotion || until <= now {
-                Text(UsageWidgetFormat.countdown(to: until, from: now))
-            } else {
+            if Self.ticks(until: until, now: now, reduceMotion: reduceMotion) {
                 Text(timerInterval: now...until, countsDown: true)
+            } else {
+                Text(UsageWidgetFormat.countdown(to: until, from: now))
             }
         }
         .font(font)

@@ -136,8 +136,17 @@ enum UsageWidgetPublisher {
                               detail: $0.detail.map { clip($0, 40) })
                     },
                     facts: provider.facts.prefix(2).map { .init(label: clip($0.label, 30), value: clip($0.value, 30)) },
-                    note: note(provider), inUse: provider.activeInHermes, logo: brand.logoAssetName, tint: tint(brand))
+                    note: note(provider), inUse: provider.activeInHermes, logo: brand.logoAssetName,
+                    logoScale: logoScale(brand), tint: tint(brand), key: ProviderUsagePreferences.key(for: provider.id))
             }
+    }
+
+    /// The app's optical size for a logo (`officialArtworkGeometry`), against a usual mark that fills 80% of its
+    /// frame. The widget draws marks to the full frame, so only the ones the app enlarges need a scale.
+    static func logoScale(_ brand: AIProviderBrand) -> Double? {
+        let geometry = brand.officialArtworkGeometry
+        let scale = Double(geometry.opticalScale * (1 - 2 * geometry.insetFraction)) / 0.8
+        return abs(scale - 1) < 0.01 ? nil : scale
     }
 
     /// The widget's color for a provider's plan, as in its own brand; others take the app's accent.
@@ -162,6 +171,28 @@ enum UsageWidgetPublisher {
         case .notShared: "This provider doesn't share usage"
         case .error: "Couldn't be read"
         }
+    }
+
+    /// A plan was given a name. The widgets put the names on themselves, so they only need drawing again.
+    /// Files from before plans carried their key get one first, or the name would wait for the next read.
+    static func namesChanged(directory: URL? = BighelpUsageSnapshot.directory) {
+        let stem = String(BighelpUsageSnapshot.fileName.dropLast(".json".count))
+        if let directory, let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path) {
+            for name in names where name.hasPrefix(stem) && name.hasSuffix(".json") {
+                let url = directory.appendingPathComponent(name, isDirectory: false)
+                guard let data = try? Data(contentsOf: url), data.count <= 131_072,
+                      var snapshot = try? JSONDecoder.bighelpWidget.decode(BighelpUsageSnapshot.self, from: data),
+                      snapshot.plans?.contains(where: { $0.key == nil }) == true else { continue }
+                snapshot.plans = snapshot.plans?.map { plan in
+                    var plan = plan
+                    plan.key = plan.key ?? ProviderUsagePreferences.key(for: plan.id)
+                    return plan
+                }
+                try? JSONEncoder.bighelpWidget.encode(snapshot)
+                    .write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            }
+        }
+        WidgetCenter.shared.reloadTimelines(ofKind: BighelpUsageSnapshot.kind)
     }
 
     static func currentHidden() -> Set<String> {

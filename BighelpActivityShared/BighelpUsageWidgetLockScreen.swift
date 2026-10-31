@@ -24,7 +24,7 @@ struct UsageLockScreenView: View {
 
     /// The picked plan's tightest limit, else whichever is nearest its limit.
     private var focus: (plan: Plan, limit: Limit)? {
-        if entry.planID != nil, let plan = entry.chosen, let limit = plan.tightest(at: now) { return (plan, limit) }
+        if !entry.planIDs.isEmpty, let plan = entry.chosen, let limit = plan.tightest(at: now) { return (plan, limit) }
         return entry.closest
     }
 
@@ -56,7 +56,12 @@ struct UsageLockScreenView: View {
             return Image(systemName: "gauge.with.dots.needle.33percent")
         }
         let size = CGSize(width: 14, height: 14)
-        let small = UIGraphicsImageRenderer(size: size).image { _ in logo.draw(in: CGRect(origin: .zero, size: size)) }
+        let scale = plan.logoScale ?? 1
+        let drawn = CGSize(width: size.width * scale, height: size.height * scale)
+        let small = UIGraphicsImageRenderer(size: size).image { _ in
+            logo.draw(in: CGRect(x: (size.width - drawn.width) / 2, y: (size.height - drawn.height) / 2,
+                                 width: drawn.width, height: drawn.height))
+        }
         return Image(uiImage: small).renderingMode(.template)
     }
 
@@ -127,8 +132,7 @@ struct UsageLockScreenView: View {
 
     private var rectangularStyle: UsageLockStyle {
         guard entry.styles.lock == .automatic else { return entry.styles.lock }
-        let picked = entry.planID.map { id in entry.plans.contains { $0.id == id } } ?? false
-        return picked || entry.metered.count == 1 ? .onePlan : .everyPlan
+        return entry.picksOnePlan || entry.metered.count == 1 ? .onePlan : .everyPlan
     }
 
     @ViewBuilder private var onePlan: some View {

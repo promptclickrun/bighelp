@@ -3,16 +3,15 @@ import WidgetKit
 
 /// What a size and style come to with the plans there are.
 enum UsageWidgetLayout: Equatable {
-    case ring, twoMeters, whatsLeft, fourPlans, closest
-    case onePlan, everyPlan, nextResets, sideBySide
+    case ring, twoMeters, whatsLeft, fourPlans, fourPlanMeters, closest
+    case onePlan, everyPlan, everyPlanRings, nextResets, sideBySide
     case dashboard, deepDive, columns
     case spending
 }
 
 extension UsageWidgetEntry {
     func layout(for family: WidgetFamily) -> UsageWidgetLayout {
-        let picked = planID.map { id in plans.contains { $0.id == id } } ?? false
-        let onePlan = picked || metered.count <= 1
+        let onePlan = picksOnePlan || metered.count <= 1
         // Nothing with limits, but 30 days of cost: that's what there is to show.
         let spendingOnly = metered.isEmpty && snapshot.totals != nil
         switch family {
@@ -23,6 +22,7 @@ extension UsageWidgetEntry {
             case .twoMeters: return .twoMeters
             case .whatsLeft: return .whatsLeft
             case .fourPlans: return metered.count > 1 ? .fourPlans : .ring
+            case .fourPlanMeters: return metered.count > 1 ? .fourPlanMeters : .twoMeters
             case .closest: return .closest
             case .spending: return .spending
             }
@@ -31,6 +31,7 @@ extension UsageWidgetEntry {
             case .automatic: return spendingOnly ? .spending : onePlan ? .onePlan : .everyPlan
             case .onePlan: return .onePlan
             case .everyPlan: return .everyPlan
+            case .everyPlanRings: return metered.count > 1 ? .everyPlanRings : .onePlan
             case .nextResets: return metered.contains { nextReset($0) != nil } ? .nextResets : .everyPlan
             case .sideBySide: return metered.count > 1 ? .sideBySide : .onePlan
             case .spending: return .spending
@@ -39,6 +40,7 @@ extension UsageWidgetEntry {
             switch styles.large {
             case .automatic: return spendingOnly ? .spending : onePlan ? .deepDive : .dashboard
             case .everyPlan: return .dashboard
+            case .everyPlanRings: return metered.count > 1 ? .everyPlanRings : .deepDive
             case .onePlan: return .deepDive
             case .spending: return .spending
             }
@@ -124,6 +126,8 @@ struct BighelpUsageWidgetView: View {
                 }
             }
         case .fourPlans: UsageFourPlansView(entry: entry, ink: ink)
+        case .fourPlanMeters: UsagePlanMetersView(entry: entry, ink: ink)
+        case .everyPlanRings: UsagePlanRingsView(entry: entry, ink: ink, large: family == .systemLarge)
         case .onePlan: if let plan = entry.chosen { UsageOnePlanView(entry: entry, plan: plan, ink: ink) }
         case .everyPlan: UsageEveryPlanView(entry: entry, ink: ink)
         case .nextResets: UsageNextResetsView(entry: entry, ink: ink)
@@ -466,15 +470,29 @@ struct UsageFourPlansView: View {
         VStack(spacing: 6) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 HStack(spacing: 10) {
-                    ForEach(row) { plan in cell(plan).frame(maxWidth: .infinity) }
+                    ForEach(row) { plan in
+                        UsagePlanRingCell(entry: entry, plan: plan, ink: ink).frame(width: 50)
+                            .frame(maxWidth: .infinity)
+                    }
                     if row.count == 1 { Color.clear.frame(maxWidth: .infinity, maxHeight: 1) }
                 }
                 .frame(maxHeight: .infinity)
             }
         }
     }
+}
 
-    private func cell(_ plan: BighelpUsageSnapshot.Plan) -> some View {
+/// One plan's tightest limit as a ring with its logo (a lock once it's used up), the share under it, and on
+/// wider sizes the plan's name.
+struct UsagePlanRingCell: View {
+    let entry: UsageWidgetEntry
+    let plan: BighelpUsageSnapshot.Plan
+    let ink: UsageWidgetInk
+    var showsName = false
+    /// The most the ring takes; it shrinks to fit a smaller widget.
+    var ringSize: CGFloat = 58
+
+    var body: some View {
         let now = entry.date
         let limit = plan.tightest(at: now)
         let used = limit.map { $0.hasReset(at: now) ? 0 : $0.usedPercent } ?? 0
@@ -488,7 +506,8 @@ struct UsageFourPlansView: View {
                     UsageWidgetLogo(plan: plan, size: 21, ink: ink)
                 }
             }
-            .frame(width: 50, height: 50)
+            .aspectRatio(1, contentMode: .fit)
+            .frame(maxWidth: ringSize, maxHeight: ringSize)
             Group {
                 if full, let resetsAt = limit?.resetsAt {
                     UsageWidgetCountdown(until: resetsAt, now: now, font: .caption.weight(.bold))
@@ -502,9 +521,98 @@ struct UsageFourPlansView: View {
             }
             .lineLimit(1)
             .minimumScaleFactor(0.7)
+            if showsName {
+                Text(plan.name).font(.caption2.weight(.semibold)).foregroundStyle(ink.secondary).lineLimit(1)
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(limit?.accessibilityText(plan: plan.name, at: now) ?? plan.name)
+    }
+}
+
+/// Every plan as rings: each plan's tightest limit, nearest its limit first (or in the order picked).
+struct UsagePlanRingsView: View {
+    let entry: UsageWidgetEntry
+    let ink: UsageWidgetInk
+    let large: Bool
+
+    var body: some View {
+        let columns = large ? 3 : 4
+        let shown = Array(entry.byRisk.prefix(large ? 6 : 4))
+        let rows = stride(from: 0, to: shown.count, by: columns).map { Array(shown[$0..<min($0 + columns, shown.count)]) }
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("AI Usage").font(large ? .headline : .subheadline.weight(.bold))
+                Spacer(minLength: 4)
+                if entry.isStale {
+                    Text(UsageWidgetFormat.updated(entry.snapshot.generatedAt, now: entry.date))
+                        .font(.caption2).foregroundStyle(ink.secondary).lineLimit(1)
+                }
+            }
+            Spacer(minLength: large ? 14 : 6)
+            VStack(spacing: large ? 20 : 0) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    HStack(alignment: .top, spacing: 10) {
+                        ForEach(row) { plan in
+                            UsagePlanRingCell(entry: entry, plan: plan, ink: ink, showsName: true, ringSize: large ? 84 : 58)
+                                .frame(maxWidth: .infinity)
+                        }
+                        ForEach(row.count..<columns, id: \.self) { _ in Color.clear.frame(maxWidth: .infinity, maxHeight: 1) }
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+/// Up to four plans as meters: each plan's tightest limit, nearest its limit first (or in the order picked).
+struct UsagePlanMetersView: View {
+    let entry: UsageWidgetEntry
+    let ink: UsageWidgetInk
+
+    var body: some View {
+        let now = entry.date
+        VStack(alignment: .leading, spacing: 0) {
+            ViewThatFits(in: .vertical) {
+                rows(4, now: now)
+                rows(3, now: now)
+                rows(2, now: now)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func rows(_ count: Int, now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(entry.byRisk.prefix(count)) { plan in
+                if let limit = plan.tightest(at: now) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 4) {
+                            UsageWidgetLogo(plan: plan, size: 12, ink: ink)
+                            Text(plan.name).font(.caption.weight(.semibold)).lineLimit(1)
+                            Spacer(minLength: 2)
+                            number(limit, now: now)
+                        }
+                        UsageWidgetMeter(fraction: limit.hasReset(at: now) ? 0 : limit.usedPercent / 100,
+                                         color: ink.fill(plan, used: limit.usedPercent), track: ink.track, height: 5)
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(limit.accessibilityText(plan: plan.name, at: now))
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func number(_ limit: BighelpUsageSnapshot.Plan.Limit, now: Date) -> some View {
+        if limit.hasReset(at: now) {
+            Text("Reset").font(.caption.weight(.semibold)).foregroundStyle(ink.secondary)
+        } else if limit.isFull(at: now), let resetsAt = limit.resetsAt {
+            UsageWidgetCountdown(until: resetsAt, now: now, font: .caption.weight(.bold)).foregroundStyle(ink.alert)
+        } else {
+            Text(UsageWidgetFormat.percent(limit.usedPercent)).font(.caption.weight(.bold)).monospacedDigit()
+                .foregroundStyle(ink.number(used: limit.usedPercent)).lineLimit(1)
+        }
     }
 }
 

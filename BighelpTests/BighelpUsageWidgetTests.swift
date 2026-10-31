@@ -34,6 +34,27 @@ struct BighelpUsageWidgetTests {
         #expect(plans[0].limits[0].detail == "1,212 of 1,500 used")
         #expect(plans.map(\.logo) == ["ProviderLogoGitHubCopilot", "ProviderLogoCodex", nil])
         #expect(plans.map(\.tint) == ["8957E5", "6A7DFF", nil], "A provider with no color of its own takes the app's")
+        #expect(plans.map(\.key) == ["copilot", "codex-hermes", "hermes-acme"].map(ProviderUsagePreferences.key(for:)))
+        #expect(plans[1].key == ProviderUsagePreferences.key(for: "codex"),
+                "Names are found by the provider's own key, whatever id the host gave it")
+        #expect(plans.map { $0.logoScale.map { ($0 * 100).rounded() / 100 } } == [nil, 1.3, nil],
+                "Codex's mark draws larger, as in the app")
+    }
+
+    /// The app sizes some marks up (`officialArtworkGeometry`); the widget does the same, so every logo looks one size.
+    @Test func logosTakeTheAppsOpticalSize() throws {
+        #expect(UsageWidgetPublisher.logoScale(.anthropic) == nil)
+        #expect(try abs(#require(UsageWidgetPublisher.logoScale(.codex)) - 1.3) < 0.001)
+        #expect(try abs(#require(UsageWidgetPublisher.logoScale(.openAI)) - 2.5) < 0.001)
+    }
+
+    /// A used-up weekly limit counts down as "2d 22h", not a timer past 24 hours.
+    @Test func onlyALimitBackWithinADayCountsDownLive() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        #expect(UsageWidgetCountdown.ticks(until: now.addingTimeInterval(5 * 3600), now: now, reduceMotion: false))
+        #expect(!UsageWidgetCountdown.ticks(until: now.addingTimeInterval(70 * 3600), now: now, reduceMotion: false))
+        #expect(!UsageWidgetCountdown.ticks(until: now.addingTimeInterval(5 * 3600), now: now, reduceMotion: true))
+        #expect(!UsageWidgetCountdown.ticks(until: now.addingTimeInterval(-60), now: now, reduceMotion: false))
     }
 
     @Test func amberFrom80PercentAndRedOnceUsedUp() {
@@ -66,7 +87,7 @@ struct BighelpUsageWidgetTests {
         #expect(layouts(two) == [.closest, .everyPlan, .dashboard, .columns])
 
         var picked = two
-        picked.planID = "codex"
+        picked.planIDs = ["codex"]
         #expect(layouts(picked) == [.ring, .onePlan, .deepDive, .columns])
         #expect(picked.chosen?.id == "codex")
 
@@ -85,6 +106,100 @@ struct BighelpUsageWidgetTests {
         #expect(entry.layout(for: .systemMedium) == .onePlan)
         entry.styles.medium = .nextResets
         #expect(entry.layout(for: .systemMedium) == .everyPlan, "No reset ahead to put on the line")
+    }
+
+    @Test func severalPickedPlansShowInTheOrderPicked() {
+        let calm = plan("claude", limits: [.init(label: "Week", leftPercent: 90, resetsAt: nil)])
+        let busy = plan("codex", limits: [.init(label: "Week", leftPercent: 10, resetsAt: nil)])
+        var entry = UsageWidgetEntry(date: now, snapshot: snapshot([calm, busy, plan("gemini")]), palette: .empty)
+        #expect(entry.byRisk.map(\.id) == ["codex", "gemini", "claude"], "Unpicked: nearest its limit first")
+        entry.planIDs = ["claude", "gone", "codex"]
+        #expect(entry.plans.map(\.id) == ["claude", "codex"], "A plan the computer no longer has drops out")
+        #expect(entry.byRisk.map(\.id) == ["claude", "codex"], "Picked: the order picked")
+        #expect(entry.chosen?.id == "claude", "Styles about one plan show the first")
+        #expect(layouts(entry) == [.closest, .everyPlan, .dashboard, .columns])
+    }
+
+    @Test func everySizeHasMetersAndRingsForSeveralPlans() {
+        var entry = UsageWidgetEntry(date: now, snapshot: snapshot([plan("claude"), plan("codex")]), palette: .empty)
+        entry.styles = UsageWidgetStyles(small: .fourPlanMeters, medium: .everyPlanRings, large: .everyPlanRings)
+        #expect(layouts(entry).prefix(3) == [.fourPlanMeters, .everyPlanRings, .everyPlanRings])
+        entry.planIDs = ["codex"]
+        #expect(layouts(entry).prefix(3) == [.twoMeters, .onePlan, .deepDive], "One plan picked: its own view")
+    }
+
+    @Test func aWidgetSetToOnePlanBeforeKeepsIt() {
+        var intent = UsageWidgetIntent()
+        intent.plan = UsageWidgetPlan(id: "claude", name: "Claude")
+        #expect(intent.planIDs == ["claude"])
+        intent.plans = [UsageWidgetPlan(id: "codex", name: "Codex"), UsageWidgetPlan(id: "claude", name: "Claude")]
+        #expect(intent.planIDs == ["codex", "claude"], "Plans, once set, wins")
+    }
+
+    // MARK: Plan names
+
+    @Test func planNamesAreKeptForEachGateway() {
+        let home = UUID().uuidString, studio = UUID().uuidString
+        var names = BighelpPlanNames.setting("Personal Claude", of: "claude", gateway: home, in: "")
+        names = BighelpPlanNames.setting("Work Claude", of: "claude", gateway: studio, in: names)
+        #expect(BighelpPlanNames.name(of: "claude", gateway: home, in: names) == "Personal Claude")
+        #expect(BighelpPlanNames.name(of: "claude", gateway: studio, in: names) == "Work Claude",
+                "The same provider is another account on another computer")
+        #expect(BighelpPlanNames.name(of: "codex", gateway: home, in: names) == nil)
+
+        names = BighelpPlanNames.setting("Personal ", of: "claude", gateway: home, in: names)
+        #expect(BighelpPlanNames.typed(of: "claude", gateway: home, in: names) == "Personal ", "A field keeps what's typed")
+        #expect(BighelpPlanNames.name(of: "claude", gateway: home, in: names) == "Personal")
+        names = BighelpPlanNames.setting("   ", of: "claude", gateway: home, in: names)
+        #expect(BighelpPlanNames.name(of: "claude", gateway: home, in: names) == nil, "Blank goes back to the provider's name")
+        #expect(BighelpPlanNames.name(of: "claude", gateway: studio, in: names) == "Work Claude")
+        names = BighelpPlanNames.setting(String(repeating: "x", count: 80), of: "claude", gateway: studio, in: names)
+        #expect(BighelpPlanNames.name(of: "claude", gateway: studio, in: names)?.count == BighelpPlanNames.maximumLength)
+    }
+
+    @Test func widgetsShowTheNamesGivenOnTheirGateway() {
+        let home = UUID().uuidString, studio = UUID().uuidString
+        let names = BighelpPlanNames.setting("Personal Claude", of: "claude", gateway: home, in: "")
+        // The host can call a provider by another id; the key it's named under stays.
+        let snapshot = BighelpUsageSnapshot(plans: [Plan(id: "claude-hermes", name: "Claude", key: "claude"),
+                                                    Plan(id: "codex", name: "Codex")])
+        #expect(snapshot.named(gateway: home, names: names).plans?.map(\.name) == ["Personal Claude", "Codex"])
+        #expect(snapshot.named(gateway: studio, names: names).plans?.map(\.name) == ["Claude", "Codex"])
+    }
+
+    @Test func aRemovedGatewaysNamesAreForgotten() throws {
+        let suite = "usage-names-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let home = UUID().uuidString, gone = UUID().uuidString
+        var names = BighelpPlanNames.setting("Personal Claude", of: "claude", gateway: home, in: "")
+        names = BighelpPlanNames.setting("Old Claude", of: "claude", gateway: gone, in: names)
+        names = BighelpPlanNames.setting("Demo Claude", of: "claude", gateway: "current", in: names)
+        defaults.set(names, forKey: BighelpPlanNames.key)
+        BighelpPlanNames.keep(gateways: [home], in: defaults)
+        let kept = defaults.string(forKey: BighelpPlanNames.key) ?? ""
+        #expect(BighelpPlanNames.name(of: "claude", gateway: home, in: kept) == "Personal Claude")
+        #expect(BighelpPlanNames.name(of: "claude", gateway: gone, in: kept) == nil)
+        #expect(BighelpPlanNames.name(of: "claude", gateway: "current", in: kept) == "Demo Claude",
+                "Only gateways bighelp lists can be gone")
+    }
+
+    @Test func aRenameReachesFilesFromBeforePlansHadKeys() throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: "usage-names-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let home = UUID().uuidString
+        // The release before wrote plans without a key; the host calls this one "codex-hermes".
+        let old = #"{"days":30,"generatedAt":0,"models":[],"daily":[],"plans":[{"id":"codex-hermes","name":"Codex","limits":[],"facts":[],"inUse":false}]}"#
+        let url = try #require(BighelpUsageSnapshot.fileURL(gateway: home, in: folder))
+        try Data(old.utf8).write(to: url)
+        #expect(BighelpUsageSnapshot.load(gateway: home, in: folder).plans?.first?.key == nil, "Old files still read")
+        UsageWidgetPublisher.namesChanged(directory: folder)
+        let key = try #require(BighelpUsageSnapshot.load(gateway: home, in: folder).plans?.first?.key)
+        #expect(key == ProviderUsagePreferences.key(for: "codex-hermes"))
+        let names = BighelpPlanNames.setting("Work Codex", of: key, gateway: home, in: "")
+        #expect(BighelpUsageSnapshot.load(gateway: home, in: folder).named(gateway: home, names: names).plans?.first?.name
+                == "Work Codex")
     }
 
     @Test func withoutAPickTheOneHermesUsesIsShown() {

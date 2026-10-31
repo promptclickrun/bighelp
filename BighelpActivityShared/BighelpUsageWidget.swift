@@ -33,7 +33,8 @@ struct BighelpUsageSnapshot: Codable, Equatable, Sendable {
         }
 
         let id: String
-        let name: String
+        /// The provider's name, or the one the person gave the plan (`named`).
+        var name: String
         var plan: String?
         var limits: [Limit] = []
         var facts: [Fact] = []
@@ -42,8 +43,13 @@ struct BighelpUsageSnapshot: Codable, Equatable, Sendable {
         var inUse = false
         /// A provider logo bundled with the app and the widgets ("ProviderLogoClaude"); none draws an initial.
         var logo: String? = nil
+        /// How much larger than its canvas the logo draws, so every mark looks one size, as in the app.
+        var logoScale: Double? = nil
         /// The provider's own color, "RRGGBB"; none takes the app's accent.
         var tint: String? = nil
+        /// What its name is saved under (`BighelpPlanNames`): one key for a provider, whatever id the host
+        /// gave it this time. Older snapshots have none.
+        var key: String? = nil
 
         var tightest: Limit? { limits.min { $0.leftPercent < $1.leftPercent } }
 
@@ -131,9 +137,21 @@ struct BighelpUsageSnapshot: Codable, Equatable, Sendable {
             .write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
 
-    /// What a widget set to `gateway` shows; nil follows the gateway in use.
+    /// What a widget set to `gateway` shows, with the names given to its plans; nil follows the gateway in use.
     static func shown(gateway: String?) -> BighelpUsageSnapshot {
-        load(gateway: gateway ?? BighelpWidgetGatewayList.inUseID())
+        let id = gateway ?? BighelpWidgetGatewayList.inUseID()
+        return load(gateway: id).named(gateway: id, names: BighelpPlanNames.saved)
+    }
+
+    /// The plans under the names given to them on this gateway.
+    func named(gateway: String?, names: String) -> BighelpUsageSnapshot {
+        var copy = self
+        copy.plans = plans?.map { plan in
+            var plan = plan
+            if let name = BighelpPlanNames.name(of: plan.key ?? plan.id, gateway: gateway, in: names) { plan.name = name }
+            return plan
+        }
+        return copy
     }
 
     var hasData: Bool { totals != nil || plans != nil }
@@ -141,11 +159,67 @@ struct BighelpUsageSnapshot: Codable, Equatable, Sendable {
     static let url = URL(string: "loopdy://usage")!
 }
 
+/// Names people give their plans in Usage, for each gateway: the same provider can be another account on
+/// another computer. Kept in the app group, so the widgets show a name as soon as it's saved.
+enum BighelpPlanNames {
+    static let key = "bighelp.plan-names.v1"
+    static let maximumLength = 40
+
+    /// One shared instance: a screen watching it redraws only for writes made through the same one.
+    /// UserDefaults is thread-safe.
+    nonisolated(unsafe) static let defaults = UserDefaults(suiteName: BighelpWidgetSnapshot.appGroup)
+    static var saved: String { defaults?.string(forKey: key) ?? "" }
+
+    /// A plan's name on a gateway, from the saved names; nil keeps the provider's.
+    static func name(of plan: String, gateway: String?, in names: String) -> String? {
+        let name = decode(names)[gateway ?? ""]?[plan]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name?.isEmpty == false ? name : nil
+    }
+
+    /// A plan's name as typed, for a field bound to it: it can end in a space while someone types.
+    static func typed(of plan: String, gateway: String?, in names: String) -> String {
+        decode(names)[gateway ?? ""]?[plan] ?? ""
+    }
+
+    /// The saved names with one plan's set; a blank name goes back to the provider's. Kept as typed, so a
+    /// field bound to it can end in a space.
+    static func setting(_ name: String, of plan: String, gateway: String?, in names: String) -> String {
+        var all = decode(names)
+        let gateway = gateway ?? ""
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        all[gateway, default: [:]][plan] = trimmed.isEmpty ? nil : String(name.prefix(maximumLength))
+        if all[gateway]?.isEmpty == true { all[gateway] = nil }
+        return encode(all)
+    }
+
+    /// Forgets the names given on gateways taken out of bighelp.
+    static func keep(gateways ids: Set<String>, in defaults: UserDefaults? = defaults) {
+        guard let defaults else { return }
+        var all = decode(defaults.string(forKey: key) ?? "")
+        let gone = all.keys.filter { UUID(uuidString: $0) != nil && !ids.contains($0) }
+        guard !gone.isEmpty else { return }
+        for id in gone { all[id] = nil }
+        defaults.set(encode(all), forKey: key)
+    }
+
+    private static func decode(_ names: String) -> [String: [String: String]] {
+        guard !names.isEmpty, names.utf8.count <= 65_536 else { return [:] }
+        return (try? JSONDecoder().decode([String: [String: String]].self, from: Data(names.utf8))) ?? [:]
+    }
+
+    private static func encode(_ all: [String: [String: String]]) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        guard !all.isEmpty, let data = try? encoder.encode(all) else { return "" }
+        return String(decoding: data, as: UTF8.self)
+    }
+}
+
 // MARK: - Configuration
 
 /// Each size has its own styles; the configuration shows only the size's own list.
 enum UsageSmallStyle: String, AppEnum {
-    case automatic, ring, twoMeters, whatsLeft, fourPlans, closest, spending
+    case automatic, ring, twoMeters, whatsLeft, fourPlans, fourPlanMeters, closest, spending
 
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Style")
     static let caseDisplayRepresentations: [UsageSmallStyle: DisplayRepresentation] = [
@@ -153,20 +227,22 @@ enum UsageSmallStyle: String, AppEnum {
         .ring: DisplayRepresentation(title: "Ring", subtitle: "One plan's tightest limit"),
         .twoMeters: DisplayRepresentation(title: "Two meters", subtitle: "One plan's first two limits"),
         .whatsLeft: DisplayRepresentation(title: "What's left", subtitle: "How much of one plan is left"),
-        .fourPlans: DisplayRepresentation(title: "Four plans", subtitle: "Each plan's tightest limit"),
+        .fourPlans: DisplayRepresentation(title: "Four plans as rings", subtitle: "Each plan's tightest limit"),
+        .fourPlanMeters: DisplayRepresentation(title: "Four plans as meters", subtitle: "Each plan's tightest limit"),
         .closest: DisplayRepresentation(title: "Closest to limit", subtitle: "The plan nearest its limit"),
         .spending: DisplayRepresentation(title: "Cost and tokens", subtitle: "The last 30 days"),
     ]
 }
 
 enum UsageMediumStyle: String, AppEnum {
-    case automatic, onePlan, everyPlan, nextResets, sideBySide, spending
+    case automatic, onePlan, everyPlan, everyPlanRings, nextResets, sideBySide, spending
 
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Style")
     static let caseDisplayRepresentations: [UsageMediumStyle: DisplayRepresentation] = [
         .automatic: DisplayRepresentation(title: "Automatic", subtitle: "One plan, or every plan"),
         .onePlan: DisplayRepresentation(title: "One plan", subtitle: "Every limit with its reset"),
-        .everyPlan: DisplayRepresentation(title: "Every plan", subtitle: "Each plan's tightest limit, nearest first"),
+        .everyPlan: DisplayRepresentation(title: "Every plan as meters", subtitle: "Each plan's tightest limit, nearest first"),
+        .everyPlanRings: DisplayRepresentation(title: "Every plan as rings", subtitle: "Each plan's tightest limit, nearest first"),
         .nextResets: DisplayRepresentation(title: "Next resets", subtitle: "When each plan's limit frees up"),
         .sideBySide: DisplayRepresentation(title: "Side by side", subtitle: "Two plans and their limits"),
         .spending: DisplayRepresentation(title: "Cost and tokens", subtitle: "The last 30 days"),
@@ -174,12 +250,13 @@ enum UsageMediumStyle: String, AppEnum {
 }
 
 enum UsageLargeStyle: String, AppEnum {
-    case automatic, everyPlan, onePlan, spending
+    case automatic, everyPlan, everyPlanRings, onePlan, spending
 
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Style")
     static let caseDisplayRepresentations: [UsageLargeStyle: DisplayRepresentation] = [
         .automatic: DisplayRepresentation(title: "Automatic", subtitle: "Every plan, or one plan in detail"),
-        .everyPlan: DisplayRepresentation(title: "Every plan", subtitle: "Every limit of every plan"),
+        .everyPlan: DisplayRepresentation(title: "Every plan as meters", subtitle: "Every limit of every plan"),
+        .everyPlanRings: DisplayRepresentation(title: "Every plan as rings", subtitle: "Each plan's tightest limit"),
         .onePlan: DisplayRepresentation(title: "One plan", subtitle: "Its limits as rings"),
         .spending: DisplayRepresentation(title: "Cost and tokens", subtitle: "The last 30 days and top models"),
     ]
@@ -224,7 +301,7 @@ struct UsageWidgetPlanQuery: EntityQuery {
 struct UsageWidgetIntent: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "Usage"
     static let description = IntentDescription(
-        "Choose a gateway, a style, and the plan for styles that show one.")
+        "Choose a gateway, a style, and the plans to show.")
 
     @Parameter(title: "Gateway")
     var gateway: BighelpWidgetGateway?
@@ -241,8 +318,20 @@ struct UsageWidgetIntent: WidgetConfigurationIntent {
     @Parameter(title: "Style", default: .automatic)
     var lockStyle: UsageLockStyle
 
-    @Parameter(title: "Plan", description: "For styles that show one plan. Leave empty for the plan your agent uses.")
+    @Parameter(title: "Plans", description: "Leave it empty to show every plan. Styles about one plan show the first.",
+               size: [.systemSmall: 4, .systemMedium: 4, .systemLarge: 6, .systemExtraLarge: 6])
+    var plans: [UsageWidgetPlan]?
+
+    /// The one plan a widget could show before Plans took several. Left out of the summary, so it no longer
+    /// shows; a widget set to a plan then keeps it until Plans is set.
+    @Parameter(title: "Plan")
     var plan: UsageWidgetPlan?
+
+    /// The plans to show, in their order; none shows every plan.
+    var planIDs: [String] {
+        let picked = (plans ?? []).map(\.id)
+        return picked.isEmpty ? plan.map { [$0.id] } ?? [] : picked
+    }
 
     static var parameterSummary: some ParameterSummary {
         Switch(.widgetFamily) {
@@ -250,34 +339,34 @@ struct UsageWidgetIntent: WidgetConfigurationIntent {
                 Summary {
                     \.$gateway
                     \.$smallStyle
-                    \.$plan
+                    \.$plans
                 }
             }
             Case(.systemMedium) {
                 Summary {
                     \.$gateway
                     \.$mediumStyle
-                    \.$plan
+                    \.$plans
                 }
             }
             Case(.systemLarge) {
                 Summary {
                     \.$gateway
                     \.$largeStyle
-                    \.$plan
+                    \.$plans
                 }
             }
             Case(.accessoryRectangular) {
                 Summary {
                     \.$gateway
                     \.$lockStyle
-                    \.$plan
+                    \.$plans
                 }
             }
             DefaultCase {
                 Summary {
                     \.$gateway
-                    \.$plan
+                    \.$plans
                 }
             }
         }
@@ -298,27 +387,37 @@ struct UsageWidgetEntry: TimelineEntry {
     let snapshot: BighelpUsageSnapshot
     let palette: BighelpWidgetSnapshot
     var styles = UsageWidgetStyles()
-    var planID: String?
+    /// The plans picked, in their order; none shows every plan.
+    var planIDs: [String] = []
     /// The chosen gateway; nil follows the one in use. A tap opens Usage there.
     var hostID: String? = nil
 
     typealias Plan = BighelpUsageSnapshot.Plan
     typealias Limit = BighelpUsageSnapshot.Plan.Limit
 
-    var plans: [Plan] { snapshot.plans ?? [] }
+    /// The picked plans in their order (one the computer no longer has drops out), else every plan.
+    var plans: [Plan] {
+        let all = snapshot.plans ?? []
+        guard !planIDs.isEmpty else { return all }
+        return planIDs.compactMap { id in all.first { $0.id == id } }
+    }
+
+    /// Exactly one plan picked, and the computer has it: styles about one plan show it.
+    var picksOnePlan: Bool { planIDs.count == 1 && !plans.isEmpty }
 
     /// The plans with limits to draw, in the app's order (the one Hermes uses first).
     var metered: [Plan] { plans.filter { !$0.limits.isEmpty } }
 
-    /// The picked plan, else the one Hermes uses, else the first with limits.
+    /// The first plan picked, else the one Hermes uses, else the first with limits.
     var chosen: Plan? {
-        if let planID, let picked = plans.first(where: { $0.id == planID }) { return picked }
+        if !planIDs.isEmpty, let picked = plans.first { return picked }
         return metered.first(where: \.inUse) ?? metered.first ?? plans.first
     }
 
-    /// Plans with limits, the one nearest its limit first.
+    /// Plans with limits, the one nearest its limit first; picked plans keep the order they were picked in.
     var byRisk: [Plan] {
-        metered.enumerated().sorted { lhs, rhs in
+        guard planIDs.isEmpty else { return metered }
+        return metered.enumerated().sorted { lhs, rhs in
             let left = risk(lhs.element), right = risk(rhs.element)
             return left == right ? lhs.offset < rhs.offset : left > right
         }.map(\.element)
@@ -414,7 +513,7 @@ struct UsageWidgetProvider: AppIntentTimelineProvider {
         UsageWidgetEntry(date: date, snapshot: snapshot, palette: palette,
                          styles: UsageWidgetStyles(small: configuration.smallStyle, medium: configuration.mediumStyle,
                                                    large: configuration.largeStyle, lock: configuration.lockStyle),
-                         planID: configuration.plan?.id, hostID: configuration.gateway?.hostID)
+                         planIDs: configuration.planIDs, hostID: configuration.gateway?.hostID)
     }
 }
 

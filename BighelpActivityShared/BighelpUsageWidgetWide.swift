@@ -239,7 +239,9 @@ struct UsageNextResetsView: View {
         let span = max(end.timeIntervalSince(entry.date), 60)
         func x(_ date: Date) -> CGFloat { inset + width * CGFloat(min(1, max(0, date.timeIntervalSince(entry.date) / span))) }
         let midY = size.height / 2
-        let ticks = stride(from: step, to: span, by: step).map { entry.date.addingTimeInterval($0) }
+        // A reset months away would draw hundreds of ticks; at most two dozen.
+        let tickStep = max(step, span / 24)
+        let ticks = stride(from: tickStep, to: span, by: tickStep).map { entry.date.addingTimeInterval($0) }
         // Two labels a side must fit across.
         let labelWidth = min(self.labelWidth, size.width / 2 - 4)
         let positions = labelPositions(marks.map { x($0.date) }, width: size.width, labelWidth: labelWidth)
@@ -558,7 +560,7 @@ struct UsageColumnsView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("AI Usage").font(.title3.weight(.bold))
                 Spacer(minLength: 8)
-                Text("\(entry.metered.count) \(entry.metered.count == 1 ? "plan" : "plans") · "
+                Text("\(shown.count) \(shown.count == 1 ? "plan" : "plans") · "
                      + UsageWidgetFormat.updated(entry.snapshot.generatedAt, now: entry.date))
                     .font(.subheadline).foregroundStyle(ink.secondary).lineLimit(1)
             }

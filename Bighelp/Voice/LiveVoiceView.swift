@@ -118,6 +118,9 @@ struct LiveVoiceView: View {
                 statusPill
             }
         }
+        // Tapping the voice button is the start: the call begins as the screen opens. Only the first
+        // time: after a failure the screen offers Try again instead of retrying by itself.
+        .task { if model.phase == .idle { model.start() } }
         .onDisappear { model.end() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { model.end() }
@@ -192,7 +195,11 @@ struct LiveVoiceView: View {
                 ) { model.setMuted(!model.isMuted) }
                     .disabled(!model.canControlAudio)
 
-                Button(role: .destructive) { model.end() } label: {
+                // Ending goes straight back to the chat.
+                Button(role: .destructive) {
+                    model.end()
+                    onEnded()
+                } label: {
                     HStack(spacing: BighelpTokens.space8) {
                         Image(systemName: "phone.down.fill")
                             .font(.system(size: 17, weight: .semibold))

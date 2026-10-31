@@ -405,10 +405,23 @@ struct ChatDestinationView: View {
         }
     }
 
+    /// A file the person sent opens in their bot's Files tab. The plugin's staging folder isn't
+    /// one Files shows, so a file still there (an agent without a folder here) doesn't open.
+    private var openSentFile: (@MainActor (ChatSentFile) -> Void)? {
+        guard !model.isBotMode else { return nil }
+        let agentID = model.agentID
+        let appState = appState
+        return { file in
+            guard !file.path.contains("/plugin-data/loopdy/uploads/") else { return }
+            appState.open(.simpleBotProfile(agentID: agentID, opening: BotProfileOpening(file: file.path)))
+        }
+    }
+
     private var chatCanvas: some View {
         referenceChatCanvas
         // Inside the chat's own link action, so file links open the viewer and the rest reach it.
         .hostFileLinks(hostFiles)
+        .environment(\.chatOpenSentFile, openSentFile)
         .environment(\.openURL, chatOpenURLAction)
         .background(ResponseHapticsSurface(controller: responseHaptics))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

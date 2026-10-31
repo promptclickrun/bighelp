@@ -6,6 +6,8 @@ import Foundation
 enum ChatDraftAttachment: Identifiable, Equatable, Sendable {
     case attachment(ChatAttachment)
     case pdfPages(DirectHermesPDFPageSelection)
+    /// A file over 8 MB, kept on disk and sent in pieces (`BigFileUploader`).
+    case bigFile(ChatBigFile)
 
     var id: String {
         switch self {
@@ -13,6 +15,8 @@ enum ChatDraftAttachment: Identifiable, Equatable, Sendable {
             "attachment:\(attachment.id)"
         case .pdfPages(let selection):
             "pdf-pages:\(selection.attachment.id)"
+        case .bigFile(let file):
+            "big-file:\(file.id)"
         }
     }
 
@@ -20,6 +24,7 @@ enum ChatDraftAttachment: Identifiable, Equatable, Sendable {
         switch self {
         case .attachment(let attachment): attachment.id
         case .pdfPages(let selection): selection.attachment.id
+        case .bigFile(let file): file.id
         }
     }
 
@@ -27,7 +32,14 @@ enum ChatDraftAttachment: Identifiable, Equatable, Sendable {
         switch self {
         case .attachment(let attachment): attachment.data.count
         case .pdfPages(let selection): selection.attachment.data.count
+        // Sent on its own path; it doesn't count toward the 24 MB a message's other files may hold.
+        case .bigFile: 0
         }
+    }
+
+    var bigFile: ChatBigFile? {
+        guard case .bigFile(let file) = self else { return nil }
+        return file
     }
 
     var ordinaryAttachment: ChatAttachment? {
@@ -47,6 +59,8 @@ enum ChatDraftAttachment: Identifiable, Equatable, Sendable {
 struct DirectHermesDraftAttachmentSendReceipt: Equatable, Sendable {
     let response: ConversationResponse
     let pdfAttachments: [DirectHermesPDFAttachmentReceipt]
+    /// What Hermes took: the message with each file's `@file:` reference, as its history keeps it.
+    var submittedText: String = ""
 }
 
 /// Immutable item used to present a picker for the exact mounted chat owner.

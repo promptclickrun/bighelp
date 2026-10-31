@@ -145,6 +145,10 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
     @ObservationIgnored var promptAnswerDrafts: [String: DirectHermesPromptAnswerDraft] = [:]
     @ObservationIgnored let drafts: DirectHermesDraftStore
     @ObservationIgnored let attachmentResolver: (any AgentAttachmentResolving)?
+    /// Where files over 8 MB go (plugin `native-uploads-v1`); nil keeps the 8 MB limit.
+    @ObservationIgnored var bigFileHost: (any BigFileUploadHost)?
+    /// Once, when Hermes takes the prompt now being submitted (`streaming` or `queued`).
+    @ObservationIgnored var onSubmissionAdmitted: (@MainActor () -> Void)?
     /// Says who is sending before each new turn (hosts several people share).
     @ObservationIgnored var speakerNote: (any ChatSpeakerNoting)?
     /// A note from this connection has reached the host, so the plugin knows who's on this device.

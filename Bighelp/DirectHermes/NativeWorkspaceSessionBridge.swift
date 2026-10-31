@@ -56,6 +56,8 @@ final class NativeWorkspaceSessionBridge: SessionCatalogClient {
 
     let authority: WorkspaceAuthority
     var attachmentResolver: (any AgentAttachmentResolving)?
+    /// Where this computer takes files over 8 MB (plugin `native-uploads-v1`).
+    var bigFileHost: (any BigFileUploadHost)?
     var speakerNote: (any ChatSpeakerNoting)?
     var agentTalk: (any AgentTalkReading)?
     var selectedFolderPath: (@MainActor (String) async throws -> String?)?

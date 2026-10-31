@@ -42,6 +42,12 @@ extension DirectHermesConversationClient {
                                 commandSelection: selection)
     }
 
+    func takeSubmissionAdmitted() {
+        let admitted = onSubmissionAdmitted
+        onSubmissionAdmitted = nil
+        admitted?()
+    }
+
     func submit(message: String, conversationID: String,
                         onDraft: @escaping (TimelineItem) -> Void,
                         preparedSubmission: DirectHermesDraftStore.Submission? = nil,
@@ -161,6 +167,7 @@ extension DirectHermesConversationClient {
                             self.status = "Accepted by Hermes"
                             self.promptSentAt = nil
                             self.admitted = true
+                            self.takeSubmissionAdmitted()
                             if self.returnsVoiceReply {
                                 self.queuedVoiceAwaitingTurn = self.submissionTurns.isEmpty
                                 self.selectPendingTurn()
@@ -176,6 +183,7 @@ extension DirectHermesConversationClient {
                             self.admissionOverlapped = self.submissionTurns.count > 1
                             self.selectPendingTurn()
                             self.admitted = true
+                            self.takeSubmissionAdmitted()
                             self.status = "Working"
                             self.completeSubmissionIfReady()
                         } else {

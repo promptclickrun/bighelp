@@ -154,7 +154,12 @@ struct TimelineItemView: View {
         VStack(alignment: item.role == .human ? .trailing : .leading,
                spacing: uiV3Enabled ? BighelpTokens.space12 : BighelpTokens.space8) {
             let pendingFiles = pendingFileState
+            let sentFiles = sentFileState
             if !uiV3Enabled { senderBadge }
+            // One look for each big file: its tile while it goes up, then its line below.
+            ForEach(item.metadata.bigFiles) { file in
+                BigFileUploadTile(file: file)
+            }
             if !item.attachments.isEmpty {
                 if case .message(let text) = item.content, text.isEmpty {
                     attachmentGallery.alignmentGuide(.messageContentBottom) { $0[.bottom] }
@@ -172,12 +177,14 @@ struct TimelineItemView: View {
             switch item.content {
             case .message(let text):
                 if (!text.isEmpty || item.attachments.isEmpty)
-                    && (pendingFiles.fileNames.isEmpty || !pendingFiles.text.isEmpty) {
+                    && (pendingFiles.fileNames.isEmpty || !pendingFiles.text.isEmpty)
+                    && (sentFiles.files.isEmpty || !sentFiles.text.isEmpty) {
                     MessageBubble(
                         messageID: item.id,
                         role: item.role,
                         speakerName: sender.name,
-                        text: pendingFiles.fileNames.isEmpty
+                        text: !sentFiles.files.isEmpty ? sentFiles.text
+                            : pendingFiles.fileNames.isEmpty
                             ? DirectHermesGeneratedMediaClient.unresolvedMessageText(text, role: item.role)
                             : pendingFiles.text,
                         delivery: item.metadata.delivery,
@@ -211,6 +218,13 @@ struct TimelineItemView: View {
                     .alignmentGuide(.messageContentBottom) { $0[.bottom] }
             }
 
+            if !sentFiles.files.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(sentFiles.files) { ChatSentFileLine(file: $0) }
+                }
+                .frame(maxWidth: 360, alignment: .leading)
+            }
+
             if let reference = item.metadata.contentReference {
                 Text("Preview — complete content is stored on Hermes.")
                     .font(.bighelp(.caption))
@@ -229,6 +243,13 @@ struct TimelineItemView: View {
                 TimelineMetadataView(metadata: item.metadata)
             }
         }
+    }
+
+    /// The person's files a message names on `@file:` lines show as lines on the rail, never as text.
+    /// A file read back from the computer shows as an attachment instead, as before.
+    private var sentFileState: (text: String, files: [ChatSentFile]) {
+        guard item.role == .human, item.attachments.isEmpty, case .message(let text) = item.content else { return ("", []) }
+        return ChatSentFiles.split(text)
     }
 
     /// An agent's files still loading show as tiles, not as their file lines.

@@ -182,15 +182,6 @@ struct BigFileUploadTests {
         #expect(waits.value == 2)
     }
 
-    @Test func aVideosNoteGivesItsLengthAndTheChatHidesIt() {
-        let file = ChatBigFile(id: String(repeating: "a", count: 32), fileName: "Trip.mov", mimeType: "video/quicktime",
-                               byteCount: 80_000_000, sha256: String(repeating: "0", count: 64),
-                               video: .init(seconds: 72.4, width: 1920, height: 1080))
-        #expect(file.agentNote == "[Video attached: Trip.mov, 1 min 12 s, 1920×1080]")
-        let sent = "Cut the best 10 seconds\n@file:/x/attachments/Trip.mov\n" + (file.agentNote ?? "")
-        #expect(HermesUserMessageDisplay.text(sent) == "Cut the best 10 seconds\n@file:/x/attachments/Trip.mov")
-    }
-
     @Test func preparingCopiesAndChecksumsWithoutLoadingTheWholeFile() async throws {
         let file = try await Self.file(bytes: 3_000_000)
         defer { BigFileStore.remove(file) }

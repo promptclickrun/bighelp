@@ -993,6 +993,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             values.openWiki = source.openWiki
             values.openGitHub = source.openGitHub
             values.opensHostFiles = source.opensHostFiles
+            values.chatOpenSentFile = source.chatOpenSentFile
             values.bighelpCardDataClient = source.bighelpCardDataClient
             values.bighelpSessionContentReader = source.bighelpSessionContentReader
             values.providerLogoStore = source.providerLogoStore

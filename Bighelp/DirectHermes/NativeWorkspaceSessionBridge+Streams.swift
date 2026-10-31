@@ -287,6 +287,7 @@ extension NativeWorkspaceSessionBridge {
         }
         adapter.speakerNote = speakerNote
         adapter.agentTalk = agentTalk
+        adapter.bigFileHost = bigFileHost
         let profileID = resolved.coordinate.profileID
         adapter.supportsCapability = { [weak self] capability in
             guard let self, !self.retired else { return false }

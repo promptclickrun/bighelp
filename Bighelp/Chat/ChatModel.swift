@@ -487,6 +487,7 @@ final class ChatModel {
         let attachmentsSupported = orderedDraftAttachments.isEmpty || (!isBotMode && orderedDraftAttachments.allSatisfy { value in
             if let selection = value.pdfSelection { return pdfAttachmentTarget == selection.target }
             if case .attachment(let attachment) = value { return supportedAttachmentKinds.contains(attachment.kind) }
+            if value.bigFile != nil { return nativeConversationClient?.bigFileHost != nil }
             return false
         })
         let hasSendableAttachments = !orderedDraftAttachments.isEmpty && attachmentsSupported

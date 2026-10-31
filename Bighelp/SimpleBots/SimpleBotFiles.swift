@@ -164,6 +164,20 @@ final class SimpleBotFilesModel {
         await load(path: directory?.path)
     }
 
+    /// Shows the folder that holds `path`, then opens that file there (a preview, or a video's
+    /// player), as a tap on its row would. A file that isn't there any more says so under the list.
+    func reveal(path: String) async {
+        let separator: Character = path.hasPrefix("/") ? "/" : "\\"
+        guard let cut = path.lastIndex(of: separator), cut > path.startIndex else { return }
+        await load(path: String(path[..<cut]))
+        guard phase == .loaded else { return }
+        if let file = entries.first(where: { $0.path == path }) {
+            await open(file)
+        } else {
+            notice = String(localized: "\(String(path[path.index(after: cut)...])) isn't in this folder any more.")
+        }
+    }
+
     func goUp() async {
         guard let parent = directory?.parent else { return }
         await load(path: parent)

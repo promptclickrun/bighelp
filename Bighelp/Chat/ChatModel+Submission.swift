@@ -138,6 +138,11 @@ extension ChatModel {
         let orderedAttachments = outgoing.orderedAttachments
         let restoresDraft = outgoing.isComposerDraft
         guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !orderedAttachments.isEmpty else { return }
+        if orderedAttachments.contains(where: { $0.bigFile != nil }) {
+            await sendBigFileDraft(message: message, ordinaryAttachments: attachments,
+                                   orderedAttachments: orderedAttachments)
+            return
+        }
         if orderedAttachments.contains(where: { $0.pdfSelection != nil }) {
             await sendPDFDraft(
                 message: message,
@@ -431,6 +436,11 @@ extension ChatModel {
         let orderedAttachments = outgoing.orderedAttachments
         let restoresDraft = outgoing.isComposerDraft
         guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !orderedAttachments.isEmpty else { return }
+        if orderedAttachments.contains(where: { $0.bigFile != nil }) {
+            await sendBigFileDraft(message: message, ordinaryAttachments: attachments,
+                                   orderedAttachments: orderedAttachments)
+            return
+        }
         if orderedAttachments.contains(where: { $0.pdfSelection != nil }) {
             await sendPDFDraft(
                 message: message,

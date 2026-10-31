@@ -23,17 +23,36 @@ struct ChatBigFile: Identifiable, Codable, Equatable, Sendable {
 
     var localURL: URL { BigFileStore.folder(id).appending(path: fileName) }
 
-    /// A line for the agent beside Hermes' own note on the file (its type, size and
-    /// where it is): what the phone knows that the agent would otherwise have to work out.
-    /// The chat doesn't show it (`HermesUserMessageDisplay`).
-    var agentNote: String? {
-        guard let video, video.seconds.isFinite, video.seconds > 0 else { return nil }
+    /// "80 MB · 1:12" for a video, "120 MB" for anything else.
+    var sizeAndLength: String {
+        let size = ByteCountFormatter.string(fromByteCount: Int64(byteCount), countStyle: .file)
+        guard let length = video.flatMap({ ChatBigFile.clock($0.seconds) }) else { return size }
+        return size + " · " + length
+    }
+
+    /// "1:12", "1:02:05"; nil without a real length.
+    static func clock(_ seconds: Double) -> String? {
+        guard seconds.isFinite, seconds > 0 else { return nil }
+        let total = Int(seconds.rounded())
+        return total >= 3_600
+            ? String(format: "%d:%02d:%02d", total / 3_600, total % 3_600 / 60, total % 60)
+            : String(format: "%d:%02d", total / 60, total % 60)
+    }
+
+    /// A line beside Hermes' own note on the file (its type, size and where it is): for the agent,
+    /// a video's length and picture size, which it would otherwise work out; for the chat, the size
+    /// and length its line shows, which the saved history keeps (`ChatSentFileNote`).
+    var agentNote: String {
+        let size = ByteCountFormatter.string(fromByteCount: Int64(byteCount), countStyle: .file)
+        guard let video, video.seconds.isFinite, video.seconds > 0 else {
+            return "[File attached: \(fileName) (\(size))]"
+        }
         let total = Int(video.seconds.rounded())
         let length = total >= 3_600
             ? "\(total / 3_600) h \(total % 3_600 / 60) min"
             : total >= 60 ? "\(total / 60) min \(total % 60) s" : "\(total) s"
-        let size = video.width > 0 && video.height > 0 ? ", \(video.width)×\(video.height)" : ""
-        return "[Video attached: \(fileName), \(length)\(size)]"
+        let picture = video.width > 0 && video.height > 0 ? ", \(video.width)×\(video.height)" : ""
+        return "[Video attached: \(fileName) (\(size), \(length)\(picture))]"
     }
 }
 
@@ -109,6 +128,16 @@ enum BigFileStore {
             height = Int(abs(shown.height).rounded())
         }
         return .init(seconds: duration.seconds, width: width, height: height)
+    }
+
+    /// A picked or dropped file over 8 MB, for the draft: refused with "update the plugin" when this
+    /// chat's computer can't take it, and with the limit past 256 MB, before anything is copied.
+    @MainActor
+    static func importing(_ source: URL, fileName: String, mimeType: String, byteCount: Int,
+                          into model: ChatModel?) async throws -> ChatBigFile {
+        guard byteCount <= BigFileUploads.maximumBytes else { throw BigFileUploadError(failure: .tooLarge) }
+        if let model, !(await model.supportsBigFiles()) { throw BigFileUploadError(failure: .pluginRequired) }
+        return try await prepare(copying: source, fileName: fileName, mimeType: mimeType)
     }
 
     /// Piece `index` of the file, written to its own file for an upload task, with its checksum.

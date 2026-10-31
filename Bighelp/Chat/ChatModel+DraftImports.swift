@@ -30,11 +30,17 @@ struct DraftAttachmentImportProgress: Equatable, Sendable {
 /// Reads one photo or file into an attachment; kept so one that failed can be tried again.
 struct DraftAttachmentLoader {
     let name: String?
-    let load: @MainActor () async throws -> ChatAttachment
+    let load: @MainActor () async throws -> ChatDraftAttachment
 
     init(name: String?, load: @escaping @MainActor () async throws -> ChatAttachment) {
         self.name = name
-        self.load = load
+        self.load = { .attachment(try await load()) }
+    }
+
+    /// A file that may be over 8 MB: it then stays on disk as a big file.
+    init(name: String?, draft: @escaping @MainActor () async throws -> ChatDraftAttachment) {
+        self.name = name
+        load = draft
     }
 }
 
@@ -65,7 +71,11 @@ extension ChatModel {
         }
         for loader in loaders {
             do {
-                try addDraftAttachment(try await loader.load())
+                switch try await loader.load() {
+                case .attachment(let attachment): try addDraftAttachment(attachment)
+                case .bigFile(let file): try addDraftBigFile(file)
+                case .pdfPages(let selection): try addPDFPageSelection(selection)
+                }
             } catch is CancellationError {
                 // The chat moved on; nothing to report.
             } catch {
@@ -82,7 +92,7 @@ extension ChatModel {
     /// limits and "didn't attach" retry as Add › Photo and Add › File.
     func importDroppedAttachments(_ providers: [NSItemProvider]) {
         guard !isComposerAttachmentInputDisabled else { return }
-        let drop = ComposerAttachmentDrop.imports(from: providers)
+        let drop = ComposerAttachmentDrop.imports(from: providers, into: self)
         guard !drop.loaders.isEmpty else { return }
         Task { await importDraftAttachments(drop.kind, drop.loaders) }
     }

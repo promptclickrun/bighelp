@@ -76,7 +76,8 @@ enum ComposerAttachmentDrop {
     /// Text and links in the same drag are left out; past `maximumItems`, each
     /// extra item stays as one that didn't attach.
     @MainActor
-    static func imports(from providers: [NSItemProvider]) -> (kind: DraftAttachmentImportKind, loaders: [DraftAttachmentLoader]) {
+    static func imports(from providers: [NSItemProvider],
+                        into model: ChatModel? = nil) -> (kind: DraftAttachmentImportKind, loaders: [DraftAttachmentLoader]) {
         let dropped = providers.filter(isAttachment)
         let images = dropped.filter { $0.hasItemConformingToTypeIdentifier(UTType.image.identifier) }
         let kind: DraftAttachmentImportKind = images.count == dropped.count ? .photos
@@ -86,15 +87,20 @@ enum ComposerAttachmentDrop {
                 return DraftAttachmentLoader(name: provider.suggestedName) { throw ChatAttachmentError.tooMany }
             }
             let read = Task { try await readFile(from: provider) }
-            return DraftAttachmentLoader(name: provider.suggestedName) {
+            return DraftAttachmentLoader(name: provider.suggestedName, draft: { @MainActor [weak model] in
                 let file = try await read.value
-                return try ChatAttachmentPreparer().prepare(
+                if let copy = file.largeFile {
+                    defer { try? FileManager.default.removeItem(at: copy.deletingLastPathComponent()) }
+                    return .bigFile(try await BigFileStore.importing(copy, fileName: file.name, mimeType: file.mimeType,
+                                                                     byteCount: file.byteCount, into: model))
+                }
+                return .attachment(try ChatAttachmentPreparer().prepare(
                     id: "attachment_\(UUID().uuidString.lowercased())",
                     fileName: file.name,
                     mimeType: file.mimeType,
                     data: file.data
-                )
-            }
+                ))
+            })
         }
         return (kind, loaders)
     }
@@ -103,6 +109,9 @@ enum ComposerAttachmentDrop {
         let name: String
         let mimeType: String
         let data: Data
+        /// Over 8 MB: a copy of the file for `BigFileStore`, read a piece at a time.
+        var largeFile: URL? = nil
+        var byteCount = 0
     }
 
     /// Photos read in their best non-TIFF image type (TIFF converts when nothing
@@ -127,13 +136,28 @@ enum ComposerAttachmentDrop {
                     let values = try url.resourceValues(forKeys: [.fileSizeKey, .isDirectoryKey])
                     if values.isDirectory == true { throw ChatAttachmentError.invalidMIMEType }
                     // Photos are prepared down from up to the preparer's input limit.
-                    let limit = isImage ? ImageAttachmentPreparer.maximumInputBytes : ChatAttachment.maximumBytes
+                    let limit = isImage ? ImageAttachmentPreparer.maximumInputBytes : BigFileUploads.maximumBytes
                     guard let size = values.fileSize, size > 0, size <= limit else {
-                        throw ChatAttachmentError.invalidSize
+                        throw isImage ? ChatAttachmentError.invalidSize : BigFileUploadError(failure: .tooLarge)
                     }
                     let fallbackName = (isImage ? "image" : "file")
                         + (type.preferredFilenameExtension.map { ".\($0)" } ?? "")
                     let name = url.lastPathComponent.isEmpty ? fallbackName : url.lastPathComponent
+                    if !isImage, BigFileUploads.isBig(size) {
+                        // UIKit removes its file after this callback; keep a copy to read in pieces.
+                        let folder = FileManager.default.temporaryDirectory
+                            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+                        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                        let copy = folder.appending(path: name)
+                        try FileManager.default.copyItem(at: url, to: copy)
+                        continuation.resume(returning: DroppedFile(
+                            name: name,
+                            mimeType: type.preferredMIMEType
+                                ?? UTType(filenameExtension: url.pathExtension)?.preferredMIMEType
+                                ?? "application/octet-stream",
+                            data: Data(), largeFile: copy, byteCount: size))
+                        return
+                    }
                     continuation.resume(returning: DroppedFile(
                         name: name,
                         mimeType: type.preferredMIMEType

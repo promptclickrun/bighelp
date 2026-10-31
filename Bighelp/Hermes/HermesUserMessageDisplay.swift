@@ -3,8 +3,7 @@ import Foundation
 /// Hermes saves a user turn the way it reached the model: a photo adds an
 /// `[Image attached at: <path>]` hint, image parts flatten to `[screenshot]`,
 /// and memory plugins append a fenced `<memory-context>` block of recalled
-/// notes (which can name older photos), and a big video the app sent adds its
-/// `[Video attached: …]` note. A chat shows what the person sent:
+/// notes (which can name older photos). A chat shows what the person sent:
 /// their words, plus a stock `@image:` reference that the media resolver turns
 /// back into their own photo.
 enum HermesUserMessageDisplay {
@@ -13,7 +12,7 @@ enum HermesUserMessageDisplay {
 
     static func text(_ raw: String) -> String {
         guard raw.contains("memory-context") || raw.contains("[Image attached")
-                || raw.contains("[System note:") || raw.contains("[Video attached:") else { return raw }
+                || raw.contains("[System note:") else { return raw }
         var text = raw
             .replacing(/(?is)<\s*memory-context\s*>.*?<\s*\/\s*memory-context\s*>/, with: "")
         // A truncated row can lose its closing fence; nothing after it is the person's.
@@ -34,9 +33,6 @@ enum HermesUserMessageDisplay {
                 if let reference = reference(String(match.1)) { images.append("@image:" + reference) }
             } else if trimmed.wholeMatch(of: /\[Image attached: .+\]/) != nil {
                 sawImage = true
-            } else if trimmed.wholeMatch(of: /\[Video attached: .+\]/) != nil {
-                // The app's note on a big video for the agent (`ChatBigFile.agentNote`).
-                continue
             } else {
                 lines.append(line)
             }
@@ -60,6 +56,7 @@ enum HermesUserMessageDisplay {
         let words = (ChatReplyQuote.split(shown)?.body ?? shown).components(separatedBy: "\n").filter { line in
             if line.hasPrefix("@image:") { photos = true; return false }
             if line.hasPrefix("@file:") { files = true; return false }
+            if ChatSentFileNote(line) != nil { return false }
             return true
         }
         let body = words.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)

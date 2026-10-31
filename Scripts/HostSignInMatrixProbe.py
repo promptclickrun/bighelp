@@ -722,8 +722,8 @@ def run_mode(mode: str, args, repo: Path) -> int:
         proxy = DelayProxy(port, args.latency_ms / 1000, args.rate_kbps * 1024) \
             if mode == "media" and (args.latency_ms or args.rate_kbps) else None
         if mode == "bigfiles":
-            # About 8 MB a second, and one drop after 30 MB, so progress and the resume both show.
-            proxy = DelayProxy(port, 0.02, (args.rate_kbps or 8 * 1024) * 1024, drop_after=30 * 1024 * 1024)
+            # About 2 MB a second, and one drop after 30 MB, so progress and the resume both show.
+            proxy = DelayProxy(port, 0.02, (args.rate_kbps or 2 * 1024) * 1024, drop_after=30 * 1024 * 1024)
             video = temp / "Trip to the coast.mov"
             subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=30",
                             "-f", "lavfi", "-i", "sine=frequency=440", "-t", "72", "-c:v", "libx264",
@@ -798,7 +798,7 @@ def run_mode(mode: str, args, repo: Path) -> int:
             probe = {"mode": mode, "address": public.removeprefix("http://"), "session_token": session_token}
             if mode == "bigfiles":
                 probe["video_file"] = str(video)
-                probe["video_bytes"] = video.stat().st_size
+                probe["video_bytes"] = str(video.stat().st_size)
             if mode == "features":
                 probe["project_dir"] = str(project / "garden")
                 probe["workspace_file"] = "garden-notes.md"

@@ -124,6 +124,7 @@ enum BigFileUploadFailure: Equatable, Sendable {
     case busy
     case damaged
     case pluginRequired
+    case tooLarge
     case expired
     case connection
     case other
@@ -158,6 +159,7 @@ enum BigFileUploadFailure: Equatable, Sendable {
         case .busy: "Not sent. The computer is taking other files right now."
         case .damaged: "Not sent. The file arrived damaged."
         case .pluginRequired: BigFileUploads.updatePluginMessage
+        case .tooLarge: BigFileUploads.tooLargeMessage
         case .expired: "Not sent. The computer let go of this file."
         case .connection: "Not sent. The connection to the computer dropped."
         case .other: "Not sent. The computer didn't take this file."

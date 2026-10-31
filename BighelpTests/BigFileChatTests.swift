@@ -1,0 +1,137 @@
+import Foundation
+import Testing
+@testable import Bighelp
+
+/// How a big file shows in the chat (#721, Colt's picks): a tile while it goes up, then a line on
+/// the rail once Hermes takes the message, the same as a reread of the saved history shows.
+@MainActor
+@Suite(.timeLimit(.minutes(1)))
+struct BigFileChatTests {
+    private static let file = ChatBigFile(
+        id: String(repeating: "a", count: 32), fileName: "Trip to the coast.mov", mimeType: "video/quicktime",
+        byteCount: 80_000_000, sha256: String(repeating: "0", count: 64),
+        video: .init(seconds: 72.4, width: 1920, height: 1080))
+    private static let path = "/home/fixture/garden/uploads/2026-10-31/Trip to the coast.mov"
+    /// What `sendDraftAttachments` sends: the words, Hermes' reference, then the app's note.
+    private static var sentText: String {
+        "Cut the best 10 seconds\n@file:`\(path)`\n" + file.agentNote
+    }
+
+    @Test func theNoteGivesSizeAndLengthForTheLineAndTheAgent() {
+        let note = Self.file.agentNote
+        #expect(note.hasPrefix("[Video attached: Trip to the coast.mov ("))
+        #expect(note.contains("1 min 12 s") && note.contains("1920×1080"))
+        let parsed = ChatSentFileNote(note)
+        #expect(parsed?.fileName == "Trip to the coast.mov")
+        #expect(parsed?.meta.contains("1 min 12 s") == true)
+        let plain = ChatBigFile(id: Self.file.id, fileName: "logs (old).zip", mimeType: "application/zip",
+                                byteCount: 120_000_000, sha256: Self.file.sha256, video: nil)
+        #expect(ChatSentFileNote(plain.agentNote)?.fileName == "logs (old).zip")
+    }
+
+    @Test func aSentFileIsALineAndItsPathNeverShowsAsText() {
+        let split = ChatSentFiles.split(Self.sentText)
+        #expect(split.text == "Cut the best 10 seconds")
+        #expect(split.files.count == 1)
+        #expect(split.files.first?.name == "Trip to the coast.mov")
+        #expect(split.files.first?.path == Self.path)
+        #expect(split.files.first?.isVideo == true)
+        #expect(!split.text.contains("/home/") && !split.text.contains("@file:") && !split.text.contains("attached:"))
+        // A file alone has no words left to show.
+        #expect(ChatSentFiles.split("@file:\(Self.path.replacingOccurrences(of: " ", with: "_"))").text.isEmpty)
+        // The chat list says Attachment, without the note or the path.
+        #expect(HermesUserMessageDisplay.preview(Self.sentText) == "Cut the best 10 seconds")
+    }
+
+    /// The tile turns into the line once, when Hermes takes the message, and a reread of the
+    /// saved history then shows the same row. A tile kept until the reread fails this.
+    @Test func theTileTurnsIntoTheLineOnceWhenHermesTakesTheMessageAndAReadKeepsIt() throws {
+        let model = ChatModel(conversationID: "big-file-chat", client: ConversationFixtureClient(), initialItems: [])
+        let human = model.humanItem(content: "Cut the best 10 seconds").carrying(bigFiles: [Self.file])
+        model.appendItem(human)
+        model.appendProjectedMessage(human)
+        BigFileUploadBoard.shared.uploading(Self.file.id, sentBytes: 34_000_000, byteCount: Self.file.byteCount)
+        #expect(model.items.last?.metadata.bigFiles == [Self.file])
+        #expect(ChatSentFiles.split(Self.text(model.items.last)).files.isEmpty)
+
+        model.bigFileMessageAccepted(rowID: human.id, text: Self.sentText, files: [Self.file])
+        let accepted = try #require(model.items.last)
+        #expect(accepted.id == human.id)
+        #expect(accepted.metadata.bigFiles.isEmpty)
+        #expect(BigFileUploadBoard.shared.state(for: Self.file.id) == nil)
+        let live = ChatSentFiles.split(Self.text(accepted))
+
+        // What a reread gets for this row: Hermes' saved text, as the history shows a person's message.
+        let reread = ChatSentFiles.split(HermesUserMessageDisplay.text(Self.sentText))
+        #expect(live.text == reread.text)
+        #expect(live.files == reread.files)
+        #expect(live.files.count == 1)
+
+        // Once: a second answer for the same message changes nothing.
+        model.bigFileMessageAccepted(rowID: human.id, text: "Something else", files: [Self.file])
+        #expect(Self.text(model.items.last) == Self.sentText)
+    }
+
+    @Test func aFailedUploadSaysWhyAndTryAgainRunsItsRetry() {
+        let board = BigFileUploadBoard.shared
+        var retried = 0
+        board.failed("failing-file", message: BigFileUploadFailure.noSpace.message) { retried += 1 }
+        #expect(board.state(for: "failing-file") == .failed("Not sent. The computer is out of space for this file."))
+        board.retry("failing-file")
+        board.retry("failing-file")
+        #expect(retried == 1)
+        board.finish("failing-file")
+        #expect(board.state(for: "failing-file") == nil)
+        #expect(BigFileUploadTile.counted(34_000_000, of: 80_000_000).hasSuffix("MB"))
+        #expect(BigFileUploadTile.counted(34_000_000, of: 80_000_000).hasPrefix("34"))
+    }
+
+    @Test func filesOpensTheSentFileInItsFolder() async {
+        let source = FixtureFiles()
+        let model = SimpleBotFilesModel(agentID: "default", source: source)
+        await model.reveal(path: Self.path)
+        #expect(source.listed == ["/home/fixture/garden/uploads/2026-10-31"])
+        #expect(model.playback != nil || model.openingPath == nil)
+        #expect(source.opened == [Self.path])
+        await model.reveal(path: "/home/fixture/garden/uploads/2026-10-31/gone.mov")
+        #expect(model.notice?.contains("gone.mov") == true)
+    }
+
+    @Test func aProfileOpeningForAFileStartsOnFiles() {
+        #expect(BotProfileOpening(file: Self.path).wantedTab == .files)
+        #expect(BotProfileOpening(tab: .info).wantedTab == .info)
+    }
+
+    private static func text(_ item: TimelineItem?) -> String {
+        guard case .message(let text)? = item?.content else { return "" }
+        return text
+    }
+}
+
+@MainActor
+private final class FixtureFiles: SimpleBotFilesSource {
+    var listed: [String] = []
+    var opened: [String] = []
+    var downloadLimit: Int { 25 * 1_024 * 1_024 }
+
+    func list(agentID: String, path: String?) async throws -> HermesManagedFileDirectory {
+        listed.append(path ?? "")
+        let folder = path ?? "/home/fixture/garden"
+        return HermesManagedFileDirectory(path: folder, parent: "/home/fixture/garden", files: [
+            HermesManagedFile(path: folder + "/Trip to the coast.mov", name: "Trip to the coast.mov", isDirectory: false,
+                              byteCount: 80_000_000, modifiedAt: .now, mimeType: "video/quicktime"),
+        ])
+    }
+
+    func download(agentID: String, file: HermesManagedFile) async throws -> HermesManagedFileContents {
+        opened.append(file.path)
+        throw CancellationError()
+    }
+
+    func canStream(agentID: String, file: HermesManagedFile) -> Bool {
+        opened.append(file.path)
+        return false
+    }
+
+    func playback(agentID: String, file: HermesManagedFile) -> DirectHermesManagedMediaPlayback? { nil }
+}

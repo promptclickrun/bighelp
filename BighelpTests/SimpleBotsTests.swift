@@ -24,6 +24,26 @@ struct SimpleBotsTests {
         #expect(context.darkBackground == .black)
     }
 
+    /// Bots mode's dark page is the one picked in Appearance, like the rest of the app (#718).
+    @Test func botsModeFollowsTheDarkBackgroundChoice() {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let settings = SettingsStore(defaults: defaults)
+        settings.simpleBotsEnabled = true
+        settings.darkBackground = .graphite
+        #expect(settings.appearanceContext.darkBackground == .graphite)
+        let graphite = BighelpTheme.resolve(appearance: settings.appearanceContext, colorScheme: .dark,
+                                            contrast: .standard)
+        settings.darkBackground = .black
+        let black = BighelpTheme.resolve(appearance: settings.appearanceContext, colorScheme: .dark,
+                                         contrast: .standard)
+        #expect(graphite.canvasHex != black.canvasHex)
+        #expect(black.canvasHex == BighelpTheme.blackDark.canvasHex)
+    }
+
     @Test func edgeSwipesGoToYourBotsAndThisBotsProfile() {
         let suiteName = #function
         let defaults = UserDefaults(suiteName: suiteName)!

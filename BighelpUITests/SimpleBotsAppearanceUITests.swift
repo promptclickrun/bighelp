@@ -72,6 +72,76 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
         XCTAssertLessThan(brightness(of: app.windows.firstMatch, in: app), 0.25, "The home turned dark")
     }
 
+    /// The dark page picked in Appearance (Graphite or Black) is Bots mode's page too, and the
+    /// home, Settings and a bot's chat change as soon as it's picked (#718).
+    @MainActor
+    func testDarkBackgroundChoiceRepaintsBotsMode() throws {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
+                               "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", "dark",
+                               "-loopdy.appearance.darkBackground", "black"]
+        app.launch()
+        let home = app.descendants(matching: .any)["simple-bots.home"]
+        XCTAssertTrue(home.waitForExistence(timeout: 15))
+        let black = brightness(of: app.windows.firstMatch, in: app)
+        XCTAssertLessThan(black, 0.03, "Black: a black home")
+        saveScreens("black", app)
+
+        pickDarkBackground("graphite", in: app)
+        let graphite = brightness(of: app.windows.firstMatch, in: app)
+        XCTAssertGreaterThan(graphite, black + 0.05, "Graphite: the home turned charcoal")
+        XCTAssertLessThan(graphite, 0.25, "Still dark")
+        saveScreens("graphite", app)
+
+        pickDarkBackground("black", in: app)
+        XCTAssertLessThan(brightness(of: app.windows.firstMatch, in: app), 0.03, "Black again")
+    }
+
+    /// The home in light mode, for comparison with the dark pages.
+    @MainActor
+    func testLightHomeKeepsItsPage() throws {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
+                               "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", "light",
+                               "-loopdy.appearance.darkBackground", "graphite"]
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
+        XCTAssertGreaterThan(brightness(of: app.windows.firstMatch, in: app), 0.95, "Light: a Paper home")
+        save("light-home", app)
+    }
+
+    /// Picks a dark page in Bots mode's Settings › Appearance and goes back to the home.
+    @MainActor
+    private func pickDarkBackground(_ choice: String, in app: XCUIApplication) {
+        app.buttons["simple-bots.settings"].tap()
+        app.buttons["simple-bots.settings.appearance"].tap()
+        let tile = app.buttons["appearance.dark.\(choice)"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 5))
+        tile.tap()
+        app.navigationBars.buttons.firstMatch.tap()
+        app.buttons["simple-bots.settings.close"].tap()
+        XCTAssertTrue(app.buttons["simple-bots.settings"].waitForExistence(timeout: 5))
+        Thread.sleep(forTimeInterval: 0.6)
+    }
+
+    /// The home, Bots mode's Settings and a bot's chat, for the evidence folder.
+    @MainActor
+    private func saveScreens(_ suffix: String, _ app: XCUIApplication) {
+        save("home-\(suffix)", app)
+        app.buttons["simple-bots.settings"].tap()
+        XCTAssertTrue(app.buttons["simple-bots.settings.close"].waitForExistence(timeout: 5))
+        Thread.sleep(forTimeInterval: 0.6)
+        save("settings-\(suffix)", app)
+        app.buttons["simple-bots.settings.close"].tap()
+        XCTAssertTrue(app.buttons["simple-bots.bot.travel"].waitForExistence(timeout: 5))
+        app.buttons["simple-bots.bot.travel"].tap()
+        XCTAssertTrue(app.buttons["chat.back"].waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 0.8)
+        save("chat-\(suffix)", app)
+        app.buttons["chat.back"].tap()
+        XCTAssertTrue(app.buttons["simple-bots.settings"].waitForExistence(timeout: 5))
+    }
+
     /// Your name in Bots mode's Settings: a box that reads in light and in dark.
     @MainActor
     func testNameRowReadsInBothModes() throws {

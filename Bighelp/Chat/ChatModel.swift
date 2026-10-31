@@ -446,6 +446,9 @@ final class ChatModel {
 
     var directTransportIsReady: Bool {
         guard !(client is NativeWorkspaceUnavailableClient) else { return false }
+        #if DEBUG && (targetEnvironment(simulator) || targetEnvironment(macCatalyst))
+        if !isBotMode, ChatConnectingPreview.isConnecting { return false }
+        #endif
         return nativeConversationClient?.isReadyForSubmission ?? true
     }
 

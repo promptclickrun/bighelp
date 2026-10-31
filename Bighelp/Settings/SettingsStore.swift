@@ -19,10 +19,10 @@ final class SettingsStore {
     private(set) var sessionSectionPreferencesRevision = 0
 
     var appearanceContext: BighelpAppearanceContext {
-        // Bots mode's page is always Paper by day; after dark and the bubbles follow the pick.
+        // Bots mode takes the themes and bubbles picked in Appearance, like the rest of the app.
         var context = BighelpAppearanceContext(
             appearance: appearance,
-            lightBackground: simpleBotsEnabled ? .paper : lightBackground,
+            lightBackground: lightBackground,
             darkBackground: darkBackground,
             bubbleColor: bubbleColor,
             customBubbleHex: customBubbleHex,

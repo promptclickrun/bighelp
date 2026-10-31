@@ -452,7 +452,7 @@ keyboard.
 ## Bots mode
 
 An opt-in calm home (Settings › Experience › Bots mode): just your bots and their chats. No tab bar
-and no ☰. The page is white by day and the dark page picked in Appearance at night, your bubbles are black (ink after dark) unless you
+and no ☰. The page is the light and dark theme picked in Appearance, your bubbles are black (ink after dark) unless you
 picked a bubble color in Appearance, and buttons and tinted text are the page's ink (white after dark). The
 text is SF Pro, as everywhere.
 

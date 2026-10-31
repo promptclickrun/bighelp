@@ -751,7 +751,7 @@ struct BighelpAppearanceContext: Equatable, Sendable {
     }
     /// Vision Pro: 0 is a solid window, 1 shows the room through the glass.
     var windowTransparency = BighelpVisionGlass.defaultTransparency
-    /// Bots mode is on (Settings › Experience). Its page is always Paper by day.
+    /// Bots mode is on (Settings › Experience). It takes the same themes as the rest of the app.
     var simpleBots = false
     /// The Ink look, bighelp's default: black bubbles and buttons by day, ink after dark. Ink is
     /// `.graphite`; no saved choice is Ink too.

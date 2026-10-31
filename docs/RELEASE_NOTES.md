@@ -3,6 +3,13 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.41
+
+### Fixed
+
+- **Gemini Live voice:** on a Gemini call, you hear the agent every time. Before, the agent's words sometimes showed on the screen, but its voice did not play.
+- **Usage widget:** the Usage widget shows your numbers again, also when bighelp is closed. Each Usage widget can show one gateway: touch and hold the widget, tap **Edit Widget**, and select a **Gateway**.
+
 ## 2.6.40
 
 ### Full Duplex voice

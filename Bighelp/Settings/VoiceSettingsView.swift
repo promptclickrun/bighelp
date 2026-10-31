@@ -62,46 +62,39 @@ struct VoiceSettingsView: View {
         (scope ?? "disconnected") + ":" + agentID
     }
 
-    /// TTS voice mode and Auto TTS speak with each agent's speech provider; GPT Live 1 speaks
-    /// for itself. A bot that has TTS as its own voice type (Bots mode) still needs its provider.
+    /// The computer agents' own voice choices are kept under (`AgentVoiceChoices`).
+    private var computer: String? { workspaceConnections?.owner?.cacheScopeID }
+
+    /// Everything on the page is for this agent, the same choices its Default Voice and voice bar
+    /// make in Bots mode. Without a connection, the defaults for every agent.
+    private var editedAgentID: String? {
+        computer != nil && agents.contains(where: { $0.id == agentID }) ? agentID : nil
+    }
+
+    /// TTS voice and Auto TTS speak with the agent's speech provider; Full Duplex speaks for itself.
     private var showsSpeechProvider: Bool {
-        settings.voiceConversationMode == .turnBased || settings.autoSpeakRepliesEnabled
-            || agents.contains { ownMode($0.id) == .turnBased }
-    }
-
-    /// An agent's own voice type from its Default Voice, if it has one.
-    private func ownMode(_ agentID: String) -> VoiceConversationMode? {
-        guard let computer = workspaceConnections?.owner?.cacheScopeID else { return nil }
-        return AgentVoiceChoices.shared.mode(computer: computer, agentID: agentID)
-    }
-
-    private var agentFooter: String {
-        let base = String(localized: "Each agent has its own speech provider and voice, saved on your computer. A voice that runs on this \(OnDeviceVoiceModel.deviceName) is saved here.")
-        guard let mode = ownMode(agentID), let name = agents.first(where: { $0.id == agentID })?.name else { return base }
-        return base + " " + String(localized: "\(name) uses \(mode.title) for voice, its own choice in Bots mode.")
+        settings.voicePreference(computer: computer, agentID: editedAgentID).mode == .turnBased
+            || settings.autoSpeakRepliesEnabled
     }
 
     var body: some View {
         Form {
-            VoicePreferenceSections(settings: settings, confirmAPIBilling: $confirmAPIBilling)
-
-            if !showsSpeechProvider {
-                // GPT Live 1 speaks for itself.
-            } else if client != nil, scope != nil, !agents.isEmpty {
+            if editedAgentID != nil {
                 Section {
                     Picker("Agent", selection: $agentID) {
                         ForEach(agents) { Text($0.name).tag($0.id) }
                     }
                     .accessibilityIdentifier("voice.settings.agent")
-                } header: {
-                    Text("Agent")
-                } footer: {
-                    Text(agentFooter)
                 }
-                if agents.contains(where: { $0.id == agentID }) {
-                    if let store, store.agentID == agentID {
-                        VoiceSettingsEditor(store: store, focusedField: $focusedField, page: $page)
-                    }
+            }
+            VoicePreferenceSections(settings: settings, confirmAPIBilling: $confirmAPIBilling,
+                                    computer: computer, agentID: editedAgentID)
+
+            if !showsSpeechProvider {
+                // Full Duplex speaks for itself.
+            } else if editedAgentID != nil {
+                if let store, store.agentID == agentID {
+                    VoiceSettingsEditor(store: store, focusedField: $focusedField, page: $page)
                 }
             } else {
                 Section("Speech provider") {
@@ -120,7 +113,9 @@ struct VoiceSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .confirmationDialog("Use separately billed API voice?", isPresented: $confirmAPIBilling,
                             titleVisibility: .visible) {
-            Button("Use API key provider") { settings.liveVoiceProvider = .apiKey }
+            Button("Use API key provider") {
+                settings.setLiveProvider(.apiKey, computer: computer, agentID: editedAgentID)
+            }
             Button("Keep Codex subscription", role: .cancel) {}
         } message: {
             Text("The host's API key may incur separate usage charges. Subscription failures never switch providers automatically.")
@@ -160,40 +155,45 @@ struct VoiceSettingsView: View {
 private struct VoicePreferenceSections: View {
     @Bindable var settings: SettingsStore
     @Binding var confirmAPIBilling: Bool
+    /// The agent these choices are for, on `computer`; nil edits the default for every agent.
+    let computer: String?
+    let agentID: String?
+
+    private var preference: AgentVoicePreference {
+        settings.voicePreference(computer: computer, agentID: agentID)
+    }
+
+    private var mode: Binding<VoiceConversationMode> {
+        Binding(get: { preference.mode },
+                set: { settings.setVoiceConversationMode($0, computer: computer, agentID: agentID) })
+    }
 
     private var provider: Binding<LiveVoiceProvider> {
         Binding(
-            get: { settings.liveVoiceProvider },
+            get: { preference.liveProvider },
             set: { value in
                 if value == .apiKey { confirmAPIBilling = true }
-                else { settings.liveVoiceProvider = value }
+                else { settings.setLiveProvider(value, computer: computer, agentID: agentID) }
             }
         )
     }
 
     private var voice: Binding<String> {
-        Binding(
-            get: { settings.liveVoice(for: settings.liveVoiceProvider) },
-            set: { settings.setLiveVoice($0, for: settings.liveVoiceProvider) }
-        )
+        Binding(get: { preference.liveVoice },
+                set: { settings.setLiveVoice($0, computer: computer, agentID: agentID) })
     }
 
     var body: some View {
         Section {
-            Picker("Voice mode", selection: $settings.voiceConversationMode) {
+            Picker("Voice mode", selection: mode) {
                 Text(VoiceConversationMode.turnBased.title).tag(VoiceConversationMode.turnBased)
                 Text(VoiceConversationMode.codexLive.title).tag(VoiceConversationMode.codexLive)
             }
             .bighelpSegmentedPicker()
             .frame(minHeight: BighelpTokens.hitTarget)
             .accessibilityIdentifier("voice.settings.conversation-mode")
-            Text(settings.voiceConversationMode.detail)
-                .bighelpFont(.metadata)
-                .foregroundStyle(.secondary)
         } header: {
-            Text("Default voice mode")
-        } footer: {
-            Text("Used when you \(BighelpPlatform.isMac ? "click" : "tap") the microphone in a chat. It's the default for every agent; in Bots mode, a bot's Default Voice can pick its own.")
+            Text("Voice mode")
         }
 
         Section {
@@ -201,11 +201,9 @@ private struct VoicePreferenceSections: View {
                 .accessibilityIdentifier("voice.settings.auto-tts")
         } header: {
             Text("In chats")
-        } footer: {
-            Text("Reads each reply aloud in the agent's voice as it arrives. Sending a message or leaving the chat stops it. Also in a chat's + menu as Auto TTS.")
         }
 
-        if settings.voiceConversationMode == .codexLive {
+        if preference.mode == .codexLive {
             Section {
                 Picker("Provider", selection: provider) {
                     ForEach(LiveVoiceProvider.allCases) { option in
@@ -214,15 +212,13 @@ private struct VoicePreferenceSections: View {
                 }
                 .accessibilityIdentifier("voice.settings.live-provider")
                 Picker("Voice", selection: voice) {
-                    ForEach(settings.liveVoiceProvider.voices, id: \.self) { option in
+                    ForEach(preference.liveProvider.voices, id: \.self) { option in
                         Text(option.capitalized).tag(option)
                     }
                 }
                 .accessibilityIdentifier("voice.settings.live-voice")
             } header: {
                 Text(VoiceConversationMode.codexLive.title)
-            } footer: {
-                Text("Sign-ins and keys stay on your computer. An API key may add separate charges, and Gemini Live uses the agent's Gemini key. This is the default for every agent; an agent's Default Voice can pick its own.")
             }
             HostPluginFeatureSection(feature: .liveVoice)
         } else {
@@ -248,11 +244,6 @@ private struct VoicePreferenceSections: View {
                     .accessibilityIdentifier("voice.settings.hold-music")
             } header: {
                 Text("Listening")
-            } footer: {
-                Text(settings.voiceMode.detail + " " + settings.voiceTranscription.detail + " "
-                     + (settings.voiceHoldMusicEnabled
-                        ? String(localized: "Hold music plays while your agent works on a reply.")
-                        : String(localized: "The wait for a reply is silent.")))
             }
         }
     }
@@ -343,8 +334,6 @@ struct VoiceSettingsEditor: View {
             }
         } header: {
             Text("Speech provider")
-        } footer: {
-            Text(footer(for: selected))
         }
         .disabled(store.isSaving)
     }
@@ -407,20 +396,6 @@ struct VoiceSettingsEditor: View {
         }
     }
 
-    private func footer(for provider: VoiceProviderConfiguration?) -> String {
-        switch provider?.kind {
-        case .onThisDevice:
-            "Saved on this \(OnDeviceVoiceModel.deviceName) for this agent. Your computer keeps its own voice for its other apps."
-        case .onYourComputer:
-            "Install it once by running hermes setup tts on your computer, then play a sample here."
-        case .cloud where provider?.supportsServerURL == true:
-            "To use your own OpenAI-compatible server, like Kokoro or Speaches, enter its address. Those servers usually accept any key. Leave the key blank to keep the saved one."
-        case .cloud where provider?.needsAPIKey == true:
-            "Leave the API key blank to keep the saved one. Changes apply to this agent's next spoken reply."
-        default:
-            "Changes apply to this agent's next spoken reply."
-        }
-    }
 }
 
 /// Every speech provider on one page, grouped by where it runs.
@@ -441,8 +416,6 @@ struct VoiceProviderList: View {
                         ForEach(items) { row($0) }
                     } header: {
                         Text(kind.title)
-                    } footer: {
-                        Text(footer(kind))
                     }
                     .listRowBackground(theme.surface)
                 }
@@ -494,15 +467,6 @@ struct VoiceProviderList: View {
         }
     }
 
-    private func footer(_ kind: VoiceProviderSpec.Kind) -> String {
-        switch kind {
-        case .onThisDevice: "Speaks on this \(OnDeviceVoiceModel.deviceName), with no voice service. The voice downloads once."
-        case .onYourComputer: "Your agent's words never leave your computer. Install one once by running hermes setup tts there."
-        case .custom: "Set up in your agent's config.yaml under tts.providers."
-        case .free: "Microsoft's free online voices."
-        case .cloud: "Billed to your own account with that service. OpenAI also works with self-hosted OpenAI-compatible servers."
-        }
-    }
 }
 
 /// A row that opens a picker page: its title, what's chosen, and a chevron.
@@ -693,10 +657,6 @@ struct VoiceOptionPicker: View {
                 .accessibilityIdentifier("voice.option.other-use")
         } header: {
             Text("Other")
-        } footer: {
-            Text(kind == .voice
-                 ? String(localized: "For a voice \(providerTitle) has that isn't listed, such as one you made yourself.")
-                 : String(localized: "For a model your server has that isn't listed."))
         }
         .listRowBackground(theme.surface)
     }

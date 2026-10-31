@@ -118,19 +118,14 @@ extension SettingsStore {
             hasOwnMode: own != nil, hasOwnLiveProvider: ownProvider != nil)
     }
 
-    /// Voice opens as TTS from now on, where the agent's voice type comes from: its own choice when it
-    /// has one, else the default for every agent. For GPT Live 1 failing to start.
+    /// Voice opens as TTS for this agent from now on. For Full Duplex failing to start.
     func useTurnBasedVoice(computer: String?, agentID: String?, choices: AgentVoiceChoices = .shared) {
-        if let computer, let agentID, !computer.isEmpty, !agentID.isEmpty,
-           choices.mode(computer: computer, agentID: agentID) != nil {
-            choices.setMode(.turnBased, computer: computer, agentID: agentID)
-        } else {
-            voiceConversationMode = .turnBased
-        }
+        setVoiceConversationMode(.turnBased, computer: computer, agentID: agentID, choices: choices)
     }
 
-    /// The person picked a voice type for one agent (its Default Voice, or the voice bar over its chat):
-    /// that agent's own choice. Without an agent to keep it for, the default for every agent.
+    /// The person picked a voice type for one agent, anywhere (Settings › Voice, its Default Voice in
+    /// Bots mode, the voice bar over its chat): that agent's own choice, the same in every mode.
+    /// Without an agent to keep it for, the default for every agent.
     func setVoiceConversationMode(_ mode: VoiceConversationMode, computer: String?, agentID: String?,
                                   choices: AgentVoiceChoices = .shared) {
         guard let computer, let agentID, !computer.isEmpty, !agentID.isEmpty else {
@@ -138,5 +133,25 @@ extension SettingsStore {
             return
         }
         choices.setMode(mode, computer: computer, agentID: agentID)
+    }
+
+    /// The Full Duplex provider for one agent, like `setVoiceConversationMode`.
+    func setLiveProvider(_ provider: LiveVoiceProvider, computer: String?, agentID: String?,
+                         choices: AgentVoiceChoices = .shared) {
+        guard let computer, let agentID, !computer.isEmpty, !agentID.isEmpty else {
+            liveVoiceProvider = provider
+            return
+        }
+        choices.setLiveProvider(provider, computer: computer, agentID: agentID)
+    }
+
+    /// The Full Duplex voice for one agent, for the provider it uses.
+    func setLiveVoice(_ voice: String, computer: String?, agentID: String?, choices: AgentVoiceChoices = .shared) {
+        guard let computer, let agentID, !computer.isEmpty, !agentID.isEmpty else {
+            setLiveVoice(voice, for: liveVoiceProvider)
+            return
+        }
+        let provider = voicePreference(computer: computer, agentID: agentID, choices: choices).liveProvider
+        choices.setLiveVoice(voice, for: provider, computer: computer, agentID: agentID)
     }
 }

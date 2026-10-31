@@ -635,7 +635,7 @@ struct SettingsView: View {
 
     @BighelpThemeReader var theme
 
-    @Environment(\.workspaceConnections) private var workspaceConnections
+    @Environment(\.workspaceConnections) var workspaceConnections
 }
 
 #Preview("Settings") {

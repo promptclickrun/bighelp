@@ -327,4 +327,75 @@ final class DemoBotChatActivity: BotChatActivityReading {
         return result
     }
 }
+
+/// `-test-live-voice-report` (with `-test-live-voice`): a call that connects at once and keeps a made-up
+/// sound report, so UI tests and screenshots see what Settings › Voice › Debug puts on the call screen.
+/// Never reaches the microphone, network or provider.
+@MainActor
+final class DemoLiveVoiceReportCall {
+    static let launchArgument = "-test-live-voice-report"
+    private weak var model: LiveVoiceModel?
+
+    static func model(owner: LiveVoiceOwner, agentName: String) -> LiveVoiceModel {
+        let call = DemoLiveVoiceReportCall()
+        let control = LiveVoiceControlClient(owner: owner, operation: { name, fields in
+            let id = fields["voiceId"]?.string ?? ""
+            switch name {
+            case "voice.live.status": return ["available": .boolean(true)]
+            case "voice.live.offer":
+                Task { @MainActor in
+                    call.model?.receive(["voiceId": .string(id), "event": .object(["kind": .string("started")])],
+                                        owner: owner)
+                }
+                return ["voiceId": .string(id), "sdp": .string(Peer.sdp)]
+            default: return ["voiceId": .string(id), "closed": .boolean(true)]
+            }
+        }, isOwnerCurrent: { $0 == owner })
+        let model = LiveVoiceModel(agentName: agentName, client: control, makePeer: { Peer() })
+        call.model = model
+        return model
+    }
+
+    @MainActor
+    private final class Peer: LiveVoiceAudioPeer, LiveVoiceAudioReporting {
+        static let sdp = "v=0\r\na=fingerprint:sha-256 00:11\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n"
+        var onConnectionState: (@MainActor (BighelpRealtimeAudioPeer.ConnectionState) -> Void)?
+        var onAudioRoute: (@MainActor (String) -> Void)?
+        var onInterruption: (@MainActor (Bool) -> Void)?
+        func makeOffer() async throws -> String { Self.sdp }
+        func applyAnswer(_ sdp: String) async throws { onConnectionState?(.connected) }
+        func setMuted(_ muted: Bool) {}
+        func setPlaybackMuted(_ muted: Bool) {}
+        func setSpeakerEnabled(_ enabled: Bool) throws {}
+        func setDefaultSpeakerOutput() throws {}
+        func resumeAudio() throws {}
+        func statistics() async throws -> BighelpRealtimeAudioPeer.MediaStatistics { .init(audioDeviceRunning: true) }
+        func close() {}
+        func audioReport() -> String {
+            GeminiLiveAudioDiagnostics.text(
+                seconds: 12, counts: .init(receivedChunks: 48, receivedBytes: 196_608, scheduledBuffers: 48,
+                                           finishedBuffers: 46),
+                mixer: (0.42, 0.081, 0.61), moving: "moving", state: Self.state,
+                events: [(0.4, "Engine started"), (0.6, "Configuration change"), (0.7, "Engine restarted")],
+                lastDeactivation: nil)
+        }
+        private static var state: GeminiLiveAudioState {
+            var state = GeminiLiveAudioState()
+            state.engineRunning = true
+            state.playerPlaying = true
+            state.playerPosition = 288_000
+            state.voiceProcessing = "in on, out on"
+            state.outputFormat = "48000 Hz × 1"
+            state.mixerFormat = "48000 Hz × 2"
+            state.category = "PlayAndRecord"
+            state.mode = "VoiceChat"
+            state.outputVolume = 0.6
+            state.sampleRate = 48_000
+            state.outputs = ["Speaker"]
+            state.inputs = ["MicrophoneBuiltIn"]
+            return state
+        }
+        func restartPlayback() {}
+    }
+}
 #endif

@@ -301,37 +301,41 @@ struct LiveVoiceView: View {
     @BighelpThemeReader private var theme
 }
 
-/// Nerd Mode: where the call's sound goes on this device, once a second, to copy into a bug report, and
-/// Restart sound, which stops and starts only the call's player.
+/// Where the call's sound goes on this device, once a second, and Copy report, to paste into a bug report.
+/// Each has its own switch in Settings › Voice › Debug (`LiveVoiceDebug`), where Restart sound is too.
 private struct LiveVoiceAudioReportSection: View {
     let model: LiveVoiceModel
     @AppStorage("loopdy.settings.nerd-mode") private var nerdMode = false
+    @AppStorage(LiveVoiceDebug.showsReportKey) private var showsReport = false
+    @AppStorage(LiveVoiceDebug.showsCopyKey) private var showsCopy = false
     @State private var report: String?
     @BighelpThemeReader private var theme
 
     var body: some View {
-        if nerdMode {
+        let parts = LiveVoiceDebug.parts(nerdMode: nerdMode, showsReport: showsReport, showsCopy: showsCopy)
+        if parts.any {
             // A view that's there before the first report: a `.task` on an empty `Group` never runs.
             VStack(alignment: .leading, spacing: 0) {
                 if let report {
                     VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                        Text(report)
-                            .bighelpFont(.code)
-                            .foregroundStyle(theme.secondaryText)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .textSelection(.enabled)
-                            .accessibilityIdentifier("live-voice.audio-report")
-                        HStack(spacing: BighelpTokens.space12) {
+                        if parts.report {
+                            Text(report)
+                                .bighelpFont(.code)
+                                .foregroundStyle(theme.secondaryText)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .textSelection(.enabled)
+                                .accessibilityIdentifier("live-voice.audio-report")
+                        }
+                        if parts.copy {
                             Button("Copy report", systemImage: "doc.on.doc") {
-                                // The text on screen: a new report would start a fresh, empty mixer reading.
+                                // The newest reading, shown or not: a new report would start a fresh, empty
+                                // mixer reading.
                                 UIPasteboard.general.string = report
                             }
+                            .buttonStyle(.bordered)
+                            .frame(minHeight: BighelpTokens.hitTarget)
                             .accessibilityIdentifier("live-voice.audio-report.copy")
-                            Button("Restart sound", systemImage: "arrow.clockwise") { model.restartPlayback() }
-                                .accessibilityIdentifier("live-voice.audio-report.restart")
                         }
-                        .buttonStyle(.bordered)
-                        .frame(minHeight: BighelpTokens.hitTarget)
                     }
                 }
             }

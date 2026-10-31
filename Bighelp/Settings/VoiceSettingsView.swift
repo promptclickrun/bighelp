@@ -107,6 +107,7 @@ struct VoiceSettingsView: View {
                         .foregroundStyle(theme.secondaryText)
                 }
             }
+            if settings.nerdModeEnabled { VoiceDebugSection() }
         }
         .bighelpFormSurface()
         .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
@@ -251,6 +252,36 @@ private struct VoicePreferenceSections: View {
                     .accessibilityIdentifier("voice.settings.hold-music")
             } header: {
                 Text("Listening")
+            }
+        }
+    }
+}
+
+/// Nerd Mode: what a Gemini Live call's screen shows of where its sound goes on this device (`LiveVoiceDebug`),
+/// and Restart sound for the call in progress.
+@MainActor
+private struct VoiceDebugSection: View {
+    @AppStorage(LiveVoiceDebug.showsReportKey) private var showsReport = false
+    @AppStorage(LiveVoiceDebug.showsCopyKey) private var showsCopy = false
+
+    private var currentCall: LiveVoiceCurrentCall { .shared }
+
+    var body: some View {
+        Section {
+            Toggle("Show call sound report", isOn: $showsReport)
+                .accessibilityIdentifier("voice.settings.debug.report")
+            Toggle("Copy report button", isOn: $showsCopy)
+                .accessibilityIdentifier("voice.settings.debug.copy")
+            Button("Restart sound", systemImage: "arrow.clockwise") { currentCall.restartSound() }
+                .disabled(!currentCall.canRestartSound)
+                .accessibilityIdentifier("voice.settings.debug.restart")
+        } header: {
+            Text("Debug")
+        } footer: {
+            if !currentCall.canRestartSound {
+                Text("Restart sound works during a Gemini Live call.")
+                    .bighelpFont(.metadata)
+                    .foregroundStyle(.secondary)
             }
         }
     }

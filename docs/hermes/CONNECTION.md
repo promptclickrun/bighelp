@@ -291,12 +291,12 @@ read current credential and exact principal
 POST /auth/native/refresh        (the saved credential keeps its refresh token)
 on 2xx: validate minted session and unchanged principal
         compare-and-replace the old record with the new credential
-on 401: compare-and-replace the record with one that has no refresh token; require a new sign-in
+on 401 without WWW-Authenticate: require a new sign-in; do not write or erase the stored record
 on anything else (503, 429, a proxy 5xx, a network error, a timeout, cancellation):
         change nothing; the next attempt sends the same refresh token again
 ```
 
-The refresh token is dropped only when Hermes answers 401. Hermes coalesces repeat refreshes for 30 seconds (the same token gets the same answer), and after a lost answer a resend cannot do worse than the sign-out that dropping the token would force; Hermes Desktop keeps its token the same way. A resend may come from the same authenticator, a new one after a reconnect, or the next launch. A stale authenticator never overwrites a newer record: the compare-and-replace fails first, whatever the host answered.
+Only Hermes' own 401 requires a new sign-in; it does not erase the saved credential. Another authenticator may be saving a newer sign-in, and the rejected authenticator must not overwrite it. Hermes coalesces repeat refreshes for 30 seconds (the same token gets the same answer). After a lost answer, the saved refresh token remains available to the same authenticator, a reconnect or the next launch. A stale authenticator never overwrites a newer record: the compare-and-replace fails first, whatever the host answered. This matches `performRefresh` and `aRejectedRenewalAsksForANewSignIn` in the linked source and renewal tests.
 
 Authenticated JSON HTTP performs one narrowly defined retry: on HTTP 401 **without** `WWW-Authenticate`, renew the Bearer token, or rebootstrap an automatic dashboard token that changed, and resend once. If another concurrent request already installed a new credential, use that one. This relies on the Hermes contract that auth refusal happens before route execution. A 401 with `WWW-Authenticate` is a proxy challenge, not this retry path. Other HTTP failures are not retried here. Dedicated multipart/binary transfers do not inherit this generic JSON retry loop.
 

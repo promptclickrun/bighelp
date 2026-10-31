@@ -1,0 +1,51 @@
+name: Android
+
+on:
+  pull_request:
+    paths:
+      - 'android/**'
+      - 'docs/hermes/**'
+      - '.github/workflows/android.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'docs/hermes/**'
+      - '.github/workflows/android.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: |
+            android/**/*.gradle.kts
+            android/gradle/wrapper/gradle-wrapper.properties
+      - name: Validate Gradle wrapper
+        run: echo '81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f  gradle/wrapper/gradle-wrapper.jar' | sha256sum --check --strict
+      # The pinned GitHub runner includes these SDK packages; use no unapproved setup actions.
+      - name: Verify Android SDK
+        run: |
+          test -d "$ANDROID_HOME/platforms/android-36"
+          test -d "$ANDROID_HOME/build-tools/35.0.0"
+      - name: Test, lint and build
+        run: ./gradlew :hermes:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bighelp-android-debug
+          path: android/app/build/outputs/apk/debug/*.apk

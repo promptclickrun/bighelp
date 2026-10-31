@@ -127,14 +127,32 @@ enum UsageWidgetPublisher {
         ProviderUsagePresentation.visible(report.providers, hidden: hidden)
             .prefix(BighelpUsageSnapshot.maximumPlans)
             .map { provider in
-                BighelpUsageSnapshot.Plan(
+                let brand = AIProviderBrandRegistry.resolve(id: ProviderUsagePresentation.logoProviderID(provider.id),
+                                                            name: provider.name)
+                return BighelpUsageSnapshot.Plan(
                     id: provider.id, name: clip(provider.name, 40), plan: provider.plan.map { clip($0, 30) },
                     limits: provider.windows.prefix(4).map {
-                        .init(label: clip($0.label, 40), leftPercent: max(0, min(100, $0.leftPercent)), resetsAt: $0.resetsAt)
+                        .init(label: clip($0.label, 40), leftPercent: max(0, min(100, $0.leftPercent)), resetsAt: $0.resetsAt,
+                              detail: $0.detail.map { clip($0, 40) })
                     },
                     facts: provider.facts.prefix(2).map { .init(label: clip($0.label, 30), value: clip($0.value, 30)) },
-                    note: note(provider), inUse: provider.activeInHermes)
+                    note: note(provider), inUse: provider.activeInHermes, logo: brand.logoAssetName, tint: tint(brand))
             }
+    }
+
+    /// The widget's color for a provider's plan, as in its own brand; others take the app's accent.
+    static func tint(_ brand: AIProviderBrand) -> String? {
+        switch brand {
+        case .anthropic, .claude: "D97757"
+        case .openAI: "10A37F"
+        // From their own logos.
+        case .codex: "6A7DFF"
+        case .google: "3186FF"
+        case .githubCopilot: "8957E5"
+        case .openRouter: "6467F2"
+        case .deepSeek: "4D6BFE"
+        default: nil
+        }
     }
 
     private static func note(_ provider: ProviderUsage) -> String? {

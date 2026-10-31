@@ -178,12 +178,17 @@ struct GeminiLiveTranslator {
         }
     }
 
-    /// The person's words end where the reply begins.
+    /// The person's words end where the reply begins. Gemini replies only once it decided they finished,
+    /// so they aren't speaking any more, even if its ACTIVITY_END never came.
     private mutating func beginOutput() -> [Output] {
         guard !turnHasOutput else { return [] }
         turnHasOutput = true
+        isUserSpeaking = false
         return finishUser()
     }
+
+    /// Muted, Gemini hears nothing more and may never send the end of the person's speech.
+    mutating func personStoppedSpeaking() { isUserSpeaking = false }
 
     private mutating func finishUser() -> [Output] {
         guard !user.isEmpty else { return [] }

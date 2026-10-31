@@ -28,6 +28,10 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
     private var outputLevel = (value: 0.0, at: Date.distantPast)
     /// When the audio already scheduled finishes playing: Gemini sends it faster than it plays.
     private var playbackEndsAt = Date.distantPast
+    /// The newest audio or words of Gemini's reply.
+    private var lastOutputAt = Date.distantPast
+    /// Since Gemini heard the person start talking.
+    private var personSpeakingSince: Date?
     /// News for the voice model, waiting for a quiet moment (`sendText`).
     private var pendingTexts: [String] = []
     private var awaitingReplySince: Date?
@@ -80,6 +84,7 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
     /// saying. So news waits until nobody is speaking and the phone has played what it already has,
     /// and goes one at a time: a result never talks over another one, or over the person.
     func sendText(_ text: String) {
+        guard !closed else { return }
         pendingTexts.append(text)
         guard quietDelivery == nil else { return }
         quietDelivery = Task { [weak self] in
@@ -98,16 +103,21 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
 
     /// Nobody is speaking: Gemini isn't generating, its audio has finished playing (with a short
     /// pause after it), the person isn't talking, and the last news already got its reply started.
-    nonisolated static func isQuiet(replying: Bool, personSpeaking: Bool, now: Date, playbackEndsAt: Date,
-                                    awaitingReplySince: Date?) -> Bool {
-        guard !replying, !personSpeaking, now >= playbackEndsAt.addingTimeInterval(0.6) else { return false }
+    /// A reply that went quiet without its turnComplete, or speech whose end Gemini never sent, stops
+    /// counting after a while, so news is never held for good.
+    nonisolated static func isQuiet(replying: Bool, lastOutputAt: Date, personSpeakingSince: Date?, now: Date,
+                                    playbackEndsAt: Date, awaitingReplySince: Date?) -> Bool {
+        let stillReplying = replying && now.timeIntervalSince(lastOutputAt) < 3
+        let personSpeaking = personSpeakingSince.map { now.timeIntervalSince($0) < 30 } ?? false
+        guard !stillReplying, !personSpeaking, now >= playbackEndsAt.addingTimeInterval(0.6) else { return false }
         guard let awaitingReplySince else { return true }
         return now.timeIntervalSince(awaitingReplySince) > 5
     }
 
     private func deliverIfQuiet() {
         if translator.isReplying { awaitingReplySince = nil }
-        guard Self.isQuiet(replying: translator.isReplying, personSpeaking: translator.isUserSpeaking, now: Date(),
+        guard Self.isQuiet(replying: translator.isReplying, lastOutputAt: lastOutputAt,
+                           personSpeakingSince: personSpeakingSince, now: Date(),
                            playbackEndsAt: playbackEndsAt, awaitingReplySince: awaitingReplySince),
               !pendingTexts.isEmpty else { return }
         awaitingReplySince = Date()
@@ -116,7 +126,13 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
 
     // MARK: Audio controls
 
-    func setMuted(_ muted: Bool) { uplink.setMuted(muted) }
+    func setMuted(_ muted: Bool) {
+        uplink.setMuted(muted)
+        if muted {
+            translator.personStoppedSpeaking()
+            personSpeakingSince = nil
+        }
+    }
 
     func setPlaybackMuted(_ muted: Bool) { player.volume = muted ? 0 : 1 }
 
@@ -256,7 +272,13 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
                     uplink.attach(task)
                     publish(.connected)
                 }
+                switch message {
+                case .audio, .assistantText: lastOutputAt = Date()
+                default: break
+                }
                 for output in translator.outputs(for: message) { perform(output) }
+                if !translator.isUserSpeaking { personSpeakingSince = nil }
+                else if personSpeakingSince == nil { personSpeakingSince = Date() }
             }
         }
     }

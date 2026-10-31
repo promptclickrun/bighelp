@@ -65,8 +65,12 @@ struct VoiceSettingsView: View {
     /// The computer agents' own voice choices are kept under (`AgentVoiceChoices`).
     private var computer: String? { workspaceConnections?.owner?.cacheScopeID }
 
+    /// The agent picker's entry for the default every agent without its own choice uses. No Hermes
+    /// profile is named this; "" stays "no agent yet", which the first agents to load replace.
+    private static let allAgents = "*"
+
     /// Everything on the page is for this agent, the same choices its Default Voice and voice bar
-    /// make in Bots mode. Without a connection, the defaults for every agent.
+    /// make in Bots mode. All agents, or no connection, edits the default for every agent.
     private var editedAgentID: String? {
         computer != nil && agents.contains(where: { $0.id == agentID }) ? agentID : nil
     }
@@ -79,9 +83,10 @@ struct VoiceSettingsView: View {
 
     var body: some View {
         Form {
-            if editedAgentID != nil {
+            if computer != nil, !agents.isEmpty {
                 Section {
                     Picker("Agent", selection: $agentID) {
+                        Text("All agents").tag(Self.allAgents)
                         ForEach(agents) { Text($0.name).tag($0.id) }
                     }
                     .accessibilityIdentifier("voice.settings.agent")
@@ -90,8 +95,8 @@ struct VoiceSettingsView: View {
             VoicePreferenceSections(settings: settings, confirmAPIBilling: $confirmAPIBilling,
                                     computer: computer, agentID: editedAgentID)
 
-            if !showsSpeechProvider {
-                // Full Duplex speaks for itself.
+            if !showsSpeechProvider || agentID == Self.allAgents {
+                // Full Duplex speaks for itself, and each agent has its own speech provider.
             } else if editedAgentID != nil {
                 if let store, store.agentID == agentID {
                     VoiceSettingsEditor(store: store, focusedField: $focusedField, page: $page)
@@ -121,10 +126,12 @@ struct VoiceSettingsView: View {
             Text("The host's API key may incur separate usage charges. Subscription failures never switch providers automatically.")
         }
         .onChange(of: agents.map(\.id)) { _, ids in
-            if !ids.contains(agentID) { agentID = agents.first(where: \.isDefault)?.id ?? ids.first ?? "" }
+            if agentID != Self.allAgents, !ids.contains(agentID) {
+                agentID = agents.first(where: \.isDefault)?.id ?? ids.first ?? ""
+            }
         }
         .toolbar {
-            if showsSpeechProvider {
+            if showsSpeechProvider, editedAgentID != nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     VoiceSettingsSaveButton(store: store) { focusedField = nil }
                 }

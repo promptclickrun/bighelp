@@ -71,7 +71,7 @@ struct SimpleBotVoiceBar: View {
                 ? String(localized: "Full Duplex couldn't start in this chat, so this is TTS voice.") : nil
         }
         if let error = live.errorMessage ?? live.cleanupMessage { return error }
-        guard live.phase == .live || live.phase == .interrupted else { return live.phase.title }
+        guard live.phase == .live else { return live.phase.title }
         let words = live.assistantCaption.isEmpty ? live.userCaption : live.assistantCaption
         return words.isEmpty ? nil : String(words.suffix(160))
     }

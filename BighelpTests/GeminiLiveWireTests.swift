@@ -119,13 +119,18 @@ struct GeminiLiveWireTests {
         #expect(translator.isUserSpeaking)
         _ = translator.outputs(for: .userActivity(false))
         #expect(!translator.isUserSpeaking)
+        // Gemini replies only once it decided the person finished, END or not.
+        _ = translator.outputs(for: .userActivity(true))
+        _ = translator.outputs(for: .assistantText("Sure."))
+        #expect(!translator.isUserSpeaking)
     }
 
     @Test func newsWaitsUntilNobodyIsSpeaking() {
         let now = Date()
-        func quiet(replying: Bool = false, speaking: Bool = false, playsFor: TimeInterval = -1,
-                   awaiting: TimeInterval? = nil) -> Bool {
-            GeminiLiveAudioPeer.isQuiet(replying: replying, personSpeaking: speaking, now: now,
+        func quiet(replying: Bool = false, lastOutput: TimeInterval = 0, speakingFor: TimeInterval? = nil,
+                   playsFor: TimeInterval = -1, awaiting: TimeInterval? = nil) -> Bool {
+            GeminiLiveAudioPeer.isQuiet(replying: replying, lastOutputAt: now.addingTimeInterval(-lastOutput),
+                                        personSpeakingSince: speakingFor.map { now.addingTimeInterval(-$0) }, now: now,
                                         playbackEndsAt: now.addingTimeInterval(playsFor),
                                         awaitingReplySince: awaiting.map { now.addingTimeInterval(-$0) })
         }
@@ -133,9 +138,12 @@ struct GeminiLiveWireTests {
         #expect(!quiet(replying: true), "Gemini is still generating its answer")
         #expect(!quiet(playsFor: 3), "Monday's results are still playing")
         #expect(!quiet(playsFor: -0.3), "A short pause after the voice stops")
-        #expect(!quiet(speaking: true), "The person is talking")
+        #expect(!quiet(speakingFor: 2), "The person is talking")
         #expect(!quiet(awaiting: 1), "The last news hasn't been answered yet")
         #expect(quiet(awaiting: 6), "An unanswered news item doesn't block the next one forever")
+        // Gemini never closed the turn, or never saw the speech end (muted mid-sentence): news still goes.
+        #expect(quiet(replying: true, lastOutput: 4), "A reply that went quiet without turnComplete")
+        #expect(quiet(speakingFor: 40), "Speech Gemini never saw end")
     }
 
     @Test func onlyGeminisOwnEndpointAndATokenAreAccepted() throws {

@@ -62,7 +62,7 @@ final class SimpleBotVoiceModel {
         settings.setVoiceConversationMode(mode, computer: voice.computer, agentID: agentID, choices: voice.choices)
     }
 
-    /// Back to the default for every agent (Settings › Voice).
+    /// Back to the default for every agent (Settings › Voice › All agents).
     func useDefaultMode() {
         voice.choices.setMode(nil, computer: voice.computer, agentID: agentID)
     }

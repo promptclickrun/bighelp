@@ -1,9 +1,10 @@
 import Foundation
 import Observation
 
-/// Each agent's own voice type (TTS or Full Duplex), Full Duplex provider and voice, chosen in its
-/// Default Voice (Bots mode) and kept on this device by computer and agent, like `OnDeviceVoiceChoices`.
-/// An agent without its own uses Settings › Voice, the default for every agent.
+/// Each agent's own voice type (TTS or Full Duplex), Full Duplex provider and voice, kept on this device
+/// by computer and agent, like `OnDeviceVoiceChoices`. Settings › Voice, the bot's Default Voice (Bots
+/// mode) and the chat's voice button all change the same choice. An agent without its own uses the
+/// default for every agent (Settings › Voice › All agents).
 @MainActor
 @Observable
 final class AgentVoiceChoices {

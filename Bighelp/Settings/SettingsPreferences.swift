@@ -96,11 +96,11 @@ enum VoiceConversationMode: String, CaseIterable, Identifiable, Sendable {
 
     var id: Self { self }
 
-    /// Stored raw values predate these names: `codexLive` is GPT Live 1 and
-    /// `turnBased` is TTS.
+    /// Stored raw values predate these names: `codexLive` is Full Duplex (GPT-Live or
+    /// Gemini Live, `LiveVoiceProvider`) and `turnBased` is TTS.
     var title: String {
         switch self {
-        case .codexLive: "GPT Live 1"
+        case .codexLive: "Full Duplex"
         case .turnBased: "TTS"
         }
     }
@@ -108,7 +108,7 @@ enum VoiceConversationMode: String, CaseIterable, Identifiable, Sendable {
     var detail: String {
         switch self {
         case .codexLive:
-            "A natural, back-and-forth conversation with OpenAI's GPT Live 1. It can keep talking while your agent works. Uses your Codex subscription or an OpenAI API key."
+            "A natural conversation, like a phone call: you can talk over each other, and the agent keeps talking while it works. Each agent can use its own live voice provider."
         case .turnBased:
             "This device turns your words into text on its own, and your agent's speech provider reads each reply aloud. The provider can run on your own computer."
         }

@@ -109,4 +109,49 @@ struct AgentVoiceChoicesTests {
         #expect(!voice.hasOwnMode)
         #expect(voice.liveVoice == "maple", "The rest of its choice still reads")
     }
+
+    @Test func eachAgentKeepsItsOwnFullDuplexProviderAndVoice() throws {
+        let (settings, choices, defaults) = try make()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        settings.liveVoiceProvider = .codexSubscription
+        let bot = SimpleBotVoiceModel(agentID: "juniper", voice: SimpleBotVoiceSettings(
+            settings: settings, choices: choices, computer: "computer-a", connection: { nil }, makeStore: { nil }))
+
+        bot.setMode(.codexLive)
+        bot.setLiveProvider(.gemini)
+        bot.setLiveVoice("Kore")
+
+        let juniper = settings.voicePreference(computer: "computer-a", agentID: "juniper", choices: choices)
+        #expect(juniper.liveProvider == .gemini)
+        #expect(juniper.liveVoice == "Kore")
+        #expect(juniper.hasOwnLiveProvider)
+        #expect(bot.summary == "Full Duplex · Gemini Live · Kore")
+        let other = settings.voicePreference(computer: "computer-a", agentID: "finance", choices: choices)
+        #expect(other.liveProvider == .codexSubscription, "Every other agent keeps the default provider")
+        #expect(other.liveVoice == LiveVoiceProvider.codexSubscription.defaultVoice)
+        #expect(!other.hasOwnLiveProvider)
+        #expect(settings.liveVoiceProvider == .codexSubscription)
+        #expect(settings.liveVoice(for: .gemini) == LiveVoiceProvider.gemini.defaultVoice)
+
+        // A voice from another provider never sticks: Gemini only plays its own names.
+        choices.setLiveVoice("cove", for: .gemini, computer: "computer-a", agentID: "juniper")
+        #expect(settings.voicePreference(computer: "computer-a", agentID: "juniper", choices: choices).liveVoice == "Kore")
+
+        choices.setLiveProvider(nil, computer: "computer-a", agentID: "juniper")
+        #expect(settings.voicePreference(computer: "computer-a", agentID: "juniper", choices: choices).liveProvider
+                == .codexSubscription)
+    }
+
+    @Test func aProviderThisVersionDoesNotKnowReadsAsNoChoice() throws {
+        let (settings, choices, defaults) = try make()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        // The entry for "computer-a" (10 bytes) and "juniper".
+        let saved = #"{"10:computer-ajuniper":{"liveProvider":"grok","liveVoices":{"grok":"ara"}}}"#
+        defaults.set(Data(saved.utf8), forKey: AgentVoiceChoices.key)
+        let reread = AgentVoiceChoices(defaults: defaults)
+
+        let voice = settings.voicePreference(computer: "computer-a", agentID: "juniper", choices: reread)
+        #expect(voice.liveProvider == settings.liveVoiceProvider)
+        #expect(!voice.hasOwnLiveProvider)
+    }
 }

@@ -133,6 +133,10 @@ final class SettingsStore {
         didSet { defaults.set(apiLiveVoice, forKey: Keys.apiLiveVoice) }
     }
 
+    private(set) var geminiLiveVoice: String {
+        didSet { defaults.set(geminiLiveVoice, forKey: Keys.geminiLiveVoice) }
+    }
+
     var offlineModeEnabled: Bool {
         didSet { defaults.set(offlineModeEnabled, forKey: Keys.offlineMode) }
     }
@@ -431,6 +435,9 @@ final class SettingsStore {
         let savedAPIVoice = defaults.string(forKey: Keys.apiLiveVoice) ?? ""
         apiLiveVoice = LiveVoiceProvider.apiKey.voices.contains(savedAPIVoice)
             ? savedAPIVoice : LiveVoiceProvider.apiKey.defaultVoice
+        let savedGeminiVoice = defaults.string(forKey: Keys.geminiLiveVoice) ?? ""
+        geminiLiveVoice = LiveVoiceProvider.gemini.voices.contains(savedGeminiVoice)
+            ? savedGeminiVoice : LiveVoiceProvider.gemini.defaultVoice
         offlineModeEnabled = defaults.bool(
             forKey: Keys.offlineMode,
             default: false
@@ -699,6 +706,7 @@ final class SettingsStore {
         switch provider {
         case .codexSubscription: codexLiveVoice
         case .apiKey: apiLiveVoice
+        case .gemini: geminiLiveVoice
         }
     }
 
@@ -707,6 +715,7 @@ final class SettingsStore {
         switch provider {
         case .codexSubscription: codexLiveVoice = voice
         case .apiKey: apiLiveVoice = voice
+        case .gemini: geminiLiveVoice = voice
         }
     }
 
@@ -807,6 +816,7 @@ private extension SettingsStore {
         static let liveVoiceProvider = "loopdy.voice.live.provider"
         static let codexLiveVoice = "loopdy.voice.live.codex-voice"
         static let apiLiveVoice = "loopdy.voice.live.api-voice"
+        static let geminiLiveVoice = "bighelp.voice.live.gemini-voice"
         static let offlineMode = "loopdy.demo.offlineMode"
         static let notifications = "loopdy.demo.notifications"
         static let showReasoningByDefault = "loopdy.chat.showReasoningByDefault"

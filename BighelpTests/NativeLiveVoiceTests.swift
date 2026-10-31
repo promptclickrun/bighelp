@@ -232,9 +232,127 @@ struct NativeLiveVoiceTests {
         #expect(!chat.isSending)
     }
 
+    @MainActor private final class LocalPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
+        var onConnectionState: (@MainActor (BighelpRealtimeAudioPeer.ConnectionState) -> Void)?
+        var onAudioRoute: (@MainActor (String) -> Void)?
+        var onInterruption: (@MainActor (Bool) -> Void)?
+        var onEvent: (@MainActor ([String: BighelpJSONValue]) -> Void)?
+        var answers: [LiveVoiceAnswer] = []
+        var texts: [String] = []
+        var functionAnswers: [String: [String: BighelpJSONValue]] = [:]
+        func makeOffer() async throws -> String { "" }
+        func applyAnswer(_ sdp: String) async throws { Issue.record("Gemini takes no SDP") }
+        func apply(_ answer: LiveVoiceAnswer) async throws {
+            answers.append(answer)
+            onConnectionState?(.connected)
+        }
+        func sendText(_ text: String) { texts.append(text) }
+        func answerFunction(id: String, name: String, response: [String: BighelpJSONValue]) { functionAnswers[id] = response }
+        func setMuted(_ muted: Bool) {}
+        func setPlaybackMuted(_ muted: Bool) {}
+        func setSpeakerEnabled(_ enabled: Bool) throws {}
+        func setDefaultSpeakerOutput() throws {}
+        func resumeAudio() throws {}
+        func statistics() async throws -> BighelpRealtimeAudioPeer.MediaStatistics { .init(audioDeviceRunning: true) }
+        func close() {}
+    }
+
+    @MainActor private final class GeminiLog {
+        var operations: [WorkspaceOperation] = []
+        var offer: [String: BighelpJSONValue] = [:]
+        var submitted: [String] = []
+    }
+
+    @Test func geminiKeepsEventsAndResultsOnThePhonesOwnConnection() async throws {
+        let log = GeminiLog()
+        let voice = NativeLiveVoiceSession(
+            owner: .init(hostID: "native", authorizationID: "auth", agentID: "juniper", sessionID: "stored"),
+            operation: { operation, payload in
+                log.operations.append(operation)
+                switch operation {
+                case .nativeVoiceGeminiStatus: return ["available": .boolean(true), "enabled": .boolean(true)]
+                case .nativeVoiceGeminiOffer:
+                    log.offer = payload
+                    return ["voiceId": payload["voiceId"]!, "transport": .string("websocket"),
+                            "url": .string("wss://generativelanguage.googleapis.com/ws/live"),
+                            "token": .string("auth_tokens/one"), "model": .string("models/gemini-3.8-live")]
+                case .nativeVoiceClose: return ["closed": .boolean(true)]
+                default: throw LiveVoiceControlError.unavailable
+                }
+            }, isCurrent: { true }, submit: { text in
+                log.submitted.append(text)
+                return "Moved 42 files into 5 folders."
+            })
+        let peer = LocalPeer()
+        let model = voice.makeModel(agentName: "Juniper", makeLocalPeer: { peer })
+        defer { model.end() }
+        model.configure(provider: .gemini, voice: "Kore")
+        model.start()
+        for _ in 0..<500 where peer.answers.isEmpty { await Task.yield() }
+
+        #expect(peer.answers == [.gemini(url: URL(string: "wss://generativelanguage.googleapis.com/ws/live")!,
+                                         token: "auth_tokens/one", model: "models/gemini-3.8-live")])
+        #expect(log.operations == [.nativeVoiceGeminiStatus, .nativeVoiceGeminiOffer])
+        #expect(log.offer["provider"] == .string("gemini"))
+        #expect(log.offer["voice"] == .string("Kore"))
+        #expect(log.offer["agentId"] == .string("juniper"))
+
+        peer.onEvent?(["kind": .string("started")])
+        peer.onEvent?(["kind": .string("delegation"), "id": .string("call-1"), "text": .string("Tidy my Downloads")])
+        for _ in 0..<500 where peer.texts.isEmpty { await Task.yield() }
+        #expect(log.submitted == ["Tidy my Downloads"])
+        #expect(peer.texts == [NativeLiveVoiceSession.update(request: "Tidy my Downloads",
+                                                             result: "Moved 42 files into 5 folders.")])
+        #expect(peer.texts.first?.hasPrefix("UPDATE: ") == true)
+        #expect(model.workStatus == .resultSent)
+
+        peer.onEvent?(["kind": .string("tool"), "name": .string("check_work"), "id": .string("call-2")])
+        #expect(peer.functionAnswers["call-2"] == ["work": .array([.object([
+            "request": .string("Tidy my Downloads"), "state": .string("finished")])])])
+        // The host has no feed for this call: nothing polled, nothing appended there.
+        #expect(!log.operations.contains(.nativeVoicePoll))
+        #expect(!log.operations.contains(.nativeVoiceResult))
+    }
+
+    @Test func geminiNeverCallsUnconfirmedWorkDone() async throws {
+        let voice = NativeLiveVoiceSession(
+            owner: .init(hostID: "native", authorizationID: "auth", agentID: "juniper", sessionID: "stored"),
+            operation: { operation, payload in
+                switch operation {
+                case .nativeVoiceGeminiStatus: return ["available": .boolean(true), "enabled": .boolean(true)]
+                case .nativeVoiceGeminiOffer:
+                    return ["voiceId": payload["voiceId"]!, "transport": .string("websocket"),
+                            "url": .string("wss://generativelanguage.googleapis.com/ws/live"),
+                            "token": .string("auth_tokens/one"), "model": .string("models/gemini-3.8-live")]
+                case .nativeVoiceClose: return ["closed": .boolean(true)]
+                default: throw LiveVoiceControlError.unavailable
+                }
+            }, isCurrent: { true }, submit: { _ in throw WorkspaceClientError.outcomeUnknown })
+        let peer = LocalPeer()
+        let model = voice.makeModel(agentName: "Juniper", makeLocalPeer: { peer })
+        defer { model.end() }
+        model.configure(provider: .gemini, voice: "Kore")
+        model.start()
+        for _ in 0..<500 where peer.answers.isEmpty { await Task.yield() }
+
+        peer.onEvent?(["kind": .string("delegation"), "id": .string("call-1"), "text": .string("Pay the invoice")])
+        for _ in 0..<500 where peer.texts.isEmpty { await Task.yield() }
+        let update = try #require(peer.texts.first)
+        #expect(update.contains("is not confirmed, so do not say it is done"))
+        #expect(!update.contains("is done. What came back"))
+
+        peer.onEvent?(["kind": .string("tool"), "name": .string("check_work"), "id": .string("call-2")])
+        #expect(peer.functionAnswers["call-2"] == ["work": .array([])], "Unconfirmed work is never listed as finished")
+
+        // Gemini ends the call; the next call can start.
+        peer.onEvent?(["kind": .string("closed")])
+        #expect(model.phase == .ended)
+        _ = try await voice.perform("voice.live.offer", fields: ["voiceId": .string("voice-next"), "provider": .string("gemini")])
+    }
+
     @Test func nativeVoiceOperationsHaveNativePluginRoutes() {
         for operation in [WorkspaceOperation.nativeVoiceStatus, .nativeVoiceOffer, .nativeVoicePoll,
-                          .nativeVoiceResult, .nativeVoiceClose] {
+                          .nativeVoiceResult, .nativeVoiceClose, .nativeVoiceGeminiStatus, .nativeVoiceGeminiOffer] {
             #expect(DirectHermesNativePluginClient.supports(operation))
         }
     }

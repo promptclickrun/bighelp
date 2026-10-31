@@ -9,15 +9,27 @@ struct LiveVoiceOwner: Equatable, Hashable, Sendable {
     let sessionID: String
 }
 
+/// Who runs a Full Duplex call. Each agent can have its own (`AgentVoiceChoices`).
 enum LiveVoiceProvider: String, CaseIterable, Identifiable, Sendable {
     case codexSubscription = "codex_subscription"
     case apiKey = "api_key"
+    /// The phone talks to Gemini directly, with a single-use token the plugin makes from the agent's key.
+    case gemini
 
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .codexSubscription: "Codex subscription"
-        case .apiKey: "API key (separate billing)"
+        case .codexSubscription: "GPT-Live, Codex subscription"
+        case .apiKey: "GPT-Live, API key (separate billing)"
+        case .gemini: "Gemini Live, your Gemini key"
+        }
+    }
+
+    /// The short name the Default Voice row shows.
+    var shortTitle: String {
+        switch self {
+        case .codexSubscription, .apiKey: "GPT-Live"
+        case .gemini: "Gemini Live"
         }
     }
 
@@ -25,19 +37,42 @@ enum LiveVoiceProvider: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .codexSubscription: ["arbor", "breeze", "cove", "ember", "juniper", "maple", "sol", "spruce", "vale"]
         case .apiKey: ["marin", "quartz", "ripple", "vesper", "willow", "stone", "gleam", "meridian", "bossa", "tempo", "beacon", "delta", "cinder"]
+        // The plugin accepts only these: Gemini plays its default voice for a name it doesn't know.
+        case .gemini: ["Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede", "Callirrhoe", "Autonoe",
+                       "Enceladus", "Iapetus", "Umbriel", "Algieba", "Despina", "Erinome", "Algenib", "Rasalgethi",
+                       "Laomedeia", "Achernar", "Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird",
+                       "Zubenelgenubi", "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat"]
         }
     }
-    var defaultVoice: String { self == .codexSubscription ? "cove" : "marin" }
+    var defaultVoice: String {
+        switch self {
+        case .codexSubscription: "cove"
+        case .apiKey: "marin"
+        case .gemini: "Zephyr"
+        }
+    }
+
+    /// GPT-Live's media and events go through the plugin; Gemini's stay between the phone and Gemini.
+    var usesHostMedia: Bool { self != .gemini }
+}
+
+/// What the plugin answers an offer with: GPT-Live's answer SDP, or where the phone connects to Gemini.
+enum LiveVoiceAnswer: Equatable, Sendable {
+    case sdp(String)
+    case gemini(url: URL, token: String, model: String)
 }
 
 enum LiveVoiceControlError: Error, LocalizedError, Sendable {
     case invalidResponse, wrongOwner, unavailable, timedOut
+    /// The host answers status for Gemini without a key for this agent.
+    case geminiKeyMissing
     var errorDescription: String? {
         switch self {
         case .invalidResponse: "Your computer sent back a voice answer the app couldn't use. Try again."
         case .wrongOwner: "This voice call no longer belongs to this chat. Close voice and open it again."
         case .unavailable: "Live voice isn't available on your computer right now. Try again, or use TTS voice mode."
         case .timedOut: "Your computer didn't answer in time. Try again."
+        case .geminiKeyMissing: "This agent has no Gemini API key on your computer. Add one as GEMINI_API_KEY, then try again."
         }
     }
 }
@@ -148,9 +183,9 @@ final class LiveVoiceControlClient {
         try await request("voice.live.status", fields: ["provider": .string(provider.rawValue)])
     }
 
-    func offer(voiceID: String, provider: LiveVoiceProvider, voice: String, sdp: String) async throws -> String {
+    func offer(voiceID: String, provider: LiveVoiceProvider, voice: String, sdp: String) async throws -> LiveVoiceAnswer {
         guard provider.voices.contains(voice), !voiceID.isEmpty else { throw LiveVoiceControlError.invalidResponse }
-        try BighelpRealtimeAudioPeer.validateAudioSDP(sdp)
+        if provider.usesHostMedia { try BighelpRealtimeAudioPeer.validateAudioSDP(sdp) }
         let result = try await request("voice.live.offer", fields: [
             "voiceId": .string(voiceID), "provider": .string(provider.rawValue),
             "voice": .string(voice), "sdp": .string(sdp),
@@ -163,11 +198,23 @@ final class LiveVoiceControlClient {
                 try? await self.close(voiceID: voiceID)
             }
         })
-        guard result["voiceId"]?.string == voiceID, let answer = result["sdp"]?.string else {
+        guard result["voiceId"]?.string == voiceID else { throw LiveVoiceControlError.invalidResponse }
+        guard provider.usesHostMedia else { return try Self.geminiAnswer(result) }
+        guard let answer = result["sdp"]?.string else { throw LiveVoiceControlError.invalidResponse }
+        try BighelpRealtimeAudioPeer.validateAudioSDP(answer)
+        return .sdp(answer)
+    }
+
+    /// Only Gemini's own Live endpoint, over TLS, with a bounded single-use token.
+    nonisolated static func geminiAnswer(_ result: [String: BighelpJSONValue]) throws -> LiveVoiceAnswer {
+        guard result["transport"]?.string == "websocket",
+              let address = result["url"]?.string, let url = URL(string: address), url.scheme == "wss",
+              url.host == "generativelanguage.googleapis.com", url.user == nil, url.query == nil,
+              let token = result["token"]?.string, token.hasPrefix("auth_tokens/"), token.utf8.count <= 600,
+              let model = result["model"]?.string, model.hasPrefix("models/"), model.utf8.count <= 120 else {
             throw LiveVoiceControlError.invalidResponse
         }
-        try BighelpRealtimeAudioPeer.validateAudioSDP(answer)
-        return answer
+        return .gemini(url: url, token: token, model: model)
     }
 
     /// Ending media is deliberately not cancelling any accepted task.

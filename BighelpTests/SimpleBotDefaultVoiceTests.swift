@@ -34,7 +34,7 @@ struct SimpleBotDefaultVoiceTests {
         let live = AgentVoicePreference(mode: .codexLive, liveProvider: .codexSubscription, liveVoice: "cove",
                                         hasOwnMode: true)
 
-        #expect(SimpleBotDefaultVoiceSummary.text(voice: live, store: store) == "GPT Live 1 · Cove")
+        #expect(SimpleBotDefaultVoiceSummary.text(voice: live, store: store) == "Full Duplex · GPT-Live · Cove")
     }
 
     @Test
@@ -89,7 +89,7 @@ struct SimpleBotDefaultVoiceTests {
         model.setLiveVoice("maple")
 
         #expect(model.preference.mode == .codexLive)
-        #expect(model.summary == "GPT Live 1 · Maple", "The row says the bot's own voice")
+        #expect(model.summary == "Full Duplex · GPT-Live · Maple", "The row says the bot's own voice")
         #expect(settings.voiceConversationMode == .turnBased, "Every other agent keeps the default")
         #expect(settings.liveVoice(for: .codexSubscription) == LiveVoiceProvider.codexSubscription.defaultVoice)
 

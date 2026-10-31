@@ -4,22 +4,39 @@ import Foundation
 /// ChatModel and Hermes submission journal; this class owns no remote job queue.
 /// Each request the voice model hands over starts at once and answers on its own,
 /// so the call keeps talking while earlier work runs.
+///
+/// GPT-Live's events come from the host's feed (`poll`) and its results go back
+/// through the host. A Gemini call's events come from the phone's own connection
+/// (`LiveVoiceLocalSession`), and its results go back to it as `UPDATE` text.
 @MainActor
 final class NativeLiveVoiceSession {
     typealias Operation = @MainActor (WorkspaceOperation, [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue]
     typealias CloseCleanupFactory = @MainActor (String) -> (@MainActor () async -> Void)?
     typealias Submit = @MainActor (String) async throws -> String
 
+    /// What a request came back with, and whether the chat confirmed it at all.
+    private struct Outcome: Sendable {
+        let text: String
+        var confirmed = true
+    }
+
     private final class Call {
         let id: String
+        /// Gemini: events and results stay on the phone's own connection.
+        let local: Bool
         var cursor = 0
         var seen: [String: String] = [:]
-        var pending: [String: Task<String, Never>] = [:]
+        var pending: [String: Task<Outcome, Never>] = [:]
         var transcripts: [(Int, String)] = []
         var contextOffset = -1
         var contextIncomplete = false
         var closeCleanup: (@MainActor () async -> Void)?
-        init(id: String) { self.id = id }
+        /// Requests that finished on this call, newest last, for `check_work`.
+        var finished: [String] = []
+        init(id: String, local: Bool) {
+            self.id = id
+            self.local = local
+        }
     }
 
     let owner: LiveVoiceOwner
@@ -30,6 +47,7 @@ final class NativeLiveVoiceSession {
     private var call: Call?
     private var pollTask: Task<Void, Never>?
     private weak var model: LiveVoiceModel?
+    private weak var localSession: (any LiveVoiceLocalSession)?
     private var retired = false
 
     init(owner: LiveVoiceOwner, operation: @escaping Operation,
@@ -45,33 +63,44 @@ final class NativeLiveVoiceSession {
 
     func makeModel(
         agentName: String,
-        makePeer: @escaping @MainActor () -> any LiveVoiceAudioPeer = { BighelpRealtimeAudioPeer() }
+        makePeer: @escaping @MainActor () -> any LiveVoiceAudioPeer = { BighelpRealtimeAudioPeer() },
+        makeLocalPeer: @escaping @MainActor () -> any LiveVoiceAudioPeer & LiveVoiceLocalSession = {
+            GeminiLiveAudioPeer()
+        }
     ) -> LiveVoiceModel {
         let client = LiveVoiceControlClient(owner: owner, operation: { [self] name, fields in
             try await perform(name, fields: fields)
         }, isOwnerCurrent: { [isCurrent, owner] value in value == owner && isCurrent() },
             onInvalidate: { [weak self] in self?.retire() })
-        let model = LiveVoiceModel(agentName: agentName, client: client, makePeer: makePeer)
+        let model = LiveVoiceModel(agentName: agentName, client: client, makePeer: { [weak self] in
+            // The model asks for its peer as it starts, with the provider it starts with.
+            guard let self, self.model?.provider.usesHostMedia == false else { return makePeer() }
+            let peer = makeLocalPeer()
+            self.adopt(peer)
+            return peer
+        })
         self.model = model
         return model
     }
 
     func perform(_ name: String, fields: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] {
         guard !retired, isCurrent() else { throw LiveVoiceControlError.wrongOwner }
+        let local = fields["provider"]?.string.flatMap(LiveVoiceProvider.init(rawValue:))?.usesHostMedia == false
         switch name {
-        case "voice.live.status": return try await request(.nativeVoiceStatus, fields)
+        case "voice.live.status": return try await request(local ? .nativeVoiceGeminiStatus : .nativeVoiceStatus, fields)
         case "voice.live.offer":
             guard call == nil, let id = fields["voiceId"]?.string else { throw LiveVoiceControlError.invalidResponse }
-            let next = Call(id: id)
+            let next = Call(id: id, local: local)
             call = next
             // Snapshot cleanup while the original owner and native context are
             // still current. The handle is retained for this exact allocation,
             // including an offer that returns late after retirement.
             next.closeCleanup = closeCleanupFactory?(id)
             do {
-                let result = try await request(.nativeVoiceOffer, fields)
+                let result = try await request(local ? .nativeVoiceGeminiOffer : .nativeVoiceOffer, fields)
                 guard call === next else { throw LiveVoiceControlError.wrongOwner }
-                pollTask = Task { [weak self, next] in await self?.poll(next) }
+                // Gemini's events arrive on the phone's own connection; the host has none to poll.
+                if !local { pollTask = Task { [weak self, next] in await self?.poll(next) } }
                 return result
             } catch {
                 if call === next { call = nil }
@@ -157,31 +186,48 @@ final class NativeLiveVoiceSession {
         guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               text.utf8.count <= 3_072, call.seen[id] == nil, call.seen.count < 1024 else { return }
         call.seen[id] = text
-        let work: Task<String, Never>
+        let work: Task<Outcome, Never>
         if let existing = call.pending[text] {
             work = existing // Same pending request, even with a new provider item ID.
         } else {
             guard call.pending.count < 8 else {
-                append("There is already pending work. Check the chat before asking for more.", delegationID: id, call: call)
+                append(Outcome(text: "There is already pending work. Check the chat before asking for more.", confirmed: false),
+                       delegationID: id, call: call)
                 return
             }
             work = Task { [self, call, text] in
                 defer { call.pending[text] = nil }
-                guard !retired, isCurrent() else { return "The host connection changed. Check the chat before resending." }
-                do { return Self.boundedResult(try await submit(text)) }
-                catch { return "This request was not confirmed. Check the chat and its pending approvals before requesting it again." }
+                guard !retired, isCurrent() else {
+                    return Outcome(text: "The host connection changed. Check the chat before resending.", confirmed: false)
+                }
+                do { return Outcome(text: Self.boundedResult(try await submit(text))) }
+                catch {
+                    return Outcome(text: "This request was not confirmed. Check the chat and its pending approvals before requesting it again.",
+                                   confirmed: false)
+                }
             }
             call.pending[text] = work
         }
         emitWorkStatus("working", delegationID: id, voiceID: voiceID)
         Task { [self, call] in
-            let text = await work.value
-            append(text, delegationID: id, call: call)
+            append(await work.value, delegationID: id, call: call)
         }
     }
 
-    private func append(_ text: String, delegationID: String, call expected: Call) {
+    private func append(_ outcome: Outcome, delegationID: String, call expected: Call) {
+        let text = outcome.text
         guard call === expected, isCurrent() else { return }
+        if expected.local {
+            guard let localSession else { return }
+            let request = expected.seen[delegationID] ?? ""
+            if outcome.confirmed {
+                expected.finished.append(request)
+                if expected.finished.count > 8 { expected.finished.removeFirst() }
+            }
+            localSession.sendText(Self.update(request: request, result: text, confirmed: outcome.confirmed))
+            emitWorkStatus("result_sent", delegationID: delegationID, voiceID: expected.id)
+            return
+        }
         Task { [self, expected] in
             guard call === expected, isCurrent() else { return }
             do {
@@ -194,6 +240,43 @@ final class NativeLiveVoiceSession {
                 emit(["kind": .string("provider_error"), "fatal": .boolean(false)], voiceID: expected.id)
             }
         }
+    }
+
+    /// A Gemini call: events from the phone's own connection, plus `check_work`, which this answers.
+    private func adopt(_ peer: any LiveVoiceLocalSession) {
+        localSession = peer
+        peer.onEvent = { [weak self] event in self?.receiveLocal(event) }
+    }
+
+    private func receiveLocal(_ event: [String: BighelpJSONValue]) {
+        guard let call, call.local else { return }
+        if event["kind"]?.string == "closed" {
+            // Gemini ended the call: the next one starts fresh. Work it started keeps going.
+            emit(event, voiceID: call.id)
+            self.call = nil
+            return
+        }
+        guard event["kind"]?.string == "tool" else {
+            receiveEvent(event, voiceID: call.id)
+            return
+        }
+        guard event["name"]?.string == GeminiLiveTranslator.checkWork, let id = event["id"]?.string else { return }
+        let running = call.pending.keys.sorted().map {
+            BighelpJSONValue.object(["request": .string($0), "state": .string("working")])
+        }
+        let done = call.finished.suffix(3).map {
+            BighelpJSONValue.object(["request": .string($0), "state": .string("finished")])
+        }
+        localSession?.answerFunction(id: id, name: GeminiLiveTranslator.checkWork, response: ["work": .array(running + done)])
+    }
+
+    /// The voice model tells this as its own news, in the first person (the plugin's brief says how).
+    /// Work the chat never confirmed is never called done.
+    static func update(request: String, result: String, confirmed: Bool = true) -> String {
+        let asked = request.isEmpty ? "" : " (\"\(String(request.prefix(300)))\")"
+        return confirmed
+            ? "UPDATE: the work you started\(asked) is done. What came back: \(result)"
+            : "UPDATE: the work you tried to start\(asked) is not confirmed, so do not say it is done. \(result)"
     }
 
     private func emit(_ event: [String: BighelpJSONValue], voiceID: String) {
@@ -224,7 +307,7 @@ final class NativeLiveVoiceSession {
     }
 
     static func boundedResult(_ text: String) -> String {
-        guard !text.isEmpty else { return "Hermes accepted the request, but no final answer is confirmed yet. Check the chat." }
+        guard !text.isEmpty else { return "I started this, but there is no final answer yet. It will show in the chat." }
         if text.utf16.count <= 1_500 { return text }
         var result = String(text.prefix(1_400))
         while result.utf16.count > 1_400 { result.removeLast() }

@@ -14,11 +14,38 @@ State-backed relay clients explicitly negotiate `state-backed-presentation-v1`. 
 
 ## Voice
 
-Live voice defaults to **Codex subscription** (`gpt-live-1-codex`). The plugin uses Hermes-managed subscription credentials; the phone receives no bearer token. Native WebRTC carries audio directly to the provider while authenticated bighelp messages carry setup, captions and job controls. The provider sideband is connected before the answer SDP is returned.
+Live voice is called **Full Duplex** in the app. Each agent can pick its own provider and voice in its Default
+Voice (`AgentVoiceChoices`); an agent without its own uses Settings › Voice. The voice model is the agent itself:
+the plugin builds its brief from the agent's name and `SOUL.md`, so it speaks in the first person and never says
+"your agent" or "Hermes".
+
+### GPT-Live
+
+GPT-Live defaults to **Codex subscription** (`gpt-live-1-codex`). The plugin uses Hermes-managed subscription credentials; the phone receives no bearer token. Native WebRTC carries audio directly to the provider while authenticated bighelp messages carry setup, captions and job controls. The provider sideband is connected before the answer SDP is returned.
 
 Requests the voice model hands over never wait for each other, so you can keep talking while work runs (`NativeLiveVoiceSession`). A request runs as a turn in the open chat when the chat is free. One made while the chat is working runs at once as a Hermes background task for that chat (`prompt.background`), beside the running turn; its answer goes back to the call when it arrives (`background.complete`) and shows in the chat. A background task uses the agent's Hermes tools, but not the phone's (Device access reaches only the chat itself). The same request said twice shares one run. Muting, barge-in and ending the call do not cancel accepted work. Unknown admission outcomes are reported, never resubmitted.
 
 An explicitly selected API-key mode uses the distinct public `gpt-live-1` protocol and the host's configured `OPENAI_API_KEY`. It may incur separate usage charges. Subscription errors never select it automatically. Turn-based voice remains an explicit alternative.
+
+### Gemini Live
+
+On plugins that list `native-voice-gemini-v1`, the plugin answers a Gemini offer with a single-use token made
+from the agent's own `GEMINI_API_KEY` (the key stays on the host). The token locks the model, voice, brief and
+tools. `GeminiLiveAudioPeer` opens the phone's own WebSocket to Gemini with it and sends only the model name, then
+16 kHz microphone audio from one voice-processing `AVAudioEngine`, which cancels the agent's voice from the
+microphone without muting it, so the person can talk over the agent.
+
+Nothing goes through the host's feed. `GeminiLiveTranslator` turns Gemini's messages into the same call events
+GPT-Live gets from `poll`, so `NativeLiveVoiceSession` routes work the same way:
+
+- `start_work` is answered at once with "started", and the request runs like any delegation (a turn in the open
+  chat, or a background task while the chat works). Its reply goes back as text that starts with `UPDATE`, and the
+  agent tells the person right away, cutting in if it is speaking.
+- `check_work` is answered from the requests in flight and the last ones that finished.
+- After a cut-in, Gemini ends the abandoned turn with an empty `turnComplete` before the reply to the cut-in;
+  the translator ignores it.
+
+A Gemini session lasts up to 30 minutes from its token; the call ends when Gemini closes the socket.
 
 ## Team call
 

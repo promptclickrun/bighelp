@@ -23,6 +23,23 @@ struct LiveVoiceCallContextTests {
                                         place: nil, timeZone: nil)
         #expect(long.fields["agentName"] == .string("Al fie"))
         #expect(long.fields["personName"]?.string?.count == UserIdentity.maximumNameLength)
+        // The plugin counts code points, not characters: 30 family emoji are 210 of them.
+        let emoji = LiveVoiceCallContext(agentName: nil, personName: String(repeating: "👨‍👩‍👧‍👦", count: 30),
+                                         place: nil, timeZone: nil)
+        #expect((emoji.fields["personName"]?.string?.unicodeScalars.count ?? 0) <= UserIdentity.maximumNameLength)
+    }
+
+    @Test func onlyAComputerWhosePluginTakesItGetsTheContext() async {
+        let place = LiveVoicePlace(isAllowed: { false }, provider: DemoDeviceLocationProvider())
+        #expect(LiveVoiceCallContext.offerContext(features: ["native-voice-v1"], agentName: "Alfie",
+                                                  personName: { "Sam" }, place: place) == nil)
+        let context = LiveVoiceCallContext.offerContext(features: ["native-voice-v1", "native-voice-context-v1"],
+                                                        agentName: "Alfie", personName: { "Sam" }, place: place)
+        let fields = await context?()
+        #expect(fields?["agentName"] == .string("Alfie"))
+        #expect(fields?["personName"] == .string("Sam"))
+        #expect(fields?["timeZone"] == .string(TimeZone.current.identifier))
+        #expect(fields?["place"] == nil, "Location is off")
     }
 
     @Test func theSessionAddsTheContextOnlyWhenTheComputerTakesIt() async throws {
@@ -63,10 +80,10 @@ struct LiveVoiceCallContextTests {
         let provider = SlowLocation()
         let place = LiveVoicePlace(isAllowed: { true }, provider: provider)
         let started = ContinuousClock.now
-        #expect(await place.coarse(within: .milliseconds(100)) == nil)
-        #expect(ContinuousClock.now - started < .milliseconds(400))
-        try await Task.sleep(for: .milliseconds(500))
-        #expect(await place.coarse(within: .milliseconds(100)) == "Sampleton, Exampleland")
+        #expect(await place.coarse(within: 0.5) == nil)
+        #expect(ContinuousClock.now - started < .milliseconds(900), "The call waits its limit, not the search")
+        try await Task.sleep(for: .seconds(1.8))
+        #expect(await place.coarse(within: 0.5) == "Sampleton, Exampleland")
         #expect(provider.fixes == 1, "The next call used the place the slow fix found")
     }
 
@@ -83,7 +100,7 @@ struct LiveVoiceCallContextTests {
         func requestPrecise(purposeKey: String) async -> DeviceLocationAccuracy { .reduced }
         func currentFix() async throws -> DeviceLocationFix {
             fixes += 1
-            try await Task.sleep(for: .milliseconds(300))
+            try await Task.sleep(for: .seconds(2))
             return DeviceLocationFix(latitude: 12.3, longitude: -65.4, horizontalAccuracy: 3_000, timestamp: Date())
         }
         func place(for fix: DeviceLocationFix) async -> DeviceLocationPlace? {

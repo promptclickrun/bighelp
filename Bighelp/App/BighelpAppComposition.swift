@@ -331,7 +331,7 @@ struct BighelpAppComposition {
         if usesFixtures {
             LiveVoicePlace.shared.provider = DemoDeviceLocationProvider()
         } else {
-            LiveVoicePlace.shared.provider = LiveDeviceLocationProvider()
+            LiveVoicePlace.shared.provider = LiveDeviceLocationProvider(accuracy: LiveVoicePlace.cityAccuracy)
             LiveVoicePlace.shared.lastKnown = { LiveVoicePlace.systemLastKnown() }
         }
         let deviceToolPermissions = DeviceToolPermissions(

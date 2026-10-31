@@ -27,19 +27,26 @@ struct LiveVoiceCallContext: Equatable, Sendable {
         return fields
     }
 
+    /// Cut by Unicode scalars, as the plugin counts: by characters, 30 family emoji were 210 code points
+    /// and the plugin refused the whole offer.
     private static func line(_ value: String?, _ limit: Int) -> String {
-        String((value ?? "").split(whereSeparator: \.isWhitespace).joined(separator: " ").prefix(limit))
+        let text = (value ?? "").split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return String(String.UnicodeScalarView(text.unicodeScalars.prefix(limit)))
+            .trimmingCharacters(in: .whitespaces)
     }
 }
 
 /// Roughly where the person is (city, region, country), for a voice call's weather and local questions.
-/// Only while Device access › Location is on and iOS allows it; never coordinates or a street. A call
-/// waits for it at most `within`, and the place it finds is kept for the next call.
+/// Only while Device access › Location is on and iOS allows it; never coordinates or a street. It comes
+/// from the last known fix under an hour old, else a fresh city-level one. A call waits for it at most
+/// `within`, and a slower search still finishes and is kept for the next call.
 @MainActor
 final class LiveVoicePlace {
     /// Set at launch (`BighelpAppComposition`).
     static let shared = LiveVoicePlace()
     static let reuseFor: TimeInterval = 30 * 60
+    /// A city needs no better than this, and a coarse fix comes quickly.
+    static let cityAccuracy: CLLocationAccuracy = kCLLocationAccuracyKilometer
 
     var isAllowed: @MainActor () -> Bool
     var provider: (any DeviceLocationProviding)?
@@ -59,20 +66,13 @@ final class LiveVoicePlace {
         _ = find()
     }
 
-    func coarse(within limit: Duration = .seconds(1)) async -> String? {
+    func coarse(within seconds: Double = 1) async -> String? {
         guard isAllowed() else { return nil }
         if let fresh { return fresh }
         let search = find()
-        return await withTaskGroup(of: String?.self) { group in
-            group.addTask { await search.value }
-            group.addTask {
-                try? await Task.sleep(for: limit)
-                return nil
-            }
-            let first = await group.next() ?? nil
-            group.cancelAll()
-            return first
-        }
+        // A race, not a task group: a group waits for every child, so the offer waited out the whole
+        // search (up to 20 s) and then had nothing. The deadline gives up on waiting, not on the search.
+        return (try? await DeviceLocationDeadline.run(seconds: seconds) { await search.value }) ?? nil
     }
 
     private var fresh: String? {
@@ -115,5 +115,23 @@ final class LiveVoicePlace {
         let parts = [place.city, place.region, place.country]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         return parts.isEmpty ? nil : String(parts.joined(separator: ", ").prefix(LiveVoiceCallContext.maximumPlaceLength))
+    }
+}
+
+extension LiveVoiceCallContext {
+    static let feature = "native-voice-context-v1"
+
+    /// The voice session's context for a computer whose plugin takes it, nil for one that doesn't (it would
+    /// refuse the fields). Asking starts the place search, so the offer seldom waits for it.
+    @MainActor static func offerContext(features: Set<String>, agentName: String?,
+                                        personName: @escaping @MainActor () -> String?,
+                                        place: LiveVoicePlace) -> NativeLiveVoiceSession.Context? {
+        guard features.contains(feature) else { return nil }
+        place.prepare()
+        return { () async -> [String: BighelpJSONValue] in
+            let found = await place.coarse()
+            return LiveVoiceCallContext(agentName: agentName, personName: personName(), place: found,
+                                        timeZone: TimeZone.current.identifier).fields
+        }
     }
 }

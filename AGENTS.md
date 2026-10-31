@@ -205,7 +205,8 @@ change in both repos.
   With plugin `native-voice-context-v1`, the offer also says who is talking and where
   (`LiveVoiceCallContext`): the agent's shown name, the person's saved name (never "You"), the time zone and,
   only while Device access › Location is usable, a coarse place (`LiveVoicePlace`: city, region, country from
-  the last known fix, waited for at most 1 s). The brief keeps the phone's language until asked in words.
+  the last known fix under an hour old, else a city-level fresh fix; the offer waits about 1 s at most, raced
+  with `DeviceLocationDeadline`, never a task group, which waits for every child). The brief keeps the phone's language until asked in words.
 - **Live voice multitasks:** requests from the voice model never wait for each other. One runs as a turn in
   the chat when it's free; one made while the chat works runs at once as a Hermes background task for it
   (`ChatModel.runNativeVoiceRequest`, `prompt.background`) and answers the call on its own. Background tasks

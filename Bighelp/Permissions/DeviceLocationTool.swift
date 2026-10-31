@@ -261,10 +261,11 @@ final class LiveDeviceLocationProvider: NSObject, DeviceLocationProviding, @prec
     private let fixes = DeviceLocationRequestPool<DeviceLocationFix>()
     private var authorizationWaiters: [CheckedContinuation<DeviceLocationAuthorization, Never>] = []
 
-    override init() {
+    /// `accuracy`: best for an agent's `location.current`; a voice call's city needs only a kilometer.
+    init(accuracy: CLLocationAccuracy = kCLLocationAccuracyBest) {
         super.init()
         manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyBest
+        manager.desiredAccuracy = accuracy
     }
 
     var authorization: DeviceLocationAuthorization {

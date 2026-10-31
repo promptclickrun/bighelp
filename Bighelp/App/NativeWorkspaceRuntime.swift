@@ -410,16 +410,9 @@ final class NativeWorkspaceRuntime {
                 authorizationID: owner.authenticationGeneration.uuidString + ":" + owner.connectionGeneration.uuidString,
                 agentID: coordinate.profileID, sessionID: stored)
             // Who is talking and where, for a plugin that briefs the voice model with it.
-            var context: NativeLiveVoiceSession.Context?
-            if workspace.nativeContext?.features.contains("native-voice-context-v1") == true {
-                LiveVoicePlace.shared.prepare()
-                let agentName = agent?.name
-                context = { [weak userIdentity] () async -> [String: BighelpJSONValue] in
-                    let place = await LiveVoicePlace.shared.coarse()
-                    return LiveVoiceCallContext(agentName: agentName, personName: userIdentity?.identity.name,
-                                                place: place, timeZone: TimeZone.current.identifier).fields
-                }
-            }
+            let context = LiveVoiceCallContext.offerContext(
+                features: workspace.nativeContext?.features ?? [], agentName: agent?.name,
+                personName: { [weak userIdentity] in userIdentity?.identity.name }, place: .shared)
             let voice = NativeLiveVoiceSession(owner: voiceOwner, operation: { operation, payload in
                 try await workspace.perform(operation, payload: payload, owner: owner)
             }, isCurrent: { [weak connections] in connections?.owner == owner },

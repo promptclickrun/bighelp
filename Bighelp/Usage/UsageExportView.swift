@@ -27,7 +27,7 @@ struct UsageExportBlocks {
                 blocks.append(AnyView(UsageExportPiece(caption: cardIndex == 0 ? caption : nil,
                                                        computer: cardIndex == 0 ? name : nil) {
                     UsageLimitCard(provider: provider, used: computer.used[provider.id], range: snapshot.range,
-                                   isExport: true, now: snapshot.generatedAt)
+                                   gatewayID: computer.id, isExport: true, now: snapshot.generatedAt)
                 }))
             }
         }

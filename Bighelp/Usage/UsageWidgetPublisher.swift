@@ -133,7 +133,7 @@ enum UsageWidgetPublisher {
                         .init(label: clip($0.label, 40), leftPercent: max(0, min(100, $0.leftPercent)), resetsAt: $0.resetsAt)
                     },
                     facts: provider.facts.prefix(2).map { .init(label: clip($0.label, 30), value: clip($0.value, 30)) },
-                    note: note(provider), inUse: provider.activeInHermes)
+                    note: note(provider), inUse: provider.activeInHermes, key: ProviderUsagePreferences.key(for: provider.id))
             }
     }
 
@@ -144,6 +144,11 @@ enum UsageWidgetPublisher {
         case .notShared: "This provider doesn't share usage"
         case .error: "Couldn't be read"
         }
+    }
+
+    /// A plan was given a name. The widgets put the names on themselves, so they only need drawing again.
+    static func namesChanged() {
+        WidgetCenter.shared.reloadTimelines(ofKind: BighelpUsageSnapshot.kind)
     }
 
     static func currentHidden() -> Set<String> {

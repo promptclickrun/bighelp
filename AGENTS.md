@@ -661,6 +661,11 @@ sections can crash only on devices ("Thread stack size exceeded").
   each new connection while bighelp is open, every 15 minutes, and on Background App Refresh; only a read
   where every part worked counts toward the 15 minutes. A read the moment bighelp comes back used the closing
   connection, failed, and then held off every retry.
+- Names people give plans (Usage › a plan's ••• › Rename…, or Choose) are per gateway, since one provider can be
+  another account on another computer. `BighelpPlanNames` keeps them in the app group, keyed by
+  `ProviderUsagePreferences.key(for:)`, and the widget puts them on itself (`BighelpUsageSnapshot.named`), so a
+  rename only reloads the widgets. A widget's Plans choice keeps the picked order; Style draws Plans and limits
+  as bars, bars with every limit, rings, dials or stacked rings.
 - A Shortcut on a gateway that isn't in use switches bighelp to it, and the app starts connecting at once.
   `reconnect()` returns at once while another connection is under way, so the Shortcut waits for that one
   (`BighelpShortcutConnectionWait`). `ShortcutGatewaySwitchHostUITests` checks it on two real hosts.

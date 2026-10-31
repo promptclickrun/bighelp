@@ -23,13 +23,17 @@ struct BighelpUsageSnapshot: Codable, Equatable, Sendable {
         }
 
         let id: String
-        let name: String
+        /// The provider's name, or the one the person gave the plan (`named`).
+        var name: String
         var plan: String?
         var limits: [Limit] = []
         var facts: [Fact] = []
         /// Why there are no numbers ("Sign in needed on your computer").
         var note: String?
         var inUse = false
+        /// What its name is saved under (`BighelpPlanNames`): one key for a provider, whatever id the host
+        /// gave it this time.
+        var key: String?
 
         var tightest: Limit? { limits.min { $0.leftPercent < $1.leftPercent } }
     }
@@ -108,14 +112,68 @@ struct BighelpUsageSnapshot: Codable, Equatable, Sendable {
             .write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
 
-    /// What a widget set to `gateway` shows; nil follows the gateway in use.
+    /// What a widget set to `gateway` shows, with the names given to its plans; nil follows the gateway in use.
     static func shown(gateway: String?) -> BighelpUsageSnapshot {
-        load(gateway: gateway ?? BighelpWidgetGatewayList.inUseID())
+        let id = gateway ?? BighelpWidgetGatewayList.inUseID()
+        return load(gateway: id).named(gateway: id, names: BighelpPlanNames.saved)
+    }
+
+    /// The plans under the names given to them on this gateway.
+    func named(gateway: String?, names: String) -> BighelpUsageSnapshot {
+        var copy = self
+        copy.plans = plans?.map { plan in
+            var plan = plan
+            if let name = BighelpPlanNames.name(of: plan.key ?? plan.id, gateway: gateway, in: names) { plan.name = name }
+            return plan
+        }
+        return copy
     }
 
     var hasData: Bool { totals != nil || plans != nil }
 
     static let url = URL(string: "loopdy://usage")!
+}
+
+/// Names people give their plans in Usage, for each gateway: the same provider can be another account on
+/// another computer. Kept in the app group, so the widgets show a name as soon as it's saved.
+enum BighelpPlanNames {
+    static let key = "bighelp.plan-names.v1"
+    static let maximumLength = 40
+
+    /// One shared instance: a screen watching it redraws only for writes made through the same one.
+    /// UserDefaults is thread-safe.
+    nonisolated(unsafe) static let defaults = UserDefaults(suiteName: BighelpWidgetSnapshot.appGroup)
+    static var saved: String { defaults?.string(forKey: key) ?? "" }
+
+    /// A plan's name on a gateway, from the saved names; nil keeps the provider's.
+    static func name(of plan: String, gateway: String?, in names: String) -> String? {
+        let name = decode(names)[gateway ?? ""]?[plan]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name?.isEmpty == false ? name : nil
+    }
+
+    /// A plan's name as typed, for a field bound to it: it can end in a space while someone types.
+    static func typed(of plan: String, gateway: String?, in names: String) -> String {
+        decode(names)[gateway ?? ""]?[plan] ?? ""
+    }
+
+    /// The saved names with one plan's set; a blank name goes back to the provider's. Kept as typed, so a
+    /// field bound to it can end in a space.
+    static func setting(_ name: String, of plan: String, gateway: String?, in names: String) -> String {
+        var all = decode(names)
+        let gateway = gateway ?? ""
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        all[gateway, default: [:]][plan] = trimmed.isEmpty ? nil : String(name.prefix(maximumLength))
+        if all[gateway]?.isEmpty == true { all[gateway] = nil }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        guard !all.isEmpty, let data = try? encoder.encode(all) else { return "" }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    private static func decode(_ names: String) -> [String: [String: String]] {
+        guard !names.isEmpty, names.utf8.count <= 65_536 else { return [:] }
+        return (try? JSONDecoder().decode([String: [String: String]].self, from: Data(names.utf8))) ?? [:]
+    }
 }
 
 // MARK: - Configuration
@@ -131,6 +189,22 @@ enum UsageWidgetContent: String, AppEnum {
         .tokens: DisplayRepresentation(title: "Tokens", subtitle: "The last 30 days"),
         .models: DisplayRepresentation(title: "Top models", subtitle: "The five your agents used most"),
     ]
+}
+
+/// How Plans and limits draws each plan.
+enum UsageWidgetStyle: String, AppEnum {
+    case bars, barsWithLimits, rings, dials, stackedRings
+
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Style")
+    static let caseDisplayRepresentations: [UsageWidgetStyle: DisplayRepresentation] = [
+        .bars: DisplayRepresentation(title: "Bars", subtitle: "One line for each plan"),
+        .barsWithLimits: DisplayRepresentation(title: "Bars with every limit", subtitle: "Each plan with all its limits"),
+        .rings: DisplayRepresentation(title: "Rings"),
+        .dials: DisplayRepresentation(title: "Dials"),
+        .stackedRings: DisplayRepresentation(title: "Stacked rings", subtitle: "A plan's first limit outside, its second inside"),
+    ]
+
+    var isGauge: Bool { self == .rings || self == .dials }
 }
 
 struct UsageWidgetPlan: AppEntity {
@@ -167,8 +241,30 @@ struct UsageWidgetIntent: WidgetConfigurationIntent {
     @Parameter(title: "Show", default: .overview)
     var content: UsageWidgetContent
 
-    @Parameter(title: "Plan", description: "For Plans and limits. Leave empty to show every plan.")
-    var plan: UsageWidgetPlan?
+    @Parameter(title: "Style", default: .bars)
+    var style: UsageWidgetStyle
+
+    @Parameter(title: "Plans", description: "Leave it empty to show every plan.",
+               size: [.systemSmall: 4, .systemMedium: 6, .systemLarge: 8])
+    var plans: [UsageWidgetPlan]?
+
+    // Style only draws Plans and limits.
+    static var parameterSummary: some ParameterSummary {
+        When(\.$content, .equalTo, .plans) {
+            Summary {
+                \.$gateway
+                \.$content
+                \.$style
+                \.$plans
+            }
+        } otherwise: {
+            Summary {
+                \.$gateway
+                \.$content
+                \.$plans
+            }
+        }
+    }
 }
 
 // MARK: - Timeline
@@ -178,14 +274,16 @@ struct UsageWidgetEntry: TimelineEntry {
     let snapshot: BighelpUsageSnapshot
     let palette: BighelpWidgetSnapshot
     let content: UsageWidgetContent
-    let planID: String?
+    var style: UsageWidgetStyle = .bars
+    /// The plans chosen, in their order; none shows every plan.
+    var planIDs: [String] = []
     /// The chosen gateway; nil follows the one in use. A tap opens Usage there.
     var hostID: String? = nil
 
     var plans: [BighelpUsageSnapshot.Plan] {
         let plans = snapshot.plans ?? []
-        guard let planID else { return plans }
-        return plans.filter { $0.id == planID }
+        guard !planIDs.isEmpty else { return plans }
+        return planIDs.compactMap { id in plans.first { $0.id == id } }
     }
 
     /// The limit closest to running out, across the plans shown.
@@ -209,6 +307,13 @@ struct UsageWidgetEntry: TimelineEntry {
                         .init(label: "Session (5 hours)", leftPercent: 62, resetsAt: .now.addingTimeInterval(5_400)),
                         .init(label: "Week", leftPercent: 41, resetsAt: .now.addingTimeInterval(172_800)),
                     ], inUse: true),
+                    .init(id: "codex", name: "Codex", plan: "Pro", limits: [
+                        .init(label: "Session (5 hours)", leftPercent: 88, resetsAt: .now.addingTimeInterval(10_800)),
+                        .init(label: "Week", leftPercent: 23, resetsAt: .now.addingTimeInterval(345_600)),
+                    ]),
+                    .init(id: "gemini", name: "Gemini", plan: "AI Pro", limits: [
+                        .init(label: "Day", leftPercent: 12, resetsAt: .now.addingTimeInterval(21_600)),
+                    ]),
                     .init(id: "openrouter", name: "OpenRouter", facts: [.init(label: "Balance", value: "$18.40")]),
                 ],
                 totals: .init(cost: 214.37, billedCost: 0, inputTokens: 21_400_000, outputTokens: 6_100_000,
@@ -219,7 +324,7 @@ struct UsageWidgetEntry: TimelineEntry {
                     .init(id: "c", name: "Hermes 4 405B", provider: "Nous Research", cost: 32.67, tokens: 9_600_000),
                 ],
                 daily: daily, generatedAt: .now),
-            palette: .empty, content: .overview, planID: nil)
+            palette: .empty, content: .overview)
     }()
 }
 
@@ -231,7 +336,7 @@ struct UsageWidgetProvider: AppIntentTimelineProvider {
         guard context.isPreview, !entry.snapshot.hasData else { return entry }
         let preview = UsageWidgetEntry.preview
         return UsageWidgetEntry(date: preview.date, snapshot: preview.snapshot, palette: preview.palette,
-                                content: configuration.content, planID: nil)
+                                content: configuration.content, style: configuration.style)
     }
 
     func timeline(for configuration: UsageWidgetIntent, in context: Context) async -> Timeline<UsageWidgetEntry> {
@@ -242,7 +347,8 @@ struct UsageWidgetProvider: AppIntentTimelineProvider {
     private func entry(for configuration: UsageWidgetIntent) -> UsageWidgetEntry {
         let hostID = configuration.gateway?.hostID
         return UsageWidgetEntry(date: .now, snapshot: .shown(gateway: hostID), palette: .load(gateway: hostID),
-                                content: configuration.content, planID: configuration.plan?.id, hostID: hostID)
+                                content: configuration.content, style: configuration.style,
+                                planIDs: (configuration.plans ?? []).map(\.id), hostID: hostID)
     }
 }
 
@@ -285,7 +391,10 @@ struct BighelpUsageWidgetView: View {
                 accessory
             } else {
                 VStack(alignment: .leading, spacing: family == .systemSmall ? 6 : 10) {
-                    header
+                    // Four gauges fill a small widget on their own.
+                    if !(family == .systemSmall && entry.content == .plans && entry.style.isGauge && snapshot.hasData) {
+                        header
+                    }
                     if !snapshot.hasData {
                         Spacer(minLength: 0)
                         Text(waiting).font(.caption).foregroundStyle(colors.secondary)
@@ -306,7 +415,7 @@ struct BighelpUsageWidgetView: View {
     private var title: String {
         switch entry.content {
         case .overview: "Usage"
-        case .plans: entry.planID.flatMap { id in entry.plans.first { $0.id == id }?.name } ?? "Plans"
+        case .plans: entry.planIDs.count == 1 ? entry.plans.first?.name ?? "Plans" : "Plans"
         case .cost: "Estimated cost"
         case .tokens: "Tokens"
         case .models: "Top models"
@@ -406,17 +515,215 @@ struct BighelpUsageWidgetView: View {
         if shown.isEmpty {
             plansFallback
             Spacer(minLength: 0)
-        } else if family == .systemSmall || shown.count == 1 {
-            planCard(shown[0], limit: family == .systemSmall ? 2 : family == .systemMedium ? 2 : 4)
-            Spacer(minLength: 0)
         } else {
-            let perPlan = family == .systemMedium ? 1 : 2
-            let planCount = family == .systemMedium ? 2 : 4
-            VStack(alignment: .leading, spacing: family == .systemMedium ? 8 : 12) {
-                ForEach(shown.prefix(planCount)) { plan in planCard(plan, limit: perPlan) }
-                Spacer(minLength: 0)
+            switch entry.style {
+            case .bars: planLines(shown)
+            case .barsWithLimits: planCards(shown)
+            case .rings, .dials: gauges(shown, dials: entry.style == .dials)
+            case .stackedRings: stackedRings(shown)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// Bars: one line for each plan, its tightest limit.
+    @ViewBuilder private func planLines(_ shown: [BighelpUsageSnapshot.Plan]) -> some View {
+        let lines = Array(shown.prefix(family == .systemSmall ? 4 : family == .systemMedium ? 6 : 8))
+        if family == .systemMedium, lines.count > 3 {
+            let left = (lines.count + 1) / 2
+            HStack(alignment: .top, spacing: 14) {
+                planLineColumn(Array(lines.prefix(left)))
+                planLineColumn(Array(lines.dropFirst(left)))
+            }
+        } else {
+            planLineColumn(lines)
+        }
+    }
+
+    private func planLineColumn(_ lines: [BighelpUsageSnapshot.Plan]) -> some View {
+        VStack(alignment: .leading, spacing: family == .systemLarge ? 10 : 7) {
+            ForEach(lines) { plan in
+                if let limit = plan.tightest {
+                    limitRow(plan, limit, compact: family != .systemLarge)
+                } else {
+                    HStack(spacing: 4) {
+                        Text(plan.name).font(.caption2.weight(.semibold)).lineLimit(1)
+                        Spacer(minLength: 2)
+                        // A narrow line keeps the balance itself, not its label.
+                        Text(family == .systemLarge ? Self.withoutLimits(plan) : plan.facts.first?.value ?? plan.note ?? "")
+                            .font(.caption2).monospacedDigit().foregroundStyle(colors.secondary)
+                            .lineLimit(1).layoutPriority(1)
+                    }
+                }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// A plan with no limits: its balance, or why there are no numbers.
+    private static func withoutLimits(_ plan: BighelpUsageSnapshot.Plan) -> String {
+        plan.facts.first.map { "\($0.label) \($0.value)" } ?? plan.note ?? ""
+    }
+
+    /// Bars with every limit: each plan with its limits, and when they reset where there's room.
+    @ViewBuilder private func planCards(_ shown: [BighelpUsageSnapshot.Plan]) -> some View {
+        if shown.count == 1 {
+            planCard(shown[0], limit: family == .systemLarge ? 4 : 2, showsReset: family != .systemSmall)
+        } else if family == .systemSmall {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(shown.prefix(2)) { plan in planCard(plan, limit: 1, showsReset: false) }
+            }
+        } else {
+            let rows = Self.rows(Array(shown.prefix(family == .systemMedium ? 2 : 4)), columns: 2)
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    HStack(alignment: .top, spacing: 16) {
+                        ForEach(row) { plan in
+                            planCard(plan, limit: 2, showsReset: true).frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        if row.count == 1 { Color.clear.frame(maxWidth: .infinity, maxHeight: 0) }
+                    }
+                }
+            }
+        }
+    }
+
+    private static func rows<Item>(_ items: [Item], columns: Int) -> [[Item]] {
+        stride(from: 0, to: items.count, by: columns).map { Array(items[$0..<min($0 + columns, items.count)]) }
+    }
+
+    /// Rings or dials: each plan's tightest limit, the share left in the middle.
+    private func gauges(_ shown: [BighelpUsageSnapshot.Plan], dials: Bool) -> some View {
+        let columns = family == .systemSmall ? 2 : family == .systemMedium ? 4 : 3
+        let size: CGFloat = switch family {
+        case .systemSmall: dials ? 66 : 52
+        case .systemMedium: dials ? 74 : 62
+        default: dials ? 80 : 62
+        }
+        let rows = Self.rows(Array(shown.prefix(family == .systemLarge ? 8 : 4)), columns: columns)
+        return VStack(spacing: family == .systemLarge ? 14 : family == .systemSmall ? 8 : 0) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                HStack(alignment: .top, spacing: 8) {
+                    ForEach(row) { plan in gaugeTile(plan, dial: dials, size: size).frame(maxWidth: .infinity) }
+                    ForEach(row.count..<columns, id: \.self) { _ in Color.clear.frame(maxWidth: .infinity, maxHeight: 0) }
+                }
+            }
+        }
+        .padding(.top, family == .systemMedium ? 4 : 0)
+    }
+
+    private func gaugeTile(_ plan: BighelpUsageSnapshot.Plan, dial: Bool, size: CGFloat) -> some View {
+        let limit = plan.tightest
+        let tint = limit.map { UsageWidgetFormat.tint(left: $0.leftPercent, accent: colors.accent) } ?? colors.secondary
+        let fraction = (limit?.leftPercent ?? 0) / 100
+        let line: CGFloat = family == .systemSmall ? 6 : 6.5
+        let middle = limit.map { UsageWidgetFormat.percent($0.leftPercent) } ?? plan.facts.first?.value ?? "–"
+        return VStack(spacing: 2) {
+            ZStack(alignment: dial ? .bottom : .center) {
+                if dial {
+                    UsageWidgetDial(fraction: fraction, tint: tint, lineWidth: line)
+                } else {
+                    UsageWidgetRing(fraction: fraction, tint: tint, lineWidth: line)
+                }
+                Text(middle)
+                    .font(family == .systemSmall ? .caption.weight(.bold) : .callout.weight(.bold))
+                    .monospacedDigit().foregroundStyle(tint)
+                    .lineLimit(1).minimumScaleFactor(0.5)
+                    .padding(.horizontal, line + 3)
+            }
+            .frame(width: size, height: dial ? size / 2 + line / 2 + 1 : size)
+            Text(plan.name).font(.caption2.weight(.semibold)).lineLimit(1)
+            if family != .systemSmall, let detail = gaugeDetail(plan) {
+                Text(detail).font(.caption2).foregroundStyle(colors.secondary).lineLimit(1)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Self.spoken(plan))
+    }
+
+    /// Under a gauge: its limit, and on a large widget when it resets.
+    private func gaugeDetail(_ plan: BighelpUsageSnapshot.Plan) -> String? {
+        guard let limit = plan.tightest else { return plan.facts.first?.label ?? plan.note }
+        guard family == .systemLarge, let resetsAt = limit.resetsAt else { return limit.label }
+        return limit.label + " · " + resetsAt.formatted(.relative(presentation: .numeric, unitsStyle: .abbreviated))
+    }
+
+    private static func spoken(_ plan: BighelpUsageSnapshot.Plan) -> String {
+        let limits = plan.limits.map { "\($0.label), \(UsageWidgetFormat.percent($0.leftPercent)) left" }
+        return ([plan.name] + (limits.isEmpty ? [withoutLimits(plan)] : limits)).joined(separator: ", ")
+    }
+
+    /// Stacked rings: a plan's first limit outside, its second inside.
+    @ViewBuilder private func stackedRings(_ shown: [BighelpUsageSnapshot.Plan]) -> some View {
+        if family == .systemLarge {
+            let rows = Self.rows(Array(shown.prefix(6)), columns: 2)
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    HStack(alignment: .center, spacing: 12) {
+                        ForEach(row) { plan in
+                            HStack(spacing: 10) {
+                                stacked(plan, size: 56)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(plan.name).font(.caption2.weight(.semibold)).lineLimit(1)
+                                    // The share first: a long limit name ("Session (5 hours)") can't push it out.
+                                    ForEach(Array(plan.limits.prefix(2).enumerated()), id: \.offset) { _, limit in
+                                        HStack(spacing: 3) {
+                                            Text(UsageWidgetFormat.percent(limit.leftPercent))
+                                                .font(.caption2.weight(.semibold)).monospacedDigit()
+                                                .foregroundStyle(UsageWidgetFormat.tint(left: limit.leftPercent, accent: colors.accent))
+                                                .fixedSize()
+                                            Text(limit.label).font(.caption2).foregroundStyle(colors.secondary).lineLimit(1)
+                                        }
+                                    }
+                                    if plan.limits.isEmpty {
+                                        Text(Self.withoutLimits(plan)).font(.caption2).foregroundStyle(colors.secondary).lineLimit(1)
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(Self.spoken(plan))
+                        }
+                        if row.count == 1 { Color.clear.frame(maxWidth: .infinity, maxHeight: 0) }
+                    }
+                }
+            }
+        } else {
+            let count = family == .systemSmall ? 2 : 3
+            HStack(alignment: .top, spacing: 8) {
+                ForEach(shown.prefix(count)) { plan in
+                    VStack(spacing: 3) {
+                        stacked(plan, size: family == .systemSmall ? 60 : 66)
+                        Text(plan.name).font(.caption2.weight(.semibold)).lineLimit(1)
+                        Text(plan.limits.isEmpty ? Self.withoutLimits(plan)
+                             : plan.limits.prefix(2).map { UsageWidgetFormat.percent($0.leftPercent) }.joined(separator: " · "))
+                            .font(.caption2.weight(.semibold)).monospacedDigit()
+                            .foregroundStyle(plan.tightest.map { UsageWidgetFormat.tint(left: $0.leftPercent, accent: colors.accent) }
+                                             ?? colors.secondary)
+                            .lineLimit(1).minimumScaleFactor(0.8)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Self.spoken(plan))
+                }
+                ForEach(min(shown.count, count)..<count, id: \.self) { _ in Color.clear.frame(maxWidth: .infinity, maxHeight: 0) }
+            }
+            .padding(.top, 2)
+        }
+    }
+
+    private func stacked(_ plan: BighelpUsageSnapshot.Plan, size: CGFloat) -> some View {
+        let line: CGFloat = size >= 60 ? 6 : 5.5
+        func ring(_ limit: BighelpUsageSnapshot.Plan.Limit?) -> UsageWidgetRing {
+            UsageWidgetRing(fraction: (limit?.leftPercent ?? 0) / 100,
+                            tint: limit.map { UsageWidgetFormat.tint(left: $0.leftPercent, accent: colors.accent) } ?? colors.secondary,
+                            lineWidth: line)
+        }
+        return ZStack {
+            ring(plan.limits.first)
+            if plan.limits.count > 1 { ring(plan.limits[1]).padding(line + 2.5) }
+        }
+        .frame(width: size, height: size)
     }
 
     @ViewBuilder private var plansFallback: some View {
@@ -426,7 +733,7 @@ struct BighelpUsageWidgetView: View {
             .font(.caption).foregroundStyle(colors.secondary)
     }
 
-    private func planCard(_ plan: BighelpUsageSnapshot.Plan, limit: Int) -> some View {
+    private func planCard(_ plan: BighelpUsageSnapshot.Plan, limit: Int, showsReset: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
                 Text(plan.name).font(.caption.weight(.semibold)).lineLimit(1)
@@ -436,7 +743,7 @@ struct BighelpUsageWidgetView: View {
             }
             if !plan.limits.isEmpty {
                 ForEach(Array(plan.limits.prefix(limit).enumerated()), id: \.offset) { _, item in
-                    limitBar(item)
+                    limitBar(item, showsReset: showsReset)
                 }
             } else if let fact = plan.facts.first {
                 Text("\(fact.label) \(fact.value)").font(.caption2).foregroundStyle(colors.secondary).lineLimit(1)
@@ -446,7 +753,7 @@ struct BighelpUsageWidgetView: View {
         }
     }
 
-    private func limitBar(_ limit: BighelpUsageSnapshot.Plan.Limit) -> some View {
+    private func limitBar(_ limit: BighelpUsageSnapshot.Plan.Limit, showsReset: Bool) -> some View {
         let tint = UsageWidgetFormat.tint(left: limit.leftPercent, accent: colors.accent)
         return VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
@@ -456,6 +763,10 @@ struct BighelpUsageWidgetView: View {
                     .font(.caption2.weight(.semibold).monospacedDigit()).foregroundStyle(tint).lineLimit(1)
             }
             UsageWidgetBar(fraction: limit.leftPercent / 100, tint: tint)
+            if showsReset, let resetsAt = limit.resetsAt {
+                Text("Resets \(resetsAt.formatted(.relative(presentation: .named)))")
+                    .font(.caption2).foregroundStyle(colors.secondary).lineLimit(1)
+            }
         }
     }
 
@@ -624,6 +935,54 @@ struct BighelpUsageWidgetView: View {
         #else
         EmptyView()
         #endif
+    }
+}
+
+/// A ring filled clockwise from the top to a share, on a faint track.
+struct UsageWidgetRing: View {
+    let fraction: Double
+    let tint: Color
+    let lineWidth: CGFloat
+
+    var body: some View {
+        ZStack {
+            Circle().stroke(tint.opacity(0.18), lineWidth: lineWidth)
+            if fraction > 0 {
+                Circle().trim(from: 0, to: min(1, fraction))
+                    .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .widgetAccentable()
+            }
+        }
+        .padding(lineWidth / 2)
+        .accessibilityHidden(true)
+    }
+}
+
+/// A half ring over its middle, filled left to right to a share. Drawn as a whole circle's top half.
+struct UsageWidgetDial: View {
+    let fraction: Double
+    let tint: Color
+    let lineWidth: CGFloat
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                arc(1).stroke(tint.opacity(0.18), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                if fraction > 0 {
+                    arc(fraction).stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                        .widgetAccentable()
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.width)
+        }
+        .clipped()
+        .accessibilityHidden(true)
+    }
+
+    /// From nine o'clock over the top: a circle's path starts at three and runs clockwise.
+    private func arc(_ share: Double) -> some Shape {
+        Circle().inset(by: lineWidth / 2).trim(from: 0.5, to: 0.5 + 0.5 * min(1, share))
     }
 }
 

@@ -80,6 +80,7 @@ struct BighelpUsageWorkflowsWidgetTests {
         ])
         let plans = UsageWidgetPublisher.plans(report, hidden: ["deepseek"])
         #expect(plans.map(\.id) == ["claude", "openrouter"])
+        #expect(plans.map(\.key) == ["claude", "openrouter"], "Names are found by the provider's own key")
         #expect(plans[0].tightest?.leftPercent == 37)
         #expect(plans[0].inUse)
     }
@@ -156,6 +157,47 @@ struct BighelpUsageWorkflowsWidgetTests {
         #expect(!BighelpUsageSnapshot.load(gateway: home, in: folder).hasData)
     }
 
+    // MARK: Plan names and choices
+
+    @Test func planNamesAreKeptForEachGateway() {
+        let home = UUID().uuidString, studio = UUID().uuidString
+        var names = BighelpPlanNames.setting("Personal Claude", of: "claude", gateway: home, in: "")
+        names = BighelpPlanNames.setting("Work Claude", of: "claude", gateway: studio, in: names)
+        #expect(BighelpPlanNames.name(of: "claude", gateway: home, in: names) == "Personal Claude")
+        #expect(BighelpPlanNames.name(of: "claude", gateway: studio, in: names) == "Work Claude",
+                "The same provider is another account on another computer")
+        #expect(BighelpPlanNames.name(of: "codex", gateway: home, in: names) == nil)
+
+        names = BighelpPlanNames.setting("Personal ", of: "claude", gateway: home, in: names)
+        #expect(BighelpPlanNames.typed(of: "claude", gateway: home, in: names) == "Personal ", "A field keeps what's typed")
+        #expect(BighelpPlanNames.name(of: "claude", gateway: home, in: names) == "Personal")
+        names = BighelpPlanNames.setting("   ", of: "claude", gateway: home, in: names)
+        #expect(BighelpPlanNames.name(of: "claude", gateway: home, in: names) == nil, "Blank goes back to the provider's name")
+        #expect(BighelpPlanNames.name(of: "claude", gateway: studio, in: names) == "Work Claude")
+        names = BighelpPlanNames.setting(String(repeating: "x", count: 80), of: "claude", gateway: studio, in: names)
+        #expect(BighelpPlanNames.name(of: "claude", gateway: studio, in: names)?.count == BighelpPlanNames.maximumLength)
+    }
+
+    @Test func widgetsShowTheNamesGivenOnTheirGateway() {
+        let home = UUID().uuidString, studio = UUID().uuidString
+        let names = BighelpPlanNames.setting("Personal Claude", of: "claude", gateway: home, in: "")
+        // The host can call a provider by another id; the key it's named under stays.
+        let snapshot = BighelpUsageSnapshot(plans: [.init(id: "claude-hermes", name: "Claude", key: "claude"),
+                                                    .init(id: "codex", name: "Codex")])
+        #expect(snapshot.named(gateway: home, names: names).plans?.map(\.name) == ["Personal Claude", "Codex"])
+        #expect(snapshot.named(gateway: studio, names: names).plans?.map(\.name) == ["Claude", "Codex"])
+    }
+
+    @Test func chosenPlansShowInTheOrderPicked() {
+        let preview = UsageWidgetEntry.preview
+        let picked = UsageWidgetEntry(date: .now, snapshot: preview.snapshot, palette: .empty, content: .plans,
+                                      planIDs: ["openrouter", "gone", "claude"])
+        #expect(picked.plans.map(\.id) == ["openrouter", "claude"], "A plan the computer no longer has drops out")
+        #expect(picked.tightest?.plan.id == "claude")
+        let every = UsageWidgetEntry(date: .now, snapshot: preview.snapshot, palette: .empty, content: .plans)
+        #expect(every.plans.map(\.id) == preview.snapshot.plans?.map(\.id))
+    }
+
     @Test func usageNumbersReadShort() {
         #expect(UsageWidgetFormat.cost(598.84) == "$598.84")
         #expect(UsageWidgetFormat.tokens(96_600_000) == "96.6M")
@@ -209,10 +251,14 @@ struct BighelpUsageWorkflowsWidgetTests {
                 ]
                 for content in [UsageWidgetContent.overview, .plans, .cost, .tokens, .models] {
                     let preview = UsageWidgetEntry.preview
-                    let entry = UsageWidgetEntry(date: .now, snapshot: preview.snapshot, palette: palette,
-                                                 content: content, planID: nil)
-                    views.append(("usage-\(content.rawValue)",
-                                  AnyView(BighelpUsageWidgetView(entry: entry, familyOverride: family))))
+                    let styles: [UsageWidgetStyle] = content == .plans
+                        ? [.bars, .barsWithLimits, .rings, .dials, .stackedRings] : [.bars]
+                    for style in styles {
+                        let entry = UsageWidgetEntry(date: .now, snapshot: preview.snapshot, palette: palette,
+                                                     content: content, style: style)
+                        views.append(("usage-\(content.rawValue)" + (content == .plans ? "-\(style.rawValue)" : ""),
+                                      AnyView(BighelpUsageWidgetView(entry: entry, familyOverride: family))))
+                    }
                 }
                 for (kind, view) in views {
                     let content = view

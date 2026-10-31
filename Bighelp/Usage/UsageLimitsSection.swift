@@ -159,7 +159,7 @@ struct UsageLimitsSection: View {
                     ForEach(showsAll ? providers : Array(providers.prefix(Self.shortList))) { provider in
                         UsageLimitCard(provider: provider,
                                        used: summary?.agentsUse(of: provider, hostID: computers.computers[0].id),
-                                       range: range)
+                                       range: range, gatewayID: computers.computers[0].id)
                     }
                     if providers.count > Self.shortList {
                         Button(showsAll ? "Show fewer" : "Show \(providers.count - Self.shortList) more") {
@@ -194,7 +194,7 @@ struct UsageLimitsSection: View {
             } else {
                 ForEach(providers) { provider in
                     UsageLimitCard(provider: provider, used: summary?.agentsUse(of: provider, hostID: host.id),
-                                   range: range)
+                                   range: range, gatewayID: host.id)
                 }
             }
         case .needsPluginUpdate?:
@@ -208,16 +208,27 @@ struct UsageLimitsSection: View {
 }
 
 /// One plan or balance: what's left of each limit, the balances, and what the
-/// agents used through it.
+/// agents used through it. Its menu names the plan or hides it.
 struct UsageLimitCard: View {
     let provider: ProviderUsage
     let used: UsageAmount?
     let range: UsageRange
+    /// The computer the plan is on. A name given to a plan is for that computer's: the same provider
+    /// can be another account on another one.
+    var gatewayID: String? = nil
     /// A shared copy of the page: nothing to tap, and resets counted from when it was made.
     var isExport = false
     var now: Date?
+    @AppStorage(BighelpPlanNames.key, store: BighelpPlanNames.defaults) private var namesRaw = ""
+    @AppStorage(ProviderUsagePreferences.hiddenKey) private var hiddenRaw = ""
+    @State private var isNaming = false
+    @State private var draft = ""
     @Environment(\.openURL) private var openURL
     @BighelpThemeReader private var theme
+
+    private var nameKey: String { ProviderUsagePreferences.key(for: provider.id) }
+    private var givenName: String? { BighelpPlanNames.name(of: nameKey, gateway: gatewayID, in: namesRaw) }
+    private var title: String { givenName ?? provider.name }
 
     var body: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
@@ -239,6 +250,18 @@ struct UsageLimitCard: View {
         .usageCard(theme, padding: EdgeInsets(top: 16, leading: 18, bottom: 16, trailing: 18))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("provider-usage.\(provider.id)")
+        .alert("Name this plan", isPresented: $isNaming) {
+            TextField("Name", text: $draft, prompt: Text(provider.name))
+                .accessibilityIdentifier("provider-usage.name-field")
+            Button("Cancel", role: .cancel) {}
+            Button("Save") {
+                namesRaw = BighelpPlanNames.setting(draft, of: nameKey, gateway: gatewayID, in: namesRaw)
+                UsageWidgetPublisher.namesChanged()
+            }
+            .accessibilityIdentifier("provider-usage.name-save")
+        } message: {
+            Text("Usage and its widgets show this name for this computer's plan. Leave it empty to use “\(provider.name)”.")
+        }
     }
 
     private var header: some View {
@@ -247,14 +270,51 @@ struct UsageLimitCard: View {
                                providerName: provider.name, context: .chatQuickChoice, size: 22)
                 .frame(width: 28, height: 28)
                 .accessibilityHidden(true)
-            Text(provider.name)
-                .font(.bighelp(.headline))
-                .foregroundStyle(theme.primaryText)
-                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title)
+                    .font(.bighelp(.headline))
+                    .foregroundStyle(theme.primaryText)
+                    .lineLimit(1)
+                    .accessibilityIdentifier("provider-usage.\(provider.id).name")
+                if givenName != nil {
+                    Text(provider.name)
+                        .font(.bighelp(.caption))
+                        .foregroundStyle(theme.secondaryText)
+                        .lineLimit(1)
+                }
+            }
             Spacer(minLength: BighelpTokens.space8)
             if provider.activeInHermes { UsageBadge(text: "In use") }
             if let plan = provider.plan { UsageBadge(text: plan) }
+            if !isExport { menu }
         }
+    }
+
+    private var menu: some View {
+        Menu {
+            Button {
+                draft = givenName ?? ""
+                isNaming = true
+            } label: {
+                Label("Rename…", systemImage: "pencil")
+            }
+            .accessibilityIdentifier("provider-usage.rename")
+            Button {
+                hiddenRaw = ProviderUsagePreferences.raw(ProviderUsagePreferences.hidden(hiddenRaw).union([nameKey]))
+            } label: {
+                Label("Hide from Usage", systemImage: "eye.slash")
+            }
+            .accessibilityIdentifier("provider-usage.hide")
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.bighelp(.footnote).weight(.bold))
+                .foregroundStyle(theme.secondaryText)
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(UsagePalette(theme: theme).wash))
+                .contentShape(.rect)
+        }
+        .accessibilityLabel("More for \(title)")
+        .accessibilityIdentifier("provider-usage.\(provider.id).more")
     }
 
     @ViewBuilder

@@ -474,6 +474,21 @@ enum PendingMidSessionPresentation {
     }
 }
 
+/// A message of the person's still on its way to Hermes, said under its bubble.
+enum ChatPendingSend: Equatable {
+    /// It waits in the chat until the chat can take it (`ChatModel.stageComposerMessage`).
+    case staged
+    /// Sent while the agent works.
+    case midSession(MidSessionChatBehavior)
+
+    var label: String {
+        switch self {
+        case .staged: "Sending…"
+        case .midSession(let behavior): PendingMidSessionPresentation.label(for: behavior)
+        }
+    }
+}
+
 enum ChatComposerInteractionPolicy {
     static let sendOptionsLongPressDuration = 1.0
 }

@@ -78,7 +78,7 @@ extension DirectHermesReconnectParityTests {
         for _ in 0..<100 where !rpc.isHolding { try await Task.sleep(for: .milliseconds(5)) }
         #expect(client.isHydrating)
 
-        // A message sent now waits for the catch-up (`isAwaitingCatchUp` keeps Send off meanwhile).
+        // A send waiting for the catch-up.
         let released = Released()
         let waiter = Task {
             defer { released.done = true }

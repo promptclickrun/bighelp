@@ -98,7 +98,7 @@ struct TimelineItemView: View {
     let item: TimelineItem
     let onApprovalTap: (ApprovalRequest) -> Void
     let onFork: ((String) -> Void)?
-    let pendingMidSessionBehavior: MidSessionChatBehavior?
+    let pendingSend: ChatPendingSend?
     let senderResolver: TimelineSenderResolver
     let showsSenderName: Bool
     let messageReaction: NativeMessageReactionPresentation?
@@ -111,7 +111,7 @@ struct TimelineItemView: View {
         item: TimelineItem,
         onApprovalTap: @escaping (ApprovalRequest) -> Void,
         onFork: ((String) -> Void)? = nil,
-        pendingMidSessionBehavior: MidSessionChatBehavior? = nil,
+        pendingSend: ChatPendingSend? = nil,
         senderResolver: TimelineSenderResolver = TimelineSenderResolver(),
         showsSenderName: Bool = false,
         messageReaction: NativeMessageReactionPresentation? = nil,
@@ -123,7 +123,7 @@ struct TimelineItemView: View {
         self.item = item
         self.onApprovalTap = onApprovalTap
         self.onFork = onFork
-        self.pendingMidSessionBehavior = pendingMidSessionBehavior
+        self.pendingSend = pendingSend
         self.senderResolver = senderResolver
         self.showsSenderName = showsSenderName
         self.messageReaction = messageReaction
@@ -144,7 +144,7 @@ struct TimelineItemView: View {
         .frame(maxWidth: .infinity, alignment: item.role == .human ? .trailing : .leading)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(senderResolver.accessibilityDescription(for: item))
-        .accessibilityValue(pendingMidSessionBehavior.map(PendingMidSessionPresentation.label) ?? "")
+        .accessibilityValue(pendingSend?.label ?? "")
         .accessibilityIdentifier("chat.message.\(item.id)")
     }
 
@@ -179,7 +179,7 @@ struct TimelineItemView: View {
                             ? DirectHermesGeneratedMediaClient.unresolvedMessageText(text, role: item.role)
                             : pendingFiles.text,
                         delivery: item.metadata.delivery,
-                        isPendingSubmission: pendingMidSessionBehavior != nil,
+                        isPendingSubmission: pendingSend != nil,
                         onFork: onFork.map { callback in { callback(item.id) } },
                         contentReference: item.metadata.contentReference,
                         metadata: item.metadata,
@@ -216,8 +216,8 @@ struct TimelineItemView: View {
                 BighelpSessionContentDisclosure(sessionID: reference.sessionID, rowID: reference.rowID)
             }
 
-            if let pendingMidSessionBehavior {
-                PendingMidSessionStatusView(behavior: pendingMidSessionBehavior)
+            if let pendingSend {
+                PendingSendStatusView(pendingSend: pendingSend)
             } else if !uiV3Enabled {
                 TimelineMetadataView(metadata: item.metadata)
             } else if case .message(let text) = item.content,
@@ -237,7 +237,7 @@ struct TimelineItemView: View {
 
     private var attachmentGallery: some View {
         ChatAttachmentGallery(attachments: item.attachments, alignsTrailing: item.role == .human)
-            .opacity(pendingMidSessionBehavior == nil ? 1 : 0.62)
+            .opacity(pendingSend == nil ? 1 : 0.62)
     }
 
     /// Group chats: the sender's name heads each run and a small avatar perches
@@ -300,14 +300,14 @@ struct TimelineItemView: View {
     @Environment(\.chatMessageContinuesPrevious) private var continuesPrevious
 }
 
-private struct PendingMidSessionStatusView: View {
-    let behavior: MidSessionChatBehavior
+private struct PendingSendStatusView: View {
+    let pendingSend: ChatPendingSend
 
     var body: some View {
         HStack(spacing: BighelpTokens.space8) {
             BighelpThinkingOrb(scenario: .working, scale: .inline)
                 .accessibilityHidden(true)
-            Text(PendingMidSessionPresentation.label(for: behavior))
+            Text(pendingSend.label)
                 .bighelpFont(.metadata, weight: .semibold)
                 .foregroundStyle(theme.secondaryText)
         }

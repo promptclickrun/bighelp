@@ -695,7 +695,7 @@ final class ShellFeatureStore {
             handle: handle, model: model, source: source,
             accountGeneration: accountGeneration, owner: owner, ownsHydrationFlag: ownsFlag
         )
-        model.beginOpening(handle.id) { _ = try? await handle.value() }
+        model.beginOpening(handle.id)
         let flightID = handle.id
         let catalog = catalog
         navigationHydrations[id]?.task = Task { @MainActor [weak self] in

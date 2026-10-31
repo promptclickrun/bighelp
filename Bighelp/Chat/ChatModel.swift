@@ -116,24 +116,28 @@ final class ChatModel {
     /// When Hermes last confirmed a compaction here. It gives the chat a new stored ID,
     /// which an alert for the turn can name before this app has heard of it.
     @ObservationIgnored internal(set) var lastCompactionAt: Date?
-    /// Send was tapped while the chat catches up; the message waits in the box until it ends.
-    var isAwaitingCatchUp = false
-    /// How long a message waits in the box for a catch-up before Send gives up on it.
-    @ObservationIgnored var catchUpTimeout: Duration = .seconds(30)
-    /// An open under way (`ShellFeatureStore.startNavigationHydration`) while the chat shows its saved
-    /// copy. Send stays on: a message waits in the box until the open ends, then goes out.
+    /// Messages sent before the chat could take them, oldest first (`stage`). Each waits at the
+    /// bottom of the chat with "Sending…" under it and goes out in order once the chat can take it.
+    internal(set) var stagedSends: [ChatStagedSend] = []
+    @ObservationIgnored var stagedSendDrain: Task<Void, Never>?
+    /// The chat has gone without a connection for `connectionGrace` while the app was open
+    /// (`ChatConnectionGrace`). Only then does Send go off, until the chat connects again.
+    var connectionIsOverdue = false
+    /// How long Send stays on without a connection, and how long a staged message waits.
+    @ObservationIgnored var connectionGrace: Duration = .seconds(25)
+    /// An open under way (`ShellFeatureStore.startNavigationHydration`) while the chat shows its saved copy.
     private(set) var isOpening = false
-    @ObservationIgnored private(set) var opening: (token: UUID, wait: @MainActor () async -> Void)?
+    @ObservationIgnored private var openingToken: UUID?
 
-    func beginOpening(_ token: UUID, until wait: @escaping @MainActor () async -> Void) {
-        opening = (token, wait)
+    func beginOpening(_ token: UUID) {
+        openingToken = token
         isOpening = true
     }
 
     /// Ends the open `token` began; a newer one stays.
     func endOpening(_ token: UUID) {
-        guard opening?.token == token else { return }
-        opening = nil
+        guard openingToken == token else { return }
+        openingToken = nil
         isOpening = false
     }
     var isSending = false {
@@ -460,29 +464,23 @@ final class ChatModel {
         return nativeConversationClient?.isReadyForSubmission ?? true
     }
 
-    /// Send's readiness: also on while a working chat only catches up with what Hermes saved,
-    /// which happens every few seconds while agents work together, and while the chat opens from
-    /// its saved copy. A message waits either out.
-    var composerTransportIsReady: Bool {
-        directTransportIsReady || isOpening || nativeConversationClient?.acceptsSubmissionAfterCatchUp == true
-    }
-
     var canSend: Bool {
         // Hosted groups have their own authenticated client and readiness gates.
         // Their unused direct-chat placeholder must not disable the composer.
-        if !isBotMode {
+        // A chat that can't hand the message to Hermes yet takes it anyway: it waits in the chat.
+        let stages = stagesComposerMessage
+        if !isBotMode, !stages {
             if isSending, let native = nativeConversationClient {
                 guard native.hasAuthoritativeEventCoverage,
                       native.preparingAttachmentID == nil,
                       native.sessionActionsAreRunning else { return false }
             } else if !isSending {
-                guard orderedDraftAttachments.isEmpty ? composerTransportIsReady : directTransportIsReady
-                else { return false }
+                guard directTransportIsReady else { return false }
             } else {
                 guard supportsMidSessionSending else { return false }
             }
         }
-        guard !isAwaitingAuthoritativeSessionAllocation, !isAwaitingCatchUp else { return false }
+        guard !isAwaitingAuthoritativeSessionAllocation else { return false }
         guard !isBotMode || botModeExecutionEnabled else { return false }
         let sendsWhileRoomWorks = acceptsBotModeFollowUp
         if !sendsWhileRoomWorks {
@@ -506,13 +504,14 @@ final class ChatModel {
               !hasStalePDFPageSelections,
               attachmentsSupported, hasText || hasSendableAttachments
         else { return false }
-        return !isSending || isMidSessionTurnLive || sendsWhileRoomWorks
+        return !isSending || isMidSessionTurnLive || sendsWhileRoomWorks || stages
     }
 
     /// Why Send is unavailable, in plain words, for VoiceOver and diagnostics.
     /// Mirrors the gates in `canSend`; nil when sending is possible or idle.
     var sendUnavailableReason: String? {
         guard !canSend else { return nil }
+        if lacksConnection, connectionIsOverdue { return "not connected to your computer" }
         if !isBotMode, let native = nativeConversationClient {
             if !native.connected { return "not connected to host" }
             if native.isHydratingForReason { return "loading chat history" }
@@ -561,7 +560,8 @@ final class ChatModel {
             || botModeRoom?.nativeRetryJournal != nil || botModeRoom?.nativePendingCancelID != nil)
             && !isStopping
             && !hasExclusiveMidSessionSubmission
-            && supportsStopping
+            // A chat still connecting stops once it connects (`stop`).
+            && (supportsStopping || waitsForConnection)
     }
 
     var isMidSessionTurnLive: Bool {
@@ -576,7 +576,7 @@ final class ChatModel {
             || isPDFDraftSendInFlight
             || hasExclusiveMidSessionSubmission
             // A group chat keeps taking messages while its agents work.
-            || (isSending && !supportsMidSessionSending && !isBotMode)
+            || (isSending && !supportsMidSessionSending && !isBotMode && !waitsForConnection)
     }
 
     var isComposerAttachmentInputDisabled: Bool {

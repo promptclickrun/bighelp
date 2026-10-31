@@ -256,10 +256,10 @@ final class ChatPerformanceAutopilot: NSObject {
             if let model = BighelpVisibleChats.shared.models.first {
                 mark("open.shown")
                 if !model.isHydratingHistory, !model.transcriptEntries.isEmpty { mark("open.loaded") }
-                if model.composerTransportIsReady { mark("open.ready") }
+                if model.directTransportIsReady { mark("open.ready") }
             }
             guard marked.count < 3, CACurrentMediaTime() - start < 30 else {
-                if let model = BighelpVisibleChats.shared.models.first, !model.composerTransportIsReady {
+                if let model = BighelpVisibleChats.shared.models.first, !model.directTransportIsReady {
                     let native = model.nativeConversationClient
                     NSLog("CHAT_PERFORMANCE open: Send not ready: native=%d connected=%d hydrating=%d recovery=%d reattach=%d sending=%d status=%@",
                           native == nil ? 0 : 1, native?.connected == true ? 1 : 0, native?.isHydratingForReason == true ? 1 : 0,

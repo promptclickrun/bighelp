@@ -22,6 +22,18 @@ after explicit enablement and iOS authorization. Grants belong to the phone, its
 authorization epoch and the selected host. Turning a grant off blocks new and
 in-flight access; it does not revoke the underlying iOS permission.
 
+## What a live voice call tells the voice model
+
+On a Full Duplex call to a computer whose plugin lists `native-voice-context-v1`, the app's offer also
+sends the agent's name as the app shows it, the name you saved in bighelp (never the placeholder "You"),
+and the phone's time zone. While Location is on in Device access and iOS allows it, it also sends a
+coarse place: city, region and country. It comes from the phone's last known position when that is
+less than an hour old, else from a new city-level fix (kilometer accuracy). The call waits for it
+about one second at most; a slower search fills the place in for the next call. It never sends
+coordinates or a street. The plugin puts these into that call's instructions for the voice provider
+(GPT-Live or Gemini Live), so the agent can call you by name and answer weather and local questions,
+and keeps none of them. With Location off, no place is sent.
+
 Agents can also change how bighelp looks (light or dark mode and the chat color)
 with `iphone_appearance`. It reads and changes only those two settings, shares no
 phone data and needs no iOS permission, so it's on until the person turns off

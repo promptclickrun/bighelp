@@ -333,7 +333,7 @@ struct ProviderAssetTests {
         URL(filePath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appending(path: "Bighelp/Resources/Assets.xcassets", directoryHint: .isDirectory)
+            .appending(path: "Bighelp/Resources/ProviderLogos.xcassets", directoryHint: .isDirectory)
     }
 
     private var resourcesURL: URL {

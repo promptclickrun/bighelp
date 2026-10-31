@@ -756,7 +756,8 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
 
 ### Provider logos
 
-- Logos are bundled SVGs in `Bighelp/Resources/Assets.xcassets/ProviderLogo*.imageset`.
+- Logos are bundled SVGs in `Bighelp/Resources/ProviderLogos.xcassets/ProviderLogo*.imageset`, a catalog of
+  their own that the widget extension includes too (the Usage widget draws them).
 - To add one:
   - Add it to `APPROVED_NAMES` in `Scripts/publish-provider-logos.py`.
   - Record it in `ProviderLogos-PROVENANCE.md` and `ProviderLogos-NOTICES.txt`.

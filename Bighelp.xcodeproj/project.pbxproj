@@ -526,6 +526,7 @@
 		47739E5FC7053A96B9E412AE /* AgentHomeChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A51D920C9BAB00A0B245CFD /* AgentHomeChrome.swift */; };
 		478ACCE672B8A0E2E29C7C62 /* DirectHermesConversationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B10DEC8B562E19003B75CF1 /* DirectHermesConversationTests.swift */; };
 		47CAAB6177BEF53AE957CC59 /* TelemetryGzip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41CE0158F3F37630D87D1010 /* TelemetryGzip.swift */; };
+		47CF23F00B6A22989889D7BF /* ProviderLogos.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 36C6B36320C5DD61770E9025 /* ProviderLogos.xcassets */; };
 		47D6401E023D25541EB9A79E /* BighelpMacConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F368CA37529B61EA59D37401 /* BighelpMacConversationView.swift */; };
 		4800B04410AF4B4645FCB626 /* ChatDraftFieldPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EC41956BB719C5141A044E0 /* ChatDraftFieldPolicy.swift */; };
 		484CF91F53F54082DA0320D2 /* CanonicalChatCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 758BC7AD425BF64408758569 /* CanonicalChatCoordinator.swift */; };
@@ -1220,6 +1221,7 @@
 		A4FECAE76C68178FECEC3222 /* DeviceAlarmsToolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92EE7F74E34D732EF562D242 /* DeviceAlarmsToolTests.swift */; };
 		A502E93285ADE122D390D37C /* bighelp-trick-spring.json in Resources */ = {isa = PBXBuildFile; fileRef = 8CAB7EADE627EDE9A8A189AC /* bighelp-trick-spring.json */; };
 		A555C3140D47F2D3F69DF6A8 /* ComposerAttachmentDrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 580978D40E72CAB3863619A6 /* ComposerAttachmentDrop.swift */; };
+		A582F3328EE33F409851F15D /* ProviderLogos.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 36C6B36320C5DD61770E9025 /* ProviderLogos.xcassets */; };
 		A585B165139B51D80E47C74C /* bighelp-trick-bunny.json in Resources */ = {isa = PBXBuildFile; fileRef = F9ED060AEBD25162FD0DD9C0 /* bighelp-trick-bunny.json */; };
 		A59E59CBEB264CAE459B2C17 /* templates-save.json in Resources */ = {isa = PBXBuildFile; fileRef = D3D2F8B1EC1B801E839E9497 /* templates-save.json */; };
 		A5A506094873E5A9C79E5935 /* soul-lens.md in Resources */ = {isa = PBXBuildFile; fileRef = 4C6DBCCBBC55CBBA9186BEF1 /* soul-lens.md */; };
@@ -2404,6 +2406,7 @@
 		361DCC9223DD4EAB9D6DCE27 /* BighelpFoundationSessionRecordProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpFoundationSessionRecordProjection.swift; sourceTree = "<group>"; };
 		363125E35F32B409045A5DD4 /* AgentTemplateLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTemplateLibrary.swift; sourceTree = "<group>"; };
 		36C0A15A93DAF2502D385D13 /* ImageDraftWriteFenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageDraftWriteFenceTests.swift; sourceTree = "<group>"; };
+		36C6B36320C5DD61770E9025 /* ProviderLogos.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = ProviderLogos.xcassets; sourceTree = "<group>"; };
 		36C9CCD6D5E90EF2AC282B99 /* BighelpCardTemplateDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpCardTemplateDetailView.swift; sourceTree = "<group>"; };
 		36E3B5F0213C68AE641282A2 /* ChatModelSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatModelSummary.swift; sourceTree = "<group>"; };
 		36E49823646B5715F924EFF9 /* BighelpMacUpdater.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BighelpMacUpdater.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -4524,6 +4527,7 @@
 				D7CCFDC793D0FC6199EB7D55 /* model-names.json */,
 				EA02A54D78F51C5693D834C4 /* PrivacyInfo.xcprivacy */,
 				580AB2B819C0E24ADA7B2FB0 /* ProviderLogos-NOTICES.txt */,
+				36C6B36320C5DD61770E9025 /* ProviderLogos.xcassets */,
 				8A0AC2A81630DA201B3B4F2D /* ThirdParty-NOTICES.txt */,
 				4257C42FC04B0F807EEA538B /* VoiceHoldLoop.wav */,
 				C340AD81178E4864E29F460B /* WebRTC-LICENSE.txt */,
@@ -6750,6 +6754,7 @@
 			buildConfigurationList = 167D309156B70FB8B9127AA2 /* Build configuration list for PBXNativeTarget "BighelpLiveActivity" */;
 			buildPhases = (
 				B6F8CC947451656AAFC368CD /* Sources */,
+				83F86A39DC0CA926FCCED0ED /* Resources */,
 			);
 			buildRules = (
 			);
@@ -6908,6 +6913,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		83F86A39DC0CA926FCCED0ED /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				47CF23F00B6A22989889D7BF /* ProviderLogos.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		99F21A92D96A9A2E56227FFC /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -6992,6 +7005,7 @@
 				39BF59E6C7019FDA3EAC77B4 /* OFL.txt in Resources */,
 				0963824B1C1CDB181BEBF365 /* PrivacyInfo.xcprivacy in Resources */,
 				A9862F72D31D162D35B57E4E /* ProviderLogos-NOTICES.txt in Resources */,
+				A582F3328EE33F409851F15D /* ProviderLogos.xcassets in Resources */,
 				FBC635B8327275A2634C2A47 /* ThirdParty-NOTICES.txt in Resources */,
 				F62DCC59F91BE8711406AEFB /* VoiceHoldLoop.wav in Resources */,
 				3DCFA4FF2C0CECCF12FA6B26 /* WebRTC-LICENSE.txt in Resources */,

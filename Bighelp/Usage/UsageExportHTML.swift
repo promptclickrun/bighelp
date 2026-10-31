@@ -20,7 +20,8 @@ struct UsageExportPalette: Equatable, Sendable {
     static func lightAppearance(_ appearance: BighelpAppearanceContext) -> BighelpAppearanceContext {
         BighelpAppearanceContext(appearance: .light, lightBackground: appearance.lightBackground,
                                  darkBackground: appearance.darkBackground, bubbleColor: appearance.bubbleColor,
-                                 customBubbleHex: appearance.customBubbleHex)
+                                 customBubbleHex: appearance.customBubbleHex,
+                                 bubbleFollowsTheme: appearance.bubbleFollowsTheme)
     }
 
     init() {}

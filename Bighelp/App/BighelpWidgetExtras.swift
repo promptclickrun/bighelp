@@ -78,7 +78,8 @@ final class BighelpWidgetExtras {
                 appearance: BighelpAppearanceContext(
                     appearance: scheme,
                     lightBackground: context.lightBackground, darkBackground: context.darkBackground,
-                    bubbleColor: context.bubbleColor, customBubbleHex: context.customBubbleHex),
+                    bubbleColor: context.bubbleColor, customBubbleHex: context.customBubbleHex,
+                    bubbleFollowsTheme: context.bubbleFollowsTheme),
                 colorScheme: scheme == .dark ? .dark : .light, contrast: .standard)
             return .init(canvasHex: theme.canvasHex, surfaceHex: theme.surfaceHex,
                          primaryTextHex: theme.primaryTextHex, secondaryTextHex: theme.secondaryTextHex,

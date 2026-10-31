@@ -3,6 +3,16 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.45
+
+### New
+
+- **Live voice:** the agent speaks the language of your phone for the full call. It changes the language only when you ask it to. It knows its own name and your name. While you share your location with bighelp, it also knows your city, so it can tell you the weather. To use this, update the bighelp plugin to 3.40.0.
+
+### Nerd Mode
+
+- **Call sound report:** the Gemini Live call screen does not show the report now. To show it, go to Settings › Voice › Debug and turn on **Show call sound report**. To copy it, turn on **Copy report button**. **Restart sound** is in the same section.
+
 ## 2.6.44
 
 ### Fixed

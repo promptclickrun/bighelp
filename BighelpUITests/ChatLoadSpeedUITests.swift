@@ -134,6 +134,53 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
         XCTAssertEqual(input.value as? String, "Could you check the vendor invoices for this week, please?!")
     }
 
+    /// Typing with a pause halfway (`BIGHELP_PERF_TYPE_PAUSE`), the way someone stops to think:
+    /// the chat saves its draft in that pause. The app's autopilot types, so no query reads the
+    /// long chat while it's measured.
+    @MainActor
+    func testTypingWithAPauseInALongRealisticChat() throws {
+        let app = makeApp()
+        app.launchEnvironment["BIGHELP_PERF_LABEL"] = "typing-pause-\(Self.turns)"
+        app.launchEnvironment["BIGHELP_PERF_TYPE_PAUSE"] = "2.5"
+        app.launchArguments = realisticArguments(opensChat: true)
+        app.launch()
+        XCTAssertTrue(realisticLatest(in: app).waitForExistence(timeout: 30))
+        settle()
+        typeWithTheAutopilot()
+        XCTAssertEqual(app.otherElements["chat.composer-shell"].textViews["Message"].value as? String,
+                       Self.autopilotText)
+    }
+
+    /// Typing while an answer streams in at a model's pace at the bottom of a long chat
+    /// (`-test-tool-stream-fast-tail`: a few words every 25 ms for about 30 s). The autopilot
+    /// types once the answer has started, and its reading ends well before the answer does.
+    @MainActor
+    func testTypingWhileAnAnswerStreamsInALongRealisticChat() throws {
+        let completionName = "app.loopdy.fixture.tool-stream.\(UUID().uuidString)"
+        withDarwinExpectation(completionName) { streamed in
+            let app = makeApp()
+            app.launchEnvironment["BIGHELP_TOOL_STREAM_COMPLETION_NOTIFICATION"] = completionName
+            app.launchEnvironment["BIGHELP_PERF_LABEL"] = "typing-stream-\(Self.turns)"
+            app.launchArguments = realisticArguments(opensChat: true)
+                + ["-test-tool-stream", "-test-tool-stream-fast-tail", "-test-companion-disabled"]
+            app.launch()
+            XCTAssertTrue(realisticLatest(in: app).waitForExistence(timeout: 30))
+            let input = app.otherElements["chat.composer-shell"].textViews["Message"]
+            XCTAssertTrue(input.waitForExistence(timeout: 10))
+            input.tap()
+            input.typeText("Run the weekly checks")
+            app.buttons["chat.send"].tap()
+            // The fixture's tool steps take under a second; then the answer grows.
+            Thread.sleep(forTimeInterval: 1)
+            typeWithTheAutopilot()
+            XCTAssertEqual(XCTWaiter.wait(for: [streamed], timeout: 120), .completed,
+                           "The answer must still be streaming while the autopilot types")
+            let complete = app.textViews.matching(NSPredicate(format: "label CONTAINS %@", "TOOL STREAM COMPLETE")).firstMatch
+            XCTAssertTrue(complete.waitForExistence(timeout: 10))
+            XCTAssertEqual(input.value as? String, Self.autopilotText)
+        }
+    }
+
     /// Opens the actual ellipsis menu, with the coordinate resolved before the
     /// measured phase so a long transcript's accessibility snapshot is excluded.
     @MainActor
@@ -226,6 +273,38 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
     private enum ChatPerformance {
         static let reset = "app.loopdy.fixture.chat-performance.reset"
         static let read = "app.loopdy.fixture.chat-performance.read"
+        static let type = "app.loopdy.fixture.chat-performance.type"
+        static let typed = "app.loopdy.fixture.chat-performance.typed"
+    }
+
+    /// What `ChatPerformanceAutopilot` types, one key at a time.
+    private static let autopilotText = "Could you check the vendor invoices for this week, please?! "
+
+    /// Has the app's autopilot type its 60 characters (resetting and reading the probe around
+    /// them) and waits until it has read.
+    @MainActor
+    private func typeWithTheAutopilot() {
+        withDarwinExpectation(ChatPerformance.typed) { typed in
+            post(ChatPerformance.type)
+            XCTAssertEqual(XCTWaiter.wait(for: [typed], timeout: 30), .completed)
+        }
+    }
+
+    /// Runs `body` with an expectation the app fulfils by posting the Darwin notification `name`.
+    @MainActor
+    private func withDarwinExpectation(_ name: String, _ body: (XCTestExpectation) throws -> Void) rethrows {
+        let expectation = XCTestExpectation(description: name)
+        let observer = Unmanaged.passRetained(expectation).toOpaque()
+        let center = CFNotificationCenterGetDarwinNotifyCenter()
+        CFNotificationCenterAddObserver(center, observer, { _, observer, _, _, _ in
+            guard let observer else { return }
+            Unmanaged<XCTestExpectation>.fromOpaque(observer).takeUnretainedValue().fulfill()
+        }, name as CFString, nil, .deliverImmediately)
+        defer {
+            CFNotificationCenterRemoveObserver(center, observer, CFNotificationName(name as CFString), nil)
+            Unmanaged<XCTestExpectation>.fromOpaque(observer).release()
+        }
+        try body(expectation)
     }
 
     private func post(_ name: String) {

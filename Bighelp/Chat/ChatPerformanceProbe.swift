@@ -208,6 +208,8 @@ final class ChatPerformanceAutopilot: NSObject {
     nonisolated static let openNotification = "app.loopdy.fixture.chat-performance.open"
     nonisolated static let listNotification = "app.loopdy.fixture.chat-performance.list"
     nonisolated static let newChatNotification = "app.loopdy.fixture.chat-performance.new-chat"
+    /// Posted by the app (not listened for) once `type` has read.
+    nonisolated static let typedNotification = "app.loopdy.fixture.chat-performance.typed"
     nonisolated static let notifications = [scrollNotification, typeNotification, sendNotification, openNotification,
                                             listNotification, newChatNotification]
 
@@ -304,21 +306,28 @@ final class ChatPerformanceAutopilot: NSObject {
         }
     }
 
-    /// 60 characters at 15 a second, the way the keyboard puts them in.
+    /// 60 characters at 15 a second, the way the keyboard puts them in. `BIGHELP_PERF_TYPE_PAUSE`
+    /// (seconds) stops halfway for that long, the way someone stops to think: the chat saves a
+    /// draft in a pause, so that save is in the reading too. Posts `typedNotification` after
+    /// the reading, so a test waits for it instead of guessing how long typing takes.
     private func type(_ recorder: ChatPerformanceRecorder) {
         guard let editor = Self.view(UITextView.self, where: { $0.accessibilityIdentifier == "chat.composer.text" })
         else { return }
         _ = editor.becomeFirstResponder()
         let text = Array("Could you check the vendor invoices for this week, please?! ")
+        let pause = Double(ProcessInfo.processInfo.environment["BIGHELP_PERF_TYPE_PAUSE"] ?? "") ?? 0
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1.5))
             recorder.reset()
-            for character in text {
+            for (index, character) in text.enumerated() {
+                if pause > 0, index == text.count / 2 { try? await Task.sleep(for: .seconds(pause)) }
                 editor.insertText(String(character))
                 try? await Task.sleep(for: .milliseconds(66))
             }
             try? await Task.sleep(for: .milliseconds(500))
             recorder.read()
+            CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
+                CFNotificationName(Self.typedNotification as CFString), nil, nil, true)
         }
     }
 

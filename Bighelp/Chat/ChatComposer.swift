@@ -38,6 +38,7 @@ struct ChatComposer: View {
     @State private var clipboardErrorMessage: String?
 
     var body: some View {
+        let _ = ChatPerformanceProbe.count("composer.body")
         VStack(spacing: BighelpTokens.space4) {
             if let compaction = model.compaction, compaction.isShown {
                 ChatCompactionRail(compaction: compaction)
@@ -758,6 +759,7 @@ private struct ComposerMentionSuggestions: View {
     let onSelect: (MentionSuggestion) -> Void
 
     var body: some View {
+        let _ = ChatPerformanceProbe.count("composer.mentions.body")
         let suggestions = model.mentionSuggestions
         if !suggestions.isEmpty {
             MentionSuggestionsView(suggestions: suggestions, agents: model.agentDirectory, onSelect: onSelect)
@@ -777,6 +779,7 @@ private struct ComposerPrimaryAction: View {
     let onKeyboardSendOptionsClosed: () -> Void
 
     var body: some View {
+        let _ = ChatPerformanceProbe.count("composer.action.body")
         AdaptiveComposerActionButton(
             action: ChatComposerPrimaryAction.resolve(draft: model.draft,
                                                       isTurnActive: model.isSending || model.otherProcessRun != nil,
@@ -802,6 +805,7 @@ private struct ComposerPlaceholder: View {
     let text: String
 
     var body: some View {
+        let _ = ChatPerformanceProbe.count("composer.placeholder.body")
         if model.draft.isEmpty {
             Text(text)
                 .bighelpFont(.body)

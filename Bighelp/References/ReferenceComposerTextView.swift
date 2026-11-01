@@ -300,6 +300,7 @@ struct ReferenceComposerTextView: UIViewRepresentable {
         }
 
         private func applySurface(_ update: SurfaceUpdate, in container: ReferenceComposerContainer) {
+            ChatPerformanceProbe.count("composer.surface")
             guard let view else { return }
             view.delegate = nil
             defer { view.delegate = self }
@@ -562,13 +563,15 @@ struct ReferenceComposerTextView: UIViewRepresentable {
 
         func textViewDidChange(_ textView: UITextView) {
             guard !applying else { return }
-            publish()
-            keepCaretVisible()
+            ChatPerformanceProbe.measure("composer.edit") {
+                publish()
+                keepCaretVisible()
+            }
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
             guard !applying, textView.isFirstResponder else { return }
-            publish()
+            ChatPerformanceProbe.measure("composer.caret") { publish() }
         }
 
         /// Change traits only, never text/selection or responder ownership. IME

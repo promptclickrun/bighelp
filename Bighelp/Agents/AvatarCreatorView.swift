@@ -456,6 +456,7 @@ struct AvatarCreatorView: View {
     let onUse: (AvatarCreatorResult) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// The state played on the face being edited. A preview only: the agent's own face never sees it.
     @State private var playState: AvatarPlayState = .idle
     @State private var faceTool: AvatarFaceTool = .shape
@@ -583,7 +584,7 @@ struct AvatarCreatorView: View {
                         .padding(.top, BighelpTokens.space8)
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
-                if model.style == .face {
+                if model.style == .face, !stripScrollsWithChoices {
                     playStrip
                         .padding(.horizontal, BighelpTokens.space20)
                         .padding(.top, BighelpTokens.space8)
@@ -606,6 +607,12 @@ struct AvatarCreatorView: View {
         }
     }
 
+    /// Large text makes the strip three or four rows tall; held under the stage it left the
+    /// phone's choices no room, so there it scrolls at the top of the choices instead.
+    private var stripScrollsWithChoices: Bool {
+        !usesSideLayout && dynamicTypeSize >= .xLarge
+    }
+
     private var usesSideLayout: Bool {
         #if os(visionOS) || targetEnvironment(macCatalyst)
         true
@@ -621,12 +628,16 @@ struct AvatarCreatorView: View {
 
     private var choices: some View {
         ScrollView {
-            panel
-                .padding(.horizontal, BighelpTokens.space20)
-                .padding(.bottom, BighelpTokens.space20)
+            VStack(spacing: BighelpTokens.space16) {
+                if model.style == .face, stripScrollsWithChoices { playStrip }
+                panel
+            }
+            .padding(.horizontal, BighelpTokens.space20)
+            .padding(.bottom, BighelpTokens.space20)
         }
         .scrollIndicators(.hidden)
         .dismissesKeyboardOnScroll(true)
+        .accessibilityIdentifier("avatar.creator.choices")
         // Each tab opens at its top, not where the last one was scrolled.
         .id("\(model.style.rawValue).\(model.catalogGroup.rawValue).\(model.tab.rawValue).\(faceTool.rawValue)")
     }
@@ -703,7 +714,7 @@ struct AvatarCreatorView: View {
             }
         }
         // A phone's face stage is shorter, so the play strip and tools fit under it.
-        .frame(height: usesSideLayout ? nil : (model.style == .face ? 210 : 260))
+        .frame(height: usesSideLayout ? nil : (model.style == .face ? (stripScrollsWithChoices ? 180 : 210) : 260))
         .frame(maxHeight: usesSideLayout ? .infinity : nil)
     }
 

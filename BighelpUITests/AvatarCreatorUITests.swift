@@ -84,6 +84,7 @@ final class AvatarCreatorUITests: BighelpUITestCase {
         }
         let love = app.buttons["avatar.creator.face.play.love"].firstMatch
         XCTAssertEqual(love.label, "Love")
+        reveal(love, in: app)
         love.tap()
         XCTAssertTrue(love.isSelected)
         XCTAssertEqual(any["avatar.creator.preview"].firstMatch.label, "Face preview, Love")
@@ -94,10 +95,12 @@ final class AvatarCreatorUITests: BighelpUITestCase {
 
         // Shape: an Organic outline gets bumps, wobble and a mirror, with Undo.
         app.buttons["avatar.creator.face.tool.shape"].firstMatch.tap()
-        app.buttons["avatar.creator.face.organic"].firstMatch.tap()
+        let organic = app.buttons["avatar.creator.face.organic"].firstMatch
+        reveal(organic, in: app)
+        organic.tap()
         XCTAssertTrue(undo.isEnabled)
         let mirror = app.switches["avatar.creator.face.mirror"].firstMatch
-        for _ in 0..<6 where !(mirror.exists && mirror.isHittable) { app.scrollViews.firstMatch.swipeUp() }
+        reveal(mirror, in: app)
         XCTAssertTrue(mirror.exists, "Organic faces can mirror")
         mirror.switches.firstMatch.tap()
         XCTAssertEqual(mirror.value as? String, "1")
@@ -113,6 +116,7 @@ final class AvatarCreatorUITests: BighelpUITestCase {
         app.buttons["avatar.creator.face.tool.size"].firstMatch.tap()
         let taller = app.buttons["avatar.creator.face.size.taller"].firstMatch
         XCTAssertTrue(taller.waitForExistence(timeout: 3))
+        reveal(taller, in: app)
         taller.tap()
         XCTAssertTrue(app.buttons["avatar.creator.face.size.reset"].firstMatch.waitForExistence(timeout: 3))
         save("face-size-\(suffix)", app)
@@ -123,16 +127,20 @@ final class AvatarCreatorUITests: BighelpUITestCase {
         app.buttons["avatar.creator.face.tool.sets"].firstMatch.tap()
         let lantern = app.buttons["avatar.creator.face.preset.lantern-759"].firstMatch
         XCTAssertTrue(lantern.waitForExistence(timeout: 3))
+        reveal(lantern, in: app)
         lantern.tap()
         XCTAssertTrue(lantern.isSelected)
         XCTAssertTrue(use.isEnabled)
-        app.buttons["avatar.creator.face.play.sleep"].firstMatch.tap()
+        let sleep = app.buttons["avatar.creator.face.play.sleep"].firstMatch
+        reveal(sleep, in: app)
+        sleep.tap()
         save("face-sets-sleep-\(suffix)", app)
 
         // Colors: named palettes, the picked one ringed.
         app.buttons["avatar.creator.face.tool.colors"].firstMatch.tap()
         let night = app.buttons["avatar.creator.face.palette.Night"].firstMatch
         XCTAssertTrue(night.waitForExistence(timeout: 3))
+        reveal(night, in: app)
         night.tap()
         XCTAssertTrue(night.isSelected)
         XCTAssertFalse(lantern.exists && lantern.isSelected)
@@ -214,6 +222,15 @@ final class AvatarCreatorUITests: BighelpUITestCase {
         XCTAssertTrue(hexagon.isSelected, "Opens on the saved shape")
         XCTAssertFalse(use.isEnabled)
         save("current-shape-\(appearance)", app)
+    }
+
+    /// Large text pushes controls below the fold; scroll the choices until it can be tapped.
+    @MainActor
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
+        let choices = app.scrollViews["avatar.creator.choices"].firstMatch
+        for _ in 0..<6 where !(element.exists && element.isHittable) { choices.swipeUp(velocity: .slow) }
+        for _ in 0..<8 where !(element.exists && element.isHittable) { choices.swipeDown(velocity: .slow) }
+        XCTAssertTrue(element.isHittable, "\(element) can be reached")
     }
 
     @MainActor

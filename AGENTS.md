@@ -311,6 +311,22 @@ change in both repos.
   client attached to the chat starts the tries again for every reason but too big; a turn that ends does for
   refused (a reply Hermes hadn't saved yet). A tile with nothing finishing it shows Try again after
   `AgentFileLoad.stallAfter` anyway. The `ChatFiles` log has each try's reason.
+- **Big files people send** (over `ChatAttachment.maximumBytes`, 8 MiB, up to 256 MiB; plugin `native-uploads-v1`,
+  bighelp-plugin's docs/BIG_FILES.md): Hermes' `file.attach` takes a file in one socket frame, so bigger files go
+  to the plugin's `uploads/*` routes in 4 MiB pieces instead (`BigFileUploader`), in any order, from a background
+  `URLSession` (`BighelpBackgroundUploads`) that iOS keeps sending while the app is away. The host records a piece
+  only once all of it arrived; after a drop the app asks `status` and sends only the rest, and starting the same
+  file again gets the same upload back. The app keeps its own copy on disk (`ChatBigFile`, `BigFileStore`, a
+  `.bigFile` draft) and never holds the whole file in memory. `finish` checks the SHA-256 and moves the file into
+  the agent's working folder (`uploads/<date>/<name>`, what its Files tab shows); stock `file.attach` then takes
+  it by `path` and tells the agent its type, size and place on disk, never its bytes. The app's
+  `[Video attached: … (size, length, picture)]` or `[File attached: … (size)]` note follows each `@file:` line.
+  One look per file (Colt, #721): while it goes up, a tile with a ring and "34 of 80 MB" (`BigFileUploadTile`,
+  progress in `BigFileUploadBoard` so only the ring redraws), or why it didn't go with Try again; once Hermes
+  takes the message (`onSubmissionAdmitted`), the row takes the sent text and shows each file as a line on the
+  rail (`ChatSentFileLine`), exactly what a reread rebuilds. A host path or `@file:` ref never shows as text; a
+  tap opens the bot's Files on the file (`BotProfileOpening.file`, `SimpleBotFilesModel.reveal`), a long press
+  shows the path. Hosts without the feature keep the 8 MiB limit and say to update the plugin.
 - **Each agent's own files:** the plugin's `workspace-files/*` routes take an optional `profile` (plugin 3.20.0,
   `native-workspace-files-agents-v1`) and read that agent's working folder with the same refusals. A bot's Files
   tab sends its ID (`DirectHermesManagedFilesClient(agentID:)`); the serving agent never names itself, so older
@@ -422,6 +438,17 @@ change in both repos.
   message as it's drawn must not grow with its text beyond the drawing itself: `MarkdownDocument`'s plain
   text is worked out only when read. The probe's `main_busy_ms` counts main run loop turns over 8.3 ms, a
   dropped frame at 120 Hz; the simulator's frame gaps can't show that.
+- **Message box redraws:** `ChatComposer` is `Equatable` and calls back through one `ChatComposerActions`
+  that `ChatComposerHost` keeps up to date, so the chat's redraws (each streamed piece of an answer) don't
+  redraw the box. A new input that changes how the box looks goes in its `==`. Never keep closures that
+  capture a view in an object in that view's own `@State`: the state then keeps the view, and its chat, alive. Send, the placeholder and the mention list
+  read `ChatModel.draftShape`, never the draft, so most keys redraw only the text view. A pause in typing
+  saves the draft to `ChatDraftJournal`, not the chat list; the chat takes it at its next save
+  (`ChatComposerRedrawTests`, `ChatDraftJournalTests`). `ChatDestinationView` must not read the chat's
+  messages in its body: then every streamed piece redrew it, and its new `openURL` action updated every
+  UIKit view under it, the box's text view too. Read them in a modifier of their own
+  (`ProjectChangesRefreshTrigger`). `@Observable` skips a set to an equal value, but an in-place
+  change (`removeAll`, `append`, `&+=`) always notifies, even when it changes nothing.
 - **Streaming under a drag:** Hermes sends an answer a few words at a time, and each piece lays the whole answer
   out again, so each timeline update waits 50 ms after the last one's layout, and while the reader drags or the chat
   decelerates (`NativeChatTimeline` `applyPendingUpdate`, `isScrolling`); otherwise a drag got a few touch
@@ -458,6 +485,10 @@ change in both repos.
   change it after, so a switch in Settings left the open sheet's text fields and pickers in the old style.
   `BighelpWindowAppearance` sets every window and presented controller, and each `bighelpSheet` and
   `bighelpFullScreenCover` applies it as it opens.
+- **Text size on sheets:** iOS starts a sheet or cover again from the device's own Dynamic Type size, not the
+  root's `.dynamicTypeSize`, so Settings once ignored Appearance's text size. `bighelpPresentedAppearance`
+  applies `BighelpTextSizing` again; it passes the size it chose down (`bighelpTextSizedTo`), so nothing takes
+  two steps.
 - **One long-press menu per List row:** a List row shows the first `.contextMenu` in it for every item, so a grid of
   tiles in one row acted on the wrong item (holding a pinned chat offered another chat's Delete). Give each tile a
   `Menu(primaryAction:)` or its own gesture (`AgentPinnedGrid`).

@@ -31,7 +31,7 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
                                "-bighelp.settings.simple-bots", "YES"]
         app.launch()
-        defer { setAppearance("Automatic", in: app) }
+        defer { setAppearance("System", in: app) }
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
         setAppearance("Light", in: app)
         XCTAssertGreaterThan(brightness(of: app.windows.firstMatch, in: app), 0.8, "Light: a light home")
@@ -49,9 +49,9 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
         // Dark from Settings › Appearance: the open page changes now, not after reopening it.
         app.buttons["simple-bots.settings"].tap()
         app.buttons["simple-bots.settings.appearance"].tap()
-        let mode = app.segmentedControls["appearance.mode"]
-        XCTAssertTrue(mode.waitForExistence(timeout: 5))
-        mode.buttons["Dark"].tap()
+        let dark = app.buttons["appearance.mode.dark"]
+        XCTAssertTrue(dark.waitForExistence(timeout: 5))
+        dark.tap()
         Thread.sleep(forTimeInterval: 0.6)
         save("appearance-page-dark", app)
         XCTAssertLessThan(brightness(of: app.windows.firstMatch, in: app), 0.25, "The open page turned dark")
@@ -168,9 +168,9 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
         else { return }
         app.buttons["simple-bots.settings"].tap()
         app.buttons["simple-bots.settings.appearance"].tap()
-        let mode = app.segmentedControls["appearance.mode"]
+        let mode = app.buttons["appearance.mode.\(title.lowercased())"]
         guard mode.waitForExistence(timeout: 5) else { return }
-        mode.buttons[title].tap()
+        mode.tap()
         app.navigationBars.buttons.firstMatch.tap()
         app.buttons["simple-bots.settings.close"].tap()
         _ = app.buttons["simple-bots.settings"].waitForExistence(timeout: 5)

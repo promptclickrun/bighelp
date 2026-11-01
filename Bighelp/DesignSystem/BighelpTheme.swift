@@ -141,6 +141,9 @@ struct BighelpTheme: Codable, Equatable, Sendable {
     /// The bubble color picked in Settings › Appearance, before any contrast
     /// adjustment; nil is bighelp's own. Never part of a theme document.
     var chosenBubbleHex: String?
+    /// A theme preset's own agent message color (Settings › Appearance › Themes); nil keeps
+    /// bighelp's see-through neutral. Never part of a theme document.
+    var messageSurfaceHex: String?
 
     private enum CodingKeys: String, CodingKey {
         case themeID
@@ -305,13 +308,16 @@ struct BighelpTheme: Codable, Equatable, Sendable {
 
     /// Agent replies sit on a see-through neutral: a shade darker than the background by day and a
     /// shade lighter at night. It takes on the background behind it, so no theme clashes with it.
+    /// A theme preset brings its own color instead.
     var incomingMessageBackground: Color {
-        Color(white: isDarkPalette ? 1 : 0, opacity: incomingMessageOpacity)
+        if let messageSurfaceHex { return Color(hex: messageSurfaceHex) }
+        return Color(white: isDarkPalette ? 1 : 0, opacity: incomingMessageOpacity)
     }
 
     /// The same neutral laid over the background, for colors that are mixed from it (loaders).
     var incomingMessageSolid: Color {
-        BighelpLoaderColor.mix(Color(hex: canvasHex), Color(white: isDarkPalette ? 1 : 0), by: incomingMessageOpacity)
+        if let messageSurfaceHex { return Color(hex: messageSurfaceHex) }
+        return BighelpLoaderColor.mix(Color(hex: canvasHex), Color(white: isDarkPalette ? 1 : 0), by: incomingMessageOpacity)
     }
 
     private var incomingMessageOpacity: Double { isDarkPalette ? 0.11 : 0.055 }
@@ -635,6 +641,7 @@ struct BighelpTheme: Codable, Equatable, Sendable {
             focusHex: resolvedActionHex
         )
         resolved.resolvesLiveSemantics = true
+        resolved.messageSurfaceHex = neutral.messageSurfaceHex
         return resolved
     }
 
@@ -661,7 +668,8 @@ struct BighelpTheme: Codable, Equatable, Sendable {
                 color.resolvedColor(with: traits).getRed(&red, green: &green, blue: &blue, alpha: nil)
                 return luminance([red, green, blue])
             }
-        } + [neutral.canvasHex, neutral.surfaceHex, neutral.raisedSurfaceHex].map { surface in
+        } + [neutral.canvasHex, neutral.surfaceHex, neutral.raisedSurfaceHex, neutral.messageSurfaceHex]
+            .compactMap(\.self).map { surface in
             let value = UInt64(surface, radix: 16) ?? 0
             return luminance([CGFloat((value >> 16) & 0xFF) / 255,
                               CGFloat((value >> 8) & 0xFF) / 255, CGFloat(value & 0xFF) / 255])
@@ -731,15 +739,25 @@ struct BighelpAppearanceContext: Equatable, Sendable {
     var bubbleColor: BighelpBubbleColor?
     /// A color you picked yourself; wins over `bubbleColor`.
     var customBubbleHex: String?
-    /// The color your bubbles start from, or nil for bighelp's own.
-    var bubbleHex: String? { customBubbleHex ?? bubbleColor?.hex }
+    /// Bubbles take the accent of the theme picked for each mode (Settings › Appearance ›
+    /// Themes), where it has one; elsewhere your own bubble color.
+    var bubbleFollowsTheme = false
+    /// The color your bubbles start from in one mode, or nil for bighelp's own.
+    func bubbleHex(dark: Bool) -> String? { themeAccentHex(dark: dark) ?? customBubbleHex ?? bubbleColor?.hex }
+    /// The theme's own accent, when bubbles follow it and it has one.
+    func themeAccentHex(dark: Bool) -> String? {
+        guard bubbleFollowsTheme else { return nil }
+        return (dark ? darkBackground.preset : lightBackground.preset).accentHex(dark: dark)
+    }
     /// Vision Pro: 0 is a solid window, 1 shows the room through the glass.
     var windowTransparency = BighelpVisionGlass.defaultTransparency
-    /// Bots mode is on (Settings › Experience). Its page is always Paper by day.
+    /// Bots mode is on (Settings › Experience). It takes the same themes as the rest of the app.
     var simpleBots = false
     /// The Ink look, bighelp's default: black bubbles and buttons by day, ink after dark. Ink is
     /// `.graphite`; no saved choice is Ink too.
-    var usesInk: Bool { customBubbleHex == nil && (bubbleColor == nil || bubbleColor == .graphite) }
+    func usesInk(dark: Bool) -> Bool {
+        themeAccentHex(dark: dark) == nil && customBubbleHex == nil && (bubbleColor == nil || bubbleColor == .graphite)
+    }
 
     init(
         appearance: AppAppearance,
@@ -747,6 +765,7 @@ struct BighelpAppearanceContext: Equatable, Sendable {
         darkBackground: BighelpDarkBackground = .black,
         bubbleColor: BighelpBubbleColor? = nil,
         customBubbleHex: String? = nil,
+        bubbleFollowsTheme: Bool = false,
         windowTransparency: Double = BighelpVisionGlass.defaultTransparency
     ) {
         self.appearance = appearance
@@ -754,7 +773,18 @@ struct BighelpAppearanceContext: Equatable, Sendable {
         self.darkBackground = darkBackground
         self.bubbleColor = bubbleColor
         self.customBubbleHex = BighelpCustomBubbleColor.validated(customBubbleHex)
+        self.bubbleFollowsTheme = bubbleFollowsTheme
         self.windowTransparency = windowTransparency
+    }
+
+    /// The same choices, shown in one mode (previews, widgets, exports).
+    func forcing(_ scheme: ColorScheme) -> BighelpAppearanceContext {
+        var context = BighelpAppearanceContext(
+            appearance: scheme == .dark ? .dark : .light, lightBackground: lightBackground,
+            darkBackground: darkBackground, bubbleColor: bubbleColor, customBubbleHex: customBubbleHex,
+            bubbleFollowsTheme: bubbleFollowsTheme, windowTransparency: windowTransparency)
+        context.simpleBots = simpleBots
+        return context
     }
 }
 
@@ -776,14 +806,15 @@ extension BighelpTheme {
         // Ink, unless another bubble color was picked in Appearance: black bubbles by day (they'd
         // vanish on a black page, so dark gray after dark), and buttons and tinted text in the page's
         // ink (the gray bubble color read as grayed out).
-        let simpleDefault = context.usesInk
+        let simpleDefault = context.usesInk(dark: dark)
         let simpleBubble = simpleDefault ? (dark ? "3A3A3F" : "111111") : nil
         let simpleInk = simpleDefault ? (dark ? "FFFFFF" : "111111") : nil
         var theme = selected.resolvedForLivePresentation(
             colorScheme: dark ? .dark : .light, contrast: contrast,
             lightBackground: context.lightBackground, darkBackground: context.darkBackground,
-            bubbleColor: simpleDefault ? nil : context.bubbleColor, customBubbleHex: simpleInk ?? context.customBubbleHex)
-        theme.chosenBubbleHex = simpleBubble ?? context.bubbleHex
+            bubbleColor: simpleDefault ? nil : context.bubbleColor,
+            customBubbleHex: simpleInk ?? context.themeAccentHex(dark: dark) ?? context.customBubbleHex)
+        theme.chosenBubbleHex = simpleBubble ?? context.bubbleHex(dark: dark)
         theme.visionCanvasOpacity = BighelpVisionGlass.canvasOpacity(forTransparency: context.windowTransparency,
                                                                      dark: dark)
         theme.visionIsLight = !dark

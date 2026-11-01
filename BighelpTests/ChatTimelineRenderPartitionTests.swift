@@ -789,6 +789,94 @@ struct ChatTimelineRenderPartitionTests {
                 "Ending a gesture must not restore a stale pre-inset offset.")
     }
 
+    /// Return to latest shows as soon as the reader flicks up, so the tap often lands while
+    /// the chat still glides. A finger on the chat still owns it.
+    @Test(.timeLimit(.minutes(1)))
+    func returnToLatestWorksWhileTheChatGlides() async throws {
+        let owner = NSObject()
+        let timeline = ChatTimelineController()
+        let rows = (0..<80).map { ChatCanvasRow.divider("Glide row \($0)") }
+        let host = UIHostingController(rootView: NativeChatTimeline(
+            conversationID: "glide", ownerID: ObjectIdentifier(owner), rows: rows,
+            controller: timeline, entryCount: rows.count
+        ) { row in
+            Text(row.id).frame(maxWidth: .infinity, minHeight: 100)
+        })
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        try await Task.sleep(for: .milliseconds(400))
+        let table = try #require(descendants(host.view, of: ChatTimelineTableView.self).first)
+        timeline.beginReview()
+        table.scrollToRow(at: IndexPath(row: 10, section: 0), at: .top, animated: false)
+        try await Task.sleep(for: .milliseconds(200))
+
+        table.interactionStateOverride = true
+        timeline.scrollToLatest(animated: false)
+        table.interactionStateOverride = nil
+        #expect(!table.followsTail, "A finger on the chat keeps it where the reader holds it.")
+
+        table.glidingStateOverride = true
+        timeline.scrollToLatest(animated: false)
+        table.glidingStateOverride = nil
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(table.followsTail)
+        #expect(abs(table.distanceFromBottom) <= 1, "A tap while the chat glides must still go to the latest.")
+    }
+
+    /// Return to latest while the answer streams in: the answer grows during the animated return.
+    @Test(.timeLimit(.minutes(1)))
+    func returnToLatestDuringAStreamingAnswerEndsAtTheLatest() async throws {
+        let owner = NSObject()
+        let timeline = ChatTimelineController()
+        var source = "The first **formatted** line.\n"
+        func view() -> some View {
+            let item = TimelineItem(id: "answer", role: .assistant,
+                sender: .agent(id: "default", snapshot: .init(name: "Juno")),
+                content: .message(source), metadata: .init(delivery: "Streaming"))
+            let rows = (0..<40).map { ChatCanvasRow.divider("History \($0)") }
+                + [.transcript(.entry(.message(item))), .bottom]
+            return NativeChatTimeline(conversationID: "return-while-streaming", ownerID: ObjectIdentifier(owner),
+                rows: rows, controller: timeline, entryCount: rows.count) { row in
+                if case .transcript(.entry(.message(let message))) = row {
+                    TimelineItemView(item: message, onApprovalTap: { _ in })
+                } else if case .bottom = row {
+                    Color.clear.frame(height: 1)
+                } else {
+                    Text(row.id).frame(maxWidth: .infinity, minHeight: 100)
+                }
+            }
+            .environment(\.bighelpUIV3Enabled, true)
+        }
+        let host = UIHostingController(rootView: view())
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        try await Task.sleep(for: .milliseconds(400))
+        let table = try #require(descendants(host.view, of: ChatTimelineTableView.self).first)
+        timeline.beginReview()
+        table.scrollToRow(at: IndexPath(row: 0, section: 0), at: .top, animated: false)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(table.distanceFromBottom > 1000)
+
+        timeline.scrollToLatest(animated: true)
+        for index in 0..<10 {
+            source += "Streamed paragraph \(index) with **formatted** content that wraps onto another line.\n"
+            host.rootView = view()
+            try await Task.sleep(for: .milliseconds(60))
+        }
+        try await Task.sleep(for: .milliseconds(1000))
+        #expect(!table.isAnimatingReturn, "The return must end even when the answer grew during it.")
+        #expect(table.followsTail)
+        #expect(abs(table.distanceFromBottom) <= 1, "Return to latest must end at the newest line of the answer.")
+    }
+
 }
 
 private struct TimelineActionProbe: UIViewRepresentable {

@@ -20,6 +20,8 @@ extension DirectHermesConversationClient {
         draftAttachments: [ChatDraftAttachment],
         conversationID: String,
         queued: Bool,
+        onBigFileProgress: @escaping @MainActor (String, BigFileUploader.Progress) -> Void = { _, _ in },
+        onAccepted: @escaping @MainActor (String) -> Void = { _ in },
         onDraft: @escaping (TimelineItem) -> Void
     ) async throws -> DirectHermesDraftAttachmentSendReceipt {
         try Task.checkCancellation()
@@ -29,7 +31,7 @@ extension DirectHermesConversationClient {
             throw DirectHermesWorkspaceError.reviewRequired
         }
         guard !draftAttachments.isEmpty,
-              draftAttachments.contains(where: { $0.pdfSelection != nil }),
+              draftAttachments.contains(where: { $0.pdfSelection != nil || $0.bigFile != nil }),
               draftAttachments.count <= 10,
               Set(draftAttachments.map(\.sourceAttachmentID)).count == draftAttachments.count,
               message.utf8.count <= 1_048_576 else {
@@ -83,6 +85,14 @@ extension DirectHermesConversationClient {
                         text: ([message] + references).filter { !$0.isEmpty }.joined(separator: "\n"),
                         method: attachment.kind == .file ? "file.attach" : "image.attach_bytes"
                     )
+                case .bigFile(let file):
+                    references += try await attachBigFile(file, runtimeID: target.runtimeID, owner: owner,
+                                                          onProgress: onBigFileProgress)
+                    _ = try replaceSubmission(
+                        entry,
+                        text: ([message] + references).filter { !$0.isEmpty }.joined(separator: "\n"),
+                        method: "file.attach"
+                    )
                 case .pdfPages(let selection):
                     let receipt = try await uploader.attachPDFPages(selection)
                     guard receipt.target == target else { throw DirectHermesError.invalidResponse }
@@ -101,6 +111,8 @@ extension DirectHermesConversationClient {
             if needsRecovery, journal.unresolved.allSatisfy({ $0.id == entry.id }) {
                 needsRecovery = false
             }
+            onSubmissionAdmitted = { onAccepted(text) }
+            defer { onSubmissionAdmitted = nil }
             guard !needsRecovery, currentPDFAttachmentTarget == target else {
                 throw DirectHermesWorkspaceError.reviewRequired
             }
@@ -119,6 +131,7 @@ extension DirectHermesConversationClient {
                 guard ["queued", "streaming"].contains(accepted.object?["status"]?.string ?? "") else {
                     throw DirectHermesError.invalidResponse
                 }
+                takeSubmissionAdmitted()
                 retireSubmission(entry.id)
                 status = "PDF pages, files, and message accepted by Hermes"
                 response = ConversationResponse(items: [])
@@ -135,7 +148,8 @@ extension DirectHermesConversationClient {
             }
             return DirectHermesDraftAttachmentSendReceipt(
                 response: response,
-                pdfAttachments: pdfReceipts
+                pdfAttachments: pdfReceipts,
+                submittedText: text
             )
         } catch {
             if owner == generation {
@@ -147,6 +161,26 @@ extension DirectHermesConversationClient {
             }
             throw error
         }
+    }
+
+    /// A file over 8 MB: its pieces go to the plugin (`BigFileUploader`), then Hermes' own
+    /// `file.attach` takes the file by its path on the computer, as it does for a file already there,
+    /// and gives the `@file:` reference. Hermes tells the agent where it is, never its bytes. A video
+    /// adds the app's note on its length. The host's record of the upload goes once Hermes has the file.
+    func attachBigFile(_ file: ChatBigFile, runtimeID: String, owner: UUID,
+                       onProgress: @escaping @MainActor (String, BigFileUploader.Progress) -> Void) async throws -> [String] {
+        guard let bigFileHost else { throw BigFileUploadError(failure: .pluginRequired) }
+        let uploader = BigFileUploader(host: bigFileHost)
+        let staged = try await uploader.upload(file, agentID: profile) { onProgress(file.id, $0) }
+        try Task.checkCancellation()
+        guard connected, owner == generation else { throw DirectHermesError.notConnected }
+        let response = try await rpc.request("file.attach", params: [
+            "session_id": .string(runtimeID), "path": .string(staged.path), "name": .string(file.fileName),
+        ])
+        guard connected, owner == generation else { throw DirectHermesError.disconnected(outcomeUnknown: true) }
+        let reference = try DirectHermesFileAttachments.reference(response, allowsInPlace: true)
+        await uploader.discard(staged.uploadID)
+        return [reference, file.agentNote]
     }
 
     func sendFiles(message: String, attachments: [ChatAttachment], conversationID: String,

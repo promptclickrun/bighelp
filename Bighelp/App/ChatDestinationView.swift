@@ -183,6 +183,7 @@ struct ChatDestinationView: View {
     }
 
     var body: some View {
+        let _ = ChatPerformanceProbe.count("chat.destination.body")
         chatCanvas
             .modifier(TeamCallEntry(chat: model, rooms: botModeRooms, services: featureStore.teamCallServices,
                                     agents: agents, userIdentity: userIdentity,
@@ -405,10 +406,23 @@ struct ChatDestinationView: View {
         }
     }
 
+    /// A file the person sent opens in their bot's Files tab. The plugin's staging folder isn't
+    /// one Files shows, so a file still there (an agent without a folder here) doesn't open.
+    private var openSentFile: (@MainActor (ChatSentFile) -> Void)? {
+        guard !model.isBotMode else { return nil }
+        let agentID = model.agentID
+        let appState = appState
+        return { file in
+            guard !file.path.contains("/plugin-data/loopdy/uploads/") else { return }
+            appState.open(.simpleBotProfile(agentID: agentID, opening: BotProfileOpening(file: file.path)))
+        }
+    }
+
     private var chatCanvas: some View {
         referenceChatCanvas
         // Inside the chat's own link action, so file links open the viewer and the rest reach it.
         .hostFileLinks(hostFiles)
+        .environment(\.chatOpenSentFile, openSentFile)
         .environment(\.openURL, chatOpenURLAction)
         .background(ResponseHapticsSurface(controller: responseHaptics))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -737,9 +751,7 @@ struct ChatDestinationView: View {
                 )
             }
         }
-        .onChange(of: projectChangesRefreshTrigger) { _, _ in
-            projectChanges.requestRefresh()
-        }
+        .modifier(ProjectChangesRefreshTrigger(model: model) { projectChanges.requestRefresh() })
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             projectChanges.requestRefresh()
@@ -842,19 +854,6 @@ struct ChatDestinationView: View {
             model.sessionWorkspaceName ?? "none",
             workspaceID,
             String(showsProjectChanges),
-        ].joined(separator: "|")
-    }
-
-    private var projectChangesRefreshTrigger: String {
-        let lastActivity = model.activityTurns.last?.events.last
-        let activityRevision = lastActivity.map {
-            "\($0.eventID):\($0.lifecycle.rawValue)"
-        } ?? "none"
-        return [
-            String(model.items.count),
-            model.items.last?.id ?? "none",
-            activityRevision,
-            String(model.isSending),
         ].joined(separator: "|")
     }
 
@@ -1041,5 +1040,31 @@ struct ChatDestinationAgentResolver {
             .joined(separator: " ")
         guard !normalized.isEmpty else { return nil }
         return ChatDestinationAgentIdentity(name: normalized, role: "Hermes agent")
+    }
+}
+
+/// Project Changes looks again whenever the chat's work moves on. The chat's messages and work are
+/// read here, in a modifier of their own: read in `ChatDestinationView`'s body, every streamed piece
+/// of an answer redrew the whole chat screen and handed every view in it a new link action, so even
+/// the message box's text view updated on each piece.
+private struct ProjectChangesRefreshTrigger: ViewModifier {
+    let model: ChatModel
+    let refresh: () -> Void
+
+    func body(content: Content) -> some View {
+        content.onChange(of: trigger) { _, _ in refresh() }
+    }
+
+    private var trigger: String {
+        let lastActivity = model.activityTurns.last?.events.last
+        let activityRevision = lastActivity.map {
+            "\($0.eventID):\($0.lifecycle.rawValue)"
+        } ?? "none"
+        return [
+            String(model.items.count),
+            model.items.last?.id ?? "none",
+            activityRevision,
+            String(model.isSending),
+        ].joined(separator: "|")
     }
 }

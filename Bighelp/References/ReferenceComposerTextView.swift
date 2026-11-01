@@ -19,50 +19,9 @@ final class ReferenceComposerEditorSession {
     }
 }
 
-/// The top-trailing corner the message box's Expand button sits in. The text
-/// container leaves it empty, so no line, caret or selection ever runs under
-/// the button, and it is kept whether or not Expand shows, so the text never
-/// wraps again when the button comes or goes.
-struct ComposerTextCornerReserve: Equatable {
-    /// The corner cut out of the first line(s): the button and its gap.
-    var width: CGFloat
-    var height: CGFloat
-    /// How tall the box must be to hold the button above Send instead. Where
-    /// even the tallest box can't (a one-line viewport, tiny text with big
-    /// buttons), the text scrolls under the corner, so the whole trailing edge
-    /// is kept free instead.
-    var actionClearance: CGFloat
-}
-
 final class ReferenceComposerContainer: UIView {
     weak var coordinator: ReferenceComposerTextView.Coordinator?
     private var lastViewportSize: CGSize?
-    var cornerReserve: ComposerTextCornerReserve? {
-        didSet { if cornerReserve != oldValue { setNeedsLayout() } }
-    }
-    var viewportHeight: CGFloat? {
-        didSet { if viewportHeight != oldValue { setNeedsLayout() } }
-    }
-
-    /// Sets the text view's exclusion path for a layout `width`. Only the box
-    /// that holds the text view sets it, so the expanded editor keeps every line full.
-    func applyCornerReserve(forWidth width: CGFloat) {
-        guard let textView = subviews.first as? UITextView else { return }
-        let rect = reservedRect(forWidth: width, font: textView.font)
-        // Comparing first keeps TextKit from laying the draft out again on every pass.
-        guard textView.textContainer.exclusionPaths.first?.bounds != rect else { return }
-        textView.textContainer.exclusionPaths = rect.map { [UIBezierPath(rect: $0)] } ?? []
-    }
-
-    private func reservedRect(forWidth width: CGFloat, font: UIFont?) -> CGRect? {
-        guard let reserve = cornerReserve, width.isFinite, width > reserve.width * 2 else { return nil }
-        let lineHeight = font?.lineHeight ?? UIFont.bighelp(.body).lineHeight
-        let tallest = viewportHeight ?? lineHeight * CGFloat(DraftFieldSizing.maximumVisibleLines)
-        // Exclusion paths are in content coordinates: a box that scrolls with the
-        // button still in the text's corner needs the whole edge, not one line.
-        let height = tallest < reserve.actionClearance ? 100_000 : reserve.height
-        return CGRect(x: width - reserve.width, y: 0, width: reserve.width, height: height)
-    }
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
@@ -78,7 +37,6 @@ final class ReferenceComposerContainer: UIView {
         let previousSize = lastViewportSize
         lastViewportSize = bounds.size
         textView.frame = bounds
-        applyCornerReserve(forWidth: bounds.width)
         if previousSize != bounds.size, bounds.width > 0, bounds.height > 0, textView.isFirstResponder,
            !textView.isTracking, !textView.isDragging, !textView.isDecelerating {
             textView.layoutIfNeeded()
@@ -136,10 +94,11 @@ struct ReferenceComposerTextView: UIViewRepresentable {
     var onDropAttachmentProviders: (([NSItemProvider]) -> Void)?
     /// Hardware Return keys (`ComposerReturnKeyHandling`). True means handled.
     var onReturnKey: ((ComposerReturnKey) -> Bool)?
+    /// The caret as a character offset, for the mention list, its only reader: nil while the
+    /// text has no `@`, since counting characters walks the whole draft on every key.
     var onSelectionChange: (Int?) -> Void = { _ in }
+    /// True once the draft takes `DraftFieldSizing.expandLines` lines: Expand shows above the box.
     var onExpansionAvailabilityChange: (Bool) -> Void = { _ in }
-    /// The compact box's Expand corner (`ComposerTextCornerReserve`); nil keeps every line full.
-    var cornerReserve: ComposerTextCornerReserve?
 
     func makeCoordinator() -> Coordinator {
         if let coordinator = session.coordinator { return coordinator }
@@ -184,8 +143,6 @@ struct ReferenceComposerTextView: UIViewRepresentable {
     }
 
     func updateUIView(_ container: ReferenceComposerContainer, context: Context) {
-        container.cornerReserve = expanded ? nil : cornerReserve
-        container.viewportHeight = viewportHeight
         context.coordinator.updateSurface(self, in: container)
     }
 
@@ -196,34 +153,25 @@ struct ReferenceComposerTextView: UIViewRepresentable {
     func sizeThatFits(_ proposal: ProposedViewSize, uiView container: ReferenceComposerContainer, context: Context) -> CGSize? {
         guard let uiView = session.textView, let width = proposal.width, width > 0 else { return nil }
         if expanded, let height = proposal.height { return CGSize(width: width, height: height) }
-        // Measure with the Expand corner at this width, then put it back for the
-        // width the box has, so what's drawn never keeps a measuring pass's corner.
-        let ownsTextView = uiView.superview === container
-        // SwiftUI asks several times per layout; each answer laid the whole text out again
-        // and moved the Expand corner, on every keystroke.
+        // SwiftUI asks several times per layout; each answer laid the whole text out again,
+        // on every keystroke.
         let key = Coordinator.MeasureKey(text: uiView.text, width: width, pointSize: uiView.font?.pointSize ?? 0,
-                                         reservesCorner: ownsTextView && container.cornerReserve != nil,
                                          expanded: expanded)
         let measured: CGSize
         if let known = context.coordinator.measuredSizes[key] {
             measured = known
         } else {
-            if ownsTextView { container.applyCornerReserve(forWidth: width) }
             measured = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
-            if ownsTextView, container.bounds.width > 0, abs(container.bounds.width - width) > 0.5 {
-                container.applyCornerReserve(forWidth: container.bounds.width)
-            }
             context.coordinator.remember(measured, for: key)
         }
         let lineHeight = uiView.font?.lineHeight ?? UIFont.bighelp(.body).lineHeight
-        // Wrapped onto a second line (one line plus the editor's insets stays under two line heights):
-        // the expand button shows inside the box from there.
+        // The whole draft's lines, also where the box scrolls: Expand shows above the box from three.
         let overflowing = DraftFieldSizing.shouldOfferExpandedEditor(hasText: !uiView.text.isEmpty,
-            measuredHeight: measured.height, lineHeight: lineHeight, thresholdLines: 2)
+            measuredHeight: measured.height, lineHeight: lineHeight)
         // Only the width the box is laid out at decides. SwiftUI also measures it at
         // widths it never gets (infinite, or the lane's cap beside the status rail),
-        // where the draft fits; reporting those flips the expand button, and with it
-        // the box's width, on every pass, so the box shakes.
+        // where the draft fits; reporting those flips Expand, and with it the
+        // message box's height, on every pass, so the box shakes.
         if isSurfaceActive, !expanded { context.coordinator.measuredOverflow(overflowing, atWidth: width, in: container) }
         // A compact editor has a real native viewport, not merely a clipped
         // SwiftUI frame. Keep enough room for UIKit's caret and line leading.
@@ -266,7 +214,6 @@ struct ReferenceComposerTextView: UIViewRepresentable {
             let text: String
             let width: CGFloat
             let pointSize: CGFloat
-            let reservesCorner: Bool
             /// The expanded editor lays the same text out with its own insets.
             let expanded: Bool
         }
@@ -310,8 +257,15 @@ struct ReferenceComposerTextView: UIViewRepresentable {
         private weak var requestedHost: ReferenceComposerContainer?
         private var pendingSurfaceUpdate: SurfaceUpdate?
         private var surfaceUpdateScheduled = false
+        #if DEBUG
+        /// How many times SwiftUI drew the box around this text view again, for tests of what redraws it.
+        private(set) var surfaceUpdates = 0
+        #endif
 
         func updateSurface(_ surface: ReferenceComposerTextView, in container: ReferenceComposerContainer) {
+            #if DEBUG
+            surfaceUpdates += 1
+            #endif
             guard surface.session.textView != nil else { return }
             guard surface.isSurfaceActive else {
                 scheduleDeactivation(in: container)
@@ -355,6 +309,7 @@ struct ReferenceComposerTextView: UIViewRepresentable {
         }
 
         private func applySurface(_ update: SurfaceUpdate, in container: ReferenceComposerContainer) {
+            ChatPerformanceProbe.count("composer.surface")
             guard let view else { return }
             view.delegate = nil
             defer { view.delegate = self }
@@ -366,8 +321,6 @@ struct ReferenceComposerTextView: UIViewRepresentable {
                 container.addSubview(view)
                 view.frame = container.bounds
                 view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-                // The other box may have left its corner (or none) on the shared text view.
-                container.applyCornerReserve(forWidth: container.bounds.width)
                 host = container
             }
             if view.isEditable != update.isEnabled { view.isEditable = update.isEnabled }
@@ -619,13 +572,15 @@ struct ReferenceComposerTextView: UIViewRepresentable {
 
         func textViewDidChange(_ textView: UITextView) {
             guard !applying else { return }
-            publish()
-            keepCaretVisible()
+            ChatPerformanceProbe.measure("composer.edit") {
+                publish()
+                keepCaretVisible()
+            }
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
             guard !applying, textView.isFirstResponder else { return }
-            publish()
+            ChatPerformanceProbe.measure("composer.caret") { publish() }
         }
 
         /// Change traits only, never text/selection or responder ownership. IME
@@ -644,22 +599,25 @@ struct ReferenceComposerTextView: UIViewRepresentable {
 
         private func publish(selections: [ReferenceDraftSelection]? = nil, force: Bool = false) {
             guard let view, !applying else { return }
-            updateKeyboardTraits()
             let bytes = Data(view.text.utf8)
             let marked = view.markedTextRange != nil
             let restoring = view.undoManager?.isUndoing == true || view.undoManager?.isRedoing == true
+            // UIKit reports most keys twice, as an edit and as a caret move; the second report
+            // changes nothing and stops here, before the keyboard's traits are worked out again.
             guard force || bytes != lastPublished || view.selectedRange != lastPublishedSelection
                     || marked != lastPublishedMarkedText || selections != nil || restoring
-                    || Data(parent.hub.source.utf8) != bytes
+                    || !parent.hub.source.utf8.elementsEqual(bytes)
                     || parent.hub.selection != view.selectedRange else { return }
+            updateKeyboardTraits()
             lastPublished = bytes
             lastPublishedSelection = view.selectedRange
             lastPublishedMarkedText = marked
-            if Data(parent.text.utf8) != lastPublished { parent.text = view.text }
+            if !parent.text.utf8.elementsEqual(lastPublished) { parent.text = view.text }
             parent.hub.receive(source: view.text, selection: view.selectedRange,
                 hasMarkedText: marked, selections: selections,
                 restoreArchivedSelections: restoring)
-            parent.onSelectionChange(DraftCaretSelection.characterOffset(in: view.text, selectedRange: view.selectedRange))
+            parent.onSelectionChange(view.text.utf8.contains(UInt8(ascii: "@"))
+                ? DraftCaretSelection.characterOffset(in: view.text, selectedRange: view.selectedRange) : nil)
             view.invalidateIntrinsicContentSize()
         }
 

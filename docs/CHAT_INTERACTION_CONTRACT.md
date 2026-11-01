@@ -46,7 +46,7 @@ canonical data, reader state, and disposable views:
 | Text storage | `ChatNativeTextStorageUpdater` compares canonical old/new attributed text, preserves the unchanged prefix, and edits the changed suffix. TextKit's added fallback attributes are not a new canonical revision. |
 | Reader choices and drafts | The prepared chat's disclosure store owns explicit tool/fold choices. `DashboardModel` owns clarification drafts by item, session, and request; removal/account reset prunes them. These are local presentation state, not a new transcript authority. |
 | Hosted SwiftUI content | `HostedRow.body` preserves Observation, and `.id(row.id)` scopes recycled local state. Propagate public presentation values and app dependencies without replacing the hosting configuration's private layout/accessibility environment. |
-| Persistence | Existing bounded checkpoints coalesce draft/tool writes. Live final-turn, stop, navigation, and lifecycle paths retain explicit flushes. Historical final answers and subagent lifecycle updates share the catch-up checkpoint; a terminal tool must not synchronously rewrite the entire retained session. |
+| Persistence | Existing bounded checkpoints coalesce draft/tool writes. A pause in typing writes the plain draft to `ChatDraftJournal`, never the catalog; the chat's next save takes it, and a relaunch restores it only while the saved draft is one the journal saw. Reference drafts keep their own checkpoint. Live final-turn, stop, navigation, and lifecycle paths retain explicit flushes. Historical final answers and subagent lifecycle updates share the catch-up checkpoint; a terminal tool must not synchronously rewrite the entire retained session. |
 | Idle startup | Home, sidebar and Sessions hold stable presentation during catch-up and publish the accumulated state once. Routing and actions continue to resolve canonical records. See [idle startup reliability](IDLE_STARTUP_RELIABILITY.md). |
 
 Tail following occurs after UIKit layout and yields during tracking, dragging,
@@ -98,6 +98,8 @@ cover these boundaries:
 | Catch-up and reference checkpoints stay bounded | `catchUpToolBurstsStayCoalescedUntilTheirDurableCheckpoint`, `streamingDoesNotRepeatAnUnchangedReferenceDurabilityWrite` |
 | Old encoders cannot overwrite newer drafts or another host | `inFlightCheckpointsPreserveNewerDurableAndAccountState` |
 | Typing and review during two active chats | `testTypingAndScrollingWithTwoActiveLongChats` |
+| The message box stays out of streaming redraws | `ChatComposerRedrawTests` |
+| Typed drafts survive a relaunch without catalog writes | `ChatDraftJournalTests` |
 
 Run [ChatStreamingAnchorUITests](../BighelpUITests/ChatStreamingAnchorUITests.swift)
 for the three short/long/expanded stress scenarios, growing-tail following,

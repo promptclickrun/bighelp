@@ -19,6 +19,7 @@ extension ChatView {
             }
             rows += transcript()
             rows += model.stagedSends.map { ChatCanvasRow.staged($0.item) }
+            rows += model.bigFileSends.map(ChatCanvasRow.staged)
         }
         if let status = model.botModeStatus { rows.append(.botStatus(status)) }
         if model.showsUnconfirmedBotModeStop { rows.append(.botStopUnconfirmed(model.isStoppingBotModeAgain)) }
@@ -89,7 +90,7 @@ extension ChatView {
                             top: headerHeight, left: 0,
                             bottom: composerHeight + ChatCanvasLayout.composerInsetSpacing, right: 0),
                            rowContext: ChatCanvasRowContext(groupedIDs: groupedIDs, continuedIDs: continuedIDs,
-                                                            density: chatDensity)) { row in
+                                                            density: chatDensity, agentStyle: chatAgentStyle)) { row in
             canvasRowContent(row)
                 .frame(maxWidth: horizontalSizeClass == .regular ? ChatCanvasLayout.regularLaneMaximumWidth : .infinity,
                        alignment: .leading)

@@ -5,9 +5,13 @@ import SwiftUI
 /// Settings › Appearance › Text and buttons: text size in steps on top of the
 /// device's own text size. The Mac starts larger: its text styles are smaller
 /// than iPhone's while its window sits farther away.
+///
+/// The raw value is what's saved, so it never changes: Default is one step under
+/// the device's size (#729), and Medium, the device's own size, was Default before.
 enum BighelpTextSize: Int, CaseIterable, Identifiable, Sendable {
-    case small = -1
-    case standard = 0
+    case small = -2
+    case standard = -1
+    case medium = 0
     case large = 1
     case larger = 2
     case largest = 3
@@ -18,6 +22,7 @@ enum BighelpTextSize: Int, CaseIterable, Identifiable, Sendable {
         switch self {
         case .small: String(localized: "Small")
         case .standard: String(localized: "Default")
+        case .medium: String(localized: "Medium")
         case .large: String(localized: "Large")
         case .larger: String(localized: "Larger")
         case .largest: String(localized: "Largest")
@@ -27,11 +32,13 @@ enum BighelpTextSize: Int, CaseIterable, Identifiable, Sendable {
     static var platformDefault: Self { .standard }
 
     /// The Mac's text styles are fixed (Dynamic Type doesn't reach them), so its
-    /// text is the iPhone size times this. Default gives 16pt body text.
+    /// text is the iPhone size times this. Default gives 15pt body text, one step
+    /// like the iPhone's from Medium's 16pt. Small is the factor Small had before #729.
     var macFactor: CGFloat {
         switch self {
         case .small: 0.82
-        case .standard: 0.94
+        case .standard: 0.88
+        case .medium: 0.94
         case .large: 1.03
         case .larger: 1.12
         case .largest: 1.22
@@ -75,12 +82,21 @@ final class BighelpInterfaceSize: @unchecked Sendable {
 
     static let textSizeKey = "bighelp.appearance.text-size"
     static let buttonSizeKey = "bighelp.appearance.button-size"
+    /// Set once the Mac has moved a Small saved before #729 (`moveMacSmallSavedBefore729`).
+    static let macSmallMovedKey = "bighelp.appearance.text-size.mac-small-moved"
 
     @ObservationIgnored private let defaults: UserDefaults
 
     var textSize: BighelpTextSize {
-        didSet { defaults.set(textSize.rawValue, forKey: Self.textSizeKey) }
+        didSet {
+            defaults.set(textSize.rawValue, forKey: Self.textSizeKey)
+            picksTextSize = true
+        }
     }
+
+    /// Whether the person picked a text size here. Until then, and again after Reset,
+    /// accessibility sizes don't take the default's step down (`dynamicTypeSize(onTopOf:)`).
+    private(set) var picksTextSize: Bool
 
     var buttonSize: BighelpButtonSize {
         didSet { defaults.set(buttonSize.rawValue, forKey: Self.buttonSizeKey) }
@@ -88,17 +104,50 @@ final class BighelpInterfaceSize: @unchecked Sendable {
 
     var buttonScale: CGFloat { buttonSize.scale }
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, isMac: Bool = BighelpPlatform.isMac) {
         self.defaults = defaults
+        if isMac { Self.moveMacSmallSavedBefore729(in: defaults) }
         // `integer(forKey:)` also reads launch arguments, which arrive as text.
         func saved(_ key: String) -> Int? { defaults.object(forKey: key) == nil ? nil : defaults.integer(forKey: key) }
-        textSize = saved(Self.textSizeKey).flatMap(BighelpTextSize.init(rawValue:)) ?? .platformDefault
+        let savedText = saved(Self.textSizeKey).flatMap(BighelpTextSize.init(rawValue:))
+        textSize = savedText ?? .platformDefault
+        picksTextSize = savedText != nil
         buttonSize = saved(Self.buttonSizeKey).flatMap(BighelpButtonSize.init(rawValue:)) ?? .platformDefault
     }
 
+    /// Before #729 the Mac's Small was raw -1 at factor 0.82; -1 is Default now (0.88), and
+    /// 0.82 is raw -2. Moves that saved Small once, so its text keeps its size; a -1 saved
+    /// after it is the new Default. iPhone and iPad keep -1: there it's still one Dynamic
+    /// Type step under the device's size.
+    private static func moveMacSmallSavedBefore729(in defaults: UserDefaults) {
+        guard !defaults.bool(forKey: macSmallMovedKey) else { return }
+        if defaults.object(forKey: textSizeKey) != nil,
+           defaults.integer(forKey: textSizeKey) == BighelpTextSize.standard.rawValue {
+            defaults.set(BighelpTextSize.small.rawValue, forKey: textSizeKey)
+        }
+        defaults.set(true, forKey: macSmallMovedKey)
+    }
+
+    /// The device's text size stepped by the chosen one. Out of the box the step down is
+    /// for regular sizes only: an accessibility size stays, with its layouts. A size
+    /// picked here applies at any device size. `sizedAbove` is the size a view above
+    /// already chose: when it came through, it stays, so nothing takes two steps.
+    func dynamicTypeSize(onTopOf system: DynamicTypeSize, sizedAbove: DynamicTypeSize? = nil) -> DynamicTypeSize {
+        if sizedAbove == system { return system }
+        if !picksTextSize, system.isAccessibilitySize { return system }
+        return system.stepped(by: textSize.rawValue)
+    }
+
     func reset() {
-        textSize = .platformDefault
+        resetText()
         buttonSize = .platformDefault
+    }
+
+    /// Back to the size out of the box, as if never picked. ⌘0 in the View menu.
+    func resetText() {
+        textSize = .platformDefault
+        defaults.removeObject(forKey: Self.textSizeKey)
+        picksTextSize = false
     }
 
     /// ⌘+ and ⌘− in the View menu.
@@ -119,13 +168,21 @@ extension DynamicTypeSize {
     }
 }
 
-/// Applies the saved text size to everything under it, sheets included.
+/// Applies the saved text size to everything under it. iOS starts a sheet or cover again
+/// from the device's own size, so `bighelpPresentedAppearance` applies it there too.
 struct BighelpTextSizing: ViewModifier {
     @Environment(\.dynamicTypeSize) private var systemSize
+    @Environment(\.bighelpTextSizedTo) private var sizedAbove
 
     func body(content: Content) -> some View {
-        content.dynamicTypeSize(systemSize.stepped(by: BighelpInterfaceSize.shared.textSize.rawValue))
+        let size = BighelpInterfaceSize.shared.dynamicTypeSize(onTopOf: systemSize, sizedAbove: sizedAbove)
+        content.dynamicTypeSize(size).environment(\.bighelpTextSizedTo, size)
     }
+}
+
+extension EnvironmentValues {
+    /// The size `BighelpTextSizing` chose above this view.
+    @Entry var bighelpTextSizedTo: DynamicTypeSize? = nil
 }
 
 extension Font {

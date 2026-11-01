@@ -195,20 +195,26 @@ extension ChatDestinationView {
         } ? .photos : .files
         Task { @MainActor in
             await model.importDraftAttachments(kind, urls.map { url in
-                DraftAttachmentLoader(name: url.lastPathComponent) {
+                DraftAttachmentLoader(draftNamed: url.lastPathComponent, load: { [model] in
                     let didAccess = url.startAccessingSecurityScopedResource()
                     defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+                    let values = try url.resourceValues(forKeys: [.contentTypeKey, .fileSizeKey])
+                    let type = values.contentType ?? UTType(filenameExtension: url.pathExtension) ?? .data
+                    let mimeType = type.preferredMIMEType ?? "application/octet-stream"
+                    // Past 8 MB a file stays on disk and goes in pieces, never read into memory.
+                    if let size = values.fileSize, BigFileUploads.isBig(size), !type.conforms(to: .image) {
+                        return .bigFile(try await BigFileStore.importing(url, fileName: url.lastPathComponent,
+                                                                         mimeType: mimeType, byteCount: size,
+                                                                         into: model))
+                    }
                     let data = try Data(contentsOf: url, options: .mappedIfSafe)
-                    let type = try url.resourceValues(forKeys: [.contentTypeKey]).contentType
-                        ?? UTType(filenameExtension: url.pathExtension)
-                        ?? .data
-                    return try ChatAttachmentPreparer().prepare(
+                    return .attachment(try ChatAttachmentPreparer().prepare(
                         id: Self.attachmentID(),
                         fileName: url.lastPathComponent,
-                        mimeType: type.preferredMIMEType ?? "application/octet-stream",
+                        mimeType: mimeType,
                         data: data
-                    )
-                }
+                    ))
+                })
             })
         }
     }

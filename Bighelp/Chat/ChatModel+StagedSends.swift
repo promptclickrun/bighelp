@@ -44,10 +44,12 @@ extension ChatModel {
 
     /// Send takes the box now, though Hermes can't yet: the chat waits for its connection or for
     /// the turn it just started, or earlier messages still wait. Commands (`/…`) and PDF pages
-    /// need the connection to be read, so they wait in the box as before.
+    /// need the connection to be read, so they wait in the box as before. A file over 8 MB waits
+    /// in the chat on its own row, with its tile (`sendBigFileDraft`).
     var stagesComposerMessage: Bool {
-        guard !isBotMode, !connectionIsOverdue, draft.first(where: { !$0.isWhitespace }) != "/",
-              !orderedDraftAttachments.contains(where: { $0.pdfSelection != nil }) else { return false }
+        guard !isBotMode, !connectionIsOverdue, !draftShape.isCommand,
+              !orderedDraftAttachments.contains(where: { $0.pdfSelection != nil || $0.bigFile != nil })
+        else { return false }
         if lacksConnection || !stagedSends.isEmpty { return true }
         return isSending && nativeConversationClient?.sessionActionsAreRunning == false
     }

@@ -203,6 +203,7 @@ struct ChatView: View {
     /// The bottom of the chat's safe area (the keyboard's top while it shows), in the window.
     @State private var safeBottomInWindow: CGFloat = 0
     @AppStorage(ChatLayoutPreferences.densityKey) var chatDensity: ChatDensity = .comfortable
+    @AppStorage(ChatLayoutPreferences.agentMessageStyleKey) var chatAgentStyle: ChatAgentMessageStyle = .bubble
     @AppStorage(ChatLayoutPreferences.showsSessionTitleKey)
     private var showsSessionTitle = ChatLayoutPreferences.showsSessionTitleByDefault
     @State var composerHeight: CGFloat = 0
@@ -775,7 +776,7 @@ struct ChatView: View {
     }
 
     private var composer: some View {
-        ChatComposer(
+        ChatComposerHost(
             model: model,
             agentName: agentName,
             sessionCatalog: sessionCatalog,
@@ -783,6 +784,7 @@ struct ChatView: View {
             onVoiceTap: dismissKeyboardAndOpenVoice,
             onFittingRailVerticalDrag: requestFittingRailScroll,
             draftFocus: $isDraftFocused,
+            isDraftFocused: isDraftFocused,
             onDismissKeyboard: dismissKeyboard,
             onWillSend: { timelineController.scrollToLatest(animated: false) },
             companionAppearance: companionStore.flatMap { store in

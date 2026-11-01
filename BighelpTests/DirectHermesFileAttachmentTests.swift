@@ -329,7 +329,9 @@ struct DirectHermesFileAttachmentTests {
         #expect(!model.takesMessageNow, "Disconnected authority must remain blocked")
     }
 
-    @Test(arguments: ["accepted", "rejected", "unknown"])
+    // One at a time: the three cases share one conversation ID, and run side by side on the main actor
+    // their sends and reconciles could interleave (a case passed in one run and failed in the next).
+    @Test(.serialized, arguments: ["accepted", "rejected", "unknown"])
     func staleCatalogIdleCannotSupersedeModelAttachmentSend(outcome: String) async throws {
         let fixture = try Fixture()
         defer { fixture.client.suspend(); fixture.cleanup() }
@@ -401,6 +403,33 @@ struct DirectHermesFileAttachmentTests {
             #expect(!model.canRetry)
             #expect(model.failureMessage == "Message delivery is unconfirmed. It will not be sent again automatically.")
         }
+    }
+
+    /// The client releases a lost submission's waiter and reports the chat idle in one step (a
+    /// replacement snapshot; the recovery after an unknown outcome does the same). The send runs
+    /// after that, and still says its delivery is unconfirmed: retired by the idle report, it said
+    /// nothing, and the "unknown" case above failed whenever the recovery ran first.
+    @Test func anIdleReportBeforeTheSendResumesKeepsTheUnconfirmedDelivery() async throws {
+        let fixture = try Fixture()
+        defer { fixture.client.suspend(); fixture.cleanup() }
+        fixture.rpc.admissionGate = FileAttachmentAsyncGate()
+        let model = ChatModel(conversationID: fixture.client.conversationID, client: fixture.client,
+                              initialItems: [], initialDraft: "Connected draft")
+        fixture.client.model = model
+        try model.addDraftAttachment(file())
+        let send = Task { @MainActor in await model.send() }
+        await fixture.rpc.admissionGate?.waitUntilEntered()
+        #expect(model.isSending)
+
+        fixture.client.applySnapshot(.object(["session_id": .string("runtime"), "stored_session_id": .string("stored"),
+                                              "running": .boolean(false), "messages": .array([])]), epoch: "epoch")
+        await send.value
+        fixture.rpc.admissionGate?.open()
+
+        #expect(!model.isSending)
+        #expect(fixture.client.journal.unresolved.count == 1)
+        #expect(!model.canRetry)
+        #expect(model.failureMessage == "Message delivery is unconfirmed. It will not be sent again automatically.")
     }
 
     private func reconcileStaleCatalog(_ session: SessionRecord, into model: ChatModel) {

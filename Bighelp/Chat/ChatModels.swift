@@ -148,6 +148,10 @@ struct TimelineMetadata: Codable, Equatable, Sendable {
     /// and why (`ChatModel.agentFileFailures`). A new connection or the chat attached again tries
     /// again, unless the file is too big for this device.
     var fileFailure: AgentFileFailure?
+    /// Display only, never saved: the person's files over 8 MB still on their way, shown as tiles
+    /// with their progress (`BigFileUploadBoard`). Once Hermes takes the message, its text names
+    /// each file instead and the tiles go.
+    var bigFiles: [ChatBigFile] = []
 
     private enum CodingKeys: String, CodingKey {
         case source, freshness, delivery, timestamp, turnDurationMilliseconds, sourceOrder,
@@ -394,6 +398,22 @@ struct TimelineItem: Identifiable, Codable, Equatable, Sendable {
         return item
     }
 
+    /// The person's message with files over 8 MB still on their way, as tiles.
+    func carrying(bigFiles: [ChatBigFile]) -> TimelineItem {
+        var item = self
+        item.metadata.bigFiles = bigFiles
+        return item
+    }
+
+    /// The same message as Hermes took it: its words with each file's `@file:` line, which is all a
+    /// reread of the saved history has, so the row looks the same before and after one.
+    func sent(as text: String) -> TimelineItem {
+        var sentMetadata = self.metadata
+        sentMetadata.bigFiles = []
+        return TimelineItem(id: id, role: role, sender: sender, content: .message(text), metadata: sentMetadata,
+                            attachments: attachments)
+    }
+
     func ordered(_ sourceOrder: Int) -> TimelineItem {
         var item = self
         item.metadata = metadata.ordered(sourceOrder)
@@ -507,10 +527,34 @@ enum ChatComposerPrimaryAction: Equatable, Sendable {
         isTurnActive: Bool = false,
         hasAttachments: Bool = false
     ) -> ChatComposerPrimaryAction {
-        if hasAttachments || !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return .send
-        }
+        resolve(hasText: ChatDraftShape(draft).hasText, isTurnActive: isTurnActive, hasAttachments: hasAttachments)
+    }
+
+    static func resolve(hasText: Bool, isTurnActive: Bool = false, hasAttachments: Bool = false) -> ChatComposerPrimaryAction {
+        if hasAttachments || hasText { return .send }
         return isTurnActive ? .stop : .voice
+    }
+}
+
+/// What the message box's small views read from the draft (`ChatModel.draftShape`), worked out
+/// once per key with early exits instead of each view trimming or walking the whole draft.
+struct ChatDraftShape: Equatable, Sendable {
+    var isEmpty = true
+    /// Something besides spaces and line breaks, so Send can send it.
+    var hasText = false
+    /// Starts with `/` after any spaces: a command, which waits in the box for the connection.
+    var isCommand = false
+    /// Has an `@`, so the mention list may show.
+    var mayMention = false
+
+    init() {}
+
+    init(_ draft: String) {
+        isEmpty = draft.isEmpty
+        // The same test as trimming `.whitespacesAndNewlines` to nothing, stopping at the first letter.
+        hasText = draft.unicodeScalars.contains { !CharacterSet.whitespacesAndNewlines.contains($0) }
+        isCommand = draft.first(where: { !$0.isWhitespace }) == "/"
+        mayMention = draft.utf8.contains(UInt8(ascii: "@"))
     }
 }
 

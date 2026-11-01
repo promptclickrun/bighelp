@@ -100,7 +100,9 @@ struct ChatAttentionBar: View {
 /// Shows the bar and pops up the chat's waiting questions and approvals.
 private struct ChatAttentionPresenter: ViewModifier {
     let client: DirectHermesConversationClient?
-    let agentName: String?
+    /// Read only while something waits: a chat's name can come from its messages, and reading
+    /// them in the chat screen's body redrew that screen for every streamed piece of an answer.
+    let agentName: () -> String?
     @Binding var isPresented: Bool
     /// The chat is on screen with nothing else over it, and the app is in front.
     let canPopUp: Bool
@@ -113,7 +115,7 @@ private struct ChatAttentionPresenter: ViewModifier {
         content
             .safeAreaInset(edge: .top, spacing: 0) {
                 if !prompts.isEmpty {
-                    ChatAttentionBar(prompts: prompts, agentName: agentName) { isPresented = true }
+                    ChatAttentionBar(prompts: prompts, agentName: agentName()) { isPresented = true }
                 }
             }
             .bighelpSheet(isPresented: $isPresented) {
@@ -133,7 +135,7 @@ private struct ChatAttentionPresenter: ViewModifier {
 }
 
 extension View {
-    func chatAttention(client: DirectHermesConversationClient?, agentName: String?,
+    func chatAttention(client: DirectHermesConversationClient?, agentName: @autoclosure @escaping () -> String?,
                        isPresented: Binding<Bool>, canPopUp: Bool) -> some View {
         modifier(ChatAttentionPresenter(client: client, agentName: agentName,
                                         isPresented: isPresented, canPopUp: canPopUp))

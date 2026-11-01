@@ -7,6 +7,8 @@ enum ChatLayoutPreferences {
     static let showsAgentNameKey = "bighelp.chat.shows-agent-name"
     static let textSizeKey = "bighelp.chat.text-size"
     static let densityKey = "bighelp.chat.density"
+    /// Settings › Appearance › Agent messages (`ChatAgentMessageStyle`).
+    static let agentMessageStyleKey = "bighelp.appearance.agent-messages"
     /// With a hardware keyboard, Return sends (true) or adds a line (false).
     static let returnSendsKey = "bighelp.chat.return-sends"
     /// Settings › Chat › Session title: the chat's title under the agent's name. Off by default.
@@ -57,8 +59,8 @@ enum ChatTextSize: Int, CaseIterable, Identifiable, Sendable {
     case large = 1
     case larger = 2
 
-    /// Out of the box, one step under the system size. A size someone picked is
-    /// saved and stays, even when it's this one.
+    /// Messages size on top of the app's text size (Appearance); out of the box, one
+    /// step under it. A size someone picked is saved and stays, even when it's this one.
     static let defaultSize: ChatTextSize = .small
 
     var id: Self { self }
@@ -104,6 +106,22 @@ enum ChatDensity: String, CaseIterable, Identifiable, Sendable {
         self == .compact ? 11 : BighelpV3MessagePresentation.horizontalContentPadding
     }
     var bubbleVerticalPadding: CGFloat { self == .compact ? 7 : 10 }
+}
+
+/// Agent replies in a bubble (the default), or on the page at the chat lane's full width with no
+/// fill, border or bubble padding. The person's own messages keep their bubble either way.
+enum ChatAgentMessageStyle: String, CaseIterable, Identifiable, Sendable {
+    case bubble
+    case page
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .bubble: String(localized: "Bubble")
+        case .page: String(localized: "On the page")
+        }
+    }
 }
 
 /// Settings › Appearance › Chat layout.
@@ -215,8 +233,9 @@ struct ChatLayoutSettingsView: View {
             """)
         #else
         String(localized: """
-            It adds to your iPhone's own text size setting. Link previews show a web link's picture, title and \
-            summary in chats and the Feed. To make one, your iPhone opens that page, without cookies.
+            It sizes message text, on top of the text size in Appearance and your iPhone's own text size. Link \
+            previews show a web link's picture, title and summary in chats and the Feed. To make one, your iPhone \
+            opens that page, without cookies.
             """)
         #endif
     }
@@ -264,11 +283,21 @@ private struct ChatLayoutPreview: View {
         .accessibilityIdentifier("chat-layout.preview")
     }
 
+    /// Message text before the chat's own size: the Mac's text styles are fixed, so
+    /// there messages start from the size in Appearance, as they do in a chat.
+    private var bodyPointSize: CGFloat {
+        #if targetEnvironment(macCatalyst)
+        Font.TextStyle.body.macPointSize
+        #else
+        bodySize
+        #endif
+    }
+
     private func bubble(_ text: String, outgoing: Bool) -> some View {
         HStack {
             if outgoing { Spacer(minLength: 40) }
             Text(text)
-                .font(.system(size: (bodySize * textSize.scale).rounded()))
+                .font(.system(size: (bodyPointSize * textSize.scale).rounded()))
                 .foregroundStyle(outgoing ? theme.outgoingMessageForeground : theme.primaryText)
                 .padding(.horizontal, density.bubbleHorizontalPadding)
                 .padding(.vertical, density.bubbleVerticalPadding)

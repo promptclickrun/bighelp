@@ -43,12 +43,17 @@ final class ChatModel {
                 draft = reply.body
                 replyDraft = reply.quote
             }
-            if !isReplacingReferenceDraft, Data(oldValue.utf8) != Data(draft.utf8) {
+            let shape = ChatDraftShape(draft)
+            if shape != draftShape { draftShape = shape }
+            if !isReplacingReferenceDraft, !oldValue.utf8.elementsEqual(draft.utf8) {
                 referenceCanonicalSource = nil
                 referenceDraftID = nil
                 referenceDraftRevision = nil
-                referenceSelections.removeAll {
-                    (try? ReferenceCodec.encode(source: draft, references: [$0.snapshot])) == nil
+                // Even an empty removal notifies whatever reads the selections, on every key.
+                if !referenceSelections.isEmpty {
+                    referenceSelections.removeAll {
+                        (try? ReferenceCodec.encode(source: draft, references: [$0.snapshot])) == nil
+                    }
                 }
             }
             if let selectedSlashCommand,
@@ -66,6 +71,9 @@ final class ChatModel {
             }
         }
     }
+    /// The draft as Send, the placeholder and the mention list need it. It changes only when one
+    /// of its flags does, so a key that changes none of them redraws only the text view.
+    private(set) var draftShape = ChatDraftShape()
     /// The message the draft answers. It is sent, and saved with the draft, as
     /// a quote line before the text (`ChatReplyQuote`).
     var replyDraft: ChatReplyQuote? {
@@ -100,7 +108,14 @@ final class ChatModel {
     var referencePersistenceNeeded = false
     @ObservationIgnored var lastReferenceCheckpoint: (draft: Data, state: ReferenceCanonicalState?)?
     let onReferenceStateChange: ((String, ReferenceCanonicalState?) throws -> Void)?
+    /// Keeps the draft (as `persistedDraft`) in the draft journal (`ChatDraftJournal`) a moment
+    /// after typing stops, instead of saving the whole chat. Nil saves the chat as before.
+    let onDraftJournal: ((String) -> Void)?
+    let draftJournalDelay: Duration
+    @ObservationIgnored var draftJournalTask: Task<Void, Never>?
     var hasLocallyPendingPrimaryTurn = false
+    /// Sends still waiting on their client's answer (`sendAwaitingClient`).
+    @ObservationIgnored var sendsAwaitingClient = 0
     var hasExternallyOwnedPrimaryTurn = false
     /// A catalog row may say a turn was active before this presentation binds
     /// its exact native runtime. Only the native snapshot/event owner may
@@ -119,6 +134,10 @@ final class ChatModel {
     /// Messages sent before the chat could take them, oldest first (`stage`). Each waits at the
     /// bottom of the chat with "Sending…" under it and goes out in order once the chat can take it.
     internal(set) var stagedSends: [ChatStagedSend] = []
+    /// Messages whose files over 8 MB are still on their way (`sendBigFileDraft`). Like staged
+    /// messages they wait outside the transcript, so a reread of the history can't drop them, and
+    /// they join it as the text Hermes took.
+    internal(set) var bigFileSends: [TimelineItem] = []
     @ObservationIgnored var stagedSendDrain: (id: UUID, task: Task<Void, Never>)?
     /// The chat has gone without a connection for `connectionGrace` while the app was open
     /// (`ChatConnectionGrace`). Only then does Send go off, until the chat connects again.
@@ -341,7 +360,9 @@ final class ChatModel {
         onBotModeChange: ((String, [String]) -> Bool)? = nil,
         onBotModeChangeWithHistory: ((String, [String], [TimelineItem]) -> Bool)? = nil,
         onBotModeCollapse: ((String, String, [TimelineItem]) -> Bool)? = nil,
-        onReferenceStateChange: ((String, ReferenceCanonicalState?) throws -> Void)? = nil
+        onReferenceStateChange: ((String, ReferenceCanonicalState?) throws -> Void)? = nil,
+        onDraftJournal: ((String) -> Void)? = nil,
+        draftJournalDelay: Duration = .milliseconds(250)
     ) {
         ChatPerformanceProbe.live("live.chat-model", 1)
         self.conversationID = conversationID
@@ -370,6 +391,8 @@ final class ChatModel {
         self.onGoalSnapshotChange = onGoalSnapshotChange
         self.onTodoSnapshotChange = onTodoSnapshotChange
         self.onReferenceStateChange = onReferenceStateChange
+        self.onDraftJournal = onDraftJournal
+        self.draftJournalDelay = draftJournalDelay
         self.persistenceCheckpointDelay = persistenceCheckpointDelay
         self.onTurnStopped = onTurnStopped
         self.onBotModeChange = onBotModeChange
@@ -420,6 +443,7 @@ final class ChatModel {
         let restoredReferences = ReferenceCanonicalState.restoredDraft(initialDraft,
             state: sourceSession?.referenceState)
         draft = restoredReferences.source
+        draftShape = ChatDraftShape(restoredReferences.source)
         referenceSelections = restoredReferences.selections
         referenceCanonicalSource = initialDraft
         referenceSubmission = sourceSession?.referenceState?.submission
@@ -483,10 +507,11 @@ final class ChatModel {
         // message settles it first. Only a stop on its way does.
         guard botModeRoom?.nativeRetryJournal == nil, !isBotModeStopInFlight else { return false }
         guard !richDraftRecovery.hasUnexportedChanges else { return false }
-        let hasText = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasText = draftShape.hasText
         let attachmentsSupported = orderedDraftAttachments.isEmpty || (!isBotMode && orderedDraftAttachments.allSatisfy { value in
             if let selection = value.pdfSelection { return pdfAttachmentTarget == selection.target }
             if case .attachment(let attachment) = value { return supportedAttachmentKinds.contains(attachment.kind) }
+            if value.bigFile != nil { return nativeConversationClient?.bigFileHost != nil }
             return false
         })
         let hasSendableAttachments = !orderedDraftAttachments.isEmpty && attachmentsSupported
@@ -517,7 +542,7 @@ final class ChatModel {
         if referenceSubmission != nil || referenceSendInFlight { return "a message is still being sent" }
         if draftAttachmentImport != nil { return "attachments are still being added" }
         if !draftAttachmentFailures.isEmpty { return "an attachment didn't attach" }
-        if orderedDraftAttachments.isEmpty && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if orderedDraftAttachments.isEmpty && !draftShape.hasText {
             return nil
         }
         if isBotMode, let reason = botModeSendUnavailableReason { return reason }
@@ -744,7 +769,8 @@ final class ChatModel {
                         && !owner.sessionActionsAreRunning) else { return }
             nativeTurnID = nil
             settleNativeActivityLiveness()
-            _ = beginOwnerGeneration()
+            // As in `reconcileNativeIdle`: a send its client just answered says how it went itself.
+            if sendsAwaitingClient == 0 { _ = beginOwnerGeneration() }
             isStopping = false
             isSending = false
             pendingMidSessionSubmissions = []
@@ -776,7 +802,9 @@ final class ChatModel {
               !owner.hasPendingSubmission,
               nativeTurnID == nil,
               hasLocallyPendingPrimaryTurn || hasRestoredPrimaryTurn else { return }
-        _ = beginOwnerGeneration()
+        // A send whose answer its client just gave keeps its turn: it says what Hermes answered (an
+        // unconfirmed delivery says so). Retired first, it returned without a word.
+        if sendsAwaitingClient == 0 { _ = beginOwnerGeneration() }
         isStopping = false
         isSending = false
         pendingMidSessionSubmissions = []

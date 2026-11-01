@@ -35,9 +35,11 @@ enum DirectHermesFileAttachments {
          "data_url": .string("data:\(attachment.mimeType);base64," + attachment.data.base64EncodedString())]
     }
 
-    static func reference(_ value: BighelpJSONValue) throws -> String {
+    /// `allowsInPlace`: a file already in the chat's folder (a big file the plugin put there) is
+    /// referenced where it is, and Hermes answers `uploaded: false`.
+    static func reference(_ value: BighelpJSONValue, allowsInPlace: Bool = false) throws -> String {
         guard let object = value.object, object["attached"]?.boolean == true,
-              object["uploaded"]?.boolean == true,
+              let uploaded = object["uploaded"]?.boolean, uploaded || allowsInPlace,
               let name = object["name"]?.string, !name.isEmpty, name.utf8.count <= 720,
               let path = object["path"]?.string, !path.isEmpty, path.utf8.count <= 4_096,
               let referencePath = object["ref_path"]?.string, !referencePath.isEmpty, referencePath.utf8.count <= 4_096,

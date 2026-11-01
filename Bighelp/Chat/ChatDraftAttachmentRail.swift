@@ -75,6 +75,8 @@ extension ChatDraftAttachment {
     var isPDF: Bool {
         switch self {
         case .pdfPages: return true
+        case .bigFile(let file):
+            return file.mimeType == "application/pdf" || file.fileName.lowercased().hasSuffix(".pdf")
         case .attachment(let attachment):
             return attachment.mimeType.lowercased() == "application/pdf"
                 || attachment.fileName.lowercased().hasSuffix(".pdf")
@@ -85,6 +87,7 @@ extension ChatDraftAttachment {
         switch self {
         case .attachment(let attachment): attachment.fileName
         case .pdfPages(let selection): selection.attachment.fileName
+        case .bigFile(let file): file.fileName
         }
     }
 
@@ -95,14 +98,17 @@ extension ChatDraftAttachment {
             ByteCountFormatter.string(fromByteCount: Int64(attachment.data.count), countStyle: .file)
         case .pdfPages(let selection):
             "Pages \(selection.pageRange.firstPage)–\(selection.pageRange.lastPage)"
+        case .bigFile(let file):
+            file.sizeAndLength
         }
     }
 
-    /// The file itself, for a full preview.
-    var previewAttachment: ChatAttachment {
+    /// The file itself, for a full preview. A big file stays on disk and has none.
+    var previewAttachment: ChatAttachment? {
         switch self {
         case .attachment(let attachment): attachment
         case .pdfPages(let selection): selection.attachment
+        case .bigFile: nil
         }
     }
 }
@@ -235,7 +241,7 @@ struct DraftAttachmentThumbnail: View {
             if case .attachment(let file) = attachment, file.kind == .image, let image = UIImage(data: file.data) {
                 Image(uiImage: image).resizable().scaledToFill()
             } else {
-                Image(systemName: attachment.isPDF ? "doc.text" : "doc")
+                Image(systemName: attachment.bigFile?.video != nil ? "film" : attachment.isPDF ? "doc.text" : "doc")
                     .font(.system(size: size * 0.42, weight: .semibold))
                     .foregroundStyle(theme.action)
                     .frame(width: size, height: size)
@@ -397,6 +403,49 @@ struct DraftAttachmentsSheet: View {
 /// one state for screenshots and UI tests, with made-up pictures and a made-up lease. The business
 /// card and poster are the photo drafts' made-up pictures, for sending to a real test host.
 enum DraftAttachmentRailFixture {
+    /// A made-up 80 MB video in a sent message: on its way (34 of 80 MB), not sent (with Try
+    /// again), or taken by Hermes (its line on the rail). "big-file-uploading|failed|sent".
+    /// A turn with a big file the way Hermes keeps it in its history: the words, the workspace-relative
+    /// `@file:` reference, the app's note, then the model's attached context with the file's host path.
+    static func hermesSavedTurn(_ words: String, file: ChatBigFile) -> String {
+        let relative = "uploads/2026-10-31/" + file.fileName
+        return words + "\n@file:`" + relative + "`\n" + file.agentNote + "\n\n--- Attached Context ---\n\n"
+            + "📎 @file:`" + relative + "` (video/quicktime, 76.3 MB) — binary file, not inlined as text. "
+            + "It is available on disk at `/home/fixture/workspace/" + relative + "`. Use your tools to work with it "
+            + "(read or convert it, extract its text, or view/render it as needed); do not tell the user the file "
+            + "type is unsupported."
+    }
+
+    @MainActor @discardableResult
+    static func seedBigFile(_ model: ChatModel, state: String) -> String {
+        let file = ChatBigFile(id: "fixturebigfile00000000000000000a", fileName: "Trip to the coast.mov",
+                               mimeType: "video/quicktime", byteCount: 80_000_000,
+                               sha256: String(repeating: "0", count: 64), video: .init(seconds: 72, width: 1920, height: 1080))
+        let words = "Here's the video from Saturday"
+        let human: TimelineItem
+        switch state {
+        case "big-file-sent":
+            // Exactly what Hermes saves for the turn, attached context and all (#721, real-host probe).
+            human = model.humanItem(content: hermesSavedTurn(words, file: file))
+        default:
+            human = model.humanItem(content: words).carrying(bigFiles: [file])
+            if state == "big-file-failed" {
+                BigFileUploadBoard.shared.failed(file.id, message: BigFileUploadFailure.noSpace.message) {
+                    BigFileUploadBoard.shared.uploading(file.id, sentBytes: 34_000_000, byteCount: file.byteCount)
+                }
+            } else {
+                BigFileUploadBoard.shared.uploading(file.id, sentBytes: 34_000_000, byteCount: file.byteCount)
+            }
+        }
+        if human.metadata.bigFiles.isEmpty {
+            model.appendItem(human)
+            model.appendProjectedMessage(human)
+        } else {
+            model.bigFileSends.append(human)
+        }
+        return human.id
+    }
+
     @MainActor
     static func seed(_ model: ChatModel, arguments: [String] = ProcessInfo.processInfo.arguments) async {
         guard let index = arguments.firstIndex(of: "-test-draft-attachments"), arguments.indices.contains(index + 1),
@@ -415,6 +464,28 @@ enum DraftAttachmentRailFixture {
                 add([picture])
             }
         case "file": add([lease])
+        case "big-file-uploading", "big-file-failed", "big-file-sent":
+            // The chat loads its own messages as it opens, and a load replaces the transcript's rows, so
+            // the sent message goes in once loading is over, and again if a late load took it out.
+            for _ in 0..<80 where model.items.isEmpty || model.isHydratingHistory {
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            var id = seedBigFile(model, state: arguments[index + 1])
+            for _ in 0..<10 {
+                try? await Task.sleep(for: .milliseconds(500))
+                if !model.items.contains(where: { $0.id == id }), !model.bigFileSends.contains(where: { $0.id == id }) {
+                    id = seedBigFile(model, state: arguments[index + 1])
+                }
+            }
+        case "big-file-import":
+            // A real host's test: the video the probe made, through the same checks as Add › File.
+            guard let at = arguments.firstIndex(of: "-test-big-file-path"), arguments.indices.contains(at + 1) else { break }
+            let url = URL(fileURLWithPath: arguments[at + 1])
+            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            await model.importDraftAttachments(.files, [DraftAttachmentLoader(draftNamed: url.lastPathComponent, load: {
+                .bigFile(try await BigFileStore.importing(url, fileName: url.lastPathComponent, mimeType: "video/quicktime",
+                                                          byteCount: size, into: model))
+            })])
         case "mixed": add(photos + [lease])
         case "adding":
             Task { @MainActor in

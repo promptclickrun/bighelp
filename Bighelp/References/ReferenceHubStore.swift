@@ -105,7 +105,7 @@ final class ReferenceHubStore {
     /// echoes; selection-only changes also invalidate async insertion ownership.
     func receive(source: String, selection: NSRange, hasMarkedText: Bool,
                  selections: [ReferenceDraftSelection]? = nil, restoreArchivedSelections: Bool = false) {
-        let changed = Data(self.source.utf8) != Data(source.utf8)
+        let changed = !self.source.utf8.elementsEqual(source.utf8)
             || self.selection != selection || self.hasMarkedText != hasMarkedText
         let next = hasMarkedText ? nil : ReferenceQueryContext.parse(source: source, selection: selection)
         guard changed || query != next || (selections != nil && selections != selected) || restoreArchivedSelections else { return }

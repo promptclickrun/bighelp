@@ -1,24 +1,154 @@
 import SwiftUI
 import UIKit
 
-/// Light mode's page color.
-enum BighelpLightBackground: String, CaseIterable, Identifiable, Sendable {
-    case cream, paper
+/// A theme in Settings › Appearance › Themes: a light and a dark page, picked separately. Classic and
+/// Warm are bighelp's own pages (Paper and Black, Cream and Graphite) and keep your bubble color; the
+/// others bring their own accent and agent message color. Their palettes are ported from T3 Code
+/// (github.com/pingdotgg/t3code, MIT License, Copyright 2026 T3 Tools Inc.), under names of our own.
+enum BighelpThemePreset: String, CaseIterable, Identifiable, Sendable {
+    case classic, warm, steel, berry, moss, harbor, clay, violet
 
     var id: String { rawValue }
-    var name: String { self == .cream ? String(localized: "Cream") : String(localized: "Paper") }
-    var detail: String { self == .cream ? String(localized: "Warm and soft") : String(localized: "Clean, bright white") }
-    var neutral: BighelpTheme { self == .cream ? .light : .paperLight }
+
+    var name: String {
+        switch self {
+        case .classic: String(localized: "Classic")
+        case .warm: String(localized: "Warm")
+        case .steel: String(localized: "Steel")
+        case .berry: String(localized: "Berry")
+        case .moss: String(localized: "Moss")
+        case .harbor: String(localized: "Harbor")
+        case .clay: String(localized: "Clay")
+        case .violet: String(localized: "Violet")
+        }
+    }
+
+    var light: BighelpLightBackground {
+        switch self {
+        case .classic: .paper
+        case .warm: .cream
+        case .steel: .steel
+        case .berry: .berry
+        case .moss: .moss
+        case .harbor: .harbor
+        case .clay: .clay
+        case .violet: .violet
+        }
+    }
+
+    var dark: BighelpDarkBackground {
+        switch self {
+        case .classic: .black
+        case .warm: .graphite
+        case .steel: .steel
+        case .berry: .berry
+        case .moss: .moss
+        case .harbor: .harbor
+        case .clay: .clay
+        case .violet: .violet
+        }
+    }
+
+    /// Nil for bighelp's own pages, which have no accent or message color of their own.
+    func palette(dark: Bool) -> BighelpPresetPalette? {
+        switch self {
+        case .classic, .warm: nil
+        case .steel: dark ? .steelDark : .steelLight
+        case .berry: dark ? .berryDark : .berryLight
+        case .moss: dark ? .mossDark : .mossLight
+        case .harbor: dark ? .harborDark : .harborLight
+        case .clay: dark ? .clayDark : .clayLight
+        case .violet: dark ? .violetDark : .violetLight
+        }
+    }
+
+    /// The bubble color this theme brings, if it has one.
+    func accentHex(dark: Bool) -> String? { palette(dark: dark)?.accent }
 }
 
-/// Dark mode's page color.
-enum BighelpDarkBackground: String, CaseIterable, Identifiable, Sendable {
-    case graphite, black
+/// One mode of a ported theme, as sRGB hex. `Scripts/theme-presets.py` writes the values
+/// (`BighelpThemePresetPalettes.swift`).
+struct BighelpPresetPalette: Equatable, Sendable {
+    let canvas: String
+    let surface: String
+    let surfaceRaised: String
+    let text: String
+    let textMuted: String
+    let border: String
+    let accent: String
+    let messageSurface: String
+
+    /// The palette as a page: statuses come from bighelp's own page for the mode.
+    func neutral(dark: Bool) -> BighelpTheme {
+        let base: BighelpTheme = dark ? .blackDark : .paperLight
+        // Some themes draw cards in the page color and lift only raised ones; cards need to show.
+        let cards = surface == canvas ? surfaceRaised : surface
+        var theme = BighelpTheme(
+            canvasHex: canvas, surfaceHex: cards, raisedSurfaceHex: surfaceRaised == canvas ? surface : surfaceRaised,
+            primaryTextHex: text, secondaryTextHex: textMuted,
+            tertiaryTextHex: Self.mix(textMuted, canvas, by: 0.2),
+            borderHex: border, separatorHex: Self.mix(border, canvas, by: 0.35),
+            actionHex: accent, actionForegroundHex: base.actionForegroundHex, actionGlowHex: accent,
+            elevationShadowHex: base.elevationShadowHex, actionGlowOpacity: base.actionGlowOpacity,
+            cardShadowOpacity: base.cardShadowOpacity, navigationShadowOpacity: base.navigationShadowOpacity,
+            successHex: base.successHex, warningHex: base.warningHex, dangerHex: base.dangerHex,
+            informationHex: base.informationHex, focusHex: accent)
+        theme.messageSurfaceHex = messageSurface
+        return theme
+    }
+
+    private static func mix(_ first: String, _ second: String, by amount: Double) -> String {
+        let a = UInt64(first, radix: 16) ?? 0, b = UInt64(second, radix: 16) ?? 0
+        return [16, 8, 0].map { shift -> String in
+            let x = Double((a >> UInt64(shift)) & 0xFF), y = Double((b >> UInt64(shift)) & 0xFF)
+            return String(format: "%02X", Int((x + (y - x) * amount).rounded()))
+        }.joined()
+    }
+}
+
+/// Light mode's page: one of the Themes. The raw names are what's saved, so Cream and Paper never
+/// change; Paper is Classic's.
+enum BighelpLightBackground: String, CaseIterable, Identifiable, Sendable {
+    case cream, paper, steel, berry, moss, harbor, clay, violet
 
     var id: String { rawValue }
-    var name: String { self == .graphite ? String(localized: "Graphite") : String(localized: "Black") }
-    var detail: String { self == .graphite ? String(localized: "Soft charcoal, easy on the eyes") : String(localized: "True black, saves battery on OLED") }
-    var neutral: BighelpTheme { self == .graphite ? .graphiteDark : .blackDark }
+    var preset: BighelpThemePreset { BighelpThemePreset.allCases.first { $0.light == self } ?? .classic }
+    var name: String {
+        switch self {
+        case .cream: String(localized: "Cream")
+        case .paper: String(localized: "Paper")
+        default: preset.name
+        }
+    }
+    var neutral: BighelpTheme {
+        switch self {
+        case .cream: .light
+        case .paper: .paperLight
+        default: preset.palette(dark: false)?.neutral(dark: false) ?? .paperLight
+        }
+    }
+}
+
+/// Dark mode's page: one of the Themes. Graphite and Black keep their saved names; Black is Classic's.
+enum BighelpDarkBackground: String, CaseIterable, Identifiable, Sendable {
+    case graphite, black, steel, berry, moss, harbor, clay, violet
+
+    var id: String { rawValue }
+    var preset: BighelpThemePreset { BighelpThemePreset.allCases.first { $0.dark == self } ?? .classic }
+    var name: String {
+        switch self {
+        case .graphite: String(localized: "Graphite")
+        case .black: String(localized: "Black")
+        default: preset.name
+        }
+    }
+    var neutral: BighelpTheme {
+        switch self {
+        case .graphite: .graphiteDark
+        case .black: .blackDark
+        default: preset.palette(dark: true)?.neutral(dark: true) ?? .blackDark
+        }
+    }
 }
 
 /// Your chat bubble (and button) color. Ink is the default. Lavender is bighelp's own violet,

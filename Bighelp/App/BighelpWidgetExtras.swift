@@ -74,12 +74,9 @@ final class BighelpWidgetExtras {
 
     func update(appearance context: BighelpAppearanceContext) {
         func palette(_ scheme: AppAppearance) -> BighelpWidgetSnapshot.Palette {
-            let theme = BighelpTheme.resolve(
-                appearance: BighelpAppearanceContext(
-                    appearance: scheme,
-                    lightBackground: context.lightBackground, darkBackground: context.darkBackground,
-                    bubbleColor: context.bubbleColor, customBubbleHex: context.customBubbleHex),
-                colorScheme: scheme == .dark ? .dark : .light, contrast: .standard)
+            let dark = scheme == .dark
+            let theme = BighelpTheme.resolve(appearance: context.forcing(dark ? .dark : .light),
+                                             colorScheme: dark ? .dark : .light, contrast: .standard)
             return .init(canvasHex: theme.canvasHex, surfaceHex: theme.surfaceHex,
                          primaryTextHex: theme.primaryTextHex, secondaryTextHex: theme.secondaryTextHex,
                          accentHex: theme.actionHex, accentForegroundHex: theme.actionForegroundHex)

@@ -93,7 +93,7 @@ private struct BighelpFormSurfaceModifier: ViewModifier {
             .scrollContentBackground(.hidden)
             .background(theme.canvas.ignoresSafeArea())
             .tint(theme.action)
-        if appearance.usesInk {
+        if appearance.usesInk(dark: theme.isDarkPalette) {
             form.toggleStyle(InkSwitchStyle())
         } else {
             form.toggleStyle(BighelpFormSwitchStyle())
@@ -118,7 +118,7 @@ struct BighelpSwitchTintStyle: ToggleStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         Toggle(configuration).toggleStyle(.automatic)
-            .tint(appearance.usesInk ? SimpleBotColor.green.color : theme.action)
+            .tint(appearance.usesInk(dark: theme.isDarkPalette) ? SimpleBotColor.green.color : theme.action)
     }
 }
 

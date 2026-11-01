@@ -19,13 +19,14 @@ final class SettingsStore {
     private(set) var sessionSectionPreferencesRevision = 0
 
     var appearanceContext: BighelpAppearanceContext {
-        // Bots mode's page is always Paper by day; after dark and the bubbles follow the pick.
+        // Bots mode takes the themes and bubbles picked in Appearance, like the rest of the app.
         var context = BighelpAppearanceContext(
             appearance: appearance,
-            lightBackground: simpleBotsEnabled ? .paper : lightBackground,
+            lightBackground: lightBackground,
             darkBackground: darkBackground,
             bubbleColor: bubbleColor,
             customBubbleHex: customBubbleHex,
+            bubbleFollowsTheme: bubbleFollowsTheme,
             windowTransparency: windowTransparency
         )
         context.simpleBots = simpleBotsEnabled
@@ -52,12 +53,25 @@ final class SettingsStore {
             let valid = BighelpCustomBubbleColor.validated(customBubbleHex)
             if valid != customBubbleHex { customBubbleHex = valid }
             defaults.set(valid, forKey: Keys.customBubbleColor)
+            if valid != nil { bubbleFollowsTheme = false }
         }
     }
 
-    /// "Custom" or the built-in color's name.
+    /// Bubbles take each mode's theme accent (the Theme swatch). Picking a theme that has an accent
+    /// turns it on; picking any other bubble color turns it off.
+    var bubbleFollowsTheme: Bool {
+        didSet { defaults.set(bubbleFollowsTheme, forKey: Keys.bubbleFollowsTheme) }
+    }
+
+    /// "Theme", "Custom" or the built-in color's name.
     var bubbleColorName: String {
-        customBubbleHex != nil ? String(localized: "Custom") : (bubbleColor ?? .graphite).name
+        if themeGivesBubbles { return String(localized: "Theme") }
+        return customBubbleHex != nil ? String(localized: "Custom") : (bubbleColor ?? .graphite).name
+    }
+
+    /// The Theme swatch is what bubbles show in at least one mode.
+    var themeGivesBubbles: Bool {
+        appearanceContext.themeAccentHex(dark: false) != nil || appearanceContext.themeAccentHex(dark: true) != nil
     }
 
     /// One of the built-in colors, replacing a custom one.
@@ -65,6 +79,14 @@ final class SettingsStore {
         // Ink is the default, so it's stored as no choice.
         bubbleColor = color == .graphite ? nil : color
         customBubbleHex = nil
+        bubbleFollowsTheme = false
+    }
+
+    /// A theme for one mode (Settings › Appearance › Themes). A theme with its own accent brings
+    /// it to your bubbles too; Classic and Warm leave your bubble color as it is.
+    func pickTheme(_ preset: BighelpThemePreset, dark: Bool) {
+        if dark { darkBackground = preset.dark } else { lightBackground = preset.light }
+        if preset.accentHex(dark: dark) != nil { bubbleFollowsTheme = true }
     }
 
     /// Vision Pro: how much of the room shows through the windows (0–1).
@@ -502,6 +524,7 @@ final class SettingsStore {
         darkBackground = defaults.string(forKey: Keys.darkBackground).flatMap(BighelpDarkBackground.init(rawValue:)) ?? .black
         bubbleColor = defaults.string(forKey: Keys.bubbleColor).flatMap(BighelpBubbleColor.init(rawValue:))
         customBubbleHex = BighelpCustomBubbleColor.validated(defaults.string(forKey: Keys.customBubbleColor))
+        bubbleFollowsTheme = defaults.bool(forKey: Keys.bubbleFollowsTheme)
         windowTransparency = defaults.object(forKey: Keys.windowTransparency) == nil
             ? BighelpVisionGlass.defaultTransparency
             : defaults.double(forKey: Keys.windowTransparency)
@@ -835,6 +858,7 @@ private extension SettingsStore {
         static let darkBackground = "loopdy.appearance.darkBackground"
         static let bubbleColor = "loopdy.appearance.bubbleColor"
         static let customBubbleColor = "loopdy.appearance.customBubbleColor"
+        static let bubbleFollowsTheme = "bighelp.appearance.bubble-follows-theme"
         static let windowTransparency = "loopdy.appearance.windowTransparency"
         static let responseHaptics = "loopdy.chat.responseHaptics"
         static let showProjectChanges = "loopdy.chat.showProjectChanges"

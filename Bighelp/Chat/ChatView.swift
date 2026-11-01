@@ -203,6 +203,7 @@ struct ChatView: View {
     /// The bottom of the chat's safe area (the keyboard's top while it shows), in the window.
     @State private var safeBottomInWindow: CGFloat = 0
     @AppStorage(ChatLayoutPreferences.densityKey) var chatDensity: ChatDensity = .comfortable
+    @AppStorage(ChatLayoutPreferences.agentMessageStyleKey) var chatAgentStyle: ChatAgentMessageStyle = .bubble
     @AppStorage(ChatLayoutPreferences.showsSessionTitleKey)
     private var showsSessionTitle = ChatLayoutPreferences.showsSessionTitleByDefault
     @State var composerHeight: CGFloat = 0

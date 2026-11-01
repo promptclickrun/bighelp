@@ -127,6 +127,7 @@ struct MessageBubble: View {
     @State private var cardCopyContext = ChatCardCopyContext()
     @AppStorage(ChatLayoutPreferences.textSizeKey) private var chatTextSize: ChatTextSize = .defaultSize
     @AppStorage(LinkPreviewPreferences.enabledKey) private var showsLinkPreviews = true
+    @AppStorage(ChatLayoutPreferences.agentMessageStyleKey) private var agentStyle: ChatAgentMessageStyle = .bubble
 
     init(
         messageID: String = "",
@@ -195,7 +196,8 @@ struct MessageBubble: View {
                     maximumWidthFraction: uiV3Enabled
                         ? BighelpV3MessagePresentation.maximumWidthFraction(
                             role: role,
-                            hasRichContent: projection.cardProjection.hasRichContent
+                            hasRichContent: projection.cardProjection.hasRichContent,
+                            agentStyle: agentStyle
                         )
                         : presentation.maximumWidthFraction,
                     contentFitsWidth: uiV3Enabled
@@ -325,19 +327,21 @@ struct MessageBubble: View {
         ) {
             // Text hits remain owned by UITextView's native selection menu.
             // Padding and gaps need a separate full-message action surface.
+            // A hold on the text opens the menu through the text's own host (`ChatMessageTextHost`);
+            // these strips cover the padding around it, thin on the page, which has none.
+            let edge = BighelpV3MessagePresentation.menuEdgeThickness(role: role, agentStyle: agentStyle)
             content
                 .overlay {
-                    // Match BighelpV3MessageSurface's sixteen-point padding.
                     // The center stays hit-transparent for native selection,
                     // links, and any interactive card inside the message.
                     VStack(spacing: 0) {
-                        messagePaddingActions(interaction).frame(height: BighelpTokens.space16)
+                        messagePaddingActions(interaction).frame(height: edge)
                         HStack(spacing: 0) {
-                            messagePaddingActions(interaction).frame(width: BighelpTokens.space16)
+                            messagePaddingActions(interaction).frame(width: edge)
                             Color.clear.allowsHitTesting(false)
-                            messagePaddingActions(interaction).frame(width: BighelpTokens.space16)
+                            messagePaddingActions(interaction).frame(width: edge)
                         }
-                        messagePaddingActions(interaction).frame(height: BighelpTokens.space16)
+                        messagePaddingActions(interaction).frame(height: edge)
                     }
                 }
         } else {

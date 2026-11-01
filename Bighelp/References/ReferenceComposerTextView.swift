@@ -94,6 +94,8 @@ struct ReferenceComposerTextView: UIViewRepresentable {
     var onDropAttachmentProviders: (([NSItemProvider]) -> Void)?
     /// Hardware Return keys (`ComposerReturnKeyHandling`). True means handled.
     var onReturnKey: ((ComposerReturnKey) -> Bool)?
+    /// The caret as a character offset, for the mention list, its only reader: nil while the
+    /// text has no `@`, since counting characters walks the whole draft on every key.
     var onSelectionChange: (Int?) -> Void = { _ in }
     /// True once the draft takes `DraftFieldSizing.expandLines` lines: Expand shows above the box.
     var onExpansionAvailabilityChange: (Bool) -> Void = { _ in }
@@ -255,8 +257,15 @@ struct ReferenceComposerTextView: UIViewRepresentable {
         private weak var requestedHost: ReferenceComposerContainer?
         private var pendingSurfaceUpdate: SurfaceUpdate?
         private var surfaceUpdateScheduled = false
+        #if DEBUG
+        /// How many times SwiftUI drew the box around this text view again, for tests of what redraws it.
+        private(set) var surfaceUpdates = 0
+        #endif
 
         func updateSurface(_ surface: ReferenceComposerTextView, in container: ReferenceComposerContainer) {
+            #if DEBUG
+            surfaceUpdates += 1
+            #endif
             guard surface.session.textView != nil else { return }
             guard surface.isSurfaceActive else {
                 scheduleDeactivation(in: container)
@@ -300,6 +309,7 @@ struct ReferenceComposerTextView: UIViewRepresentable {
         }
 
         private func applySurface(_ update: SurfaceUpdate, in container: ReferenceComposerContainer) {
+            ChatPerformanceProbe.count("composer.surface")
             guard let view else { return }
             view.delegate = nil
             defer { view.delegate = self }
@@ -562,13 +572,15 @@ struct ReferenceComposerTextView: UIViewRepresentable {
 
         func textViewDidChange(_ textView: UITextView) {
             guard !applying else { return }
-            publish()
-            keepCaretVisible()
+            ChatPerformanceProbe.measure("composer.edit") {
+                publish()
+                keepCaretVisible()
+            }
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
             guard !applying, textView.isFirstResponder else { return }
-            publish()
+            ChatPerformanceProbe.measure("composer.caret") { publish() }
         }
 
         /// Change traits only, never text/selection or responder ownership. IME
@@ -587,22 +599,25 @@ struct ReferenceComposerTextView: UIViewRepresentable {
 
         private func publish(selections: [ReferenceDraftSelection]? = nil, force: Bool = false) {
             guard let view, !applying else { return }
-            updateKeyboardTraits()
             let bytes = Data(view.text.utf8)
             let marked = view.markedTextRange != nil
             let restoring = view.undoManager?.isUndoing == true || view.undoManager?.isRedoing == true
+            // UIKit reports most keys twice, as an edit and as a caret move; the second report
+            // changes nothing and stops here, before the keyboard's traits are worked out again.
             guard force || bytes != lastPublished || view.selectedRange != lastPublishedSelection
                     || marked != lastPublishedMarkedText || selections != nil || restoring
-                    || Data(parent.hub.source.utf8) != bytes
+                    || !parent.hub.source.utf8.elementsEqual(bytes)
                     || parent.hub.selection != view.selectedRange else { return }
+            updateKeyboardTraits()
             lastPublished = bytes
             lastPublishedSelection = view.selectedRange
             lastPublishedMarkedText = marked
-            if Data(parent.text.utf8) != lastPublished { parent.text = view.text }
+            if !parent.text.utf8.elementsEqual(lastPublished) { parent.text = view.text }
             parent.hub.receive(source: view.text, selection: view.selectedRange,
                 hasMarkedText: marked, selections: selections,
                 restoreArchivedSelections: restoring)
-            parent.onSelectionChange(DraftCaretSelection.characterOffset(in: view.text, selectedRange: view.selectedRange))
+            parent.onSelectionChange(view.text.utf8.contains(UInt8(ascii: "@"))
+                ? DraftCaretSelection.characterOffset(in: view.text, selectedRange: view.selectedRange) : nil)
             view.invalidateIntrinsicContentSize()
         }
 

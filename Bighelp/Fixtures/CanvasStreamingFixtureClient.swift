@@ -178,11 +178,19 @@ final class CanvasStreamingFixtureClient: ConversationFixtureClient, StreamingCo
         if args.contains("-test-tool-stream-slow") { try await Task.sleep(for: .seconds(8)) }
         var tail = "LIVE TOOL STREAM TAIL\n"
         monitor.beginAnswerUpdates()
+        if let notification = ProcessInfo.processInfo.environment["BIGHELP_TOOL_STREAM_TAIL_NOTIFICATION"] {
+            CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
+                CFNotificationName(notification as CFString), nil, nil, true)
+        }
         let tailID = "\(prefix)-tail"
         // `-test-tool-stream-fast-tail`: the answer arrives the way a model sends it, a few words every
         // 25 ms with no pauses, to drag and read while it grows (AGENTS.md, Streaming under a drag).
+        // `-test-tool-stream-tail-count <n>` sends that many pieces instead: at the bottom of a long
+        // chat each piece takes far longer than 25 ms, and 1,200 of them took minutes.
         let fastTail = args.contains("-test-tool-stream-fast-tail")
-        for index in 0..<(fastTail ? 1_200 : twoTurns ? 10 : 40) {
+        let tailCount = args.firstIndex(of: "-test-tool-stream-tail-count")
+            .flatMap { args.indices.contains($0 + 1) ? Int(args[$0 + 1]) : nil }
+        for index in 0..<(tailCount ?? (fastTail ? 1_200 : twoTurns ? 10 : 40)) {
             try await Task.sleep(for: .milliseconds(fastTail ? 25 : 80))
             tail += fastTail
                 ? (index.isMultiple(of: 6) ? "\nAnswer part \(index): " : "") + "the **answer** keeps growing "

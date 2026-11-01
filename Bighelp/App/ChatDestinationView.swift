@@ -183,6 +183,7 @@ struct ChatDestinationView: View {
     }
 
     var body: some View {
+        let _ = ChatPerformanceProbe.count("chat.destination.body")
         chatCanvas
             .modifier(TeamCallEntry(chat: model, rooms: botModeRooms, services: featureStore.teamCallServices,
                                     agents: agents, userIdentity: userIdentity,
@@ -750,9 +751,7 @@ struct ChatDestinationView: View {
                 )
             }
         }
-        .onChange(of: projectChangesRefreshTrigger) { _, _ in
-            projectChanges.requestRefresh()
-        }
+        .modifier(ProjectChangesRefreshTrigger(model: model) { projectChanges.requestRefresh() })
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             projectChanges.requestRefresh()
@@ -855,19 +854,6 @@ struct ChatDestinationView: View {
             model.sessionWorkspaceName ?? "none",
             workspaceID,
             String(showsProjectChanges),
-        ].joined(separator: "|")
-    }
-
-    private var projectChangesRefreshTrigger: String {
-        let lastActivity = model.activityTurns.last?.events.last
-        let activityRevision = lastActivity.map {
-            "\($0.eventID):\($0.lifecycle.rawValue)"
-        } ?? "none"
-        return [
-            String(model.items.count),
-            model.items.last?.id ?? "none",
-            activityRevision,
-            String(model.isSending),
         ].joined(separator: "|")
     }
 
@@ -1054,5 +1040,31 @@ struct ChatDestinationAgentResolver {
             .joined(separator: " ")
         guard !normalized.isEmpty else { return nil }
         return ChatDestinationAgentIdentity(name: normalized, role: "Hermes agent")
+    }
+}
+
+/// Project Changes looks again whenever the chat's work moves on. The chat's messages and work are
+/// read here, in a modifier of their own: read in `ChatDestinationView`'s body, every streamed piece
+/// of an answer redrew the whole chat screen and handed every view in it a new link action, so even
+/// the message box's text view updated on each piece.
+private struct ProjectChangesRefreshTrigger: ViewModifier {
+    let model: ChatModel
+    let refresh: () -> Void
+
+    func body(content: Content) -> some View {
+        content.onChange(of: trigger) { _, _ in refresh() }
+    }
+
+    private var trigger: String {
+        let lastActivity = model.activityTurns.last?.events.last
+        let activityRevision = lastActivity.map {
+            "\($0.eventID):\($0.lifecycle.rawValue)"
+        } ?? "none"
+        return [
+            String(model.items.count),
+            model.items.last?.id ?? "none",
+            activityRevision,
+            String(model.isSending),
+        ].joined(separator: "|")
     }
 }

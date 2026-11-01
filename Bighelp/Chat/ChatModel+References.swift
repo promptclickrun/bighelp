@@ -50,6 +50,8 @@ extension ChatModel {
         referenceOwner = nil
         persistenceCheckpointTask?.cancel()
         persistenceCheckpointTask = nil
+        draftJournalTask?.cancel()
+        draftJournalTask = nil
         hasDirtyPersistence = false
         hasDirtyContent = false
         isReplacingReferenceDraft = true
@@ -69,7 +71,7 @@ extension ChatModel {
     /// Parent forwards hub edits here, including removals and native Undo/Redo.
     func updateReferenceDraft(source: String, selections: [ReferenceDraftSelection]) throws {
         guard !referenceOwnerRetired else { throw CancellationError() }
-        let sameSource = Data(draft.utf8) == Data(source.utf8)
+        let sameSource = draft.utf8.elementsEqual(source.utf8)
         let sameSelections = Self.sameReferenceSelections(referenceSelections, selections)
         guard !sameSource || !sameSelections else { return }
         let canonical = try ReferenceCodec.encode(source: source, references: selections.map(\.snapshot))
@@ -351,13 +353,18 @@ extension ChatModel {
         }
     }
 
-    /// Saves the chat after `persistenceCheckpointDelay`. A change to the draft alone waits
-    /// for a pause in typing: each save redraws every screen that lists chats, and doing that
-    /// every two seconds while someone types made the keyboard stutter.
+    /// Saves the chat after `persistenceCheckpointDelay`. A change to the draft alone goes to
+    /// the draft journal instead (`journalsDraft`), or else waits for a pause in typing: each save
+    /// redraws every screen that lists chats, and doing that while someone types made the
+    /// keyboard stutter. The draft still reaches the chat at its next save of any kind.
     func persistSession(draftOnly: Bool = false) {
         guard !referenceOwnerRetired, !isReplacingReferenceDraft else { return }
         hasDirtyPersistence = true
         if !draftOnly { hasDirtyContent = true }
+        if draftOnly, journalsDraft {
+            scheduleDraftJournal()
+            return
+        }
         if draftOnly, !hasDirtyContent {
             persistenceCheckpointTask?.cancel()
             persistenceCheckpointTask = nil
@@ -372,6 +379,25 @@ extension ChatModel {
             }
             self?.persistenceCheckpointTask = nil
             self?.flushPersistence()
+        }
+    }
+
+    /// Typing goes to the draft journal rather than saving the chat. Reference drafts keep
+    /// their own checkpoint, byte for byte, and so does a chat that ever had one.
+    var journalsDraft: Bool {
+        onDraftJournal != nil && !referenceOwnerRetired && referenceSelections.isEmpty
+            && referenceSubmission == nil && !referencePersistenceNeeded
+    }
+
+    private func scheduleDraftJournal() {
+        draftJournalTask?.cancel()
+        let delay = draftJournalDelay
+        draftJournalTask = Task { [weak self] in
+            do { try await Task.sleep(for: delay) } catch { return }
+            guard let self, self.journalsDraft else { return }
+            self.draftJournalTask = nil
+            guard let onDraftJournal = self.onDraftJournal else { return }
+            ChatPerformanceProbe.measure("chat.draft-journal") { onDraftJournal(self.persistedDraft) }
         }
     }
 

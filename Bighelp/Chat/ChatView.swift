@@ -776,7 +776,7 @@ struct ChatView: View {
     }
 
     private var composer: some View {
-        ChatComposer(
+        ChatComposerHost(
             model: model,
             agentName: agentName,
             sessionCatalog: sessionCatalog,
@@ -784,6 +784,7 @@ struct ChatView: View {
             onVoiceTap: dismissKeyboardAndOpenVoice,
             onFittingRailVerticalDrag: requestFittingRailScroll,
             draftFocus: $isDraftFocused,
+            isDraftFocused: isDraftFocused,
             onDismissKeyboard: dismissKeyboard,
             onWillSend: { timelineController.scrollToLatest(animated: false) },
             companionAppearance: companionStore.flatMap { store in

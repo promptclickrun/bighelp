@@ -318,8 +318,11 @@ final class NativeWorkspaceRuntime {
             return .init(workspace: workspace, client: client, owner: owner)
         }
         let replyVoices = ReplyVoiceCache()
+        let draftJournal = ChatDraftJournal(repository: DemoRepository<[String: ChatDraftJournal.Entry]>(
+            directory: root, name: "native-chat-drafts", seed: [:]
+        ))
         let features = ShellFeatureStore(
-            timing: .immediate, catalog: sessions, agents: agents, agentRuntimeDefaults: defaults,
+            timing: .immediate, catalog: sessions, draftJournal: draftJournal, agents: agents, agentRuntimeDefaults: defaults,
             allowsNewChatAgentDefaults: false,
             botModeRooms: rooms, userIdentity: userIdentity, scheduledTasks: scheduledTasks,
             dashboardSource: dashboard, approvalRequestLoader: dashboard, approvalClient: dashboard,

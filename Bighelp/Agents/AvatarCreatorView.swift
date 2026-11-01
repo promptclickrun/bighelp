@@ -637,7 +637,6 @@ struct AvatarCreatorView: View {
         }
         .scrollIndicators(.hidden)
         .dismissesKeyboardOnScroll(true)
-        .accessibilityIdentifier("avatar.creator.choices")
         // Each tab opens at its top, not where the last one was scrolled.
         .id("\(model.style.rawValue).\(model.catalogGroup.rawValue).\(model.tab.rawValue).\(faceTool.rawValue)")
     }

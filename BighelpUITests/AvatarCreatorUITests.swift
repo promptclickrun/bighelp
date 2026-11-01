@@ -227,7 +227,9 @@ final class AvatarCreatorUITests: BighelpUITestCase {
     /// Large text pushes controls below the fold; scroll the choices until it can be tapped.
     @MainActor
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
-        let choices = app.scrollViews["avatar.creator.choices"].firstMatch
+        // The choices are the sheet's last scroll view, after the row of categories.
+        let scrollViews = app.scrollViews
+        let choices = scrollViews.element(boundBy: max(0, scrollViews.count - 1))
         for _ in 0..<6 where !(element.exists && element.isHittable) { choices.swipeUp(velocity: .slow) }
         for _ in 0..<8 where !(element.exists && element.isHittable) { choices.swipeDown(velocity: .slow) }
         XCTAssertTrue(element.isHittable, "\(element) can be reached")

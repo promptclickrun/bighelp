@@ -37,7 +37,7 @@ struct BighelpMenuCommands: Commands {
                 .keyboardShortcut("+")
             Button("Smaller Text") { BighelpInterfaceSize.shared.stepText(by: -1) }
                 .keyboardShortcut("-")
-            Button("Default Text Size") { BighelpInterfaceSize.shared.textSize = .platformDefault }
+            Button("Default Text Size") { BighelpInterfaceSize.shared.resetText() }
                 .keyboardShortcut("0")
         }
         #if targetEnvironment(macCatalyst)

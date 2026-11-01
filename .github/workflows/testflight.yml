@@ -1,3 +1,6 @@
+# Apple CI rule: this workflow builds, tests, signs or uploads an Apple app. Use it only when no Mac is
+# available (local or linked) and the user explicitly asked for it. Otherwise do not start, dispatch,
+# re-run, enable or wait on it. See AGENTS.md > Build and test.
 name: Internal TestFlight
 
 on:

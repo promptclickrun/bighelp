@@ -1,5 +1,8 @@
 # Prepare CI signing without a powered-on Mac
 
+> Use this workflow only when no Mac is available and the user asked for it in words. The rule is in
+> [AGENTS.md](../AGENTS.md) › Build and test.
+
 Use an existing encrypted Apple Distribution `.p12` backup if you have one.
 Otherwise, the optional **Prepare signing identity** workflow can generate a
 new signing key and Apple Distribution certificate on a hosted macOS runner.

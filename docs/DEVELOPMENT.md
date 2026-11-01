@@ -408,8 +408,13 @@ Security reports belong in private channels described by `SECURITY.md`.
 
 ## Hosted iOS validation and TestFlight
 
-The `iOS build and tests` GitHub Actions workflow builds the XcodeGen project on
-`macos-26`. By default, one simulator job with a 35-minute limit runs the native
+These two workflows are the fallback only. Build, test and release on a Mac (`Scripts/with-build-lock.sh`, the
+release lane). Use a workflow here only when no Mac is available, local or linked, and the user asked for the
+workflow in words. Otherwise do not start, dispatch, re-run, enable or wait on it. A missing CI run is not a gap:
+report the local results.
+
+The `iOS build and tests` GitHub Actions workflow runs only when someone dispatches it.
+It builds the XcodeGen project on `macos-26`. By default, one simulator job with a 35-minute limit runs the native
 suite and the focused UI regressions selected by
 [`Scripts/ci_release_validation.py`](../Scripts/ci_release_validation.py), covering
 References, keyboard dismissal, workspace navigation, expanded draft sending,
@@ -424,8 +429,8 @@ No Apple signing credentials are needed for simulator validation.
 `Internal TestFlight` is a manually started workflow. After this workflow reaches
 the default branch, open Actions → Internal TestFlight → Run workflow and choose
 `main` and enter release notes. This release workflow does not run simulator
-tests or require a CI receipt. Review the available validation evidence before
-starting it; a release does not make a failed CI run passing. It archives/signs
+tests or require a CI receipt. Review the local validation results before
+starting it. It archives/signs
 the merged app and its extensions, uploads the IPA, waits for processing,
 and verifies the exact version/build and internal group membership. It records
 `release.json` beside the signed IPA. A failed upload/distribution must be

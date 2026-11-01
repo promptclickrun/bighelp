@@ -4,8 +4,9 @@ Describe the user-visible outcome and the affected ownership or data boundaries.
 
 ## Validation
 
-List the checks actually run, their results, and any relevant skipped or
-unverified cases. For UI changes, identify the devices/orientations and
+List the checks actually run on a Mac, their results, and any relevant skipped or
+unverified cases. Do not ask for a CI run: the Apple workflows are off by default
+([AGENTS.md](../AGENTS.md)). For UI changes, identify the devices/orientations and
 accessibility/keyboard states exercised.
 
 ## Chat behavior

@@ -29,6 +29,8 @@ Read `.github/copilot-instructions.md`, `docs/DEVELOPMENT.md`, `fastlane/Fastfil
 
 # Release gates
 
+Release from a Mac with the Fastlane lanes below. Do not use or wait on Apple CI workflows (`ios-ci.yml`, `testflight.yml`, `prepare-signing.yml`) unless no Mac is available and the user explicitly asked for the workflow; see `.github/copilot-instructions.md`. A missing CI run is not a release gate.
+
 ## Shared gates
 
 - The final aggregate candidate is reviewed and has no unresolved blocking finding.

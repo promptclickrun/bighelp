@@ -90,6 +90,7 @@ struct ChatComposer: View, Equatable {
     @State private var restoresFocusAfterExpansion = false
     @State private var presentedStatus: SessionStatusRailDestination?
     @State private var companionAdventureResetToken = 0
+    @State private var keyboardEndFrame: CGRect?
     @State private var clipboardImportSession = ClipboardImageImportSession()
     @State private var clipboardImportTask: Task<Void, Never>?
     @State private var clipboardErrorMessage: String?
@@ -124,6 +125,7 @@ struct ChatComposer: View, Equatable {
                     .padding(.horizontal, BighelpTokens.space4)
             } else {
                 ComposerMentionSuggestions(model: model, onSelect: selectMention)
+                    .equatable()
             }
 
             if !referenceHub.selected.isEmpty || referenceHub.message != nil {
@@ -218,7 +220,12 @@ struct ChatComposer: View, Equatable {
                 presentedStatus = nil
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
+            // UIKit can announce the frame the keyboard already has; only a real move resets the
+            // companion, so the box isn't drawn again for nothing.
+            let frame = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue
+            guard frame != keyboardEndFrame else { return }
+            keyboardEndFrame = frame
             companionAdventureResetToken &+= 1
         }
         .bighelpSheet(item: $presentedSheet, onDismiss: restoreDraftFocus) { _ in
@@ -458,10 +465,12 @@ struct ChatComposer: View, Equatable {
     }
 
     private var primaryAction: some View {
-        ComposerPrimaryAction(model: model, onVoice: { [actions] in actions.voice() }, onSend: send, onStop: stop,
+        ComposerPrimaryAction(model: model, owners: [ObjectIdentifier(referenceHub), ObjectIdentifier(actions)],
+                              onVoice: { [actions] in actions.voice() }, onSend: send, onStop: stop,
                               onMidSessionSend: sendMidSession,
                               keyboardSendOptionsRequest: keyboardSendOptionsRequest,
                               onKeyboardSendOptionsClosed: { draftFocus.wrappedValue = true })
+            .equatable()
     }
 
     private var composerInputFocusSurface: some View {
@@ -829,11 +838,16 @@ extension View {
 
 // Typing changes the draft and the caret on every key. These small views read only the
 // draft's shape (`ChatDraftShape`), so most keys redraw none of them, and never the whole box.
+// The box hands them new closures each time it draws; theirs act only on objects that `==` compares
+// and on the box's own state, so they keep the first ones and aren't drawn again for a new set.
 
 /// The @-mention list.
-private struct ComposerMentionSuggestions: View {
+private struct ComposerMentionSuggestions: View, Equatable {
     let model: ChatModel
+    /// Acts only on `model`.
     let onSelect: (MentionSuggestion) -> Void
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool { lhs.model === rhs.model }
 
     var body: some View {
         let _ = ChatPerformanceProbe.count("composer.mentions.body")
@@ -846,14 +860,22 @@ private struct ComposerMentionSuggestions: View {
 }
 
 /// Send, stop or voice: which one shows follows the draft.
-private struct ComposerPrimaryAction: View {
+private struct ComposerPrimaryAction: View, Equatable {
     let model: ChatModel
+    /// The other objects the closures act on (the reference hub, the chat's actions); everything
+    /// else they use is the box's own state.
+    let owners: [ObjectIdentifier]
     let onVoice: () -> Void
     let onSend: () -> Void
     let onStop: () -> Void
     let onMidSessionSend: (MidSessionChatBehavior) -> Void
     let keyboardSendOptionsRequest: Int
     let onKeyboardSendOptionsClosed: () -> Void
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.model === rhs.model && lhs.owners == rhs.owners
+            && lhs.keyboardSendOptionsRequest == rhs.keyboardSendOptionsRequest
+    }
 
     var body: some View {
         let _ = ChatPerformanceProbe.count("composer.action.body")

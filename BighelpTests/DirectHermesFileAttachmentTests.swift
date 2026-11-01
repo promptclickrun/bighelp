@@ -329,7 +329,9 @@ struct DirectHermesFileAttachmentTests {
         #expect(!model.takesMessageNow, "Disconnected authority must remain blocked")
     }
 
-    @Test(arguments: ["accepted", "rejected", "unknown"])
+    // One at a time: the three cases share one conversation ID, and run side by side on the main actor
+    // their sends and reconciles could interleave (a case passed in one run and failed in the next).
+    @Test(.serialized, arguments: ["accepted", "rejected", "unknown"])
     func staleCatalogIdleCannotSupersedeModelAttachmentSend(outcome: String) async throws {
         let fixture = try Fixture()
         defer { fixture.client.suspend(); fixture.cleanup() }

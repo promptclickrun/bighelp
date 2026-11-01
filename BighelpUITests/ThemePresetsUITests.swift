@@ -102,7 +102,8 @@ final class ThemePresetsUITests: BighelpUITestCase {
         XCTAssertTrue(reply.waitForExistence(timeout: 8))
         let width = reply.frame.width
         if checkMenu {
-            reply.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 12, dy: 10)).press(forDuration: 1)
+            // Mid-text: the chat's edge-swipe strips cover the outer 28 points of the screen.
+            reply.press(forDuration: 1)
             for title in ["Reply", "Copy to clipboard", "Share…", "Select text"] {
                 let item = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", title)).firstMatch
                 XCTAssertTrue(item.waitForExistence(timeout: 3), "\(title) is in the menu of a reply on the page")

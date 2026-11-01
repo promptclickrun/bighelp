@@ -36,7 +36,8 @@ final class AgentAppearanceUITests: BighelpUITestCase {
         openDemoChat(in: app)
         // The call is sent as the chat opens; give it time to (not) land.
         Thread.sleep(forTimeInterval: 2)
-        expectAppearance(mode: "Light", color: "lavender", in: app)
+        // Ink (`graphite`) is the default bubble color since #624.
+        expectAppearance(mode: "Light", color: "graphite", in: app)
     }
 
     @MainActor

@@ -3,6 +3,16 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.48
+
+### New
+
+- **Big files:** send videos and other files of up to 256 MB to your agent. bighelp sends them in pieces in the background and continues after a lost connection. The file shows its progress, then a line that opens it in Files. To use this, update the bighelp plugin to 3.41.0.
+
+### Fixed
+
+- **Unconfirmed sends:** when bighelp cannot confirm that a message with a file was delivered, the chat now always tells you, and it does not send the message again by itself.
+
 ## 2.6.47
 
 ### New

@@ -1,5 +1,6 @@
 import Foundation
 import QuartzCore
+import SwiftUI
 import UIKit
 import os
 
@@ -28,6 +29,16 @@ enum ChatPerformanceProbe {
         #endif
     }
 
+    /// With `BIGHELP_PERF_LOG_CHANGES` also set, logs why a view's body ran (SwiftUI's
+    /// "Changed Body Properties" log, subsystem com.apple.SwiftUI), to find what redraws it.
+    /// Call it from the view's own body.
+    @inline(__always)
+    static func logChanges<V: View>(_ view: V.Type) {
+        #if DEBUG
+        if ChatPerformanceRecorder.logsViewChanges { V._logChanges() }
+        #endif
+    }
+
     /// Objects alive right now (rows, parsed messages, chat models), for finding
     /// what a long chat keeps after it closes. Safe from `deinit`.
     @inline(__always)
@@ -49,6 +60,8 @@ final class ChatPerformanceRecorder: NSObject {
     nonisolated static let resetNotification = "app.loopdy.fixture.chat-performance.reset"
     nonisolated static let readNotification = "app.loopdy.fixture.chat-performance.read"
     nonisolated static let isEnabled = ProcessInfo.processInfo.arguments.contains(launchArgument)
+    nonisolated static let logsViewChanges = isEnabled
+        && ProcessInfo.processInfo.environment["BIGHELP_PERF_LOG_CHANGES"] != nil
     nonisolated static let liveCounts = OSAllocatedUnfairLock(initialState: [String: Int]())
     static let shared: ChatPerformanceRecorder? = isEnabled ? ChatPerformanceRecorder() : nil
 
@@ -166,7 +179,8 @@ final class ChatPerformanceRecorder: NSObject {
         }
         let label = ProcessInfo.processInfo.environment["BIGHELP_PERF_LABEL"] ?? "run"
         let report: [String: Any] = [
-            "label": label, "reading": readings,
+            // A new process starts the readings at 1 again; this tells two launches apart.
+            "label": label, "reading": readings, "pid": Int(ProcessInfo.processInfo.processIdentifier),
             "seconds": CACurrentMediaTime() - phaseStart,
             "stats": stats.mapValues { ["count": $0.count, "total_ms": $0.total, "max_ms": $0.max] },
             "main_queue_gaps_ms": summary(queueGaps),

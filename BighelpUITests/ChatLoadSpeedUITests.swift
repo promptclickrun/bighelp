@@ -142,6 +142,7 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
         let app = makeApp()
         app.launchEnvironment["BIGHELP_PERF_LABEL"] = "typing-pause-\(Self.turns)"
         app.launchEnvironment["BIGHELP_PERF_TYPE_PAUSE"] = "2.5"
+        forwardDiagnostics(to: app)
         app.launchArguments = realisticArguments(opensChat: true)
         app.launch()
         XCTAssertTrue(realisticLatest(in: app).waitForExistence(timeout: 30))
@@ -152,32 +153,44 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
     }
 
     /// Typing while an answer streams in at a model's pace at the bottom of a long chat
-    /// (`-test-tool-stream-fast-tail`: a few words every 25 ms for about 30 s). The autopilot
-    /// types once the answer has started, and its reading ends well before the answer does.
+    /// (`-test-tool-stream-fast-tail`: a few words every 25 ms, 400 pieces). The autopilot starts
+    /// once the answer grows, and the answer must still be growing when it has read: then the
+    /// whole reading was taken while it streamed.
     @MainActor
     func testTypingWhileAnAnswerStreamsInALongRealisticChat() throws {
+        let tailName = "app.loopdy.fixture.tool-stream-tail.\(UUID().uuidString)"
         let completionName = "app.loopdy.fixture.tool-stream.\(UUID().uuidString)"
-        withDarwinExpectation(completionName) { streamed in
-            let app = makeApp()
-            app.launchEnvironment["BIGHELP_TOOL_STREAM_COMPLETION_NOTIFICATION"] = completionName
-            app.launchEnvironment["BIGHELP_PERF_LABEL"] = "typing-stream-\(Self.turns)"
-            app.launchArguments = realisticArguments(opensChat: true)
-                + ["-test-tool-stream", "-test-tool-stream-fast-tail", "-test-companion-disabled"]
-            app.launch()
-            XCTAssertTrue(realisticLatest(in: app).waitForExistence(timeout: 30))
-            let input = app.otherElements["chat.composer-shell"].textViews["Message"]
-            XCTAssertTrue(input.waitForExistence(timeout: 10))
-            input.tap()
-            input.typeText("Run the weekly checks")
-            app.buttons["chat.send"].tap()
-            // The fixture's tool steps take under a second; then the answer grows.
-            Thread.sleep(forTimeInterval: 1)
-            typeWithTheAutopilot()
-            XCTAssertEqual(XCTWaiter.wait(for: [streamed], timeout: 120), .completed,
-                           "The answer must still be streaming while the autopilot types")
-            let complete = app.textViews.matching(NSPredicate(format: "label CONTAINS %@", "TOOL STREAM COMPLETE")).firstMatch
-            XCTAssertTrue(complete.waitForExistence(timeout: 10))
-            XCTAssertEqual(input.value as? String, Self.autopilotText)
+        // Two expectations of the same end: each may be waited on only once.
+        withDarwinExpectation(tailName) { growing in
+            withDarwinExpectation(completionName) { endedEarly in
+                withDarwinExpectation(completionName) { streamed in
+                    let app = makeApp()
+                    app.launchEnvironment["BIGHELP_TOOL_STREAM_TAIL_NOTIFICATION"] = tailName
+                    app.launchEnvironment["BIGHELP_TOOL_STREAM_COMPLETION_NOTIFICATION"] = completionName
+                    app.launchEnvironment["BIGHELP_PERF_LABEL"] = "typing-stream-\(Self.turns)"
+                    forwardDiagnostics(to: app)
+                    app.launchArguments = realisticArguments(opensChat: true)
+                        + ["-test-tool-stream", "-test-tool-stream-fast-tail", "-test-tool-stream-tail-count", "400",
+                           "-test-companion-disabled"]
+                    app.launch()
+                    XCTAssertTrue(realisticLatest(in: app).waitForExistence(timeout: 30))
+                    let input = app.otherElements["chat.composer-shell"].textViews["Message"]
+                    XCTAssertTrue(input.waitForExistence(timeout: 10))
+                    input.tap()
+                    input.typeText("Run the weekly checks")
+                    app.buttons["chat.send"].tap()
+                    XCTAssertEqual(XCTWaiter.wait(for: [growing], timeout: 30), .completed,
+                                   "The answer must start growing")
+                    typeWithTheAutopilot()
+                    XCTAssertEqual(XCTWaiter.wait(for: [endedEarly], timeout: 0.1), .timedOut,
+                                   "The answer must still be streaming when the autopilot has read; make the tail longer")
+                    XCTAssertEqual(XCTWaiter.wait(for: [streamed], timeout: 240), .completed)
+                    let complete = app.textViews.matching(NSPredicate(format: "label CONTAINS %@",
+                                                                      "TOOL STREAM COMPLETE")).firstMatch
+                    XCTAssertTrue(complete.waitForExistence(timeout: 10))
+                    XCTAssertEqual(input.value as? String, Self.autopilotText)
+                }
+            }
         }
     }
 
@@ -260,7 +273,9 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
             XCTAssertTrue(realisticLatest(in: app).waitForExistence(timeout: 30))
             let timeline = app.descendants(matching: .any)["chat.timeline"].firstMatch
             for _ in 0..<4 { timeline.swipeDown(velocity: .fast) }
-            app.open(URL(string: "loopdy://sessions")!)
+            // The app's own link, not `app.open`: that launched the app again, so every reading
+            // came from a new process at the list, with no chat ever opened.
+            post(ChatPerformance.list)
             XCTAssertTrue(row.waitForExistence(timeout: 20))
             settle()
             post(ChatPerformance.read)
@@ -274,6 +289,7 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
         static let reset = "app.loopdy.fixture.chat-performance.reset"
         static let read = "app.loopdy.fixture.chat-performance.read"
         static let type = "app.loopdy.fixture.chat-performance.type"
+        static let list = "app.loopdy.fixture.chat-performance.list"
         static let typed = "app.loopdy.fixture.chat-performance.typed"
     }
 
@@ -364,10 +380,18 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
             + (opensChat ? ["-start-long-chat"] : [])
     }
 
+    /// BIGHELP_PERF_LOG_CHANGES (TEST_RUNNER_…) has the app log why the message box redraws
+    /// (`ChatPerformanceProbe.logChanges`). It costs time, so leave it off for the numbers.
+    @MainActor
+    private func forwardDiagnostics(to app: XCUIApplication) {
+        app.launchEnvironment["BIGHELP_PERF_LOG_CHANGES"] = ProcessInfo.processInfo.environment["BIGHELP_PERF_LOG_CHANGES"]
+    }
+
     @MainActor
     private func launchRealistic(label: String, opensChat: Bool = false) -> XCUIApplication {
         let app = makeApp()
         app.launchEnvironment["BIGHELP_PERF_LABEL"] = "\(label)-\(Self.turns)"
+        forwardDiagnostics(to: app)
         app.launchArguments = realisticArguments(opensChat: opensChat)
         app.launch()
         return app

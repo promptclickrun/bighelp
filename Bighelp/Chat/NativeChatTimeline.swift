@@ -284,7 +284,7 @@ final class ChatTimelineController {
         if table.numberOfRows(inSection: 0) > 0 {
             table.scrollToRow(at: IndexPath(row: table.numberOfRows(inSection: 0) - 1, section: 0), at: .bottom, animated: animated)
         }
-        if animated { table.endReturnAnimation(after: ChatTimelineTableView.returnAnimationLimit) } else { table.setNeedsLayout() }
+        if !animated { table.setNeedsLayout() }
     }
 
     func scrollToOldest() {
@@ -304,22 +304,6 @@ final class ChatTimelineController {
 final class ChatTimelineTableView: UITableView {
     var followsTail = true
     var isAnimatingReturn = false
-    /// Longer than UIKit's animated scroll.
-    static let returnAnimationLimit: Double = 0.6
-    private var returnGeneration = 0
-
-    /// A streaming answer resizes its row during the animated return, which can end UIKit's
-    /// animation without `scrollViewDidEndScrollingAnimation`. The return then never ended, so
-    /// the tail was never pinned again and the chat stopped short of the answer.
-    func endReturnAnimation(after seconds: Double) {
-        returnGeneration &+= 1
-        let generation = returnGeneration
-        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
-            guard let self, self.returnGeneration == generation, self.isAnimatingReturn else { return }
-            self.isAnimatingReturn = false
-            self.setNeedsLayout()
-        }
-    }
     /// Set by an update; its first layout, which resizes the changed rows, records `updateLaidOutAt`.
     var awaitsUpdateLayout = false
     private(set) var updateLaidOutAt: CFTimeInterval = 0

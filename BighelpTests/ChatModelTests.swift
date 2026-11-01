@@ -872,22 +872,18 @@ struct ChatModelTests {
         #expect(DraftFieldSizing.height(measuredHeight: 400, lineHeight: 20) == 80)
     }
 
-    @Test func draftFieldOffersExpandedEditorOnlyBeyondFourRenderedLines() {
-        #expect(!DraftFieldSizing.shouldOfferExpandedEditor(
-            hasText: false,
-            measuredHeight: 400,
-            lineHeight: 20
-        ))
-        #expect(!DraftFieldSizing.shouldOfferExpandedEditor(
-            hasText: true,
-            measuredHeight: 80,
-            lineHeight: 20
-        ))
-        #expect(DraftFieldSizing.shouldOfferExpandedEditor(
-            hasText: true,
-            measuredHeight: 81,
-            lineHeight: 20
-        ))
+    /// #728: Expand shows above the box from three lines. TextKit measures a line a fraction
+    /// of a point over the font's line height (17 pt body: 20.29 tall, 41 for two lines).
+    @Test func draftFieldOffersExpandedEditorFromThreeRenderedLines() {
+        let lineHeight: CGFloat = 20.29
+        #expect(!DraftFieldSizing.shouldOfferExpandedEditor(hasText: false, measuredHeight: 400, lineHeight: lineHeight))
+        #expect(!DraftFieldSizing.shouldOfferExpandedEditor(hasText: true, measuredHeight: 21, lineHeight: lineHeight))
+        #expect(!DraftFieldSizing.shouldOfferExpandedEditor(hasText: true, measuredHeight: 41, lineHeight: lineHeight))
+        #expect(DraftFieldSizing.shouldOfferExpandedEditor(hasText: true, measuredHeight: 61, lineHeight: lineHeight))
+        #expect(DraftFieldSizing.shouldOfferExpandedEditor(hasText: true, measuredHeight: 60.5, lineHeight: lineHeight))
+        // A long draft scrolls in the box but still counts every line.
+        #expect(DraftFieldSizing.shouldOfferExpandedEditor(hasText: true, measuredHeight: 400, lineHeight: lineHeight))
+        #expect(DraftFieldSizing.lineCount(measuredHeight: 41, lineHeight: lineHeight) == 2)
     }
 
     @Test func unchangedUIKitDraftUpdatePreservesTheUsersManualScrollPosition() {

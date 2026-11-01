@@ -307,14 +307,24 @@ final class ChatTimelineTableView: UITableView {
     #if DEBUG
     // Deterministic gesture tests avoid private UIScrollView state.
     var interactionStateOverride: Bool?
+    var glidingStateOverride: Bool?
     var onProgrammaticContentOffsetWrite: (() -> Void)?
     #endif
-    var isUserInteracting: Bool {
+    /// A finger on the chat, holding or dragging it.
+    var isTouched: Bool {
         #if DEBUG
         if let interactionStateOverride { return interactionStateOverride }
         #endif
-        return isTracking || isDragging || isDecelerating
+        return isTracking || isDragging
     }
+    /// The chat still glides after a flick, with no finger on it.
+    var isGliding: Bool {
+        #if DEBUG
+        if let glidingStateOverride { return glidingStateOverride }
+        #endif
+        return isDecelerating
+    }
+    var isUserInteracting: Bool { isTouched || isGliding }
     /// The reader drags or the chat decelerates, on screen. A finger resting on the chat doesn't count.
     var isScrolling: Bool {
         #if DEBUG

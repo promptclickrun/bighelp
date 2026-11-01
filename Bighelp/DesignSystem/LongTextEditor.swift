@@ -167,7 +167,7 @@ struct LongTextEditor: UIViewRepresentable {
         func textViewDidChange(_ textView: UITextView) {
             let current = textView.text ?? ""
             synced = current
-            (textView as? LongTextView)?.textDidChange()
+            (textView as? LongTextView)?.didEdit()
             text.wrappedValue = current
         }
 
@@ -285,6 +285,17 @@ final class LongTextView: UITextView {
         let height = LongTextBox.height(measured: measured, minimum: minimum, maximum: maximum)
         lastBoxHeight = height
         return height
+    }
+
+    /// After the person's own keystroke. UIKit scrolls to the caret later, and not always far
+    /// enough: after a jump through text TextKit 2 hasn't laid out yet, or onto a new empty last
+    /// line, the line being typed sat out of sight for a while (#727). So the edit is laid out
+    /// and the caret brought into view now; UIKit's own scroll then finds it already there.
+    func didEdit() {
+        textDidChange()
+        guard isFirstResponder else { return }
+        layoutIfNeeded()
+        scrollCaretToVisible()
     }
 
     /// After the person's own edit, or text put in from elsewhere.
@@ -416,10 +427,16 @@ final class LongTextView: UITextView {
     }
 
     private func scrollCaretToVisible() {
-        guard let end = selectedTextRange?.end else { return }
-        let caret = caretRect(for: end)
-        guard !caret.isNull, !caret.isInfinite else { return }
-        scrollRectToVisible(caret.insetBy(dx: 0, dy: -LongTextKeyboard.caretMargin), animated: false)
+        // TextKit 2 places text it hasn't laid out by estimate, so a long scroll can move the
+        // caret once its lines are laid out: look again until it stays in view.
+        for _ in 0..<3 {
+            guard let end = selectedTextRange?.end else { return }
+            let caret = caretRect(for: end)
+            guard !caret.isNull, !caret.isInfinite else { return }
+            if caret.minY >= bounds.minY, caret.maxY - 1 <= bounds.maxY - contentInset.bottom { return }
+            scrollRectToVisible(caret.insetBy(dx: 0, dy: -LongTextKeyboard.caretMargin), animated: false)
+            layoutIfNeeded()
+        }
     }
 
     /// A box the keyboard covers scrolls its form up, never past the box's own top. Only when

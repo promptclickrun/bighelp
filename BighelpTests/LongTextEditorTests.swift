@@ -56,6 +56,29 @@ struct LongTextEditorTests {
         #expect(view.text == host.text)
     }
 
+    /// "The line that you type stays above the keyboard": after every keystroke, including a new
+    /// empty last line, the caret is inside what the box shows above the keyboard.
+    @Test func theCaretStaysInViewWhileTyping() throws {
+        let host = try Host(text: Self.longText)
+        defer { host.close() }
+        let view = try #require(host.textView)
+        #expect(view.becomeFirstResponder())
+        for atEnd in [false, true] {
+            let length = (view.text as NSString).length
+            let location = atEnd ? length : length / 2
+            view.selectedRange = NSRange(location: location, length: 0)
+            for character in "\nKeep every receipt.\n\nAsk first." {
+                view.insertText(String(character))
+                let end = try #require(view.selectedTextRange?.end)
+                let caret = view.caretRect(for: end)
+                var visible = view.bounds
+                visible.size.height -= view.contentInset.bottom
+                #expect(visible.insetBy(dx: -1, dy: -1).contains(CGPoint(x: caret.midX, y: caret.maxY - 1)),
+                        "Caret out of sight after typing \(character.debugDescription) at \(location)")
+            }
+        }
+    }
+
     @Test func textFromElsewhereWhileTypingKeepsTheCaret() throws {
         let host = try Host(text: Self.longText)
         defer { host.close() }

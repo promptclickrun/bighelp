@@ -121,7 +121,7 @@ or chat persistence, read the
   writers, per-tool full-session writes, or row-local ownership of request-scoped
   clarification drafts.
 - Verify the actual native/UI scenarios. The old scroll-key microbenchmark and
-  default CI smoke selection do not establish chat interaction acceptance.
+  default smoke selection do not establish chat interaction acceptance.
   Keep optimized simulator instrumentation out of production archives.
 
 Historical design plans and retained test names do not override this contract.
@@ -162,6 +162,8 @@ Use fixture mode for UI work that does not require production services:
 ```
 
 Keep fixtures synthetic. Never copy production content, identifiers, credentials, or logs into tests.
+
+Build, test, and release on a Mac, local or linked. Use `.github/workflows/ios-ci.yml`, `testflight.yml`, or `prepare-signing.yml` (or any workflow that builds, tests, signs, or uploads an Apple app) only when no Mac is available and the user explicitly asked for the workflow. Otherwise do not start, dispatch, re-run, enable, or wait on it, and do not report a missing CI run as a gap. Report the local results.
 
 For the Hermes plugin, use the Python environment bundled with a real Hermes checkout:
 

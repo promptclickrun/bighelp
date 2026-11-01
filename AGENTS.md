@@ -143,6 +143,12 @@ change in both repos.
     at a time.
   - Use one simulator per session, and shut down the ones you booted when you stop.
   - Run long suites in the background so you can keep working.
+- **Apple CI workflows are off by default.** Build, test and release on a Mac: this one, or a linked one (for
+  example the Mac that T3 Code links to). Use a GitHub workflow that builds, tests, signs or uploads an Apple app
+  (`ios-ci.yml`, `testflight.yml`, `prepare-signing.yml`, or a new one like them) only when both are true: no Mac is
+  available, and the user asked for the workflow in words. Otherwise never start, dispatch, re-run, enable or wait
+  on one. "CI is disabled" or "the workflow returned 422" is not a gap to report. Report the local build and test
+  results instead. `catalog.yml` and `telemetry.yml` build no Apple app and are not covered.
 - **Known failures:** some tests fail on untouched `main` too, for example
   `DirectHermesVoiceMediaTests.nativePCMSilenceActuallySchedulesAndDrains` (simulator audio) and a few old UI tests.
   Check against `main` before calling something a regression.
@@ -287,7 +293,7 @@ change in both repos.
   - It looks up the release's exact commit, installs it, reads it back, and never replaces a newer or equal
     plugin. An install that may still be running on the host is finished with the commit it asked for.
   - When the app needs a newer plugin feature, gate it on `/native/context` and say "update the plugin".
-  - CI tests against the plugin's `main`.
+  - Test the app against the plugin's `main` on the Mac, not through a CI workflow.
 - **Agents talking to each other:** the app reads them from the tool calls Hermes recorded (`AgentTalkCall`:
   `hermes -p <agent> chat -q`, `hermes peer dm`, `message_agent`) and from the messages other agents send in
   (`AgentTalkIncomingMessage`, `AgentTalkDelivery`), never from prose. The plugin's `agents/talk` route reads the
@@ -929,7 +935,8 @@ whole process is in [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md).
   - Commit your work before you stop.
 - **Pull requests:**
   - Explain the visible behavior and any trust-boundary impact.
-  - List what you tested, and where: demo, real host or device.
+  - List what you tested, and where: demo, real host or device. Give the results from the Mac, never a CI run, and
+    never list a missing CI run as a blocker (see Build and test).
   - The maintainer merges, or the release captain session the maintainer names. Factory sessions never merge.
 - **Versions** live in `project.yml`: `MARKETING_VERSION`, and `CURRENT_PROJECT_VERSION` in every target. Regenerate
   after bumping.
@@ -939,6 +946,8 @@ whole process is in [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md).
   - Public TestFlight builds go out only when the maintainer says so. They cover everything since the last public
     build, with one set of notes, because every build notifies every tester.
   - When both repos change, release the plugin first, then the app build that needs it.
+  - Builds and uploads run on a Mac (`Scripts/` and the release lane), never through `testflight.yml` unless the
+    rule in Build and test allows it.
 - **Release notes** for each App Store version live in [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md), in ASD-STE100
   plain English. The App Store "What's New", the TestFlight notes and the Mac release notes come from it.
 - **TestFlight "What to Test" notes** are plain text. Some symbols (like ☰) are rejected. Write them for testers:

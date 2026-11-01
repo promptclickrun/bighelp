@@ -89,7 +89,7 @@ git diff --stat <base>..<candidate>
 git diff <base>..<candidate>
 ```
 
-For iOS changes, run focused tests and the broadest feasible affected Xcode scheme. For plugin changes, run the complete offline plugin suite and `hermes plugins doctor bighelp-plugin --ci` against a real Hermes checkout. For customization changes, run `python3 .github/scripts/validate-copilot-customizations.py`.
+Run builds and tests on a Mac. Do not use or wait on Apple CI workflows (`ios-ci.yml`, `testflight.yml`, `prepare-signing.yml`) unless no Mac is available and the user explicitly asked for the workflow; see `.github/copilot-instructions.md`. For iOS changes, run focused tests and the broadest feasible affected Xcode scheme. For plugin changes, run the complete offline plugin suite and `hermes plugins doctor bighelp-plugin --ci` against a real Hermes checkout. For customization changes, run `python3 .github/scripts/validate-copilot-customizations.py`.
 
 Never install, restart, deploy, upload, push, publish, or notify during review.
 

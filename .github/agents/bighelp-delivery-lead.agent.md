@@ -108,7 +108,7 @@ Return one concise delivery report containing:
 - exact candidate identity and files changed;
 - specialists used and their bounded ownership;
 - Hermes-native surfaces used or exact blocked gap;
-- build, test, review, and accessibility evidence;
+- build, test, review, and accessibility evidence from a Mac (not an Apple CI workflow; see `.github/copilot-instructions.md`);
 - security, privacy, compatibility, and migration impact;
 - external writes performed and authoritative readback;
 - retained artifacts and cleanup;

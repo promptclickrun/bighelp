@@ -118,3 +118,6 @@ All sessions usually build on the same machine. Treat its CPU, memory and simula
 - **Build what you changed.** Iterate on one target and the affected tests. Leave multi-platform builds to the
   captain's release, unless the diff touches code for those platforms.
 - **Run long builds in the background** and keep working; don't poll in a loop.
+- **No Apple workflows.** Factory sessions and the captain build and test on the Mac. They never dispatch, re-run,
+  enable or wait on `ios-ci.yml`, `testflight.yml` or `prepare-signing.yml` (AGENTS.md › Build and test). A PR
+  never lists a missing CI run as a blocker.

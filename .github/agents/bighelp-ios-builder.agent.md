@@ -103,7 +103,7 @@ xcodebuild test \
   -destination 'platform=iOS Simulator,name=<available simulator>'
 ```
 
-Use `-only-testing:BighelpTests/<SuiteName>` or another smallest accurate selector while iterating. If another build runs concurrently, use one bounded reusable DerivedData root and remove it when no longer needed.
+Build and test on a Mac, local or linked. Do not use or wait on Apple CI workflows (`ios-ci.yml`, `testflight.yml`, `prepare-signing.yml`) unless no Mac is available and the user explicitly asked for the workflow; see `.github/copilot-instructions.md`. Use `-only-testing:BighelpTests/<SuiteName>` or another smallest accurate selector while iterating. If another build runs concurrently, use one bounded reusable DerivedData root and remove it when no longer needed.
 
 # Handoff
 

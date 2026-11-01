@@ -255,8 +255,15 @@ struct ReferenceComposerTextView: UIViewRepresentable {
         private weak var requestedHost: ReferenceComposerContainer?
         private var pendingSurfaceUpdate: SurfaceUpdate?
         private var surfaceUpdateScheduled = false
+        #if DEBUG
+        /// How many times SwiftUI drew the box around this text view again, for tests of what redraws it.
+        private(set) var surfaceUpdates = 0
+        #endif
 
         func updateSurface(_ surface: ReferenceComposerTextView, in container: ReferenceComposerContainer) {
+            #if DEBUG
+            surfaceUpdates += 1
+            #endif
             guard surface.session.textView != nil else { return }
             guard surface.isSurfaceActive else {
                 scheduleDeactivation(in: container)

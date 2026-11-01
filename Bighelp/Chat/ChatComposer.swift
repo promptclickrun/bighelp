@@ -2,28 +2,43 @@ import Combine
 import SwiftUI
 import UIKit
 
-struct ChatComposer: View {
+/// What the message box calls back into its chat screen with. `ChatView` keeps one for its whole
+/// life and brings these up to date each time it draws; the box calls through it when tapped. So
+/// the box itself compares equal (`ChatComposer.==`) and isn't drawn again for every streamed
+/// piece of an answer that redraws the chat. (T3 Code's phone app keeps its composer's callbacks
+/// stable for the same reason: github.com/pingdotgg/t3code, apps/mobile.)
+@MainActor
+final class ChatComposerActions {
+    var attachment: (() -> Void)?
+    var voice: () -> Void = {}
+    var fittingRailVerticalDrag: (ChatRailScrollDirection) -> Void = { _ in }
+    var dismissKeyboard: () -> Void = {}
+    var willSend: () -> Void = {}
+    var referenceSend: ((ReferenceFrozenDraft, MidSessionChatBehavior?) async -> Void)?
+}
+
+struct ChatComposer: View, Equatable {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.nerdModeEnabled) private var nerdModeEnabled
     @Environment(\.providerUsage) private var providerUsage
     @ScaledMetric(relativeTo: .body) private var compactDraftLineHeight: CGFloat = 22
-    @Bindable var model: ChatModel
+    let model: ChatModel
     let agentName: String
     let sessionCatalog: SessionCatalogStore?
-    let onAttachmentTap: (() -> Void)?
-    let onVoiceTap: () -> Void
-    let onFittingRailVerticalDrag: (ChatRailScrollDirection) -> Void
+    let actions: ChatComposerActions
+    /// `actions` has an attachment action, so + shows.
+    let offersAttachments: Bool
     let draftFocus: Binding<Bool>
-    let onDismissKeyboard: () -> Void
-    let onWillSend: () -> Void
+    /// `draftFocus` as the chat screen drew it. Two copies of one binding read the same
+    /// value, so this is what `==` compares.
+    let isDraftFocused: Bool
     let companionAppearance: CompanionAppearance?
     let companionReaction: CompanionReaction
     let companionSizeScale: Double
     let companionIsAdventurous: Bool
     let referenceHub: ReferenceHubStore
     let referenceSkills: SkillsAndToolsStore?
-    let onReferenceSend: ((ReferenceFrozenDraft, MidSessionChatBehavior?) async -> Void)?
     @State private var referenceEditorSession = ReferenceComposerEditorSession()
     @AppStorage(ChatLayoutPreferences.returnSendsKey) private var returnSends = true
     @State private var keyboardSendOptionsRequest = 0
@@ -36,6 +51,19 @@ struct ChatComposer: View {
     @State private var clipboardImportSession = ClipboardImageImportSession()
     @State private var clipboardImportTask: Task<Void, Never>?
     @State private var clipboardErrorMessage: String?
+
+    /// Everything the box is drawn from but its own observed state and environment, which
+    /// SwiftUI follows by itself. A new input that changes how the box looks goes here too.
+    nonisolated static func == (lhs: ChatComposer, rhs: ChatComposer) -> Bool {
+        lhs.model === rhs.model && lhs.agentName == rhs.agentName
+            && lhs.sessionCatalog === rhs.sessionCatalog && lhs.actions === rhs.actions
+            && lhs.offersAttachments == rhs.offersAttachments && lhs.isDraftFocused == rhs.isDraftFocused
+            && lhs.companionAppearance == rhs.companionAppearance
+            && lhs.companionReaction == rhs.companionReaction
+            && lhs.companionSizeScale == rhs.companionSizeScale
+            && lhs.companionIsAdventurous == rhs.companionIsAdventurous
+            && lhs.referenceHub === rhs.referenceHub && lhs.referenceSkills === rhs.referenceSkills
+    }
 
     var body: some View {
         let _ = ChatPerformanceProbe.count("composer.body")
@@ -80,7 +108,7 @@ struct ChatComposer: View {
                     if showsExpandRail {
                         ComposerExpandRail(action: openExpandedEditor)
                             // Centered over the field, not the + button beside it.
-                            .padding(.leading, onAttachmentTap == nil ? 0 : BighelpTokens.hitTarget + BighelpTokens.space8)
+                            .padding(.leading, offersAttachments ? BighelpTokens.hitTarget + BighelpTokens.space8 : 0)
                             .frame(maxWidth: horizontalSizeClass == .regular ? ChatCanvasLayout.regularLaneMaximumWidth : .infinity)
                             .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.9, anchor: .bottom)))
                     }
@@ -154,7 +182,7 @@ struct ChatComposer: View {
             ExpandedDraftEditor(
                 model: model,
                 agentName: agentName,
-                onAttachmentTap: onAttachmentTap,
+                onAttachmentTap: attachmentTap,
                 onSend: send,
                 referenceHub: referenceHub,
                 referenceSkills: referenceSkills,
@@ -226,7 +254,7 @@ struct ChatComposer: View {
                 nativeSubagents: nerdModeEnabled ? model.nativeSubagents : [],
                 tasks: model.taskDrawer,
                 onSelect: presentStatus,
-                onFittingVerticalDrag: onFittingRailVerticalDrag
+                onFittingVerticalDrag: { [actions] in actions.fittingRailVerticalDrag($0) }
             )
             .padding(.leading, horizontalSizeClass == .regular ? companionRailReservation : 0)
             .padding(.trailing, companionRailReservation)
@@ -283,7 +311,7 @@ struct ChatComposer: View {
     }
 
     private func showProviderUsage() {
-        onDismissKeyboard()
+        actions.dismissKeyboard()
         providerUsage?.show(agentID: model.memberIDs.first ?? "default")
     }
 
@@ -294,7 +322,7 @@ struct ChatComposer: View {
     }
 
     private var usesCompactEditingLayout: Bool {
-        verticalSizeClass == .compact && draftFocus.wrappedValue
+        verticalSizeClass == .compact && isDraftFocused
     }
 
     private var composerFooterLayout: AnyLayout {
@@ -357,10 +385,16 @@ struct ChatComposer: View {
         }
     }
 
+    /// The chat screen's attachment action as it is when tapped; nil while it has none.
+    private var attachmentTap: (() -> Void)? {
+        guard offersAttachments else { return nil }
+        return { [actions] in actions.attachment?() }
+    }
+
     @ViewBuilder
     private var attachmentButton: some View {
-        if let onAttachmentTap {
-            Button(action: onAttachmentTap) {
+        if let attachmentTap {
+            Button(action: attachmentTap) {
                 Image(systemName: "plus")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(theme.secondaryText)
@@ -381,7 +415,7 @@ struct ChatComposer: View {
     }
 
     private var primaryAction: some View {
-        ComposerPrimaryAction(model: model, onVoice: onVoiceTap, onSend: send, onStop: stop,
+        ComposerPrimaryAction(model: model, onVoice: { [actions] in actions.voice() }, onSend: send, onStop: stop,
                               onMidSessionSend: sendMidSession,
                               keyboardSendOptionsRequest: keyboardSendOptionsRequest,
                               onKeyboardSendOptionsClosed: { draftFocus.wrappedValue = true })
@@ -564,7 +598,7 @@ struct ChatComposer: View {
             prepareReferenceSend(behavior: behavior)
             return
         }
-        onWillSend()
+        actions.willSend()
         Task {
             if let behavior { await model.sendMidSession(using: behavior) }
             else { await model.send() }
@@ -582,7 +616,7 @@ struct ChatComposer: View {
 
     private func prepareReferenceSend(behavior: MidSessionChatBehavior?) {
         guard !referenceHub.isPreparingSend, referenceSubmissionID == nil else { return }
-        guard let onReferenceSend else {
+        guard let onReferenceSend = actions.referenceSend else {
             referenceHub.showMessage("Reference sending is not connected for this chat. Remove references to send ordinary text.")
             return
         }
@@ -599,7 +633,7 @@ struct ChatComposer: View {
             }
             // Parent owns the actual submission, envelope bounds, acceptance and
             // ambiguous receipt reconciliation. This never calls model.send().
-            onWillSend()
+            actions.willSend()
             await onReferenceSend(frozen, behavior)
         }
     }
@@ -613,7 +647,7 @@ struct ChatComposer: View {
     }
 
     private func dismissComposerKeyboard() {
-        onDismissKeyboard()
+        actions.dismissKeyboard()
         restoresFocusAfterExpansion = false
         draftFocus.wrappedValue = false
         referenceEditorSession.dismissKeyboard()

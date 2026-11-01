@@ -167,7 +167,10 @@ struct ChatTableCellText: UIViewRepresentable {
             proseLineSpacing: 0, traitCollection: view.traitCollection, theme: theme, citationLinks: citationLinks))
         view.accessibilityLabel = ChatMentionRendering.plainText(text, usingNames: true)
         if view.attributedText?.isEqual(to: text) != true {
+            let selection = view.text == text.string ? view.selectedRange : nil
             view.attributedText = text
+            // Enabling citations changes attributes, not the words the person selected.
+            if let selection, selection.location != NSNotFound { view.selectedRange = selection }
             view.invalidateIntrinsicContentSize()
         }
     }

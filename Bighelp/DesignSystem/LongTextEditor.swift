@@ -270,7 +270,10 @@ final class LongTextView: UITextView {
         appliedColors = resolved
         textColor = inkColor
         placeholderLabel.textColor = hintColor
-        if let caretColor { tintColor = caretColor }
+        if let caretColor {
+            tintColor = caretColor
+            inputAccessoryView?.tintColor = caretColor
+        }
     }
 
     /// The box's height for a width. Text past `LongTextBox.measuredLength` is always taller than
@@ -457,10 +460,14 @@ final class LongTextView: UITextView {
             return
         }
         // A form's own keyboard bar is SwiftUI's and only shows for SwiftUI fields.
+        // The word, in the app's color: iOS 26 draws the system Done item as a check in the
+        // system accent instead.
         let bar = UIToolbar(frame: CGRect(x: 0, y: 0, width: 320, height: 44))
-        let done = UIBarButtonItem(systemItem: .done, primaryAction: UIAction { [weak self] _ in
+        bar.tintColor = tintColor
+        let title = String(localized: "Done")
+        let done = UIBarButtonItem(title: title, image: nil, primaryAction: UIAction(title: title) { [weak self] _ in
             self?.resignFirstResponder()
-        })
+        }, menu: nil)
         done.accessibilityLabel = String(localized: "Dismiss keyboard")
         bar.items = [.flexibleSpace(), done]
         bar.sizeToFit()

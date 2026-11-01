@@ -378,8 +378,9 @@ final class ChatPerformanceAutopilot: NSObject {
     }
 
     /// 42 characters at 15 a second in the middle of the text being edited, then 20 after its
-    /// last line, the way the keyboard puts them in. `editor.caret_hidden` counts keystrokes after
-    /// which the caret was out of sight (clipped, or under the keyboard).
+    /// last line, the way the keyboard puts them in. `editor.caret_hidden_middle` and
+    /// `editor.caret_hidden_end` count keystrokes after which the caret was out of sight
+    /// (clipped, or under the keyboard), in each part.
     private func typeInEditor(_ recorder: ChatPerformanceRecorder) {
         guard let editor = Self.editedTextView() else { return }
         _ = editor.becomeFirstResponder()
@@ -393,13 +394,13 @@ final class ChatPerformanceAutopilot: NSObject {
             for character in "Check every bill twice before it is paid. " {
                 editor.insertText(String(character))
                 try? await Task.sleep(for: .milliseconds(66))
-                if recorder.caretIsHidden(in: editor) { recorder.record("editor.caret_hidden", milliseconds: nil) }
+                if recorder.caretIsHidden(in: editor) { recorder.record("editor.caret_hidden_middle", milliseconds: nil) }
             }
             editor.selectedRange = NSRange(location: (editor.text as NSString).length, length: 0)
             for character in "\nKeep every receipt." {
                 editor.insertText(String(character))
                 try? await Task.sleep(for: .milliseconds(66))
-                if recorder.caretIsHidden(in: editor) { recorder.record("editor.caret_hidden", milliseconds: nil) }
+                if recorder.caretIsHidden(in: editor) { recorder.record("editor.caret_hidden_end", milliseconds: nil) }
             }
             try? await Task.sleep(for: .milliseconds(500))
             recorder.read()

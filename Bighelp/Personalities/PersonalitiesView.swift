@@ -294,6 +294,8 @@ private struct PersonalityEditorView: View {
     @State private var style: String
     @State private var validationMessage: String?
     @State private var expandsInstructions = false
+    /// While the instructions box is edited, a drag that scrolls the form keeps the keyboard.
+    @State private var editsInstructions = false
 
     init(store: PersonalityStore, presentation: PersonalityEditorPresentation) {
         self.store = store
@@ -326,7 +328,7 @@ private struct PersonalityEditorView: View {
             Section {
                 LongTextEditor(text: $systemPrompt, placeholder: "How should this personality behave?",
                                accessibilityLabel: "Instructions", identifier: "personality.editor.instructions",
-                               layout: .formBox)
+                               layout: .formBox, onEditingChanged: { editsInstructions = $0 })
             } header: {
                 HStack {
                     Text("Instructions")
@@ -350,6 +352,7 @@ private struct PersonalityEditorView: View {
                 }
             }
         }
+        .dismissesKeyboardOnScroll(!editsInstructions, immediately: true)
         .focusedTextEditor(
             isPresented: $expandsInstructions,
             title: "Instructions",

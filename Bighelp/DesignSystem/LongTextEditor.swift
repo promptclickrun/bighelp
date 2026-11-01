@@ -29,6 +29,9 @@ struct LongTextEditor: UIViewRepresentable {
     let identifier: String
     let layout: Layout
     let focusesOnAppear: Bool
+    /// When editing starts and stops. A form turns its own keyboard dismissal off while its
+    /// box is edited: a drag on the box that scrolled the form put the keyboard away.
+    let onEditingChanged: ((Bool) -> Void)?
     @BighelpThemeReader private var theme
 
     init(
@@ -37,7 +40,8 @@ struct LongTextEditor: UIViewRepresentable {
         accessibilityLabel: String,
         identifier: String,
         layout: Layout = .fill,
-        focusesOnAppear: Bool = false
+        focusesOnAppear: Bool = false,
+        onEditingChanged: ((Bool) -> Void)? = nil
     ) {
         _text = text
         self.placeholder = placeholder
@@ -45,6 +49,7 @@ struct LongTextEditor: UIViewRepresentable {
         self.identifier = identifier
         self.layout = layout
         self.focusesOnAppear = focusesOnAppear
+        self.onEditingChanged = onEditingChanged
     }
 
     /// TextKit 2 lays out only what's on screen, so long text costs the same as short.
@@ -57,7 +62,7 @@ struct LongTextEditor: UIViewRepresentable {
         #endif
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text, onEditingChanged: onEditingChanged) }
 
     func makeUIView(context: Context) -> LongTextView {
         let view = LongTextView(usesTextKit2: Self.usesTextKit2)
@@ -79,6 +84,7 @@ struct LongTextEditor: UIViewRepresentable {
     func updateUIView(_ view: LongTextView, context: Context) {
         let coordinator = context.coordinator
         coordinator.text = $text
+        coordinator.onEditingChanged = onEditingChanged
         configure(view, environment: context.environment)
         // The view's own keystrokes come back as the same string, which compares at once.
         if text != coordinator.synced, view.markedTextRange == nil {
@@ -103,6 +109,10 @@ struct LongTextEditor: UIViewRepresentable {
 
     static func dismantleUIView(_ view: LongTextView, coordinator: Coordinator) {
         view.delegate = nil
+        // Gone while edited: its form gets its keyboard dismissal back, after this update.
+        if view.isFirstResponder, let onEditingChanged = coordinator.onEditingChanged {
+            Task { @MainActor in onEditingChanged(false) }
+        }
     }
 
     private func configure(_ view: LongTextView, environment: EnvironmentValues) {
@@ -145,11 +155,13 @@ struct LongTextEditor: UIViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, UITextViewDelegate {
         var text: Binding<String>
+        var onEditingChanged: ((Bool) -> Void)?
         /// The text the view and the binding last agreed on.
         var synced = ""
 
-        init(text: Binding<String>) {
+        init(text: Binding<String>, onEditingChanged: ((Bool) -> Void)?) {
             self.text = text
+            self.onEditingChanged = onEditingChanged
         }
 
         func textViewDidChange(_ textView: UITextView) {
@@ -161,10 +173,12 @@ struct LongTextEditor: UIViewRepresentable {
 
         func textViewDidBeginEditing(_ textView: UITextView) {
             (textView as? LongTextView)?.didBeginEditing()
+            onEditingChanged?(true)
         }
 
         func textViewDidEndEditing(_ textView: UITextView) {
             (textView as? LongTextView)?.didEndEditing()
+            onEditingChanged?(false)
         }
     }
 }

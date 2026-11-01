@@ -37,6 +37,12 @@ final class InstructionsEditingUITests: BighelpUITestCase {
             box.typeText(" Keep receipts.")
             XCTAssertTrue((box.value as? String)?.contains("Keep receipts.") == true)
 
+            // Down through the text: a drag that starts on the box scrolls its text, not the form.
+            let frame = box.frame
+            box.swipeUp(velocity: .slow)
+            XCTAssertEqual(box.frame.minY, frame.minY, accuracy: 2, "A drag on the box scrolls its text")
+            XCTAssertTrue(keyboard.exists)
+
             app.buttons["agent.editor.cancel"].tap()
             let discard = app.buttons["Discard changes"]
             if discard.waitForExistence(timeout: 3) { discard.tap() }

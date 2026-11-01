@@ -31,6 +31,17 @@ struct LongTextEditorTests {
         #expect(textKit1.boxHeight(forWidth: 320, minimum: 140, maximum: 260) == 260)
     }
 
+    /// The form turns its keyboard dismissal off while the box is edited, from this.
+    @Test func editingStartAndEndReachTheForm() throws {
+        let host = try Host(text: Self.longText)
+        defer { host.close() }
+        let view = try #require(host.textView)
+        #expect(view.becomeFirstResponder())
+        #expect(host.editing == [true])
+        #expect(view.resignFirstResponder())
+        #expect(host.editing == [true, false])
+    }
+
     @Test func typingInTheViewReachesTheBindingAndChangesNothingElse() throws {
         let host = try Host(text: Self.longText)
         defer { host.close() }
@@ -133,6 +144,7 @@ struct LongTextEditorTests {
     @MainActor
     private final class Host {
         var text: String
+        var editing: [Bool] = []
         private let window: UIWindow
         private let controller: UIHostingController<LongTextEditor>
         private let previousKeyWindow: UIWindow?
@@ -162,7 +174,8 @@ struct LongTextEditorTests {
         func update() {
             controller.rootView = LongTextEditor(
                 text: Binding(get: { self.text }, set: { self.text = $0 }),
-                accessibilityLabel: "Instructions", identifier: "test", layout: .formBox)
+                accessibilityLabel: "Instructions", identifier: "test", layout: .formBox,
+                onEditingChanged: { self.editing.append($0) })
             controller.view.setNeedsLayout()
             controller.view.layoutIfNeeded()
         }

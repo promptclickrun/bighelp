@@ -17,6 +17,8 @@ struct AgentEditorView: View {
     @State private var avatarPreparationTask: Task<Void, Never>?
     @State private var avatarPreparationID: UUID?
     @State private var expandsInstructions = false
+    /// While the instructions box is edited, a drag that scrolls the form keeps the keyboard.
+    @State private var editsInstructions = false
     @State private var avatarPreparationLabel: String?
     @State private var isDiscardConfirmationPresented = false
     @State private var isModelConfirmationPresented = false
@@ -198,7 +200,7 @@ struct AgentEditorView: View {
                 Text(deleteError ?? "")
             }
             .scrollContentBackground(.hidden)
-            .dismissesKeyboardOnScroll(true)
+            .dismissesKeyboardOnScroll(!editsInstructions)
             .background(theme.canvas.ignoresSafeArea())
             .navigationTitle(model.isEditing ? "Edit Agent" : "Agent Studio")
             .navigationBarTitleDisplayMode(.inline)
@@ -1018,7 +1020,7 @@ struct AgentEditorView: View {
             // A long SOUL scrolls inside its own box instead of stretching the form,
             // so the sections below it (the agent's model) stay within easy reach.
             LongTextEditor(text: text, placeholder: placeholder, accessibilityLabel: title,
-                           identifier: identifier, layout: .formBox)
+                           identifier: identifier, layout: .formBox, onEditingChanged: { editsInstructions = $0 })
             if let error { recoveryMessage(error) }
         }
     }

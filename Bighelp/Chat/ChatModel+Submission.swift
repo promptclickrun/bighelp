@@ -138,6 +138,11 @@ extension ChatModel {
         let orderedAttachments = outgoing.orderedAttachments
         let restoresDraft = outgoing.isComposerDraft
         guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !orderedAttachments.isEmpty else { return }
+        if orderedAttachments.contains(where: { $0.bigFile != nil }) {
+            await sendBigFileDraft(message: message, ordinaryAttachments: attachments,
+                                   orderedAttachments: orderedAttachments)
+            return
+        }
         if orderedAttachments.contains(where: { $0.pdfSelection != nil }) {
             await sendPDFDraft(
                 message: message,
@@ -271,12 +276,14 @@ extension ChatModel {
         }
 
         do {
-            let response = try await sendThroughClient(
-                message,
-                attachments: attachments,
-                slashSelection: slashSelection,
-                ownerGeneration: generation
-            )
+            let response = try await sendAwaitingClient {
+                try await sendThroughClient(
+                    message,
+                    attachments: attachments,
+                    slashSelection: slashSelection,
+                    ownerGeneration: generation
+                )
+            }
             guard isCurrentOwner(generation) else { return }
             try appendValidated(response.items)
             if attachments.isEmpty,
@@ -431,6 +438,11 @@ extension ChatModel {
         let orderedAttachments = outgoing.orderedAttachments
         let restoresDraft = outgoing.isComposerDraft
         guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !orderedAttachments.isEmpty else { return }
+        if orderedAttachments.contains(where: { $0.bigFile != nil }) {
+            await sendBigFileDraft(message: message, ordinaryAttachments: attachments,
+                                   orderedAttachments: orderedAttachments)
+            return
+        }
         if orderedAttachments.contains(where: { $0.pdfSelection != nil }) {
             await sendPDFDraft(
                 message: message,
@@ -660,6 +672,14 @@ extension ChatModel {
         isSending = false
     }
 
+    /// The client resumes a send's waiter and may report the chat idle before the send runs again;
+    /// that idle report leaves the send's turn to it (`reconcileNativeIdle`).
+    func sendAwaitingClient<T>(_ body: () async throws -> T) async rethrows -> T {
+        sendsAwaitingClient += 1
+        defer { sendsAwaitingClient -= 1 }
+        return try await body()
+    }
+
     func sendThroughClient(
         _ message: String,
         attachments: [ChatAttachment] = [],
@@ -794,7 +814,7 @@ extension ChatModel {
         attachments: [ChatAttachment] = []
     ) -> TimelineItem {
         // A reload resets the count, so a message still waiting in the chat may hold the next ID.
-        let existingIDs = Set(items.map(\.id) + stagedSends.map(\.id))
+        let existingIDs = Set(items.map(\.id) + stagedSends.map(\.id) + bigFileSends.map(\.id))
         while existingIDs.contains("\(conversationID)-human-\(nextHumanSequence)") {
             nextHumanSequence += 1
         }

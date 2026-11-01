@@ -29,6 +29,7 @@ extension ChatAttachmentError {
             return error.localizedDescription
         }
         if error as? ChatAttachmentError == .unsupportedKind { return DirectHermesFileAttachments.imagesUnavailable }
+        if let bigFile = error as? BigFileUploadError { return bigFile.failure.message }
         if error as? ChatAttachmentError == .invalidSize {
             return "Each attachment can be up to 8 MB, with up to 24 MB in one message."
         }

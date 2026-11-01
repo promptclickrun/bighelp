@@ -148,6 +148,10 @@ struct TimelineMetadata: Codable, Equatable, Sendable {
     /// and why (`ChatModel.agentFileFailures`). A new connection or the chat attached again tries
     /// again, unless the file is too big for this device.
     var fileFailure: AgentFileFailure?
+    /// Display only, never saved: the person's files over 8 MB still on their way, shown as tiles
+    /// with their progress (`BigFileUploadBoard`). Once Hermes takes the message, its text names
+    /// each file instead and the tiles go.
+    var bigFiles: [ChatBigFile] = []
 
     private enum CodingKeys: String, CodingKey {
         case source, freshness, delivery, timestamp, turnDurationMilliseconds, sourceOrder,
@@ -392,6 +396,22 @@ struct TimelineItem: Identifiable, Codable, Equatable, Sendable {
         var item = self
         item.metadata.endsTurn = true
         return item
+    }
+
+    /// The person's message with files over 8 MB still on their way, as tiles.
+    func carrying(bigFiles: [ChatBigFile]) -> TimelineItem {
+        var item = self
+        item.metadata.bigFiles = bigFiles
+        return item
+    }
+
+    /// The same message as Hermes took it: its words with each file's `@file:` line, which is all a
+    /// reread of the saved history has, so the row looks the same before and after one.
+    func sent(as text: String) -> TimelineItem {
+        var sentMetadata = self.metadata
+        sentMetadata.bigFiles = []
+        return TimelineItem(id: id, role: role, sender: sender, content: .message(text), metadata: sentMetadata,
+                            attachments: attachments)
     }
 
     func ordered(_ sourceOrder: Int) -> TimelineItem {

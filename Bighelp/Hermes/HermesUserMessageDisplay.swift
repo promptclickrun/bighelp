@@ -10,7 +10,9 @@ enum HermesUserMessageDisplay {
     /// The caption Hermes substitutes when a photo is sent without text.
     static let defaultImageCaption = "What do you see in this image?"
 
-    static func text(_ raw: String) -> String {
+    static func text(_ saved: String) -> String {
+        // Hermes' "--- Attached Context ---" for `@file:` references is the model's, never the chat's.
+        let raw = HermesAttachedContext.strip(saved)
         guard raw.contains("memory-context") || raw.contains("[Image attached")
                 || raw.contains("[System note:") else { return raw }
         var text = raw
@@ -56,6 +58,7 @@ enum HermesUserMessageDisplay {
         let words = (ChatReplyQuote.split(shown)?.body ?? shown).components(separatedBy: "\n").filter { line in
             if line.hasPrefix("@image:") { photos = true; return false }
             if line.hasPrefix("@file:") { files = true; return false }
+            if ChatSentFileNote(line) != nil { return false }
             return true
         }
         let body = words.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)

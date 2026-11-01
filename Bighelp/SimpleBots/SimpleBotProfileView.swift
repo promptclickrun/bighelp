@@ -436,6 +436,14 @@ struct SimpleBotProfileView: View {
     /// come (no Dashboard, no screen, a computer that won't edit), nothing is shown.
     private func applyOpening(_ opening: BotProfileOpening?) async {
         if let wanted = opening?.wantedTab { tab = wanted }
+        if let file = opening?.file {
+            // The Files model is made in its own task as the profile appears.
+            for _ in 0..<30 where files == nil && !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            await files?.reveal(path: file)
+            return
+        }
         guard let sheet = opening?.sheet else { return }
         try? await Task.sleep(for: .milliseconds(500))
         for _ in 0..<30 {

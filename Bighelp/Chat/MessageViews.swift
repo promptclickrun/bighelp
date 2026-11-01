@@ -53,7 +53,9 @@ struct TimelineSenderResolver {
         if item.role == .human, case .message(let text) = item.content,
            let reply = ChatReplyQuote.split(text) {
             // The quote above the bubble speaks for itself.
-            description = reply.body
+            description = Self.spokenSentFiles(reply.body, attachments: item.attachments)
+        } else if item.role == .human, case .message(let text) = item.content {
+            description = Self.spokenSentFiles(text, attachments: item.attachments)
         } else if item.role == .assistant, case .message(let raw) = item.content {
             // Files still to come have their own tile and label: never read a host path aloud.
             let text = item.attachments.isEmpty ? DirectHermesGeneratedMediaClient.pendingFiles(raw, role: .assistant).text : raw
@@ -74,6 +76,16 @@ struct TimelineSenderResolver {
             description = contentDescription(for: item.content)
         }
         return "\(display(for: item.sender).name): \(description)"
+    }
+
+    /// A person's words, then each file the message names by its name, as the row shows it:
+    /// a host path or `@file:` reference is never read aloud.
+    static func spokenSentFiles(_ text: String, attachments: [ChatAttachment]) -> String {
+        guard attachments.isEmpty else { return text }
+        let split = ChatSentFiles.split(text)
+        guard !split.files.isEmpty else { return text }
+        let files = split.files.map { ($0.isVideo ? "Video " : "File ") + $0.name }
+        return ([split.text] + files).filter { !$0.isEmpty }.joined(separator: ". ")
     }
 
     private func contentDescription(for content: TimelineContent) -> String {
@@ -154,7 +166,12 @@ struct TimelineItemView: View {
         VStack(alignment: item.role == .human ? .trailing : .leading,
                spacing: uiV3Enabled ? BighelpTokens.space12 : BighelpTokens.space8) {
             let pendingFiles = pendingFileState
+            let sentFiles = sentFileState
             if !uiV3Enabled { senderBadge }
+            // One look for each big file: its tile while it goes up, then its line below.
+            ForEach(item.metadata.bigFiles) { file in
+                BigFileUploadTile(file: file)
+            }
             if !item.attachments.isEmpty {
                 if case .message(let text) = item.content, text.isEmpty {
                     attachmentGallery.alignmentGuide(.messageContentBottom) { $0[.bottom] }
@@ -172,12 +189,14 @@ struct TimelineItemView: View {
             switch item.content {
             case .message(let text):
                 if (!text.isEmpty || item.attachments.isEmpty)
-                    && (pendingFiles.fileNames.isEmpty || !pendingFiles.text.isEmpty) {
+                    && (pendingFiles.fileNames.isEmpty || !pendingFiles.text.isEmpty)
+                    && (sentFiles.files.isEmpty || !sentFiles.text.isEmpty) {
                     MessageBubble(
                         messageID: item.id,
                         role: item.role,
                         speakerName: sender.name,
-                        text: pendingFiles.fileNames.isEmpty
+                        text: !sentFiles.files.isEmpty ? sentFiles.text
+                            : pendingFiles.fileNames.isEmpty
                             ? DirectHermesGeneratedMediaClient.unresolvedMessageText(text, role: item.role)
                             : pendingFiles.text,
                         delivery: item.metadata.delivery,
@@ -211,6 +230,13 @@ struct TimelineItemView: View {
                     .alignmentGuide(.messageContentBottom) { $0[.bottom] }
             }
 
+            if !sentFiles.files.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(sentFiles.files) { ChatSentFileLine(file: $0) }
+                }
+                .frame(maxWidth: 360, alignment: .leading)
+            }
+
             if let reference = item.metadata.contentReference {
                 Text("Preview — complete content is stored on Hermes.")
                     .font(.bighelp(.caption))
@@ -218,7 +244,7 @@ struct TimelineItemView: View {
                 BighelpSessionContentDisclosure(sessionID: reference.sessionID, rowID: reference.rowID)
             }
 
-            if let pendingSend {
+            if let pendingSend, !bigFileFailed {
                 PendingSendStatusView(pendingSend: pendingSend)
             } else if !uiV3Enabled {
                 TimelineMetadataView(metadata: item.metadata)
@@ -229,6 +255,21 @@ struct TimelineItemView: View {
                 TimelineMetadataView(metadata: item.metadata)
             }
         }
+    }
+
+    /// A big file that didn't go says why on its tile; "Sending…" would say otherwise.
+    private var bigFileFailed: Bool {
+        item.metadata.bigFiles.contains {
+            if case .failed = BigFileUploadBoard.shared.state(for: $0.id) { return true }
+            return false
+        }
+    }
+
+    /// The person's files a message names on `@file:` lines show as lines on the rail, never as text.
+    /// A file read back from the computer shows as an attachment instead, as before.
+    private var sentFileState: (text: String, files: [ChatSentFile]) {
+        guard item.role == .human, item.attachments.isEmpty, case .message(let text) = item.content else { return ("", []) }
+        return ChatSentFiles.split(text)
     }
 
     /// An agent's files still loading show as tiles, not as their file lines.

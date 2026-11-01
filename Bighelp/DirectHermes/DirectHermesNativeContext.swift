@@ -415,6 +415,14 @@ final class DirectHermesNativePluginClient {
             // Hermes may start the agent's own gateway first.
             return Route(path: "bot-chat/create", feature: "native-bot-chat-v1", isMutation: true,
                          maximumResponseBytes: 16_384, timeout: 60)
+        case .uploadsStart, .uploadsStatus, .uploadsDiscard:
+            return Route(path: operation.rawValue.replacingOccurrences(of: ".", with: "/"),
+                         feature: BigFileUploads.feature, isMutation: operation != .uploadsStatus,
+                         maximumResponseBytes: 16_384, timeout: 30)
+        case .uploadsFinish:
+            // The host reads the whole file back to check it before it answers.
+            return Route(path: "uploads/finish", feature: BigFileUploads.feature, isMutation: true,
+                         maximumResponseBytes: 16_384, timeout: 60)
         case .voiceCatalog:
             return Route(path: "voice-catalog", feature: "native-voice-catalog-v1", isMutation: false,
                          maximumResponseBytes: 131_072, timeout: 20)

@@ -311,6 +311,22 @@ change in both repos.
   client attached to the chat starts the tries again for every reason but too big; a turn that ends does for
   refused (a reply Hermes hadn't saved yet). A tile with nothing finishing it shows Try again after
   `AgentFileLoad.stallAfter` anyway. The `ChatFiles` log has each try's reason.
+- **Big files people send** (over `ChatAttachment.maximumBytes`, 8 MiB, up to 256 MiB; plugin `native-uploads-v1`,
+  bighelp-plugin's docs/BIG_FILES.md): Hermes' `file.attach` takes a file in one socket frame, so bigger files go
+  to the plugin's `uploads/*` routes in 4 MiB pieces instead (`BigFileUploader`), in any order, from a background
+  `URLSession` (`BighelpBackgroundUploads`) that iOS keeps sending while the app is away. The host records a piece
+  only once all of it arrived; after a drop the app asks `status` and sends only the rest, and starting the same
+  file again gets the same upload back. The app keeps its own copy on disk (`ChatBigFile`, `BigFileStore`, a
+  `.bigFile` draft) and never holds the whole file in memory. `finish` checks the SHA-256 and moves the file into
+  the agent's working folder (`uploads/<date>/<name>`, what its Files tab shows); stock `file.attach` then takes
+  it by `path` and tells the agent its type, size and place on disk, never its bytes. The app's
+  `[Video attached: … (size, length, picture)]` or `[File attached: … (size)]` note follows each `@file:` line.
+  One look per file (Colt, #721): while it goes up, a tile with a ring and "34 of 80 MB" (`BigFileUploadTile`,
+  progress in `BigFileUploadBoard` so only the ring redraws), or why it didn't go with Try again; once Hermes
+  takes the message (`onSubmissionAdmitted`), the row takes the sent text and shows each file as a line on the
+  rail (`ChatSentFileLine`), exactly what a reread rebuilds. A host path or `@file:` ref never shows as text; a
+  tap opens the bot's Files on the file (`BotProfileOpening.file`, `SimpleBotFilesModel.reveal`), a long press
+  shows the path. Hosts without the feature keep the 8 MiB limit and say to update the plugin.
 - **Each agent's own files:** the plugin's `workspace-files/*` routes take an optional `profile` (plugin 3.20.0,
   `native-workspace-files-agents-v1`) and read that agent's working folder with the same refusals. A bot's Files
   tab sends its ID (`DirectHermesManagedFilesClient(agentID:)`); the serving agent never names itself, so older

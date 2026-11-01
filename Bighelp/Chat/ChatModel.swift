@@ -101,6 +101,8 @@ final class ChatModel {
     @ObservationIgnored var lastReferenceCheckpoint: (draft: Data, state: ReferenceCanonicalState?)?
     let onReferenceStateChange: ((String, ReferenceCanonicalState?) throws -> Void)?
     var hasLocallyPendingPrimaryTurn = false
+    /// Sends still waiting on their client's answer (`sendAwaitingClient`).
+    @ObservationIgnored var sendsAwaitingClient = 0
     var hasExternallyOwnedPrimaryTurn = false
     /// A catalog row may say a turn was active before this presentation binds
     /// its exact native runtime. Only the native snapshot/event owner may
@@ -119,6 +121,10 @@ final class ChatModel {
     /// Messages sent before the chat could take them, oldest first (`stage`). Each waits at the
     /// bottom of the chat with "Sending…" under it and goes out in order once the chat can take it.
     internal(set) var stagedSends: [ChatStagedSend] = []
+    /// Messages whose files over 8 MB are still on their way (`sendBigFileDraft`). Like staged
+    /// messages they wait outside the transcript, so a reread of the history can't drop them, and
+    /// they join it as the text Hermes took.
+    internal(set) var bigFileSends: [TimelineItem] = []
     @ObservationIgnored var stagedSendDrain: (id: UUID, task: Task<Void, Never>)?
     /// The chat has gone without a connection for `connectionGrace` while the app was open
     /// (`ChatConnectionGrace`). Only then does Send go off, until the chat connects again.
@@ -487,6 +493,7 @@ final class ChatModel {
         let attachmentsSupported = orderedDraftAttachments.isEmpty || (!isBotMode && orderedDraftAttachments.allSatisfy { value in
             if let selection = value.pdfSelection { return pdfAttachmentTarget == selection.target }
             if case .attachment(let attachment) = value { return supportedAttachmentKinds.contains(attachment.kind) }
+            if value.bigFile != nil { return nativeConversationClient?.bigFileHost != nil }
             return false
         })
         let hasSendableAttachments = !orderedDraftAttachments.isEmpty && attachmentsSupported
@@ -744,7 +751,8 @@ final class ChatModel {
                         && !owner.sessionActionsAreRunning) else { return }
             nativeTurnID = nil
             settleNativeActivityLiveness()
-            _ = beginOwnerGeneration()
+            // As in `reconcileNativeIdle`: a send its client just answered says how it went itself.
+            if sendsAwaitingClient == 0 { _ = beginOwnerGeneration() }
             isStopping = false
             isSending = false
             pendingMidSessionSubmissions = []
@@ -776,7 +784,9 @@ final class ChatModel {
               !owner.hasPendingSubmission,
               nativeTurnID == nil,
               hasLocallyPendingPrimaryTurn || hasRestoredPrimaryTurn else { return }
-        _ = beginOwnerGeneration()
+        // A send whose answer its client just gave keeps its turn: it says what Hermes answered (an
+        // unconfirmed delivery says so). Retired first, it returned without a word.
+        if sendsAwaitingClient == 0 { _ = beginOwnerGeneration() }
         isStopping = false
         isSending = false
         pendingMidSessionSubmissions = []

@@ -29,6 +29,10 @@ HOME and HERMES_HOME, then runs the matching HostSignInMatrixUITests:
             in place of their `MEDIA:` lines (and ones that are gone say why,
             with Try again), and Hermes' vault code and save-login prompts open
             bighelp's secure pop-up. Needs a Hermes with the vault (canary)
+  bigfiles  no sign-in, with the bighelp plugin (--plugin), a scripted model and a
+            slower link that drops once mid-upload: an 80 MB video goes from the
+            app in pieces, continues after the drop, and the agent reads it with
+            ffprobe from the path Hermes gives it (BigFileHostUITests)
   drafts    no sign-in, with the bighelp plugin (--plugin) and a scripted model:
             a made-up business card sent from the app becomes a contact draft,
             the review's Save writes once and the agent hears it at its next
@@ -50,6 +54,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import secrets
 import shutil
 import socket
@@ -86,6 +91,7 @@ TESTS = {
               "ShortcutGatewaySwitchHostUITests/testAskAnAgentSwitchesToItsGatewayAndGetsTheAnswer"],
     "drafts": ["ImageDraftsHostUITests/testAContactDraftFromAPhotoSavesOnceAndTheAgentHearsIt",
                "ImageDraftsHostUITests/testAPhotoAloneGetsTheOfferAndTheAgentCantAddTheContactItself"],
+    "bigfiles": ["BigFileHostUITests/testAnEightyMegabyteVideoReachesTheAgentAfterADrop"],
     "media": ["testGeneratedImageStaysAfterTheTurnEnds", "testPicturesAnAgentSavedShowInTheChat",
               "testPicturesAnAgentSavedShowInItsBotChat", "testPicturesFromATurnThatEndedWhileAwayShow",
               "testPicturesThatAreGoneSayWhyWithTryAgain", "testPicturesThatAreGoneSayWhyInDark",
@@ -108,6 +114,15 @@ STREAMED_CARD = ("Here's your card.\n\n```loopdy-card\n"
                  '"title":"Streamed fixture","body":"The whole card arrived."}\n```\n\n' "That's all.")
 
 
+def video_path(messages: list, start: int) -> str:
+    """The file Hermes put beside the message: its note for a binary `@file:` names where it is on disk."""
+    content = messages[start].get("content") if start >= 0 else ""
+    text = content if isinstance(content, str) else " ".join(
+        str(part.get("text", "")) for part in content or [] if isinstance(part, dict))
+    match = re.search(r"available on disk at `([^`]+)`", text)
+    return match.group(1) if match else "missing-video-path"
+
+
 class ToolTurnModel(BaseHTTPRequestHandler):
     """A scripted model whose tool keeps running. "secure input test" asks for a secret with
     bighelp's tool, which waits for the pop-up; "long tool test" runs a 20-second command so a
@@ -122,7 +137,7 @@ class ToolTurnModel(BaseHTTPRequestHandler):
         offered = {t.get("function", {}).get("name", "") for t in request.get("tools", [])}
         texts = [(i, str(m.get("content") or "")) for i, m in enumerate(messages) if m.get("role") == "user"]
         triggers = ("secure input test", "long tool test", "question test", "image test", "vault code test",
-                    "save login test", "card test", "files test")
+                    "save login test", "card test", "files test", "video test")
         start = max((i for i, text in texts if any(t in text for t in triggers)), default=-1)
         asked = str(messages[start].get("content", "")) if start >= 0 else ""
         secure = "secure input test" in asked
@@ -131,7 +146,9 @@ class ToolTurnModel(BaseHTTPRequestHandler):
             if "image test" in asked else ("probe_vault_code", {"site": "example.com"}) \
             if "vault code test" in asked else ("probe_vault_save_login", {"origin": "https://example.com"}) \
             if "save login test" in asked else ("terminal", {"command": "sleep 20" if "slow" in asked else "true"}) \
-            if "files test" in asked else None
+            if "files test" in asked else ("terminal", {"command": "ffprobe -v error -show_entries format=duration "
+                                                    "-of csv=p=0 " + shlex.quote(video_path(messages, start))}) \
+            if "video test" in asked else None
         results = [str(m.get("content") or "") for m in messages[start + 1:] if m.get("role") == "tool"]
         steers = [re.sub(r"^\[OUT-OF-BAND[^\]]*\]\s*|\s*\[/OUT-OF-BAND USER MESSAGE\]$", "", text.strip())
                   for i, text in texts if i > start and STEER_OPEN in text]
@@ -182,6 +199,10 @@ class ToolTurnModel(BaseHTTPRequestHandler):
             elif "files test" in asked:
                 sent = self.server.gone_files if "missing" in asked else self.server.sent_files
                 text = FILES_REPLY + "".join("\nMEDIA:" + path for path in sent)
+            elif "video test" in asked:
+                outcome = json.loads(results[-1]) if results and results[-1].startswith("{") else {}
+                output = str(outcome.get("output", results[-1] if results else "")).strip()
+                text = "Video fixture: ffprobe says " + output[:80] + " seconds."
             elif probe_tool and probe_tool[0] == "image_generate":
                 outcome = json.loads(results[-1]) if results and results[-1].startswith("{") else {}
                 text = ("MEDIA:" + outcome["image"]) if outcome.get("image") else "Image fixture failed: " + results[-1][:160]
@@ -472,14 +493,17 @@ class DelayProxy:
     network (a Tailscale link to another computer). Order is kept; `rate` (bytes a second) limits
     throughput when set, so a large download takes as long as it would on a phone."""
 
-    def __init__(self, target_port: int, delay: float, rate: float = 0):
+    def __init__(self, target_port: int, delay: float, rate: float = 0, drop_after: int = 0):
         import asyncio
         self.port = free_port()
+        # Once this many bytes went up from the app, every open connection drops, once (a lost link).
+        self.drop_after, self.sent_up, self.dropped, self.writers = drop_after, 0, False, set()
         self.loop = asyncio.new_event_loop()
         threading.Thread(target=self.loop.run_forever, daemon=True).start()
 
-        async def pipe(reader, writer):
+        async def pipe(reader, writer, upward=False):
             queue = asyncio.Queue()
+            self.writers.add(writer)
 
             async def send():
                 while (item := await queue.get()) is not None:
@@ -490,9 +514,17 @@ class DelayProxy:
                     if rate:
                         await asyncio.sleep(len(data) / rate)
                 writer.close()
+                self.writers.discard(writer)
             sender = asyncio.ensure_future(send())
             try:
                 while data := await reader.read(65536):
+                    if upward and self.drop_after and not self.dropped:
+                        self.sent_up += len(data)
+                        if self.sent_up >= self.drop_after:
+                            self.dropped = True
+                            for open_writer in list(self.writers):
+                                open_writer.transport.abort()
+                            break
                     queue.put_nowait((self.loop.time() + delay, data))
             except (ConnectionError, OSError):
                 pass
@@ -505,7 +537,7 @@ class DelayProxy:
             except OSError:
                 client_writer.close()
                 return
-            await asyncio.gather(pipe(client_reader, upstream_writer), pipe(upstream_reader, client_writer),
+            await asyncio.gather(pipe(client_reader, upstream_writer, upward=True), pipe(upstream_reader, client_writer),
                                  return_exceptions=True)
 
         async def start():
@@ -673,7 +705,7 @@ def run_mode(mode: str, args, repo: Path) -> int:
         home.mkdir()
         project.mkdir()
         model = ThreadingHTTPServer(("127.0.0.1", 0), PhotoDraftModel if mode == "drafts"
-                                    else ToolTurnModel if mode in ("tools", "media") else SyntheticModel)
+                                    else ToolTurnModel if mode in ("tools", "media", "bigfiles") else SyntheticModel)
         model.sent_files, model.gone_files = [], []
         if mode == "media":
             # Named in a reply but not on the computer: the app says so, with Try again.
@@ -689,18 +721,26 @@ def run_mode(mode: str, args, repo: Path) -> int:
         # The media mode reaches its host over a slower link, like a phone on Tailscale.
         proxy = DelayProxy(port, args.latency_ms / 1000, args.rate_kbps * 1024) \
             if mode == "media" and (args.latency_ms or args.rate_kbps) else None
+        if mode == "bigfiles":
+            # About 2 MB a second, and one drop after 30 MB, so progress and the resume both show.
+            proxy = DelayProxy(port, 0.02, (args.rate_kbps or 2 * 1024) * 1024, drop_after=30 * 1024 * 1024)
+            video = temp / "Trip to the coast.mov"
+            subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=30",
+                            "-f", "lavfi", "-i", "sine=frequency=440", "-t", "72", "-c:v", "libx264",
+                            "-b:v", "11200k", "-maxrate", "11200k", "-bufsize", "4M", "-c:a", "aac",
+                            "-shortest", str(video)], check=True, timeout=600)
         # Hermes only gates a dashboard whose public address isn't loopback. *.localhost
         # still resolves to this Mac, so gated hosts use it; single sign-on needs the
         # app on that same name, since the sign-in cookie belongs to it.
         public = f"http://127.0.0.1:{proxy.port}" if proxy \
-            else origin if mode in ("open", "tools", "widgets", "features", "update", "media", "drafts") \
+            else origin if mode in ("open", "tools", "widgets", "features", "update", "media", "drafts", "bigfiles") \
             else f"http://hermes.localhost:{port}"
         config = {"dashboard": {"public_url": public},
                   "model": {"default": "fixture-model", "provider": "custom",
                             "base_url": f"http://127.0.0.1:{model.server_port}/v1", "api_key": "local-synthetic-no-auth"},
                   "agent": {"max_turns": 3}, "terminal": {"backend": "local", "cwd": str(project)},
                   "memory": {"memory_enabled": False, "user_profile_enabled": False}}
-        if mode in ("tools", "features", "media", "drafts"):
+        if mode in ("tools", "features", "media", "drafts", "bigfiles"):
             if not args.plugin:
                 raise SystemExit(f"{mode} mode needs --plugin <bighelp plugin folder>")
             shutil.copytree(args.plugin, home / "plugins" / "loopdy",
@@ -756,6 +796,9 @@ def run_mode(mode: str, args, repo: Path) -> int:
                     raise TimeoutError(f"Hermes not ready ({mode})")
                 time.sleep(0.3)
             probe = {"mode": mode, "address": public.removeprefix("http://"), "session_token": session_token}
+            if mode == "bigfiles":
+                probe["video_file"] = str(video)
+                probe["video_bytes"] = str(video.stat().st_size)
             if mode == "features":
                 probe["project_dir"] = str(project / "garden")
                 probe["workspace_file"] = "garden-notes.md"
@@ -785,6 +828,18 @@ def run_mode(mode: str, args, repo: Path) -> int:
                 print(json.dumps({"workspace_on_host": workspace_agreement(origin, session_token)}), flush=True)
             if mode == "update":
                 print(json.dumps({"plugin_on_host": installed_plugin(home)}), flush=True)
+            if mode == "bigfiles":
+                staged = home / "plugin-data" / "loopdy" / "uploads"
+                print(json.dumps({"bigfiles_on_host": {
+                    "proxy_dropped": proxy.dropped,
+                    "attachments": sorted(str(p.relative_to(home)) + f" {p.stat().st_size}"
+                                          for p in (home / "attachments").glob("*") if p.is_file())
+                    if (home / "attachments").exists() else [],
+                    # The plugin moves the finished file into the agent's folder; Hermes uses it there.
+                    "agent_folder_uploads": sorted(str(p.relative_to(project)) + f" {p.stat().st_size}"
+                                                   for p in (project / "uploads").rglob("*") if p.is_file())
+                    if (project / "uploads").exists() else [],
+                    "staged_left": sorted(p.name for p in staged.iterdir()) if staged.exists() else []}}), flush=True)
             if mode == "media":
                 print(json.dumps({"vault_on_host": vault_labels(args.hermes, env, project)}), flush=True)
             # The app's chats must reach Hermes as "bighelp", not its terminal UI.

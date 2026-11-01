@@ -42,6 +42,12 @@ extension DirectHermesConversationClient {
                                 commandSelection: selection)
     }
 
+    func takeSubmissionAdmitted() {
+        let admitted = onSubmissionAdmitted
+        onSubmissionAdmitted = nil
+        admitted?()
+    }
+
     func submit(message: String, conversationID: String,
                         onDraft: @escaping (TimelineItem) -> Void,
                         preparedSubmission: DirectHermesDraftStore.Submission? = nil,
@@ -161,6 +167,7 @@ extension DirectHermesConversationClient {
                             self.status = "Accepted by Hermes"
                             self.promptSentAt = nil
                             self.admitted = true
+                            self.takeSubmissionAdmitted()
                             if self.returnsVoiceReply {
                                 self.queuedVoiceAwaitingTurn = self.submissionTurns.isEmpty
                                 self.selectPendingTurn()
@@ -170,6 +177,8 @@ extension DirectHermesConversationClient {
                                 self.finishAcceptedSubmission()
                             }
                         } else if ["streaming", "ok"].contains(response["status"]?.string ?? "") {
+                            // A message waiting outside the transcript joins it first, so it's the one bound.
+                            self.takeSubmissionAdmitted()
                             if !command || expandedToPrompt, let row = response["user_row_id"]?.integer {
                                 self.model?.bindNewestUnsavedMessage(role: .human, toRow: row, from: self)
                             }

@@ -19,6 +19,7 @@ extension ChatView {
             }
             rows += transcript()
             rows += model.stagedSends.map { ChatCanvasRow.staged($0.item) }
+            rows += model.bigFileSends.map(ChatCanvasRow.staged)
         }
         if let status = model.botModeStatus { rows.append(.botStatus(status)) }
         if model.showsUnconfirmedBotModeStop { rows.append(.botStopUnconfirmed(model.isStoppingBotModeAgain)) }

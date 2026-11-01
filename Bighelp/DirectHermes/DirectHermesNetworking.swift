@@ -526,6 +526,15 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
         }
     }
 
+    func bigFileChunkRequest(_ chunk: DirectHermesBigFileChunk,
+                             nativeGuard: DirectHermesNativeRequestGuard) async throws -> URLRequest {
+        guard !terminallyClosed, isConnected else { throw DirectHermesError.notConnected }
+        let owner = generation
+        let request = try await authenticator.authenticatedBigFileChunkRequest(chunk, nativeGuard: nativeGuard)
+        guard generation == owner, !terminallyClosed else { throw WorkspaceClientError.ownerChanged }
+        return request
+    }
+
     func nativeResponse(_ request: DirectHermesHTTPRequest,
                         requestGuard: DirectHermesNativeRequestGuard?) async throws -> DirectHermesHTTP.Response {
         guard !terminallyClosed, isConnected else { throw DirectHermesError.notConnected }

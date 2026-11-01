@@ -32,10 +32,12 @@ enum BotProfileSheet: Hashable, Sendable {
 struct BotProfileOpening: Hashable, Sendable {
     var tab: SimpleBotProfileTab?
     var sheet: BotProfileSheet?
+    /// A file on the bot's computer to open in its Files tab: one the person sent in a chat.
+    var file: String?
 
     /// The tab to show first. A sheet wins over a tab that disagrees with it: the sheet's button
-    /// has to be on screen.
-    var wantedTab: SimpleBotProfileTab? { sheet?.tab ?? tab }
+    /// has to be on screen. A file opens in Files.
+    var wantedTab: SimpleBotProfileTab? { sheet?.tab ?? (file != nil ? .files : tab) }
 }
 
 /// What a profile has ready right now; a sheet waits until its part is here.

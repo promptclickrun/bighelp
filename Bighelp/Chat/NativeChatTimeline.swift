@@ -274,7 +274,11 @@ final class ChatTimelineController {
     func beginReview() { table?.followsTail = false }
 
     func scrollToLatest(animated: Bool) {
-        guard let table, !table.isUserInteracting else { return }
+        // A finger on the chat owns it. A glide left from a flick doesn't: Return to latest shows
+        // as the reader flicks up, so taps often land mid-glide, and ignoring them made the button
+        // feel as if it only worked when pressed just so.
+        guard let table, !table.isTouched else { return }
+        if table.isGliding { table.setContentOffset(table.contentOffset, animated: false) }
         table.followsTail = true
         table.isAnimatingReturn = animated
         if table.numberOfRows(inSection: 0) > 0 {
@@ -307,14 +311,24 @@ final class ChatTimelineTableView: UITableView {
     #if DEBUG
     // Deterministic gesture tests avoid private UIScrollView state.
     var interactionStateOverride: Bool?
+    var glidingStateOverride: Bool?
     var onProgrammaticContentOffsetWrite: (() -> Void)?
     #endif
-    var isUserInteracting: Bool {
+    /// A finger on the chat, holding or dragging it.
+    var isTouched: Bool {
         #if DEBUG
         if let interactionStateOverride { return interactionStateOverride }
         #endif
-        return isTracking || isDragging || isDecelerating
+        return isTracking || isDragging
     }
+    /// The chat still glides after a flick, with no finger on it.
+    var isGliding: Bool {
+        #if DEBUG
+        if let glidingStateOverride { return glidingStateOverride }
+        #endif
+        return isDecelerating
+    }
+    var isUserInteracting: Bool { isTouched || isGliding }
     /// The reader drags or the chat decelerates, on screen. A finger resting on the chat doesn't count.
     var isScrolling: Bool {
         #if DEBUG

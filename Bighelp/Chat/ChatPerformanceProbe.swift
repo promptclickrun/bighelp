@@ -66,6 +66,8 @@ final class ChatPerformanceRecorder: NSObject {
     private var lastFrame: CFTimeInterval?
     private var phaseStart = CACurrentMediaTime()
     private var readings = 0
+    /// The keyboard's frame in screen coordinates while it's up, for the editor checks.
+    private(set) var keyboardScreenFrame: CGRect?
     private var timer: DispatchSourceTimer?
     private var link: CADisplayLink?
     /// The phase between a reset and a reading, for lining up an Instruments trace.
@@ -103,6 +105,40 @@ final class ChatPerformanceRecorder: NSObject {
         }
         CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
         self.observer = observer
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillChangeFrame(_:)),
+                                               name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)),
+                                               name: UIResponder.keyboardWillHideNotification, object: nil)
+    }
+
+    @objc private func keyboardWillChangeFrame(_ notification: Notification) {
+        keyboardScreenFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
+    }
+
+    @objc private func keyboardWillHide(_ notification: Notification) {
+        keyboardScreenFrame = nil
+    }
+
+    /// Whether the caret is out of sight: clipped by the text view or anything around it, or
+    /// under the keyboard.
+    func caretIsHidden(in editor: UITextView) -> Bool {
+        guard let end = editor.selectedTextRange?.end, let window = editor.window else { return true }
+        let caret = editor.convert(editor.caretRect(for: end), to: window)
+        guard !caret.isNull, !caret.isInfinite else { return true }
+        let point = CGPoint(x: caret.midX, y: caret.maxY - 1)
+        var view: UIView? = editor
+        while let current = view {
+            if current === editor || current.clipsToBounds,
+               !current.convert(current.bounds, to: window).contains(point) { return true }
+            view = current.superview
+        }
+        #if !os(visionOS) // Vision Pro's keyboard is a window of its own.
+        if let keyboard = keyboardScreenFrame, let screen = window.windowScene?.screen {
+            let frame = window.convert(keyboard, from: screen.coordinateSpace)
+            if frame.contains(CGPoint(x: frame.midX, y: point.y)) { return true }
+        }
+        #endif
+        return false
     }
 
     private func runLoop(_ activity: CFRunLoopActivity) {
@@ -208,8 +244,12 @@ final class ChatPerformanceAutopilot: NSObject {
     nonisolated static let openNotification = "app.loopdy.fixture.chat-performance.open"
     nonisolated static let listNotification = "app.loopdy.fixture.chat-performance.list"
     nonisolated static let newChatNotification = "app.loopdy.fixture.chat-performance.new-chat"
+    /// The long text being edited (an agent's instructions, #727): typing in it and scrolling it.
+    nonisolated static let editorTypeNotification = "app.loopdy.fixture.chat-performance.editor-type"
+    nonisolated static let editorScrollNotification = "app.loopdy.fixture.chat-performance.editor-scroll"
     nonisolated static let notifications = [scrollNotification, typeNotification, sendNotification, openNotification,
-                                            listNotification, newChatNotification]
+                                            listNotification, newChatNotification, editorTypeNotification,
+                                            editorScrollNotification]
 
     private var link: CADisplayLink?
     private var lastFrame: CFTimeInterval?
@@ -239,6 +279,8 @@ final class ChatPerformanceAutopilot: NSObject {
         case Self.newChatNotification:
             // New chat over the open one, the way a widget starts one (the outgoing chat dissolves).
             BighelpIncomingLinkCenter.shared.open(URL(string: "loopdy://new-chat")!)
+        case Self.editorTypeNotification: typeInEditor(recorder)
+        case Self.editorScrollNotification: scrollEditor(recorder)
         default: break
         }
     }
@@ -333,6 +375,76 @@ final class ChatPerformanceAutopilot: NSObject {
             try? await Task.sleep(for: .milliseconds(500))
             recorder.read()
         }
+    }
+
+    /// 42 characters at 15 a second in the middle of the text being edited, then 20 after its
+    /// last line, the way the keyboard puts them in. `editor.caret_hidden` counts keystrokes after
+    /// which the caret was out of sight (clipped, or under the keyboard).
+    private func typeInEditor(_ recorder: ChatPerformanceRecorder) {
+        guard let editor = Self.editedTextView() else { return }
+        _ = editor.becomeFirstResponder()
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1))
+            let middle = (editor.text as NSString).length / 2
+            editor.selectedRange = NSRange(location: middle, length: 0)
+            editor.scrollRangeToVisible(editor.selectedRange)
+            try? await Task.sleep(for: .seconds(1))
+            recorder.reset()
+            for character in "Check every bill twice before it is paid. " {
+                editor.insertText(String(character))
+                try? await Task.sleep(for: .milliseconds(66))
+                if recorder.caretIsHidden(in: editor) { recorder.record("editor.caret_hidden", milliseconds: nil) }
+            }
+            editor.selectedRange = NSRange(location: (editor.text as NSString).length, length: 0)
+            for character in "\nKeep every receipt." {
+                editor.insertText(String(character))
+                try? await Task.sleep(for: .milliseconds(66))
+                if recorder.caretIsHidden(in: editor) { recorder.record("editor.caret_hidden", milliseconds: nil) }
+            }
+            try? await Task.sleep(for: .milliseconds(500))
+            recorder.read()
+        }
+    }
+
+    /// Through the text being edited to its end and back to the top at a fling's speed
+    /// (`BIGHELP_PERF_SCROLL_SPEED`, 2,000 points a second unless set), one reading.
+    /// `editor.height_changes` counts how often its content height changed on the way.
+    private func scrollEditor(_ recorder: ChatPerformanceRecorder) {
+        guard let editor = Self.editedTextView() else { return }
+        recorder.reset()
+        let speed = CGFloat(Double(ProcessInfo.processInfo.environment["BIGHELP_PERF_SCROLL_SPEED"] ?? "") ?? 2_000)
+        var goingDown = true
+        var height = editor.contentSize.height
+        animate { dt in
+            if editor.contentSize.height != height {
+                height = editor.contentSize.height
+                recorder.record("editor.height_changes", milliseconds: nil)
+            }
+            let top = -editor.adjustedContentInset.top
+            let bottom = max(top, editor.contentSize.height + editor.adjustedContentInset.bottom - editor.bounds.height)
+            if goingDown {
+                editor.contentOffset.y = min(bottom, editor.contentOffset.y + speed * dt)
+                if editor.contentOffset.y >= bottom - 0.5 { goingDown = false }
+                return true
+            }
+            editor.contentOffset.y = max(top, editor.contentOffset.y - speed * dt)
+            guard editor.contentOffset.y <= top + 0.5 else { return true }
+            recorder.read()
+            return false
+        }
+    }
+
+    /// The text view being edited, or else the one with the most text.
+    private static func editedTextView() -> UITextView? {
+        if let editing = view(UITextView.self, where: { $0.isFirstResponder }) { return editing }
+        var longest: UITextView?
+        _ = view(UITextView.self) { candidate in
+            if candidate.window != nil, candidate.textStorage.length > (longest?.textStorage.length ?? 0) {
+                longest = candidate
+            }
+            return false
+        }
+        return longest
     }
 
     private func animate(_ step: @escaping (CFTimeInterval) -> Bool) {

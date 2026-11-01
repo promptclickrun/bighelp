@@ -3,6 +3,23 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.47
+
+### New
+
+- **Themes:** Settings › Appearance has a grid of themes. Each theme has a light version and a dark version. Pick a theme for light mode and a theme for dark mode. Bots mode uses the themes too.
+- **Agent messages on the page:** in Settings › Appearance, you can show agent messages on the page, without a bubble. Your own messages keep their bubble. Hold a message to open its menu, with a bubble or on the page.
+- **Avatar designer:** the avatar designer shows how a face moves in each state. It has shape controls with Undo, named palettes and ready-made face sets.
+- **Expand:** when your message has 3 or more lines, an Expand button shows above the message box. Tap it to open a bigger editor. The text now uses the full width of the message box.
+
+### Changed
+
+- **Text size:** text in bighelp is now one step smaller by default, and chat messages are one step smaller too. A text size that you picked does not change. Settings › Appearance has a new Small size. Settings and other sheets now follow your text size.
+
+### Fixed
+
+- **Return to latest:** one tap on Return to latest goes to the newest message, also while the chat still moves after a flick.
+
 ## 2.6.46
 
 ### Fixed

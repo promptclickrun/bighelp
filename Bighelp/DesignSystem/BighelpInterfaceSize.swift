@@ -130,8 +130,10 @@ final class BighelpInterfaceSize: @unchecked Sendable {
 
     /// The device's text size stepped by the chosen one. Out of the box the step down is
     /// for regular sizes only: an accessibility size stays, with its layouts. A size
-    /// picked here applies at any device size.
-    func dynamicTypeSize(onTopOf system: DynamicTypeSize) -> DynamicTypeSize {
+    /// picked here applies at any device size. `sizedAbove` is the size a view above
+    /// already chose: when it came through, it stays, so nothing takes two steps.
+    func dynamicTypeSize(onTopOf system: DynamicTypeSize, sizedAbove: DynamicTypeSize? = nil) -> DynamicTypeSize {
+        if sizedAbove == system { return system }
         if !picksTextSize, system.isAccessibilitySize { return system }
         return system.stepped(by: textSize.rawValue)
     }
@@ -166,13 +168,21 @@ extension DynamicTypeSize {
     }
 }
 
-/// Applies the saved text size to everything under it, sheets included.
+/// Applies the saved text size to everything under it. iOS starts a sheet or cover again
+/// from the device's own size, so `bighelpPresentedAppearance` applies it there too.
 struct BighelpTextSizing: ViewModifier {
     @Environment(\.dynamicTypeSize) private var systemSize
+    @Environment(\.bighelpTextSizedTo) private var sizedAbove
 
     func body(content: Content) -> some View {
-        content.dynamicTypeSize(BighelpInterfaceSize.shared.dynamicTypeSize(onTopOf: systemSize))
+        let size = BighelpInterfaceSize.shared.dynamicTypeSize(onTopOf: systemSize, sizedAbove: sizedAbove)
+        content.dynamicTypeSize(size).environment(\.bighelpTextSizedTo, size)
     }
+}
+
+extension EnvironmentValues {
+    /// The size `BighelpTextSizing` chose above this view.
+    @Entry var bighelpTextSizedTo: DynamicTypeSize? = nil
 }
 
 extension Font {

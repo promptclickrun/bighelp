@@ -15,6 +15,40 @@ final class TextSizeDefaultUITests: BighelpUITestCase {
         try textSizeOutOfTheBox(appearance: "dark")
     }
 
+    /// Settings is a sheet, which iOS starts from the device's own text size: it must take
+    /// the step too, and Chat layout's preview must show the smaller messages.
+    @MainActor
+    func testSettingsAreAStepSmallerThanMedium() throws {
+        try XCTSkipIf(pinsTextSize, "Compares the default with Medium, so it needs no pinned size")
+        let medium = settingsHeights(extra: ["-bighelp.appearance.text-size", "0"])
+        let standard = settingsHeights(extra: [])
+        XCTAssertLessThan(standard.label, medium.label, "Settings text is a step smaller out of the box")
+        XCTAssertLessThan(standard.preview, medium.preview, "Chat layout's preview shows the smaller messages")
+    }
+
+    @MainActor
+    private func settingsHeights(extra: [String]) -> (label: CGFloat, preview: CGFloat) {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
+                               "-loopdy.appearance.interface-version", "v3", "-loopdy.demo.appearance", "light"] + extra
+        app.launch()
+        defer { app.terminate() }
+        openSettings(in: app)
+        settingsRow("settings.themes", in: app).tap()
+        let studio = app.descendants(matching: .any)["appearance.studio"].firstMatch
+        XCTAssertTrue(studio.waitForExistence(timeout: 5))
+        let label = app.staticTexts["Button size"].firstMatch
+        for _ in 0..<10 where !label.exists || !label.isHittable { studio.swipeUp() }
+        XCTAssertTrue(label.isHittable)
+        let labelHeight = label.frame.height
+        let chatLayout = app.buttons["settings.appearance.chat-layout"].firstMatch
+        for _ in 0..<6 where !chatLayout.exists || !chatLayout.isHittable { studio.swipeUp() }
+        chatLayout.tap()
+        let preview = app.descendants(matching: .any)["chat-layout.preview"].firstMatch
+        XCTAssertTrue(preview.waitForExistence(timeout: 5))
+        return (labelHeight, preview.frame.height)
+    }
+
     /// A run with a size pinned by `BIGHELP_UI_EXTRA_ARGS` isn't the default.
     private var pinsTextSize: Bool {
         ProcessInfo.processInfo.environment["BIGHELP_UI_EXTRA_ARGS"]?.contains("-bighelp.appearance.text-size") == true

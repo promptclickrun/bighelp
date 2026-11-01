@@ -127,6 +127,19 @@ struct ChatLayoutPreferencesTests {
         #expect(BighelpInterfaceSize(defaults: defaults, isMac: false).dynamicTypeSize(onTopOf: .accessibility1) == .xxxLarge)
     }
 
+    /// iOS starts a sheet again from the device's size, so it steps once more; a size that
+    /// came through from the root stays.
+    @Test func aSheetTakesOneStepNotTwo() throws {
+        let (defaults, suite) = try freshDefaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let size = BighelpInterfaceSize(defaults: defaults, isMac: false)
+        let root = size.dynamicTypeSize(onTopOf: .large)
+        #expect(root == .medium)
+        #expect(size.dynamicTypeSize(onTopOf: .large, sizedAbove: root) == .medium)
+        #expect(size.dynamicTypeSize(onTopOf: root, sizedAbove: root) == .medium)
+    }
+
     @Test func resetGoesToTheNewDefaultAndSmallerTextHasRoomBelowIt() throws {
         let (defaults, suite) = try freshDefaults()
         defer { defaults.removePersistentDomain(forName: suite) }

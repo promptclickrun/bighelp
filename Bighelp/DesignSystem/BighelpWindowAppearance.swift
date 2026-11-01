@@ -37,8 +37,10 @@ enum BighelpWindowAppearance {
 }
 
 extension View {
-    /// A sheet or cover takes the app's Light or Dark choice as it opens.
+    /// A sheet or cover takes the app's Light or Dark choice as it opens, and its text size:
+    /// iOS gives a sheet the device's own size, not the one stepped at the app's root.
     func bighelpPresentedAppearance() -> some View {
         onAppear { BighelpWindowAppearance.applyCurrent() }
+            .modifier(BighelpTextSizing())
     }
 }

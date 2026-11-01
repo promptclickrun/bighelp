@@ -101,6 +101,8 @@ final class ChatModel {
     @ObservationIgnored var lastReferenceCheckpoint: (draft: Data, state: ReferenceCanonicalState?)?
     let onReferenceStateChange: ((String, ReferenceCanonicalState?) throws -> Void)?
     var hasLocallyPendingPrimaryTurn = false
+    /// Sends still waiting on their client's answer (`sendAwaitingClient`).
+    @ObservationIgnored var sendsAwaitingClient = 0
     var hasExternallyOwnedPrimaryTurn = false
     /// A catalog row may say a turn was active before this presentation binds
     /// its exact native runtime. Only the native snapshot/event owner may
@@ -749,7 +751,8 @@ final class ChatModel {
                         && !owner.sessionActionsAreRunning) else { return }
             nativeTurnID = nil
             settleNativeActivityLiveness()
-            _ = beginOwnerGeneration()
+            // As in `reconcileNativeIdle`: a send its client just answered says how it went itself.
+            if sendsAwaitingClient == 0 { _ = beginOwnerGeneration() }
             isStopping = false
             isSending = false
             pendingMidSessionSubmissions = []
@@ -781,7 +784,9 @@ final class ChatModel {
               !owner.hasPendingSubmission,
               nativeTurnID == nil,
               hasLocallyPendingPrimaryTurn || hasRestoredPrimaryTurn else { return }
-        _ = beginOwnerGeneration()
+        // A send whose answer its client just gave keeps its turn: it says what Hermes answered (an
+        // unconfirmed delivery says so). Retired first, it returned without a word.
+        if sendsAwaitingClient == 0 { _ = beginOwnerGeneration() }
         isStopping = false
         isSending = false
         pendingMidSessionSubmissions = []

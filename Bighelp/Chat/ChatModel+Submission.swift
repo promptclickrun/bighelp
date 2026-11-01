@@ -276,12 +276,14 @@ extension ChatModel {
         }
 
         do {
-            let response = try await sendThroughClient(
-                message,
-                attachments: attachments,
-                slashSelection: slashSelection,
-                ownerGeneration: generation
-            )
+            let response = try await sendAwaitingClient {
+                try await sendThroughClient(
+                    message,
+                    attachments: attachments,
+                    slashSelection: slashSelection,
+                    ownerGeneration: generation
+                )
+            }
             guard isCurrentOwner(generation) else { return }
             try appendValidated(response.items)
             if attachments.isEmpty,
@@ -668,6 +670,14 @@ extension ChatModel {
         guard isCurrentOwner(generation) else { return }
         settleTaskDrawerAfterTurn()
         isSending = false
+    }
+
+    /// The client resumes a send's waiter and may report the chat idle before the send runs again;
+    /// that idle report leaves the send's turn to it (`reconcileNativeIdle`).
+    func sendAwaitingClient<T>(_ body: () async throws -> T) async rethrows -> T {
+        sendsAwaitingClient += 1
+        defer { sendsAwaitingClient -= 1 }
+        return try await body()
     }
 
     func sendThroughClient(

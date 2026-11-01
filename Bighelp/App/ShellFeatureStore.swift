@@ -39,6 +39,8 @@ final class ShellFeatureStore {
 
     private let timing: DemoFixtureTiming
     private let catalog: SessionCatalogStore
+    /// Drafts typed since their chat last saved (`ChatDraftJournal`); nil saves typing with the chat.
+    private let draftJournal: ChatDraftJournal?
     private let agents: AgentDirectoryStore?
     private let agentRuntimeDefaults: (any AgentRuntimeDefaultsClient)?
     private let allowsNewChatAgentDefaults: Bool
@@ -271,6 +273,7 @@ final class ShellFeatureStore {
     init(
         timing: DemoFixtureTiming,
         catalog: SessionCatalogStore,
+        draftJournal: ChatDraftJournal? = nil,
         agents: AgentDirectoryStore? = nil,
         agentRuntimeDefaults: (any AgentRuntimeDefaultsClient)? = nil,
         allowsNewChatAgentDefaults: Bool = true,
@@ -307,6 +310,11 @@ final class ShellFeatureStore {
     ) {
         self.timing = timing
         self.catalog = catalog
+        self.draftJournal = draftJournal
+        // Drafts of chats that are gone go with them; a catalog that couldn't load keeps them all.
+        if catalog.hasLoadedCatalogState, !catalog.records.isEmpty {
+            draftJournal?.retain(sessionIDs: Set(catalog.records.map(\.id)))
+        }
         self.agents = agents
         self.agentRuntimeDefaults = agentRuntimeDefaults
         self.allowsNewChatAgentDefaults = allowsNewChatAgentDefaults
@@ -957,6 +965,7 @@ final class ShellFeatureStore {
             $0.invalidateReferenceOwnership()
         }
         catalog.flushPersistence()
+        draftJournal?.removeAll()
         accountGeneration &+= 1
         retentionTask?.cancel()
         retentionTask = nil
@@ -975,6 +984,7 @@ final class ShellFeatureStore {
     func flushChatPersistence() {
         chatModels.values.forEach { $0.flushPersistence() }
         catalog.flushPersistence()
+        draftJournal?.flush()
     }
 
 
@@ -1311,6 +1321,7 @@ final class ShellFeatureStore {
             )
         }
         let referenceGeneration = accountGeneration
+        let openingDraft = draftJournal?.openingDraft(for: session) ?? session.draft
         weak var referenceModel: ChatModel?
         let conversationClient = conversationClientFactory(session, agent)
         #if DEBUG
@@ -1319,6 +1330,11 @@ final class ShellFeatureStore {
             fixture.catalog = catalog
         }
         #endif
+        let journalDraft: ((String) -> Void)? = draftJournal == nil ? nil : { [weak self, weak catalog] draft in
+            guard let self, let catalog, self.accountGeneration == referenceGeneration,
+                  let referenceModel, self.chatModels[session.id] === referenceModel else { return }
+            self.draftJournal?.write(draft, over: catalog.session(id: session.id)?.draft ?? "", for: session.id)
+        }
         let model = ChatModel(
             conversationID: session.id,
             client: conversationClient,
@@ -1326,7 +1342,7 @@ final class ShellFeatureStore {
             userIdentityStore: userIdentity,
             agentID: agentID,
             initialItems: initialItems,
-            initialDraft: session.draft,
+            initialDraft: openingDraft,
             initialActivityEvents: session.activityEvents,
             initialActivityVisibility: catalog.activityVisibility(for: session),
             chosenActivityVisibility: session.activityVisibility,
@@ -1438,9 +1454,12 @@ final class ShellFeatureStore {
                       let current = catalog.session(id: session.id),
                       referenceModel.ownsReferenceSession(current) else { throw CancellationError() }
                 try catalog.updateReferenceState(canonicalDraft: draft, state: state, for: session.id)
-            }
+            },
+            onDraftJournal: journalDraft
         )
         referenceModel = model
+        // A draft from the journal isn't in the chat yet: its next save writes it there.
+        if !openingDraft.utf8.elementsEqual(session.draft.utf8) { model.persistSession(draftOnly: true) }
         // Turns Hermes runs on its own (a background process finished, another agent wrote in) never stream
         // their messages here, so the chat reads the saved history again, as it does after Stop.
         model.hostHistoryRefresh = { [weak self, weak catalog] in

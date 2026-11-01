@@ -373,6 +373,9 @@ extension RootShellView {
             }
             return false
         }
+        // Renaming an agent refuses while one of its chats has a draft; drafts typed since a chat
+        // last saved (`ChatDraftJournal`) reach the chat first.
+        featureStore.flushChatPersistence()
         let presentationID = UUID()
         do {
             let coordinator = try NativeWorkspaceLifecycleCoordinator(

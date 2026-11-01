@@ -475,9 +475,16 @@ struct BighelpAppComposition {
         if let clarificationFixture { dashboardSource = clarificationFixture }
         if let homeWorkFixture { dashboardSource = homeWorkFixture }
         #endif
+        // Demo chats keep their drafts in memory, like the rest of a demo run.
+        let draftRepository: DemoRepository<[String: ChatDraftJournal.Entry]>? = usesFixtures
+            ? nil : DemoRepository<[String: ChatDraftJournal.Entry]>(
+            directory: dataDirectory, name: "chat-drafts", seed: [:],
+            protectedDataAvailability: protectedDataAvailability, scopeID: { hostRepositoryScope.hostID }
+        )
         let featureStore = ShellFeatureStore(
             timing: timing,
             catalog: sessionCatalog,
+            draftJournal: ChatDraftJournal(repository: draftRepository),
             agents: agentDirectory,
             agentRuntimeDefaults: agentRuntimeDefaults,
             botModeRooms: botModeRooms,

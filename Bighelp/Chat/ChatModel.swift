@@ -108,6 +108,11 @@ final class ChatModel {
     var referencePersistenceNeeded = false
     @ObservationIgnored var lastReferenceCheckpoint: (draft: Data, state: ReferenceCanonicalState?)?
     let onReferenceStateChange: ((String, ReferenceCanonicalState?) throws -> Void)?
+    /// Keeps the draft (as `persistedDraft`) in the draft journal (`ChatDraftJournal`) a moment
+    /// after typing stops, instead of saving the whole chat. Nil saves the chat as before.
+    let onDraftJournal: ((String) -> Void)?
+    let draftJournalDelay: Duration
+    @ObservationIgnored var draftJournalTask: Task<Void, Never>?
     var hasLocallyPendingPrimaryTurn = false
     /// Sends still waiting on their client's answer (`sendAwaitingClient`).
     @ObservationIgnored var sendsAwaitingClient = 0
@@ -355,7 +360,9 @@ final class ChatModel {
         onBotModeChange: ((String, [String]) -> Bool)? = nil,
         onBotModeChangeWithHistory: ((String, [String], [TimelineItem]) -> Bool)? = nil,
         onBotModeCollapse: ((String, String, [TimelineItem]) -> Bool)? = nil,
-        onReferenceStateChange: ((String, ReferenceCanonicalState?) throws -> Void)? = nil
+        onReferenceStateChange: ((String, ReferenceCanonicalState?) throws -> Void)? = nil,
+        onDraftJournal: ((String) -> Void)? = nil,
+        draftJournalDelay: Duration = .milliseconds(250)
     ) {
         ChatPerformanceProbe.live("live.chat-model", 1)
         self.conversationID = conversationID
@@ -384,6 +391,8 @@ final class ChatModel {
         self.onGoalSnapshotChange = onGoalSnapshotChange
         self.onTodoSnapshotChange = onTodoSnapshotChange
         self.onReferenceStateChange = onReferenceStateChange
+        self.onDraftJournal = onDraftJournal
+        self.draftJournalDelay = draftJournalDelay
         self.persistenceCheckpointDelay = persistenceCheckpointDelay
         self.onTurnStopped = onTurnStopped
         self.onBotModeChange = onBotModeChange

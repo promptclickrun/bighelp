@@ -15,7 +15,10 @@ policy, App Store disclosure review, or independent security audit.
 
 The next release candidate adds independent, default-off Health, Calendar,
 Reminders and Location controls in Permissions. Health data is read only for the user's health
-and fitness questions. Location shares where the phone is only when an agent
+and fitness questions. Before Health's first grant, a one-time note says that shared Health data goes to
+the person's Hermes computer and its AI provider, is not used for advertising, and can be turned off
+at any time. When an agent asks for a tool that's off, a card in the chat can turn on the same
+switch; it never turns one on by itself, and Not now refuses the call. Location shares where the phone is only when an agent
 asks, with While Using the App access; it's approximate unless the person allows
 precise location for that call. Calendar and Reminders permit direct reads and changes
 after explicit enablement and iOS authorization. Grants belong to the phone, its

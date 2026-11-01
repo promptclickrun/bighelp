@@ -4,6 +4,22 @@ import Testing
 
 @MainActor
 struct DirectHermesManagedFilesTests {
+    @Test func creationDateIsOptionalAndNeverUsesModificationAsFallback() throws {
+        let owner = try makeOwner()
+        let scope = try DirectHermesWorkspaceFileScope.fixture(root: "/workspace", owner: owner)
+        var row: [String: BighelpJSONValue] = [
+            "path": .string("/workspace/report.txt"), "name": .string("report.txt"),
+            "is_directory": .boolean(false), "size": .integer(1),
+            "mime_type": .string("text/plain"), "mtime": .number(200)
+        ]
+        #expect(try scope.managedFile(row).createdAt == nil)
+        row["created"] = .number(100)
+        #expect(try scope.managedFile(row).createdAt == Date(timeIntervalSince1970: 100))
+        #expect(try scope.managedFile(row).modifiedAt == Date(timeIntervalSince1970: 200))
+        row["created"] = .string("invalid")
+        #expect(throws: DirectHermesManagedFilesError.invalidResponse) { try scope.managedFile(row) }
+    }
+
     @Test func hostConfiguredRootIsDiscoveredWithoutLiteralFallback() async throws {
         let owner = try makeOwner()
         let http = ManagedFilesTestHTTP()

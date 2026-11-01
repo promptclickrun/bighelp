@@ -76,6 +76,9 @@ enum SimpleBotProfileTabs {
 struct SimpleBotFilesTab: View {
     @Bindable var model: SimpleBotFilesModel
     let botName: String
+    @State private var options = FileExplorerOptions()
+
+    private var visibleFiles: [HermesManagedFile] { options.apply(model.entries) }
 
     @BighelpThemeReader private var theme
 
@@ -110,6 +113,8 @@ struct SimpleBotFilesTab: View {
 
     @ViewBuilder
     private var folder: some View {
+        let entries = visibleFiles
+        FileExplorerControls(options: $options)
         SimpleBotsSectionLabel(title: model.locationTitle)
             .accessibilityIdentifier("simple-bots.files.location")
         // Lazy: a folder can hold thousands of files.
@@ -125,16 +130,16 @@ struct SimpleBotFilesTab: View {
                 .accessibilityIdentifier("simple-bots.files.up")
                 if !model.entries.isEmpty { SimpleBotsDivider() }
             }
-            if model.entries.isEmpty {
-                Text(model.isAtTop ? "No files yet" : "This folder is empty")
+            if entries.isEmpty {
+                Text(options.isFiltering ? "No matching files" : (model.isAtTop ? "No files yet" : "This folder is empty"))
                     .font(.bighelp(.body))
                     .foregroundStyle(theme.tertiaryText)
                     .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
                     .padding(.horizontal, BighelpTokens.space20)
                     .accessibilityIdentifier("simple-bots.files.empty")
             }
-            ForEach(model.entries) { file in
-                if file.id != model.entries.first?.id { SimpleBotsDivider() }
+            ForEach(entries) { file in
+                if file.id != entries.first?.id { SimpleBotsDivider() }
                 row(file)
             }
         }

@@ -62,7 +62,8 @@ final class SimpleBotDemoFiles: SimpleBotFilesSource {
                          modifiedAt: now.addingTimeInterval(-86_400), mimeType: nil)
         case .file(let name, let mimeType, let daysAgo, let data):
             return .init(path: path, name: name, isDirectory: false, byteCount: data().count,
-                         modifiedAt: now.addingTimeInterval(-daysAgo * 86_400), mimeType: mimeType)
+                         modifiedAt: now.addingTimeInterval(-daysAgo * 86_400), mimeType: mimeType,
+                         createdAt: now.addingTimeInterval(-(daysAgo + 2) * 86_400))
         }
     }
 
@@ -287,6 +288,7 @@ final class DemoWorkspaceFiles: WorkspaceOperationPerforming {
                     "size": file.byteCount.map(BighelpJSONValue.integer) ?? .null,
                     "mime_type": file.mimeType.map(BighelpJSONValue.string) ?? .null,
                     "mtime": .number(file.modifiedAt.timeIntervalSince1970),
+                    "created": file.createdAt.map { .number($0.timeIntervalSince1970) } ?? .null,
                 ])
             }),
         ]) { $1 }

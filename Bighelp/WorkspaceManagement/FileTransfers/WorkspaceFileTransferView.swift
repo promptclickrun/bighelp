@@ -5,6 +5,9 @@ import UniformTypeIdentifiers
 struct WorkspaceFileTransferView: View {
     @Bindable var store: WorkspaceFileTransferStore
 
+    @State private var options = FileExplorerOptions()
+    private var visibleFiles: [HermesManagedFile] { options.apply(store.directory.files) }
+
     @State private var isImporting = false
     @State private var isCreatingDirectory = false
     @State private var newDirectoryName = ""
@@ -102,6 +105,7 @@ struct WorkspaceFileTransferView: View {
 
     private var fileList: some View {
         List {
+            Section { FileExplorerControls(options: $options) }
             locationSection
             statusSections
             directorySection
@@ -178,7 +182,10 @@ struct WorkspaceFileTransferView: View {
                         : "Upload a file or create a folder inside this host’s configured workspace.")
                 )
             }
-            ForEach(store.directory.files) { file in
+            if visibleFiles.isEmpty, !store.directory.files.isEmpty {
+                Text("No matching files").foregroundStyle(.secondary)
+            }
+            ForEach(visibleFiles) { file in
                 Button {
                     if file.isDirectory {
                         Task { await store.open(file) }

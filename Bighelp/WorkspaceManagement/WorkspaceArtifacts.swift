@@ -254,7 +254,7 @@ final class WorkspaceArtifactsStore {
 @MainActor
 struct WorkspaceArtifactsView: View {
     @State private var store: WorkspaceArtifactsStore
-    @State private var search = ""
+    @State private var options = FileExplorerOptions(sort: .modified, ascending: false)
     /// Inside the agent home's Apps tab: no navigation title, toolbar or
     /// system search bar, which would land in the root navigation bar.
     var isEmbedded = false
@@ -280,13 +280,7 @@ struct WorkspaceArtifactsView: View {
     }
 
     private var visibleFiles: [WorkspaceFileListing.Entry] {
-        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return store.files }
-        return store.files.filter {
-            $0.name.localizedCaseInsensitiveContains(query)
-                || $0.path.localizedCaseInsensitiveContains(query)
-                || ($0.mimeType?.localizedCaseInsensitiveContains(query) ?? false)
-        }
+        options.apply(store.files)
     }
 
     var body: some View {
@@ -323,13 +317,8 @@ struct WorkspaceArtifactsView: View {
 
     private var content: some View {
         List {
-            if isEmbedded {
-                Section {
-                    TextField("Search files, paths, or types", text: $search)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .accessibilityIdentifier("workspace.artifacts.search")
-                }
+            Section {
+                FileExplorerControls(options: $options, searchPrompt: String(localized: "Search files, paths, or types"))
             }
             // The Apps tab keeps to the files; the Workspace screen names the host and folder.
             if !isEmbedded {
@@ -400,10 +389,10 @@ struct WorkspaceArtifactsView: View {
             Section {
                 if visibleFiles.isEmpty, !store.isLoading, store.errorMessage == nil {
                     ContentUnavailableView(
-                        search.isEmpty
+                        !options.isFiltering
                             ? (store.scanDiagnostics.isEmpty ? "No files in this workspace" : "No verified files found")
                             : "No matching files",
-                        systemImage: search.isEmpty ? "doc" : "magnifyingglass"
+                        systemImage: !options.isFiltering ? "doc" : "magnifyingglass"
                     )
                 }
                 ForEach(visibleFiles) { entry in
@@ -421,13 +410,13 @@ struct WorkspaceArtifactsView: View {
                 Text(store.isAgentIndex ? "Made or changed lately" : "Files")
             } footer: {
                 Text(store.isAgentIndex
-                     ? "Files your agent wrote, edited or sent you, plus new files near the top of the workspace. Newest first."
-                     : "Newest-created files first. Files without a creation date appear afterward, sorted by name.")
+                     ? "Files your agent wrote, edited or sent you, plus new files near the top of the workspace."
+                     : "Files found in the configured workspace.")
             }
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(isEmbedded ? .hidden : .automatic)
-        .modifier(ArtifactsSearchAndRefresh(isEmbedded: isEmbedded, search: $search) {
+        .modifier(ArtifactsSearchAndRefresh(isEmbedded: isEmbedded) {
             await store.refresh()
         })
     }
@@ -449,7 +438,6 @@ private struct ArtifactsNavigationChrome: ViewModifier {
 
 private struct ArtifactsSearchAndRefresh: ViewModifier {
     let isEmbedded: Bool
-    @Binding var search: String
     let refresh: @MainActor () async -> Void
 
     func body(content: Content) -> some View {
@@ -457,7 +445,6 @@ private struct ArtifactsSearchAndRefresh: ViewModifier {
             content.bighelpRefreshable { await refresh() }
         } else {
             content
-                .searchable(text: $search, prompt: "Search files, paths, or types")
                 .bighelpRefreshable { await refresh() }
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {

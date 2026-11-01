@@ -53,7 +53,9 @@ struct TimelineSenderResolver {
         if item.role == .human, case .message(let text) = item.content,
            let reply = ChatReplyQuote.split(text) {
             // The quote above the bubble speaks for itself.
-            description = reply.body
+            description = Self.spokenSentFiles(reply.body, attachments: item.attachments)
+        } else if item.role == .human, case .message(let text) = item.content {
+            description = Self.spokenSentFiles(text, attachments: item.attachments)
         } else if item.role == .assistant, case .message(let raw) = item.content {
             // Files still to come have their own tile and label: never read a host path aloud.
             let text = item.attachments.isEmpty ? DirectHermesGeneratedMediaClient.pendingFiles(raw, role: .assistant).text : raw
@@ -74,6 +76,16 @@ struct TimelineSenderResolver {
             description = contentDescription(for: item.content)
         }
         return "\(display(for: item.sender).name): \(description)"
+    }
+
+    /// A person's words, then each file the message names by its name, as the row shows it:
+    /// a host path or `@file:` reference is never read aloud.
+    static func spokenSentFiles(_ text: String, attachments: [ChatAttachment]) -> String {
+        guard attachments.isEmpty else { return text }
+        let split = ChatSentFiles.split(text)
+        guard !split.files.isEmpty else { return text }
+        let files = split.files.map { ($0.isVideo ? "Video " : "File ") + $0.name }
+        return ([split.text] + files).filter { !$0.isEmpty }.joined(separator: ". ")
     }
 
     private func contentDescription(for content: TimelineContent) -> String {

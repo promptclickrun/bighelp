@@ -73,6 +73,18 @@ struct BigFileChatTests {
         #expect(Self.text(model.items.last) == Self.sentText)
     }
 
+    /// VoiceOver reads the message the way the row shows it: the words and the file's name.
+    @Test func theMessageIsReadAloudWithItsFileNameNeverItsPath() {
+        let model = ChatModel(conversationID: "big-file-spoken", client: ConversationFixtureClient(), initialItems: [])
+        let item = model.humanItem(content: Self.sentText)
+        let spoken = TimelineSenderResolver().accessibilityDescription(for: item)
+        #expect(spoken.contains("Cut the best 10 seconds"))
+        #expect(spoken.contains("Video Trip to the coast.mov"))
+        #expect(!spoken.contains("/home/") && !spoken.contains("@file:") && !spoken.contains("attached:"))
+        let reply = model.humanItem(content: "[Replying to: \"Send me the clip\"]\n\n" + Self.sentText)
+        #expect(!TimelineSenderResolver().accessibilityDescription(for: reply).contains("@file:"))
+    }
+
     @Test func aFailedUploadSaysWhyAndTryAgainRunsItsRetry() {
         let board = BigFileUploadBoard.shared
         var retried = 0

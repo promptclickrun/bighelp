@@ -48,15 +48,16 @@ struct BigFileChatTests {
     @Test func theTileTurnsIntoTheLineOnceWhenHermesTakesTheMessageAndAReadKeepsIt() throws {
         let model = ChatModel(conversationID: "big-file-chat", client: ConversationFixtureClient(), initialItems: [])
         let human = model.humanItem(content: "Cut the best 10 seconds").carrying(bigFiles: [Self.file])
-        model.appendItem(human)
-        model.appendProjectedMessage(human)
+        // While its file goes up, the message waits outside the transcript, where a reread can't drop it.
+        model.bigFileSends.append(human)
         BigFileUploadBoard.shared.uploading(Self.file.id, sentBytes: 34_000_000, byteCount: Self.file.byteCount)
-        #expect(model.items.last?.metadata.bigFiles == [Self.file])
-        #expect(ChatSentFiles.split(Self.text(model.items.last)).files.isEmpty)
+        #expect(model.bigFileSends.first?.metadata.bigFiles == [Self.file])
+        #expect(!model.items.contains { $0.id == human.id })
 
         model.bigFileMessageAccepted(rowID: human.id, text: Self.sentText, files: [Self.file])
         let accepted = try #require(model.items.last)
         #expect(accepted.id == human.id)
+        #expect(model.bigFileSends.isEmpty)
         #expect(accepted.metadata.bigFiles.isEmpty)
         #expect(BigFileUploadBoard.shared.state(for: Self.file.id) == nil)
         let live = ChatSentFiles.split(Self.text(accepted))

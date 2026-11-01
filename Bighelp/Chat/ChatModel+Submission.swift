@@ -804,7 +804,7 @@ extension ChatModel {
         attachments: [ChatAttachment] = []
     ) -> TimelineItem {
         // A reload resets the count, so a message still waiting in the chat may hold the next ID.
-        let existingIDs = Set(items.map(\.id) + stagedSends.map(\.id))
+        let existingIDs = Set(items.map(\.id) + stagedSends.map(\.id) + bigFileSends.map(\.id))
         while existingIDs.contains("\(conversationID)-human-\(nextHumanSequence)") {
             nextHumanSequence += 1
         }

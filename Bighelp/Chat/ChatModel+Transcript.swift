@@ -207,6 +207,7 @@ extension ChatModel {
         !isBotMode
             && transcriptEntries.isEmpty
             && stagedSends.isEmpty
+            && bigFileSends.isEmpty
             && !isHydratingHistory
             && !isSending
             && !hasPreviousHistory

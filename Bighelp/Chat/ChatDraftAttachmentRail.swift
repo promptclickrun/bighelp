@@ -426,8 +426,12 @@ enum DraftAttachmentRailFixture {
                 BigFileUploadBoard.shared.uploading(file.id, sentBytes: 34_000_000, byteCount: file.byteCount)
             }
         }
-        model.appendItem(human)
-        model.appendProjectedMessage(human)
+        if human.metadata.bigFiles.isEmpty {
+            model.appendItem(human)
+            model.appendProjectedMessage(human)
+        } else {
+            model.bigFileSends.append(human)
+        }
     }
 
     @MainActor
@@ -449,6 +453,9 @@ enum DraftAttachmentRailFixture {
             }
         case "file": add([lease])
         case "big-file-uploading", "big-file-failed", "big-file-sent":
+            // The chat loads its own messages as it opens; a row added before that is replaced.
+            for _ in 0..<50 where model.items.isEmpty { try? await Task.sleep(for: .milliseconds(100)) }
+            try? await Task.sleep(for: .milliseconds(500))
             seedBigFile(model, state: arguments[index + 1])
         case "big-file-import":
             // A real host's test: the video the probe made, through the same checks as Add › File.

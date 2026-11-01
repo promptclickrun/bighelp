@@ -232,7 +232,7 @@ struct TimelineItemView: View {
                 BighelpSessionContentDisclosure(sessionID: reference.sessionID, rowID: reference.rowID)
             }
 
-            if let pendingSend {
+            if let pendingSend, !bigFileFailed {
                 PendingSendStatusView(pendingSend: pendingSend)
             } else if !uiV3Enabled {
                 TimelineMetadataView(metadata: item.metadata)
@@ -242,6 +242,14 @@ struct TimelineItemView: View {
             } else {
                 TimelineMetadataView(metadata: item.metadata)
             }
+        }
+    }
+
+    /// A big file that didn't go says why on its tile; "Sending…" would say otherwise.
+    private var bigFileFailed: Bool {
+        item.metadata.bigFiles.contains {
+            if case .failed = BigFileUploadBoard.shared.state(for: $0.id) { return true }
+            return false
         }
     }
 

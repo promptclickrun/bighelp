@@ -119,6 +119,10 @@ final class ChatModel {
     /// Messages sent before the chat could take them, oldest first (`stage`). Each waits at the
     /// bottom of the chat with "Sending…" under it and goes out in order once the chat can take it.
     internal(set) var stagedSends: [ChatStagedSend] = []
+    /// Messages whose files over 8 MB are still on their way (`sendBigFileDraft`). Like staged
+    /// messages they wait outside the transcript, so a reread of the history can't drop them, and
+    /// they join it as the text Hermes took.
+    internal(set) var bigFileSends: [TimelineItem] = []
     @ObservationIgnored var stagedSendDrain: (id: UUID, task: Task<Void, Never>)?
     /// The chat has gone without a connection for `connectionGrace` while the app was open
     /// (`ChatConnectionGrace`). Only then does Send go off, until the chat connects again.

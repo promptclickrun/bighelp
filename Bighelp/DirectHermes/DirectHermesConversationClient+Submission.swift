@@ -177,13 +177,14 @@ extension DirectHermesConversationClient {
                                 self.finishAcceptedSubmission()
                             }
                         } else if ["streaming", "ok"].contains(response["status"]?.string ?? "") {
+                            // A message waiting outside the transcript joins it first, so it's the one bound.
+                            self.takeSubmissionAdmitted()
                             if !command || expandedToPrompt, let row = response["user_row_id"]?.integer {
                                 self.model?.bindNewestUnsavedMessage(role: .human, toRow: row, from: self)
                             }
                             self.admissionOverlapped = self.submissionTurns.count > 1
                             self.selectPendingTurn()
                             self.admitted = true
-                            self.takeSubmissionAdmitted()
                             self.status = "Working"
                             self.completeSubmissionIfReady()
                         } else {

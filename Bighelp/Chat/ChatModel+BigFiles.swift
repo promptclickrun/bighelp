@@ -1,6 +1,7 @@
 import Foundation
 
-/// Files over 8 MB in a message (#721). Each has one look at a time: while it goes up, and
+/// Files over 8 MB in a message (#721). The message waits outside the transcript while its files
+/// go up (`bigFileSends`), so a reread of the history can't drop it. Each file has one look at a time: while it goes up, and
 /// if it doesn't, a tile on the message with its progress (or why, with Try again); once
 /// Hermes takes the message, the message's text names the file and the chat shows its line
 /// on the rail. A reread of the saved history only has that text, so it looks the same.
@@ -36,12 +37,11 @@ extension ChatModel {
         let startsPrimaryTurn = !isSending
         let generation = startsPrimaryTurn ? beginOwnerGeneration() : ownerGeneration
         let human: TimelineItem
-        if let rowID, let existing = items.first(where: { $0.id == rowID }) {
+        if let rowID, let existing = bigFileSends.first(where: { $0.id == rowID }) {
             human = existing
         } else {
             human = humanItem(content: message, attachments: ordinaryAttachments).carrying(bigFiles: files)
-            appendItem(human)
-            appendProjectedMessage(human)
+            bigFileSends.append(human)
         }
         if Data(outgoingDraftText.utf8) == Data(message.utf8), orderedDraftAttachments == orderedAttachments {
             draft = ""
@@ -91,7 +91,7 @@ extension ChatModel {
                          orderedAttachments: orderedAttachments,
                          reason: BigFileUploadFailure.connection.message)
         } catch {
-            guard items.first(where: { $0.id == human.id })?.metadata.bigFiles.isEmpty == false else {
+            guard bigFileSends.contains(where: { $0.id == human.id }) else {
                 // Hermes already took the message; what failed came after (the turn itself).
                 failureMessage = "Message could not be delivered. Try again."
                 return
@@ -106,11 +106,11 @@ extension ChatModel {
     /// The one change of look: tiles out, the text Hermes took in. The phone's copies go, since
     /// the computer has each file now.
     func bigFileMessageAccepted(rowID: String, text: String, files: [ChatBigFile]) {
-        guard !text.isEmpty, let index = items.firstIndex(where: { $0.id == rowID }),
-              !items[index].metadata.bigFiles.isEmpty else { return }
-        let sent = items[index].sent(as: text)
-        replaceItem(at: index, with: sent)
-        updateProjectedMessage(sent)
+        guard !text.isEmpty, let index = bigFileSends.firstIndex(where: { $0.id == rowID }) else { return }
+        // It leaves the waiting row and joins the transcript in one step, so it never shows twice.
+        let sent = bigFileSends.remove(at: index).sent(as: text).ordered(takeTranscriptOrder())
+        appendItem(sent)
+        appendProjectedMessage(sent)
         for file in files {
             BigFileUploadBoard.shared.finish(file.id)
             BigFileStore.remove(file)

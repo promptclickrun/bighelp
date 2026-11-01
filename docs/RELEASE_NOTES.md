@@ -3,6 +3,16 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.49
+
+### Changed
+
+- **Smoother chat:** typing while the agent answers is smoother, and the chat does not stop for a moment after you stop typing.
+
+### Fixed
+
+- **Agent instructions:** long instructions scroll and type smoothly, in the small box and in the full-screen editor. The line that you type stays in view above the keyboard.
+
 ## 2.6.48
 
 ### New

@@ -225,13 +225,20 @@ final class AvatarCreatorUITests: BighelpUITestCase {
     }
 
     /// Large text pushes controls below the fold; scroll the choices until it can be tapped.
+    /// The choices can be shorter than two tiles, so a swipe's fling jumps past whole rows:
+    /// drag a short way with no fling instead.
     @MainActor
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
         // The choices are the sheet's last scroll view, after the row of categories.
         let scrollViews = app.scrollViews
         let choices = scrollViews.element(boundBy: max(0, scrollViews.count - 1))
-        for _ in 0..<6 where !(element.exists && element.isHittable) { choices.swipeUp(velocity: .slow) }
-        for _ in 0..<8 where !(element.exists && element.isHittable) { choices.swipeDown(velocity: .slow) }
+        func drag(from: CGFloat, to: CGFloat) {
+            choices.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: from))
+                .press(forDuration: 0.1, thenDragTo: choices.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: to)),
+                       withVelocity: .slow, thenHoldForDuration: 0.2)
+        }
+        for _ in 0..<14 where !(element.exists && element.isHittable) { drag(from: 0.7, to: 0.3) }
+        for _ in 0..<20 where !(element.exists && element.isHittable) { drag(from: 0.3, to: 0.7) }
         XCTAssertTrue(element.isHittable, "\(element) can be reached")
     }
 

@@ -49,6 +49,34 @@ final class AgentFilesUITests: BighelpUITestCase {
         }
     }
 
+    @MainActor
+    func testWorkspaceFileSearchFilterAndSort() throws {
+        for appearance in ["light", "dark"] {
+            let app = makeApp()
+            app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES",
+                                    "-bighelp.hosts.all-hosts", "NO", "-loopdy.demo.appearance", appearance,
+                                    "-bighelp.app-layout", "{pinned=(feed,ideas,files);menu=();}"]
+            app.launch()
+            XCTAssertTrue(app.buttons["tab.apps"].waitForExistence(timeout: 30))
+            app.buttons["tab.apps"].tap()
+            switchAgent(to: "finance", in: app)
+            let search = app.descendants(matching: .any)["files.search"].firstMatch
+            XCTAssertTrue(search.waitForExistence(timeout: 10))
+            app.buttons["files.sort"].tap()
+            app.buttons["Created"].tap()
+            app.buttons["files.filter"].tap()
+            app.buttons["Documents"].tap()
+            save("workspace-filtered-\(appearance)", app)
+            search.tap()
+            search.typeText("no-such-file-12345")
+            XCTAssertTrue(app.staticTexts["No matching files"].waitForExistence(timeout: 5))
+            app.buttons["files.clear"].tap()
+            XCTAssertTrue(row("Notes.md", in: app).waitForExistence(timeout: 5))
+            save("workspace-files-\(appearance)", app)
+            app.terminate()
+        }
+    }
+
     /// The same on a real Hermes with two agents or more, read only: no chats, no settings changed.
     /// Set BIGHELP_AGENT_FILES_HOST (as TEST_RUNNER_…) to an open host, e.g. 127.0.0.1:9121.
     @MainActor

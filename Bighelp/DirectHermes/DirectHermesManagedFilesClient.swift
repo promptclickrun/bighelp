@@ -8,6 +8,7 @@ public struct HermesManagedFile: Identifiable, Equatable, Sendable {
     public let name: String
     public let isDirectory: Bool
     public let byteCount: Int?
+    public let createdAt: Date?
     public let modifiedAt: Date
     public let mimeType: String?
 
@@ -19,12 +20,14 @@ public struct HermesManagedFile: Identifiable, Equatable, Sendable {
         isDirectory: Bool,
         byteCount: Int?,
         modifiedAt: Date,
-        mimeType: String?
+        mimeType: String?,
+        createdAt: Date? = nil
     ) {
         self.path = path
         self.name = name
         self.isDirectory = isDirectory
         self.byteCount = byteCount
+        self.createdAt = createdAt
         self.modifiedAt = modifiedAt
         self.mimeType = mimeType
     }

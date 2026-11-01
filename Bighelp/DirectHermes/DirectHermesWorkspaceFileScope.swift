@@ -275,13 +275,24 @@ struct DirectHermesWorkspaceFileScope: Equatable, Sendable {
             byteCount = size
             mimeType = try Self.mimeType(rawMIME)
         }
+        let createdAt: Date?
+        if object["created"] == nil || object["created"] == .null {
+            createdAt = nil
+        } else {
+            guard let seconds = object["created"]?.number, seconds.isFinite,
+                  (-62_135_596_800.0...253_402_300_799.0).contains(seconds) else {
+                throw DirectHermesManagedFilesError.invalidResponse
+            }
+            createdAt = Date(timeIntervalSince1970: seconds)
+        }
         return .init(
             path: path,
             name: name,
             isDirectory: isDirectory,
             byteCount: byteCount,
             modifiedAt: Date(timeIntervalSince1970: modified),
-            mimeType: mimeType
+            mimeType: mimeType,
+            createdAt: createdAt
         )
     }
 

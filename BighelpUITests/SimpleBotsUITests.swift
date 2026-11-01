@@ -140,6 +140,29 @@ final class SimpleBotsUITests: BighelpUITestCase {
     }
 
     @MainActor
+    func testFilesSearchFilterAndSort() throws {
+        for appearance in ["light", "dark"] {
+            let app = launch(appearance: appearance)
+            openPrimaryProfile(app)
+            app.buttons["simple-bots.profile.tab.files"].tap()
+            let search = app.descendants(matching: .any)["files.search"].firstMatch
+            XCTAssertTrue(search.waitForExistence(timeout: 10))
+            app.buttons["files.sort"].tap()
+            app.buttons["Recently modified"].tap()
+            app.buttons["files.filter"].tap()
+            app.buttons["Documents"].tap()
+            save("files-filtered-\(appearance)", app)
+            search.tap()
+            search.typeText("no-such-file-12345")
+            XCTAssertTrue(app.staticTexts["No matching files"].waitForExistence(timeout: 5))
+            app.buttons["files.clear"].tap()
+            XCTAssertTrue(app.staticTexts["No matching files"].waitForNonExistence(timeout: 5))
+            save("files-\(appearance)", app)
+            app.terminate()
+        }
+    }
+
+    @MainActor
     private func openPrimaryProfile(_ app: XCUIApplication) {
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
         app.buttons["simple-bots.primary"].tap()

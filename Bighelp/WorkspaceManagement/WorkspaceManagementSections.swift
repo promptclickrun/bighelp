@@ -184,10 +184,15 @@ struct WorkspaceFilesSection: View {
     let store: WorkspaceManagementStore
     let listing: WorkspaceFileListing
 
-    private var rows: [WorkspaceFileListing.Entry] { listing.entries.filter { store.matches($0.name) } }
+    @State private var options = FileExplorerOptions()
+
+    private var rows: [WorkspaceFileListing.Entry] {
+        options.apply(listing.entries.filter { store.matches($0.name) })
+    }
 
     var body: some View {
         Section {
+            FileExplorerControls(options: $options, showsSearch: false)
             LabeledContent(listing.rootLabel == nil ? "Permitted root" : "Granted folder", value: listing.rootLabel ?? listing.root)
             Text(listing.path.isEmpty ? "Root folder" : listing.path).font(.bighelp(.footnote)).textSelection(.enabled)
             if listing.rootLabel != nil {

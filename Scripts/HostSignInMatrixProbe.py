@@ -33,6 +33,11 @@ HOME and HERMES_HOME, then runs the matching HostSignInMatrixUITests:
             slower link that drops once mid-upload: an 80 MB video goes from the
             app in pieces, continues after the drop, and the agent reads it with
             ffprobe from the path Hermes gives it (BigFileHostUITests)
+  device    no sign-in, with the bighelp plugin (--plugin) and a scripted model that
+            calls iphone_reminders while Reminders is off: the chat shows the Device
+            access card, Turn on (or Not now) answers it, and the agent says what its
+            original call got back (DeviceAccessHostUITests; Reminders is granted to
+            the app on the simulator first, so iOS doesn't ask)
   drafts    no sign-in, with the bighelp plugin (--plugin) and a scripted model:
             a made-up business card sent from the app becomes a contact draft,
             the review's Save writes once and the agent hears it at its next
@@ -92,6 +97,8 @@ TESTS = {
     "drafts": ["ImageDraftsHostUITests/testAContactDraftFromAPhotoSavesOnceAndTheAgentHearsIt",
                "ImageDraftsHostUITests/testAPhotoAloneGetsTheOfferAndTheAgentCantAddTheContactItself"],
     "bigfiles": ["BigFileHostUITests/testAnEightyMegabyteVideoReachesTheAgentAfterADrop"],
+    "device": ["DeviceAccessHostUITests/testAToolThatIsOffAsksWithACardAndTheCallGoesOn",
+               "DeviceAccessHostUITests/testNotNowGivesTheAgentAPlainRefusal"],
     "media": ["testGeneratedImageStaysAfterTheTurnEnds", "testPicturesAnAgentSavedShowInTheChat",
               "testPicturesAnAgentSavedShowInItsBotChat", "testPicturesFromATurnThatEndedWhileAwayShow",
               "testPicturesThatAreGoneSayWhyWithTryAgain", "testPicturesThatAreGoneSayWhyInDark",
@@ -123,6 +130,44 @@ def video_path(messages: list, start: int) -> str:
     return match.group(1) if match else "missing-video-path"
 
 
+def last_week_of_sleep() -> dict:
+    """iphone_health's arguments for the last seven nights, in this Mac's time zone."""
+    zone = os.path.realpath("/etc/localtime").split("zoneinfo/")[-1] or "UTC"
+    end = time.time()
+    stamp = lambda moment: time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(moment)) + \
+        time.strftime("%z", time.localtime(moment))[:3] + ":" + time.strftime("%z", time.localtime(moment))[3:]
+    return {"start": stamp(end - 7 * 86400), "end": stamp(end), "timeZone": zone, "types": ["sleep_analysis"]}
+
+
+def sleep_nights(result: str) -> dict:
+    """Hours asleep for each night iphone_health returned, by the day the night ended."""
+    try:
+        items = json.loads(result).get("payload", {}).get("items", [])
+    except (ValueError, AttributeError):
+        return {}
+    nights: dict = {}
+    for item in items:
+        if not str(item.get("value", "")).startswith("asleep"):
+            continue
+        start, end = (time.mktime(time.strptime(item[key][:19], "%Y-%m-%dT%H:%M:%S")) for key in ("start", "end"))
+        day = time.strftime("%a %b %-d", time.localtime(end))
+        nights[day] = nights.get(day, 0) + (end - start) / 3600
+    return {day: round(hours, 1) for day, hours in nights.items()}
+
+
+def sleep_chart(result: str) -> tuple:
+    nights = sleep_nights(result)
+    return ("bighelp_render_chart", {
+        "schema": "bighelp.generative_ui", "version": 2, "component": "chart",
+        "title": "Your sleep this week", "subtitle": "From Apple Health",
+        "data": {"chart_type": "bar", "description": "Hours asleep each night, from Apple Health.",
+                 "x_axis": {"label": "Night", "kind": "category"},
+                 "y_axis": {"label": "Asleep", "unit": "h", "min": 0},
+                 "series": [{"id": "sleep", "label": "Asleep", "semantic": "primary",
+                             "status_label": f"{len(nights)} nights",
+                             "points": [{"x": day, "y": hours} for day, hours in nights.items()]}]}})
+
+
 class ToolTurnModel(BaseHTTPRequestHandler):
     """A scripted model whose tool keeps running. "secure input test" asks for a secret with
     bighelp's tool, which waits for the pop-up; "long tool test" runs a 20-second command so a
@@ -137,9 +182,11 @@ class ToolTurnModel(BaseHTTPRequestHandler):
         offered = {t.get("function", {}).get("name", "") for t in request.get("tools", [])}
         texts = [(i, str(m.get("content") or "")) for i, m in enumerate(messages) if m.get("role") == "user"]
         triggers = ("secure input test", "long tool test", "question test", "image test", "vault code test",
-                    "save login test", "card test", "files test", "video test")
+                    "save login test", "card test", "files test", "video test", "device access test",
+                    "sleep this week")
         start = max((i for i, text in texts if any(t in text for t in triggers)), default=-1)
         asked = str(messages[start].get("content", "")) if start >= 0 else ""
+        results = [str(m.get("content") or "") for m in messages[start + 1:] if m.get("role") == "tool"]
         secure = "secure input test" in asked
         question = "question test" in asked
         probe_tool = ("image_generate", {"prompt": "A probe picture", "aspect_ratio": "square"}) \
@@ -148,8 +195,11 @@ class ToolTurnModel(BaseHTTPRequestHandler):
             if "save login test" in asked else ("terminal", {"command": "sleep 20" if "slow" in asked else "true"}) \
             if "files test" in asked else ("terminal", {"command": "ffprobe -v error -show_entries format=duration "
                                                     "-of csv=p=0 " + shlex.quote(video_path(messages, start))}) \
-            if "video test" in asked else None
-        results = [str(m.get("content") or "") for m in messages[start + 1:] if m.get("role") == "tool"]
+            if "video test" in asked else ("iphone_reminders" if "reminders" in asked else "iphone_calendar",
+                                           {"operation": "list"}) \
+            if "device access test" in asked else ("iphone_health", last_week_of_sleep()) \
+            if "sleep this week" in asked and not results else sleep_chart(results[0]) \
+            if "sleep this week" in asked and len(results) == 1 and sleep_nights(results[0]) else None
         steers = [re.sub(r"^\[OUT-OF-BAND[^\]]*\]\s*|\s*\[/OUT-OF-BAND USER MESSAGE\]$", "", text.strip())
                   for i, text in texts if i > start and STEER_OPEN in text]
         if "card test" in asked and request.get("stream"):
@@ -170,7 +220,7 @@ class ToolTurnModel(BaseHTTPRequestHandler):
             self.wfile.flush()
             return
         call = None
-        if start >= 0 and not results:
+        if start >= 0 and (not results or ("sleep this week" in asked and probe_tool)):
             # "secure input test 2" asks for SECURE_INPUT_FIXTURE_2: a value already saved isn't asked again.
             round_suffix = re.search(r"secure input test (\d+)", asked)
             name, arguments = (("bighelp_request_secure_input",
@@ -203,6 +253,22 @@ class ToolTurnModel(BaseHTTPRequestHandler):
                 outcome = json.loads(results[-1]) if results and results[-1].startswith("{") else {}
                 output = str(outcome.get("output", results[-1] if results else "")).strip()
                 text = "Video fixture: ffprobe says " + output[:80] + " seconds."
+            elif "sleep this week" in asked:
+                # Only what Apple Health gave: the chart card it made, or that nothing came back.
+                nights = sleep_nights(results[0]) if results else {}
+                card = json.loads(results[-1]).get("display_markdown", "") if len(results) > 1 else ""
+                text = (f"You slept about {sum(nights.values()) / len(nights):.1f} hours a night "
+                        f"over {len(nights)} nights.\n\n{card}" if nights else
+                        "Apple Health shared no sleep for this week. You can check what it shares in the "
+                        "Health app under Sharing.")
+            elif "device access test" in asked:
+                # What the agent's own call got back from the phone: the list, or the refusal and its note.
+                outcome = json.loads(results[-1]) if results and results[-1].startswith("{") else {}
+                payload = outcome.get("payload") if isinstance(outcome.get("payload"), dict) else {}
+                text = (f"Device access fixture: {outcome.get('status', 'no result')}"
+                        + (f" {outcome['code']}" if outcome.get("code") else "")
+                        + f", {len(payload.get('items') or [])} items."
+                        + (" Note: " + str(payload["note"])[:160] if payload.get("note") else ""))
             elif probe_tool and probe_tool[0] == "image_generate":
                 outcome = json.loads(results[-1]) if results and results[-1].startswith("{") else {}
                 text = ("MEDIA:" + outcome["image"]) if outcome.get("image") else "Image fixture failed: " + results[-1][:160]
@@ -705,7 +771,7 @@ def run_mode(mode: str, args, repo: Path) -> int:
         home.mkdir()
         project.mkdir()
         model = ThreadingHTTPServer(("127.0.0.1", 0), PhotoDraftModel if mode == "drafts"
-                                    else ToolTurnModel if mode in ("tools", "media", "bigfiles") else SyntheticModel)
+                                    else ToolTurnModel if mode in ("tools", "media", "bigfiles", "device") else SyntheticModel)
         model.sent_files, model.gone_files = [], []
         if mode == "media":
             # Named in a reply but not on the computer: the app says so, with Try again.
@@ -733,14 +799,15 @@ def run_mode(mode: str, args, repo: Path) -> int:
         # still resolves to this Mac, so gated hosts use it; single sign-on needs the
         # app on that same name, since the sign-in cookie belongs to it.
         public = f"http://127.0.0.1:{proxy.port}" if proxy \
-            else origin if mode in ("open", "tools", "widgets", "features", "update", "media", "drafts", "bigfiles") \
+            else origin if mode in ("open", "tools", "widgets", "features", "update", "media", "drafts", "bigfiles",
+                                    "device") \
             else f"http://hermes.localhost:{port}"
         config = {"dashboard": {"public_url": public},
                   "model": {"default": "fixture-model", "provider": "custom",
                             "base_url": f"http://127.0.0.1:{model.server_port}/v1", "api_key": "local-synthetic-no-auth"},
                   "agent": {"max_turns": 3}, "terminal": {"backend": "local", "cwd": str(project)},
                   "memory": {"memory_enabled": False, "user_profile_enabled": False}}
-        if mode in ("tools", "features", "media", "drafts", "bigfiles"):
+        if mode in ("tools", "features", "media", "drafts", "bigfiles", "device"):
             if not args.plugin:
                 raise SystemExit(f"{mode} mode needs --plugin <bighelp plugin folder>")
             shutil.copytree(args.plugin, home / "plugins" / "loopdy",
@@ -807,6 +874,10 @@ def run_mode(mode: str, args, repo: Path) -> int:
                 probe.update(username="signin-fixture", password=password, token=tokens["access_token"])
             secret.write_text(json.dumps(probe))
             secret.chmod(0o600)
+            if mode == "device":
+                # Reminders is iOS's to give: granted ahead, the card's Turn on doesn't wait on an alert.
+                subprocess.run(["xcrun", "simctl", "privacy", args.simulator_id, "grant", "reminders",
+                                "app.loopdy.mobile"], check=False, timeout=60)
             client_env = dict(os.environ, TEST_RUNNER_BIGHELP_SIGNIN_PROBE=str(secret),
                               TEST_RUNNER_BIGHELP_SIGNIN_EVIDENCE=str(args.results / mode))
             (args.results / mode).mkdir(parents=True, exist_ok=True)

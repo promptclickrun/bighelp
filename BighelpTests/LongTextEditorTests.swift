@@ -18,7 +18,8 @@ struct LongTextEditorTests {
         let host = try Host(text: Self.longText)
         defer { host.close() }
         let view = try #require(host.textView)
-        #expect(view.textLayoutManager != nil, "TextKit 2")
+        #expect(view.textLayoutManager == nil, "TextKit 1")
+        #expect(!view.layoutManager.allowsNonContiguousLayout, "Laid out in one piece")
         view.applyColors(ink: .red, hint: .gray, caret: .blue)
         view.applyColors(ink: .red, hint: .gray, caret: .blue)
         #expect(view.textColor != nil)
@@ -27,11 +28,11 @@ struct LongTextEditorTests {
         view.textDidChange()
         view.layoutIfNeeded()
 
-        let textKit1 = LongTextView(usesTextKit2: false)
-        #expect(textKit1.textLayoutManager == nil, "TextKit 1, for comparing")
-        textKit1.applyColors(ink: .red, hint: .gray, caret: nil)
-        textKit1.text = Self.longText
-        #expect(textKit1.boxHeight(forWidth: 320, minimum: 140, maximum: 260) == 260)
+        let textKit2 = LongTextView(usesTextKit2: true)
+        #expect(textKit2.textLayoutManager != nil, "TextKit 2, for comparing")
+        textKit2.applyColors(ink: .red, hint: .gray, caret: nil)
+        textKit2.text = Self.longText
+        #expect(textKit2.boxHeight(forWidth: 320, minimum: 140, maximum: 260) == 260)
     }
 
     /// The form turns its keyboard dismissal off while the box is edited, from this.

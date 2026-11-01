@@ -52,13 +52,15 @@ struct LongTextEditor: UIViewRepresentable {
         self.onEditingChanged = onEditingChanged
     }
 
-    /// TextKit 2 lays out only what's on screen, so long text costs the same as short.
-    /// DEBUG builds launched with `-test-long-text-textkit1` use TextKit 1, to compare.
+    /// TextKit 1, laid out in one piece. TextKit 2 places text it hasn't laid out by estimate:
+    /// far from the screen the caret and the scroll height were wrong, and the box crawled toward
+    /// the line being typed (#727). DEBUG builds launched with `-test-long-text-textkit2` use
+    /// TextKit 2, to compare.
     static var usesTextKit2: Bool {
         #if DEBUG
-        !ProcessInfo.processInfo.arguments.contains("-test-long-text-textkit1")
+        ProcessInfo.processInfo.arguments.contains("-test-long-text-textkit2")
         #else
-        true
+        false
         #endif
     }
 
@@ -208,6 +210,8 @@ final class LongTextView: UITextView {
     private var observesKeyboard = false
     private var lastBoxHeight: CGFloat?
     private var revealsCaretAfterEdit = false
+    /// A TextKit 1 view's storage: the view holds its container, the storage holds the rest.
+    private let keptTextStorage: NSTextStorage?
     /// The colors last applied, resolved, so an update that changes nothing re-colors nothing:
     /// setting `textColor` touches every character.
     private var appliedColors: [CGFloat] = []
@@ -216,12 +220,25 @@ final class LongTextView: UITextView {
     /// initializer Swift doesn't override, so this class's stored properties were never set and
     /// the first read of one crashed (#727).
     init(usesTextKit2: Bool) {
-        super.init(frame: .zero, textContainer: nil)
-        // Asking for the layout manager is how a text view moves to TextKit 1.
-        if !usesTextKit2 { _ = layoutManager }
+        guard !usesTextKit2 else {
+            keptTextStorage = nil
+            super.init(frame: .zero, textContainer: nil)
+            return
+        }
+        // Laid out in one piece, so the caret and the scroll height are exact everywhere.
+        let storage = NSTextStorage()
+        let manager = NSLayoutManager()
+        manager.allowsNonContiguousLayout = false
+        storage.addLayoutManager(manager)
+        let container = NSTextContainer(size: CGSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
+        container.widthTracksTextView = true
+        manager.addTextContainer(container)
+        keptTextStorage = storage
+        super.init(frame: .zero, textContainer: container)
     }
 
     required init?(coder: NSCoder) {
+        keptTextStorage = nil
         super.init(coder: coder)
     }
 
@@ -278,7 +295,7 @@ final class LongTextView: UITextView {
     }
 
     /// The box's height for a width. Text past `LongTextBox.measuredLength` is always taller than
-    /// the box, so it isn't laid out at all; shorter text is measured, which is cheap.
+    /// the box, so it isn't measured; shorter text is, which is cheap.
     func boxHeight(forWidth width: CGFloat, minimum: CGFloat, maximum: CGFloat) -> CGFloat {
         let measured: CGFloat? = textStorage.length > LongTextBox.measuredLength
             ? nil
@@ -288,10 +305,10 @@ final class LongTextView: UITextView {
         return height
     }
 
-    /// After the person's own keystroke. UIKit scrolls to the caret after the edit, and not always
-    /// far enough: after a jump through text TextKit 2 hasn't laid out yet, or onto a new empty last
-    /// line, the line being typed stayed out of sight (#727). A scroll during the edit doesn't hold,
-    /// so the caret is brought into view right after it, once however fast the keys come.
+    /// After the person's own keystroke. UIKit scrolls to the caret after the edit, sometimes with
+    /// an animation that leaves the line being typed out of sight for a moment (#727). A scroll
+    /// during the edit doesn't hold, so the caret is brought into view right after it, once
+    /// however fast the keys come.
     func didEdit() {
         textDidChange()
         guard isFirstResponder, !revealsCaretAfterEdit else { return }
@@ -431,25 +448,13 @@ final class LongTextView: UITextView {
         if followsCaret, isFirstResponder { scrollCaretToVisible() }
     }
 
-    /// Each step only when the caret is still out of view: TextKit 2 places text it hasn't laid out
-    /// by estimate, so a caret far from what's on screen isn't where it says until the text is laid
-    /// out; then UIKit's own scroll to the selection; then a scroll to the caret's rect with room.
     private func scrollCaretToVisible() {
-        for step in 0..<4 {
-            layoutIfNeeded()
-            guard let end = selectedTextRange?.end else { return }
-            let caret = caretRect(for: end)
-            guard !caret.isNull, !caret.isInfinite else { return }
-            if caret.minY >= bounds.minY, caret.maxY - 1 <= bounds.maxY - contentInset.bottom { return }
-            switch step {
-            case 0:
-                if let manager = textLayoutManager { manager.ensureLayout(for: manager.documentRange) }
-            case 1:
-                scrollRangeToVisible(selectedRange)
-            default:
-                scrollRectToVisible(caret.insetBy(dx: 0, dy: -LongTextKeyboard.caretMargin), animated: false)
-            }
-        }
+        layoutIfNeeded()
+        guard let end = selectedTextRange?.end else { return }
+        let caret = caretRect(for: end)
+        guard !caret.isNull, !caret.isInfinite,
+              caret.minY < bounds.minY || caret.maxY - 1 > bounds.maxY - contentInset.bottom else { return }
+        scrollRectToVisible(caret.insetBy(dx: 0, dy: -LongTextKeyboard.caretMargin), animated: false)
     }
 
     /// A box the keyboard covers scrolls its form up, never past the box's own top. Only when

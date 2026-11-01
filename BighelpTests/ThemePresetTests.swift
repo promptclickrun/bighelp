@@ -174,6 +174,17 @@ struct ThemePresetTests {
         }
     }
 
+    /// A hold on a message reaches the strips around its text (the 2026-10-31 probe: the text view's
+    /// own menu is never asked). A reply on the page keeps them, thin, so holding it still opens its menu.
+    @Test func everyMessageKeepsItsHoldStrips() {
+        typealias Layout = BighelpV3MessagePresentation
+        #expect(Layout.menuEdgeThickness(role: .assistant, agentStyle: .page) == BighelpTokens.space4)
+        #expect(Layout.menuEdgeThickness(role: .assistant, agentStyle: .bubble) == BighelpTokens.space16)
+        for style in ChatAgentMessageStyle.allCases {
+            #expect(Layout.menuEdgeThickness(role: .human, agentStyle: style) == BighelpTokens.space16)
+        }
+    }
+
     @Test func agentMessageStyleIsSavedAndStartsAsBubble() {
         #expect(ChatAgentMessageStyle(rawValue: "bubble") == .bubble && ChatAgentMessageStyle(rawValue: "page") == .page)
         #expect(ChatCanvasRowContext().agentStyle == .bubble)

@@ -324,28 +324,24 @@ struct MessageBubble: View {
         if ChatMessageInteractionPolicy.usesInlineNativeSelection(
             role: role,
             uiV3Enabled: uiV3Enabled
-        ), !BighelpV3MessagePresentation.drawsBubble(role: role, agentStyle: agentStyle, isInterim: false) {
-            // On the page there's no padding to hold actions: the text view's own menu has them all.
-            content
-        } else if ChatMessageInteractionPolicy.usesInlineNativeSelection(
-            role: role,
-            uiV3Enabled: uiV3Enabled
         ) {
             // Text hits remain owned by UITextView's native selection menu.
             // Padding and gaps need a separate full-message action surface.
+            // These strips are what a hold on the message reaches, in the middle too, so a reply on
+            // the page keeps them, only thinner: it has no padding for them to sit in.
+            let edge = BighelpV3MessagePresentation.menuEdgeThickness(role: role, agentStyle: agentStyle)
             content
                 .overlay {
-                    // Match BighelpV3MessageSurface's sixteen-point padding.
                     // The center stays hit-transparent for native selection,
                     // links, and any interactive card inside the message.
                     VStack(spacing: 0) {
-                        messagePaddingActions(interaction).frame(height: BighelpTokens.space16)
+                        messagePaddingActions(interaction).frame(height: edge)
                         HStack(spacing: 0) {
-                            messagePaddingActions(interaction).frame(width: BighelpTokens.space16)
+                            messagePaddingActions(interaction).frame(width: edge)
                             Color.clear.allowsHitTesting(false)
-                            messagePaddingActions(interaction).frame(width: BighelpTokens.space16)
+                            messagePaddingActions(interaction).frame(width: edge)
                         }
-                        messagePaddingActions(interaction).frame(height: BighelpTokens.space16)
+                        messagePaddingActions(interaction).frame(height: edge)
                     }
                 }
         } else {

@@ -27,6 +27,12 @@ enum BighelpV3MessagePresentation {
         !isInterim && (role == .human || agentStyle == .bubble)
     }
 
+    /// The strips around a message's text that a hold reaches (`ChatMessageMenuStrip`): the bubble's
+    /// padding, or a thin edge for a reply on the page, which has none.
+    static func menuEdgeThickness(role: TimelineRole, agentStyle: ChatAgentMessageStyle) -> CGFloat {
+        drawsBubble(role: role, agentStyle: agentStyle, isInterim: false) ? BighelpTokens.space16 : BighelpTokens.space4
+    }
+
     /// The room inside a message's bubble; none across a reply on the page, a little above and below.
     static func contentInsets(role: TimelineRole, density: ChatDensity, agentStyle: ChatAgentMessageStyle,
                               isInterim: Bool) -> EdgeInsets {

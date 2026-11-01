@@ -274,13 +274,17 @@ final class ChatTimelineController {
     func beginReview() { table?.followsTail = false }
 
     func scrollToLatest(animated: Bool) {
-        guard let table, !table.isUserInteracting else { return }
+        // A finger on the chat owns it. A glide left from a flick doesn't: Return to latest shows
+        // as the reader flicks up, so taps often land mid-glide, and ignoring them made the button
+        // feel as if it only worked when pressed just so.
+        guard let table, !table.isTouched else { return }
+        if table.isGliding { table.setContentOffset(table.contentOffset, animated: false) }
         table.followsTail = true
         table.isAnimatingReturn = animated
         if table.numberOfRows(inSection: 0) > 0 {
             table.scrollToRow(at: IndexPath(row: table.numberOfRows(inSection: 0) - 1, section: 0), at: .bottom, animated: animated)
         }
-        if !animated { table.setNeedsLayout() }
+        if animated { table.endReturnAnimation(after: ChatTimelineTableView.returnAnimationLimit) } else { table.setNeedsLayout() }
     }
 
     func scrollToOldest() {
@@ -300,6 +304,22 @@ final class ChatTimelineController {
 final class ChatTimelineTableView: UITableView {
     var followsTail = true
     var isAnimatingReturn = false
+    /// Longer than UIKit's animated scroll.
+    static let returnAnimationLimit: Double = 0.6
+    private var returnGeneration = 0
+
+    /// A streaming answer resizes its row during the animated return, which can end UIKit's
+    /// animation without `scrollViewDidEndScrollingAnimation`. The return then never ended, so
+    /// the tail was never pinned again and the chat stopped short of the answer.
+    func endReturnAnimation(after seconds: Double) {
+        returnGeneration &+= 1
+        let generation = returnGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
+            guard let self, self.returnGeneration == generation, self.isAnimatingReturn else { return }
+            self.isAnimatingReturn = false
+            self.setNeedsLayout()
+        }
+    }
     /// Set by an update; its first layout, which resizes the changed rows, records `updateLaidOutAt`.
     var awaitsUpdateLayout = false
     private(set) var updateLaidOutAt: CFTimeInterval = 0

@@ -8,8 +8,9 @@ import Foundation
 /// to the background, a message arriving). T3 Code's phone app keeps drafts apart from its threads
 /// the same way (github.com/pingdotgg/t3code, apps/mobile, `use-composer-drafts.ts`).
 ///
-/// After a relaunch, a chat opens with its journal draft only while its saved draft is still one
-/// the journal saw when it wrote (`Entry.bases`): anything else that wrote the chat since wins.
+/// The chat's own save drops its entry (`chatSaved`): the chat then holds what was typed. After a
+/// relaunch, a chat opens with its journal draft only while its saved draft is still one the
+/// journal saw when it wrote (`Entry.bases`): anything else that wrote the chat since wins.
 /// Reference drafts never come from here; they keep their own checkpoint, byte for byte.
 @MainActor
 final class ChatDraftJournal {
@@ -29,6 +30,8 @@ final class ChatDraftJournal {
     /// False until the file has been read: a write before then (the phone still locked) would
     /// replace drafts it never saw.
     private var isLoaded = false
+    /// `removeAll` couldn't clear the file: it must be written over, never read back.
+    private var wipePending = false
     private var saveTask: Task<Void, Never>?
 
     /// `repository` nil keeps the journal in memory only (demo mode, tests).
@@ -70,6 +73,12 @@ final class ChatDraftJournal {
         scheduleSave()
     }
 
+    /// The chat saved its draft with the rest of it, so it holds what was typed. Whatever comes
+    /// later (more typing, a reference draft, a send) starts again from what it saved.
+    func chatSaved(_ sessionID: String) {
+        discard(sessionID)
+    }
+
     /// Forgets drafts of chats that are gone.
     func retain(sessionIDs: Set<String>) {
         loadIfNeeded()
@@ -88,9 +97,11 @@ final class ChatDraftJournal {
         do {
             try repository.save([:])
             isLoaded = true
+            wipePending = false
         } catch {
-            // Read again (and so never overwrite) once the file opens.
+            // Written over (never read back) once the file opens.
             isLoaded = false
+            wipePending = true
         }
     }
 
@@ -110,6 +121,12 @@ final class ChatDraftJournal {
     private func loadIfNeeded() {
         guard !isLoaded else { return }
         guard let repository else {
+            isLoaded = true
+            return
+        }
+        if wipePending {
+            do { try repository.save(entries) } catch { return }
+            wipePending = false
             isLoaded = true
             return
         }

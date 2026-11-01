@@ -803,6 +803,7 @@ final class ShellFeatureStore {
             if !model.hasPendingIndependentMessageSubmission {
                 catalog.updateChatSnapshot(draft: model.persistedDraft, items: model.items,
                     activityEvents: model.activityLedger.allEvents, activityVisibility: model.chosenActivityVisibility, for: id)
+                draftJournal?.chatSaved(id)
             }
             // The model's normal checkpoint excludes provisional independent
             // rows. Do not bypass that rule while such a submission is pending.
@@ -1330,10 +1331,15 @@ final class ShellFeatureStore {
             fixture.catalog = catalog
         }
         #endif
+        // The same owner checks as the chat's own save below.
         let journalDraft: ((String) -> Void)? = draftJournal == nil ? nil : { [weak self, weak catalog] draft in
             guard let self, let catalog, self.accountGeneration == referenceGeneration,
                   let referenceModel, self.chatModels[session.id] === referenceModel else { return }
-            self.draftJournal?.write(draft, over: catalog.session(id: session.id)?.draft ?? "", for: session.id)
+            let current = catalog.session(id: session.id)
+            if self.ownsNativeNavigationHydration, !referenceModel.isBotMode {
+                guard let current, referenceModel.ownsReferenceSession(current) else { return }
+            }
+            self.draftJournal?.write(draft, over: current?.draft ?? "", for: session.id)
         }
         let model = ChatModel(
             conversationID: session.id,
@@ -1383,6 +1389,7 @@ final class ShellFeatureStore {
                     activityVisibility: visibility,
                     for: session.id
                 )
+                self.draftJournal?.chatSaved(session.id)
                 if settledReply, !self.defersChatPresentation { catalog.flushPersistence() }
                 if shouldSettle {
                     self.refreshDashboardAfterIncomingChange()

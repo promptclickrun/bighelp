@@ -98,6 +98,20 @@ struct ChatDraftJournalTests {
         #expect(relaunched.openingDraft(for: Self.record("chat", draft: "A")) == "AB")
     }
 
+    /// Typed, then the chat saved (here a reference draft, later sent and cleared): the typed text
+    /// must not come back over what the chat saved after it.
+    @Test func aChatSaveDropsItsJournalDraft() throws {
+        let directory = try Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let journal = ChatDraftJournal(repository: Self.repository(in: directory))
+        journal.write("Look at", over: "", for: "chat")
+        journal.chatSaved("chat")
+        journal.flush()
+
+        let relaunched = ChatDraftJournal(repository: Self.repository(in: directory))
+        #expect(relaunched.openingDraft(for: Self.record("chat", draft: "")) == "")
+    }
+
     @Test func referenceDraftsNeverComeFromTheJournal() {
         let journal = ChatDraftJournal(repository: nil)
         journal.write("Plain text", over: "Canonical", for: "chat")

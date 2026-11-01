@@ -2,11 +2,11 @@ import Combine
 import SwiftUI
 import UIKit
 
-/// What the message box calls back into its chat screen with. `ChatView` keeps one for its whole
-/// life and brings these up to date each time it draws; the box calls through it when tapped. So
-/// the box itself compares equal (`ChatComposer.==`) and isn't drawn again for every streamed
-/// piece of an answer that redraws the chat. (T3 Code's phone app keeps its composer's callbacks
-/// stable for the same reason: github.com/pingdotgg/t3code, apps/mobile.)
+/// What the message box calls back into its chat screen with. `ChatComposerHost` keeps one for its
+/// whole life and brings these up to date each time the chat draws; the box calls through it when
+/// tapped. So the box itself compares equal (`ChatComposer.==`) and isn't drawn again for every
+/// streamed piece of an answer that redraws the chat. (T3 Code's phone app keeps its composer's
+/// callbacks stable for the same reason: github.com/pingdotgg/t3code, apps/mobile.)
 @MainActor
 final class ChatComposerActions {
     var attachment: (() -> Void)?
@@ -15,6 +15,48 @@ final class ChatComposerActions {
     var dismissKeyboard: () -> Void = {}
     var willSend: () -> Void = {}
     var referenceSend: ((ReferenceFrozenDraft, MidSessionChatBehavior?) async -> Void)?
+}
+
+/// The message box as the chat screen places it: takes the chat's closures on every draw, puts them
+/// in its `ChatComposerActions` and draws the box only when `ChatComposer.==` says it changed. The
+/// actions live in this view's state, not `ChatView`'s: there, closures that capture the chat
+/// screen would keep it, and its chat, alive after it closes.
+struct ChatComposerHost: View {
+    let model: ChatModel
+    let agentName: String
+    let sessionCatalog: SessionCatalogStore?
+    let onAttachmentTap: (() -> Void)?
+    let onVoiceTap: () -> Void
+    let onFittingRailVerticalDrag: (ChatRailScrollDirection) -> Void
+    let draftFocus: Binding<Bool>
+    let isDraftFocused: Bool
+    let onDismissKeyboard: () -> Void
+    let onWillSend: () -> Void
+    let companionAppearance: CompanionAppearance?
+    let companionReaction: CompanionReaction
+    let companionSizeScale: Double
+    let companionIsAdventurous: Bool
+    let referenceHub: ReferenceHubStore
+    let referenceSkills: SkillsAndToolsStore?
+    let onReferenceSend: ((ReferenceFrozenDraft, MidSessionChatBehavior?) async -> Void)?
+    @State private var actions = ChatComposerActions()
+
+    var body: some View {
+        actions.attachment = onAttachmentTap
+        actions.voice = onVoiceTap
+        actions.fittingRailVerticalDrag = onFittingRailVerticalDrag
+        actions.dismissKeyboard = onDismissKeyboard
+        actions.willSend = onWillSend
+        actions.referenceSend = onReferenceSend
+        return ChatComposer(
+            model: model, agentName: agentName, sessionCatalog: sessionCatalog, actions: actions,
+            offersAttachments: onAttachmentTap != nil, draftFocus: draftFocus, isDraftFocused: isDraftFocused,
+            companionAppearance: companionAppearance, companionReaction: companionReaction,
+            companionSizeScale: companionSizeScale, companionIsAdventurous: companionIsAdventurous,
+            referenceHub: referenceHub, referenceSkills: referenceSkills
+        )
+        .equatable()
+    }
 }
 
 struct ChatComposer: View, Equatable {

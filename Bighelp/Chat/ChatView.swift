@@ -190,7 +190,6 @@ struct ChatView: View {
     @State private var companionAffectionTask: Task<Void, Never>?
     @State private var companionIsCelebrating = false
     @State private var isDraftFocused = false
-    @State private var composerActions = ChatComposerActions()
     @State private var composerFocusTask: Task<Void, Never>?
     @State private var isForceRefreshing = false
     @State private var refreshGeneration: UUID?
@@ -777,22 +776,17 @@ struct ChatView: View {
     }
 
     private var composer: some View {
-        // The box calls back through `composerActions`, brought up to date here, so it compares
-        // equal and isn't drawn again for what changes around it (each streamed piece of an answer).
-        composerActions.attachment = attachmentAction
-        composerActions.voice = { dismissKeyboardAndOpenVoice() }
-        composerActions.fittingRailVerticalDrag = { requestFittingRailScroll($0) }
-        composerActions.dismissKeyboard = { dismissKeyboard() }
-        composerActions.willSend = { timelineController.scrollToLatest(animated: false) }
-        composerActions.referenceSend = onReferenceSend
-        return ChatComposer(
+        ChatComposerHost(
             model: model,
             agentName: agentName,
             sessionCatalog: sessionCatalog,
-            actions: composerActions,
-            offersAttachments: onAttachmentTap != nil,
+            onAttachmentTap: attachmentAction,
+            onVoiceTap: dismissKeyboardAndOpenVoice,
+            onFittingRailVerticalDrag: requestFittingRailScroll,
             draftFocus: $isDraftFocused,
             isDraftFocused: isDraftFocused,
+            onDismissKeyboard: dismissKeyboard,
+            onWillSend: { timelineController.scrollToLatest(animated: false) },
             companionAppearance: companionStore.flatMap { store in
                 store.isEnabled ? companionAppearance(from: store) : nil
             },
@@ -800,9 +794,9 @@ struct ChatView: View {
             companionSizeScale: companionStore?.sizeScale ?? 1,
             companionIsAdventurous: companionStore?.isAdventurous == true,
             referenceHub: referenceHub ?? fallbackReferenceHub,
-            referenceSkills: referenceSkills
+            referenceSkills: referenceSkills,
+            onReferenceSend: onReferenceSend
         )
-        .equatable()
         .frame(maxWidth: .infinity, alignment: .center)
     }
 

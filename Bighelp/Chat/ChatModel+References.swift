@@ -396,7 +396,8 @@ extension ChatModel {
             do { try await Task.sleep(for: delay) } catch { return }
             guard let self, self.journalsDraft else { return }
             self.draftJournalTask = nil
-            ChatPerformanceProbe.measure("chat.draft-journal") { self.onDraftJournal?(self.persistedDraft) }
+            guard let onDraftJournal = self.onDraftJournal else { return }
+            ChatPerformanceProbe.measure("chat.draft-journal") { onDraftJournal(self.persistedDraft) }
         }
     }
 

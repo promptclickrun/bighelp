@@ -6,6 +6,36 @@ import UIKit
 /// Agent `MEDIA:` deliveries resolve through the plugin's provenance-bound route.
 @MainActor
 struct DirectHermesNativeAttachmentTests {
+    @Test func savedHistoryWithLongRowIdentityLoadsAttachments() async throws {
+        let owner = try makeOwner()
+        let http = AttachmentHTTP(features: ["native-agent-attachments-v1"])
+        let pdf = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 10, height: 10)).pdfData { $0.beginPage() }
+        http.file = pdf
+        let workspace = DirectHermesWorkspaceClient(rpc: NoRPC(), http: http, owner: owner,
+                                                    capabilities: .init(owner: owner), currentOwner: { owner })
+        let resolver = DirectHermesGeneratedMediaClient(workspace: workspace, owner: owner, currentOwner: { owner })
+        let stored = "local-bot-" + String(repeating: "a", count: 80)
+        let session = try DirectHermesSessionIdentity.appID(owner: owner, profileID: "default", anchorID: stored)
+        let rowID = session + ":row:12345"
+        #expect(rowID.utf8.count > 180)
+        let result = try #require(try await resolver.resolve(agentID: "default", storedID: stored,
+            items: [.init(id: rowID, text: "MEDIA:/fixture/Report.pdf")]).first)
+        #expect(result.id == rowID)
+        #expect(result.attachments.first?.data == pdf)
+        // A different row with the same long prefix must not share the host's cached item.
+        for id in [rowID + "6", rowID] {
+            let resolved = try #require(try await resolver.resolve(agentID: "default", storedID: stored,
+                items: [.init(id: id, text: "MEDIA:/fixture/Report.pdf")]).first)
+            #expect(resolved.id == id)
+            #expect(resolved.attachments.first?.data == pdf)
+        }
+        let requestIDs = http.requests.filter { $0.path.hasSuffix("/resolve") }
+            .compactMap { $0.body?["items"]?.array?.first?.object?["itemId"]?.string }
+        #expect(requestIDs.count == 3)
+        #expect(requestIDs.first == requestIDs.last)
+        #expect(requestIDs[0] != requestIDs[1])
+    }
+
     @Test func assistantMediaResolvesThroughPluginInBoundedChunksAndStripsTheDirective() async throws {
         let owner = try makeOwner()
         let http = AttachmentHTTP(features: ["native-agent-attachments-v1"])
@@ -364,6 +394,9 @@ private final class AttachmentHTTP: DirectHermesAuthenticatedHTTP, DirectHermesN
                                                  "byteCount": .integer(data.count)])]
             } else if request.path.hasSuffix("/resolve") {
                 let item = try #require(body["items"]?.array?.first?.object)
+                // The plugin attachment store bounds item IDs to 180 UTF-8 bytes.
+                guard let itemID = item["itemId"]?.string, !itemID.isEmpty,
+                      itemID.utf8.count <= 180 else { throw WorkspaceClientError.invalidRequest }
                 var attachments: [BighelpJSONValue] = file.map { data in
                     [.object(["id": .string(String(repeating: "c", count: 32)), "fileName": .string("Report.pdf"),
                               "mimeType": .string("application/pdf"), "byteCount": .integer(byteCount ?? data.count)])]

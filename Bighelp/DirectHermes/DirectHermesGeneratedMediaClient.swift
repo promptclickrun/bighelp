@@ -200,18 +200,22 @@ final class DirectHermesGeneratedMediaClient: GeneratedMediaResolving, AgentAtta
     /// Returns nil when the host does not advertise the route.
     private func resolveNatively(_ item: AgentAttachmentTextItem, agentID: String,
                                  storedID: String) async throws -> ResolvedAgentAttachmentItem? {
+        // Catalog row IDs include the host and encoded session; the plugin's attachment
+        // store accepts only 180 bytes. Keep short IDs stable for existing cache entries.
+        let requestID = item.id.utf8.count <= 180 ? item.id
+            : "message_" + SHA256.hash(data: Data(item.id.utf8)).map { String(format: "%02x", $0) }.joined()
         let response: [String: BighelpJSONValue]
         do {
             response = try await workspace.perform(.attachmentsResolve, payload: [
                 "agentId": .string(agentID), "storedId": .string(storedID),
-                "items": .array([.object(["itemId": .string(item.id), "text": .string(item.text)])])
+                "items": .array([.object(["itemId": .string(requestID), "text": .string(item.text)])])
             ], owner: owner)
         } catch WorkspaceClientError.unavailable {
             return nil
         }
         try checkOwner()
         guard let rows = response["items"]?.array, rows.count == 1, let row = rows[0].object,
-              row["itemId"]?.string == item.id, let text = row["text"]?.string,
+              row["itemId"]?.string == requestID, let text = row["text"]?.string,
               let listed = row["attachments"]?.array else { throw WorkspaceClientError.invalidResponse }
         // Newer plugins say why a file didn't come (`unavailable`); older ones send nothing.
         var failure = row["unavailable"]?.array?.lazy.compactMap { $0.object?["reason"]?.string }

@@ -91,7 +91,7 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
         Coordinator(openURL: openURL)
     }
 
-    func makeUIView(context: Context) -> UITextView {
+    func makeUIView(context: Context) -> ChatMessageTextHost {
         // Read-only messages use incremental NSTextStorage updates and full-height
         // measurement. Avoid TextKit 2 fragment relayout on each streaming append.
         // The editable composer keeps its own text system and selection owner.
@@ -115,22 +115,14 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
         view.isAccessibilityElement = true
         view.accessibilityIdentifier = "chat.message.inline-selection"
         view.accessibilityHint = "Long press shows message actions. Double tap selects a word. Links open in your chosen browser."
-        let textLongPressRecognizers = (view.gestureRecognizers ?? []).compactMap { $0 as? UILongPressGestureRecognizer }
-        let contextMenuInteraction = UIContextMenuInteraction(delegate: context.coordinator.menu)
-        view.addInteraction(contextMenuInteraction)
-        let textRecognizerIDs = Set(textLongPressRecognizers.map(ObjectIdentifier.init))
-        if let contextMenuLongPress = (view.gestureRecognizers ?? [])
-            .compactMap({ $0 as? UILongPressGestureRecognizer })
-            .first(where: { !textRecognizerIDs.contains(ObjectIdentifier($0)) }) {
-            // The message menu owns a hold; UIKit's tap gestures remain free to
-            // select a precise word or range without a second message surface.
-            textLongPressRecognizers.forEach { $0.require(toFail: contextMenuLongPress) }
-        }
+        let host = ChatMessageTextHost(textView: view)
+        host.addInteraction(UIContextMenuInteraction(delegate: context.coordinator.menu))
         context.coordinator.idealLayout = ChatNativeMarkdownIdealLayout(textStorage: view.textStorage)
-        return view
+        return host
     }
 
-    func updateUIView(_ view: UITextView, context: Context) {
+    func updateUIView(_ host: ChatMessageTextHost, context: Context) {
+        let view = host.textView
         _ = dynamicTypeSize
         context.coordinator.openURL = openURL
         context.coordinator.menu.update(
@@ -189,11 +181,12 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
         }
         view.invalidateIntrinsicContentSize()
         view.setNeedsLayout()
+        host.setNeedsLayout()
     }
 
     func sizeThatFits(
         _ proposal: ProposedViewSize,
-        uiView: UITextView,
+        uiView host: ChatMessageTextHost,
         context: Context
     ) -> CGSize? {
         guard let width = proposal.width, width.isFinite, width > 0 else {
@@ -204,7 +197,7 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
         }
         let measured = context.coordinator.renderCache.measure(width: width) { width in
             ChatPerformanceProbe.measure("text.layout.constrained") {
-                uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+                host.textView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
             }
         }
         return CGSize(width: width, height: ceil(measured.height))
@@ -240,6 +233,41 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
         ) -> Bool {
             openURL(url)
             return false
+        }
+    }
+}
+
+/// Holds a message's text view and the message menu. The menu sits on this view, not on the text
+/// view: UIKit never asks a menu added to the text view itself, so a hold on the text opened nothing
+/// and only the bubble's padding strips worked (#719). Holds on the text reach this view's menu,
+/// which wins over the text view's own long-press; taps still select words and open links.
+final class ChatMessageTextHost: UIView {
+    let textView: UITextView
+
+    init(textView: UITextView) {
+        self.textView = textView
+        super.init(frame: .zero)
+        backgroundColor = .clear
+        isOpaque = false
+        addSubview(textView)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        textView.frame = bounds
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        guard window != nil else { return }
+        // The menu's recognizers exist once the view is in a window. The text view's long-press
+        // (its loupe) waits for them, so a hold opens the menu; Select text there selects.
+        let menuRecognizers = gestureRecognizers ?? []
+        for recognizer in textView.gestureRecognizers ?? [] where recognizer is UILongPressGestureRecognizer {
+            menuRecognizers.forEach { recognizer.require(toFail: $0) }
         }
     }
 }

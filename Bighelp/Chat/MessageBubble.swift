@@ -327,8 +327,8 @@ struct MessageBubble: View {
         ) {
             // Text hits remain owned by UITextView's native selection menu.
             // Padding and gaps need a separate full-message action surface.
-            // These strips are what a hold on the message reaches, in the middle too, so a reply on
-            // the page keeps them, only thinner: it has no padding for them to sit in.
+            // A hold on the text opens the menu through the text's own host (`ChatMessageTextHost`);
+            // these strips cover the padding around it, thin on the page, which has none.
             let edge = BighelpV3MessagePresentation.menuEdgeThickness(role: role, agentStyle: agentStyle)
             content
                 .overlay {

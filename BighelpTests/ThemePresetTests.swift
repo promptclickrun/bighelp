@@ -174,8 +174,8 @@ struct ThemePresetTests {
         }
     }
 
-    /// A hold on a message reaches the strips around its text (the 2026-10-31 probe: the text view's
-    /// own menu is never asked). A reply on the page keeps them, thin, so holding it still opens its menu.
+    /// The strips around a message's text open its menu from the padding; a reply on the page keeps
+    /// them, thin. A hold on the text itself goes to `ChatMessageTextHost`.
     @Test func everyMessageKeepsItsHoldStrips() {
         typealias Layout = BighelpV3MessagePresentation
         #expect(Layout.menuEdgeThickness(role: .assistant, agentStyle: .page) == BighelpTokens.space4)

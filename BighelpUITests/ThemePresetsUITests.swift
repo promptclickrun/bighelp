@@ -47,7 +47,8 @@ final class ThemePresetsUITests: BighelpUITestCase {
 
     @MainActor
     func testAgentRepliesOnThePageUseTheLaneAndKeepTheirMenu() throws {
-        let bubbleWidth = try agentReplyWidth(style: "bubble", checkMenu: false)
+        // A hold in the middle of the text opens the menu, with a bubble and on the page.
+        let bubbleWidth = try agentReplyWidth(style: "bubble", checkMenu: true)
         let pageWidth = try agentReplyWidth(style: "page", checkMenu: true)
         XCTAssertGreaterThan(pageWidth - bubbleWidth, 20, "On the page a reply takes the lane's full width")
     }
@@ -109,11 +110,12 @@ final class ThemePresetsUITests: BighelpUITestCase {
         XCTAssertTrue(reply.waitForExistence(timeout: 8))
         let width = reply.frame.width
         if checkMenu {
-            // Mid-text: the chat's edge-swipe strips cover the outer 28 points of the screen.
-            reply.press(forDuration: 1)
+            // The text's own middle, never the padding around it (XCUITest's own hold point can land
+            // in a bubble's padding).
+            reply.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 1)
             for title in ["Reply", "Copy to clipboard", "Share…", "Select text"] {
                 let item = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", title)).firstMatch
-                XCTAssertTrue(item.waitForExistence(timeout: 3), "\(title) is in the menu of a reply on the page")
+                XCTAssertTrue(item.waitForExistence(timeout: 3), "\(title) is in the menu of a reply held mid-text, \(style)")
             }
             app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Select text")).firstMatch.tap()
             XCTAssertTrue(app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "Room for the conversation"))

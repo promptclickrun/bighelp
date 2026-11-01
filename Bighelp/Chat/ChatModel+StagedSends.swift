@@ -47,7 +47,7 @@ extension ChatModel {
     /// need the connection to be read, so they wait in the box as before. A file over 8 MB waits
     /// in the chat on its own row, with its tile (`sendBigFileDraft`).
     var stagesComposerMessage: Bool {
-        guard !isBotMode, !connectionIsOverdue, draft.first(where: { !$0.isWhitespace }) != "/",
+        guard !isBotMode, !connectionIsOverdue, !draftShape.isCommand,
               !orderedDraftAttachments.contains(where: { $0.pdfSelection != nil || $0.bigFile != nil })
         else { return false }
         if lacksConnection || !stagedSends.isEmpty { return true }

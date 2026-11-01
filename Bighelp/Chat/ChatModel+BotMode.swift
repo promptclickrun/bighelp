@@ -341,7 +341,9 @@ extension ChatModel {
     }
 
     var mentionToken: String? {
-        activeMentionContext?.token
+        // Most drafts have no @: the mention list then never walks the draft.
+        guard draftShape.mayMention else { return nil }
+        return activeMentionContext?.token
     }
 
     var mentionSuggestions: [MentionSuggestion] {

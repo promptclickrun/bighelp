@@ -43,12 +43,17 @@ final class ChatModel {
                 draft = reply.body
                 replyDraft = reply.quote
             }
-            if !isReplacingReferenceDraft, Data(oldValue.utf8) != Data(draft.utf8) {
+            let shape = ChatDraftShape(draft)
+            if shape != draftShape { draftShape = shape }
+            if !isReplacingReferenceDraft, !oldValue.utf8.elementsEqual(draft.utf8) {
                 referenceCanonicalSource = nil
                 referenceDraftID = nil
                 referenceDraftRevision = nil
-                referenceSelections.removeAll {
-                    (try? ReferenceCodec.encode(source: draft, references: [$0.snapshot])) == nil
+                // Even an empty removal notifies whatever reads the selections, on every key.
+                if !referenceSelections.isEmpty {
+                    referenceSelections.removeAll {
+                        (try? ReferenceCodec.encode(source: draft, references: [$0.snapshot])) == nil
+                    }
                 }
             }
             if let selectedSlashCommand,
@@ -66,6 +71,9 @@ final class ChatModel {
             }
         }
     }
+    /// The draft as Send, the placeholder and the mention list need it. It changes only when one
+    /// of its flags does, so a key that changes none of them redraws only the text view.
+    private(set) var draftShape = ChatDraftShape()
     /// The message the draft answers. It is sent, and saved with the draft, as
     /// a quote line before the text (`ChatReplyQuote`).
     var replyDraft: ChatReplyQuote? {
@@ -426,6 +434,7 @@ final class ChatModel {
         let restoredReferences = ReferenceCanonicalState.restoredDraft(initialDraft,
             state: sourceSession?.referenceState)
         draft = restoredReferences.source
+        draftShape = ChatDraftShape(restoredReferences.source)
         referenceSelections = restoredReferences.selections
         referenceCanonicalSource = initialDraft
         referenceSubmission = sourceSession?.referenceState?.submission
@@ -489,7 +498,7 @@ final class ChatModel {
         // message settles it first. Only a stop on its way does.
         guard botModeRoom?.nativeRetryJournal == nil, !isBotModeStopInFlight else { return false }
         guard !richDraftRecovery.hasUnexportedChanges else { return false }
-        let hasText = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasText = draftShape.hasText
         let attachmentsSupported = orderedDraftAttachments.isEmpty || (!isBotMode && orderedDraftAttachments.allSatisfy { value in
             if let selection = value.pdfSelection { return pdfAttachmentTarget == selection.target }
             if case .attachment(let attachment) = value { return supportedAttachmentKinds.contains(attachment.kind) }
@@ -524,7 +533,7 @@ final class ChatModel {
         if referenceSubmission != nil || referenceSendInFlight { return "a message is still being sent" }
         if draftAttachmentImport != nil { return "attachments are still being added" }
         if !draftAttachmentFailures.isEmpty { return "an attachment didn't attach" }
-        if orderedDraftAttachments.isEmpty && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if orderedDraftAttachments.isEmpty && !draftShape.hasText {
             return nil
         }
         if isBotMode, let reason = botModeSendUnavailableReason { return reason }

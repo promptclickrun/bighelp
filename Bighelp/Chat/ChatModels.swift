@@ -527,10 +527,34 @@ enum ChatComposerPrimaryAction: Equatable, Sendable {
         isTurnActive: Bool = false,
         hasAttachments: Bool = false
     ) -> ChatComposerPrimaryAction {
-        if hasAttachments || !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return .send
-        }
+        resolve(hasText: ChatDraftShape(draft).hasText, isTurnActive: isTurnActive, hasAttachments: hasAttachments)
+    }
+
+    static func resolve(hasText: Bool, isTurnActive: Bool = false, hasAttachments: Bool = false) -> ChatComposerPrimaryAction {
+        if hasAttachments || hasText { return .send }
         return isTurnActive ? .stop : .voice
+    }
+}
+
+/// What the message box's small views read from the draft (`ChatModel.draftShape`), worked out
+/// once per key with early exits instead of each view trimming or walking the whole draft.
+struct ChatDraftShape: Equatable, Sendable {
+    var isEmpty = true
+    /// Something besides spaces and line breaks, so Send can send it.
+    var hasText = false
+    /// Starts with `/` after any spaces: a command, which waits in the box for the connection.
+    var isCommand = false
+    /// Has an `@`, so the mention list may show.
+    var mayMention = false
+
+    init() {}
+
+    init(_ draft: String) {
+        isEmpty = draft.isEmpty
+        // The same test as trimming `.whitespacesAndNewlines` to nothing, stopping at the first letter.
+        hasText = draft.unicodeScalars.contains { !CharacterSet.whitespacesAndNewlines.contains($0) }
+        isCommand = draft.first(where: { !$0.isWhitespace }) == "/"
+        mayMention = draft.utf8.contains(UInt8(ascii: "@"))
     }
 }
 

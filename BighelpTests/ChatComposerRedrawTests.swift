@@ -87,10 +87,64 @@ struct ChatComposerRedrawTests {
         #expect(anotherChatRedraws)
     }
 
+    /// Send, the placeholder and the mention list read the draft's shape, not the draft: a key
+    /// that changes nothing they show redraws none of them.
+    @Test func aKeyThatChangesNothingSendShowsRedrawsNeitherSendNorThePlaceholder() {
+        let model = ChatModel(conversationID: "composer-redraw-keys", client: ConversationFixtureClient(),
+                              initialItems: [])
+        model.draft = "H"
+        let redraws = ComposerRedrawCounter()
+        withObservationTracking {
+            _ = model.draftShape.isEmpty
+            _ = model.canSend
+            _ = model.sendUnavailableReason
+            _ = model.mentionSuggestions
+        } onChange: {
+            redraws.increment()
+        }
+        model.draft = "Hi"
+        model.draft = "Hi there, could you check the invoices"
+        #expect(redraws.value == 0)
+        #expect(model.canSend)
+
+        model.draft = ""
+        #expect(redraws.value == 1)
+        #expect(!model.canSend)
+        #expect(model.draftShape == ChatDraftShape())
+    }
+
+    @Test func theDraftShapeAgreesWithTheChecksItReplaces() {
+        let samples = ["", " ", "\n\t ", "\u{00A0}", "\u{2028}\u{3000}", "\u{200B}", "a", "  a  ", "e\u{301}", "👋",
+                       " /plan it", "/", "\n/note", "a/b", "@", "Ask @ju", "Ask @", "mail@example.com"]
+        for sample in samples {
+            let shape = ChatDraftShape(sample)
+            #expect(shape.isEmpty == sample.isEmpty, "\(sample.debugDescription)")
+            #expect(shape.hasText == !sample.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                    "\(sample.debugDescription)")
+            #expect(shape.isCommand == (sample.first(where: { !$0.isWhitespace }) == "/"), "\(sample.debugDescription)")
+            #expect(shape.mayMention == sample.unicodeScalars.contains("@"), "\(sample.debugDescription)")
+            #expect(ChatComposerPrimaryAction.resolve(draft: sample)
+                    == ChatComposerPrimaryAction.resolve(hasText: shape.hasText), "\(sample.debugDescription)")
+        }
+        // Restored with the chat, not typed.
+        let restored = ChatModel(conversationID: "composer-redraw-restored", client: ConversationFixtureClient(),
+                                 initialItems: [], initialDraft: "Ask @ju")
+        #expect(restored.draftShape == ChatDraftShape("Ask @ju"))
+    }
+
     private static func answer(_ id: String, _ text: String, delivery: String = "Delivered") -> TimelineItem {
         TimelineItem(id: id, role: .assistant, sender: .agent(id: "default", snapshot: .init(name: "Juno")),
                      content: .message(text), metadata: .init(delivery: delivery))
     }
+}
+
+private final class ComposerRedrawCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    var value: Int { lock.withLock { count } }
+
+    func increment() { lock.withLock { count += 1 } }
 }
 
 @MainActor

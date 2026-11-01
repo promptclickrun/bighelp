@@ -545,7 +545,7 @@ struct ChatComposer: View, Equatable {
     }
 
     private func publishReferenceDraft() {
-        guard Data(model.draft.utf8) == Data(referenceHub.source.utf8) else { return }
+        guard model.draft.utf8.elementsEqual(referenceHub.source.utf8) else { return }
         do { try model.updateReferenceDraft(source: referenceHub.source, selections: referenceHub.selected) }
         catch { referenceHub.showMessage("The reference draft could not be saved. Keep this chat open and retry.") }
     }
@@ -784,8 +784,8 @@ extension View {
     }
 }
 
-// Typing changes the draft and the caret on every key. Only these small views read them,
-// so a keystroke redraws them alone, never the whole message box.
+// Typing changes the draft and the caret on every key. These small views read only the
+// draft's shape (`ChatDraftShape`), so most keys redraw none of them, and never the whole box.
 
 /// The @-mention list.
 private struct ComposerMentionSuggestions: View {
@@ -794,7 +794,7 @@ private struct ComposerMentionSuggestions: View {
 
     var body: some View {
         let _ = ChatPerformanceProbe.count("composer.mentions.body")
-        let suggestions = model.mentionSuggestions
+        let suggestions = model.draftShape.mayMention ? model.mentionSuggestions : []
         if !suggestions.isEmpty {
             MentionSuggestionsView(suggestions: suggestions, agents: model.agentDirectory, onSelect: onSelect)
                 .padding(.horizontal, BighelpTokens.space4)
@@ -815,7 +815,7 @@ private struct ComposerPrimaryAction: View {
     var body: some View {
         let _ = ChatPerformanceProbe.count("composer.action.body")
         AdaptiveComposerActionButton(
-            action: ChatComposerPrimaryAction.resolve(draft: model.draft,
+            action: ChatComposerPrimaryAction.resolve(hasText: model.draftShape.hasText,
                                                       isTurnActive: model.isSending || model.otherProcessRun != nil,
                                                       hasAttachments: model.hasDraftAttachmentActivity),
             isBusy: model.isStopping || model.hasExclusiveMidSessionSubmission,
@@ -840,7 +840,7 @@ private struct ComposerPlaceholder: View {
 
     var body: some View {
         let _ = ChatPerformanceProbe.count("composer.placeholder.body")
-        if model.draft.isEmpty {
+        if model.draftShape.isEmpty {
             Text(text)
                 .bighelpFont(.body)
                 .foregroundStyle(color)

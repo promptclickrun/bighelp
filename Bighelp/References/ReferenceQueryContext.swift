@@ -17,6 +17,8 @@ struct ReferenceQueryContext: Equatable, Sendable {
     }
 
     static func parse(source: String, selection: NSRange) -> ReferenceQueryContext? {
+        // Every query starts with `/`; most drafts have none, and this runs on every key.
+        guard source.utf8.contains(UInt8(ascii: "/")) else { return nil }
         let units = Array(source.utf16)
         guard ReferenceSourceSyntax.valid(selection, in: units) else { return nil }
         var start = selection.location

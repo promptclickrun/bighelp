@@ -69,7 +69,7 @@ extension ChatModel {
     /// Parent forwards hub edits here, including removals and native Undo/Redo.
     func updateReferenceDraft(source: String, selections: [ReferenceDraftSelection]) throws {
         guard !referenceOwnerRetired else { throw CancellationError() }
-        let sameSource = Data(draft.utf8) == Data(source.utf8)
+        let sameSource = draft.utf8.elementsEqual(source.utf8)
         let sameSelections = Self.sameReferenceSelections(referenceSelections, selections)
         guard !sameSource || !sameSelections else { return }
         let canonical = try ReferenceCodec.encode(source: source, references: selections.map(\.snapshot))

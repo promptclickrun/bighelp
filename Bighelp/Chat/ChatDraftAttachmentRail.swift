@@ -405,8 +405,8 @@ struct DraftAttachmentsSheet: View {
 enum DraftAttachmentRailFixture {
     /// A made-up 80 MB video in a sent message: on its way (34 of 80 MB), not sent (with Try
     /// again), or taken by Hermes (its line on the rail). "big-file-uploading|failed|sent".
-    @MainActor
-    static func seedBigFile(_ model: ChatModel, state: String) {
+    @MainActor @discardableResult
+    static func seedBigFile(_ model: ChatModel, state: String) -> String {
         let file = ChatBigFile(id: "fixturebigfile00000000000000000a", fileName: "Trip to the coast.mov",
                                mimeType: "video/quicktime", byteCount: 80_000_000,
                                sha256: String(repeating: "0", count: 64), video: .init(seconds: 72, width: 1920, height: 1080))
@@ -432,6 +432,7 @@ enum DraftAttachmentRailFixture {
         } else {
             model.bigFileSends.append(human)
         }
+        return human.id
     }
 
     @MainActor
@@ -453,10 +454,18 @@ enum DraftAttachmentRailFixture {
             }
         case "file": add([lease])
         case "big-file-uploading", "big-file-failed", "big-file-sent":
-            // The chat loads its own messages as it opens; a row added before that is replaced.
-            for _ in 0..<50 where model.items.isEmpty { try? await Task.sleep(for: .milliseconds(100)) }
-            try? await Task.sleep(for: .milliseconds(500))
-            seedBigFile(model, state: arguments[index + 1])
+            // The chat loads its own messages as it opens, and a load replaces the transcript's rows, so
+            // the sent message goes in once loading is over, and again if a late load took it out.
+            for _ in 0..<80 where model.items.isEmpty || model.isHydratingHistory {
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            var id = seedBigFile(model, state: arguments[index + 1])
+            for _ in 0..<10 {
+                try? await Task.sleep(for: .milliseconds(500))
+                if !model.items.contains(where: { $0.id == id }), !model.bigFileSends.contains(where: { $0.id == id }) {
+                    id = seedBigFile(model, state: arguments[index + 1])
+                }
+            }
         case "big-file-import":
             // A real host's test: the video the probe made, through the same checks as Add › File.
             guard let at = arguments.firstIndex(of: "-test-big-file-path"), arguments.indices.contains(at + 1) else { break }

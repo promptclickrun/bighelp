@@ -597,6 +597,10 @@ struct BighelpApp: App {
                 #if DEBUG && os(iOS) && targetEnvironment(simulator)
                 CarPlaySessionFixture.rootView()
                 #endif
+            } else if ProcessInfo.processInfo.arguments.contains("-test-chat-citations") {
+                #if DEBUG && targetEnvironment(simulator)
+                ChatCitationFixture()
+                #endif
             } else if isMarkdownAttachmentFixture {
                 #if DEBUG && targetEnvironment(simulator)
                 MarkdownAttachmentFixture.rootView()

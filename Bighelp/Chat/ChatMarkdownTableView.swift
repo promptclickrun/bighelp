@@ -9,6 +9,7 @@ import UniformTypeIdentifiers
 struct ChatMarkdownTableView: View {
     let table: MarkdownTable
     var textColor: Color?
+    var citationLinks: [Int: URL] = [:]
 
     @BighelpThemeReader private var theme: BighelpTheme
     @Environment(\.openURL) private var openURL
@@ -84,7 +85,7 @@ struct ChatMarkdownTableView: View {
         let alignment = table.alignments.indices.contains(column) ? table.alignments[column] : .leading
         return ChatTableCellText(
             markdown: markdown, isHeader: isHeader, alignment: nativeAlignment(alignment),
-            textColor: textColor ?? theme.primaryText, theme: theme, openURL: openURL
+            textColor: textColor ?? theme.primaryText, theme: theme, openURL: openURL, citationLinks: citationLinks
         )
             .padding(.horizontal, BighelpTokens.space12)
             .padding(.vertical, BighelpTokens.space8)
@@ -134,6 +135,7 @@ struct ChatTableCellText: UIViewRepresentable {
     let textColor: Color
     let theme: BighelpTheme
     let openURL: OpenURLAction
+    var citationLinks: [Int: URL] = [:]
 
     func makeCoordinator() -> Coordinator { Coordinator(openURL: openURL) }
 
@@ -162,7 +164,7 @@ struct ChatTableCellText: UIViewRepresentable {
         let text = ChatNativeMarkdownAttributedBuilder.tableCell(markdown, isHeader: isHeader, alignment: alignment, style: .init(
             primaryText: UIColor(textColor), secondaryText: UIColor(theme.secondaryText),
             accent: UIColor(theme.action), codeBackground: UIColor(theme.primaryText.opacity(0.07)),
-            proseLineSpacing: 0, traitCollection: view.traitCollection, theme: theme))
+            proseLineSpacing: 0, traitCollection: view.traitCollection, theme: theme, citationLinks: citationLinks))
         view.accessibilityLabel = ChatMentionRendering.plainText(text, usingNames: true)
         if view.attributedText?.isEqual(to: text) != true {
             view.attributedText = text

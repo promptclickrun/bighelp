@@ -923,18 +923,24 @@ private struct SimpleBotInstructionsEditor: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-                TextEditor(text: $text)
-                    .font(.bighelp(.body))
-                    .scrollContentBackground(.hidden)
-                    .padding(BighelpTokens.space12)
-                    .background(theme.surface, in: .rect(cornerRadius: BighelpTokens.radius20, style: .continuous))
-                    .accessibilityIdentifier("simple-bots.instructions.editor")
+                // Above the text: the editor runs on under the keyboard.
                 if let errorMessage {
                     Text(errorMessage).font(.bighelp(.subheadline)).foregroundStyle(theme.danger)
                 }
+                LongTextEditor(text: $text, accessibilityLabel: String(localized: "Instructions"),
+                               identifier: "simple-bots.instructions.editor")
+                    .padding(.horizontal, BighelpTokens.space12)
+                    .padding(.vertical, BighelpTokens.space4)
+                    .background(theme.surface)
+                    // Text scrolled to the edge stays inside the rounded corners.
+                    .clipShape(.rect(cornerRadius: BighelpTokens.radius20, style: .continuous))
             }
             .padding(BighelpTokens.space16)
+            // The editor keeps the caret above the keyboard itself, so its frame stays put.
+            .ignoresSafeArea(.keyboard, edges: .bottom)
             .background(theme.canvas.ignoresSafeArea())
+            // A swipe down never throws away unsaved instructions.
+            .interactiveDismissDisabled(isSaving || text != profile.instructions)
             .navigationTitle("Instructions")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

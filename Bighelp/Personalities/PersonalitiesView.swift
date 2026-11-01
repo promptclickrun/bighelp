@@ -324,13 +324,9 @@ private struct PersonalityEditorView: View {
             }
 
             Section {
-                TextField(
-                    "How should this personality behave?",
-                    text: $systemPrompt,
-                    axis: .vertical
-                )
-                .lineLimit(6...16)
-                .accessibilityIdentifier("personality.editor.instructions")
+                LongTextEditor(text: $systemPrompt, placeholder: "How should this personality behave?",
+                               accessibilityLabel: "Instructions", identifier: "personality.editor.instructions",
+                               layout: .formBox)
             } header: {
                 HStack {
                     Text("Instructions")

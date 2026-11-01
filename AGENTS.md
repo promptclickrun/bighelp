@@ -440,7 +440,11 @@ change in both repos.
   capture a view in an object in that view's own `@State`: the state then keeps the view, and its chat, alive. Send, the placeholder and the mention list
   read `ChatModel.draftShape`, never the draft, so most keys redraw only the text view. A pause in typing
   saves the draft to `ChatDraftJournal`, not the chat list; the chat takes it at its next save
-  (`ChatComposerRedrawTests`, `ChatDraftJournalTests`).
+  (`ChatComposerRedrawTests`, `ChatDraftJournalTests`). `ChatDestinationView` must not read the chat's
+  messages in its body: then every streamed piece redrew it, and its new `openURL` action updated every
+  UIKit view under it, the box's text view too. Read them in a modifier of their own
+  (`ProjectChangesRefreshTrigger`). `@Observable` skips a set to an equal value, but an in-place
+  change (`removeAll`, `append`, `&+=`) always notifies, even when it changes nothing.
 - **Streaming under a drag:** Hermes sends an answer a few words at a time, and each piece lays the whole answer
   out again, so each timeline update waits 50 ms after the last one's layout, and while the reader drags or the chat
   decelerates (`NativeChatTimeline` `applyPendingUpdate`, `isScrolling`); otherwise a drag got a few touch

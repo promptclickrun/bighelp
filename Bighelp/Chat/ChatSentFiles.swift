@@ -29,10 +29,48 @@ struct ChatSentFile: Equatable, Identifiable {
     var id: String { path }
 }
 
+/// Hermes saves a turn the way its model got it: for `@file:` references, the person's text, then
+/// "--- Attached Context ---" with a block for each file (for a video: its type, size, where it is
+/// on disk and what to do with it), after any "--- Context Warnings ---". That's for the model, never
+/// the chat. A reference is relative to the chat's folder when the file is in it, so its block's
+/// "available on disk at" path is kept: it's where Files opens the file.
+enum HermesAttachedContext {
+    private static let markers = ["\n--- Context Warnings ---\n", "\n--- Attached Context ---\n"]
+
+    static func strip(_ raw: String) -> String {
+        guard ChatTextMarker.mayContain("--- Attached Context ---", in: raw)
+                || ChatTextMarker.mayContain("--- Context Warnings ---", in: raw),
+              let cut = markers.compactMap({ raw.range(of: $0)?.lowerBound }).min() else { return raw }
+        var places: [String: String] = [:]
+        for line in raw[cut...].components(separatedBy: "\n") where line.hasPrefix("📎 @file:") {
+            guard let reference = reference(at: line.dropFirst(2)),
+                  let disk = line.firstMatch(of: /available on disk at `([^`\n]+)`/) else { continue }
+            places[reference] = String(disk.1)
+        }
+        let body = raw[..<cut].components(separatedBy: "\n").map { line -> String in
+            guard let path = places[line.trimmingCharacters(in: .whitespaces)], path.hasPrefix("/") else { return line }
+            return "@file:`" + path + "`"
+        }
+        return body.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The `@file:` token a block starts with, quoted (`@file:`a b.mov``) or up to the first space.
+    private static func reference(at text: Substring) -> String? {
+        guard text.hasPrefix("@file:") else { return nil }
+        let value = text.dropFirst(6)
+        if let quote = value.first, ["`", "\"", "'"].contains(quote) {
+            guard let end = value.dropFirst().firstIndex(of: quote) else { return nil }
+            return String(text[..<value.index(after: end)])
+        }
+        return String(text.prefix { !$0.isWhitespace })
+    }
+}
+
 enum ChatSentFiles {
     /// The person's words, and the files the message names on `@file:` lines (with the app's note
-    /// after a big file's). The note and the lines never show as text.
-    static func split(_ text: String) -> (text: String, files: [ChatSentFile]) {
+    /// after a big file's). The note, the lines and Hermes' attached context never show as text.
+    static func split(_ raw: String) -> (text: String, files: [ChatSentFile]) {
+        let text = HermesAttachedContext.strip(raw)
         guard ChatTextMarker.mayContain("@file:", in: text) || ChatTextMarker.mayContain(" attached: ", in: text)
         else { return (text, []) }
         var kept: [String] = []
@@ -42,8 +80,10 @@ enum ChatSentFiles {
         while index < lines.count {
             let line = lines[index]
             index += 1
+            // Relative when Hermes used the file where it was, in the chat's folder (no block to say where).
             if line.hasPrefix("@file:"), let path = DirectHermesFileAttachments.referenceValue(String(line.dropFirst(6))),
-               path.hasPrefix("/"), !path.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) {
+               !path.isEmpty, !path.split(separator: "/").contains(".."),
+               !path.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) {
                 let note = index < lines.count ? ChatSentFileNote(lines[index]) : nil
                 if note != nil { index += 1 }
                 let name = note?.fileName ?? URL(fileURLWithPath: path).lastPathComponent

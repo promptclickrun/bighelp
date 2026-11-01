@@ -403,7 +403,10 @@ final class DirectHermesGeneratedMediaClient: GeneratedMediaResolving, AgentAtta
     static func messageMarkers(_ text: String, role: TimelineRole) -> [(line: String, path: String)] {
         guard role == .human else { return mediaMarkers(text) }
         guard text.utf8.count <= DirectHermesWire.maximumMessageBytes else { return [] }
-        return text.components(separatedBy: "\n").compactMap { line in
+        let lines = text.components(separatedBy: "\n")
+        return lines.enumerated().compactMap { index, line -> (line: String, path: String)? in
+            // A file over 8 MB the app sent (its note follows) stays a line on the rail: never fetched back.
+            if index + 1 < lines.count, ChatSentFileNote(lines[index + 1]) != nil { return nil }
             let image = line.hasPrefix("@image:")
             guard image || line.hasPrefix("@file:"),
                   let path = DirectHermesFileAttachments.referenceValue(String(line.dropFirst(image ? 7 : 6))),

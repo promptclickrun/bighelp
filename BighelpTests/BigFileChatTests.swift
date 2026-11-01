@@ -85,6 +85,56 @@ struct BigFileChatTests {
         #expect(!TimelineSenderResolver().accessibilityDescription(for: reply).contains("@file:"))
     }
 
+    /// What Hermes saves for the turn (real-host probe, run 4): the reference relative to the chat's
+    /// folder, the app's note, then its attached context for the model with the host path. None of
+    /// that shows as text; the file is one line, and it opens where the block says the file is.
+    private static var hermesSaved: String {
+        "Cut the best 10 seconds\n@file:`uploads/2026-10-31/Trip to the coast.mov`\n" + file.agentNote
+            + "\n\n--- Attached Context ---\n\n📎 @file:`uploads/2026-10-31/Trip to the coast.mov` (video/quicktime, "
+            + "76.3 MB) — binary file, not inlined as text. It is available on disk at `" + path + "`. Use your tools "
+            + "to work with it (read or convert it, extract its text, or view/render it as needed); do not tell the "
+            + "user the file type is unsupported."
+    }
+
+    @Test func hermesSavedFormIsOneLineAndNoPathOrContextShows() {
+        for shown in [ChatSentFiles.split(Self.hermesSaved), ChatSentFiles.split(HermesUserMessageDisplay.text(Self.hermesSaved))] {
+            #expect(shown.text == "Cut the best 10 seconds")
+            #expect(shown.files.count == 1)
+            #expect(shown.files.first?.name == "Trip to the coast.mov")
+            #expect(shown.files.first?.path == Self.path, "Files opens it where Hermes' block says it is")
+            #expect(shown.files.first?.meta?.contains("1 min 12 s") == true)
+            for raw in ["Attached Context", "available on disk", "/home/", "@file:", "attached:", "Use your tools"] {
+                #expect(!shown.text.contains(raw), "\(raw)")
+            }
+        }
+        #expect(HermesUserMessageDisplay.preview(Self.hermesSaved) == "Cut the best 10 seconds")
+        // The media loader never fetches a big file back to show it as a tile on a reread.
+        #expect(DirectHermesGeneratedMediaClient.messageMarkers(HermesUserMessageDisplay.text(Self.hermesSaved),
+                                                                role: .human).isEmpty)
+        let model = ChatModel(conversationID: "big-file-saved", client: ConversationFixtureClient(), initialItems: [])
+        let spoken = TimelineSenderResolver().accessibilityDescription(for: model.humanItem(content: Self.hermesSaved))
+        #expect(!spoken.contains("/home/") && !spoken.contains("Attached Context"))
+    }
+
+    /// The live row (what the app sent: a relative reference when Hermes used the file in place) and
+    /// the reread (Hermes' saved form) show the same words and the same line.
+    @Test func theLiveRowAndTheRereadLookTheSame() {
+        let live = ChatSentFiles.split("Cut the best 10 seconds\n@file:`uploads/2026-10-31/Trip to the coast.mov`\n"
+                                       + Self.file.agentNote)
+        let reread = ChatSentFiles.split(HermesUserMessageDisplay.text(Self.hermesSaved))
+        #expect(live.text == reread.text)
+        #expect(live.files.map(\.name) == reread.files.map(\.name))
+        #expect(live.files.map(\.meta) == reread.files.map(\.meta))
+        #expect(live.files.first?.path == "uploads/2026-10-31/Trip to the coast.mov")
+    }
+
+    @Test func aRelativeFileOpensUnderTheAgentsFolder() async {
+        let source = FixtureFiles()
+        let model = SimpleBotFilesModel(agentID: "default", source: source)
+        await model.reveal(path: "uploads/2026-10-31/Trip to the coast.mov")
+        #expect(source.listed.last == "/home/fixture/garden/uploads/2026-10-31")
+    }
+
     @Test func aFailedUploadSaysWhyAndTryAgainRunsItsRetry() {
         let board = BigFileUploadBoard.shared
         var retried = 0
@@ -130,7 +180,8 @@ private final class FixtureFiles: SimpleBotFilesSource {
     func list(agentID: String, path: String?) async throws -> HermesManagedFileDirectory {
         listed.append(path ?? "")
         let folder = path ?? "/home/fixture/garden"
-        return HermesManagedFileDirectory(path: folder, parent: "/home/fixture/garden", files: [
+        // The top folder has no parent, as on the computer.
+        return HermesManagedFileDirectory(path: folder, parent: path == nil ? nil : "/home/fixture/garden", files: [
             HermesManagedFile(path: folder + "/Trip to the coast.mov", name: "Trip to the coast.mov", isDirectory: false,
                               byteCount: 80_000_000, modifiedAt: .now, mimeType: "video/quicktime"),
         ])

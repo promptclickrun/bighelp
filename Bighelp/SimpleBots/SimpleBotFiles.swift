@@ -166,7 +166,14 @@ final class SimpleBotFilesModel {
 
     /// Shows the folder that holds `path`, then opens that file there (a preview, or a video's
     /// player), as a tap on its row would. A file that isn't there any more says so under the list.
-    func reveal(path: String) async {
+    func reveal(path given: String) async {
+        // A reference Hermes kept relative is relative to the agent's folder, the top one here.
+        var path = given
+        if !given.hasPrefix("/") {
+            if rootPath == nil { await load(path: nil) }
+            guard let root = rootPath else { return }
+            path = root.hasSuffix("/") ? root + given : root + "/" + given
+        }
         let separator: Character = path.hasPrefix("/") ? "/" : "\\"
         guard let cut = path.lastIndex(of: separator), cut > path.startIndex else { return }
         await load(path: String(path[..<cut]))

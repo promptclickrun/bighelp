@@ -405,6 +405,17 @@ struct DraftAttachmentsSheet: View {
 enum DraftAttachmentRailFixture {
     /// A made-up 80 MB video in a sent message: on its way (34 of 80 MB), not sent (with Try
     /// again), or taken by Hermes (its line on the rail). "big-file-uploading|failed|sent".
+    /// A turn with a big file the way Hermes keeps it in its history: the words, the workspace-relative
+    /// `@file:` reference, the app's note, then the model's attached context with the file's host path.
+    static func hermesSavedTurn(_ words: String, file: ChatBigFile) -> String {
+        let relative = "uploads/2026-10-31/" + file.fileName
+        return words + "\n@file:`" + relative + "`\n" + file.agentNote + "\n\n--- Attached Context ---\n\n"
+            + "📎 @file:`" + relative + "` (video/quicktime, 76.3 MB) — binary file, not inlined as text. "
+            + "It is available on disk at `/home/fixture/workspace/" + relative + "`. Use your tools to work with it "
+            + "(read or convert it, extract its text, or view/render it as needed); do not tell the user the file "
+            + "type is unsupported."
+    }
+
     @MainActor @discardableResult
     static func seedBigFile(_ model: ChatModel, state: String) -> String {
         let file = ChatBigFile(id: "fixturebigfile00000000000000000a", fileName: "Trip to the coast.mov",
@@ -414,8 +425,8 @@ enum DraftAttachmentRailFixture {
         let human: TimelineItem
         switch state {
         case "big-file-sent":
-            human = model.humanItem(content: words + "\n@file:`/home/fixture/workspace/uploads/2026-10-31/"
-                                    + file.fileName + "`\n" + file.agentNote)
+            // Exactly what Hermes saves for the turn, attached context and all (#721, real-host probe).
+            human = model.humanItem(content: hermesSavedTurn(words, file: file))
         default:
             human = model.humanItem(content: words).carrying(bigFiles: [file])
             if state == "big-file-failed" {

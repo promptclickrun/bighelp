@@ -72,24 +72,24 @@ enum BigFileStore {
     static func prepare(copying source: URL, fileName: String, mimeType: String) async throws -> ChatBigFile {
         try validate(fileName: fileName, mimeType: mimeType)
         let id = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-        let folder = folder(id)
+        let directory = Self.folder(id)
         let prepared = try await Task.detached(priority: .userInitiated) { () throws -> (Int, String) in
             let scoped = source.startAccessingSecurityScopedResource()
             defer { if scoped { source.stopAccessingSecurityScopedResource() } }
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
                                                     attributes: [.posixPermissions: 0o700])
-            let target = folder.appending(path: fileName)
+            let target = directory.appending(path: fileName)
             do {
-                return try copy(source, to: target)
+                return try Self.copy(source, to: target)
             } catch {
-                try? FileManager.default.removeItem(at: folder)
+                try? FileManager.default.removeItem(at: directory)
                 throw error
             }
         }.value
         let mime = mimeType.lowercased()
         var video: ChatBigFile.Video?
         if UTType(mimeType: mime)?.conforms(to: .movie) == true || mime.hasPrefix("video/") {
-            video = await videoInfo(folder.appending(path: fileName))
+            video = await videoInfo(directory.appending(path: fileName))
         }
         return ChatBigFile(id: id, fileName: fileName, mimeType: mime, byteCount: prepared.0,
                            sha256: prepared.1, video: video)
@@ -122,8 +122,8 @@ enum BigFileStore {
         guard let duration = try? await asset.load(.duration) else { return nil }
         var width = 0, height = 0
         if let track = try? await asset.loadTracks(withMediaType: .video).first,
-           let (size, transform) = try? await track.load(.naturalSize, .preferredTransform) {
-            let shown = size.applying(transform)
+           let loaded = try? await track.load(.naturalSize, .preferredTransform) {
+            let shown = loaded.0.applying(loaded.1)
             width = Int(abs(shown.width).rounded())
             height = Int(abs(shown.height).rounded())
         }
@@ -167,7 +167,7 @@ enum BigFileStore {
 
     /// The app's copy and its pieces, once the host has the file or the message is dropped.
     static func remove(_ file: ChatBigFile) {
-        try? FileManager.default.removeItem(at: folder(file.id))
+        try? FileManager.default.removeItem(at: Self.folder(file.id))
         try? FileManager.default.removeItem(at: pieces.appending(path: file.id, directoryHint: .isDirectory))
     }
 

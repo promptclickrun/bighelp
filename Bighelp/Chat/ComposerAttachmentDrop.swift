@@ -138,7 +138,8 @@ enum ComposerAttachmentDrop {
                     // Photos are prepared down from up to the preparer's input limit.
                     let limit = isImage ? ImageAttachmentPreparer.maximumInputBytes : BigFileUploads.maximumBytes
                     guard let size = values.fileSize, size > 0, size <= limit else {
-                        throw isImage ? ChatAttachmentError.invalidSize : BigFileUploadError(failure: .tooLarge)
+                        if isImage { throw ChatAttachmentError.invalidSize }
+                        throw BigFileUploadError(failure: .tooLarge)
                     }
                     let fallbackName = (isImage ? "image" : "file")
                         + (type.preferredFilenameExtension.map { ".\($0)" } ?? "")

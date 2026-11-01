@@ -408,9 +408,9 @@ struct TimelineItem: Identifiable, Codable, Equatable, Sendable {
     /// The same message as Hermes took it: its words with each file's `@file:` line, which is all a
     /// reread of the saved history has, so the row looks the same before and after one.
     func sent(as text: String) -> TimelineItem {
-        var metadata = metadata
-        metadata.bigFiles = []
-        return TimelineItem(id: id, role: role, sender: sender, content: .message(text), metadata: metadata,
+        var sentMetadata = self.metadata
+        sentMetadata.bigFiles = []
+        return TimelineItem(id: id, role: role, sender: sender, content: .message(text), metadata: sentMetadata,
                             attachments: attachments)
     }
 

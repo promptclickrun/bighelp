@@ -52,9 +52,11 @@ struct BigFileUploadTests {
             ["finished": .boolean(true), "uploadId": .string(id), "path": .string(path), "inWorkspace": .boolean(inWorkspace)]
         }
         let workspace = "/home/hermes/projects/garden/uploads/2026-10-31/Trip.mov"
-        #expect(try BigFileUploadReceipt.finishedFile(answer(workspace, true), uploadID: id) == (workspace, true))
+        let inFolder = try BigFileUploadReceipt.finishedFile(answer(workspace, true), uploadID: id)
+        #expect(inFolder.path == workspace && inFolder.inWorkspace)
         let staged = "/home/hermes/.hermes/plugin-data/loopdy/uploads/\(id)/file/Trip.mov"
-        #expect(try BigFileUploadReceipt.finishedFile(answer(staged, false), uploadID: id) == (staged, false))
+        let stagedFile = try BigFileUploadReceipt.finishedFile(answer(staged, false), uploadID: id)
+        #expect(stagedFile.path == staged && !stagedFile.inWorkspace)
         for (path, inWorkspace) in [
             ("/etc/passwd", true), ("/etc/passwd", false), (workspace, false), (staged, true),
             ("relative/uploads/2026-10-31/a.mov", true), ("/x/uploads/2026-10-31/../../.ssh/id", true),

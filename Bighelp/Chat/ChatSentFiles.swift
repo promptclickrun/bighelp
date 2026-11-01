@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// The app's note beside a big file it sent (`ChatBigFile.agentNote`), as Hermes keeps it:
 /// "[Video attached: Trip.mov (80 MB, 1 min 12 s, 1920×1080)]" or "[File attached: a.zip (120 MB)]".
@@ -48,7 +49,8 @@ enum ChatSentFiles {
                 let name = note?.fileName ?? URL(fileURLWithPath: path).lastPathComponent
                 files.append(ChatSentFile(path: path, name: name, meta: note?.meta,
                                           isVideo: lines[index - 1].hasPrefix("[Video attached: ")
-                                            || DirectHermesGeneratedMediaClient.isVideoPath(path)))
+                                            || ["mp4", "m4v", "mov", "webm"].contains(
+                                                URL(fileURLWithPath: path).pathExtension.lowercased())))
             } else if ChatSentFileNote(line) == nil {
                 kept.append(line)
             }
@@ -105,7 +107,7 @@ struct ChatSentFileLine: View {
 /// arrive and the size counts up; a file that didn't go says why, with Try again.
 struct BigFileUploadTile: View {
     let file: ChatBigFile
-    private let board = BigFileUploadBoard.shared
+    private var board: BigFileUploadBoard { .shared }
     @BighelpThemeReader private var theme
 
     var body: some View {

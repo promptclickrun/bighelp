@@ -455,7 +455,7 @@ enum DraftAttachmentRailFixture {
             guard let at = arguments.firstIndex(of: "-test-big-file-path"), arguments.indices.contains(at + 1) else { break }
             let url = URL(fileURLWithPath: arguments[at + 1])
             let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-            await model.importDraftAttachments(.files, [DraftAttachmentLoader(name: url.lastPathComponent, draft: {
+            await model.importDraftAttachments(.files, [DraftAttachmentLoader(draftNamed: url.lastPathComponent, load: {
                 .bigFile(try await BigFileStore.importing(url, fileName: url.lastPathComponent, mimeType: "video/quicktime",
                                                           byteCount: size, into: model))
             })])

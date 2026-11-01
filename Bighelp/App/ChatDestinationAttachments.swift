@@ -195,7 +195,7 @@ extension ChatDestinationView {
         } ? .photos : .files
         Task { @MainActor in
             await model.importDraftAttachments(kind, urls.map { url in
-                DraftAttachmentLoader(name: url.lastPathComponent, draft: { [model] in
+                DraftAttachmentLoader(draftNamed: url.lastPathComponent, load: { [model] in
                     let didAccess = url.startAccessingSecurityScopedResource()
                     defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
                     let values = try url.resourceValues(forKeys: [.contentTypeKey, .fileSizeKey])

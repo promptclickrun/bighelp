@@ -87,7 +87,7 @@ enum ComposerAttachmentDrop {
                 return DraftAttachmentLoader(name: provider.suggestedName) { throw ChatAttachmentError.tooMany }
             }
             let read = Task { try await readFile(from: provider) }
-            return DraftAttachmentLoader(name: provider.suggestedName, draft: { @MainActor [weak model] in
+            return DraftAttachmentLoader(draftNamed: provider.suggestedName, load: { @MainActor [weak model] in
                 let file = try await read.value
                 if let copy = file.largeFile {
                     defer { try? FileManager.default.removeItem(at: copy.deletingLastPathComponent()) }

@@ -38,7 +38,7 @@ struct DraftAttachmentLoader {
     }
 
     /// A file that may be over 8 MB: it then stays on disk as a big file.
-    init(name: String?, draft: @escaping @MainActor () async throws -> ChatDraftAttachment) {
+    init(draftNamed name: String?, load draft: @escaping @MainActor () async throws -> ChatDraftAttachment) {
         self.name = name
         load = draft
     }

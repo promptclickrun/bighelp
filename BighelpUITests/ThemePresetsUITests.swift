@@ -19,21 +19,28 @@ final class ThemePresetsUITests: BighelpUITestCase {
         let before = color(of: studio, in: app)
 
         let moss = app.buttons["appearance.light.moss"]
+        reveal(moss, in: studio)
         moss.tap()
         XCTAssertTrue(moss.waitForSelection(), "The tapped orb is picked")
+        reveal(paper, in: studio)
         XCTAssertFalse(paper.isSelected)
         XCTAssertTrue(app.buttons["appearance.dark.black"].isSelected, "Dark mode keeps its own theme")
         let after = color(of: studio, in: app)
         XCTAssertNotEqual(before, after, "The open page took Moss's color at once")
         XCTAssertGreaterThan(after.green, after.red, "Moss is a green page")
 
-        app.buttons["appearance.dark.violet"].tap()
-        XCTAssertTrue(app.buttons["appearance.dark.violet"].waitForSelection())
+        let violet = app.buttons["appearance.dark.violet"]
+        reveal(violet, in: studio)
+        violet.tap()
+        XCTAssertTrue(violet.waitForSelection())
+        reveal(moss, in: studio)
         XCTAssertTrue(moss.isSelected, "Light and dark come from different themes")
         let theme = app.buttons["appearance.bubble.theme"]
-        for _ in 0..<4 where !theme.isHittable { studio.swipeUp() }
+        reveal(theme, in: studio)
         XCTAssertTrue(theme.isSelected, "A theme with its own accent brings it to your bubbles")
-        app.buttons["appearance.bubble.ocean"].tap()
+        let ocean = app.buttons["appearance.bubble.ocean"]
+        reveal(ocean, in: studio)
+        ocean.tap()
         XCTAssertTrue(app.buttons["appearance.bubble.ocean"].waitForSelection())
         XCTAssertFalse(theme.isSelected, "A bubble color replaces the theme's")
     }
@@ -126,6 +133,15 @@ final class ThemePresetsUITests: BighelpUITestCase {
                                "-bighelp.appearance.agent-messages", style] + extra
         app.launch()
         return app
+    }
+
+    /// Scrolls the page until the element is on screen. On iPad Appearance is a sheet, and the
+    /// grid only builds the cards that are on screen.
+    @MainActor
+    private func reveal(_ element: XCUIElement, in page: XCUIElement) {
+        for _ in 0..<6 where !(element.exists && element.isHittable) { page.swipeUp() }
+        for _ in 0..<8 where !(element.exists && element.isHittable) { page.swipeDown() }
+        XCTAssertTrue(element.exists && element.isHittable, "\(element) is reachable")
     }
 
     @MainActor

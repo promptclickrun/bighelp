@@ -76,6 +76,15 @@ projection, decoding, or persistence constant-time. Measure the affected path.
 Keep background catch-up's authenticated event handling and deferred presentation
 boundaries described in [Background chat continuity](BACKGROUND_CHAT_CONTINUITY.md).
 
+Completed assistant messages may link `[N]` citations to explicit `[N] URL` or
+`[N]: URL` references in that same message, including a titled Markdown link and
+bullet-prefixed references. Ambiguous references, code and existing links stay
+untouched. Resolution belongs to the cached message projection, never a streaming
+delta or layout measurement. Prose and table cells share the mapping. Only display
+attributes change: the original text, source list, copy/share content and preview
+selection remain authoritative. Completion can invalidate the affected text's
+layout once; do not describe this as zero-cost rendering.
+
 ## Regression coverage
 
 The historical suite name `ChatTimelineRenderPartitionTests` now protects the

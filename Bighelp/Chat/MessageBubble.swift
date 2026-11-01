@@ -63,6 +63,7 @@ final class ChatMessageContentCache {
         let reply: ChatReplyQuote?
         let references: ReferenceDecodedMessage
         let document: MarkdownDocument
+        let citationLinks: [Int: URL]
         let cardProjection: ChatCardMessageProjection
         let role: TimelineRole
         /// The first web link, for the preview under the message.
@@ -76,6 +77,8 @@ final class ChatMessageContentCache {
             self.reply = reply?.quote
             references = ReferenceCodec.decode(reply?.body ?? source)
             document = MarkdownDocument(references.prose)
+            citationLinks = role == .assistant && !isStreaming
+                ? ChatCitationLinks.resolve(in: references.prose) : [:]
             cardProjection = ChatCardMessageProjection(source: references.prose, role: role, isStreaming: isStreaming)
             self.role = role
             self.isStreaming = isStreaming
@@ -207,6 +210,7 @@ struct MessageBubble: View {
                     messageContent(
                         cardProjection: projection.cardProjection,
                         document: document,
+                        citationLinks: projection.citationLinks,
                         presentation: presentation,
                         interaction: interaction
                     )
@@ -458,12 +462,13 @@ struct MessageBubble: View {
     private func messageContent(
         cardProjection: ChatCardMessageProjection,
         document: MarkdownDocument,
+        citationLinks: [Int: URL],
         presentation: ChatMessagePresentation,
         interaction: ChatBubbleInteraction
     ) -> some View {
         if role == .assistant, cardProjection.hasRichContent {
             if uiV3Enabled {
-                mixedAssistantContent(cardProjection, interaction: interaction, proseLineSpacing: 5)
+                mixedAssistantContent(cardProjection, citationLinks: citationLinks, interaction: interaction, proseLineSpacing: 5)
                     .modifier(BighelpV3MessageSurface(
                         role: role,
                         theme: theme,
@@ -474,6 +479,7 @@ struct MessageBubble: View {
                 case .accentBubble:
                     mixedAssistantContent(
                         cardProjection,
+                        citationLinks: citationLinks,
                         interaction: interaction,
                         proseLineSpacing: presentation.proseLineSpacing
                     )
@@ -483,6 +489,7 @@ struct MessageBubble: View {
                 case .openProse:
                     mixedAssistantContent(
                         cardProjection,
+                        citationLinks: citationLinks,
                         interaction: interaction,
                         proseLineSpacing: presentation.proseLineSpacing
                     )
@@ -515,7 +522,8 @@ struct MessageBubble: View {
                 textScale: (isInterimReply ? ChatInterimReplyStyle.textScale : 1) * chatTextSize.scale,
                 mentionIdentities: mentionIdentities,
                 menuAnchor: menuAnchor,
-                bubbleShape: bubbleShape
+                bubbleShape: bubbleShape,
+                citationLinks: citationLinks
             )
             .modifier(BighelpV3MessageSurface(
                 role: role,
@@ -559,15 +567,17 @@ struct MessageBubble: View {
 
     private func mixedAssistantContent(
         _ projection: ChatCardMessageProjection,
+        citationLinks: [Int: URL],
         interaction: ChatBubbleInteraction,
         proseLineSpacing: CGFloat
     ) -> some View {
-        mixedAssistantSegments(projection, interaction: interaction, proseLineSpacing: proseLineSpacing)
+        mixedAssistantSegments(projection, citationLinks: citationLinks, interaction: interaction, proseLineSpacing: proseLineSpacing)
             .modifier(ChatCardCopyContextReader(context: cardCopyContext))
     }
 
     private func mixedAssistantSegments(
         _ projection: ChatCardMessageProjection,
+        citationLinks: [Int: URL],
         interaction: ChatBubbleInteraction,
         proseLineSpacing: CGFloat
     ) -> some View {
@@ -597,7 +607,8 @@ struct MessageBubble: View {
                             onShare: { isSharing = true },
                             mentionIdentities: mentionIdentities,
                             menuAnchor: menuAnchor,
-                            bubbleShape: bubbleShape
+                            bubbleShape: bubbleShape,
+                            citationLinks: citationLinks
                         )
                     } else {
                         MarkdownMessageView(document: document, proseLineSpacing: proseLineSpacing)
@@ -615,7 +626,8 @@ struct MessageBubble: View {
                     }
                 case .table(let table):
                     ChatMarkdownTableView(table: table,
-                                          textColor: isPendingSubmission ? theme.secondaryText : theme.primaryText)
+                                          textColor: isPendingSubmission ? theme.secondaryText : theme.primaryText,
+                                          citationLinks: citationLinks)
                 case .rule:
                     ChatMarkdownRuleView()
                 case .pendingCard(let kind):

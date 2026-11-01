@@ -5,6 +5,58 @@ import UIKit
 
 @Suite(.serialized) @MainActor
 struct ChatTimelineRenderPartitionTests {
+    @Test func finishedCitationsLinkAcrossTextAndTableWithoutChangingSelection() async throws {
+        let text = """
+        A short answer.[15]
+
+        | Detail | Source |
+        | --- | --- |
+        | Example | Evidence.[15] |
+
+        [15] https://example.com/evidence
+        """
+        func bubble(streaming: Bool) -> some View {
+            MessageBubble(role: .assistant, speakerName: "Juno", text: text,
+                          delivery: streaming ? "Streaming" : "Delivered",
+                          isPendingSubmission: false, onFork: nil)
+                .environment(\.bighelpUIV3Enabled, true)
+                .frame(width: 350)
+        }
+        let host = UIHostingController(rootView: bubble(streaming: true))
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        func textViews(_ view: UIView) -> [UITextView] {
+            (view as? UITextView).map { [$0] } ?? view.subviews.flatMap(textViews)
+        }
+        try await Task.sleep(for: .milliseconds(250))
+        let prose = try #require(textViews(host.view).first { $0.text.contains("A short answer") })
+        let tableCell = try #require(textViews(host.view).first { $0.text.contains("Evidence.[15]") })
+        tableCell.selectedRange = NSRange(location: 1, length: 3)
+        let before = prose.text
+        let frame = prose.frame
+        prose.selectedRange = NSRange(location: 2, length: 5)
+        let range = (prose.text as NSString).range(of: "[15]")
+        #expect(prose.attributedText.attribute(.link, at: range.location, effectiveRange: nil) == nil)
+        host.rootView = bubble(streaming: false)
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(textViews(host.view).contains { $0 === prose })
+        #expect(prose.text == before)
+        #expect(tableCell.selectedRange == NSRange(location: 1, length: 3))
+        #expect(prose.selectedRange == NSRange(location: 2, length: 5))
+        #expect(prose.frame == frame)
+        let citedViews = textViews(host.view).filter { $0.text.contains("answer.[15]") || $0.text.contains("Evidence.[15]") }
+        #expect(citedViews.count == 2)
+        for view in citedViews {
+            let index = (view.text as NSString).range(of: "[15]").location
+            #expect(view.attributedText.attribute(.link, at: index, effectiveRange: nil) as? URL
+                    == URL(string: "https://example.com/evidence"))
+        }
+    }
+
     @Test(arguments: [DynamicTypeSize.large, .accessibility3])
     func longAssistantRepliesUseTheAvailablePhoneWidth(typeSize: DynamicTypeSize) async throws {
         let text = """

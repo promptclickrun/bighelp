@@ -83,6 +83,7 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
     /// The bubble around this text, so a hold lifts all of it.
     var menuAnchor: ChatBubbleMenuAnchor? = nil
     var bubbleShape = ChatBubbleMenuShape(alignsTrailing: false, hasTail: false)
+    var citationLinks: [Int: URL] = [:]
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.opensHostFiles) private var opensHostFiles
@@ -159,7 +160,8 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
                 theme: theme,
                 textScale: textScale,
                 mentionIdentities: mentionIdentities,
-                linksMarkdownFiles: opensHostFiles
+                linksMarkdownFiles: opensHostFiles,
+                citationLinks: citationLinks
             )
         )
         let textChanged = context.coordinator.renderedText?.isEqual(to: updatedText) != true

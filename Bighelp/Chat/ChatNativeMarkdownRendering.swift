@@ -15,6 +15,7 @@ struct ChatNativeMarkdownStyle {
     var mentionIdentities: [ChatMentionIdentity] = []
     /// Markdown file paths become links that open the viewer (Code mode chats).
     var linksMarkdownFiles = false
+    var citationLinks: [Int: URL] = [:]
 }
 
 /// One rendered revision per native text view. The cache never crosses a
@@ -30,10 +31,12 @@ final class ChatNativeMarkdownRenderCache {
         let colors: [CGColor]
         let mentionIdentities: [ChatMentionIdentity]
         let linksMarkdownFiles: Bool
+        let citationLinks: [Int: URL]
 
         init(_ style: ChatNativeMarkdownStyle) {
             mentionIdentities = style.mentionIdentities
             linksMarkdownFiles = style.linksMarkdownFiles
+            citationLinks = style.citationLinks
             lineSpacing = style.proseLineSpacing
             textScale = style.textScale
             typeface = style.theme.typeface
@@ -284,7 +287,8 @@ enum ChatNativeMarkdownAttributedBuilder {
         forceItalic: Bool = false,
         style: ChatNativeMarkdownStyle
     ) -> NSAttributedString {
-        let source = ChatInlineMarkdown.attributedText(markdown)
+        let source = ChatCitationLinks.applying(
+            to: ChatInlineMarkdown.attributedText(markdown), links: style.citationLinks)
         let result = NSMutableAttributedString(string: "")
 
         for run in source.runs {

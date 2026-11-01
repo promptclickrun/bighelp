@@ -59,8 +59,8 @@ enum ChatTextSize: Int, CaseIterable, Identifiable, Sendable {
     case large = 1
     case larger = 2
 
-    /// Out of the box, one step under the system size. A size someone picked is
-    /// saved and stays, even when it's this one.
+    /// Messages size on top of the app's text size (Appearance); out of the box, one
+    /// step under it. A size someone picked is saved and stays, even when it's this one.
     static let defaultSize: ChatTextSize = .small
 
     var id: Self { self }
@@ -233,8 +233,9 @@ struct ChatLayoutSettingsView: View {
             """)
         #else
         String(localized: """
-            It adds to your iPhone's own text size setting. Link previews show a web link's picture, title and \
-            summary in chats and the Feed. To make one, your iPhone opens that page, without cookies.
+            It sizes message text, on top of the text size in Appearance and your iPhone's own text size. Link \
+            previews show a web link's picture, title and summary in chats and the Feed. To make one, your iPhone \
+            opens that page, without cookies.
             """)
         #endif
     }
@@ -282,11 +283,21 @@ private struct ChatLayoutPreview: View {
         .accessibilityIdentifier("chat-layout.preview")
     }
 
+    /// Message text before the chat's own size: the Mac's text styles are fixed, so
+    /// there messages start from the size in Appearance, as they do in a chat.
+    private var bodyPointSize: CGFloat {
+        #if targetEnvironment(macCatalyst)
+        Font.TextStyle.body.macPointSize
+        #else
+        bodySize
+        #endif
+    }
+
     private func bubble(_ text: String, outgoing: Bool) -> some View {
         HStack {
             if outgoing { Spacer(minLength: 40) }
             Text(text)
-                .font(.system(size: (bodySize * textSize.scale).rounded()))
+                .font(.system(size: (bodyPointSize * textSize.scale).rounded()))
                 .foregroundStyle(outgoing ? theme.outgoingMessageForeground : theme.primaryText)
                 .padding(.horizontal, density.bubbleHorizontalPadding)
                 .padding(.vertical, density.bubbleVerticalPadding)

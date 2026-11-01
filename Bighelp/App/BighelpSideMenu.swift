@@ -51,10 +51,11 @@ struct BighelpSideMenuHost: ViewModifier {
     @State private var windowWidth: CGFloat = 0
     #endif
 
-    /// The Mac's sidebar widens with bigger text so rows don't wrap.
+    /// The Mac's sidebar widens with bigger text so rows don't wrap. 330 at Medium,
+    /// the default before #729, so a size someone picked keeps its width.
     static var width: CGFloat {
         #if targetEnvironment(macCatalyst)
-        min(max(330 * BighelpInterfaceSize.shared.textSize.macFactor / BighelpTextSize.standard.macFactor, 300), 420)
+        min(max(330 * BighelpInterfaceSize.shared.textSize.macFactor / BighelpTextSize.medium.macFactor, 300), 420)
         #else
         340
         #endif

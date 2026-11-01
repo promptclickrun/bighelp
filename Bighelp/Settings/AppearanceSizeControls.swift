@@ -9,13 +9,20 @@ struct AppearanceSizeControls: View {
         VStack(alignment: .leading, spacing: BighelpTokens.space16) {
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                 label(String(localized: "Text size"), value: size.textSize.title)
-                Picker("Text size", selection: $size.textSize) {
-                    ForEach(BighelpTextSize.allCases) { step in
-                        Text(step.title).tag(step)
-                    }
+                // Six sizes don't fit an iPhone as named segments; a slider, like Chat layout's.
+                HStack(spacing: BighelpTokens.space12) {
+                    Image(systemName: "textformat.size.smaller")
+                        .accessibilityHidden(true)
+                    Slider(value: textSizeValue, in: Self.textSizeRange, step: 1)
+                        .tint(theme.action)
+                        .accessibilityLabel("Text size")
+                        .accessibilityValue(size.textSize.title)
+                        .accessibilityIdentifier("appearance.text-size")
+                    Image(systemName: "textformat.size.larger")
+                        .accessibilityHidden(true)
                 }
-                .bighelpSegmentedPicker()
-                .accessibilityIdentifier("appearance.text-size")
+                .foregroundStyle(theme.primaryText)
+                .frame(minHeight: BighelpTokens.hitTarget)
             }
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                 label(String(localized: "Button size"), value: size.buttonSize.title)
@@ -42,6 +49,13 @@ struct AppearanceSizeControls: View {
             Spacer()
             Text(value).font(.bighelp(.caption)).foregroundStyle(theme.secondaryText)
         }
+    }
+
+    private static let textSizeRange = Double(BighelpTextSize.small.rawValue)...Double(BighelpTextSize.largest.rawValue)
+
+    private var textSizeValue: Binding<Double> {
+        Binding(get: { Double(size.textSize.rawValue) },
+                set: { size.textSize = BighelpTextSize(rawValue: Int($0.rounded())) ?? .platformDefault })
     }
 
     private var footnote: String {

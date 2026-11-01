@@ -1808,6 +1808,7 @@
 		F30B941F7E77DBB38B2F3259 /* DirectHermesScheduledTasksClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB930083C507FFAD2A1FF04 /* DirectHermesScheduledTasksClient.swift */; };
 		F31F4A76FA960358DEA1BE1B /* CompactChatComposerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 658B59C231EAF42CD31649DE /* CompactChatComposerTests.swift */; };
 		F339D409231CD9D11B66109E /* BighelpLinkProjectGitClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02F2DEE243A51982965DE06D /* BighelpLinkProjectGitClientTests.swift */; };
+		F341755AC880D86DFD86B52F /* TextSizeDefaultUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C9C1ED2BC60CA3C8BF159D0 /* TextSizeDefaultUITests.swift */; };
 		F348F065E83BAF11B87F61C7 /* generation-preview.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = E7173F836ECF6E4D13740E1B /* generation-preview.mp4 */; };
 		F3DDC06464DA83E58A7B8D52 /* AgentActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5068277073666FC21BE690A9 /* AgentActions.swift */; };
 		F402A7FA85AEDCDB788F3D55 /* ProfileDeletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4BA8B35DA3A81885AD5F235 /* ProfileDeletionTests.swift */; };
@@ -2718,6 +2719,7 @@
 		5C6E3EE1BAF5669F077AAE6D /* WorkspaceFileTransferView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceFileTransferView.swift; sourceTree = "<group>"; };
 		5C7E590112EC3D9CC152B743 /* GenerativeUIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerativeUIModels.swift; sourceTree = "<group>"; };
 		5C91AAE8E1839B2BC3E252AB /* NativeWorkspaceRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWorkspaceRuntime.swift; sourceTree = "<group>"; };
+		5C9C1ED2BC60CA3C8BF159D0 /* TextSizeDefaultUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextSizeDefaultUITests.swift; sourceTree = "<group>"; };
 		5CB930083C507FFAD2A1FF04 /* DirectHermesScheduledTasksClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesScheduledTasksClient.swift; sourceTree = "<group>"; };
 		5CF2F4BBA17591B56074734A /* HermesUsage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesUsage.swift; sourceTree = "<group>"; };
 		5D6B4B1E5F9374B89D737B30 /* TelemetrySettingsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetrySettingsUITests.swift; sourceTree = "<group>"; };
@@ -5649,6 +5651,7 @@
 				3F4DFC16C4655EE1CB5DA6BF /* TeamworkUITests.swift */,
 				5D6B4B1E5F9374B89D737B30 /* TelemetrySettingsUITests.swift */,
 				BBD533A9FF9B1BB710AF3F81 /* TemplateCatalogUITests.swift */,
+				5C9C1ED2BC60CA3C8BF159D0 /* TextSizeDefaultUITests.swift */,
 				452E072E8A85C91749456B55 /* ThemePresetsUITests.swift */,
 				2D1E11795B7E88BB7F60730C /* ToolDisclosureUITests.swift */,
 				EF768AB5BA4E7E7F91249A1D /* UnifiedModeToggleUITests.swift */,
@@ -8956,6 +8959,7 @@
 				E2224744D3218AE6F5036BC8 /* TeamworkUITests.swift in Sources */,
 				E47BCFFE95993F12DAD002C6 /* TelemetrySettingsUITests.swift in Sources */,
 				562B523D2568D03C42DCBC76 /* TemplateCatalogUITests.swift in Sources */,
+				F341755AC880D86DFD86B52F /* TextSizeDefaultUITests.swift in Sources */,
 				A12EADDD274F9BB179677CC8 /* ThemePresetsUITests.swift in Sources */,
 				6E06FD7A158360A66779DB29 /* ToolDisclosureUITests.swift in Sources */,
 				050AF19EDB08DD39CFB94B47 /* UnifiedModeToggleUITests.swift in Sources */,

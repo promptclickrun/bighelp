@@ -454,6 +454,10 @@ change in both repos.
   change it after, so a switch in Settings left the open sheet's text fields and pickers in the old style.
   `BighelpWindowAppearance` sets every window and presented controller, and each `bighelpSheet` and
   `bighelpFullScreenCover` applies it as it opens.
+- **Text size on sheets:** iOS starts a sheet or cover again from the device's own Dynamic Type size, not the
+  root's `.dynamicTypeSize`, so Settings once ignored Appearance's text size. `bighelpPresentedAppearance`
+  applies `BighelpTextSizing` again; it passes the size it chose down (`bighelpTextSizedTo`), so nothing takes
+  two steps.
 - **One long-press menu per List row:** a List row shows the first `.contextMenu` in it for every item, so a grid of
   tiles in one row acted on the wrong item (holding a pinned chat offered another chat's Delete). Give each tile a
   `Menu(primaryAction:)` or its own gesture (`AgentPinnedGrid`).

@@ -210,8 +210,6 @@ final class LongTextView: UITextView {
     private var observesKeyboard = false
     private var lastBoxHeight: CGFloat?
     private var revealsCaretAfterEdit = false
-    /// A TextKit 1 view's storage: the view holds its container, the storage holds the rest.
-    private let keptTextStorage: NSTextStorage?
     /// The colors last applied, resolved, so an update that changes nothing re-colors nothing:
     /// setting `textColor` touches every character.
     private var appliedColors: [CGFloat] = []
@@ -220,25 +218,16 @@ final class LongTextView: UITextView {
     /// initializer Swift doesn't override, so this class's stored properties were never set and
     /// the first read of one crashed (#727).
     init(usesTextKit2: Bool) {
-        guard !usesTextKit2 else {
-            keptTextStorage = nil
-            super.init(frame: .zero, textContainer: nil)
-            return
-        }
-        // Laid out in one piece, so the caret and the scroll height are exact everywhere.
-        let storage = NSTextStorage()
-        let manager = NSLayoutManager()
-        manager.allowsNonContiguousLayout = false
-        storage.addLayoutManager(manager)
-        let container = NSTextContainer(size: CGSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
-        container.widthTracksTextView = true
-        manager.addTextContainer(container)
-        keptTextStorage = storage
-        super.init(frame: .zero, textContainer: container)
+        super.init(frame: .zero, textContainer: nil)
+        guard !usesTextKit2 else { return }
+        // Asking for the layout manager moves the view to TextKit 1 with UIKit's own text stack (a
+        // hand-made container's endless height gave frames UIKit can't draw). UIKit turns
+        // non-contiguous layout on as it builds the stack, so it goes off after: laid out in one
+        // piece, the caret and the scroll height are exact everywhere.
+        layoutManager.allowsNonContiguousLayout = false
     }
 
     required init?(coder: NSCoder) {
-        keptTextStorage = nil
         super.init(coder: coder)
     }
 
@@ -290,7 +279,9 @@ final class LongTextView: UITextView {
         placeholderLabel.textColor = hintColor
         if let caretColor {
             tintColor = caretColor
+            #if !os(visionOS)
             inputAccessoryView?.tintColor = caretColor
+            #endif
         }
     }
 
@@ -452,9 +443,18 @@ final class LongTextView: UITextView {
         layoutIfNeeded()
         guard let end = selectedTextRange?.end else { return }
         let caret = caretRect(for: end)
+        let margin = LongTextKeyboard.caretMargin
         guard !caret.isNull, !caret.isInfinite,
               caret.minY < bounds.minY || caret.maxY - 1 > bounds.maxY - contentInset.bottom else { return }
-        scrollRectToVisible(caret.insetBy(dx: 0, dy: -LongTextKeyboard.caretMargin), animated: false)
+        scrollRectToVisible(caret.insetBy(dx: 0, dy: -margin), animated: false)
+        // A new empty last line can sit past the content height until the next layout, where
+        // scrollRectToVisible stops short of it: show it anyway.
+        let visibleHeight = bounds.height - contentInset.bottom
+        if caret.maxY - 1 > bounds.minY + visibleHeight {
+            contentOffset.y = caret.maxY + margin - visibleHeight
+        } else if caret.minY < bounds.minY {
+            contentOffset.y = caret.minY - margin
+        }
     }
 
     /// A box the keyboard covers scrolls its form up, never past the box's own top. Only when

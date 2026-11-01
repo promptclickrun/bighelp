@@ -9,10 +9,11 @@ struct HermesBlobFaceView: View {
     private let eyes: [Path]
 
     /// `color` (`hsl()` or hex) paints the face over the color its seed would give.
-    init(seed: String, kind: HermesBlobFace.Kind?, color: String? = nil) {
-        let rendering = HermesBlobFace.render(seed: seed, kind: kind)
-        head = HermesFaceColor.color(color.flatMap { $0.isEmpty ? nil : $0 } ?? rendering.head)
-        eye = HermesFaceColor.color(rendering.eye)
+    init(seed: String, kind: HermesBlobFace.Kind?, edits: HermesBlobEdits? = nil, color: String? = nil) {
+        let rendering = HermesBlobFace.render(seed: seed, kind: kind, edits: edits)
+        let headColor = color.flatMap { $0.isEmpty ? nil : $0 } ?? rendering.head
+        head = HermesFaceColor.color(headColor)
+        eye = HermesFaceColor.color(HermesFaceColor.eye(rendering.eye, on: headColor))
         bodyParts = rendering.body.map { part in
             switch part {
             case .circle(let cx, let cy, let r):
@@ -81,7 +82,7 @@ struct HermesLookView: View {
         switch look.style {
         case .face:
             let blob = HermesBlobShape(look.shape) ?? HermesBlobShape()
-            HermesBlobFaceView(seed: look.faceSeed ?? blob.seed(name: name), kind: blob.kind, color: look.color)
+            HermesBlobFaceView(seed: look.faceSeed ?? blob.seed(name: name), kind: blob.kind, edits: blob.edits, color: look.color)
         case .shape:
             HermesShapeFaceView(shape: look.shape ?? HermesShapeFace.defaultShape(for: name),
                                 color: HermesShapeFace.color(look.color, name: name))
@@ -95,6 +96,20 @@ enum HermesFaceColor {
     static func color(_ css: String) -> Color {
         guard let rgb = HermesCSSColor.rgb(css) else { return Color(red: 139 / 255, green: 92 / 255, blue: 246 / 255) }
         return Color(red: rgb.red, green: rgb.green, blue: rgb.blue)
+    }
+
+    /// The seed's eye color, unless a picked body color is too close to it to see the
+    /// eyes: then a light or dark ink, as blobatar picks for its own dark bodies.
+    static func eye(_ seedEye: String, on head: String) -> String {
+        guard let body = HermesCSSColor.rgb(head), let eye = HermesCSSColor.rgb(seedEye) else { return seedEye }
+        let a = luminance(body), b = luminance(eye)
+        if (max(a, b) + 0.05) / (min(a, b) + 0.05) >= 3 { return seedEye }
+        return a < 0.2 ? "#F4F1EA" : "#17141F"
+    }
+
+    private static func luminance(_ rgb: (red: Double, green: Double, blue: Double)) -> Double {
+        func linear(_ value: Double) -> Double { value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4) }
+        return 0.2126 * linear(rgb.red) + 0.7152 * linear(rgb.green) + 0.0722 * linear(rgb.blue)
     }
 }
 

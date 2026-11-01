@@ -119,17 +119,25 @@ final class BighelpBackgroundUploads: NSObject, BigFileChunkSending, URLSessionD
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
         guard let value = lock.withLock({ pending.removeValue(forKey: task.taskIdentifier) }) else { return }
-        if let failure = value.failure ?? error {
-            value.continuation.resume(throwing: (failure as? URLError)?.code == .cancelled ? CancellationError() : failure)
-        } else if let response = value.response {
-            guard response.url == task.originalRequest?.url else {
-                value.continuation.resume(throwing: DirectHermesError.redirectRefused)
-                return
-            }
-            value.continuation.resume(returning: (value.received, response))
-        } else {
-            value.continuation.resume(throwing: DirectHermesError.invalidResponse)
+        value.continuation.resume(with: Self.outcome(failure: value.failure ?? error, captured: value.response,
+                                                     taskResponse: task.response, requested: task.originalRequest?.url,
+                                                     body: value.received))
+    }
+
+    /// How a finished piece ends. A background session never asks about the response before the body
+    /// (`didReceive response` is for foreground sessions), so the task's own response stands in for it:
+    /// without it every piece that reached the host came back as a refusal.
+    static func outcome(failure: (any Error)?, captured: HTTPURLResponse?, taskResponse: URLResponse?,
+                        requested: URL?, body: Data) -> Result<(Data, HTTPURLResponse), any Error> {
+        if let failure {
+            return .failure((failure as? URLError)?.code == .cancelled ? CancellationError() : failure)
         }
+        guard let response = captured ?? (taskResponse as? HTTPURLResponse) else {
+            return .failure(DirectHermesError.invalidResponse)
+        }
+        guard requested == nil || response.url == requested else { return .failure(DirectHermesError.redirectRefused) }
+        guard body.count <= maximumResponseBytes else { return .failure(DirectHermesError.messageTooLarge) }
+        return .success((body, response))
     }
 
     func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {

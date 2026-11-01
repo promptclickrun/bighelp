@@ -207,14 +207,17 @@ final class BigFileUploader {
                     return .failed(index, .connection, staleContext: false)
                 }
                 let code = value?["error"]?.object?["code"]?.string ?? ""
-                if code == "upload_finished" { return .failed(index, .connection, staleContext: false) }
-                return .failed(index, code.isEmpty && response.statusCode >= 500 ? .connection
-                               : BigFileUploadFailure(code: code), staleContext: false)
+                // No code is no answer from the plugin (a proxy, or a request cut short): worth another try.
+                if code.isEmpty || code == "upload_finished" { return .failed(index, .connection, staleContext: false) }
+                return .failed(index, BigFileUploadFailure(code: code), staleContext: false)
             }
             guard let value else { return .failed(index, .connection, staleContext: false) }
             let answer = try BigFileUploadReceipt(value, expectedByteCount: file.byteCount, expectedUploadID: uploadID)
             return .received(index, answer)
         } catch is CancellationError {
+            return .failed(index, .connection, staleContext: false)
+        } catch DirectHermesError.invalidResponse, WorkspaceClientError.invalidResponse {
+            // An answer that doesn't read is no answer: the host's own record says what arrived.
             return .failed(index, .connection, staleContext: false)
         } catch {
             return .failed(index, BigFileUploadFailure(error), staleContext: false)

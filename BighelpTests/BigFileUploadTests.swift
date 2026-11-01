@@ -135,6 +135,43 @@ struct BigFileUploadTests {
         #expect(host.pieceOffsets == [4_194_304])
     }
 
+    /// A background session hands over the response only with the finished task. Taking it from
+    /// there is what lets a piece the host took count; without it every piece read as a refusal.
+    @Test func aFinishedBackgroundPieceUsesTheTasksOwnResponse() throws {
+        let url = URL(string: "https://hermes.example.invalid" + DirectHermesBigFileChunk.route)!
+        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
+        let body = Data(#"{"uploadId":"x"}"#.utf8)
+        let finished = try BighelpBackgroundUploads.outcome(failure: nil, captured: nil, taskResponse: response,
+                                                            requested: url, body: body).get()
+        #expect(finished.1.statusCode == 200 && finished.0 == body)
+        #expect(throws: (any Error).self) {
+            try BighelpBackgroundUploads.outcome(failure: nil, captured: nil, taskResponse: nil, requested: url, body: body).get()
+        }
+        let elsewhere = HTTPURLResponse(url: URL(string: "https://other.example.invalid/")!, statusCode: 200,
+                                        httpVersion: nil, headerFields: nil)!
+        #expect(throws: DirectHermesError.redirectRefused) {
+            try BighelpBackgroundUploads.outcome(failure: nil, captured: nil, taskResponse: elsewhere, requested: url,
+                                                 body: body).get()
+        }
+        #expect(throws: CancellationError.self) {
+            try BighelpBackgroundUploads.outcome(failure: URLError(.cancelled), captured: nil, taskResponse: response,
+                                                 requested: url, body: body).get()
+        }
+    }
+
+    /// An answer that doesn't read (or a 400 with no code, from a proxy) is no refusal: the upload asks the host
+    /// what it has and goes on, instead of saying the computer didn't take the file.
+    @Test func anAnswerThatDoesNotReadIsTriedAgainNotAFinalRefusal() async throws {
+        let file = try await Self.file(bytes: 5_000_000)
+        defer { BigFileStore.remove(file) }
+        let host = FakeUploadHost()
+        host.unreadableOnce = true
+        let staged = try await BigFileUploader(host: host, sender: host, retryDelays: [.seconds(1)], sleep: { _ in })
+            .upload(file, agentID: "default")
+        #expect(host.stored == (try Data(contentsOf: file.localURL)))
+        #expect(!staged.path.isEmpty)
+    }
+
     @Test func aChangedContextIsReadAgainAndThePieceRetried() async throws {
         let file = try await Self.file(bytes: 5_000_000)
         defer { BigFileStore.remove(file) }
@@ -232,6 +269,7 @@ private final class FakeUploadHost: BigFileUploadHost, BigFileChunkSending, @unc
     var preloaded: Set<Int> = []
     var preloadSource: URL?
     var staleOnce = false
+    var unreadableOnce = false
     var offline = false
     var startRefusal: String?
     var contextReloads = 0
@@ -303,6 +341,10 @@ private final class FakeUploadHost: BigFileUploadHost, BigFileChunkSending, @unc
         if staleOnce {
             staleOnce = false
             return reply(412, ["error": .object(["code": .string("context_changed")])])
+        }
+        if unreadableOnce {
+            unreadableOnce = false
+            throw DirectHermesError.invalidResponse
         }
         let index = offset / chunkBytes
         if dropPieces.remove(index) != nil {

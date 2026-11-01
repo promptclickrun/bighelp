@@ -183,6 +183,7 @@ struct ChatDestinationView: View {
     }
 
     var body: some View {
+        let _ = ChatPerformanceProbe.count("chat.destination.body")
         chatCanvas
             .modifier(TeamCallEntry(chat: model, rooms: botModeRooms, services: featureStore.teamCallServices,
                                     agents: agents, userIdentity: userIdentity,

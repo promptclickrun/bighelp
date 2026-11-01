@@ -109,6 +109,7 @@ struct ChatComposer: View, Equatable {
 
     var body: some View {
         let _ = ChatPerformanceProbe.count("composer.body")
+        let _ = ChatPerformanceProbe.logChanges(Self.self)
         VStack(spacing: BighelpTokens.space4) {
             if let compaction = model.compaction, compaction.isShown {
                 ChatCompactionRail(compaction: compaction)
@@ -856,6 +857,7 @@ private struct ComposerPrimaryAction: View {
 
     var body: some View {
         let _ = ChatPerformanceProbe.count("composer.action.body")
+        let _ = ChatPerformanceProbe.logChanges(Self.self)
         AdaptiveComposerActionButton(
             action: ChatComposerPrimaryAction.resolve(hasText: model.draftShape.hasText,
                                                       isTurnActive: model.isSending || model.otherProcessRun != nil,

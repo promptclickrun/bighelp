@@ -207,6 +207,7 @@ final class LongTextView: UITextView {
     private var hasFocusedOnAppear = false
     private var observesKeyboard = false
     private var lastBoxHeight: CGFloat?
+    private var revealsCaretAfterEdit = false
     /// The colors last applied, resolved, so an update that changes nothing re-colors nothing:
     /// setting `textColor` touches every character.
     private var appliedColors: [CGFloat] = []
@@ -287,15 +288,19 @@ final class LongTextView: UITextView {
         return height
     }
 
-    /// After the person's own keystroke. UIKit scrolls to the caret later, and not always far
-    /// enough: after a jump through text TextKit 2 hasn't laid out yet, or onto a new empty last
-    /// line, the line being typed sat out of sight for a while (#727). So the edit is laid out
-    /// and the caret brought into view now; UIKit's own scroll then finds it already there.
+    /// After the person's own keystroke. UIKit scrolls to the caret after the edit, and not always
+    /// far enough: after a jump through text TextKit 2 hasn't laid out yet, or onto a new empty last
+    /// line, the line being typed stayed out of sight (#727). A scroll during the edit doesn't hold,
+    /// so the caret is brought into view right after it, once however fast the keys come.
     func didEdit() {
         textDidChange()
-        guard isFirstResponder else { return }
-        layoutIfNeeded()
-        scrollCaretToVisible()
+        guard isFirstResponder, !revealsCaretAfterEdit else { return }
+        revealsCaretAfterEdit = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.revealsCaretAfterEdit = false
+            if self.isFirstResponder { self.scrollCaretToVisible() }
+        }
     }
 
     /// After the person's own edit, or text put in from elsewhere.
@@ -426,16 +431,24 @@ final class LongTextView: UITextView {
         if followsCaret, isFirstResponder { scrollCaretToVisible() }
     }
 
+    /// Each step only when the caret is still out of view: TextKit 2 places text it hasn't laid out
+    /// by estimate, so a caret far from what's on screen isn't where it says until the text is laid
+    /// out; then UIKit's own scroll to the selection; then a scroll to the caret's rect with room.
     private func scrollCaretToVisible() {
-        // TextKit 2 places text it hasn't laid out by estimate, so a long scroll can move the
-        // caret once its lines are laid out: look again until it stays in view.
-        for _ in 0..<3 {
+        for step in 0..<4 {
+            layoutIfNeeded()
             guard let end = selectedTextRange?.end else { return }
             let caret = caretRect(for: end)
             guard !caret.isNull, !caret.isInfinite else { return }
             if caret.minY >= bounds.minY, caret.maxY - 1 <= bounds.maxY - contentInset.bottom { return }
-            scrollRectToVisible(caret.insetBy(dx: 0, dy: -LongTextKeyboard.caretMargin), animated: false)
-            layoutIfNeeded()
+            switch step {
+            case 0:
+                if let manager = textLayoutManager { manager.ensureLayout(for: manager.documentRange) }
+            case 1:
+                scrollRangeToVisible(selectedRange)
+            default:
+                scrollRectToVisible(caret.insetBy(dx: 0, dy: -LongTextKeyboard.caretMargin), animated: false)
+            }
         }
     }
 

@@ -3,6 +3,9 @@ import Testing
 import UIKit
 @testable import Bighelp
 
+/// One at a time: the caret test waits between keystrokes, and another test taking the keyboard
+/// in its own window meanwhile would leave nothing to judge.
+@Suite(.serialized)
 @MainActor
 struct LongTextEditorTests {
     private static let longText = (1...60)
@@ -57,18 +60,26 @@ struct LongTextEditorTests {
     }
 
     /// "The line that you type stays above the keyboard": after every keystroke, including a new
-    /// empty last line, the caret is inside what the box shows above the keyboard.
-    @Test func theCaretStaysInViewWhileTyping() throws {
+    /// empty last line and a jump far from what's on screen, the caret is inside what the box shows
+    /// above the keyboard.
+    @Test(.timeLimit(.minutes(1))) func theCaretStaysInViewWhileTyping() async throws {
         let host = try Host(text: Self.longText)
         defer { host.close() }
         let view = try #require(host.textView)
         #expect(view.becomeFirstResponder())
+        var judged = 0
         for atEnd in [false, true] {
             let length = (view.text as NSString).length
             let location = atEnd ? length : length / 2
             view.selectedRange = NSRange(location: location, length: 0)
             for character in "\nKeep every receipt.\n\nAsk first." {
+                // A test in another suite can take the keyboard while this one waits.
+                if !view.isFirstResponder { _ = view.becomeFirstResponder() }
                 view.insertText(String(character))
+                // A keyboard's next key comes in a later turn of the run loop.
+                try await Task.sleep(for: .milliseconds(30))
+                guard view.isFirstResponder else { continue }
+                judged += 1
                 let end = try #require(view.selectedTextRange?.end)
                 let caret = view.caretRect(for: end)
                 var visible = view.bounds
@@ -77,6 +88,7 @@ struct LongTextEditorTests {
                         "Caret out of sight after typing \(character.debugDescription) at \(location)")
             }
         }
+        #expect(judged >= 40, "Kept the keyboard for most keystrokes")
     }
 
     @Test func textFromElsewhereWhileTypingKeepsTheCaret() throws {

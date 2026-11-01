@@ -143,12 +143,15 @@ change in both repos.
     at a time.
   - Use one simulator per session, and shut down the ones you booted when you stop.
   - Run long suites in the background so you can keep working.
-- **Apple CI workflows are off by default.** Build, test and release on a Mac: this one, or a linked one (for
-  example the Mac that T3 Code links to). Use a GitHub workflow that builds, tests, signs or uploads an Apple app
+- **Apple CI workflows are off by default.** Build, test and release on a Mac: a local one, or a remote one that
+  you can reach. Use a GitHub workflow that builds, tests, signs or uploads an Apple app
   (`ios-ci.yml`, `testflight.yml`, `prepare-signing.yml`, or a new one like them) only when both are true: no Mac is
   available, and the user asked for the workflow in words. Otherwise never start, dispatch, re-run, enable or wait
   on one. "CI is disabled" or "the workflow returned 422" is not a gap to report. Report the local build and test
   results instead. `catalog.yml` and `telemetry.yml` build no Apple app and are not covered.
+  - A contributor who has no Mac says so in the PR and lists what they could check. The maintainer then builds
+    and tests the PR on a Mac before it merges. Don't dispatch a workflow to fill that gap unless the maintainer
+    asks for it.
 - **Known failures:** some tests fail on untouched `main` too, for example
   `DirectHermesVoiceMediaTests.nativePCMSilenceActuallySchedulesAndDrains` (simulator audio) and a few old UI tests.
   Check against `main` before calling something a regression.
@@ -327,7 +330,7 @@ change in both repos.
   the agent's working folder (`uploads/<date>/<name>`, what its Files tab shows); stock `file.attach` then takes
   it by `path` and tells the agent its type, size and place on disk, never its bytes. The app's
   `[Video attached: … (size, length, picture)]` or `[File attached: … (size)]` note follows each `@file:` line.
-  One look per file (Colt, #721): while it goes up, a tile with a ring and "34 of 80 MB" (`BigFileUploadTile`,
+  One look per file (#721): while it goes up, a tile with a ring and "34 of 80 MB" (`BigFileUploadTile`,
   progress in `BigFileUploadBoard` so only the ring redraws), or why it didn't go with Try again; once Hermes
   takes the message (`onSubmissionAdmitted`), the row takes the sent text and shows each file as a line on the
   rail (`ChatSentFileLine`), exactly what a reread rebuilds. A host path or `@file:` ref never shows as text; a

@@ -44,6 +44,30 @@ struct SimpleBotsTests {
         #expect(black.canvasHex == BighelpTheme.blackDark.canvasHex)
     }
 
+    /// Bots mode's light page is the theme picked in Appearance too (#719); it used to be Paper always.
+    @Test func botsModeFollowsTheLightThemeChoice() {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let settings = SettingsStore(defaults: defaults)
+        settings.simpleBotsEnabled = true
+        settings.pickTheme(.moss, dark: false)
+        settings.pickTheme(.violet, dark: true)
+        let context = settings.appearanceContext
+        #expect(context.lightBackground == .moss && context.darkBackground == .violet)
+        let day = BighelpTheme.resolve(appearance: context, colorScheme: .light, contrast: .standard)
+        let night = BighelpTheme.resolve(appearance: context, colorScheme: .dark, contrast: .standard)
+        #expect(day.canvasHex == BighelpPresetPalette.mossLight.canvas)
+        #expect(day.messageSurfaceHex == BighelpPresetPalette.mossLight.messageSurface)
+        #expect(night.canvasHex == BighelpPresetPalette.violetDark.canvas)
+        #expect(day.chosenBubbleHex == BighelpPresetPalette.mossLight.accent, "The theme's own bubbles")
+        settings.lightBackground = .cream
+        #expect(BighelpTheme.resolve(appearance: settings.appearanceContext, colorScheme: .light,
+                                     contrast: .standard).canvasHex == BighelpTheme.light.canvasHex)
+    }
+
     @Test func edgeSwipesGoToYourBotsAndThisBotsProfile() {
         let suiteName = #function
         let defaults = UserDefaults(suiteName: suiteName)!

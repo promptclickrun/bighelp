@@ -26,15 +26,22 @@ enum DraftFieldSizing {
         return min(max(measuredHeight, boundedLineHeight), maximumHeight)
     }
 
+    /// Expand shows above the message box once the draft takes this many lines (#728).
+    static let expandLines = 3
+
+    /// The lines a measured draft takes. The editor has no insets, so each line is one line
+    /// height; rounding absorbs the fraction of a point TextKit adds.
+    static func lineCount(measuredHeight: CGFloat, lineHeight: CGFloat) -> Int {
+        Int((max(measuredHeight, 0) / max(lineHeight, 1)).rounded())
+    }
+
     static func shouldOfferExpandedEditor(
         hasText: Bool,
         measuredHeight: CGFloat,
         lineHeight: CGFloat,
-        thresholdLines: Int = 4
+        minimumLines: Int = DraftFieldSizing.expandLines
     ) -> Bool {
-        let boundedThreshold = max(thresholdLines, 1)
-        return hasText
-            && measuredHeight > max(lineHeight, 1) * CGFloat(boundedThreshold)
+        hasText && lineCount(measuredHeight: measuredHeight, lineHeight: lineHeight) >= max(minimumLines, 1)
     }
 }
 

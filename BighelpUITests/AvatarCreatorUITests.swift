@@ -36,16 +36,115 @@ final class AvatarCreatorUITests: BighelpUITestCase {
         XCTAssertNotEqual(any["avatar.creator.name"].firstMatch.label, shapeName, "Randomize picks another shape")
         save("hermes-shapes", app)
         any["avatar.creator.style.face"].firstMatch.tap()
-        let swatch = any["avatar.creator.face-color.3"].firstMatch
-        for _ in 0..<5 where !(swatch.exists && swatch.isHittable) { app.swipeUp() }
-        XCTAssertTrue(swatch.exists, "Face has colors like Shapes")
+        app.buttons["avatar.creator.face.tool.colors"].firstMatch.tap()
+        let swatch = any["avatar.creator.face.palette.Iris"].firstMatch
+        for _ in 0..<5 where !(swatch.exists && swatch.isHittable) { app.scrollViews.firstMatch.swipeUp() }
+        XCTAssertTrue(swatch.exists, "Faces have named palettes")
         swatch.tap()
+        XCTAssertTrue(swatch.isSelected)
         let saturation = any["avatar.creator.face-color.saturation"].firstMatch
-        for _ in 0..<3 where !(saturation.exists && saturation.isHittable) { app.swipeUp() }
+        for _ in 0..<5 where !(saturation.exists && saturation.isHittable) { app.scrollViews.firstMatch.swipeUp() }
         XCTAssertTrue(saturation.exists, "Saturation, down to gray")
         saturation.adjust(toNormalizedSliderPosition: 0)
         XCTAssertTrue(any["avatar.creator.face-color.custom"].firstMatch.exists, "The color wheel")
         save("face-color", app)
+    }
+
+    /// The face designer: the play strip plays each state on the face, the tools edit its
+    /// shape and size with Undo, and sets and palettes pick a finished face or a color.
+    /// BIGHELP_AVATAR_APPEARANCE (light, dark) and BIGHELP_AVATAR_TEXT_SIZE (a content size
+    /// category, such as UICTContentSizeCategoryAccessibilityXXL) set how it's drawn.
+    @MainActor
+    func testFaceDesignerPlaysStatesAndEditsTheShape() throws {
+        let environment = ProcessInfo.processInfo.environment
+        let appearance = environment["BIGHELP_AVATAR_APPEARANCE"] ?? "light"
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance]
+        if let size = environment["BIGHELP_AVATAR_TEXT_SIZE"] {
+            app.launchArguments += ["-UIPreferredContentSizeCategoryName", size]
+        }
+        app.launch()
+        openRootTab("tab.agents", in: app)
+        let create = app.buttons["agents.create"].firstMatch
+        XCTAssertTrue(create.waitForExistence(timeout: 10))
+        create.tap()
+        let preview = app.descendants(matching: .any)["agent.editor.avatar-preview"].firstMatch
+        XCTAssertTrue(preview.waitForExistence(timeout: 10))
+        preview.tap()
+        let any = app.descendants(matching: .any)
+        let suffix = environment["BIGHELP_AVATAR_TEXT_SIZE"] == nil ? appearance : "\(appearance)-large-text"
+        XCTAssertTrue(app.buttons["avatar.creator.category.hermes"].firstMatch.waitForExistence(timeout: 10))
+        app.buttons["avatar.creator.category.hermes"].firstMatch.tap()
+        app.buttons["avatar.creator.style.face"].firstMatch.tap()
+
+        // Every state, each named for VoiceOver; one tap plays it on the big face.
+        for state in ["idle", "still", "bounce", "listen", "think", "speak", "work", "curious", "love",
+                      "celebrate", "sleep", "oops"] {
+            XCTAssertTrue(app.buttons["avatar.creator.face.play.\(state)"].firstMatch.exists, state)
+        }
+        let love = app.buttons["avatar.creator.face.play.love"].firstMatch
+        XCTAssertEqual(love.label, "Love")
+        reveal(love, in: app)
+        love.tap()
+        XCTAssertTrue(love.isSelected)
+        XCTAssertEqual(any["avatar.creator.preview"].firstMatch.label, "Face preview, Love")
+        save("face-play-love-\(suffix)", app)
+        let use = app.buttons["avatar.creator.use"].firstMatch
+        let undo = app.buttons["avatar.creator.face.undo"].firstMatch
+        XCTAssertFalse(undo.isEnabled, "Playing a state changes nothing")
+
+        // Shape: an Organic outline gets bumps, wobble and a mirror, with Undo.
+        app.buttons["avatar.creator.face.tool.shape"].firstMatch.tap()
+        let organic = app.buttons["avatar.creator.face.organic"].firstMatch
+        reveal(organic, in: app)
+        organic.tap()
+        XCTAssertTrue(undo.isEnabled)
+        let mirror = app.switches["avatar.creator.face.mirror"].firstMatch
+        reveal(mirror, in: app)
+        XCTAssertTrue(mirror.exists, "Organic faces can mirror")
+        mirror.switches.firstMatch.tap()
+        XCTAssertEqual(mirror.value as? String, "1")
+        let wobble = app.sliders["avatar.creator.face.wobble"].firstMatch
+        XCTAssertTrue(wobble.exists)
+        wobble.adjust(toNormalizedSliderPosition: 0.9)
+        save("face-shape-\(suffix)", app)
+        undo.tap()
+        undo.tap()
+        XCTAssertEqual(mirror.value as? String, "0", "Undo steps back through the wobble and the mirror")
+
+        // Size: Taller, then Undo.
+        app.buttons["avatar.creator.face.tool.size"].firstMatch.tap()
+        let taller = app.buttons["avatar.creator.face.size.taller"].firstMatch
+        XCTAssertTrue(taller.waitForExistence(timeout: 3))
+        reveal(taller, in: app)
+        taller.tap()
+        XCTAssertTrue(app.buttons["avatar.creator.face.size.reset"].firstMatch.waitForExistence(timeout: 3))
+        save("face-size-\(suffix)", app)
+        undo.tap()
+        XCTAssertFalse(app.buttons["avatar.creator.face.size.reset"].firstMatch.exists)
+
+        // Sets: a finished face in one tap.
+        app.buttons["avatar.creator.face.tool.sets"].firstMatch.tap()
+        let lantern = app.buttons["avatar.creator.face.preset.lantern-759"].firstMatch
+        XCTAssertTrue(lantern.waitForExistence(timeout: 3))
+        reveal(lantern, in: app)
+        lantern.tap()
+        XCTAssertTrue(lantern.isSelected)
+        XCTAssertTrue(use.isEnabled)
+        let sleep = app.buttons["avatar.creator.face.play.sleep"].firstMatch
+        reveal(sleep, in: app)
+        sleep.tap()
+        save("face-sets-sleep-\(suffix)", app)
+
+        // Colors: named palettes, the picked one ringed.
+        app.buttons["avatar.creator.face.tool.colors"].firstMatch.tap()
+        let night = app.buttons["avatar.creator.face.palette.Night"].firstMatch
+        XCTAssertTrue(night.waitForExistence(timeout: 3))
+        reveal(night, in: app)
+        night.tap()
+        XCTAssertTrue(night.isSelected)
+        XCTAssertFalse(lantern.exists && lantern.isSelected)
+        save("face-colors-\(suffix)", app)
     }
 
     /// Editing an agent: the picker opens on the avatar it has now, never a random one, and
@@ -123,6 +222,24 @@ final class AvatarCreatorUITests: BighelpUITestCase {
         XCTAssertTrue(hexagon.isSelected, "Opens on the saved shape")
         XCTAssertFalse(use.isEnabled)
         save("current-shape-\(appearance)", app)
+    }
+
+    /// Large text pushes controls below the fold; scroll the choices until it can be tapped.
+    /// The choices can be shorter than two tiles, so a swipe's fling jumps past whole rows:
+    /// drag a short way with no fling instead.
+    @MainActor
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
+        // The choices are the sheet's last scroll view, after the row of categories.
+        let scrollViews = app.scrollViews
+        let choices = scrollViews.element(boundBy: max(0, scrollViews.count - 1))
+        func drag(from: CGFloat, to: CGFloat) {
+            choices.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: from))
+                .press(forDuration: 0.1, thenDragTo: choices.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: to)),
+                       withVelocity: .slow, thenHoldForDuration: 0.2)
+        }
+        for _ in 0..<14 where !(element.exists && element.isHittable) { drag(from: 0.7, to: 0.3) }
+        for _ in 0..<20 where !(element.exists && element.isHittable) { drag(from: 0.3, to: 0.7) }
+        XCTAssertTrue(element.isHittable, "\(element) can be reached")
     }
 
     @MainActor

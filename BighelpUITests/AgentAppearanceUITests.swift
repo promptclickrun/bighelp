@@ -36,7 +36,8 @@ final class AgentAppearanceUITests: BighelpUITestCase {
         openDemoChat(in: app)
         // The call is sent as the chat opens; give it time to (not) land.
         Thread.sleep(forTimeInterval: 2)
-        expectAppearance(mode: "Light", color: "lavender", in: app)
+        // Ink (`graphite`) is the default bubble color since #624.
+        expectAppearance(mode: "Light", color: "graphite", in: app)
     }
 
     @MainActor
@@ -90,10 +91,10 @@ final class AgentAppearanceUITests: BighelpUITestCase {
                                   file: StaticString = #filePath, line: UInt = #line) {
         openSettings(in: app, file: file, line: line)
         settingsRow("settings.themes", in: app, file: file, line: line).tap()
-        let picker = app.segmentedControls["appearance.mode"].firstMatch
-        XCTAssertTrue(picker.waitForExistence(timeout: 5), file: file, line: line)
+        let scheme = app.buttons["appearance.mode.\(mode.lowercased())"].firstMatch
+        XCTAssertTrue(scheme.waitForExistence(timeout: 5), file: file, line: line)
         let selected = NSPredicate(format: "isSelected == true")
-        expectation(for: selected, evaluatedWith: picker.buttons[mode].firstMatch)
+        expectation(for: selected, evaluatedWith: scheme)
         let swatch = app.descendants(matching: .any)["appearance.bubble.\(color)"].firstMatch
         let studio = app.descendants(matching: .any)["appearance.studio"].firstMatch
         for _ in 0..<4 where !swatch.isHittable { studio.swipeUp() }

@@ -89,7 +89,7 @@ extension ChatView {
                             top: headerHeight, left: 0,
                             bottom: composerHeight + ChatCanvasLayout.composerInsetSpacing, right: 0),
                            rowContext: ChatCanvasRowContext(groupedIDs: groupedIDs, continuedIDs: continuedIDs,
-                                                            density: chatDensity)) { row in
+                                                            density: chatDensity, agentStyle: chatAgentStyle)) { row in
             canvasRowContent(row)
                 .frame(maxWidth: horizontalSizeClass == .regular ? ChatCanvasLayout.regularLaneMaximumWidth : .infinity,
                        alignment: .leading)

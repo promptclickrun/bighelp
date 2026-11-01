@@ -253,13 +253,70 @@ final class AvatarCreatorModel {
         selectedPetFrame = frame
     }
 
+    /// A fresh seed draws a fresh face, so hand edits made for the last one go.
     func randomizeFace() {
-        blobShape.seedPart = HermesBlobShape.randomSeed()
+        editFace { shape, _ in
+            shape.seedPart = HermesBlobShape.randomSeed()
+            shape.edits = nil
+        }
     }
 
     /// Lock keeps today's face even if the name changes; unlock follows the name again.
     func toggleFaceLock(name: String) {
-        blobShape.seedPart = blobShape.isLocked ? "" : name
+        editFace { shape, _ in shape.seedPart = shape.isLocked ? "" : name }
+    }
+
+    // MARK: Face edits and Undo
+
+    /// A face as it was before an edit, for Undo.
+    private struct FaceState: Equatable {
+        var shape: HermesBlobShape
+        var color: String?
+    }
+
+    private var faceHistory: [FaceState] = []
+    private static let faceHistoryLimit = 50
+
+    var canUndoFace: Bool { faceHistory.contains { $0 != FaceState(shape: blobShape, color: faceColor) } }
+
+    /// Every face change goes through here, so Undo can step back through them.
+    func editFace(_ change: (inout HermesBlobShape, inout String?) -> Void) {
+        var shape = blobShape
+        var color = faceColor
+        change(&shape, &color)
+        guard shape != blobShape || color != faceColor else { return }
+        recordFaceUndo()
+        blobShape = shape
+        faceColor = color
+    }
+
+    /// Keeps the face as it is now. A slider calls it once as a drag starts, so one
+    /// Undo takes back the whole drag.
+    func recordFaceUndo() {
+        let now = FaceState(shape: blobShape, color: faceColor)
+        guard faceHistory.last != now else { return }
+        faceHistory.append(now)
+        if faceHistory.count > Self.faceHistoryLimit { faceHistory.removeFirst() }
+    }
+
+    /// Steps back to the last face that differs from this one; a kept face that
+    /// matches it (a drag that changed nothing) is skipped.
+    func undoFace() {
+        let now = FaceState(shape: blobShape, color: faceColor)
+        while let last = faceHistory.popLast() {
+            guard last != now else { continue }
+            blobShape = last.shape
+            faceColor = last.color
+            return
+        }
+    }
+
+    /// A finished face from a set: its seed, silhouette and edits, in the color its seed gives.
+    func apply(_ preset: AvatarFacePreset) {
+        editFace { shape, color in
+            shape = preset.shape
+            color = nil
+        }
     }
 
     func select(_ pet: PetdexPet, gallery: PetdexGalleryModel) async {
@@ -398,6 +455,11 @@ struct AvatarCreatorView: View {
     let useTitle: String
     let onUse: (AvatarCreatorResult) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    /// The state played on the face being edited. A preview only: the agent's own face never sees it.
+    @State private var playState: AvatarPlayState = .idle
+    @State private var faceTool: AvatarFaceTool = .shape
     #if os(visionOS)
     /// A mood being tried on the 3D stage; nil plays the chosen moves.
     @State private var tryingMood: String?
@@ -477,62 +539,106 @@ struct AvatarCreatorView: View {
         }
     }
 
-    /// Phone and iPad: the character on top, choices under it. Vision Pro: the
-    /// 3D character beside the choices, in a wider sheet, so both have room.
-    /// The Mac too: its sheet is wide and short, so a stage on top left the
-    /// choices a sliver.
+    /// Phone: the character on top, choices under it. iPad, the Mac and Vision Pro:
+    /// the character beside the choices (Vision Pro's in 3D, in a wider sheet), so
+    /// both have room; a stage on top of the Mac's short sheet left the choices a sliver.
     @ViewBuilder
     private var layout: some View {
-        #if os(visionOS) || targetEnvironment(macCatalyst)
-        GeometryReader { proxy in
-            HStack(spacing: 0) {
-                stage
+        if usesSideLayout {
+            GeometryReader { proxy in
+                HStack(spacing: 0) {
+                    VStack(spacing: BighelpTokens.space12) {
+                        stage
+                        if model.style == .face { playStrip }
+                    }
                     .frame(width: min(440, proxy.size.width * 0.46))
                     .padding([.leading, .vertical], BighelpTokens.space20)
-                VStack(spacing: 0) {
-                    styleBar
-                        .padding(.top, BighelpTokens.space12)
-                    sectionBar
-                    if model.style == .catalog, hasCatalogPick {
-                        tabBar
-                            .padding(.top, BighelpTokens.space8)
+                    VStack(spacing: 0) {
+                        styleBar
+                            .padding(.top, BighelpTokens.space12)
+                        sectionBar
+                        if model.style == .catalog, hasCatalogPick {
+                            tabBar
+                                .padding(.top, BighelpTokens.space8)
+                        }
+                        if model.style == .face {
+                            HStack(alignment: .top, spacing: 0) {
+                                AvatarFaceToolPicker(selection: $faceTool, isRail: true)
+                                    .padding(.leading, BighelpTokens.space20)
+                                    .padding(.top, BighelpTokens.space12)
+                                choices
+                                    .padding(.top, BighelpTokens.space12)
+                            }
+                        } else {
+                            choices
+                                .padding(.top, BighelpTokens.space12)
+                        }
                     }
-                    choices
-                        .padding(.top, BighelpTokens.space12)
+                }
+            }
+        } else {
+            VStack(spacing: 0) {
+                if !(isSearchingPets && model.style == .pets) {
+                    stage
+                        .padding(.horizontal, BighelpTokens.space20)
+                        .padding(.top, BighelpTokens.space8)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+                if model.style == .face, !stripScrollsWithChoices {
+                    playStrip
+                        .padding(.horizontal, BighelpTokens.space20)
+                        .padding(.top, BighelpTokens.space8)
+                }
+                styleBar
+                    .padding(.top, BighelpTokens.space12)
+                sectionBar
+                if model.style == .catalog, hasCatalogPick {
+                    tabBar
+                        .padding(.top, BighelpTokens.space8)
+                }
+                choices
+                    .padding(.top, BighelpTokens.space12)
+                if model.style == .face {
+                    AvatarFaceToolPicker(selection: $faceTool)
+                        .padding(.horizontal, BighelpTokens.space20)
+                        .padding(.vertical, BighelpTokens.space8)
                 }
             }
         }
+    }
+
+    /// Large text makes the strip three or four rows tall; held under the stage it left the
+    /// phone's choices no room, so there it scrolls at the top of the choices instead.
+    private var stripScrollsWithChoices: Bool {
+        !usesSideLayout && dynamicTypeSize >= .xLarge
+    }
+
+    private var usesSideLayout: Bool {
+        #if os(visionOS) || targetEnvironment(macCatalyst)
+        true
         #else
-        VStack(spacing: 0) {
-            if !(isSearchingPets && model.style == .pets) {
-                stage
-                    .padding(.horizontal, BighelpTokens.space20)
-                    .padding(.top, BighelpTokens.space8)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-            styleBar
-                .padding(.top, BighelpTokens.space12)
-            sectionBar
-            if model.style == .catalog, hasCatalogPick {
-                tabBar
-                    .padding(.top, BighelpTokens.space8)
-            }
-            choices
-                .padding(.top, BighelpTokens.space12)
-        }
+        horizontalSizeClass == .regular
         #endif
+    }
+
+    private var playStrip: some View {
+        AvatarPlayStrip(seed: model.blobShape.seed(name: faceName), kind: model.blobShape.kind,
+                        edits: model.blobShape.edits, color: model.faceColor, selection: $playState)
     }
 
     private var choices: some View {
         ScrollView {
-            panel
-                .padding(.horizontal, BighelpTokens.space20)
-                .padding(.bottom, BighelpTokens.space20)
+            VStack(spacing: BighelpTokens.space16) {
+                if model.style == .face, stripScrollsWithChoices { playStrip }
+                panel
+            }
+            .padding(.horizontal, BighelpTokens.space20)
+            .padding(.bottom, BighelpTokens.space20)
         }
         .scrollIndicators(.hidden)
         .dismissesKeyboardOnScroll(true)
         // Each tab opens at its top, not where the last one was scrolled.
-        .id("\(model.style.rawValue).\(model.catalogGroup.rawValue).\(model.tab.rawValue)")
+        .id("\(model.style.rawValue).\(model.catalogGroup.rawValue).\(model.tab.rawValue).\(faceTool.rawValue)")
     }
 
     // MARK: Stage
@@ -566,6 +672,26 @@ struct AvatarCreatorView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .allowsHitTesting(false)
                 .accessibilityIdentifier("avatar.creator.name")
+            HStack(spacing: 0) {
+            if model.style == .face {
+                Button {
+                    withAnimation(.snappy) { model.undoFace() }
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(model.canUndoFace ? theme.primaryText : theme.secondaryText)
+                        .frame(width: 40, height: 40)
+                        .background(Circle().fill(theme.incomingMessageBackground))
+                        .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                        .contentShape(.circle)
+                }
+                .bighelpPlainButtonStyle()
+                .disabled(!model.canUndoFace)
+                .padding(.vertical, BighelpTokens.space8)
+                .bighelpIconLabel("Undo", shortcut: "⌘Z")
+                .keyboardShortcut("z", modifiers: .command)
+                .accessibilityIdentifier("avatar.creator.face.undo")
+            }
             if model.style != .photo {
             Button {
                 withAnimation(.snappy) { randomize() }
@@ -584,12 +710,11 @@ struct AvatarCreatorView: View {
             .accessibilityHint("Tries a random \(model.style == .pets ? "pet" : model.style == .shapes ? "shape" : model.style == .face ? "face" : model.style == .bots ? "shape and color" : "character and look").")
             .accessibilityIdentifier("avatar.creator.shuffle")
             }
+            }
         }
-        #if os(visionOS) || targetEnvironment(macCatalyst)
-        .frame(maxHeight: .infinity)
-        #else
-        .frame(height: 260)
-        #endif
+        // A phone's face stage is shorter, so the play strip and tools fit under it.
+        .frame(height: usesSideLayout ? nil : (model.style == .face ? (stripScrollsWithChoices ? 180 : 210) : 260))
+        .frame(maxHeight: usesSideLayout ? .infinity : nil)
     }
 
     @ViewBuilder
@@ -1110,8 +1235,10 @@ struct AvatarCreatorView: View {
     private var hermesStage: some View {
         switch model.style {
         case .face:
-            HermesBlobFaceView(seed: model.blobShape.seed(name: faceName), kind: model.blobShape.kind,
-                               color: model.faceColor)
+            HermesBlobFacePlayer(seed: model.blobShape.seed(name: faceName), kind: model.blobShape.kind,
+                                 edits: model.blobShape.edits, color: model.faceColor, state: playState)
+                .accessibilityElement()
+                .accessibilityLabel("Face preview, \(playState.title)")
         case .shapes:
             HermesShapeFaceView(shape: model.shape, color: HermesShapeFace.color(model.shapeColor, name: faceName))
         case .pets:
@@ -1146,7 +1273,28 @@ struct AvatarCreatorView: View {
         }
     }
 
+    @ViewBuilder
     private var facePanel: some View {
+        let seed = model.blobShape.seed(name: faceName)
+        switch faceTool {
+        case .sets:
+            AvatarFaceSetsPanel(model: model)
+        case .shape:
+            faceShapePanel(seed: seed)
+        case .size:
+            AvatarBlobSizePanel(model: model, seed: seed)
+        case .colors:
+            VStack(alignment: .leading, spacing: BighelpTokens.space16) {
+                AvatarFacePaletteGrid(model: model, seed: seed)
+                colorSection(selection: Binding(get: { model.faceColor },
+                                                set: { color in model.editFace { _, picked in picked = color } }),
+                             nameColor: HermesBlobFace.render(seed: seed, kind: model.blobShape.kind).head,
+                             identifier: "avatar.creator.face-color", showsSwatches: false)
+            }
+        }
+    }
+
+    private func faceShapePanel(seed: String) -> some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space16) {
             section("Shape") {
                 grid(minimum: 76) {
@@ -1156,10 +1304,9 @@ struct AvatarCreatorView: View {
                             isSelected: model.blobShape.kind == kind,
                             identifier: "avatar.creator.face.\(kind?.rawValue ?? "auto")"
                         ) {
-                            withAnimation(.snappy) { model.blobShape.kind = kind }
+                            withAnimation(.snappy) { model.editFace { shape, _ in shape.kind = kind } }
                         } preview: {
-                            HermesBlobFaceView(seed: model.blobShape.seed(name: faceName), kind: kind,
-                                               color: model.faceColor)
+                            HermesBlobFaceView(seed: seed, kind: kind, edits: model.blobShape.edits, color: model.faceColor)
                         }
                     }
                 }
@@ -1180,16 +1327,15 @@ struct AvatarCreatorView: View {
                 .font(.bighelp(.footnote))
                 .foregroundStyle(theme.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
-            colorSection(selection: Binding(get: { model.faceColor }, set: { model.faceColor = $0 }),
-                         nameColor: HermesBlobFace.render(seed: model.blobShape.seed(name: faceName),
-                                                          kind: model.blobShape.kind).head,
-                         identifier: "avatar.creator.face-color")
+            AvatarBlobOutlineControls(model: model, seed: seed)
         }
     }
 
     /// "Match the name", Hermes Desktop's twelve swatches, any color from the wheel, and how
     /// colorful it is (down to gray), for faces and shapes alike.
-    private func colorSection(selection: Binding<String?>, nameColor: String, identifier: String) -> some View {
+    /// Faces show their named palettes above instead of the twelve swatches.
+    private func colorSection(selection: Binding<String?>, nameColor: String, identifier: String,
+                              showsSwatches: Bool = true) -> some View {
         section("Color") {
             let matchesName = selection.wrappedValue == nil
             Button {
@@ -1214,6 +1360,7 @@ struct AvatarCreatorView: View {
             .accessibilityAddTraits(matchesName ? [.isButton, .isSelected] : .isButton)
             .accessibilityIdentifier("\(identifier).name")
             // Hermes Desktop's twelve swatches, two even rows.
+            if showsSwatches {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: BighelpTokens.space12), count: 6),
                       spacing: BighelpTokens.space12) {
                 ForEach(Array(HermesShapeFace.swatches.enumerated()), id: \.element) { index, color in
@@ -1224,6 +1371,7 @@ struct AvatarCreatorView: View {
                         identifier: "\(identifier).\(index)"
                     ) { selection.wrappedValue = color } overlay: { EmptyView() }
                 }
+            }
             }
             let current = selection.wrappedValue ?? nameColor
             HStack(spacing: BighelpTokens.space12) {

@@ -24,9 +24,8 @@ struct FocusedTextEditorButton: View {
 
 extension View {
     /// Long instructions are hard to fine-tune in a small box. This opens the
-    /// same text full screen. It edits the text in place, so every change is
-    /// still there back in the form; Save also saves the form once the
-    /// full-screen editor has closed.
+    /// same text full screen. Every change is back in the form when it closes;
+    /// Save also saves the form once the full-screen editor has closed.
     func focusedTextEditor(
         isPresented: Binding<Bool>,
         title: String,
@@ -93,52 +92,62 @@ struct FocusedTextEditor: View {
     let identifier: String
     let onSave: (() -> Void)?
 
+    /// The text while the editor is open. It goes back when the editor closes, not on every
+    /// keystroke: each change to the form's text draws the whole form behind the editor again.
+    @State private var draft: String
     @Environment(\.dismiss) private var dismiss
-    @FocusState private var isFocused: Bool
+
+    init(title: String, text: Binding<String>, placeholder: String, identifier: String, onSave: (() -> Void)?) {
+        self.title = title
+        _text = text
+        self.placeholder = placeholder
+        self.identifier = identifier
+        self.onSave = onSave
+        _draft = State(initialValue: text.wrappedValue)
+    }
 
     var body: some View {
         NavigationStack {
-            TextEditor(text: $text)
-                .font(.bighelp(.body))
-                .focused($isFocused)
-                .scrollContentBackground(.hidden)
-                .accessibilityLabel(title)
-                .accessibilityIdentifier("\(identifier).focused")
+            LongTextEditor(text: $draft, placeholder: placeholder, accessibilityLabel: title,
+                           identifier: "\(identifier).focused", focusesOnAppear: true)
                 .padding(.horizontal, BighelpTokens.space12)
-                .overlay(alignment: .topLeading) {
-                    if text.isEmpty {
-                        Text(placeholder)
-                            .font(.bighelp(.body))
-                            .foregroundStyle(theme.tertiaryText)
-                            .padding(.top, 8)
-                            .padding(.leading, BighelpTokens.space12 + 5)
-                            .allowsHitTesting(false)
-                            .accessibilityHidden(true)
-                    }
-                }
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // The editor keeps the caret above the keyboard itself, so its frame stays put
+                // while the keyboard comes and goes instead of shrinking under the text.
+                .ignoresSafeArea(.keyboard, edges: .bottom)
                 .background(theme.canvas.ignoresSafeArea())
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Done") { dismiss() }
-                            .keyboardShortcut(.cancelAction)
-                            .accessibilityHint("Keeps your changes and goes back")
-                            .accessibilityIdentifier("\(identifier).done")
-                            .bighelpToolbarText()
+                        Button("Done") {
+                            handBack()
+                            dismiss()
+                        }
+                        .keyboardShortcut(.cancelAction)
+                        .accessibilityHint("Keeps your changes and goes back")
+                        .accessibilityIdentifier("\(identifier).done")
+                        .bighelpToolbarText()
                     }
                     if let onSave {
                         ToolbarItem(placement: .confirmationAction) {
-                            Button("Save", action: onSave)
-                                .fontWeight(.semibold)
-                                .accessibilityIdentifier("\(identifier).save")
+                            Button("Save") {
+                                handBack()
+                                onSave()
+                            }
+                            .fontWeight(.semibold)
+                            .accessibilityIdentifier("\(identifier).save")
                         }
                     }
                 }
-                .onAppear { isFocused = true }
+                // Any other way out keeps the changes too.
+                .onDisappear(perform: handBack)
         }
+    }
+
+    private func handBack() {
+        if text != draft { text = draft }
     }
 
     @BighelpThemeReader private var theme

@@ -17,6 +17,8 @@ struct AgentEditorView: View {
     @State private var avatarPreparationTask: Task<Void, Never>?
     @State private var avatarPreparationID: UUID?
     @State private var expandsInstructions = false
+    /// While the instructions box is edited, a drag that scrolls the form keeps the keyboard.
+    @State private var editsInstructions = false
     @State private var avatarPreparationLabel: String?
     @State private var isDiscardConfirmationPresented = false
     @State private var isModelConfirmationPresented = false
@@ -198,7 +200,7 @@ struct AgentEditorView: View {
                 Text(deleteError ?? "")
             }
             .scrollContentBackground(.hidden)
-            .dismissesKeyboardOnScroll(true)
+            .dismissesKeyboardOnScroll(!editsInstructions)
             .background(theme.canvas.ignoresSafeArea())
             .navigationTitle(model.isEditing ? "Edit Agent" : "Agent Studio")
             .navigationBarTitleDisplayMode(.inline)
@@ -910,7 +912,6 @@ struct AgentEditorView: View {
                 "Instructions",
                 placeholder: instructionsPlaceholder,
                 text: instructions,
-                focus: .instructions,
                 error: model.fieldErrors[.instructions],
                 identifier: "agent.editor.instructions"
             )
@@ -1012,32 +1013,14 @@ struct AgentEditorView: View {
         _ title: String,
         placeholder: String,
         text: Binding<String>,
-        focus: AgentEditorModel.Field,
         error: String?,
         identifier: String
     ) -> some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space4) {
             // A long SOUL scrolls inside its own box instead of stretching the form,
             // so the sections below it (the agent's model) stay within easy reach.
-            TextEditor(text: text)
-                .focused($focusedField, equals: focus)
-                .font(.bighelp(.body))
-                .scrollContentBackground(.hidden)
-                .frame(minHeight: 140, maxHeight: 260)
-                .overlay(alignment: .topLeading) {
-                    if text.wrappedValue.isEmpty {
-                        Text(placeholder)
-                            .font(.bighelp(.body))
-                            .foregroundStyle(theme.tertiaryText)
-                            .padding(.top, 8)
-                            .padding(.leading, 5)
-                            .allowsHitTesting(false)
-                            .accessibilityHidden(true)
-                    }
-                }
-                .accessibilityLabel(title)
-                .accessibilityHint(text.wrappedValue.isEmpty ? placeholder : "")
-                .accessibilityIdentifier(identifier)
+            LongTextEditor(text: text, placeholder: placeholder, accessibilityLabel: title,
+                           identifier: identifier, layout: .formBox, onEditingChanged: { editsInstructions = $0 })
             if let error { recoveryMessage(error) }
         }
     }

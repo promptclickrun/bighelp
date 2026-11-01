@@ -435,8 +435,9 @@ change in both repos.
   text is worked out only when read. The probe's `main_busy_ms` counts main run loop turns over 8.3 ms, a
   dropped frame at 120 Hz; the simulator's frame gaps can't show that.
 - **Message box redraws:** `ChatComposer` is `Equatable` and calls back through one `ChatComposerActions`
-  that `ChatView` keeps up to date, so the chat's redraws (each streamed piece of an answer) don't redraw the
-  box. A new input that changes how the box looks goes in its `==`. Send, the placeholder and the mention list
+  that `ChatComposerHost` keeps up to date, so the chat's redraws (each streamed piece of an answer) don't
+  redraw the box. A new input that changes how the box looks goes in its `==`. Never keep closures that
+  capture a view in an object in that view's own `@State`: the state then keeps the view, and its chat, alive. Send, the placeholder and the mention list
   read `ChatModel.draftShape`, never the draft, so most keys redraw only the text view. A pause in typing
   saves the draft to `ChatDraftJournal`, not the chat list; the chat takes it at its next save
   (`ChatComposerRedrawTests`, `ChatDraftJournalTests`).

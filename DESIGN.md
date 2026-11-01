@@ -55,10 +55,10 @@ are historical (`docs/ui-v3-design.md`).
   Symbols; ones without a glyph fall back to the symbol. Edit `glyphs.py`, then run `export_assets.py`.
 - Product type is SF Pro. Root screens use large titles; section captions are small, bold, letterspaced and muted.
 - The message box: + beside it, and one pill inside it at its end: voice mode (a waveform) while it's empty,
-  Send once there's text, Stop while the agent works. No other microphone button. A long draft's expand
-  button is a faint circle inside the box, at the top of the text's trailing end, and moves up above the pill
-  once the box is tall enough. The text always keeps that corner free (`ComposerTextCornerReserve`, an exclusion
-  path), so no text runs under the button and the text's width never changes when it shows.
+  Send once there's text, Stop while the agent works. No other microphone button. Once a draft has three
+  lines, a small, quiet rail shows centered above the box: the expand icon and "Expand", in a glass pill
+  (`ComposerExpandRail`). It opens the expanded editor. Its touch area is the full hit target, reaching into
+  the gaps around the pill, and it never changes the box. The text uses the box's full width.
 - Links in a chat open where they belong (`ChatLinkRoute`): Maps, Music, the App Store, Podcasts, TV, Books and
   News links in those apps, any other link in an installed app that claims it, and only web pages in the browser
   picked in Settings › Chat. A card's Directions opens Apple Maps, never a map website.

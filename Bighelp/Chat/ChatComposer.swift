@@ -28,8 +28,7 @@ struct ChatComposer: View {
     @AppStorage(ChatLayoutPreferences.returnSendsKey) private var returnSends = true
     @State private var keyboardSendOptionsRequest = 0
     @State private var referenceSubmissionID: UUID?
-    @State private var isDraftOverflowing = false
-    @State private var draftInputHeight: CGFloat = 0
+    @State private var showsExpandRail = false
     @State private var presentedSheet: ChatComposerSheet?
     @State private var restoresFocusAfterExpansion = false
     @State private var presentedStatus: SessionStatusRailDestination?
@@ -75,20 +74,30 @@ struct ChatComposer: View {
                     .fixedSize(horizontal: usesCompactEditingLayout, vertical: usesCompactEditingLayout)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
 
-                composerControlRow
-                    .frame(maxWidth: horizontalSizeClass == .regular ? ChatCanvasLayout.regularLaneMaximumWidth : .infinity)
-                    #if DEBUG && (targetEnvironment(simulator) || targetEnvironment(macCatalyst))
-                    // On the row, not the tag: an empty tag draws nothing, so its tasks never run.
-                    .task(id: model.conversationID) { await DraftAttachmentRailFixture.seed(model) }
-                    #endif
-                    .companionComposerAnchor(.input)
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("chat.composer-shell")
-                    .simultaneousGesture(
-                        MagnifyGesture().onEnded { value in
-                            if value.magnification > 1.12 { openExpandedEditor() }
-                        }
-                    )
+                // The rail rides on top of the box in one column, so a landscape footer keeps it over the box.
+                VStack(spacing: BighelpTokens.space4) {
+                    if showsExpandRail {
+                        ComposerExpandRail(action: openExpandedEditor)
+                            // Centered over the field, not the + button beside it.
+                            .padding(.leading, onAttachmentTap == nil ? 0 : BighelpTokens.hitTarget + BighelpTokens.space8)
+                            .frame(maxWidth: horizontalSizeClass == .regular ? ChatCanvasLayout.regularLaneMaximumWidth : .infinity)
+                            .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.9, anchor: .bottom)))
+                    }
+                    composerControlRow
+                        .frame(maxWidth: horizontalSizeClass == .regular ? ChatCanvasLayout.regularLaneMaximumWidth : .infinity)
+                        #if DEBUG && (targetEnvironment(simulator) || targetEnvironment(macCatalyst))
+                        // On the row, not the tag: an empty tag draws nothing, so its tasks never run.
+                        .task(id: model.conversationID) { await DraftAttachmentRailFixture.seed(model) }
+                        #endif
+                        .companionComposerAnchor(.input)
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("chat.composer-shell")
+                        .simultaneousGesture(
+                            MagnifyGesture().onEnded { value in
+                                if value.magnification > 1.12 { openExpandedEditor() }
+                            }
+                        )
+                }
             }
         }
         .padding(.horizontal, BighelpTokens.space12)
@@ -283,11 +292,6 @@ struct ChatComposer: View {
         return min(72 * CGFloat(scale), 116) + CompanionComposerPathSampler.restGap
     }
 
-    private var showsExpandButton: Bool {
-        // Once the draft wraps. Its corner is kept free either way, so the text never moves for it.
-        isDraftOverflowing
-    }
-
     private var usesCompactEditingLayout: Bool {
         verticalSizeClass == .compact && draftFocus.wrappedValue
     }
@@ -312,8 +316,6 @@ struct ChatComposer: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(height: usesCompactEditingLayout ? max(44, compactDraftLineHeight) : nil)
                     .frame(minHeight: BighelpTokens.hitTarget)
-                    // Changes only when the box gains or loses a line.
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { draftInputHeight = $0 }
                     .submitLabel(.send)
                     .disabled(model.isComposerInputDisabled)
                     .onSubmit { send() }
@@ -341,10 +343,6 @@ struct ChatComposer: View {
                     )
                     .allowsHitTesting(false)
             }
-            // Over the clip, so its touch area may reach past the box's edge.
-            .overlay(alignment: .topTrailing) {
-                if showsExpandButton { expandButton }
-            }
             .background {
                 // Geometry marker for the visible field; not an accessibility container.
                 Color.clear.accessibilityElement().accessibilityIdentifier("chat.composer.field")
@@ -356,44 +354,6 @@ struct ChatComposer: View {
             // glass container flattening that drops identifiers on the HStack.
             Color.clear.accessibilityElement().accessibilityIdentifier("chat.composer.editing-controls")
         }
-    }
-
-    /// Expand, inside the box at its top-trailing corner. The text view keeps that
-    /// corner empty (`ComposerTextCornerReserve`), so the box's text is never under
-    /// it and keeps one width whether it shows or not. Once the box is tall enough,
-    /// it moves up the column above Send, clear of a scrolled draft's lines.
-    private var expandButton: some View {
-        let hit = BighelpTokens.hitTarget
-        let chip = ComposerFieldMetrics.expandChipDiameter
-        let inset = ComposerFieldMetrics.verticalInset
-        let sitsAboveSend = draftInputHeight >= ComposerFieldMetrics.expandReserve.actionClearance
-        // Above Send: the touch area ends where Send's begins and reaches up past
-        // the box when the column is short. In the corner: it reaches up into the
-        // row's margin and right into the gap before Send, so it takes as little
-        // of the text's end as it can.
-        let outset = ComposerFieldMetrics.expandTouchOutset
-        let chipTop = sitsAboveSend ? max(0, 2 * hit - draftInputHeight) : inset + outset
-        let frameTop = sitsAboveSend ? inset + min(0, draftInputHeight - 2 * hit) : -outset
-        return Button(action: openExpandedEditor) {
-            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                .font(.system(size: (chip * 0.5).rounded(), weight: .semibold))
-                .foregroundStyle(theme.secondaryText.opacity(colorSchemeContrast == .increased ? 1 : 0.7))
-                .frame(width: chip, height: chip)
-                .background(theme.secondaryText.opacity(colorSchemeContrast == .increased ? 0.22 : 0.1), in: .circle)
-                // Mac: the chip takes the click and lights up, not the text around it.
-                .bighelpPointer(.circle, minimum: BighelpPointer.minimumIconTarget)
-                .padding(.top, chipTop)
-                .padding(.trailing, sitsAboveSend ? 0 : ComposerFieldMetrics.expandChipGap)
-                .frame(width: sitsAboveSend ? AdaptiveComposerActionPresentation.pillWidth : hit,
-                       height: hit, alignment: sitsAboveSend ? .top : .topTrailing)
-                .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .bighelpIconLabel(String(localized: "Expand message editor"))
-        .accessibilityIdentifier("chat.composer.expand")
-        .padding(.trailing, ComposerFieldMetrics.trailingInset + (sitsAboveSend ? 0
-            : AdaptiveComposerActionPresentation.pillWidth + BighelpTokens.space4 - ComposerFieldMetrics.expandChipGap))
-        .offset(y: frameTop)
     }
 
     @ViewBuilder
@@ -457,8 +417,11 @@ struct ChatComposer: View {
             onDropAttachmentProviders: droppedAttachmentImporter,
             onReturnKey: handleReturnKey,
             onSelectionChange: reportComposerSelection,
-            onExpansionAvailabilityChange: { isDraftOverflowing = $0 },
-            cornerReserve: ComposerFieldMetrics.expandReserve
+            onExpansionAvailabilityChange: { shows in
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration)) {
+                    showsExpandRail = shows
+                }
+            }
         )
         .overlay(alignment: .topLeading) {
             ComposerPlaceholder(model: model, color: theme.secondaryText,
@@ -708,27 +671,54 @@ enum ComposerFieldMetrics {
     /// The pill inside the box sits this close to its end.
     static let trailingInset: CGFloat = 4
     static let verticalInset: CGFloat = 2
-    /// Expand's faint circle, the size of a line of text; its touch area stays at the hit target.
-    static var expandChipDiameter: CGFloat {
-        #if os(visionOS)
-        BighelpTokens.scaled(24)
-        #else
-        BighelpTokens.scaled(20)
-        #endif
-    }
-    /// Space between the text and Expand.
-    static let expandChipGap: CGFloat = 4
-    /// How far Expand's touch area reaches above the box in the corner, into the
-    /// row's margin, so less of it lies over the text's end.
-    static let expandTouchOutset: CGFloat = 4
-    static var expandReserve: ComposerTextCornerReserve {
-        ComposerTextCornerReserve(
-            width: expandChipDiameter + expandChipGap,
-            height: expandChipDiameter,
-            actionClearance: BighelpTokens.hitTarget + expandChipDiameter + expandChipGap
-        )
-    }
     static var shape: RoundedRectangle { RoundedRectangle(cornerRadius: cornerRadius, style: .continuous) }
+}
+
+/// Expand, a small pill centered above the message box once the draft has three lines
+/// (`DraftFieldSizing.expandLines`). It looks slim, but its touch area is the full hit target:
+/// the extra reaches into the gaps around it instead of taking room, down to the box's edge
+/// (the column's spacing and the control row's margin) and up into the space above.
+private struct ComposerExpandRail: View {
+    let action: () -> Void
+
+    @BighelpThemeReader private var theme
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    private static var pillHeight: CGFloat { BighelpTokens.scaled(28) }
+    /// The gaps the touch area reaches into: never past the box's top or what sits above.
+    private static let reachBelow = BighelpTokens.space8
+    private static let reachAbove = BighelpTokens.space4
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: BighelpTokens.space4) {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.bighelp(.caption2).weight(.semibold))
+                Text("Expand")
+                    .font(.bighelp(.caption).weight(.semibold))
+            }
+            .foregroundStyle(theme.secondaryText)
+            .lineLimit(1)
+            .padding(.horizontal, BighelpTokens.space12)
+            .frame(minHeight: Self.pillHeight)
+            .composerGlass(Capsule(), fill: theme.surface)
+            .overlay {
+                Capsule()
+                    .strokeBorder(contrast == .increased ? theme.primaryText : theme.border,
+                                  lineWidth: contrast == .increased ? 2 : 1)
+            }
+            // Mac: the pill takes the click and lights up.
+            .bighelpPointer(.capsule)
+            .frame(minWidth: BighelpTokens.hitTarget, minHeight: BighelpTokens.hitTarget)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Expand")
+        .accessibilityHint("Opens a bigger editor for your message")
+        .accessibilityIdentifier("chat.composer.expand-rail")
+        .padding(.top, -Self.reachAbove)
+        .padding(.bottom, -Self.reachBelow)
+    }
 }
 
 /// The message box, + and the voice button: Liquid Glass tinted with their usual fill, so the chat

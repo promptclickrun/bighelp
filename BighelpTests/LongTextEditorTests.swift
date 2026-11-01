@@ -73,6 +73,10 @@ struct LongTextEditorTests {
             let length = (view.text as NSString).length
             let location = atEnd ? length : length / 2
             view.selectedRange = NSRange(location: location, length: 0)
+            // A person puts the caret where they look (a tap) or moves it with keys, and both scroll
+            // to it; a selection set in code doesn't, so show it first, as they would see it.
+            view.scrollRangeToVisible(view.selectedRange)
+            try await Task.sleep(for: .milliseconds(30))
             for character in "\nKeep every receipt.\n\nAsk first." {
                 // A test in another suite can take the keyboard while this one waits.
                 if !view.isFirstResponder { _ = view.becomeFirstResponder() }

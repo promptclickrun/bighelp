@@ -85,8 +85,12 @@ final class InstructionsEditingUITests: BighelpUITestCase {
             primary.tap()
             let identity = app.buttons["chat.identity"]
             XCTAssertTrue(identity.waitForExistence(timeout: 10))
+            // The demo chat is still settling right after it opens; a tap then can land before the
+            // header takes it.
+            let profile = app.descendants(matching: .any)["simple-bots.profile"]
             identity.tap()
-            XCTAssertTrue(app.descendants(matching: .any)["simple-bots.profile"].waitForExistence(timeout: 5))
+            if !profile.waitForExistence(timeout: 3) { identity.tap() }
+            XCTAssertTrue(profile.waitForExistence(timeout: 5))
             app.buttons["simple-bots.profile.tab.info"].tap()
             let row = app.buttons["simple-bots.profile.instructions"]
             for _ in 0..<4 where !row.isHittable { app.swipeUp() }

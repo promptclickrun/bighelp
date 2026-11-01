@@ -408,8 +408,14 @@ final class LongTextView: UITextView {
 
     @objc private func keyboardDidChangeFrame(_ notification: Notification) {
         guard isFirstResponder else { return }
-        // Once the form has made room for the keyboard: the box moves up out of its way.
+        // Once the form has made room for the keyboard: the box moves up out of its way. The form
+        // can still be adding the keyboard to its insets now, which holds the scroll short, so look
+        // again once it has settled.
         revealBoxAboveKeyboard()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            guard let self, self.isFirstResponder else { return }
+            self.revealBoxAboveKeyboard()
+        }
     }
 
     /// The keyboard's frame in the window, while it's up.

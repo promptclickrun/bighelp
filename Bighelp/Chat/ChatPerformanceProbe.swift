@@ -35,7 +35,8 @@ enum ChatPerformanceProbe {
     @inline(__always)
     static func logChanges<V: View>(_ view: V.Type) {
         #if DEBUG
-        if ChatPerformanceRecorder.logsViewChanges { V._logChanges() }
+        // `_logChanges` needs iOS 17.1; the app still starts at 17.0.
+        if ChatPerformanceRecorder.logsViewChanges, #available(iOS 17.1, *) { V._logChanges() }
         #endif
     }
 

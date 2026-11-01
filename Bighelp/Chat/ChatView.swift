@@ -780,9 +780,9 @@ struct ChatView: View {
         // The box calls back through `composerActions`, brought up to date here, so it compares
         // equal and isn't drawn again for what changes around it (each streamed piece of an answer).
         composerActions.attachment = attachmentAction
-        composerActions.voice = dismissKeyboardAndOpenVoice
-        composerActions.fittingRailVerticalDrag = requestFittingRailScroll
-        composerActions.dismissKeyboard = dismissKeyboard
+        composerActions.voice = { dismissKeyboardAndOpenVoice() }
+        composerActions.fittingRailVerticalDrag = { requestFittingRailScroll($0) }
+        composerActions.dismissKeyboard = { dismissKeyboard() }
         composerActions.willSend = { timelineController.scrollToLatest(animated: false) }
         composerActions.referenceSend = onReferenceSend
         return ChatComposer(

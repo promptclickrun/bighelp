@@ -168,11 +168,14 @@ final class ComposerInteractionUITests: BighelpUITestCase {
         // Words, not Return: Return may send, depending on the keyboard.
         let words = ("then the notes from the garden club, the dates of the spring plant sale, who brings the tables,"
             + " who bakes, and what to do if it rains on the morning of the sale").split(separator: " ")
-        var nextWord = words.startIndex
+        // The words come round again: an iPad's wide box takes more of them than an iPhone's.
+        var nextWord = 0
         func type(untilLines target: Int) {
-            while lines() < target, nextWord < words.endIndex {
-                input.typeText(" " + words[nextWord])
+            var typedWords = 0
+            while lines() < target, typedWords < 120 {
+                input.typeText(" " + words[nextWord % words.count])
                 nextWord += 1
+                typedWords += 1
                 if lines() < 3 {
                     XCTAssertFalse(rail.exists, "No Expand under three lines")
                 }

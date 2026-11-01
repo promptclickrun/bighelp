@@ -41,6 +41,9 @@ final class NativeDeviceToolSession {
     private let agentID: String
     private let sessionID: String
     private var enabled: Set<DeviceToolCapability>
+    /// Tools that are off here but can be turned on from a card in the chat (`askFeature`). A call to one
+    /// asks the person, and only a plugin that knows about cards hears of them.
+    private(set) var askable: Set<DeviceToolCapability>
     /// Tools turned on here that this host's plugin is too old to offer.
     private(set) var needsNewerPlugin: Set<DeviceToolCapability> = []
     /// The agent the plugin serves, set when this chat is with another one and the plugin is too old to
@@ -52,6 +55,14 @@ final class NativeDeviceToolSession {
     /// A plugin that keeps a call waiting for a while when the phone is only away (a channel closed
     /// with `reason: "paused"`), instead of failing it at once.
     static let waitFeature = "native-device-tools-wait-v1"
+    /// A plugin that sends a call for a tool that's off (`askable`) to the phone, which asks the person
+    /// with a card, and waits for the answer.
+    static let askFeature = "native-device-permission-request-v1"
+    /// How long a call to an askable tool may wait: the person reads the card, then iOS asks too. Hermes
+    /// waits as long for its own connect cards.
+    static let askWindow = 300
+    /// Every other call's longest window.
+    static let callWindow = 120
     /// Appearance and Navigation are on by default and share nothing, so a channel with only them polls
     /// every 8 seconds: well inside the plugin's 30-second lease and tool timeout, a quarter of the
     /// traffic. An agent calls tools only while it answers, and the person who asked "show me" is
@@ -77,6 +88,7 @@ final class NativeDeviceToolSession {
     init(http: any DirectHermesNativeHTTP, owner: WorkspaceOwner,
          currentOwner: @escaping @MainActor () -> WorkspaceOwner?, scope: DeviceToolScope,
          agentID: String, sessionID: String, enabled: Set<DeviceToolCapability>,
+         askable: Set<DeviceToolCapability> = [],
          isAvailable: @escaping @MainActor () -> Bool,
          isPaused: @escaping @MainActor () -> Bool = { false },
          isAnswering: @escaping @MainActor () -> Bool = { false },
@@ -84,14 +96,15 @@ final class NativeDeviceToolSession {
          handle: @escaping Handler) {
         self.http = http; self.owner = owner; self.currentOwner = currentOwner
         self.scope = scope; self.agentID = agentID; self.sessionID = sessionID
-        self.enabled = enabled; self.isAvailable = isAvailable; self.isPaused = isPaused; self.handle = handle
+        self.enabled = enabled; self.askable = askable.subtracting(enabled).filter(\.sharesPersonalData)
+        self.isAvailable = isAvailable; self.isPaused = isPaused; self.handle = handle
         self.isAnswering = isAnswering
         self.closeCleanupFactory = closeCleanupFactory
     }
 
     func connect() async throws {
         try check()
-        guard !consumed, !enabled.isEmpty else { throw WorkspaceClientError.invalidRequest }
+        guard !consumed, !(enabled.isEmpty && askable.isEmpty) else { throw WorkspaceClientError.invalidRequest }
         consumed = true
         let plugin = DirectHermesNativePluginClient(http: http, owner: owner, currentOwner: currentOwner)
         let context = try await plugin.loadContext()
@@ -102,7 +115,10 @@ final class NativeDeviceToolSession {
         // An older plugin refuses the whole channel over a tool name it doesn't know.
         let offered = enabled.filter { $0.pluginFeature.map(context.features.contains) ?? true }
         needsNewerPlugin = enabled.subtracting(offered)
-        guard !offered.isEmpty else { throw WorkspaceClientError.unavailable(.pluginRequired) }
+        // Likewise `askable`: only a plugin with cards takes the field, and only tools it knows.
+        let asks: Set<DeviceToolCapability> = context.features.contains(Self.askFeature)
+            ? askable.filter { $0.pluginFeature.map(context.features.contains) ?? true } : []
+        guard !offered.isEmpty || !asks.isEmpty else { throw WorkspaceClientError.unavailable(.pluginRequired) }
         // An older plugin gives the phone's tools only to the agent it serves: another agent's chat
         // would only be refused (`profile_not_served`), and its cleanup close too, on every chat change.
         if !context.features.contains(Self.everyAgentFeature) {
@@ -112,6 +128,7 @@ final class NativeDeviceToolSession {
             }
         }
         enabled = offered
+        askable = asks
         self.context = context
         closeCleanup = closeCleanupFactory?(channelID)
         if closeCleanup == nil, let direct = http as? DirectHermesClient,
@@ -121,12 +138,14 @@ final class NativeDeviceToolSession {
             closeCleanup = { [weak self] in await cleanup.close(paused: self?.closesPaused() ?? false) }
         }
         connectionAttempted = true
+        var body: [String: BighelpJSONValue] = ["channelId": .string(channelID),
+            "deviceId": .string(scope.deviceID), "hostId": .string(scope.hostID),
+            "authorizationEpoch": .integer(scope.authorizationEpoch), "agentId": .string(agentID),
+            "sessionId": .string(sessionID), "enabled": .array(enabled.map(\.rawValue).sorted().map(BighelpJSONValue.string))]
+        if !askable.isEmpty { body["askable"] = .array(askable.map(\.rawValue).sorted().map(BighelpJSONValue.string)) }
         let result: [String: BighelpJSONValue]
         do {
-            result = try await request("connect", ["channelId": .string(channelID),
-                "deviceId": .string(scope.deviceID), "hostId": .string(scope.hostID),
-                "authorizationEpoch": .integer(scope.authorizationEpoch), "agentId": .string(agentID),
-                "sessionId": .string(sessionID), "enabled": .array(enabled.map(\.rawValue).sorted().map(BighelpJSONValue.string))])
+            result = try await request("connect", body)
         } catch WorkspaceClientError.rejected(let code?, let message) where Self.refusedBeforeOpening.contains(code) {
             // The plugin opened nothing; a close would only be refused too (`channel_not_found`).
             connectionAttempted = false
@@ -161,11 +180,12 @@ final class NativeDeviceToolSession {
             guard value.version == 1, value.type == "device.tool.request",
                   value.sentAt > 0, value.sentAt <= now + 5,
                   value.expiresAt > now, value.expiresAt > value.sentAt,
-                  value.expiresAt - value.sentAt <= 120,
                   !value.requestId.isEmpty, requestIDs.insert(value.requestId).inserted,
                   value.scope == scope, value.sessionId == sessionID, value.agentId == agentID,
                   let capability = value.operation.split(separator: ".").first.flatMap({ DeviceToolCapability(rawValue: String($0)) }),
-                  enabled.contains(capability) else { throw WorkspaceClientError.invalidResponse }
+                  enabled.contains(capability) || askable.contains(capability),
+                  value.expiresAt - value.sentAt <= (askable.contains(capability) ? Self.askWindow : Self.callWindow)
+            else { throw WorkspaceClientError.invalidResponse }
             requests.append((sequence, value)); expected = sequence
         }
         guard next == expected else { throw WorkspaceClientError.invalidResponse }

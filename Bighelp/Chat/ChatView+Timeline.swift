@@ -30,6 +30,7 @@ extension ChatView {
         if dashboardModel != nil { rows += chatClarifications.map(ChatCanvasRow.clarification) }
         rows += directHermesClarifications.map(ChatCanvasRow.directClarification)
         rows += (model.nativeConversationClient?.connectorCards ?? []).map(ChatCanvasRow.connector)
+        rows += DeviceAccessCardStore.shared.cards(in: model.conversationID).map(ChatCanvasRow.deviceAccess)
         if model.isBotMode {
             // One typing bubble per member Hermes reports writing; without such
             // reports (an older plugin, a member in a long tool call) one
@@ -274,6 +275,7 @@ extension ChatView {
             if let store = model.nativeConversationClient?.promptStore?.connectorCards {
                 ConnectorInlineCard(store: store, card: card)
             }
+        case .deviceAccess(let card): DeviceAccessInlineCard(store: .shared, card: card)
         case .pending(let name, let isGroup): PendingMessageView(agentName: name, isGroup: isGroup)
         case .botTyping(let sender): GroupTypingView(stableID: sender.id, sender: senderResolver.display(for: sender))
         case .failure(let message): failure(message: message)

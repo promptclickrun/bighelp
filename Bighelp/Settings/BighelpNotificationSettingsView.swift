@@ -913,6 +913,9 @@ struct BighelpPluginCapabilitiesSection: View {
                     systemImage: "bell.and.waves.left.and.right",
                     capability: .cloudNotifications
                 )
+                if DeviceToolCapability.health.isOfferedOnThisPlatform {
+                    deviceCapabilityRow(.health, title: "Apple Health", systemImage: "heart")
+                }
                 deviceCapabilityRow(.calendar, title: "Calendar", systemImage: "calendar")
                 deviceCapabilityRow(.reminders, title: "Reminders", systemImage: "checklist")
                 deviceCapabilityRow(.location, title: "Location", systemImage: "location")

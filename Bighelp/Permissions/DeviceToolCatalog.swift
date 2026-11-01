@@ -42,6 +42,8 @@ enum DeviceToolCatalog {
                     capability, journaled: true, liveOnlyKeys: liveOnly, keptKeys: kept)
             }
         }
+        // Read only: bighelp never writes to Health.
+        reads(.health, "read")
         reads(.calendar, "list"); writes(.calendar, "create", "update", "delete")
         reads(.reminders, "list"); writes(.reminders, "create", "update", "delete")
         reads(.contacts, "list"); writes(.contacts, "create", "update", "delete")
@@ -92,7 +94,7 @@ struct DeviceToolCallContext: Equatable, Sendable {
 }
 
 /// A phone tool with its own iOS permission: Contacts, Photos, Arriving and leaving, Alarms,
-/// Music, Focus and Shortcuts. Calendar, Reminders and Location live in `AppleDeviceToolService`.
+/// Music, Focus and Shortcuts. Apple Health, Calendar, Reminders and Location live in `AppleDeviceToolService`.
 @MainActor
 protocol DeviceCapabilityTool: AnyObject {
     var capability: DeviceToolCapability { get }

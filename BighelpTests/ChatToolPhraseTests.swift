@@ -29,6 +29,25 @@ struct ChatToolPhraseTests {
         #expect(phrase("read_file", "not json").past == "Read a file")
     }
 
+    /// Each Apple Health read is its own step in the agent's work, named by the kinds of data and the
+    /// dates it read, never by a value.
+    @Test func appleHealthReadsSayWhatAndWhen() {
+        let week = #"{"types":["sleep_analysis"],"start":"2026-10-25T00:00:00-05:00","end":"2026-11-01T00:00:00-05:00","timeZone":"America/Chicago"}"#
+        let english = Locale(identifier: "en_US")
+        let sleep = ChatHealthPhrase.phrase(ChatToolArguments(week), locale: english)
+        #expect(sleep.live == "Reading sleep in Apple Health, Oct 25–31…")
+        #expect(sleep.past == "Read sleep in Apple Health, Oct 25–31")
+        let two = #"{"types":["step_count","blood_pressure_systolic","blood_pressure_diastolic"],"start":"2026-10-30T00:00:00Z","end":"2026-11-02T12:00:00Z","timeZone":"UTC"}"#
+        #expect(ChatHealthPhrase.phrase(ChatToolArguments(two), locale: english).past
+                == "Read steps and blood pressure in Apple Health, Oct 30–Nov 2")
+        let many = #"{"types":["heart_rate","resting_heart_rate","workout"],"start":"2026-10-31T06:00:00Z","end":"2026-10-31T20:00:00Z","timeZone":"UTC"}"#
+        #expect(ChatHealthPhrase.phrase(ChatToolArguments(many), locale: english).past
+                == "Read 3 kinds of data in Apple Health, Oct 31")
+        #expect(phrase("iphone_health", "not json").past == "Read Apple Health")
+        #expect(phrase("iphone_health", week).summaryOne == "Read Apple Health")
+        #expect(BighelpToolActivityCatalog.activity(forTool: "iphone_health").doneLabel == "Read Apple Health")
+    }
+
     @Test func commandsSayWhatTheyDoNotWhatTheyType() {
         #expect(command("git clone https://github.com/example/weather-app.git").live == "Cloning weather-app…")
         #expect(command("git clone https://github.com/example/weather-app.git").past == "Cloned weather-app")

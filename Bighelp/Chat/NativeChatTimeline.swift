@@ -33,6 +33,8 @@ enum ChatCanvasRow: Identifiable, Equatable {
     case directClarification(DirectHermesPrompt)
     /// Hermes asks to connect apps or tools for this chat (`manage_connections`).
     case connector(ConnectorCardStore.Card)
+    /// An agent asks to use a Device access tool that's off (`DeviceAccessCardStore`).
+    case deviceAccess(DeviceAccessCardStore.Card)
     case pending(String, Bool)
     /// A group member Hermes reports writing right now.
     case botTyping(TimelineSender)
@@ -65,6 +67,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case .clarification(let item): "chat.clarification.\(item.id)"
         case .directClarification(let prompt): "chat.direct-clarification.\(prompt.id)"
         case .connector(let card): "chat.connector.\(card.id)"
+        case .deviceAccess(let card): "chat.device-access.\(card.id)"
         case .pending: "chat-pending"
         case .botTyping(let sender): "chat.bot-typing:\(sender.id)"
         case .failure: "chat.failure"
@@ -96,6 +99,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case (.clarification(let a), .clarification(let b)): a == b
         case (.directClarification(let a), .directClarification(let b)): a == b
         case (.connector(let a), .connector(let b)): a == b
+        case (.deviceAccess(let a), .deviceAccess(let b)): a == b
         case (.pending(let a, let b), .pending(let c, let d)): a == c && b == d
         case (.botTyping(let a), .botTyping(let b)): a == b
         case (.turnFailure(let a, let b), .turnFailure(let c, let d)): a == c && b == d

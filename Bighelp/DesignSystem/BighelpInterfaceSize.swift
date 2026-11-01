@@ -5,9 +5,13 @@ import SwiftUI
 /// Settings › Appearance › Text and buttons: text size in steps on top of the
 /// device's own text size. The Mac starts larger: its text styles are smaller
 /// than iPhone's while its window sits farther away.
+///
+/// The raw value is what's saved, so it never changes: Default is one step under
+/// the device's size (#729), and Medium, the device's own size, was Default before.
 enum BighelpTextSize: Int, CaseIterable, Identifiable, Sendable {
-    case small = -1
-    case standard = 0
+    case small = -2
+    case standard = -1
+    case medium = 0
     case large = 1
     case larger = 2
     case largest = 3
@@ -18,6 +22,7 @@ enum BighelpTextSize: Int, CaseIterable, Identifiable, Sendable {
         switch self {
         case .small: String(localized: "Small")
         case .standard: String(localized: "Default")
+        case .medium: String(localized: "Medium")
         case .large: String(localized: "Large")
         case .larger: String(localized: "Larger")
         case .largest: String(localized: "Largest")
@@ -27,11 +32,13 @@ enum BighelpTextSize: Int, CaseIterable, Identifiable, Sendable {
     static var platformDefault: Self { .standard }
 
     /// The Mac's text styles are fixed (Dynamic Type doesn't reach them), so its
-    /// text is the iPhone size times this. Default gives 16pt body text.
+    /// text is the iPhone size times this. Default gives 14pt body text, Small the
+    /// Mac's own 13pt.
     var macFactor: CGFloat {
         switch self {
-        case .small: 0.82
-        case .standard: 0.94
+        case .small: 0.76
+        case .standard: 0.82
+        case .medium: 0.94
         case .large: 1.03
         case .larger: 1.12
         case .largest: 1.22

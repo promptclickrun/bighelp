@@ -5584,23 +5584,6 @@
         }
       }
     },
-    "It adds to your iPhone's own text size setting. Link previews show a web link's picture, title and summary in chats and the Feed. To make one, your iPhone opens that page, without cookies.": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "It adds to your iPhone's own text size setting. Link previews show a web link's picture, title and summary in chats and the Feed. To make one, your iPhone opens that page, without cookies."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "它会在 iPhone 本身的文字大小设置基础上调整。链接预览会在聊天和动态中显示网页链接的图片、标题和摘要。为生成预览，iPhone 会在不使用 Cookie 的情况下打开该网页。"
-          }
-        }
-      }
-    },
     "It asks for a username and password": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -5614,6 +5597,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "需要用户名和密码"
+          }
+        }
+      }
+    },
+    "It sizes message text, on top of the text size in Appearance and your iPhone's own text size. Link previews show a web link's picture, title and summary in chats and the Feed. To make one, your iPhone opens that page, without cookies.": {
+      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It sizes message text, on top of the text size in Appearance and your iPhone's own text size. Link previews show a web link's picture, title and summary in chats and the Feed. To make one, your iPhone opens that page, without cookies."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "它会在“外观”中的文字大小和 iPhone 本身的文字大小设置基础上调整消息文字。链接预览会在聊天和动态中显示网页链接的图片、标题和摘要。为生成预览，iPhone 会在不使用 Cookie 的情况下打开该网页。"
           }
         }
       }

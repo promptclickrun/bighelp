@@ -9,6 +9,28 @@ struct LongTextEditorTests {
         .map { "\($0). Help with financial planning: budgets, bills, savings goals and the reasoning behind each choice." }
         .joined(separator: "\n\n")
 
+    /// Made through `makeUIView` in a window, as every screen makes it. The text view's own stored
+    /// properties must be set up: made by UIKit's TextKit factory, the first color crashed.
+    @Test func theEditorMakesAWorkingTextView() throws {
+        let host = try Host(text: Self.longText)
+        defer { host.close() }
+        let view = try #require(host.textView)
+        #expect(view.textLayoutManager != nil, "TextKit 2")
+        view.applyColors(ink: .red, hint: .gray, caret: .blue)
+        view.applyColors(ink: .red, hint: .gray, caret: .blue)
+        #expect(view.textColor != nil)
+        view.placeholder = "What should it help with?"
+        view.text = ""
+        view.textDidChange()
+        view.layoutIfNeeded()
+
+        let textKit1 = LongTextView(usesTextKit2: false)
+        #expect(textKit1.textLayoutManager == nil, "TextKit 1, for comparing")
+        textKit1.applyColors(ink: .red, hint: .gray, caret: nil)
+        textKit1.text = Self.longText
+        #expect(textKit1.boxHeight(forWidth: 320, minimum: 140, maximum: 260) == 260)
+    }
+
     @Test func typingInTheViewReachesTheBindingAndChangesNothingElse() throws {
         let host = try Host(text: Self.longText)
         defer { host.close() }

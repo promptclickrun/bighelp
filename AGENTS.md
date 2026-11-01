@@ -396,6 +396,10 @@ change in both repos.
   `Color.clear.allowsHitTesting(false).accessibilityHidden(true)`.
 - **Presentation order:** close a popover before presenting a full-screen cover from it.
 - **Glass button taps:** glass buttons need `.contentShape` before `bighelpNavigationGlass`, or taps miss.
+- **UIKit factory initializers skip Swift properties:** `UITextView(usingTextLayoutManager:)` makes a subclass
+  through an initializer Swift doesn't override, so the subclass's stored properties are never set and the first
+  read of one crashes (#727). A subclass with stored properties needs a designated initializer of its own
+  (`LongTextView(usesTextKit2:)`).
 - **Overlays that swallow taps:** full-screen `UIView` helpers in overlays need `isUserInteractionEnabled = false`,
   or they swallow every tap.
 - **Chat row environment:** chat rows (`NativeChatTimeline`) copy selected environment values into each row as it's

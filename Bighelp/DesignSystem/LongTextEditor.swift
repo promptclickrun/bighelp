@@ -60,7 +60,7 @@ struct LongTextEditor: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
 
     func makeUIView(context: Context) -> LongTextView {
-        let view = LongTextView(usingTextLayoutManager: Self.usesTextKit2)
+        let view = LongTextView(usesTextKit2: Self.usesTextKit2)
         view.delegate = context.coordinator
         view.backgroundColor = .clear
         // The font follows bighelp's text size from the environment (`configure`).
@@ -196,6 +196,19 @@ final class LongTextView: UITextView {
     /// The colors last applied, resolved, so an update that changes nothing re-colors nothing:
     /// setting `textColor` touches every character.
     private var appliedColors: [CGFloat] = []
+
+    /// Never `UITextView(usingTextLayoutManager:)`: that factory makes the view through an
+    /// initializer Swift doesn't override, so this class's stored properties were never set and
+    /// the first read of one crashed (#727).
+    init(usesTextKit2: Bool) {
+        super.init(frame: .zero, textContainer: nil)
+        // Asking for the layout manager is how a text view moves to TextKit 1.
+        if !usesTextKit2 { _ = layoutManager }
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+    }
 
     override var font: UIFont? {
         didSet { placeholderLabel.font = font }

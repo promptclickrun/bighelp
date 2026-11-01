@@ -307,7 +307,15 @@ final class LongTextView: UITextView {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.revealsCaretAfterEdit = false
-            if self.isFirstResponder { self.scrollCaretToVisible() }
+            guard self.isFirstResponder else { return }
+            // UIKit's own scroll to the caret can still be animating (the first key after a jump),
+            // and it would carry the view back to where it aimed: stop it, then show the caret.
+            self.setContentOffset(self.contentOffset, animated: false)
+            self.scrollCaretToVisible()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                guard let self, self.isFirstResponder, !self.isTracking else { return }
+                self.scrollCaretToVisible()
+            }
         }
     }
 

@@ -77,7 +77,7 @@ final class ComposerInteractionUITests: BighelpUITestCase {
         saveComposer("composer-typing-light", app)
     }
 
-    /// #515: once a draft wraps, the expand button stays and the box keeps its width on every key.
+    /// #515: once Expand shows, it stays and the box keeps its width on every key.
     @MainActor
     func testWrappedDraftKeepsTheBoxStillWhileTyping() throws {
         let app = makeApp()
@@ -91,40 +91,41 @@ final class ComposerInteractionUITests: BighelpUITestCase {
         input.tap()
         let field = app.otherElements["chat.composer.field"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
-        let expand = app.buttons["chat.composer.expand"]
-        let text = "Please read the notes from the garden club and write a short summary of the plans for the spring plant sale with every date"
-        var wrappedWidth: CGFloat?
+        let expand = app.buttons["chat.composer.expand-rail"]
+        let text = "Please read the notes from the garden club and write a short summary of the plans for the spring plant sale with every date, who brings the tables and what to do if it rains"
+        var shownWidth: CGFloat?
         var index = text.startIndex
         while index < text.endIndex {
             let next = text.index(index, offsetBy: 3, limitedBy: text.endIndex) ?? text.endIndex
             input.typeText(String(text[index..<next]))
             index = next
-            if let width = wrappedWidth {
-                XCTAssertTrue(expand.exists, "The expand button stays once the draft wraps")
+            if let width = shownWidth {
+                XCTAssertTrue(expand.exists, "Expand stays once the draft has three lines")
                 XCTAssertEqual(field.frame.width, width, accuracy: 1, "The box keeps its width while typing")
             } else if expand.exists {
-                wrappedWidth = field.frame.width
+                shownWidth = field.frame.width
             }
         }
-        XCTAssertNotNil(wrappedWidth, "A long draft wraps and offers the expand button")
+        XCTAssertNotNil(shownWidth, "A long draft offers Expand")
         saveComposer("composer-wrapped-light", app)
         input.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: text.count))
         XCTAssertTrue(input.waitForExistence(timeout: 2))
-        XCTAssertFalse(expand.exists, "An empty draft has no expand button")
+        XCTAssertTrue(expand.waitForNonExistence(timeout: 3), "An empty draft has no Expand")
     }
 
-    /// Expand sits inside the box, in a corner the text keeps free: the text's width is the same with or
-    /// without it, no line runs under it, and it still opens the expanded editor. Light and dark.
+    /// #728: Expand is a small rail centered above the message box, shown only once the draft has
+    /// three lines. The box keeps its place and size when it comes and goes, the text uses the box's
+    /// full width, and a tap opens the expanded editor. Light and dark.
     /// Set BIGHELP_COMPOSER_EVIDENCE (TEST_RUNNER_…) to save screenshots.
     @MainActor
-    func testExpandSitsInsideTheBoxWithoutNarrowingTheText() throws {
+    func testExpandRailShowsAboveTheBoxFromThreeLines() throws {
         for appearance in ["light", "dark"] {
-            try checkExpandInsideTheBox(appearance: appearance)
+            try checkExpandRail(appearance: appearance)
         }
     }
 
     @MainActor
-    private func checkExpandInsideTheBox(appearance: String) throws {
+    private func checkExpandRail(appearance: String) throws {
         let app = makeApp()
         app.launchArguments = [
             "-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3",
@@ -136,51 +137,78 @@ final class ComposerInteractionUITests: BighelpUITestCase {
         input.tap()
         let field = app.otherElements["chat.composer.field"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
-        let expand = app.buttons["chat.composer.expand"]
+        let rail = app.buttons["chat.composer.expand-rail"]
         input.typeText("W")
-        let oneLineWidth = input.frame.width
-        XCTAssertFalse(expand.exists, "One line has no Expand")
-
-        // One unbroken run of wide letters reaches the text's trailing edge before it wraps. Until Expand
-        // shows, its corner (a 20 pt circle and a 4 pt gap) must stay empty: no letter, no caret.
-        // Without the kept corner, the last letters before the wrap land in it.
-        var typed = 1
-        while !expand.exists, typed < 80 {
-            input.typeText("WW")
-            typed += 2
-            XCTAssertEqual(input.frame.width, oneLineWidth, accuracy: 1, "The text keeps its width while typing")
-            guard !expand.exists else { break }
-            let corner = CGRect(x: input.frame.maxX - 22, y: input.frame.minY + 3, width: 20, height: 14)
-            XCTAssertEqual(inkPixels(in: corner, dark: appearance == "dark"), 0,
-                           "No text runs into Expand's corner (\(typed) letters)")
+        // The text view is as tall as its lines (the box's minimum height is around it).
+        let lineHeight = input.frame.height
+        func lines() -> Int { Int((input.frame.height / lineHeight).rounded()) }
+        let boxWidth = field.frame.width
+        let boxBottom = field.frame.maxY
+        func checkBoxStill(_ step: String) {
+            XCTAssertEqual(field.frame.width, boxWidth, accuracy: 1, "The box keeps its width (\(step))")
+            XCTAssertEqual(field.frame.maxY, boxBottom, accuracy: 1, "The box stays in place (\(step))")
         }
-        XCTAssertTrue(expand.waitForExistence(timeout: 3), "A wrapped draft offers Expand")
-        XCTAssertEqual(input.frame.width, oneLineWidth, accuracy: 1, "Expand appearing leaves the text's width alone")
-        XCTAssertTrue(expand.isHittable)
-        XCTAssertGreaterThanOrEqual(expand.frame.width, 44)
-        XCTAssertGreaterThanOrEqual(expand.frame.height, 44)
-        // Inside the box (its touch area may reach into the row's margin above it), and never over Send.
-        XCTAssertTrue(field.frame.insetBy(dx: 0, dy: -6).contains(expand.frame), "\(expand.frame) in \(field.frame)")
-        let send = app.buttons["chat.send"]
-        XCTAssertTrue(send.exists)
-        XCTAssertFalse(expand.frame.intersects(send.frame.insetBy(dx: 1, dy: 1)), "Expand never covers Send")
-        saveComposer("composer-expand-inside-\(appearance)", app)
+        XCTAssertFalse(rail.exists, "One line has no Expand")
 
-        // More lines, then a box that scrolls: the width holds, and Expand moves above Send, clear of the text.
+        // One unbroken run of wide letters wraps by letter, so the first line fills to the box's
+        // trailing edge. The old Expand kept that corner (a 20 pt circle and a 4 pt gap) empty.
+        var typed = 1
+        while lines() < 2, typed < 80 {
+            input.typeText("W")
+            typed += 1
+        }
+        XCTAssertEqual(lines(), 2)
+        let corner = CGRect(x: input.frame.maxX - 22, y: input.frame.minY + 3, width: 20, height: 14)
+        XCTAssertGreaterThan(inkPixels(in: corner, dark: appearance == "dark"), 0,
+                             "The first line runs to the box's trailing edge")
+        XCTAssertFalse(rail.exists, "Two lines have no Expand")
+        checkBoxStill("two lines")
+        saveComposer("composer-expand-rail-2-lines-\(appearance)", app)
+
         // Words, not Return: Return may send, depending on the keyboard.
-        input.typeText(" then the notes from the garden club, the dates of the spring plant sale, who brings"
-            + " the tables, who bakes, and what to do if it rains on the morning of the sale")
-        XCTAssertEqual(input.frame.width, oneLineWidth, accuracy: 1, "A tall draft keeps the text's width")
-        XCTAssertTrue(expand.isHittable)
-        XCTAssertTrue(field.frame.insetBy(dx: 0, dy: -6).contains(expand.frame), "\(expand.frame) in \(field.frame)")
-        XCTAssertGreaterThanOrEqual(expand.frame.minX, input.frame.maxX - 1, "A scrolling draft's lines never pass under Expand")
-        XCTAssertFalse(expand.frame.intersects(send.frame.insetBy(dx: 1, dy: 1)), "Expand never covers Send")
-        saveComposer("composer-expand-tall-\(appearance)", app)
+        let words = ("then the notes from the garden club, the dates of the spring plant sale, who brings the tables,"
+            + " who bakes, and what to do if it rains on the morning of the sale").split(separator: " ")
+        var nextWord = words.startIndex
+        func type(untilLines target: Int) {
+            while lines() < target, nextWord < words.endIndex {
+                input.typeText(" " + words[nextWord])
+                nextWord += 1
+                if lines() < 3 {
+                    XCTAssertFalse(rail.exists, "No Expand under three lines")
+                }
+            }
+            XCTAssertGreaterThanOrEqual(lines(), target)
+        }
+        type(untilLines: 3)
+        XCTAssertTrue(rail.waitForExistence(timeout: 3), "Three lines offer Expand")
+        checkBoxStill("Expand shows")
+        XCTAssertTrue(rail.isHittable)
+        XCTAssertGreaterThanOrEqual(rail.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(rail.frame.height, 44)
+        XCTAssertEqual(rail.frame.midX, field.frame.midX, accuracy: 1, "Centered over the box")
+        XCTAssertLessThanOrEqual(rail.frame.maxY, field.frame.minY + 0.5, "Above the box, never over its text")
+        XCTAssertLessThan(field.frame.minY - rail.frame.maxY, 2, "Right above the box")
+        XCTAssertEqual(rail.label, "Expand")
 
-        expand.tap()
+        type(untilLines: 4)
+        XCTAssertTrue(rail.exists, "Four lines keep Expand")
+        checkBoxStill("four lines")
+        saveComposer("composer-expand-rail-4-lines-\(appearance)", app)
+
+        // Back under three lines, Expand goes.
+        while lines() >= 3 {
+            input.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 6))
+        }
+        XCTAssertTrue(rail.waitForNonExistence(timeout: 3), "Under three lines, Expand goes")
+        checkBoxStill("Expand goes")
+
+        type(untilLines: 3)
+        XCTAssertTrue(rail.waitForExistence(timeout: 3))
+        rail.tap()
         let expanded = app.textViews["chat.composer.expanded.text"]
         XCTAssertTrue(expanded.waitForExistence(timeout: 5), "Expand opens the expanded editor")
-        saveComposer("composer-expand-opened-\(appearance)", app)
+        XCTAssertTrue((expanded.value as? String)?.hasPrefix("WW") == true, "The editor has the draft")
+        saveComposer("composer-expand-rail-opened-\(appearance)", app)
         app.terminate()
     }
 

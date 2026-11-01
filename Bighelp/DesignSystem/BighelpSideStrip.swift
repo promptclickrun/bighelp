@@ -29,7 +29,8 @@ private struct BighelpSideColumnLayout<Column: View>: ViewModifier {
                     column
                         .frame(width: max(screen.trailingColumnWidth, BighelpScreenGeometry.sideColumnWidth))
                         .padding(.top, max(screen.trailingColumnFreeTop + BighelpTokens.space8, 8))
-                        .ignoresSafeArea(.container, edges: [.trailing, .top])
+                        // Only the system's side column supplies its own top clearance.
+                        .ignoresSafeArea(.container, edges: screen.usesSideBar ? [.trailing, .top] : .trailing)
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }

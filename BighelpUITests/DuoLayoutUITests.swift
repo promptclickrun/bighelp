@@ -109,6 +109,37 @@ final class DuoLayoutUITests: BighelpUITestCase {
         XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "chat-switcher").count, 1)
     }
 
+    @MainActor
+    func testIPadBotSwitcherStaysBelowStatusBar() throws {
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        for appearance in appearances {
+            let app = makeApp()
+            app.launchArguments = demo + ["-bighelp.settings.simple-bots", "YES", "-test-bot-activity",
+                                          "-bighelp.settings.chat-switcher", "YES",
+                                          "-loopdy.demo.appearance", appearance]
+            app.launch()
+            try requireWideScreen(app)
+            let mina = app.buttons["simple-bots.bot.travel"]
+            XCTAssertTrue(mina.waitForExistence(timeout: 20))
+            mina.tap()
+            let switcher = element("chat-switcher", in: app)
+            XCTAssertTrue(switcher.waitForExistence(timeout: 10))
+            // The header's Back button follows the window's safe area; the status bar itself
+            // is not exposed in the app's accessibility tree on every iPad runtime.
+            let back = app.buttons["chat.back"]
+            XCTAssertTrue(back.waitForExistence(timeout: 5))
+            XCTAssertGreaterThanOrEqual(switcher.frame.minY, back.frame.minY,
+                                       "The whole glass rail stays below the safe-area header's top")
+            save("ipad-bots-switcher-\(appearance)", app)
+            let jordan = app.buttons.matching(identifier: "chat-switcher.stop")
+                .matching(NSPredicate(format: "label == %@", "Jordan Lee")).firstMatch
+            jordan.tap()
+            XCTAssertTrue(jordan.waitForSelection(timeout: 10))
+            app.terminate()
+        }
+    }
+
     // MARK: Open and half-folded (an iPad simulator standing in)
 
     @MainActor

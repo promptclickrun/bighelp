@@ -5,6 +5,9 @@ import XCTest
 /// The app runs without demo fixtures, as on a phone, with every Device access switch off. The model
 /// calls `iphone_reminders` (or `iphone_calendar`); the chat shows the card, and the agent's reply says
 /// what its own call got back. Skipped without the probe.
+///
+/// `testHowDidISleepThisWeekReadsAppleHealth` is the flow App Review follows; it reads the simulator's own
+/// Health data, so add some sleep there first if the answer should have a chart.
 final class DeviceAccessHostUITests: BighelpUITestCase {
     @MainActor
     func testAToolThatIsOffAsksWithACardAndTheCallGoesOn() throws {
@@ -49,6 +52,61 @@ final class DeviceAccessHostUITests: BighelpUITestCase {
         waitForExpectations(timeout: 60)
         XCTAssertFalse(card.exists, "The card does not come back in that chat")
         save("device-5-no-second-card", app)
+    }
+
+    /// What App Review follows (guideline 2.5.1): Apple Health in Settings › Device access, then "How did I
+    /// sleep this week?" in a chat. The card turns Health on, the one-time note says where the data goes,
+    /// iOS's own Health sheet asks, and the agent answers with a chart of what Health gave. Reads the
+    /// simulator's own Health data; run it with a few nights of sleep added there, and record the screen.
+    @MainActor
+    func testHowDidISleepThisWeekReadsAppleHealth() throws {
+        let app = try openNewChat()
+        openSettings(in: app)
+        settingsRow("settings.menu.permissions", in: app).tap()
+        let health = app.switches["permissions.device-tools.health"].firstMatch
+        XCTAssertTrue(health.waitForExistence(timeout: 10), "Apple Health is in Device access")
+        XCTAssertEqual(health.value as? String, "0")
+        sleep(3)
+        save("sleep-1-device-access", app)
+        closeSettings(in: app)
+
+        send("How did I sleep this week?", in: app)
+        let card = element("device-access.card.health", in: app)
+        XCTAssertTrue(card.waitForExistence(timeout: 60), "The agent asks for Apple Health with a card")
+        sleep(2)
+        save("sleep-2-card", app)
+        app.buttons["device-access.card.turn-on"].firstMatch.tap()
+        XCTAssertTrue(element("device-access.card.health-sharing", in: app).waitForExistence(timeout: 10))
+        sleep(3)
+        save("sleep-3-sharing-note", app)
+        app.buttons["device-access.card.turn-on"].firstMatch.tap()
+        allowHealthSheet(in: app)
+        XCTAssertTrue(card.waitForNonExistence(timeout: 60))
+        XCTAssertTrue(message(containing: "Apple Health", in: app).waitForExistence(timeout: 60),
+                      "The read shows as an Apple Health step")
+        // A chart of the nights Health gave, or a plain answer when it gave none.
+        let answered = NSPredicate { _, _ in
+            self.message(containing: "You slept about", in: app).exists
+                || self.message(containing: "Apple Health shared no sleep", in: app).exists
+        }
+        wait(for: [expectation(for: answered, evaluatedWith: nil)], timeout: 90)
+        sleep(4)
+        save("sleep-4-answer", app)
+    }
+
+    /// iOS's Health sheet: turn on every kind bighelp asks for, then Allow.
+    @MainActor private func allowHealthSheet(in app: XCUIApplication) {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        for root in [app, springboard] {
+            let all = root.descendants(matching: .any)["Turn On All"].firstMatch
+            guard all.waitForExistence(timeout: 15) else { continue }
+            sleep(2)
+            all.tap()
+            sleep(1)
+            let allow = root.buttons["Allow"].firstMatch
+            if allow.waitForExistence(timeout: 5) { allow.tap() }
+            return
+        }
     }
 
     // MARK: Helpers

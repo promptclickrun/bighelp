@@ -835,6 +835,10 @@ def run_mode(mode: str, args, repo: Path) -> int:
                     "attachments": sorted(str(p.relative_to(home)) + f" {p.stat().st_size}"
                                           for p in (home / "attachments").glob("*") if p.is_file())
                     if (home / "attachments").exists() else [],
+                    # The plugin moves the finished file into the agent's folder; Hermes uses it there.
+                    "agent_folder_uploads": sorted(str(p.relative_to(project)) + f" {p.stat().st_size}"
+                                                   for p in (project / "uploads").rglob("*") if p.is_file())
+                    if (project / "uploads").exists() else [],
                     "staged_left": sorted(p.name for p in staged.iterdir()) if staged.exists() else []}}), flush=True)
             if mode == "media":
                 print(json.dumps({"vault_on_host": vault_labels(args.hermes, env, project)}), flush=True)

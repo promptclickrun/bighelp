@@ -43,7 +43,8 @@ struct CapabilityManagementStateTests {
         defer { gate.finish(); task.cancel() }
         for _ in 0..<100 where !gate.entered { await Task.yield() }
         try #require(gate.entered)
-        #expect(harness.state.isBusy)
+        // Skills and Plugins read again over the list they already show, so they don't say busy.
+        #expect(harness.state.isBusy == ![Domain.skills, .plugins].contains(domain))
         let calls = fixture.events
         await harness.load()
         #expect(fixture.events == calls)
@@ -261,6 +262,7 @@ private final class CapabilityStateFixture: SkillsHubManagementClient, MCPManage
         try await read()
         return .init(installed: [], catalog: [], removedCatalogEntries: [])
     }
+    func loadInstalled() async throws -> [InstalledPlugin] { try await (load() as PluginSnapshot).installed }
     func load() async throws -> ToolsetSnapshot {
         try await read()
         return .init(toolsets: [toolset])

@@ -11,9 +11,8 @@ struct MemoryManagementView: View {
 
     @Bindable var store: MemoryGraphStore
     @State private var section: Tab = .providers
-    @State private var configuringProvider: HermesMemoryProvider?
     @State private var providerSelection: ProviderSelection?
-    @State private var setupSelection: HermesMemoryProvider?
+    @State private var openedProvider: String?
     @State private var resetTarget: HermesMemoryResetTarget?
 
     var body: some View {
@@ -54,10 +53,6 @@ struct MemoryManagementView: View {
                 .disabled(store.isLoading || store.isMutating)
             }
         }
-        .bighelpSheet(item: $configuringProvider) { provider in
-            MemoryProviderConfigurationView(store: store, provider: provider)
-                .bighelpSheetSize(.standard)
-        }
         .confirmationDialog(
             providerSelection?.title ?? "Change memory provider?",
             isPresented: Binding(
@@ -75,24 +70,6 @@ struct MemoryManagementView: View {
             Button("Cancel", role: .cancel) { providerSelection = nil }
         } message: {
             Text(providerSelection?.message ?? "")
-        }
-        .confirmationDialog(
-            "Install provider dependencies on this Hermes host?",
-            isPresented: Binding(
-                get: { setupSelection != nil },
-                set: { if !$0 { setupSelection = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            if let provider = setupSelection {
-                Button("Run setup") {
-                    setupSelection = nil
-                    Task { await store.setupProvider(provider) }
-                }
-            }
-            Button("Cancel", role: .cancel) { setupSelection = nil }
-        } message: {
-            Text("Hermes may run the dependency-install commands declared by this provider. The action changes the host environment and may take several minutes.")
         }
         .confirmationDialog(
             resetTarget?.title ?? "Reset built-in memory?",
@@ -121,124 +98,40 @@ struct MemoryManagementView: View {
         List {
             MemoryOperationMessages(store: store)
 
-            Section {
-                LabeledContent("Host", value: store.hostName)
-                LabeledContent("Profile", value: store.profileName)
-                if let status = store.memoryStatus {
-                    LabeledContent(
-                        "Active provider",
-                        value: status.activeProvider.isEmpty ? "Built-in" : status.activeProvider)
-                }
-            } header: {
-                Text("Current")
-            } footer: {
-                Text("Provider selection is host-wide. Settings and learned knowledge use this profile when the host supports it.")
-            }
-
             if let status = store.memoryStatus {
-                Section("Built-in memory") {
-                    providerRow(
-                        name: "Built-in",
-                        description: "Hermes-managed memory files.",
-                        state: status.activeProvider.isEmpty ? "Active" : "Available",
-                        active: status.activeProvider.isEmpty
-                    ) {
-                        if !status.activeProvider.isEmpty {
-                            providerSelection = .builtIn
-                        }
+                let active = status.providers.first { $0.name == status.activeProvider }
+                Section(HermesTools.heading(String(localized: "In use"), 1)) {
+                    if let active {
+                        providerRow(active, isActive: true)
+                    } else {
+                        builtInRow(isActive: true)
                     }
+                }
+                let available = status.providers.filter { $0.name != status.activeProvider }
+                Section(HermesTools.heading(String(localized: "Available"), available.count + (active == nil ? 0 : 1))) {
+                    if active != nil { builtInRow(isActive: false) }
+                    ForEach(available) { providerRow($0, isActive: false) }
+                    if available.isEmpty, active == nil {
+                        Text("No external providers. Built-in memory stays available.")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Section {
                     LabeledContent(
                         "Learned memory",
                         value: ByteCountFormatter.string(fromByteCount: Int64(status.builtInFiles.memoryBytes), countStyle: .file))
                     LabeledContent(
                         "User profile memory",
                         value: ByteCountFormatter.string(fromByteCount: Int64(status.builtInFiles.userBytes), countStyle: .file))
-                }
-
-                Section("Providers") {
-                    if status.providers.isEmpty {
-                        ContentUnavailableView(
-                            "No external providers",
-                            systemImage: "externaldrive",
-                            description: Text("Built-in memory remains available."))
-                    }
-                    ForEach(status.providers) { provider in
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack(alignment: .firstTextBaseline) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(provider.name).font(.bighelp(.headline))
-                                    if !provider.description.isEmpty {
-                                        Text(provider.description)
-                                            .font(.bighelp(.subheadline))
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                                Spacer(minLength: 12)
-                                if status.activeProvider == provider.name {
-                                    Label("Active", systemImage: "checkmark.circle.fill")
-                                        .labelStyle(.iconOnly)
-                                        .foregroundStyle(.green)
-                                        .accessibilityLabel("Active provider")
-                                }
-                            }
-
-                            HStack {
-                                Label(provider.state.title, systemImage: providerSymbol(provider))
-                                    .font(.bighelp(.caption))
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                if !provider.setup.dependenciesInstalled {
-                                    Text("Dependencies needed")
-                                        .font(.bighelp(.caption))
-                                        .foregroundStyle(.orange)
-                                }
-                            }
-
-                            HStack(spacing: 12) {
-                                Button("Configure") {
-                                    configuringProvider = provider
-                                }
-                                .buttonStyle(.bordered)
-
-                                if provider.setup.hasInstallSteps && !provider.setup.dependenciesInstalled {
-                                    Button("Set up") { setupSelection = provider }
-                                        .buttonStyle(.bordered)
-                                }
-
-                                if provider.name == "honcho" {
-                                    Button(store.providerOAuth[provider.name]?.isConnected == true ? "Connected" : "Connect") {
-                                        Task { await store.startOAuth(provider) }
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .disabled(store.providerOAuth[provider.name]?.isConnected == true)
-                                    Button("Check sign-in") {
-                                        Task { await store.refreshOAuth(provider) }
-                                    }
-                                    .font(.bighelp(.footnote))
-                                }
-
-                                Spacer()
-                                if status.activeProvider != provider.name {
-                                    Button("Use") { providerSelection = .provider(provider) }
-                                        .bighelpProminentButtonStyle()
-                                        .disabled(provider.state != .ready)
-                                }
-                            }
-                        }
-                        .padding(.vertical, 6)
-                        .accessibilityElement(children: .contain)
-                        .accessibilityIdentifier("memory.provider.\(provider.name)")
-                    }
-                }
-
-                Section {
                     Menu("Reset built-in memory", systemImage: "trash") {
                         ForEach(HermesMemoryResetTarget.allCases) { target in
                             Button(target.title, role: .destructive) { resetTarget = target }
                         }
                     }
                     .disabled(store.isMutating)
-                } header: { Text("Advanced") } footer: {
+                } header: {
+                    Text("Advanced · Built-in memory")
+                } footer: {
                     Text("Reset permanently erases only the selected built-in memory files on this host.")
                 }
             } else if store.isLoading {
@@ -251,39 +144,172 @@ struct MemoryManagementView: View {
                         description: Text("Refresh to ask Hermes for its current provider state."))
                 }
             }
-        }
-        .listStyle(.insetGrouped)
-    }
 
-    private func providerRow(
-        name: String,
-        description: String,
-        state: String,
-        active: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "internaldrive")
-                .foregroundStyle(active ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-            VStack(alignment: .leading, spacing: 4) {
-                Text(name).font(.bighelp(.headline))
-                Text(description).font(.bighelp(.caption)).foregroundStyle(.secondary)
-                Text(state).font(.bighelp(.caption2)).foregroundStyle(active ? .green : .secondary)
-            }
-            Spacer()
-            if !active {
-                Button("Use", action: action).buttonStyle(.bordered)
+            Section {
+                LabeledContent("Host", value: store.hostName)
+                LabeledContent("Profile", value: store.profileName)
+            } header: {
+                Text("Applies to")
+            } footer: {
+                Text("Provider selection is host-wide. Settings and learned knowledge use this profile when the host supports it.")
             }
         }
-        .frame(minHeight: 44)
+        .bighelpFormSurface()
+        .navigationDestination(item: $openedProvider) { name in
+            MemoryProviderPage(store: store, providerName: name)
+        }
     }
 
-    private func providerSymbol(_ provider: HermesMemoryProvider) -> String {
-        switch provider.state {
-        case .ready: "checkmark.circle"
-        case .needsConfiguration: "slider.horizontal.3"
-        case .missing, .unavailable: "exclamationmark.triangle"
-        case .other: "questionmark.circle"
+    private func builtInRow(isActive: Bool) -> some View {
+        HermesToolRow(art: .symbol("internaldrive", key: "built-in"), name: String(localized: "Built-in"),
+                      detail: String(localized: "Hermes-managed memory files.")) {
+            if isActive {
+                HermesToolStatus(text: String(localized: "In use"), tone: .positive)
+            } else {
+                HermesToolGetButton(title: String(localized: "Use"), accessibilityLabel: "Use built-in memory",
+                                    identifier: "memory.provider.built-in.use",
+                                    isDisabled: store.isMutating) { providerSelection = .builtIn }
+            }
+        }
+        .accessibilityIdentifier("memory.provider.built-in")
+    }
+
+    private func providerRow(_ provider: HermesMemoryProvider, isActive: Bool) -> some View {
+        HermesToolRow(art: MemoryProviderPage.art(provider.name), name: provider.name,
+                      detail: provider.rowDetail, open: { openedProvider = provider.name }) {
+            if isActive {
+                HermesToolStatus(text: String(localized: "In use"), tone: .positive)
+                    .accessibilityLabel("Active provider")
+            } else if provider.state == .ready {
+                HermesToolGetButton(title: String(localized: "Use"), accessibilityLabel: "Use \(provider.name)",
+                                    identifier: "memory.provider.use.\(provider.name)",
+                                    isDisabled: store.isMutating) { providerSelection = .provider(provider) }
+            } else {
+                HermesToolStatus(text: String(localized: "Needs setup"), tone: .warning)
+            }
+        }
+        .accessibilityIdentifier("memory.provider.\(provider.name)")
+    }
+}
+
+private extension HermesMemoryProvider {
+    /// A row's one line: what it is, else its state, and whether it still needs its dependencies.
+    var rowDetail: String {
+        HermesTools.line(description.isEmpty ? state.title : description,
+                         setup.dependenciesInstalled ? nil : String(localized: "Dependencies needed"))
+    }
+}
+
+/// One memory provider: Use, its settings and setup (dependencies, sign-in), Advanced details.
+@MainActor
+private struct MemoryProviderPage: View {
+    @Bindable var store: MemoryGraphStore
+    let providerName: String
+    @State private var configuring: HermesMemoryProvider?
+    @State private var selecting: HermesMemoryProvider?
+    @State private var settingUp: HermesMemoryProvider?
+
+    /// Memory providers have no logo from the host: a memory tile, its color by name.
+    static func art(_ name: String) -> HermesToolArt {
+        .symbol("brain.head.profile", key: name)
+    }
+
+    private var provider: HermesMemoryProvider? {
+        store.memoryStatus?.providers.first { $0.name == providerName }
+    }
+
+    var body: some View {
+        List {
+            MemoryOperationMessages(store: store)
+            if let provider {
+                Section {
+                    HermesToolHeader(art: Self.art(provider.name), name: provider.name, summary: provider.description)
+                }
+                useSection(provider)
+                setupSection(provider)
+                Section("Advanced") {
+                    LabeledContent("State", value: provider.state.title)
+                    LabeledContent("Dependencies", value: provider.setup.dependenciesInstalled ? "Installed" : "Needed")
+                    if !provider.setup.requiredEnvironmentKeys.isEmpty {
+                        LabeledContent("Keys", value: provider.setup.requiredEnvironmentKeys.joined(separator: ", "))
+                    }
+                    if !provider.setup.packageDependencies.isEmpty {
+                        LabeledContent("Packages", value: provider.setup.packageDependencies.joined(separator: ", "))
+                    }
+                }
+            } else {
+                ContentUnavailableView("Provider unavailable", systemImage: "brain")
+            }
+        }
+        .bighelpFormSurface()
+        .navigationTitle(providerName)
+        .navigationBarTitleDisplayMode(.inline)
+        .bighelpSheet(item: $configuring) { provider in
+            MemoryProviderConfigurationView(store: store, provider: provider)
+                .bighelpSheetSize(.standard)
+        }
+        .confirmationDialog(
+            "Change memory provider?",
+            isPresented: Binding(get: { selecting != nil }, set: { if !$0 { selecting = nil } }),
+            titleVisibility: .visible, presenting: selecting
+        ) { provider in
+            Button(ProviderSelection.provider(provider).actionTitle) {
+                Task { await store.selectProvider(provider) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { provider in
+            Text(ProviderSelection.provider(provider).message)
+        }
+        .confirmationDialog(
+            "Install provider dependencies on this Hermes host?",
+            isPresented: Binding(get: { settingUp != nil }, set: { if !$0 { settingUp = nil } }),
+            titleVisibility: .visible, presenting: settingUp
+        ) { provider in
+            Button("Run setup") { Task { await store.setupProvider(provider) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("Hermes may run the dependency-install commands declared by this provider. The action changes the host environment and may take several minutes.")
+        }
+    }
+
+    @ViewBuilder
+    private func useSection(_ provider: HermesMemoryProvider) -> some View {
+        Section {
+            if store.memoryStatus?.activeProvider == provider.name {
+                LabeledContent("Memory") {
+                    HermesToolStatus(text: String(localized: "In use"), tone: .positive)
+                }
+            } else {
+                Button("Use \(provider.name)") { selecting = provider }
+                    .disabled(provider.state != .ready || store.isMutating)
+                    .accessibilityIdentifier("memory.provider.use")
+            }
+        } footer: {
+            if provider.state != .ready {
+                Text("\(provider.state.title). Configure it below first.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func setupSection(_ provider: HermesMemoryProvider) -> some View {
+        Section("Setup") {
+            Button("Configure", systemImage: "slider.horizontal.3") { configuring = provider }
+                .accessibilityIdentifier("memory.provider.configure")
+            if provider.setup.hasInstallSteps && !provider.setup.dependenciesInstalled {
+                Button("Install dependencies", systemImage: "shippingbox") { settingUp = provider }
+                    .disabled(store.isMutating)
+            }
+            if provider.name == "honcho" {
+                let connected = store.providerOAuth[provider.name]?.isConnected == true
+                Button(connected ? "Connected" : "Connect", systemImage: "person.badge.key") {
+                    Task { await store.startOAuth(provider) }
+                }
+                .disabled(connected)
+                Button("Check sign-in") {
+                    Task { await store.refreshOAuth(provider) }
+                }
+            }
         }
     }
 }

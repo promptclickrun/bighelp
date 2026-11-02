@@ -1350,7 +1350,7 @@ describe("choosing direct or BuzzKit", () => {
       });
       expect(apnsCalls[0]!.payload).toMatchObject({
         aps: {
-          alert: { title: "Loopdy test notification", body: "This is your requested BuzzKit notification test." },
+          alert: { title: "bighelp test notification", body: "This is your successful test notification from bighelp!" },
           sound: "default", "mutable-content": 1,
         },
         loopdy_test: { version: 1 },

@@ -403,6 +403,7 @@ struct PluginSnapshot: Equatable, Sendable {
 protocol PluginLifecycleManagementClient: AnyObject {
     var owner: WorkspaceOwner { get }
     func load() async throws -> PluginSnapshot
+    func loadInstalled() async throws -> [InstalledPlugin]
     func rescan() async throws -> PluginSnapshot
     func installCatalog(name: String, expectedCommitSHA: String) async throws -> InstalledPlugin
     func setEnabled(_ enabled: Bool, pluginName: String) async throws -> InstalledPlugin

@@ -21,6 +21,15 @@ struct WorkspaceHubView: View {
 
     var body: some View {
         List {
+            Section {
+                BighelpSearchField(text: $search, prompt: String(localized: "Find a tool"),
+                                   accessibilityLabel: String(localized: "Find a tool"),
+                                   accessibilityIdentifier: "workspace.search")
+                    .bighelpListSearchRow()
+            }
+            if visibleDestinations.isEmpty {
+                ManagementSearchEmptySection(search: search)
+            }
             Section("Current workspace") {
                 VStack(alignment: .leading, spacing: BighelpTokens.space4) {
                     Text(hostName).font(.bighelp(.headline))
@@ -55,13 +64,6 @@ struct WorkspaceHubView: View {
         .foregroundStyle(theme.primaryText)
         .tint(theme.action)
         .navigationTitle("Hermes Tools")
-        .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always),
-                    prompt: "Find a tool")
-        .overlay {
-            if visibleDestinations.isEmpty {
-                ContentUnavailableView.search(text: search)
-            }
-        }
         .accessibilityIdentifier("workspace.hub")
     }
 

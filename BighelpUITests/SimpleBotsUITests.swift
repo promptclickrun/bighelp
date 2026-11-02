@@ -176,7 +176,7 @@ final class SimpleBotsUITests: BighelpUITestCase {
     }
 
     /// A bot's profile: More avatars opens the full studio with the marks in it, and Save comes back
-    /// to the profile; Default Model opens the model and reasoning picker.
+    /// to the profile; Default Model opens its page of models.
     @MainActor
     func testProfileOpensTheStudioAndTheModelPicker() throws {
         let app = launch(appearance: "dark")
@@ -215,6 +215,23 @@ final class SimpleBotsUITests: BighelpUITestCase {
         XCTAssertTrue(app.navigationBars["Default Model"].waitForExistence(timeout: 5)
                       || app.staticTexts["Default Model"].waitForExistence(timeout: 2))
         save("simple-default-model-dark", app)
+
+        // The lists open in the page, under the row they change: no sheet over it.
+        let chat = app.buttons["default-models.mainChats.model"]
+        XCTAssertTrue(chat.waitForExistence(timeout: 10))
+        chat.tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@",
+                                                       "default-models.mainChats.choices.provider."))
+            .firstMatch.waitForExistence(timeout: 5))
+        save("simple-default-model-choices-dark", app)
+        chat.tap()
+        let advanced = app.buttons["default-models.advanced"]
+        XCTAssertTrue(advanced.waitForExistence(timeout: 5))
+        advanced.tap()
+        XCTAssertTrue(app.buttons["default-models.subagents.model"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["default-models.helper.vision"].waitForExistence(timeout: 10),
+                      "Helper tasks list under Advanced")
+        save("simple-default-model-advanced-dark", app)
     }
 
     /// A bot's profile: Default Voice sits under Default Model and opens the voice picker;

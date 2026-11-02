@@ -61,18 +61,17 @@ final class DefaultModelUITests: BighelpUITestCase {
 
             guard appearance == "light" else { app.terminate(); continue }
             // Change Mina's default; Avery's stays as it was.
+            // The models open under the row, in the page; a pick saves at once.
             main.tap()
-            let surface = app.descendants(matching: .any)["model-picker.surface"].firstMatch
-            XCTAssertTrue(surface.waitForExistence(timeout: 5))
-            XCTAssertTrue(app.staticTexts["New chats with Mina Shah"].exists)
-            app.buttons["model-picker.provider.nous"].tap()
-            let hermes = app.buttons["model-picker.nous.Hermes-4-405B"]
+            let nous = app.buttons["models.choices.main.provider.nous"]
+            XCTAssertTrue(nous.waitForExistence(timeout: 5))
+            nous.tap()
+            let hermes = app.buttons["models.choices.main.nous.Hermes-4-405B"]
+            if !hermes.waitForExistence(timeout: 2) { app.swipeUp() }
             XCTAssertTrue(hermes.waitForExistence(timeout: 3))
             hermes.tap()
-            let apply = app.buttons["model-picker.apply"]
-            XCTAssertEqual(apply.label, "Save as default")
-            apply.tap()
-            XCTAssertTrue(surface.waitForNonExistence(timeout: 5))
+            XCTAssertTrue(hermes.waitForNonExistence(timeout: 5), "The list closes once Hermes saved it")
+            if !main.exists { app.swipeDown() }
             XCTAssertTrue((main.value as? String)?.contains("405B") == true, String(describing: main.value))
             app.buttons["models.agent.finance"].tap()
             let backToAvery = NSPredicate(format: "label CONTAINS %@ AND value CONTAINS %@", "Avery Park", "GPT")

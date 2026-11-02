@@ -20,23 +20,22 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
     }
 
     func load() async throws -> PluginSnapshot {
-        async let hubValue = request(.hub)
+        async let installedValue = loadInstalled()
         async let catalogValue = request(.catalog)
-        let hub = try await hubValue
+        let installed = try await installedValue
         let catalog = try await catalogValue
-        let installed = try CapabilitiesPayload.rows(hub["plugins"], decodeInstalled)
-        let catalogRows = try CapabilitiesPayload.array(catalog["entries"])
-        // A name is a row's identity on screen; a second row with the same name is left out.
-        var names = Set<String>()
-        let entries = catalogRows.compactMap { try? decodeCatalog($0) }.filter { names.insert($0.name).inserted }
-        let removed = try CapabilitiesPayload.rows(catalog["removed"]) { value -> String in
-            let row = try CapabilitiesPayload.object(value)
-            let name = try CapabilitiesPayload.text(row["name"], maximumBytes: 160)
-            let reason = try CapabilitiesPayload.text(row["reason"], maximumBytes: 2_048, required: false)
-            return reason.isEmpty ? name : "\(name): \(reason)"
-        }
+        // Hermes lists 900 and more catalog plugins: their rows are read off the main actor.
+        let (entries, removed, skipped) = try await Task.detached(priority: .userInitiated) {
+            try Self.decodeCatalogPage(catalog)
+        }.value
+        try requireOwner()
         return PluginSnapshot(installed: installed, catalog: entries, removedCatalogEntries: removed,
-                              skippedCatalogRows: catalogRows.count - entries.count)
+                              skippedCatalogRows: skipped)
+    }
+
+    /// The installed plugins alone (the hub), a small read next to the catalog.
+    func loadInstalled() async throws -> [InstalledPlugin] {
+        try CapabilitiesPayload.rows(try await request(.hub)["plugins"], Self.decodeInstalled)
     }
 
     func rescan() async throws -> PluginSnapshot {
@@ -83,20 +82,19 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
         let route: Route = enabled ? .enable(name: name) : .disable(name: name)
         let payload = try await request(route)
         guard payload["ok"]?.boolean == true else { throw CapabilitiesManagementError.invalidResponse }
-        guard let plugin = try await load().installed.first(where: { $0.name == name }),
+        guard let plugin = try await loadInstalled().first(where: { $0.name == name }),
               plugin.isEnabled == enabled else { throw CapabilitiesManagementError.readbackFailed }
         return plugin
     }
 
     func update(pluginName: String) async throws -> InstalledPlugin {
         let name = try pluginNameValue(pluginName)
-        let before = try await load()
-        guard let plugin = before.installed.first(where: { $0.name == name }), plugin.canUpdate else {
+        guard let plugin = try await loadInstalled().first(where: { $0.name == name }), plugin.canUpdate else {
             throw CapabilitiesManagementError.invalidRequest
         }
         let payload = try await request(.update(name: name))
         guard payload["ok"]?.boolean == true else { throw CapabilitiesManagementError.invalidResponse }
-        guard let readback = try await load().installed.first(where: { $0.name == name }) else {
+        guard let readback = try await loadInstalled().first(where: { $0.name == name }) else {
             throw CapabilitiesManagementError.readbackFailed
         }
         return readback
@@ -104,8 +102,7 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
 
     func remove(pluginName: String) async throws {
         let name = try pluginNameValue(pluginName)
-        let before = try await load()
-        guard before.installed.contains(where: { $0.name == name && $0.canRemove }) else {
+        guard try await loadInstalled().contains(where: { $0.name == name && $0.canRemove }) else {
             throw CapabilitiesManagementError.invalidRequest
         }
         let payload = try await request(.remove(name: name))
@@ -183,7 +180,23 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
         return value
     }
 
-    private func decodeInstalled(_ value: BighelpJSONValue) throws -> InstalledPlugin {
+    private nonisolated static func decodeCatalogPage(
+        _ catalog: [String: BighelpJSONValue]
+    ) throws -> (entries: [PluginCatalogEntry], removed: [String], skipped: Int) {
+        let rows = try CapabilitiesPayload.array(catalog["entries"])
+        // A name is a row's identity on screen; a second row with the same name is left out.
+        var names = Set<String>()
+        let entries = rows.compactMap { try? decodeCatalog($0) }.filter { names.insert($0.name).inserted }
+        let removed = try CapabilitiesPayload.rows(catalog["removed"]) { value -> String in
+            let row = try CapabilitiesPayload.object(value)
+            let name = try CapabilitiesPayload.text(row["name"], maximumBytes: 160)
+            let reason = try CapabilitiesPayload.text(row["reason"], maximumBytes: 2_048, required: false)
+            return reason.isEmpty ? name : "\(name): \(reason)"
+        }
+        return (entries, removed, rows.count - entries.count)
+    }
+
+    private nonisolated static func decodeInstalled(_ value: BighelpJSONValue) throws -> InstalledPlugin {
         let row = try CapabilitiesPayload.object(value)
         let runtime = try CapabilitiesPayload.text(row["runtime_status"], maximumBytes: 32)
         guard ["enabled", "disabled", "inactive"].contains(runtime) else {
@@ -203,7 +216,7 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
         )
     }
 
-    private func decodeCatalog(_ value: BighelpJSONValue) throws -> PluginCatalogEntry {
+    private nonisolated static func decodeCatalog(_ value: BighelpJSONValue) throws -> PluginCatalogEntry {
         let row = try CapabilitiesPayload.object(value)
         let capabilities = try CapabilitiesPayload.object(row["capabilities"])
         let sha = try CapabilitiesPayload.text(row["sha"], maximumBytes: 40)
@@ -243,21 +256,21 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
     // The storefront's fields are display-only: a missing or odd value is nil, never a refused row.
 
     /// An https address with a host, else nil.
-    private static func httpsURL(_ value: BighelpJSONValue?) -> URL? {
+    private nonisolated static func httpsURL(_ value: BighelpJSONValue?) -> URL? {
         guard let raw = value?.string, raw.utf8.count <= 4_096, let url = URL(string: raw),
               url.scheme?.lowercased() == "https", url.host() != nil else { return nil }
         return url
     }
 
     /// Short text, trimmed; nil when missing, empty or too long.
-    private static func label(_ value: BighelpJSONValue?, maximumBytes: Int) -> String? {
+    private nonisolated static func label(_ value: BighelpJSONValue?, maximumBytes: Int) -> String? {
         guard let value = (try? CapabilitiesPayload.optionalText(value, maximumBytes: maximumBytes)) ?? nil else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
 
     /// `known_issues` comes as one string or a list of them.
-    private static func knownIssues(_ value: BighelpJSONValue?) -> [String] {
+    private nonisolated static func knownIssues(_ value: BighelpJSONValue?) -> [String] {
         let values = value?.array ?? (value.map { [$0] } ?? [])
         return Array(values.compactMap { label($0, maximumBytes: 2_048) }.prefix(10))
     }

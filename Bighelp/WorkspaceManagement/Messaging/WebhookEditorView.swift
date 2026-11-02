@@ -105,6 +105,13 @@ final class WebhookEditorStore {
 
     func refresh() async { await load() }
 
+    /// Runs a change the page already settled in its own way (a switch, its own dialog), without
+    /// the review dialog.
+    func run(_ change: Review) async {
+        review = change
+        await confirm(change)
+    }
+
     func confirm(_ expected: Review) async {
         guard canAct, review == expected else {
             review = nil
@@ -212,29 +219,37 @@ final class WebhookEditorStore {
     }
 }
 
+/// Settings › Hermes tools › Webhooks: the host's listener, then its webhooks by state, each with
+/// its switch. A webhook's name opens its page.
 @MainActor
 struct WebhookEditorView: View {
     @Bindable var store: WebhookEditorStore
     @State private var presentsCreate = false
     @State private var search = ""
+    @State private var filter: HermesToolFilter = .all
+    /// The webhook whose switch is changing, so only its row shows the new value.
+    @State private var changing: HermesToolChange?
+    @State private var opened: String?
 
     var body: some View {
         Group {
             if store.ownsScope {
                 List {
+                    HermesToolSearchSection(search: $search, prompt: String(localized: "Search webhooks"),
+                                            searchIdentifier: "webhooks.search", filters: [.all, .on, .off],
+                                            filter: $filter, filtersIdentifier: "webhooks.filters")
+                    WebhookStatusSections(store: store, showsProgress: changing == nil)
+                    if let catalog = store.catalog {
+                        if !ManagementSearch.isActive(search), filter == .all { platform(catalog) }
+                        subscriptions(catalog)
+                    }
                     Section("Workspace") {
                         LabeledContent("Host", value: store.hostName)
                         Text("Webhooks are host-wide. Signing secrets remain on Hermes and are never included in this list.")
                             .font(.bighelp(.footnote)).foregroundStyle(.secondary)
                     }
-                    status
-                    if let catalog = store.catalog {
-                        if !ManagementSearch.isActive(search) { platform(catalog) }
-                        subscriptions(catalog)
-                    }
                 }
-                .listStyle(.insetGrouped)
-                .searchable(text: $search, prompt: "Search webhooks")
+                .bighelpFormSurface()
                 .bighelpRefreshable { await store.refresh() }
             } else {
                 ContentUnavailableView(
@@ -246,6 +261,9 @@ struct WebhookEditorView: View {
         .navigationTitle("Webhooks")
         .navigationBarTitleDisplayMode(.inline)
         .task { if store.catalog == nil { await store.load() } }
+        .navigationDestination(item: $opened) { name in
+            WebhookDetailView(store: store, name: name)
+        }
         .bighelpSheet(isPresented: $presentsCreate) {
             NavigationStack {
                 WebhookCreateForm { draft in
@@ -288,23 +306,6 @@ struct WebhookEditorView: View {
         .accessibilityIdentifier("workspace.webhooks.native")
     }
 
-    @ViewBuilder
-    private var status: some View {
-        if store.isLoading || store.isMutating {
-            Section { ProgressView(store.isMutating ? "Waiting for Hermes confirmation" : "Loading webhooks") }
-        }
-        if let error = store.errorMessage {
-            Section {
-                Label(error, systemImage: "exclamationmark.triangle")
-                Button("Refresh") { Task { await store.refresh() } }
-                    .disabled(store.isLoading || store.isMutating)
-            }
-        }
-        if let success = store.successMessage {
-            Section { Label(success, systemImage: "checkmark.circle") }
-        }
-    }
-
     private func platform(_ catalog: HermesWebhookCatalog) -> some View {
         Section("Status") {
             LabeledContent("Status", value: catalog.isPlatformEnabled ? "Enabled" : "Disabled")
@@ -320,45 +321,173 @@ struct WebhookEditorView: View {
         }
     }
 
+    @ViewBuilder
     private func subscriptions(_ catalog: HermesWebhookCatalog) -> some View {
-        Section("Webhooks") {
-            let shown = catalog.subscriptions.filter {
-                ManagementSearch.matches(search, $0.name, $0.description, $0.events.joined(separator: " "))
-            }
-            if ManagementSearch.isActive(search), shown.isEmpty {
-                ContentUnavailableView.search(text: search.trimmingCharacters(in: .whitespacesAndNewlines))
-            }
-            ForEach(shown) { webhook in
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text(webhook.name).font(.bighelp(.headline))
-                        Spacer()
-                        Text(webhook.isEnabled ? "Enabled" : "Disabled")
-                            .font(.bighelp(.caption)).foregroundStyle(.secondary)
-                    }
-                    if !webhook.description.isEmpty { Text(webhook.description).foregroundStyle(.secondary) }
-                    LabeledContent("Delivery", value: webhook.delivery.replacingOccurrences(of: "_", with: " ").capitalized)
-                    LabeledContent("Signing secret", value: webhook.hasSecret ? "Configured" : "Not set")
-                    if !webhook.events.isEmpty {
-                        LabeledContent("Events", value: webhook.events.joined(separator: ", "))
-                    }
-                    Link("Webhook URL", destination: webhook.URL)
-                    HStack {
-                        Button(webhook.isEnabled ? "Disable" : "Enable") {
-                            store.review = .setEnabled(name: webhook.name, enabled: !webhook.isEnabled)
-                        }
-                        .disabled(!store.canAct || (!catalog.isPlatformEnabled && !webhook.isEnabled))
-                        Spacer()
-                        Button("Delete", role: .destructive) { store.review = .delete(name: webhook.name) }
-                            .disabled(!store.canAct)
-                    }
-                    .frame(minHeight: BighelpTokens.hitTarget)
-                }
-            }
-            if catalog.subscriptions.isEmpty {
+        let shown = catalog.subscriptions.filter {
+            ManagementSearch.matches(search, $0.name, $0.description, $0.events.joined(separator: " "))
+                && filter.admits(isOn: $0.isEnabled)
+        }
+        if ManagementSearch.isActive(search), shown.isEmpty {
+            ManagementSearchEmptySection(search: search)
+        } else if catalog.subscriptions.isEmpty {
+            Section {
                 Text(catalog.isPlatformEnabled ? "No webhooks yet." : "Enable the platform before creating a webhook.")
                     .foregroundStyle(.secondary)
             }
+        } else if shown.isEmpty {
+            Section { Text("No webhooks match this filter.").foregroundStyle(.secondary) }
+        }
+        section(String(localized: "On"), shown.filter(\.isEnabled), catalog: catalog)
+        section(String(localized: "Off"), shown.filter { !$0.isEnabled }, catalog: catalog)
+    }
+
+    @ViewBuilder
+    private func section(_ title: String, _ webhooks: [HermesWebhookSubscription],
+                         catalog: HermesWebhookCatalog) -> some View {
+        if !webhooks.isEmpty {
+            Section(HermesTools.heading(title, webhooks.count)) {
+                ForEach(webhooks) { row($0, catalog: catalog) }
+            }
+        }
+    }
+
+    private func row(_ webhook: HermesWebhookSubscription, catalog: HermesWebhookCatalog) -> some View {
+        HermesToolRow(art: HermesWebhookSubscription.art(webhook.name), name: webhook.name,
+                      detail: webhook.summary, open: { opened = webhook.name }) {
+            HermesToolSwitch(title: webhook.name, isOn: webhook.isEnabled,
+                             pending: changing?.pending(for: webhook.id),
+                             isLocked: !store.canAct || (!catalog.isPlatformEnabled && !webhook.isEnabled),
+                             identifier: "webhooks.switch.\(webhook.name)") { set($0, webhook) }
+        }
+        .accessibilityIdentifier("webhooks.webhook.\(webhook.name)")
+    }
+
+    private func set(_ isOn: Bool, _ webhook: HermesWebhookSubscription) {
+        guard changing == nil, store.canAct else { return }
+        changing = HermesToolChange(id: webhook.id, isOn: isOn)
+        Task {
+            await store.run(.setEnabled(name: webhook.name, enabled: isOn))
+            changing = nil
+        }
+    }
+}
+
+private extension HermesWebhookSubscription {
+    /// Webhooks have no logo or topic: an incoming-arrow tile, its color by name.
+    static func art(_ name: String) -> HermesToolArt {
+        .symbol("arrow.down.right.circle", key: name)
+    }
+
+    /// The row's one line: its description, else the events it takes.
+    var summary: String {
+        if !description.isEmpty { return description }
+        return events.isEmpty ? String(localized: "Takes every event") : events.joined(separator: ", ")
+    }
+}
+
+/// Loading, waiting, the last error with Refresh, and the last confirmation, at the top of the
+/// webhook pages. A switch's change shows on its row instead of here (`showsProgress`).
+@MainActor
+private struct WebhookStatusSections: View {
+    let store: WebhookEditorStore
+    var showsProgress = true
+
+    var body: some View {
+        if store.isLoading || (store.isMutating && showsProgress) {
+            Section { ProgressView(store.isMutating ? "Waiting for Hermes confirmation" : "Loading webhooks") }
+        }
+        if let error = store.errorMessage {
+            Section {
+                Label(error, systemImage: "exclamationmark.triangle")
+                Button("Refresh") { Task { await store.refresh() } }
+                    .disabled(store.isLoading || store.isMutating)
+            }
+        }
+        if let success = store.successMessage {
+            Section { Label(success, systemImage: "checkmark.circle") }
+        }
+    }
+}
+
+/// One webhook: its switch, the events it takes, where it delivers, its address and Delete.
+@MainActor
+private struct WebhookDetailView: View {
+    @Bindable var store: WebhookEditorStore
+    let name: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var confirmsDelete = false
+    /// The new value while this page's switch is changing.
+    @State private var changing: Bool?
+
+    private var webhook: HermesWebhookSubscription? {
+        store.catalog?.subscriptions.first { $0.name.utf8.elementsEqual(name.utf8) }
+    }
+
+    var body: some View {
+        List {
+            if let webhook {
+                Section {
+                    HermesToolHeader(art: HermesWebhookSubscription.art(webhook.name), name: webhook.name,
+                                     summary: webhook.description)
+                }
+                WebhookStatusSections(store: store, showsProgress: changing == nil)
+                Section {
+                    HermesToolSwitch(title: String(localized: "Turned on"), isOn: webhook.isEnabled,
+                                     pending: changing,
+                                     isLocked: !store.canAct
+                                        || (store.catalog?.isPlatformEnabled != true && !webhook.isEnabled),
+                                     showsTitle: true, identifier: "webhooks.enabled") { set($0, webhook) }
+                } footer: {
+                    Text("Turned off, it stops taking events but keeps its settings.")
+                }
+                Section("Events") {
+                    if webhook.events.isEmpty {
+                        Text("Takes every event.").foregroundStyle(.secondary)
+                    }
+                    ForEach(webhook.events, id: \.self) { Text($0).font(.bighelp(.body).monospaced()) }
+                }
+                Section("Delivery") {
+                    LabeledContent("Sends to", value: HermesTools.readable(webhook.delivery))
+                    LabeledContent("Signing secret", value: webhook.hasSecret ? "Configured" : "Not set")
+                    Link("Webhook URL", destination: webhook.URL)
+                }
+                if !webhook.skills.isEmpty {
+                    Section("Advanced · Skills") {
+                        ForEach(webhook.skills, id: \.self) { Text($0).font(.bighelp(.footnote).monospaced()) }
+                    }
+                }
+                Section {
+                    Button("Delete", role: .destructive) { confirmsDelete = true }
+                        .disabled(!store.canAct)
+                        .accessibilityIdentifier("webhooks.delete")
+                }
+            } else {
+                ContentUnavailableView("Webhook unavailable", systemImage: "arrow.down.right.circle")
+            }
+        }
+        .bighelpFormSurface()
+        .navigationTitle(name)
+        .navigationBarTitleDisplayMode(.inline)
+        .confirmationDialog(WebhookEditorStore.Review.delete(name: name).title,
+                            isPresented: $confirmsDelete, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                Task {
+                    await store.run(.delete(name: name))
+                    if store.errorMessage == nil { dismiss() }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(WebhookEditorStore.Review.delete(name: name).message)
+        }
+    }
+
+    private func set(_ isOn: Bool, _ webhook: HermesWebhookSubscription) {
+        guard changing == nil, store.canAct else { return }
+        changing = isOn
+        Task {
+            await store.run(.setEnabled(name: webhook.name, enabled: isOn))
+            changing = nil
         }
     }
 }
@@ -412,6 +541,7 @@ private struct WebhookCreateForm: View {
                 }
             }
         }
+        .bighelpFormSurface()
         .navigationTitle("New Webhook")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -475,6 +605,7 @@ private struct WebhookSecretReceiptView: View {
                     .font(.bighelp(.footnote)).foregroundStyle(.secondary)
             }
         }
+        .bighelpFormSurface()
         .navigationTitle("Save Signing Secret")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

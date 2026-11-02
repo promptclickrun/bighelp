@@ -29,13 +29,36 @@ private extension CapabilityOperationState {
         do {
             try await operation()
             support = .available
-        } catch is CancellationError {
-        } catch let error as CapabilitiesManagementError {
+        } catch {
+            report(error)
+        }
+    }
+
+    func report(_ error: any Error) {
+        switch error {
+        case is CancellationError:
+            break
+        case let error as CapabilitiesManagementError:
             if case .unsupportedHost(let message) = error { support = .unavailable(message) }
             errorMessage = error.localizedDescription
-        } catch {
+        default:
             errorMessage = requestFailureMessage
         }
+    }
+}
+
+/// The last Plugins and Skills Hub lists each computer gave, for this run of the app, so a page
+/// opens on them at once and its read only updates them. Hermes builds the plugin catalog (900
+/// and more plugins, a few megabytes) on every read, and a remote host took 10 s or more.
+@MainActor
+final class CapabilitiesKeptCopies {
+    static let shared = CapabilitiesKeptCopies()
+
+    var plugins: [String: PluginSnapshot] = [:]
+    var skills: [String: SkillHubSnapshot] = [:]
+
+    static func skillsKey(_ owner: WorkspaceOwner, profileID: String) -> String {
+        "\(owner.cacheScopeID)\n\(profileID)"
     }
 }
 
@@ -137,24 +160,50 @@ final class SkillsHubManagementModel: CapabilityActionTrackingState {
     @ObservationIgnored private let client: any SkillsHubManagementClient
     @ObservationIgnored fileprivate let actionStatusClient: (any HermesHostActionStatusClient)?
     @ObservationIgnored fileprivate var actionGeneration = UUID()
+    @ObservationIgnored private let keptCopies: CapabilitiesKeptCopies?
+    @ObservationIgnored private var hasRead = false
+    @ObservationIgnored private var isRereading = false
 
     init(
         client: any SkillsHubManagementClient,
-        actionStatusClient: (any HermesHostActionStatusClient)? = nil
+        actionStatusClient: (any HermesHostActionStatusClient)? = nil,
+        keptCopies: CapabilitiesKeptCopies? = nil
     ) {
         self.client = client
         self.actionStatusClient = actionStatusClient ?? client.actionStatusClient
+        self.keptCopies = keptCopies
+        snapshot = keptCopies?.skills[CapabilitiesKeptCopies.skillsKey(client.owner, profileID: client.profileID)]
+    }
+
+    /// The first read for this page: over the kept copy it updates quietly.
+    func loadIfNeeded() async {
+        guard !hasRead else { return }
+        await load()
     }
 
     func load() async {
+        hasRead = true
+        if snapshot != nil, actionStatus?.phase != .running {
+            // The kept copy stays on screen and in use: no "Waiting", nothing turned off.
+            guard !isBusy, !isRereading else { return }
+            isRereading = true
+            defer { isRereading = false }
+            do { keep(try await client.load()); support = .available } catch { report(error) }
+            return
+        }
         await perform {
             if let receipt = actionReceipt, actionStatus?.phase == .running {
                 await track(receipt, pendingMessage: "Refreshing the retained Skills Hub action.", attempts: 1) {
-                    snapshot = try await client.load()
+                    keep(try await client.load())
                 }
             }
-            snapshot = try await client.load()
+            keep(try await client.load())
         }
+    }
+
+    private func keep(_ snapshot: SkillHubSnapshot) {
+        self.snapshot = snapshot
+        keptCopies?.skills[CapabilitiesKeptCopies.skillsKey(client.owner, profileID: client.profileID)] = snapshot
     }
 
     func search() async {
@@ -184,11 +233,11 @@ final class SkillsHubManagementModel: CapabilityActionTrackingState {
             var rows = current.installedSkills.filter { $0.name != confirmed.name }
             rows.append(confirmed)
             rows.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-            snapshot = SkillHubSnapshot(
+            keep(SkillHubSnapshot(
                 sources: current.sources, featured: current.featured, official: current.official,
                 installedSkills: rows, installedIdentifiers: current.installedIdentifiers,
                 indexAvailable: current.indexAvailable
-            )
+            ))
             successMessage = "Hermes confirmed the skill is \(enabled ? "enabled" : "disabled")."
         }
     }
@@ -201,7 +250,7 @@ final class SkillsHubManagementModel: CapabilityActionTrackingState {
             guard review.id == identifier else { throw CapabilitiesManagementError.invalidRequest }
             let result = try await client.install(identifier: review.id, preview: review.preview, scan: review.scan)
             self.review = nil
-            try await accept(result) { snapshot = try await client.load() }
+            try await accept(result) { keep(try await client.load()) }
         }
     }
 
@@ -229,13 +278,13 @@ final class SkillsHubManagementModel: CapabilityActionTrackingState {
     func uninstall(_ item: SkillHubItem) async {
         await perform {
             let result = try await client.uninstall(name: item.name)
-            try await accept(result) { snapshot = try await client.load() }
+            try await accept(result) { keep(try await client.load()) }
         }
     }
 
     func updateInstalled() async {
         await perform {
-            try await accept(try await client.updateInstalled()) { snapshot = try await client.load() }
+            try await accept(try await client.updateInstalled()) { keep(try await client.load()) }
         }
     }
 
@@ -406,56 +455,144 @@ final class MCPManagementModel: CapabilityActionTrackingState {
     }
 }
 
+struct PluginChange: Equatable {
+    enum Kind: Equatable { case turningOn, turningOff, updating, removing }
+    let pluginName: String
+    let kind: Kind
+}
+
 @MainActor @Observable
 final class PluginLifecycleManagementModel: CapabilityOperationState {
     fileprivate(set) var support: CapabilitiesHostSupport = .unknown
     private(set) var snapshot: PluginSnapshot?
+    /// The storefront's shelves, worked out once per list rather than on every redraw.
+    private(set) var storefront: PluginStorefront?
     fileprivate(set) var isBusy = false
     fileprivate(set) var errorMessage: String?
     fileprivate(set) var successMessage: String?
+    /// The change under way on an installed plugin, so its page says what's happening.
+    private(set) var change: PluginChange?
 
     @ObservationIgnored private let client: any PluginLifecycleManagementClient
+    @ObservationIgnored private let keptCopies: CapabilitiesKeptCopies?
+    @ObservationIgnored private var hasRead = false
+    /// Bumped by each change, so a read that started before it never puts the old list back.
+    @ObservationIgnored private var changeGeneration = 0
+    @ObservationIgnored private var isRereading = false
 
-    init(client: any PluginLifecycleManagementClient) { self.client = client }
+    init(client: any PluginLifecycleManagementClient, keptCopies: CapabilitiesKeptCopies? = nil) {
+        self.client = client
+        self.keptCopies = keptCopies
+        snapshot = keptCopies?.plugins[client.owner.cacheScopeID]
+        storefront = snapshot.map { PluginStorefront(catalog: $0.catalog) }
+    }
 
-    func load() async { await perform { snapshot = try await client.load() } }
+    /// The first read for this page: over the kept copy it updates quietly.
+    func loadIfNeeded() async {
+        guard !hasRead else { return }
+        await load()
+    }
+
+    func load() async {
+        hasRead = true
+        guard snapshot != nil else {
+            await perform { keep(try await client.load()) }
+            return
+        }
+        // The kept copy stays on screen and in use: no "Waiting", and a change isn't refused.
+        guard !isBusy, !isRereading else { return }
+        isRereading = true
+        defer { isRereading = false }
+        // A change made while this read was out makes its answer old: read again.
+        while !Task.isCancelled {
+            let generation = changeGeneration
+            do {
+                let fresh = try await client.load()
+                support = .available
+                guard generation != changeGeneration else { return keep(fresh) }
+            } catch {
+                return report(error)
+            }
+        }
+    }
+
     func rescan() async {
         await perform {
-            snapshot = try await client.rescan()
+            changeGeneration += 1
+            keep(try await client.rescan())
             successMessage = "Hermes rescanned installed plugins."
         }
     }
 
     func install(_ entry: PluginCatalogEntry) async {
         await perform {
+            changeGeneration += 1
             _ = try await client.installCatalog(name: entry.name, expectedCommitSHA: entry.commitSHA)
-            snapshot = try await client.load()
+            keep(try await client.load())
             successMessage = "Hermes installed and enabled the selected plugin."
         }
     }
 
+    /// Turning a plugin on or off changes only its own row, so only the small installed list is
+    /// read back (the catalog was read twice more before, a few megabytes each).
     func setEnabled(_ enabled: Bool, plugin: InstalledPlugin) async {
-        await perform {
-            _ = try await client.setEnabled(enabled, pluginName: plugin.name)
-            snapshot = try await client.load()
+        await change(enabled ? .turningOn : .turningOff, plugin) {
+            let confirmed = try await client.setEnabled(enabled, pluginName: plugin.name)
+            replaceInstalled(plugin.name, with: confirmed)
             successMessage = "Hermes confirmed the plugin is \(enabled ? "enabled" : "disabled")."
         }
     }
 
     func update(_ plugin: InstalledPlugin) async {
-        await perform {
-            _ = try await client.update(pluginName: plugin.name)
-            snapshot = try await client.load()
+        await change(.updating, plugin) {
+            let confirmed = try await client.update(pluginName: plugin.name)
+            replaceInstalled(plugin.name, with: confirmed)
             successMessage = "Hermes updated the selected plugin and confirmed it is still installed."
         }
+        // Update available and the pinned commit come from the catalog.
+        if errorMessage == nil { readCatalogAgain() }
     }
 
     func remove(_ plugin: InstalledPlugin) async {
-        await perform {
+        await change(.removing, plugin) {
             try await client.remove(pluginName: plugin.name)
-            snapshot = try await client.load()
+            replaceInstalled(plugin.name, with: nil)
             successMessage = "Hermes confirmed the plugin was removed."
         }
+        // The storefront's Get or Open comes from the catalog.
+        if errorMessage == nil { readCatalogAgain() }
+    }
+
+    /// Reads both lists again in the background, so the page that made the change can close now.
+    /// A read already out sees the change and reads again itself.
+    private func readCatalogAgain() {
+        Task { [weak self] in await self?.load() }
+    }
+
+    private func change(_ kind: PluginChange.Kind, _ plugin: InstalledPlugin,
+                        _ operation: () async throws -> Void) async {
+        guard !isBusy else { return }
+        changeGeneration += 1
+        change = PluginChange(pluginName: plugin.name, kind: kind)
+        defer { change = nil }
+        await perform(operation)
+    }
+
+    private func replaceInstalled(_ name: String, with plugin: InstalledPlugin?) {
+        guard let current = snapshot else { return }
+        var installed = current.installed
+        if let index = installed.firstIndex(where: { $0.name == name }) {
+            if let plugin { installed[index] = plugin } else { installed.remove(at: index) }
+        }
+        keep(PluginSnapshot(installed: installed, catalog: current.catalog,
+                            removedCatalogEntries: current.removedCatalogEntries,
+                            skippedCatalogRows: current.skippedCatalogRows))
+    }
+
+    private func keep(_ snapshot: PluginSnapshot) {
+        self.snapshot = snapshot
+        storefront = PluginStorefront(catalog: snapshot.catalog)
+        keptCopies?.plugins[client.owner.cacheScopeID] = snapshot
     }
 
     func clearMessages() { errorMessage = nil; successMessage = nil }

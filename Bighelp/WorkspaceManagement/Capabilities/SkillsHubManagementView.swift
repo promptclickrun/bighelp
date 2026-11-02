@@ -40,7 +40,7 @@ struct SkillsHubManagementView: View {
         }
         .catalogPage()
         .bighelpRefreshable { await model.load() }
-        .task { if model.snapshot == nil { await model.load() } }
+        .task { await model.loadIfNeeded() }
         .onChange(of: model.query) { _, query in
             if !ManagementSearch.isActive(query) { model.clearSearch() }
         }
@@ -390,75 +390,96 @@ private struct SkillsOfficialView: View {
     }
 }
 
-/// The agent's own skills: turn each on or off, and check Hub skills for updates.
+/// The agent's own skills by state, each with its switch, and Check for updates. A skill turned off
+/// stays listed.
 @MainActor
 private struct SkillsInstalledView: View {
     @Bindable var model: SkillsHubManagementModel
     let profileName: String
-    @State private var toggleCandidate: InstalledSkill?
+    @State private var search = ""
+    @State private var filter: HermesToolFilter = .all
+    /// The skill whose switch is changing, so only its row shows the new value.
+    @State private var changing: HermesToolChange?
 
     var body: some View {
         List {
+            HermesToolSearchSection(search: $search, prompt: String(localized: "Search \(profileName)'s skills"),
+                                    searchIdentifier: "skills.installed.search", filters: filters,
+                                    filter: $filter, filtersIdentifier: "skills.installed.filters")
             CapabilitiesStatusSections(
-                support: model.support, isBusy: model.isBusy,
+                support: model.support, isBusy: model.isBusy && changing == nil,
                 errorMessage: model.errorMessage, successMessage: model.successMessage,
                 retry: { Task { await model.load() } }
             )
             if let snapshot = model.snapshot {
-                Section {
-                    if snapshot.installedSkills.isEmpty {
-                        Text("No active skills were reported.").foregroundStyle(.secondary)
-                    }
-                    ForEach(snapshot.installedSkills) { skill in
-                        VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                            HStack {
-                                VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                                    Text(skill.name).font(.bighelp(.headline))
-                                    Text([skill.category, skill.provenance].filter { !$0.isEmpty }.joined(separator: " • "))
-                                        .font(.bighelp(.caption)).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Text(skill.isEnabled ? "On" : "Off").font(.bighelp(.caption))
-                            }
-                            if !skill.summary.isEmpty { Text(skill.summary).font(.bighelp(.subheadline)) }
-                            Button(skill.isEnabled ? "Turn off" : "Turn on") { toggleCandidate = skill }
-                                .buttonStyle(.bordered)
-                                .frame(minHeight: BighelpTokens.hitTarget)
-                        }
-                    }
-                } footer: {
-                    Text("A skill you turn off stays here, so you can turn it back on.")
-                }
-                Section {
-                    Button("Check Hub skills for updates", systemImage: "arrow.triangle.2.circlepath") {
-                        Task { await model.updateInstalled() }
-                    }
-                    .disabled(model.isBusy || snapshot.installedIdentifiers.isEmpty)
-                    .frame(minHeight: BighelpTokens.hitTarget)
-                } footer: {
-                    Text("Updates stay pending until a later refresh reports the result.")
-                }
+                content(snapshot)
             }
         }
-        .listStyle(.insetGrouped)
+        .bighelpFormSurface()
         .navigationTitle("\(profileName)'s skills")
         .navigationBarTitleDisplayMode(.inline)
         .bighelpRefreshable { await model.load() }
         .accessibilityIdentifier("skills.installed")
-        .confirmationDialog(
-            "Change this skill?",
-            isPresented: Binding(get: { toggleCandidate != nil }, set: { if !$0 { toggleCandidate = nil } }),
-            titleVisibility: .visible
-        ) {
-            if let skill = toggleCandidate {
-                Button(skill.isEnabled ? "Turn off \(skill.name)" : "Turn on \(skill.name)") {
-                    toggleCandidate = nil
-                    Task { await model.setEnabled(!skill.isEnabled, skill: skill) }
-                }
+    }
+
+    private var filters: [HermesToolFilter] {
+        [.all, .on, .off] + HermesToolFilter.topics(model.snapshot?.installedSkills.map(\.category) ?? [])
+    }
+
+    @ViewBuilder
+    private func content(_ snapshot: SkillHubSnapshot) -> some View {
+        let skills = snapshot.installedSkills.filter {
+            ManagementSearch.matches(search, $0.name, $0.summary, $0.category, $0.provenance)
+                && filter.admits(isOn: $0.isEnabled, topic: CatalogCategory($0.category))
+        }
+        if ManagementSearch.isActive(search), skills.isEmpty {
+            ManagementSearchEmptySection(search: search)
+        } else if snapshot.installedSkills.isEmpty {
+            Section { Text("No active skills were reported.").foregroundStyle(.secondary) }
+        } else if skills.isEmpty {
+            Section { Text("No skills match this filter.").foregroundStyle(.secondary) }
+        }
+        section(String(localized: "On"), skills.filter(\.isEnabled))
+        section(String(localized: "Off"), skills.filter { !$0.isEnabled })
+        Section {
+            Button("Check Hub skills for updates", systemImage: "arrow.triangle.2.circlepath") {
+                Task { await model.updateInstalled() }
             }
-            Button("Cancel", role: .cancel) { toggleCandidate = nil }
-        } message: {
-            Text("Only this skill changes, for this agent. New chats use the change.")
+            .disabled(model.isBusy || snapshot.installedIdentifiers.isEmpty)
+            .frame(minHeight: BighelpTokens.hitTarget)
+        } footer: {
+            Text("A skill you turn off stays here, so you can turn it back on. Updates stay pending until a later refresh reports the result.")
+        }
+    }
+
+    @ViewBuilder
+    private func section(_ title: String, _ skills: [InstalledSkill]) -> some View {
+        if !skills.isEmpty {
+            Section(HermesTools.heading(title, skills.count)) {
+                ForEach(skills) { row($0) }
+            }
+        }
+    }
+
+    private func row(_ skill: InstalledSkill) -> some View {
+        let topic = CatalogCategory(skill.category)
+        return HermesToolRow(
+            art: .topic(topic), name: skill.name,
+            detail: skill.summary.isEmpty ? HermesTools.line(topic.title, skill.provenance) : skill.summary
+        ) {
+            HermesToolSwitch(title: skill.name, isOn: skill.isEnabled,
+                             pending: changing?.pending(for: skill.id), isLocked: model.isBusy,
+                             identifier: "skills.installed.switch.\(skill.name)") { set($0, skill) }
+        }
+        .accessibilityIdentifier("skills.installed.skill.\(skill.name)")
+    }
+
+    private func set(_ isOn: Bool, _ skill: InstalledSkill) {
+        guard changing == nil, !model.isBusy else { return }
+        changing = HermesToolChange(id: skill.id, isOn: isOn)
+        Task {
+            await model.setEnabled(isOn, skill: skill)
+            changing = nil
         }
     }
 }

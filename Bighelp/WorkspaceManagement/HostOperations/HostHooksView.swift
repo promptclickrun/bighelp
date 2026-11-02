@@ -1,5 +1,7 @@
 import SwiftUI
 
+/// Settings › Hermes tools › Shell Hooks: the host's hooks by consent, each with its command and
+/// Review Removal, then New hook. Every write is reviewed first.
 @MainActor
 struct HostHooksView: View {
     @Bindable var store: HostOperationsStore
@@ -12,13 +14,13 @@ struct HostHooksView: View {
 
     var body: some View {
         List {
-            scopeSection
             messageSections
-            contractSection
             configuredSection
             createSection
+            contractSection
+            scopeSection
         }
-        .listStyle(.insetGrouped)
+        .bighelpFormSurface()
         .navigationTitle("Shell Hooks")
         .navigationBarTitleDisplayMode(.inline)
         .onDisappear { store.closeShellHooks() }
@@ -101,54 +103,76 @@ struct HostHooksView: View {
 
     @ViewBuilder
     private var configuredSection: some View {
-        Section {
-            if let snapshot = store.shellHooks {
-                if snapshot.hooks.isEmpty {
+        if let snapshot = store.shellHooks {
+            if snapshot.hooks.isEmpty {
+                Section("Configured hooks") {
                     ContentUnavailableView(
                         "No shell hooks",
                         systemImage: "terminal",
                         description: Text("Hermes returned an empty configured hook list."))
-                } else {
-                    ForEach(snapshot.hooks) { hook in
-                        VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                            HStack {
-                                Text(hook.event).font(.bighelp(.headline).monospaced())
-                                Spacer()
-                                Label(hook.isAllowed ? "Approved" : "Not approved",
-                                      systemImage: hook.isAllowed ? "checkmark.shield" : "shield.slash")
-                                    .font(.bighelp(.caption))
-                                    .foregroundStyle(hook.isAllowed ? .green : .orange)
-                            }
-                            Text(hook.command)
-                                .font(.bighelp(.caption).monospaced())
-                                .textSelection(.enabled)
-                                .privacySensitive()
-                            if let matcher = hook.matcher {
-                                LabeledContent("Matcher", value: matcher).font(.bighelp(.caption))
-                            }
-                            LabeledContent("Timeout", value: "\(hook.timeoutSeconds) seconds").font(.bighelp(.caption))
-                            LabeledContent("Executable now", value: hook.isExecutable ? "Yes" : "No").font(.bighelp(.caption))
-                            if let approvedAt = hook.approvedAt {
-                                LabeledContent("Approved at", value: approvedAt).font(.bighelp(.caption))
-                            }
-                            Button("Review Removal", systemImage: "trash", role: .destructive) {
-                                Task { await store.reviewHookDeletion(hook) }
-                            }
-                            .disabled(!store.canAct)
-                        }
-                        .padding(.vertical, BighelpTokens.space4)
-                    }
                 }
-            } else if store.isLoading {
-                ProgressView("Loading hooks…")
             } else {
-                ContentUnavailableView("Hooks unavailable", systemImage: "terminal")
+                hookSection(String(localized: "Approved"), snapshot.hooks.filter(\.isAllowed))
+                hookSection(String(localized: "Not approved"), snapshot.hooks.filter { !$0.isAllowed })
+                Section {
+                } footer: {
+                    Text("Executable reflects the script target now; approved reflects the separate consent allowlist. Neither field is a fabricated on/off toggle.")
+                }
             }
-        } header: {
-            Text("Configured hooks")
-        } footer: {
-            Text("Executable reflects the script target now; approved reflects the separate consent allowlist. Neither field is a fabricated on/off toggle.")
+        } else if store.isLoading {
+            Section { ProgressView("Loading hooks…") }
+        } else {
+            Section { ContentUnavailableView("Hooks unavailable", systemImage: "terminal") }
         }
+    }
+
+    @ViewBuilder
+    private func hookSection(_ title: String, _ hooks: [HermesShellHook]) -> some View {
+        if !hooks.isEmpty {
+            Section(HermesTools.heading(title, hooks.count)) {
+                ForEach(hooks) { hookRow($0) }
+            }
+        }
+    }
+
+    /// A hook: what it runs on, its command, its matcher and timeout, and Review Removal in its menu.
+    /// Hooks have no page: leaving this screen drops the catalog (`closeShellHooks`).
+    private func hookRow(_ hook: HermesShellHook) -> some View {
+        HStack(alignment: .top, spacing: BighelpTokens.space12) {
+            HermesToolIcon(art: .symbol("terminal", key: hook.event))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(HermesTools.readable(hook.event)).font(.bighelp(.body))
+                Text(hook.command)
+                    .font(.bighelp(.footnote).monospaced())
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+                    .privacySensitive()
+                Text(HermesTools.line(hook.matcher.map { "Matches \($0)" },
+                                      "\(hook.timeoutSeconds) s timeout",
+                                      hook.isExecutable ? "Can run now" : "Can't run now",
+                                      hook.approvedAt.map { "Approved \($0)" }))
+                    .font(.bighelp(.footnote))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+            VStack(alignment: .trailing, spacing: BighelpTokens.space4) {
+                HermesToolStatus(text: hook.isAllowed ? String(localized: "Approved") : String(localized: "Not approved"),
+                                 tone: hook.isAllowed ? .positive : .warning)
+                Menu {
+                    Button("Review Removal", systemImage: "trash", role: .destructive) {
+                        Task { await store.reviewHookDeletion(hook) }
+                    }
+                    .disabled(!store.canAct)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                        .contentShape(.rect)
+                }
+                .accessibilityLabel("More for \(HermesTools.readable(hook.event)) hook")
+            }
+        }
+        .padding(.vertical, BighelpTokens.space4)
+        .accessibilityElement(children: .contain)
     }
 
     @ViewBuilder
@@ -231,6 +255,7 @@ private struct HookCreateReviewView: View {
                         .foregroundStyle(.orange)
                 }
             }
+            .bighelpFormSurface()
             .navigationTitle("Review Hook")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -282,6 +307,7 @@ private struct HookDeleteReviewView: View {
                     Text("Hermes will re-read the catalog and refuse the deletion if it changed after review, then verify absence with a second catalog read.")
                 }
             }
+            .bighelpFormSurface()
             .navigationTitle("Review Hook Removal")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

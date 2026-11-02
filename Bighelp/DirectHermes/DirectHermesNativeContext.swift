@@ -46,6 +46,10 @@ struct DirectHermesNativeContext: Equatable, Sendable {
     let unavailable: [String: String]
     let etag: String
 
+    /// Plugins list at most 64 features to releases before this one, which refuse more
+    /// (`DirectHermesHTTP.featureListHeader`); this one asks for all of them.
+    static let maximumFeatures = 256
+
     init(response: DirectHermesHTTP.Response, owner: WorkspaceOwner) throws {
         guard response.http.statusCode == 200, response.body.count <= 16_384,
               owner.authority.kind == .direct,
@@ -57,7 +61,7 @@ struct DirectHermesNativeContext: Equatable, Sendable {
         guard value["schemaVersion"]?.integer == 1,
               let version = value["pluginVersion"]?.string,
               let runtime = value["runtimeId"]?.string,
-              let values = value["features"]?.array, values.count <= 64 else {
+              let values = value["features"]?.array, values.count <= Self.maximumFeatures else {
             throw WorkspaceClientError.invalidResponse
         }
         let principal: [String: BighelpJSONValue]

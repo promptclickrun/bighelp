@@ -99,7 +99,8 @@ final class DirectHostNotificationClient: DirectHostNotificationServing {
                 guard context.http.statusCode != 404 else { throw DirectHostNotificationError.featureUnavailable }
                 try DirectHermesHTTP.requireSuccess(context)
                 guard let etag = DirectHermesNativeRequestGuard.contextTag(context.http.value(forHTTPHeaderField: "ETag")),
-                      let features = try context.object()["features"]?.array, features.count <= 64 else {
+                      let features = try context.object()["features"]?.array,
+                      features.count <= DirectHermesNativeContext.maximumFeatures else {
                     throw DirectHermesError.invalidResponse
                 }
                 guard features.contains(.string(feature)) else { throw DirectHostNotificationError.featureUnavailable }

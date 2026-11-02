@@ -30,6 +30,8 @@ final class ConnectorAppsModel {
     enum Phase: Equatable {
         case loading
         case ready
+        /// Hermes keeps connectors closed (4031): no usable Nous Portal sign-in (a lapsed one leaves a
+        /// record without tokens, so Hermes makes no free identity either), an account without apps,
         /// `tools.connectors.enabled: false` or `nous.guest: false` on the computer.
         case turnedOff
         /// A Hermes older than connectors (before 0.21.4).
@@ -79,10 +81,24 @@ final class ConnectorAppsModel {
     /// The chosen category chip; nil shows every category.
     var category: String?
 
+    /// Makes a Nous Portal sign-in for this computer, which the page offers while Hermes keeps apps
+    /// closed. Nil where the page can't sign in (no connection to the computer's settings).
+    let nousSignIn: (@MainActor () -> ProviderAccountsStore?)?
+    /// A Nous Portal sign-in finished here and Hermes still kept apps closed: the cause is a setting.
+    var signedInStillOff = false
+
     private let service: any ConnectorAppsService
 
-    init(service: any ConnectorAppsService) {
+    init(service: any ConnectorAppsService, nousSignIn: (@MainActor () -> ProviderAccountsStore?)? = nil) {
         self.service = service
+        self.nousSignIn = nousSignIn
+    }
+
+    /// The Nous Portal sign-in sheet closed: read the apps again. After a finished sign-in, apps that
+    /// are still closed point at a setting on the computer, not at the sign-in.
+    func nousSignInClosed(signedIn: Bool) async {
+        await load()
+        if signedIn { signedInStillOff = phase == .turnedOff }
     }
 
     var connected: [App] {
@@ -308,9 +324,14 @@ final class ConnectorAppsModel {
 }
 
 /// Demo mode: a slice of Hermes' real catalog (names, categories and logos as the public catalog
-/// lists them) and a made-up account, in memory; connecting succeeds at once.
+/// lists them) and a made-up account, in memory; connecting succeeds at once. `signedOut` answers the
+/// first read the way a computer that lost its Nous Portal sign-in does, so the page offers to sign in.
 @MainActor
 final class DemoConnectorAppsService: ConnectorAppsService {
+    private var signedOut: Bool
+
+    init(signedOut: Bool = false) { self.signedOut = signedOut }
+
     private var accounts: [[String: BighelpJSONValue]] = [
         ["connection_id": .string("demo-1"), "connector": .string("slack"), "status": .string("active"),
          "label": .string("sam@example.com"), "alias": .null, "active": .boolean(true), "disabled": .boolean(false),
@@ -337,6 +358,10 @@ final class DemoConnectorAppsService: ConnectorAppsService {
     func call(_ method: String, params: [String: BighelpJSONValue]) async throws -> BighelpJSONValue {
         switch method {
         case "connectors.catalog":
+            if signedOut {
+                signedOut = false
+                throw DirectHermesError.rpcRejected(code: 4031)
+            }
             return .object(["connectors": .array(Self.catalog.map {
                 .object(["slug": .string($0.slug), "name": .string($0.name), "description": .string($0.summary),
                          "category": .string($0.category),

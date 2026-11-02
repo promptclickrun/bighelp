@@ -1263,10 +1263,39 @@ struct RootShellView: View {
     func connectorAppsModel() -> ConnectorAppsModel? {
         if let workspace = hostRegistry?.selectedWorkspace, hostRegistry?.selectedHostID != nil {
             guard workspace.isConnected else { return nil }
-            return ConnectorAppsModel(service: DirectHermesConnectorAppsService(workspace: workspace))
+            return ConnectorAppsModel(service: DirectHermesConnectorAppsService(workspace: workspace),
+                                      nousSignIn: { providerSignInStore() })
         }
         guard usesWorkspaceFixtures else { return nil }
+        #if DEBUG
+        let signedOut = ProcessInfo.processInfo.arguments.contains("-test-connectors-signed-out")
+        return ConnectorAppsModel(service: DemoConnectorAppsService(signedOut: signedOut),
+                                  nousSignIn: { DemoProviderKeys.store() })
+        #else
         return ConnectorAppsModel(service: DemoConnectorAppsService())
+        #endif
+    }
+
+    /// A provider sign-in for the computer and agent in use, built as AI providers builds its own, for
+    /// a page that signs in without opening AI providers (Apps' Nous Portal sign-in). The caller retires it.
+    func providerSignInStore() -> ProviderAccountsStore? {
+        guard let owner = currentWorkspaceOwner, let connections = workspaceConnections,
+              let direct = connections.hosts.selectedWorkspace?.nativeClient else { return nil }
+        let profileID = workspaceAgentID
+        let currentOwner: @MainActor () -> WorkspaceOwner? = {
+            Data(workspaceAgentID.utf8) == Data(profileID.utf8) ? currentWorkspaceOwner : nil
+        }
+        return ProviderAccountsStore(
+            hostName: workspaceHostName, profileID: profileID,
+            servingProfileID: connections.workspace?.nativeContext?.servingProfileID,
+            client: DirectHermesProviderClient(rpc: direct, http: direct, owner: owner, currentOwner: currentOwner),
+            hostSignIn: ProviderHostSignInStore(
+                profileID: profileID, hostName: workspaceHostName,
+                client: DirectHermesHostSignInClient(owner: owner, currentWorkspace: { [weak connections] in
+                    currentOwner() == owner ? connections?.workspace : nil
+                })
+            )
+        )
     }
 
     /// Home's pet: the primary agent's own avatar.

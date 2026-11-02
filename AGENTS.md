@@ -288,6 +288,8 @@ change in both repos.
   - The route only runs when `/native/context` lists its feature. Otherwise it fails as unsupported, and the UI
     should say "update the plugin", never show a raw error.
   - Requests send `If-Match` (the context ETag) and `X-Loopdy-Request-ID`, which must be a lowercase UUID.
+  - Context reads send `X-Bighelp-Features: all` (`DirectHermesHTTP.featureListHeader`): plugins list at most 64
+    features to apps without it, because older releases refuse a longer list. The app takes up to 256.
   - On a `conflict` (context changed), reload the context and retry once.
 - **Plugin releases (no pin):**
   - The app installs and offers the plugin's latest GitHub Release (`Bighelp/Hosts/PluginLatestRelease.swift`).
@@ -346,7 +348,10 @@ change in both repos.
   its own iOS permission is a `DeviceCapabilityTool` that `DeviceToolRouter` checks before it runs. A new one needs a
   catalog entry, a tool, a plugin feature (`native-device-<kind>-v1`) and the contract text. Every switch starts off
   and then stays on until the person turns it off: one list for the phone, every host and agent
-  (`DeviceToolPermissions.grantsKey`); iOS saying no pauses a tool (`isUsable`), never turns its switch off. The
+  (`DeviceToolPermissions.grantsKey`); iOS saying no pauses a tool (`isUsable`), never turns its switch off. An agent's
+  call to one that's off shows a connect card in the chat (`DeviceAccessCardStore`, plugin
+  `native-device-permission-request-v1`): its Turn on flips the same switch, without reopening the channel
+  that carried the call, and the call goes on. Apple Health is read only and asks once about sharing first. The
   channel runs while bighelp is active, inactive or in the background grace, and in any agent's chat on a plugin with
   `native-device-tools-agents-v1`; after the grace it closes as `paused` so the host waits for the phone.
   Two reach past the open chat: Arriving and leaving sends its message from the background (`DeviceGeofenceMonitor`),
@@ -922,16 +927,6 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
 - Never call `/api/gateway/restart` on a test host. On macOS it reaps every gateway process on the machine.
 - Ask the maintainer before running anything against their real hosts.
 
-## Many sessions at once
-
-When several agent sessions work on bighelp together, one working session does the work. New issues and
-features go to the session that is already working, which builds them itself: no session per feature and no handoffs
-to sub-sessions for normal work. It groups related changes into one branch and PR where it makes sense, builds and
-tests the combined change once on the Mac, and merges once checks and review pass. It starts a second session only
-when the maintainer asks, or when two pieces of work must run at the same time on different files. Two sessions
-never build the same feature: check open PRs, issues and the other sessions first. The maintainer starts a release,
-and the session the maintainer asks runs it. The whole process is in [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md).
-
 ## Git, commits and releases
 
 - **Commits:**
@@ -943,11 +938,11 @@ and the session the maintainer asks runs it. The whole process is in [docs/AGENT
   - Explain the visible behavior and any trust-boundary impact.
   - List what you tested, and where: demo, real host or device. Give the results from the Mac, never a CI run, and
     never list a missing CI run as a blocker (see Build and test).
-  - The maintainer merges, or the working session merges its own PR once checks and review pass.
+  - The maintainer merges.
 - **Versions** live in `project.yml`: `MARKETING_VERSION`, and `CURRENT_PROJECT_VERSION` in every target. Regenerate
   after bumping.
 - **Releases are batched.** Merge pull requests whenever they're ready; releasing is a separate step the
-  maintainer starts, and the session the maintainer asks runs it from start to finish:
+  maintainer starts:
   - Internal TestFlight builds can go out whenever they're useful.
   - Public TestFlight builds go out only when the maintainer says so. They cover everything since the last public
     build, with one set of notes, because every build notifies every tester.

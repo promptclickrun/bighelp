@@ -70,6 +70,30 @@ struct DirectHermesHistoryProjectionTests {
         #expect(projection.messages.map(\.metadata.timestamp) == [Date(timeIntervalSince1970: 30), Date(timeIntervalSince1970: 2)])
     }
 
+    @Test func savedTurnAnswerSurvivesLaterValidationWork() throws {
+        for duration in [0, 20_125] {
+            var final = try #require(Self.row(id: 2, role: "assistant",
+                content: .string("Implemented the change")).object)
+            final["turn_duration_ms"] = .integer(duration)
+            let rows = try [
+                Self.row(id: 1, role: "user", content: .string("Make the change")),
+                .object(final),
+                Self.row(id: 3, role: "tool", content: .string("Validation passed")),
+                Self.row(id: 4, role: "assistant", content: .string("Validation passed")),
+            ].map { try DirectHermesHistoryRow($0, sessionID: "tip") }
+            let projection = try DirectHermesHistoryProjection(rows: rows, appID: "chat",
+                profileID: "default", source: nil, sourceOrderBase: 0)
+            let entries = ChatTranscriptProjection.entries(items: projection.messages,
+                activityEvents: projection.activityEvents(sessionID: "chat"),
+                visibility: .default, isBotMode: false)
+            let marked = ChatInterimReplies.marking(entries, isSending: false, isBotMode: false)
+            let display = ChatCompletedTurnProjection.rows(from: marked, isSending: false,
+                enabled: true, interimReplies: .fold)
+            #expect(display.contains { $0.id == "message:chat:row:2" })
+            #expect(display.contains { $0.id == "message:chat:row:4" })
+        }
+    }
+
     @Test func officialTurnDurationOnFinalHistoryRowReachesFoldPresentation() throws {
         var request = try #require(Self.row(id: 2, role: "assistant", content: .null).object)
         request["tool_calls"] = .array([.object([

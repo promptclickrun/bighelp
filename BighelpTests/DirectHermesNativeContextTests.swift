@@ -491,3 +491,24 @@ extension DirectHermesNativeContextTests {
         #expect(plain.calls.allSatisfy { $0.request.method == .get })
     }
 }
+
+extension DirectHermesNativeContextTests {
+    /// Plugins now list more than 64 features. They give app releases from before this change, which
+    /// refuse a longer list, at most 64; this app asks for every one (`X-Bighelp-Features: all`).
+    @Test func aContextWithMoreThanSixtyFourFeaturesLoads() throws {
+        let request = DirectHermesHTTPRequest(path: "/api/plugins/loopdy/native/context", method: .get)
+        let features = ["native-context-v1", "serving-profile-v1"] + (0..<70).map { "native-fixture-\($0)-v1" }
+        let decoded = try DirectHermesNativeContext(response: try response(request, body: context(features: features)),
+                                                    owner: owner())
+        #expect(decoded.features.count == 72)
+        let unbounded = ["native-context-v1"] + (0..<300).map { "native-fixture-\($0)-v1" }
+        let tooMany = try response(request, body: context(features: unbounded))
+        #expect(throws: WorkspaceClientError.invalidResponse) {
+            try DirectHermesNativeContext(response: tooMany, owner: owner())
+        }
+        #expect(DirectHermesHTTP.featureListHeader(route: request.path, method: "GET")?.value == "all")
+        #expect(DirectHermesHTTP.featureListHeader(route: request.path, method: "GET")?.name == "X-Bighelp-Features")
+        #expect(DirectHermesHTTP.featureListHeader(route: "/api/plugins/loopdy/native/device-tools/connect",
+                                                   method: "POST") == nil)
+    }
+}

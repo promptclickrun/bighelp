@@ -21,13 +21,12 @@ in `AppleDeviceToolServiceTests` reproduces that crash before the correction;
 keep the post-fetch authorization check. See Apple's
 [asynchronous reminder retrieval](https://developer.apple.com/documentation/eventkit/retrieving-events-and-reminders).
 
-Device access has independent switches for Calendar, Reminders, Contacts, Photos,
-Location, Arriving and leaving, Alarms and timers, Music, Focus and Shortcuts. Apple Health
-access was removed in 2.3.0 (105): App Review (guideline 2.5.1) refuses HealthKit in an app
-whose main features don't need health data. The phone never lists or runs `health.read`, so
-the plugin's `iphone_health` tool answers `authorization_required`; a saved Health grant is
-dropped when read.
-Every data control starts off. Enabling one requests its native iOS permission from
+Device access has independent switches for Apple Health, Calendar, Reminders, Contacts,
+Photos, Location, Arriving and leaving, Alarms and timers, Music, Focus and Shortcuts.
+Apple Health came back in #750 (see [Apple Health](#apple-health)); 2.3.0 (105) had removed it
+after App Review (guideline 2.5.1) found no health feature in the app.
+Every data control starts off. An agent can still ask for one that's off: its call shows a
+connect card in the chat ([Connect cards](#connect-cards)), whose Turn on flips the same switch. Enabling one requests its native iOS permission from
 that explicit foreground action. Appearance ("Let agents change how bighelp looks") is
 the exception: it shares no data and Appearance undoes any change, so it's on until the
 person turns it off, and it needs no iOS permission. Calendar and Reminders authorize direct reads,
@@ -71,11 +70,12 @@ Native harness is not required and is not treated as operational.
 | Component | Responsibility |
 | --- | --- |
 | Hermes `ToolExecutionContext` extension | Carries immutable authenticated ingress ownership to official plugin handlers and hooks, with official session/turn/tool-call IDs. |
-| bighelp plugin 2.11.2 | Registers `iphone_calendar`, `iphone_reminders` (and `iphone_health`, which the app no longer offers); uses the gateway connection loop to target the verified phone and correlate canonical Hermes turn IDs. |
+| bighelp plugin 2.11.2 | Registers `iphone_health`, `iphone_calendar`, `iphone_reminders`; uses the gateway connection loop to target the verified phone and correlate canonical Hermes turn IDs. |
 | Link relay with `directed-frames-v1` | Negotiates exact-recipient delivery and queues only for that active paired device. Legacy sockets never receive a broadcast fallback. |
 | iOS `DeviceToolPermissions` | Persists opt-in grants and fences asynchronous work by scope/revision. |
 | iOS `DeviceToolCoordinator` | Validates envelopes, deadlines, ownership and grants; bounds concurrency and journals mutation outcomes. |
-| iOS `AppleDeviceToolService` | Executes the finite EventKit and location operations with authorization checks around native boundaries. |
+| iOS `AppleDeviceToolService` | Executes the finite HealthKit, EventKit and location operations with authorization checks around native boundaries. |
+| iOS `DeviceAccessCardStore` | Shows a connect card in the chat when an agent calls a tool that's off, and lets the call go on once the person turns it on (`DeviceAccessAsk`). |
 | iOS live socket | Receipts authenticated requests before native execution and sends directed correlated results without blocking chat streaming. |
 
 The generic Hermes source extension is documented in
@@ -129,7 +129,8 @@ tool-call coordinates generate a stable request ID. Reusing that ID with
 different arguments produces a conflict. The native request limit is 20 KB;
 the plugin additionally limits arguments to 16 KB. Native results are bounded
 to 128 KB. Host timeout is normally 30 seconds (bounded to 20–60 seconds);
-the native envelope permits no more than 120 seconds.
+the native envelope permits no more than 120 seconds, or 300 seconds for a call to a
+tool the channel offered as `askable` ([Connect cards](#connect-cards)).
 
 Status is advisory. Every operation still checks the live native grant,
 open (active, inactive or background grace)/protected-data state, selected host,
@@ -148,6 +149,7 @@ are returned only to their active caller, not cached for later retries.
 
 | Tool | Operations and constraints |
 | --- | --- |
+| `iphone_health` | `health.read` only: raw samples by `types` (from the fixed list below), with an ISO-8601 `start`/`end` and an IANA `timeZone`. At most 31 days and 200 records. Read only. |
 | `iphone_calendar` | List events in a bounded date range; create; update/delete an exact ID with expected revision. |
 | `iphone_reminders` | List with optional list IDs, completion and undated filters; create; update/delete an exact ID with expected revision. An optional date filter requires start, end and time zone together. |
 | `iphone_location` | `current` only, with no other arguments: where the phone is right now. Needs plugin feature `native-device-location-v1`. |
@@ -180,6 +182,67 @@ Reminders accept title, list, start/due date, time zone, notes and priority;
 updates also accept completion. Both native APIs recheck system authorization
 before execution. Neither API is bridged through arbitrary selectors, an
 additional HTTP service or model-supplied executable code.
+
+## Apple Health
+
+`health.read` (`AppleDeviceToolService`, `LiveAppleDeviceToolNativeBoundary`). Read only:
+the app asks HealthKit with `requestAuthorization(toShare: [], read: …)` and has no write
+operation. Settings › Device access › Apple Health shows only where
+`HKHealthStore.isHealthDataAvailable()` is true (iPhone, iPad, Vision Pro; never the Mac),
+and its detail names every kind of data it reads (App Review 5.1.3(i)).
+
+- Types: steps (`step_count`), distance (`distance_walking_running`), active and resting
+  energy (`active_energy_burned`, `basal_energy_burned`), flights climbed, exercise and stand
+  time, sleep (`sleep_analysis`), heart rate, resting and walking heart rate, heart rate
+  variability (`heart_rate_variability_sdnn`), blood oxygen (`oxygen_saturation`), breathing
+  rate (`respiratory_rate`), blood pressure (systolic and diastolic), height, weight
+  (`body_mass`), body mass index, lean body mass, body fat (`body_fat_percentage`) and
+  workouts (`workout`). `AppleDeviceToolService.commonHealthCatalog` is the list.
+- Arguments: `start`, `end` (at most 31 days apart), `timeZone`, optional `types` and
+  `limit` (1–200). Each item has `type`, `start`, `end` and `value`/`unit` (quantities),
+  a sleep stage (sleep) or `activityType`, `duration`, energy and distance (workouts).
+- Results carry `coverage` (`start`, `end`, `timeZone`, `limit`, `returnedCount`,
+  `truncated`, `aggregation: raw_samples`). They are raw samples, not HealthKit's daily
+  totals. Never describe a truncated read or an empty one as a full total or zero activity:
+  Health never tells an app which types the person kept back, so an empty answer can mean no
+  data or no access. Once its sheet has been shown, the phone treats Health as available.
+- Before the first grant, the person reads a one-time note (`HealthSharingNote`, in Settings'
+  sheet or on the card): Health data they share goes to their Hermes computer and the AI
+  provider on it, isn't used for advertising, and can be turned off at any time (App Review
+  5.1.2(i) and 5.1.3). It's saved as `bighelp.device-tools.health-sharing`; the switch can't
+  turn on before it.
+- Each read shows as an Apple Health step in the agent's work: "Read sleep in Apple Health,
+  Oct 25–31" (`ChatHealthPhrase`). The plugin's brief tells agents to answer health trends with
+  a chart card (`bighelp_render_chart`).
+
+## Connect cards
+
+Every data-sharing tool (`sharesPersonalData`) starts off. When an agent calls one that's off,
+the chat shows a card like the connector cards (`DeviceAccessCardStore`,
+`DeviceAccessInlineCard`): the tool's name and icon, one line about what the agent gets, and
+Turn on and Not now. Plugin feature `native-device-permission-request-v1`:
+
+- The phone's `connect` adds `askable`: the tools that are off but this device can give
+  (`DeviceAccessAsk.askable`: shared data, offered here, iOS not unavailable). Only a plugin
+  with the feature hears it; an older one refuses unknown fields, and keeps answering
+  `authorization_required`. With every switch off, a chat still opens a channel when it has
+  askable tools, but only on such a plugin.
+- The host sends a call to an askable tool like any other, with a 300-second window, and
+  holds the channel's lease until then, because the phone stops polling while the card waits.
+- `DeviceAccessAsk.asking` wraps the chat's handler: a call to a tool that's off waits on its
+  card. Turn on calls `DeviceToolPermissions.setEnabled(_:for:reopensChannel: false)`: the
+  same switch, saved the same way, and iOS asks. Then the original call runs and returns its
+  result. The grant doesn't bump the permissions revision, so the channel that carried the
+  call stays open; it learns the new switch the next time it reopens.
+- Not now answers `permission_declined`; an iOS no `permission_denied`; no answer by five
+  seconds before the call's own time runs out `permission_timeout`. Each is remembered for that
+  chat and tool, so the card doesn't come back there. A call that ends (chat closed, app gone)
+  takes its card with it (`request_cancelled`), and the next call may ask again.
+- Arriving and leaving says it needs Always location before iOS asks. Shortcuts has a name
+  field, filled with the shortcut the agent asked to run; Turn on adds it to the list. Apple
+  Health shows its sharing note first.
+- Demo mode: `-test-device-access-card <read operation>` sends one call through the real card
+  and coordinator in the first chat opened, with made-up data (`DeviceAccessCardFixture`).
 
 ## Location
 
@@ -494,15 +557,26 @@ socket receive loop while an Apple permission prompt/query is pending.
 
 ## Release metadata
 
-The app links no HealthKit: no HealthKit entitlement, no `NSHealth…` usage descriptions and
-no HealthKit calls. App Review rejects any of them in an app without a main health feature.
+The app reads HealthKit and never writes it. Keep it that way:
+
+- Entitlement: only `com.apple.developer.healthkit`, in `Bighelp.entitlements` (also Vision
+  Pro) and `BighelpCarPlay.entitlements` (iPhone and iPad). No clinical records, no background
+  delivery, nothing in `BighelpCatalyst.entitlements`: the Mac has no Health data.
+- Info.plist: `NSHealthShareUsageDescription` only. There is no `NSHealthUpdateUsageDescription`
+  because nothing asks to share (`toShare: []`); add one only if a device shows iOS needs it.
+- App Review (2.5.1) looks for the health feature: Settings › Device access › Apple Health, and
+  in a chat ("How did I sleep this week?") the card, the Health sheet, an Apple Health step and
+  a chart. Review notes for each build say where it is, with a screen recording.
+- The App ID needs the HealthKit capability; automatic signing with
+  `-allowProvisioningUpdates` adds it.
 
 ## Regression and acceptance requirements
 
 Native suites:
 `DeviceToolPermissionsTests`, `AppleDeviceToolServiceTests`,
 `DeviceToolCoordinatorTests`, `DeviceToolFileJournalTests`, `DeviceLocationToolTests`,
-`DeviceAppearanceToolTests`, `AgentAppearanceUITests`,
+`DeviceAppearanceToolTests`, `AgentAppearanceUITests`, `DeviceAccessCardsTests`,
+`DeviceAccessCardUITests`,
 `BighelpLinkDirectedDeviceToolTests`, existing socket/backpressure and account
 erasure suites, and `DeviceToolPermissionsUITests`.
 
@@ -525,10 +599,12 @@ Preserve the full visible input focus target and microphone/Send alignment in
 `ComposerInteractionUITests` and the chat interaction contract.
 
 Physical-device acceptance requires real, explicitly enabled OS permissions:
-list and create/update/delete disposable Calendar
+read a known Health sample; list and create/update/delete disposable Calendar
 and Reminders records; verify exact revision conflicts; turn each permission
 off during a pending read; switch host; lock/background; reconnect. Simulator
 and injected-boundary tests do not establish those real-data outcomes.
 
 Apple references:
+[HealthKit privacy](https://developer.apple.com/documentation/healthkit/protecting-user-privacy),
+[Health authorization](https://developer.apple.com/documentation/healthkit/authorizing-access-to-health-data),
 [EventKit calendar access](https://developer.apple.com/documentation/eventkit/accessing-calendar-using-eventkit-and-eventkitui).

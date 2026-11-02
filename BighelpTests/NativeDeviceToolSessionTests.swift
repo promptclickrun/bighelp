@@ -108,6 +108,68 @@ struct NativeDeviceToolSessionTests {
         #expect(session.needsNewerPlugin.isEmpty)
     }
 
+    /// A plugin with connect cards hears which tools are off but can ask the person with a card.
+    @Test func aPluginWithCardsHearsWhichToolsCanAsk() async throws {
+        let fixture = try Fixture()
+        fixture.http.features.append(NativeDeviceToolSession.askFeature)
+        let session = fixture.session(enabled: [.calendar], askable: [.reminders, .health, .calendar, .appearance])
+        try await session.connect()
+        #expect(fixture.http.connectedEnabled == ["calendar"])
+        #expect(fixture.http.connectedAskable == ["health", "reminders"],
+                "Never one that's on, never one that shares nothing")
+        #expect(session.askable == [.health, .reminders])
+    }
+
+    /// An older plugin refuses a field it doesn't know, so it never hears about tools that can ask.
+    @Test func anOlderPluginNeverHearsAboutToolsThatCanAsk() async throws {
+        let fixture = try Fixture()
+        let session = fixture.session(enabled: [.calendar], askable: [.reminders])
+        try await session.connect()
+        #expect(fixture.http.connectedEnabled == ["calendar"])
+        #expect(fixture.http.connectedAskable == nil)
+        #expect(session.askable.isEmpty)
+    }
+
+    /// With every switch off, the chat still opens a channel so an agent's call can reach its card, but
+    /// only on a plugin with cards.
+    @Test func toolsThatCanAskAloneOpenAChannelOnlyOnAPluginWithCards() async throws {
+        let fixture = try Fixture()
+        let older = fixture.session(enabled: [], askable: [.reminders])
+        await #expect(throws: WorkspaceClientError.unavailable(.pluginRequired)) { try await older.connect() }
+        #expect(fixture.http.paths == ["context"])
+        fixture.http.features.append(NativeDeviceToolSession.askFeature)
+        let session = fixture.session(enabled: [], askable: [.reminders])
+        try await session.connect()
+        #expect(fixture.http.connectedEnabled == [] && fixture.http.connectedAskable == ["reminders"])
+    }
+
+    /// A call to a tool that's off may wait five minutes for the person; every other call keeps its
+    /// two-minute bound, and a tool the channel never offered is refused.
+    @Test func onlyACallThatAsksMayWaitFiveMinutes() async throws {
+        let now = Int(Date().timeIntervalSince1970)
+        let asking = try Fixture()
+        asking.http.features.append(NativeDeviceToolSession.askFeature)
+        asking.http.request["operation"] = .string("reminders.list")
+        asking.http.request["sentAt"] = .integer(now)
+        asking.http.request["expiresAt"] = .integer(now + 300)
+        let session = asking.session(enabled: [.calendar], askable: [.reminders])
+        try await session.connect()
+        try await session.pollOnce()
+        #expect(asking.handled == 1)
+
+        for (operation, window) in [("calendar.list", 300), ("contacts.list", 60), ("reminders.list", 301)] {
+            let fixture = try Fixture()
+            fixture.http.features.append(NativeDeviceToolSession.askFeature)
+            fixture.http.request["operation"] = .string(operation)
+            fixture.http.request["sentAt"] = .integer(now)
+            fixture.http.request["expiresAt"] = .integer(now + window)
+            let session = fixture.session(enabled: [.calendar], askable: [.reminders])
+            try await session.connect()
+            await #expect(throws: WorkspaceClientError.self) { try await session.pollOnce() }
+            #expect(fixture.handled == 0, "\(operation) for \(window) s")
+        }
+    }
+
     @Test func appearanceAloneOnAnOlderPluginNeverOpensAChannel() async throws {
         let fixture = try Fixture()
         let session = fixture.session(enabled: [.appearance])
@@ -410,9 +472,10 @@ struct NativeDeviceToolSessionTests {
                 "turnId": .string("turn"), "operation": .string("calendar.list"), "arguments": .object([:]),
                 "sentAt": .integer(Int(Date().timeIntervalSince1970)), "expiresAt": .integer(Int(Date().timeIntervalSince1970) + 60)]
         }
-        func session(enabled: Set<DeviceToolCapability> = [.calendar], agentID: String = "default") -> NativeDeviceToolSession {
+        func session(enabled: Set<DeviceToolCapability> = [.calendar], askable: Set<DeviceToolCapability> = [],
+                     agentID: String = "default") -> NativeDeviceToolSession {
             NativeDeviceToolSession(http: http, owner: owner, currentOwner: { self.current ? self.owner : nil },
-                scope: scope, agentID: agentID, sessionID: "session", enabled: enabled,
+                scope: scope, agentID: agentID, sessionID: "session", enabled: enabled, askable: askable,
                 isAvailable: { self.available }, isPaused: { self.paused }, handle: { request, _, _ in
                     self.handled += 1
                     if let slowFor = self.slowFor { try? await Task.sleep(for: slowFor) }
@@ -434,6 +497,8 @@ struct NativeDeviceToolSessionTests {
         var paths: [String] = []
         var results: [[String: BighelpJSONValue]] = []
         var connectedEnabled: [String] = []
+        /// The connect's `askable`, or nil when it had none.
+        var connectedAskable: [String]?
         var beforePollReply: () -> Void = {}
         var beforeConnectReply: () -> Void = {}
         var duplicateRequest = false
@@ -501,7 +566,12 @@ struct NativeDeviceToolSessionTests {
                     }
                     for old in held.keys { channels[old] = nil; retired.insert(old) }
                 }
+                // Like the plugin's strict model: a field it doesn't know is refused.
+                if request.body?["askable"] != nil, !features.contains(NativeDeviceToolSession.askFeature) {
+                    return try refusal("invalid_request", status: 422, request: request, requestGuard: requestGuard)
+                }
                 connectedEnabled = request.body?["enabled"]?.array?.compactMap(\.string) ?? []
+                connectedAskable = request.body?["askable"]?.array?.compactMap(\.string)
                 beforeConnectReply()
                 channels[id] = Held(device: device, agent: agent, session: session, expires: now + 30)
                 value = ["channelId": channel, "connected": .boolean(true)]

@@ -1,5 +1,6 @@
 @preconcurrency import EventKit
 import Foundation
+@preconcurrency import HealthKit
 
 @MainActor
 protocol AppleDeviceToolNativeBoundary: AnyObject {
@@ -49,7 +50,43 @@ private struct ReminderFetchResult: Sendable {
 
 @MainActor
 final class AppleDeviceToolService {
+    /// What `health.read` can read: Settings › Device access lists the same, in plain words.
+    nonisolated static let commonHealthCatalog: [String] = [
+        "step_count",
+        "distance_walking_running",
+        "active_energy_burned",
+        "basal_energy_burned",
+        "flights_climbed",
+        "apple_exercise_time",
+        "apple_stand_time",
+        "sleep_analysis",
+        "heart_rate",
+        "resting_heart_rate",
+        "walking_heart_rate_average",
+        "heart_rate_variability_sdnn",
+        "oxygen_saturation",
+        "respiratory_rate",
+        "blood_pressure_systolic",
+        "blood_pressure_diastolic",
+        "height",
+        "body_mass",
+        "body_mass_index",
+        "lean_body_mass",
+        "body_fat_percentage",
+        "workout",
+    ]
+
+    /// Health data exists only where Apple keeps it: iPhone, iPad and Vision Pro, never a Mac.
+    nonisolated static var isHealthDataAvailable: Bool {
+        #if targetEnvironment(macCatalyst)
+        false
+        #else
+        HKHealthStore.isHealthDataAvailable()
+        #endif
+    }
+
     private static let operations: Set<String> = [
+        "health.read",
         "calendar.list", "calendar.create", "calendar.update", "calendar.delete",
         "reminders.list", "reminders.create", "reminders.update", "reminders.delete",
         "location.current",
@@ -112,6 +149,9 @@ final class AppleDeviceToolService {
                 return try Self.sanitizeMutationResult(operation: operation, arguments: arguments, result: result)
             }
             try Self.validateReadResult(result: result)
+            if operation == "health.read" {
+                return Self.enrichHealthCoverage(arguments: arguments, result: result)
+            }
             return result
         } catch let error as AppleDeviceToolError {
             throw error
@@ -127,6 +167,17 @@ private extension AppleDeviceToolService {
         arguments: [String: BighelpJSONValue]
     ) throws {
         switch operation {
+        case "health.read":
+            try validateRange(arguments, allowed: ["start", "end", "timeZone", "types", "limit"])
+            if let types = arguments["types"] {
+                guard let values = types.array,
+                      !values.isEmpty,
+                      values.count <= commonHealthCatalog.count,
+                      values.allSatisfy({ value in
+                          guard let value = value.string else { return false }
+                          return commonHealthCatalog.contains(value)
+                      }) else { throw AppleDeviceToolError.invalidArguments }
+            }
         case "calendar.list":
             try validateRange(arguments, allowed: ["start", "end", "timeZone", "calendarIDs", "limit"])
             try validateStringArray(arguments["calendarIDs"])
@@ -214,6 +265,7 @@ private extension AppleDeviceToolService {
 
     static func capability(for operation: String) -> DeviceToolCapability? {
         switch operation {
+        case "health.read": .health
         case "calendar.list", "calendar.create", "calendar.update", "calendar.delete": .calendar
         case "reminders.list", "reminders.create", "reminders.update", "reminders.delete": .reminders
         case "location.current": .location
@@ -425,6 +477,27 @@ private extension AppleDeviceToolService {
         }
     }
 
+    /// What the read covered, so the agent never calls a short or cut-off answer a full total.
+    static func enrichHealthCoverage(
+        arguments: [String: BighelpJSONValue],
+        result: [String: BighelpJSONValue]
+    ) -> [String: BighelpJSONValue] {
+        var enriched = result
+        let items = result["items"]?.array ?? []
+        let limit = arguments["limit"]?.integer ?? 200
+        let truncated = result["truncated"]?.boolean ?? (items.count >= limit)
+        enriched["coverage"] = .object([
+            "start": arguments["start"] ?? .null,
+            "end": arguments["end"] ?? .null,
+            "timeZone": arguments["timeZone"] ?? .null,
+            "limit": .integer(limit),
+            "returnedCount": .integer(items.count),
+            "truncated": .boolean(truncated),
+            "aggregation": .string("raw_samples"),
+        ])
+        return enriched
+    }
+
     nonisolated static var iso8601: ISO8601DateFormatter {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -441,19 +514,23 @@ private extension AppleDeviceToolService {
 
 @MainActor
 final class LiveAppleDeviceToolNativeBoundary: AppleDeviceToolNativeBoundary {
+    private let healthStore: HKHealthStore
     private let eventStore: EKEventStore
     private let location: DeviceLocationTool
 
     init(
+        healthStore: HKHealthStore = HKHealthStore(),
         eventStore: EKEventStore = EKEventStore(),
         location: DeviceLocationTool? = nil
     ) {
+        self.healthStore = healthStore
         self.eventStore = eventStore
         self.location = location ?? DeviceLocationTool(provider: LiveDeviceLocationProvider())
     }
 
     func status(for capability: DeviceToolCapability) async -> DeviceToolSystemAccess {
         switch capability {
+        case .health: await healthStatus()
         case .calendar: eventKitStatus(.event)
         case .reminders: eventKitStatus(.reminder)
         case .location: await location.status()
@@ -465,6 +542,7 @@ final class LiveAppleDeviceToolNativeBoundary: AppleDeviceToolNativeBoundary {
 
     func request(_ capability: DeviceToolCapability) async -> DeviceToolSystemAccess {
         switch capability {
+        case .health: await requestHealth()
         case .calendar: await requestFullCalendarAccess()
         case .reminders: await requestFullReminderAccess()
         case .location: await location.request()
@@ -479,6 +557,7 @@ final class LiveAppleDeviceToolNativeBoundary: AppleDeviceToolNativeBoundary {
         authorize: @escaping @MainActor () throws -> Void
     ) async throws -> [String: BighelpJSONValue] {
         switch operation {
+        case "health.read": try await readHealth(arguments, authorize: authorize)
         case "calendar.list": try await listCalendarEvents(arguments, authorize: authorize)
         case "calendar.create": try createCalendarEvent(arguments, authorize: authorize)
         case "calendar.update": try updateCalendarEvent(arguments, authorize: authorize)
@@ -494,6 +573,171 @@ final class LiveAppleDeviceToolNativeBoundary: AppleDeviceToolNativeBoundary {
 }
 
 private extension LiveAppleDeviceToolNativeBoundary {
+    static let quantityIdentifiers: [String: HKQuantityTypeIdentifier] = [
+        "step_count": .stepCount,
+        "distance_walking_running": .distanceWalkingRunning,
+        "active_energy_burned": .activeEnergyBurned,
+        "basal_energy_burned": .basalEnergyBurned,
+        "flights_climbed": .flightsClimbed,
+        "apple_exercise_time": .appleExerciseTime,
+        "apple_stand_time": .appleStandTime,
+        "heart_rate": .heartRate,
+        "resting_heart_rate": .restingHeartRate,
+        "walking_heart_rate_average": .walkingHeartRateAverage,
+        "heart_rate_variability_sdnn": .heartRateVariabilitySDNN,
+        "oxygen_saturation": .oxygenSaturation,
+        "respiratory_rate": .respiratoryRate,
+        "blood_pressure_systolic": .bloodPressureSystolic,
+        "blood_pressure_diastolic": .bloodPressureDiastolic,
+        "height": .height,
+        "body_mass": .bodyMass,
+        "body_mass_index": .bodyMassIndex,
+        "lean_body_mass": .leanBodyMass,
+        "body_fat_percentage": .bodyFatPercentage,
+    ]
+
+    func healthTypes(_ names: [String]) -> Set<HKObjectType> {
+        Set(names.compactMap { name -> HKObjectType? in sampleType(for: name) })
+    }
+
+    /// Health never says whether a type may be read: once the person has seen its sheet, reads just
+    /// come back empty for what they kept back. So "asked before" is as available as Health gets.
+    func healthStatus() async -> DeviceToolSystemAccess {
+        guard AppleDeviceToolService.isHealthDataAvailable else { return .unavailable }
+        do {
+            switch try await healthStore.statusForAuthorizationRequest(
+                toShare: [], read: healthTypes(AppleDeviceToolService.commonHealthCatalog)) {
+            case .shouldRequest: return .notRequested
+            case .unnecessary: return .available
+            default: return .unavailable
+            }
+        } catch { return .unavailable }
+    }
+
+    /// Read only: bighelp never asks to write to Health (`toShare` is empty).
+    func requestHealth() async -> DeviceToolSystemAccess {
+        guard AppleDeviceToolService.isHealthDataAvailable else { return .unavailable }
+        do {
+            try await healthStore.requestAuthorization(
+                toShare: [], read: healthTypes(AppleDeviceToolService.commonHealthCatalog))
+            return .available
+        } catch { return .unavailable }
+    }
+
+    func readHealth(
+        _ arguments: [String: BighelpJSONValue],
+        authorize: @escaping @MainActor () throws -> Void
+    ) async throws -> [String: BighelpJSONValue] {
+        let start = try date(arguments, key: "start")
+        let end = try date(arguments, key: "end")
+        let timeZone = try timeZone(arguments)
+        let names = arguments["types"]?.array?.compactMap(\.string)
+            ?? AppleDeviceToolService.commonHealthCatalog
+        let limit = arguments["limit"]?.integer ?? 200
+        var items: [BighelpJSONValue] = []
+        var remaining = limit
+
+        for name in names where remaining > 0 {
+            let samples = try await queryHealthSamples(
+                name: name, start: start, end: end, limit: remaining, timeZone: timeZone, authorize: authorize)
+            for sample in samples {
+                guard remaining > 0 else { break }
+                items.append(sample)
+                remaining -= 1
+            }
+        }
+        return ["items": .array(items), "truncated": .boolean(remaining == 0)]
+    }
+
+    func queryHealthSamples(
+        name: String,
+        start: Date,
+        end: Date,
+        limit: Int,
+        timeZone: TimeZone,
+        authorize: @escaping @MainActor () throws -> Void
+    ) async throws -> [BighelpJSONValue] {
+        guard let sampleType = sampleType(for: name) else { return [] }
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: [])
+        try authorize()
+        let descriptor = HKSampleQueryDescriptor(
+            predicates: [.sample(type: sampleType, predicate: predicate)],
+            sortDescriptors: [SortDescriptor(\.startDate, order: .forward)],
+            limit: limit)
+        let samples = try await descriptor.result(for: healthStore)
+        try authorize()
+        return try samples.map { try Self.healthItem($0, name: name, timeZone: timeZone) }
+    }
+
+    func sampleType(for name: String) -> HKSampleType? {
+        if let identifier = Self.quantityIdentifiers[name] {
+            return HKObjectType.quantityType(forIdentifier: identifier)
+        }
+        if name == "sleep_analysis" {
+            return HKObjectType.categoryType(forIdentifier: .sleepAnalysis)
+        }
+        if name == "workout" { return HKObjectType.workoutType() }
+        return nil
+    }
+
+    nonisolated static func healthItem(
+        _ sample: HKSample,
+        name: String,
+        timeZone: TimeZone
+    ) throws -> BighelpJSONValue {
+        var item: [String: BighelpJSONValue] = [
+            "type": .string(name),
+            "start": .string(Self.iso(sample.startDate, timeZone: timeZone)),
+            "end": .string(Self.iso(sample.endDate, timeZone: timeZone)),
+        ]
+        if let quantitySample = sample as? HKQuantitySample {
+            guard let unit = Self.unit(for: name) else { throw AppleDeviceToolError.nativeFailure }
+            item["value"] = .number(quantitySample.quantity.doubleValue(for: unit))
+            item["unit"] = .string(unit.description)
+        } else if let categorySample = sample as? HKCategorySample {
+            item["value"] = .string(Self.sleepValue(categorySample.value))
+        } else if let workout = sample as? HKWorkout {
+            item["activityType"] = .integer(Int(workout.workoutActivityType.rawValue))
+            item["duration"] = .number(workout.duration)
+            if let energy = workout.totalEnergyBurned {
+                item["activeEnergyKilocalories"] = .number(energy.doubleValue(for: .kilocalorie()))
+            }
+            if let distance = workout.totalDistance {
+                item["distanceMeters"] = .number(distance.doubleValue(for: .meter()))
+            }
+        }
+        return .object(item)
+    }
+
+    nonisolated static func unit(for name: String) -> HKUnit? {
+        switch name {
+        case "step_count", "flights_climbed", "body_mass_index": .count()
+        case "distance_walking_running": .meter()
+        case "active_energy_burned", "basal_energy_burned": .kilocalorie()
+        case "apple_exercise_time", "apple_stand_time": .minute()
+        case "heart_rate", "resting_heart_rate", "walking_heart_rate_average", "respiratory_rate":
+            .count().unitDivided(by: .minute())
+        case "heart_rate_variability_sdnn": .secondUnit(with: .milli)
+        case "oxygen_saturation", "body_fat_percentage": .percent()
+        case "blood_pressure_systolic", "blood_pressure_diastolic": .millimeterOfMercury()
+        case "height": .meter()
+        case "body_mass", "lean_body_mass": .gramUnit(with: .kilo)
+        default: nil
+        }
+    }
+
+    nonisolated static func sleepValue(_ rawValue: Int) -> String {
+        switch HKCategoryValueSleepAnalysis(rawValue: rawValue) {
+        case .inBed: "inBed"
+        case .awake: "awake"
+        case .asleepCore: "asleepCore"
+        case .asleepDeep: "asleepDeep"
+        case .asleepREM: "asleepREM"
+        case .asleepUnspecified: "asleepUnspecified"
+        default: "unknown"
+        }
+    }
+
     func eventKitStatus(_ entityType: EKEntityType) -> DeviceToolSystemAccess {
         switch EKEventStore.authorizationStatus(for: entityType) {
         case .notDetermined: .notRequested

@@ -117,6 +117,8 @@
     </dict>
     <key>NSLocalNetworkUsageDescription</key>
     <string>bighelp connects directly to the Hermes computer you choose on your home network, VPN or Tailscale.</string>
+    <key>NSHealthShareUsageDescription</key>
+    <string>When you turn on Apple Health in Device access, bighelp reads the Health data you allow and shares it with your Hermes computer and the AI provider on it, to answer your health and fitness questions. bighelp never changes your Health data.</string>
     <key>NSCalendarsFullAccessUsageDescription</key>
     <string>When you enable Calendar tools, your selected agent can read, create, update, and delete calendar events on your request.</string>
     <key>NSRemindersFullAccessUsageDescription</key>

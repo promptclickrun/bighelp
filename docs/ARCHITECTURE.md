@@ -12,7 +12,8 @@ with an authorized Hermes host and bighelp's notification services. This documen
 follows the implementation rather than older design proposals.
 
 The [iPhone device-tools contract](IPHONE_DEVICE_TOOLS.md) describes the native
-EventKit and location service, host-scoped permissions, authenticated Hermes tool
+HealthKit (read only), EventKit and location service, the connect cards for tools that are off,
+host-scoped permissions, authenticated Hermes tool
 context, and negotiated directed Link frames.
 
 ## 1. System boundaries

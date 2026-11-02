@@ -123,6 +123,8 @@ struct ChatToolPhrase: Equatable, Sendable {
             guard let host = arguments.string("url").flatMap(ChatToolNames.host) else { return nil }
             return ChatToolPhrase(live: "Opening \(host)…", past: "Opened \(host)", key: "Browsed the web",
                                   one: "Browsed the web")
+        case "iphone_health":
+            return ChatHealthPhrase.phrase(arguments)
         case "skill_view":
             guard let skill = arguments.string("name").flatMap({ ChatToolNames.plainName($0) }) else { return nil }
             return ChatToolPhrase(live: "Reading the \(skill) skill…", past: "Read the \(skill) skill",
@@ -140,6 +142,66 @@ struct ChatToolPhrase: Equatable, Sendable {
             return ChatToolPhrase(live: "\(live) a file…", past: "\(past) a file", key: key, many: many)
         }
         return ChatToolPhrase(live: "\(live) \(name)…", past: "\(past) \(name)", key: key, many: many)
+    }
+}
+
+/// An agent's Apple Health read as its own step: "Read sleep in Apple Health, Oct 25–31". It names only
+/// kinds of data from the tool's fixed list and the dates asked for, never a value.
+enum ChatHealthPhrase {
+    static let names: [String: String] = [
+        "step_count": "steps", "distance_walking_running": "distance", "active_energy_burned": "active energy",
+        "basal_energy_burned": "resting energy", "flights_climbed": "flights climbed",
+        "apple_exercise_time": "exercise time", "apple_stand_time": "stand time", "sleep_analysis": "sleep",
+        "heart_rate": "heart rate", "resting_heart_rate": "resting heart rate",
+        "walking_heart_rate_average": "walking heart rate", "heart_rate_variability_sdnn": "heart rate variability",
+        "oxygen_saturation": "blood oxygen", "respiratory_rate": "breathing rate",
+        "blood_pressure_systolic": "blood pressure", "blood_pressure_diastolic": "blood pressure",
+        "height": "height", "body_mass": "weight", "body_mass_index": "body mass index",
+        "lean_body_mass": "lean body mass", "body_fat_percentage": "body fat", "workout": "workouts",
+    ]
+
+    static func phrase(_ arguments: ChatToolArguments, locale: Locale = .current) -> ChatToolPhrase {
+        var kinds: [String] = []
+        for name in arguments.strings("types") {
+            if let kind = names[name], !kinds.contains(kind) { kinds.append(kind) }
+        }
+        let what = switch kinds.count {
+        case 0: "Apple Health"
+        case 1, 2: kinds.joined(separator: " and ") + " in Apple Health"
+        default: "\(kinds.count) kinds of data in Apple Health"
+        }
+        let span = dates(arguments, locale: locale).map { ", " + $0 } ?? ""
+        return ChatToolPhrase(live: "Reading \(what)\(span)…", past: "Read \(what)\(span)", key: "apple-health",
+                              one: "Read Apple Health", many: "Read Apple Health %d times")
+    }
+
+    /// "Oct 25–31", "Oct 30–Nov 2" or "Oct 25", in the time zone the agent asked in. An end at
+    /// midnight is the day before's end.
+    static func dates(_ arguments: ChatToolArguments, locale: Locale) -> String? {
+        guard let start = arguments.string("start").flatMap(date), let rawEnd = arguments.string("end").flatMap(date),
+              rawEnd > start else { return nil }
+        let zone = arguments.string("timeZone").flatMap(TimeZone.init(identifier:)) ?? .current
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let end = calendar.startOfDay(for: rawEnd) == rawEnd ? rawEnd.addingTimeInterval(-1) : rawEnd
+        func format(_ date: Date, _ template: String) -> String {
+            let formatter = DateFormatter()
+            formatter.locale = locale
+            formatter.timeZone = zone
+            formatter.setLocalizedDateFormatFromTemplate(template)
+            return formatter.string(from: date)
+        }
+        if calendar.isDate(start, inSameDayAs: end) { return format(start, "MMMd") }
+        let sameMonth = calendar.isDate(start, equalTo: end, toGranularity: .month)
+        return format(start, "MMMd") + "–" + format(end, sameMonth ? "d" : "MMMd")
+    }
+
+    private static func date(_ raw: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: raw) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: raw)
     }
 }
 

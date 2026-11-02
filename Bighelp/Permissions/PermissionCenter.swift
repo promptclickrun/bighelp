@@ -126,6 +126,8 @@ final class PermissionCenter {
     #if DEBUG
     /// Demo mode's stand-in for an agent's appearance call (`-test-agent-appearance`).
     @ObservationIgnored var demoAppearanceCall: DeviceAppearanceFixture?
+    /// Demo mode's stand-in for an agent's call to a tool that's off (`-test-device-access-card`).
+    @ObservationIgnored var demoAccessCall: DeviceAccessCardFixture?
     #endif
     private(set) var requestInFlight: PermissionKind?
     private(set) var statuses: [PermissionKind: PermissionStatus]

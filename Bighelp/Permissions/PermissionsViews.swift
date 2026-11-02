@@ -84,6 +84,9 @@ private struct DeviceToolPermissionRow: View {
     let permissions: DeviceToolPermissions
     let kind: DeviceToolCapability
     @Environment(\.openURL) private var openURL
+    /// Apple Health's sharing note, shown once before its switch first turns on.
+    @State private var showsHealthSharing = false
+    @State private var turnsOnAfterSharing = false
 
     private var title: String { kind.title }
     private var detail: String { kind.detail }
@@ -93,14 +96,18 @@ private struct DeviceToolPermissionRow: View {
             Toggle(isOn: Binding(
                 get: { permissions.isEnabled(kind) },
                 set: { enabled in
-                    if enabled { Task { await permissions.setEnabled(true, for: kind) } }
+                    if enabled, kind == .health, !permissions.healthSharingAgreed { showsHealthSharing = true }
+                    else if enabled { Task { await permissions.setEnabled(true, for: kind) } }
                     else { permissions.disable(kind) }
                 }
             )) {
-                VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                    Text(title).bighelpFont(.body, weight: .semibold)
-                    Text(detail).bighelpFont(.metadata).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                HStack(alignment: .top, spacing: BighelpTokens.space12) {
+                    DeviceToolIcon(kind: kind, size: 28)
+                    VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                        Text(title).bighelpFont(.body, weight: .semibold)
+                        Text(detail).bighelpFont(.metadata).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
             .disabled(!permissions.isEnabled(kind) && (permissions.requestInFlight != nil
@@ -114,6 +121,9 @@ private struct DeviceToolPermissionRow: View {
                     if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                 }
                 .accessibilityIdentifier("permissions.device-tools.\(kind.rawValue).settings")
+            } else if kind == .health, permissions.isEnabled(kind) {
+                Text("Health decides which kinds of data bighelp can read; change them in the Health app under Sharing. An empty answer can mean no data or no access.")
+                    .bighelpFont(.metadata).foregroundStyle(.secondary)
             } else if kind == .location, permissions.isEnabled(kind) {
                 Text("Only while bighelp is open. \(BighelpPlatform.isMac ? "macOS" : "iOS") asks before sharing your exact spot; if you keep it approximate, your agent gets a rough area.")
                     .bighelpFont(.metadata).foregroundStyle(.secondary)
@@ -123,6 +133,17 @@ private struct DeviceToolPermissionRow: View {
             DeviceToolPermissionExtras(kind: kind, permissions: permissions)
         }
         .padding(.vertical, BighelpTokens.space4)
+        // iOS shows Health's own sheet next, once this one has gone.
+        .bighelpSheet(isPresented: $showsHealthSharing, onDismiss: {
+            guard turnsOnAfterSharing else { return }
+            turnsOnAfterSharing = false
+            Task { await permissions.setEnabled(true, for: .health) }
+        }) {
+            HealthSharingSheet {
+                permissions.agreeToHealthSharing()
+                turnsOnAfterSharing = true
+            }
+        }
     }
 }
 

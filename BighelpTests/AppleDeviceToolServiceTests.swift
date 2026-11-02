@@ -12,6 +12,69 @@ struct AppleDeviceToolServiceTests {
         #expect(result["items"] == .array([]))
         #expect(result["truncated"] == .boolean(false))
     }
+    @Test func commonHealthCatalogIsFiniteAndIncludesEachSupportedDomain() {
+        let catalog = Set(AppleDeviceToolService.commonHealthCatalog)
+
+        #expect(catalog.count == 22)
+        #expect(catalog.contains("step_count"))
+        #expect(catalog.contains("sleep_analysis"))
+        #expect(catalog.contains("heart_rate"))
+        #expect(catalog.contains("body_mass"))
+        #expect(catalog.contains("workout"))
+    }
+
+    /// The row's detail names every kind of data the catalog can read (App Review 5.1.3(i)).
+    @Test func healthRowNamesEveryKindOfDataItCanRead() {
+        let detail = DeviceToolCapability.health.detail.lowercased()
+        for words in ["steps", "distance", "active and resting energy", "flights climbed", "exercise and stand time",
+                      "sleep", "heart rate", "resting and walking heart rate", "heart rate variability",
+                      "blood oxygen", "breathing rate", "blood pressure", "height", "weight", "body mass index",
+                      "lean body mass", "body fat", "workouts", "read only"] {
+            #expect(detail.contains(words), "\(words)")
+        }
+        #expect(DeviceToolCatalog.capability(for: "health.read") == .health)
+        #expect(DeviceToolCatalog.operations["health.read"]?.journaled == false)
+        #expect(DeviceToolCatalog.operations["health.write"] == nil)
+    }
+
+    @Test func healthReadReportsRawQueryCoverageAndLimitEvidence() async throws {
+        let boundary = RecordingAppleDeviceToolBoundary()
+        boundary.response = ["items": .array([]), "truncated": .boolean(false)]
+        let service = AppleDeviceToolService(boundary: boundary)
+
+        let result = try await service.execute(
+            operation: "health.read",
+            arguments: Self.rangeArguments,
+            authorize: { }
+        )
+
+        #expect(result["coverage"] == .object([
+            "start": .string("2026-09-01T00:00:00Z"),
+            "end": .string("2026-09-02T00:00:00Z"),
+            "timeZone": .string("America/Chicago"),
+            "limit": .integer(200),
+            "returnedCount": .integer(0),
+            "truncated": .boolean(false),
+            "aggregation": .string("raw_samples"),
+        ]))
+    }
+
+    @Test func healthReadKeepsToTheCatalogThirtyOneDaysAndTwoHundredRecords() async {
+        let service = AppleDeviceToolService(boundary: RecordingAppleDeviceToolBoundary())
+        let refused: [[String: BighelpJSONValue]] = [
+            Self.rangeArguments.merging(["types": .array([.string("clinical_records")])]) { $1 },
+            Self.rangeArguments.merging(["types": .array([])]) { $1 },
+            Self.rangeArguments.merging(["limit": .integer(201)]) { $1 },
+            Self.rangeArguments.merging(["end": .string("2026-10-03T00:00:00Z")]) { $1 },
+            Self.rangeArguments.merging(["write": .boolean(true)]) { $1 },
+        ]
+        for arguments in refused {
+            await #expect(throws: AppleDeviceToolError.invalidArguments) {
+                try await service.execute(operation: "health.read", arguments: arguments, authorize: { })
+            }
+        }
+    }
+
     @Test func statusAndRequestDelegateToTheNativeBoundary() async {
         let boundary = RecordingAppleDeviceToolBoundary()
         boundary.statuses[.calendar] = .available
@@ -216,6 +279,7 @@ struct AppleDeviceToolServiceTests {
     }
 
     @Test(arguments: [
+        "health.read",
         "calendar.list",
         "calendar.create",
         "calendar.update",
@@ -340,7 +404,7 @@ struct AppleDeviceToolServiceTests {
 
     private static func arguments(for operation: String) -> [String: BighelpJSONValue] {
         switch operation {
-        case "calendar.list", "reminders.list":
+        case "health.read", "calendar.list", "reminders.list":
             rangeArguments
         case "calendar.create":
             [
@@ -386,7 +450,7 @@ nonisolated private final class BackgroundReminderEventStore: EKEventStore, @unc
 @MainActor
 private final class RecordingAppleDeviceToolBoundary: AppleDeviceToolNativeBoundary {
     var statuses: [DeviceToolCapability: DeviceToolSystemAccess] = [
-        .calendar: .available, .reminders: .available,
+        .health: .available, .calendar: .available, .reminders: .available,
     ]
     var requestResults: [DeviceToolCapability: DeviceToolSystemAccess] = [:]
     var statusRequests: [DeviceToolCapability] = []

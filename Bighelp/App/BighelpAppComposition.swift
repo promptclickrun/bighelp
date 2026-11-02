@@ -334,13 +334,17 @@ struct BighelpAppComposition {
             LiveVoicePlace.shared.provider = LiveDeviceLocationProvider(accuracy: LiveVoicePlace.cityAccuracy)
             LiveVoicePlace.shared.lastKnown = { LiveVoicePlace.systemLastKnown() }
         }
+        // Demo mode's connect cards (`-test-device-access-card`) turn switches on without asking iOS.
+        let demoGrants = DemoDeviceGrants(on: usesFixtures && arguments.contains("-test-device-access-card"))
         let deviceToolPermissions = DeviceToolPermissions(
             status: { kind in
                 if kind == .location, let demoLocation { return await demoLocation.status() }
+                if let demo = demoGrants.status(kind) { return demo }
                 return usesFixtures ? .unavailable : await deviceToolRouter.status(kind)
             },
             request: { kind in
                 if kind == .location, let demoLocation { return await demoLocation.request() }
+                if let demo = demoGrants.request(kind) { return demo }
                 return usesFixtures ? .unavailable : await deviceToolRouter.request(kind)
             },
             isForeground: { UIApplication.shared.applicationState == .active },
@@ -357,8 +361,12 @@ struct BighelpAppComposition {
             saveAppearanceAllowed: { if !usesFixtures { defaults.set($0, forKey: DeviceToolPermissions.appearanceAllowedKey) } },
             navigationAllowed: defaults.object(forKey: DeviceToolPermissions.navigationAllowedKey) == nil
                 || defaults.bool(forKey: DeviceToolPermissions.navigationAllowedKey),
-            saveNavigationAllowed: { if !usesFixtures { defaults.set($0, forKey: DeviceToolPermissions.navigationAllowedKey) } }
+            saveNavigationAllowed: { if !usesFixtures { defaults.set($0, forKey: DeviceToolPermissions.navigationAllowedKey) } },
+            healthSharingAgreed: !usesFixtures && defaults.bool(forKey: DeviceToolPermissions.healthSharingKey),
+            saveHealthSharingAgreed: { if !usesFixtures { defaults.set($0, forKey: DeviceToolPermissions.healthSharingKey) } }
         )
+        // Chats show the cards an agent's call to a tool that's off asks with.
+        DeviceAccessCardStore.shared.permissions = deviceToolPermissions
         let appearanceTool = DeviceAppearanceTool(settings: settings)
         let navigationTool = DeviceNavigationTool(.init(
             mode: { settings.currentMode },
@@ -411,6 +419,9 @@ struct BighelpAppComposition {
         if usesFixtures {
             permissionCenter.demoAppearanceCall = DeviceAppearanceFixture(
                 launchArguments: arguments, permissions: deviceToolPermissions, tool: appearanceTool)
+            permissionCenter.demoAccessCall = DeviceAccessCardFixture(
+                launchArguments: arguments, permissions: deviceToolPermissions,
+                report: { [weak permissionCenter] in permissionCenter?.nativeDeviceToolStatus = $0 })
         }
         #endif
         managedNotificationFactory = BighelpManagedNotificationFactory(

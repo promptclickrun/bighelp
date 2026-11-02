@@ -109,6 +109,18 @@ struct DeviceToolCoordinatorTests {
         #expect(result.payload.isEmpty)
     }
 
+    /// A call that asks with a card may wait five minutes for the person; nothing longer gets through.
+    @Test func aCardsCallMayWaitFiveMinutesButNoLonger() async {
+        let fixture = DeviceCoordinatorFixture()
+        await fixture.permissions.setEnabled(true, for: .calendar)
+        let waits = await fixture.coordinator.handle(fixture.request(expiresAt: 1_300), owner: fixture.scope,
+                                                     isCurrent: { true })
+        #expect(waits.status == "completed")
+        let tooLong = await fixture.coordinator.handle(fixture.request(expiresAt: 1_301), owner: fixture.scope,
+                                                       isCurrent: { true })
+        #expect(tooLong.code == "invalid_request")
+    }
+
     @Test func inactivePhoneNeverReadsOrChangesData() async {
         let fixture = DeviceCoordinatorFixture()
         await fixture.permissions.setEnabled(true, for: .calendar)

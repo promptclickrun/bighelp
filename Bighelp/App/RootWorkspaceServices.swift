@@ -124,6 +124,13 @@ extension RootShellView {
             })
             return
         }
+        if usesDemoFixtures, let call = permissionCenter.demoAccessCall, let scope = currentDeviceToolScope,
+           let conversationID = appState.activeConversationID, scenePhase == .active {
+            await call.send(scope: scope, conversationID: conversationID, isCurrent: {
+                appState.activeConversationID == conversationID && Self.deviceToolsOpenNow
+            })
+            return
+        }
         #endif
         guard let owner = currentWorkspaceOwner, owner.authority.kind == .direct,
               let scope = currentDeviceToolScope, let direct = nativeWorkspaceStore?.nativeClient,
@@ -134,10 +141,13 @@ extension RootShellView {
         await permissions.refresh()
         // On, and allowed by iOS now: a switch whose iOS access is off stays on but isn't offered.
         let enabled = Set(DeviceToolCapability.allCases.filter { permissions.isUsable($0) })
-        guard !enabled.isEmpty else { permissionCenter.nativeDeviceToolStatus = nil; return }
+        // Off, but a card in the chat can turn it on when an agent asks for it.
+        let askable = DeviceAccessAsk.askable(permissions)
+        guard !enabled.isEmpty || !askable.isEmpty else { permissionCenter.nativeDeviceToolStatus = nil; return }
         guard let conversationID = appState.activeConversationID,
               let coordinate = nativeRuntime?.bridge.currentCoordinate(for: conversationID),
               coordinate.owner == owner else {
+            NativeDeviceToolSession.log.notice("no channel: the chat has no session yet")
             permissionCenter.nativeDeviceToolStatus = DeviceToolChannelNote.noChat(enabled: enabled)
             return
         }
@@ -145,9 +155,11 @@ extension RootShellView {
         // An agent's own contacts.create and calendar.create wait for a reviewed draft in a chat with
         // the person's picture (docs/IMAGE_DRAFTS.md › Image fence); the chat is read per such call.
         let features = featureStore
-        let guarded = ImageDraftWriteFence.guarding(handler, holdsPicture: {
+        let fenced = ImageDraftWriteFence.guarding(handler, holdsPicture: {
             features.preparedChatModel(id: conversationID).map { ImageDraftWriteFence.holdsPersonPicture($0.items) } ?? false
         })
+        let guarded = DeviceAccessAsk.asking(fenced, cards: .shared, permissions: permissions,
+                                             conversationID: conversationID)
         var session: NativeDeviceToolSession?
         permissionCenter.nativeDeviceToolStatus = nil
         do {
@@ -155,7 +167,7 @@ extension RootShellView {
                 let next = NativeDeviceToolSession(http: direct, owner: owner, currentOwner: { currentWorkspaceOwner },
                     scope: scope, agentID: coordinate.profileID,
                     sessionID: coordinate.storedSessionID ?? coordinate.runtimeSessionID ?? coordinate.sessionID,
-                    enabled: enabled, isAvailable: {
+                    enabled: enabled, askable: askable, isAvailable: {
                         permissions.scope == scope && permissions.revision == revision
                             && Self.deviceToolsOpenNow && UIApplication.shared.isProtectedDataAvailable
                             && appState.activeConversationID == conversationID

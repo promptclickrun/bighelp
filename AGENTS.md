@@ -288,6 +288,8 @@ change in both repos.
   - The route only runs when `/native/context` lists its feature. Otherwise it fails as unsupported, and the UI
     should say "update the plugin", never show a raw error.
   - Requests send `If-Match` (the context ETag) and `X-Loopdy-Request-ID`, which must be a lowercase UUID.
+  - Context reads send `X-Bighelp-Features: all` (`DirectHermesHTTP.featureListHeader`): plugins list at most 64
+    features to apps without it, because older releases refuse a longer list. The app takes up to 256.
   - On a `conflict` (context changed), reload the context and retry once.
 - **Plugin releases (no pin):**
   - The app installs and offers the plugin's latest GitHub Release (`Bighelp/Hosts/PluginLatestRelease.swift`).
@@ -346,7 +348,10 @@ change in both repos.
   its own iOS permission is a `DeviceCapabilityTool` that `DeviceToolRouter` checks before it runs. A new one needs a
   catalog entry, a tool, a plugin feature (`native-device-<kind>-v1`) and the contract text. Every switch starts off
   and then stays on until the person turns it off: one list for the phone, every host and agent
-  (`DeviceToolPermissions.grantsKey`); iOS saying no pauses a tool (`isUsable`), never turns its switch off. The
+  (`DeviceToolPermissions.grantsKey`); iOS saying no pauses a tool (`isUsable`), never turns its switch off. An agent's
+  call to one that's off shows a connect card in the chat (`DeviceAccessCardStore`, plugin
+  `native-device-permission-request-v1`): its Turn on flips the same switch, without reopening the channel
+  that carried the call, and the call goes on. Apple Health is read only and asks once about sharing first. The
   channel runs while bighelp is active, inactive or in the background grace, and in any agent's chat on a plugin with
   `native-device-tools-agents-v1`; after the grace it closes as `paused` so the host waits for the phone.
   Two reach past the open chat: Arriving and leaving sends its message from the background (`DeviceGeofenceMonitor`),

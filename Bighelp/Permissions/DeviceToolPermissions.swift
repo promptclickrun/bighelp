@@ -1,17 +1,19 @@
 import Foundation
 import Observation
 import CryptoKit
+import os
 
 /// The order here is the order of Settings › Device access.
 enum DeviceToolCapability: String, CaseIterable, Codable, Identifiable, Sendable {
-    case calendar, reminders, contacts, photos, location, geofences, alarms, music, focus, shortcuts, appearance, navigation
+    case health, calendar, reminders, contacts, photos, location, geofences, alarms, music, focus, shortcuts, appearance, navigation
     var id: String { rawValue }
 
     /// The plugin feature a host must list before the phone offers this tool.
     /// Older plugins reject an unknown name in the channel's `enabled` list.
     var pluginFeature: String? {
         switch self {
-        case .calendar, .reminders: nil
+        // Every plugin with phone tools has Health: 2.3.0 took it out of the app only.
+        case .health, .calendar, .reminders: nil
         case .location: "native-device-location-v1"
         case .appearance: "native-device-appearance-v1"
         case .navigation: "native-device-navigation-v1"
@@ -34,6 +36,8 @@ enum DeviceToolCapability: String, CaseIterable, Codable, Identifiable, Sendable
     /// showing a switch that can never turn on.
     var isOfferedOnThisPlatform: Bool {
         switch self {
+        case .health:
+            return AppleDeviceToolService.isHealthDataAvailable
         case .alarms:
             #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(AlarmKit)
             if #available(iOS 26.0, *) { return true }
@@ -61,6 +65,7 @@ enum DeviceToolCapability: String, CaseIterable, Codable, Identifiable, Sendable
 
     var title: String {
         switch self {
+        case .health: String(localized: "Apple Health")
         case .calendar: String(localized: "Calendar")
         case .reminders: String(localized: "Reminders")
         case .contacts: String(localized: "Contacts")
@@ -78,6 +83,8 @@ enum DeviceToolCapability: String, CaseIterable, Codable, Identifiable, Sendable
 
     var detail: String {
         switch self {
+        // App Review 5.1.3(i): the exact kinds of Health data an agent can read.
+        case .health: String(localized: "Read only. Your agent can read steps, distance, active and resting energy, flights climbed, exercise and stand time, sleep, heart rate, resting and walking heart rate, heart rate variability, blood oxygen, breathing rate, blood pressure, height, weight, body mass index, lean body mass, body fat, and workouts.")
         case .calendar: String(localized: "Read, create, update, and delete events directly after you enable access.")
         case .reminders: String(localized: "Read, create, update, and delete reminders directly after you enable access.")
         case .contacts: String(localized: "Look up, add, change, and delete people in your contacts.")
@@ -90,6 +97,42 @@ enum DeviceToolCapability: String, CaseIterable, Codable, Identifiable, Sendable
         case .shortcuts: String(localized: "Run the shortcuts you pick and give your agent what they return.")
         case .appearance: String(localized: "Switch light or dark mode and change your chat color when you ask.")
         case .navigation: String(localized: "Open the page or setting you ask about and point at it.")
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .health: "heart.fill"
+        case .calendar: "calendar"
+        case .reminders: "checklist"
+        case .contacts: "person.crop.circle"
+        case .photos: "photo.on.rectangle"
+        case .location: "location.fill"
+        case .geofences: "mappin.and.ellipse"
+        case .alarms: "alarm"
+        case .music: "music.note"
+        case .focus: "moon.fill"
+        case .shortcuts: "square.stack.3d.up.fill"
+        case .appearance: "circle.lefthalf.filled"
+        case .navigation: "hand.point.up.left"
+        }
+    }
+
+    /// The connect card's one line about what the agent gets once the switch is on.
+    var cardLine: String {
+        switch self {
+        case .health: String(localized: "Your agent can read your Health data, like sleep, steps, and heart rate. It never changes it.")
+        case .calendar: String(localized: "Your agent can see, add, change, and delete events in your calendars.")
+        case .reminders: String(localized: "Your agent can see, add, change, and delete your reminders.")
+        case .contacts: String(localized: "Your agent can look up, add, change, and delete people in your contacts.")
+        case .photos: String(localized: "Your agent can find and look at your photos, and save pictures it makes.")
+        case .location: String(localized: "Your agent can see where you are when it asks, while bighelp is open.")
+        case .geofences: String(localized: "Your agent hears from bighelp when you arrive at or leave places you name.")
+        case .alarms: String(localized: "Your agent can set, change, and turn off alarms and timers.")
+        case .music: String(localized: "Your agent can see what's playing, play and pause music, and make playlists.")
+        case .focus: String(localized: "Your agent can see when a Focus is on, with the note you set for it.")
+        case .shortcuts: String(localized: "Your agent can run the shortcut you name here and get what it returns.")
+        case .appearance, .navigation: detail
         }
     }
 }
@@ -115,6 +158,8 @@ final class DeviceToolPermissions {
     static let appearanceAllowedKey = "bighelp.device-tools.appearance"
     /// Where "Let agents show you around bighelp" is saved; missing means on.
     static let navigationAllowedKey = "bighelp.device-tools.navigation"
+    /// Where the person's yes to Apple Health's sharing note is saved: asked once, before the first grant.
+    static let healthSharingKey = "bighelp.device-tools.health-sharing"
     /// Where the switches are saved: one list for this phone, for every computer and agent. A switch
     /// stays on until the person turns it off; iOS saying no only pauses its tool (`isUsable`).
     static let grantsKey = "bighelp.device-tools.grants"
@@ -130,6 +175,8 @@ final class DeviceToolPermissions {
     private(set) var appearanceAllowed: Bool
     /// Settings › Device access › "Let agents show you around bighelp". One switch for every host.
     private(set) var navigationAllowed: Bool
+    /// The person read where Health data goes (their computer and its AI provider) and agreed, once.
+    private(set) var healthSharingAgreed: Bool
     private var statuses: [DeviceToolCapability: DeviceToolSystemAccess] = [:]
     private let readStatus: (DeviceToolCapability) async -> DeviceToolSystemAccess
     private let requestAccess: (DeviceToolCapability) async -> DeviceToolSystemAccess
@@ -137,6 +184,11 @@ final class DeviceToolPermissions {
     private let writeGrants: (String, [String]) -> Void
     private let saveAppearanceAllowed: (Bool) -> Void
     private let saveNavigationAllowed: (Bool) -> Void
+    private let saveHealthSharingAgreed: (Bool) -> Void
+    /// How long one iOS status read may take. The phone's channel opens after a refresh, so a framework
+    /// that never answers (HealthKit's daemon stuck, say) must not hold up every other tool.
+    private let statusDeadline: TimeInterval
+    private static let log = Logger(subsystem: "app.loopdy.mobile", category: "DeviceTools")
     init(
         status: @escaping (DeviceToolCapability) async -> DeviceToolSystemAccess,
         request: @escaping (DeviceToolCapability) async -> DeviceToolSystemAccess,
@@ -147,7 +199,10 @@ final class DeviceToolPermissions {
         appearanceAllowed: Bool = true,
         saveAppearanceAllowed: @escaping (Bool) -> Void = { _ in },
         navigationAllowed: Bool = true,
-        saveNavigationAllowed: @escaping (Bool) -> Void = { _ in }
+        saveNavigationAllowed: @escaping (Bool) -> Void = { _ in },
+        healthSharingAgreed: Bool = false,
+        saveHealthSharingAgreed: @escaping (Bool) -> Void = { _ in },
+        statusDeadline: TimeInterval = 3
     ) {
         readStatus = status
         requestAccess = request
@@ -157,6 +212,9 @@ final class DeviceToolPermissions {
         self.saveAppearanceAllowed = saveAppearanceAllowed
         self.navigationAllowed = navigationAllowed
         self.saveNavigationAllowed = saveNavigationAllowed
+        self.healthSharingAgreed = healthSharingAgreed
+        self.saveHealthSharingAgreed = saveHealthSharingAgreed
+        self.statusDeadline = statusDeadline
         let saved = readGrants(Self.grantsKey)
         let names = saved ?? legacyGrants().flatMap { $0 }
         enabled = Set(names.compactMap(DeviceToolCapability.init(rawValue:)).filter(\.sharesPersonalData))
@@ -206,6 +264,13 @@ final class DeviceToolPermissions {
         saveNavigationAllowed(allowed)
     }
 
+    /// The sharing note's Continue. Health's switch can't turn on before it.
+    func agreeToHealthSharing() {
+        guard !healthSharingAgreed else { return }
+        healthSharingAgreed = true
+        saveHealthSharingAgreed(true)
+    }
+
     private func setAllowed(_ allowed: Bool, for kind: DeviceToolCapability) {
         if kind == .navigation { setNavigationAllowed(allowed) } else { setAppearanceAllowed(allowed) }
     }
@@ -221,7 +286,12 @@ final class DeviceToolPermissions {
         for kind in DeviceToolCapability.allCases where kind.sharesPersonalData {
             guard requestInFlight != kind else { continue }
             let owner = revision
-            let value = await readStatus(kind)
+            let read = readStatus
+            guard let value = try? await DeviceLocationDeadline.run(seconds: statusDeadline, { await read(kind) }) else {
+                // No answer in time: keep what was known, and ask again at the next refresh.
+                Self.log.notice("\(kind.rawValue, privacy: .public) status didn't answer in time")
+                continue
+            }
             guard revision == owner, requestInFlight != kind else { continue }
             let previous = statuses[kind]
             statuses[kind] = value
@@ -238,10 +308,14 @@ final class DeviceToolPermissions {
         persist()
     }
 
-    func setEnabled(_ enabled: Bool, for kind: DeviceToolCapability) async {
+    /// Turning a switch on reopens the phone's channel, so the host hears the tool is on. A connect card
+    /// passes `reopensChannel: false`: its channel already offers the tool, and the call that asked is
+    /// still waiting on it for the answer.
+    func setEnabled(_ enabled: Bool, for kind: DeviceToolCapability, reopensChannel: Bool = true) async {
         guard enabled else { disable(kind); return }
         guard kind.sharesPersonalData else { setAllowed(true, for: kind); return }
         guard isForeground(), requestInFlight == nil, !isEnabled(kind) else { return }
+        guard kind != .health || healthSharingAgreed else { return }
         let choice = choices
         requestInFlight = kind
         defer { requestInFlight = nil }
@@ -252,7 +326,7 @@ final class DeviceToolPermissions {
         statuses[kind] = value
         guard value == .available else { return }
         self.enabled.insert(kind)
-        revision &+= 1
+        if reopensChannel { revision &+= 1 }
         choices &+= 1
         persist()
     }

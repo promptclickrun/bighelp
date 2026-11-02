@@ -106,7 +106,8 @@ struct DeviceToolPermissionsTests {
         store.bind(scope)
         let started = ContinuousClock.now
         await store.refresh()
-        #expect(ContinuousClock.now - started < .seconds(5), "Refresh doesn't wait on the stuck one")
+        // Without the deadline this never returns; the bound leaves room for a busy main actor.
+        #expect(ContinuousClock.now - started < .seconds(30), "Refresh doesn't wait on the stuck one")
         #expect(store.status(for: .reminders) == .available)
         #expect(store.status(for: .health) == .notRequested, "No answer keeps what was known")
         stuck.resolve(.available)

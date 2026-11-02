@@ -94,12 +94,14 @@ final class DeviceAccessHostUITests: BighelpUITestCase {
         save("sleep-4-answer", app)
     }
 
-    /// iOS's Health sheet: turn on every kind bighelp asks for, then Allow.
+    /// iOS's Health sheet: turn on every kind bighelp asks for ("Select All 21 Topics" on iOS 27, "Turn On All"
+    /// before), then Allow.
     @MainActor private func allowHealthSheet(in app: XCUIApplication) {
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let selectAll = NSPredicate(format: "label BEGINSWITH 'Select All' OR label == 'Turn On All'")
         for root in [app, springboard] {
-            let all = root.descendants(matching: .any)["Turn On All"].firstMatch
-            guard all.waitForExistence(timeout: 15) else { continue }
+            let all = root.descendants(matching: .any).matching(selectAll).firstMatch
+            guard all.waitForExistence(timeout: 20) else { continue }
             sleep(2)
             all.tap()
             sleep(1)
@@ -118,8 +120,10 @@ final class DeviceAccessHostUITests: BighelpUITestCase {
         let probe = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
         guard probe["mode"] == "device" else { throw XCTSkip("This host runs the \(probe["mode"] ?? "?") mode") }
         let app = makeApp()
-        // Every data-sharing switch off for this run, whatever the simulator saved before.
-        app.launchArguments = ["-loopdy.home.opens-chat", "YES", "-bighelp.device-tools.grants", "()"]
+        // Every data-sharing switch off for this run, and Apple Health's note not yet agreed to, whatever the
+        // simulator saved before.
+        app.launchArguments = ["-loopdy.home.opens-chat", "YES", "-bighelp.device-tools.grants", "()",
+                               "-bighelp.device-tools.health-sharing", "NO"]
         app.launch()
         let composer = app.textViews["chat.composer.text"]
         if !composer.waitForExistence(timeout: 10) {
@@ -132,6 +136,15 @@ final class DeviceAccessHostUITests: BighelpUITestCase {
             confirmNewChatPicker(in: app)
         }
         XCTAssertTrue(composer.waitForExistence(timeout: 20))
+        // A new chat has no session until its first message, and the phone opens the chat's channel only
+        // then. A person's agent takes seconds to call a tool; the scripted one calls at once, so say hi first.
+        send("Hi", in: app)
+        let greeted = NSPredicate { _, _ in
+            self.message(containing: "How can I help", in: app).exists
+                || self.message(containing: "Long tool fixture complete.", in: app).exists
+        }
+        wait(for: [expectation(for: greeted, evaluatedWith: nil)], timeout: 60)
+        sleep(3)
         return app
     }
 

@@ -196,8 +196,10 @@ class ToolTurnModel(BaseHTTPRequestHandler):
             if "save login test" in asked else ("terminal", {"command": "sleep 20" if "slow" in asked else "true"}) \
             if "files test" in asked else ("terminal", {"command": "ffprobe -v error -show_entries format=duration "
                                                     "-of csv=p=0 " + shlex.quote(video_path(messages, start))}) \
-            if "video test" in asked else ("iphone_reminders" if "reminders" in asked else "iphone_calendar",
-                                           {"operation": "list"}) \
+            if "video test" in asked else ("iphone_reminders", {"operation": "list"}) \
+            if "device access test" in asked and "reminders" in asked else \
+            ("iphone_calendar", {"operation": "list", **{key: value for key, value in last_week_of_sleep().items()
+                                                         if key != "types"}}) \
             if "device access test" in asked else ("iphone_health", last_week_of_sleep()) \
             if "sleep this week" in asked and not results else sleep_chart(results[0]) \
             if "sleep this week" in asked and len(results) == 1 and sleep_nights(results[0]) else None
@@ -278,6 +280,8 @@ class ToolTurnModel(BaseHTTPRequestHandler):
                 text = ("Vault fixture: " + ("received." if outcome.get("success") else "nothing entered.")
                         + (f" {outcome['digits']} digits." if "digits" in outcome else "")
                         + (f" Saved for {outcome['identifier']}." if outcome.get("identifier") else ""))
+            elif start < 0 and texts and texts[-1][1].strip().lower() in ("hi", "hello"):
+                text = "Hi! How can I help?"
             else:
                 text = "Long tool fixture complete."
             if steers:

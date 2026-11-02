@@ -864,9 +864,12 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
   refresh it before a release.
 - Only first-party or permissively licensed art can ship in this Apache-2.0 repo.
 - The maintainer approves new character art before it ships.
-- An agent's face (`AgentLiveAvatar`) draws, in order: its saved character (`CompanionStore` override), its
-  petdex pet's moves (`PetAvatarStore`), then its picture. Both stores live on the device, so saving any other
-  kind of avatar must clear them (`AgentEditorModel.applySavedLook`), or chats keep the old one.
+- An agent's face (`AgentFace`, drawn by `AgentLiveAvatar`, Bots mode's `SimpleBotFace` and its pet
+  companion `AgentPet`) is, in order: its saved character (`CompanionStore` override), its petdex pet's moves
+  (`PetAvatarStore`), its Hermes face or shape (`AgentLookStore`, from the profiles' looks), its Bots mode mark
+  (`SimpleBotMarkStore`), then its picture. The first two live on the device, so saving any other kind of
+  avatar must clear them (`AgentEditorModel.applySavedLook`), or chats keep the old one. There is no app-wide
+  pet: each agent's pet is its own face.
 - A petdex pet saves its first frame as the agent's picture (what Hermes Desktop and other devices show). Its
   sheet is fetched from petdex and cut into one strip per move; hatched-on-host pets have no sheet and stay still.
 

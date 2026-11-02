@@ -32,6 +32,7 @@ struct ChatActivityRow: View {
                             Image(systemName: "chevron.right")
                                 .font(.bighelp(.caption2, weight: .bold))
                                 .foregroundStyle(theme.tertiaryText)
+                                .fixedSize()
                                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
                                 .accessibilityHidden(true)
                         }

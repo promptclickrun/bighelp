@@ -1,10 +1,26 @@
 import Foundation
+import SwiftUI
+import UIKit
 import Testing
 @testable import Bighelp
 
 /// The chat's adapters from real activity events to the shared activity row.
 @MainActor
 struct ChatActivityPresentationTests {
+    @Test func longToolNamesStayWithinTheRowWidth() {
+        for width in [280.0, 390.0] {
+            for size in [DynamicTypeSize.large, .accessibility3] {
+                for name in ["terminal", String(repeating: "very_long_tool_name_", count: 20)] {
+                    let event = tool("layout", name: name, arguments: #"{"query":"a long search query with details"}"#, ms: 1200)
+                    let host = UIHostingController(rootView: ChatActivityRow(event: event, onDisclosureChange: {})
+                        .environment(\.dynamicTypeSize, size))
+                    let measured = host.sizeThatFits(in: CGSize(width: width, height: 1000))
+                    #expect(measured.width <= width + 1, "Tool name must leave the disclosure inside the row")
+                }
+            }
+        }
+    }
+
     private func tool(_ id: String, name: String? = nil, title: String = "Tool", lifecycle: ChatActivityLifecycle = .succeeded,
                       arguments: String? = nil, ms: Int? = nil, turn: String = "turn", order: Int? = nil) -> ChatActivityEvent {
         ChatActivityEvent(eventID: id, sessionID: "session", turnID: turn, kind: .tool, lifecycle: lifecycle,

@@ -20,7 +20,6 @@ struct SimpleBotsContext {
     let onCreateGroup: ([String]) -> Void
     /// A model for a new bot, set up the way the shell creates agents; nil when this computer can't.
     let makeCreator: () -> AgentEditorModel?
-    let onRoutines: (String) -> Void
     /// Multi-gateway: every other gateway's bots too; nil when it's off.
     var gateways: SimpleBotsGateways? = nil
     /// Which bots are working or need you, kept current while the home shows.
@@ -341,14 +340,13 @@ final class SimpleBotsUnreadStore {
 }
 
 private enum SimpleBotsSheet: Identifiable {
-    case search, create, group, primary
+    case search, create, group
 
     var id: String {
         switch self {
         case .search: "search"
         case .create: "create"
         case .group: "group"
-        case .primary: "primary"
         }
     }
 }
@@ -705,6 +703,7 @@ struct SimpleBotsHomeView: View {
                               message: home.latest[bot.id]?.preview)
                 .companionScope(bot.faceScope)
         }
+        .menuOrder(.fixed)
         .accessibilityLabel(isPrimary ? "\(bot.name), your primary bot" : "\(bot.name), pinned")
         .modifier(SimpleBotActivityValue(key: bot.activityKey, activity: context.activity))
         .accessibilityHint("Opens its chat")
@@ -753,6 +752,7 @@ struct SimpleBotsHomeView: View {
                 SimpleBotsPreview(agentID: bot.profileID, name: bot.name, imageURL: bot.imageURL, message: item.preview)
                     .companionScope(bot.faceScope)
             }
+            .menuOrder(.fixed)
             .modifier(SimpleBotActivityValue(key: bot.activityKey, activity: context.activity))
             .accessibilityIdentifier("simple-bots.bot.\(bot.id)")
         case .group(let summary):
@@ -789,46 +789,30 @@ struct SimpleBotsHomeView: View {
         .frame(width: 56, height: 56)
     }
 
-    /// A bot's menu. With Multi-gateway each action works on the bot's own gateway: pins and the
-    /// primary bot are kept per bot whichever gateway it's on, and the rest bring its gateway into use.
+    /// With Multi-gateway each action works on the bot's own gateway.
     @ViewBuilder
     private func botMenu(_ bot: SimpleBotsBot, isPrimary: Bool, home: SimpleBotsHomeProjection.Home) -> some View {
         let unreadNow = isUnread(bot)
-        Button(unreadNow ? "Mark Read" : "Mark Unread", systemImage: unreadNow ? "message" : "message.badge") {
-            setUnread(bot, !unreadNow)
+        Button("New Chat", systemImage: "square.and.pencil") {
+            act(bot, .newChat(profileID: bot.profileID)) { context.onNewChat(bot.profileID) }
         }
         if isPinned(bot), !isPrimary {
             Button("Unpin", systemImage: "pin.slash") { setPinned(bot, false, home: home) }
         } else if !isPrimary, canPin(bot, home: home) {
             Button("Pin", systemImage: "pin") { setPinned(bot, true, home: home) }
         }
-        if isPrimary {
-            if context.gateways == nil {
-                Button("Replace Primary Bot…", systemImage: "arrow.left.arrow.right") { sheet = .primary }
-            }
-        } else {
-            Button("Make Primary Bot", systemImage: "star") {
-                if let gateways = context.gateways { gateways.setPrimary(bot) }
-                else { _ = context.agents.setPrimaryAgent(bot.profileID) }
-            }
-        }
         rearrangeButton
-        Menu("More", systemImage: "ellipsis") {
-            Button("Bot Profile", systemImage: "person.crop.circle") {
-                act(bot, .botProfile(profileID: bot.profileID)) { context.onOpenProfile(bot.profileID) }
-            }
-            Button("New Chat", systemImage: "square.and.pencil") {
-                act(bot, .newChat(profileID: bot.profileID)) { context.onNewChat(bot.profileID) }
-            }
-            Button("Routines", systemImage: "clock") {
-                act(bot, .routines(profileID: bot.profileID)) { context.onRoutines(bot.profileID) }
-            }
-            if !isPrimary {
-                Divider()
-                Button("Hide", systemImage: "eye.slash", role: .destructive) {
-                    if let gateways = context.gateways, bot.profile == nil { gateways.hide(bot) }
-                    else if let profile = bot.profile { hide(profile) }
-                }
+        Button(unreadNow ? "Mark Read" : "Mark Unread", systemImage: unreadNow ? "message" : "message.badge") {
+            setUnread(bot, !unreadNow)
+        }
+        Button("Bot Profile", systemImage: "person.crop.circle") {
+            act(bot, .botProfile(profileID: bot.profileID)) { context.onOpenProfile(bot.profileID) }
+        }
+        if !isPrimary {
+            Divider()
+            Button("Hide", systemImage: "eye.slash", role: .destructive) {
+                if let gateways = context.gateways, bot.profile == nil { gateways.hide(bot) }
+                else if let profile = bot.profile { hide(profile) }
             }
         }
     }
@@ -1016,12 +1000,6 @@ struct SimpleBotsHomeView: View {
                 context.onCreateGroup(ids)
             })
             .bighelpSheetSize(.large)
-        case .primary:
-            SimpleBotsPrimaryPicker(context: context) { id in
-                _ = context.agents.setPrimaryAgent(id)
-                self.sheet = nil
-            }
-            .bighelpSheetSize(.standard)
         }
     }
 }
@@ -1142,42 +1120,6 @@ private struct SimpleBotsPreview: View {
         .frame(width: 320, alignment: .leading)
         // A preview is drawn outside the app's own colors; the system's match Bots mode.
         .background(Color(uiColor: .systemBackground))
-    }
-}
-
-/// Replace Primary Bot: the bot that leads the home screen.
-private struct SimpleBotsPrimaryPicker: View {
-    let context: SimpleBotsContext
-    let onPick: (String) -> Void
-    @Environment(\.dismiss) private var dismiss
-    @BighelpThemeReader private var theme
-
-    var body: some View {
-        NavigationStack {
-            List(context.agents.profiles.filter { $0.placement?.isHidden != true }) { profile in
-                Button { onPick(profile.id) } label: {
-                    HStack(spacing: BighelpTokens.space16) {
-                        SimpleBotFace(agentID: profile.id, name: profile.name,
-                                      imageURL: context.agents.avatarURL(for: profile), size: 44)
-                        Text(profile.name).font(.bighelp(.body))
-                        Spacer()
-                        if context.agents.isPrimary(profile.id) || (context.agents.primaryAgentID == nil && profile.isDefault) {
-                            Image(systemName: "checkmark").foregroundStyle(theme.action)
-                        }
-                    }
-                    .frame(minHeight: BighelpTokens.hitTarget)
-                    .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("simple-bots.primary-pick.\(profile.id)")
-            }
-            .listStyle(.plain)
-            .navigationTitle("Primary Bot")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-            }
-        }
     }
 }
 

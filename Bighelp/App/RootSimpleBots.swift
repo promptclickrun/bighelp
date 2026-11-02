@@ -117,7 +117,6 @@ extension RootShellView {
             },
             onCreateGroup: { createGroupChat(with: $0) },
             makeCreator: { makeSimpleBotCreator() },
-            onRoutines: { openSimpleBotRoutines($0) },
             gateways: simpleBotsGateways,
             activity: botChatActivity,
             activitySource: botChatActivitySource,

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Plain HTTP is allowed here only because the private networks bighelp accepts (10/8, 172.16/12, 192.168/16,
+  100.64/10, loopback, single-label names, *.local, *.lan, *.ts.net and the rest of the list in
+  docs/hermes/CONNECTION.md) cannot be written as Android domain rules. The gate is the typed client:
+  HermesEndpoint.parse refuses http:// unless the person turned on the private-network switch AND the host is
+  private by its syntax, and HostDiscovery only ever requests a HermesEndpoint. Nothing else in the app opens
+  a connection, and every https:// request uses ordinary system certificate validation.
+-->
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+    <base-config cleartextTrafficPermitted="true" tools:ignore="InsecureBaseConfiguration">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

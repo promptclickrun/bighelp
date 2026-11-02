@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Noodle (same path as NoodleMark.kt and the Apple apps), centered in the adaptive icon's safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.47"
+        android:scaleY="0.47"
+        android:translateX="33.79"
+        android:translateY="29.09">
+        <path
+            android:pathData="M28,12 L28,60 C28,73.807 39.193,85 53,85 C66.807,85 78,73.807 78,60 C78,46.193 66.807,35 53,35 C39.193,35 28,46.193 28,60 C28,80 22,90 8,94"
+            android:strokeColor="#FF8A7A"
+            android:strokeWidth="16"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>

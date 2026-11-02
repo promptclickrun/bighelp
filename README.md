@@ -108,6 +108,7 @@ xcodebuild test -project Bighelp.xcodeproj -scheme Bighelp \
 | `BighelpMacUpdater/` | The Mac app's updates (Sparkle) |
 | `BighelpTests/`, `BighelpUITests/`, `BighelpVisionUITests/`, `BighelpWatchUITests/` | Tests |
 | `BighelpMac/`, `BighelpMacTests/` | An early desktop prototype on sample data. It is not the Mac app. |
+| `android/` | Native Kotlin/Compose Android foundation; see its README for build instructions and current limits |
 | `services/` | Cloudflare Workers: the notification service, the template and avatar catalogs, and the provider logos |
 | `Scripts/` | Tests against real Hermes hosts, the Mac release, and other tools |
 | `Design/AvatarKit/` | Avatar artwork and the tools that export it |
@@ -119,6 +120,7 @@ that work on the code.
 For an Android or other client port, start with the platform-neutral
 [Hermes transport contract](docs/NATIVE_TRANSPORT.md), including API references,
 recovery rules and portable conformance vectors.
+The native Kotlin/Compose build-out is in [`android/`](android/README.md).
 
 ## Contributing
 

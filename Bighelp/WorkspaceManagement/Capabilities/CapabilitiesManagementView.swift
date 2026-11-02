@@ -22,9 +22,9 @@ struct CapabilitiesManagementView: View {
         self.kind = kind
         self.hostName = hostName
         self.profileName = profileName
-        _skillsModel = State(initialValue: SkillsHubManagementModel(client: dependencies.skills))
+        _skillsModel = State(initialValue: SkillsHubManagementModel(client: dependencies.skills, keptCopies: .shared))
         _mcpModel = State(initialValue: MCPManagementModel(client: dependencies.mcp))
-        _pluginModel = State(initialValue: PluginLifecycleManagementModel(client: dependencies.plugins))
+        _pluginModel = State(initialValue: PluginLifecycleManagementModel(client: dependencies.plugins, keptCopies: .shared))
         _toolsetModel = State(initialValue: ToolsetManagementModel(client: dependencies.toolsets))
     }
 

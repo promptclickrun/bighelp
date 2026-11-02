@@ -426,7 +426,9 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
             try Task.checkCancellation()
             if let refusal = DirectHermesHTTP.sessionEditRefusal(request, response) { throw refusal }
             try DirectHermesHTTP.requireSuccess(response)
-            return try response.value()
+            let value = try await response.parsedValue()
+            guard generation == owner, !terminallyClosed else { throw WorkspaceClientError.ownerChanged }
+            return value
         } catch {
             if request.method != .get,
                ![400, 401, 403, 404, 405, 409, 422, 429].contains(receivedStatus ?? -1) {

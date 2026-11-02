@@ -40,7 +40,7 @@ struct SkillsHubManagementView: View {
         }
         .catalogPage()
         .bighelpRefreshable { await model.load() }
-        .task { if model.snapshot == nil { await model.load() } }
+        .task { await model.loadIfNeeded() }
         .onChange(of: model.query) { _, query in
             if !ManagementSearch.isActive(query) { model.clearSearch() }
         }

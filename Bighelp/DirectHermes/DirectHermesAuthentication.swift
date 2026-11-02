@@ -306,7 +306,19 @@ final class DirectHermesHTTP {
     struct Response {
         let http: HTTPURLResponse
         let body: Data
-        func value() throws -> BighelpJSONValue {
+        func value() throws -> BighelpJSONValue { try Self.value(of: body) }
+
+        /// `value()`, off the main actor for a big body. Hermes' plugin catalog is a few megabytes,
+        /// and parsing it on the main actor held the screen for a few hundred milliseconds a read.
+        func parsedValue() async throws -> BighelpJSONValue {
+            guard body.count > Self.mainActorParseBytes else { return try value() }
+            let body = body
+            return try await Task.detached(priority: .userInitiated) { try Self.value(of: body) }.value
+        }
+
+        static let mainActorParseBytes = 256 * 1024
+
+        private static func value(of body: Data) throws -> BighelpJSONValue {
             try DirectHermesWire.validateNesting(body)
             guard let value = try? JSONDecoder().decode(BighelpJSONValue.self, from: body) else {
                 throw DirectHermesError.invalidResponse

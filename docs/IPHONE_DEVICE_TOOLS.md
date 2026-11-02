@@ -562,8 +562,10 @@ The app reads HealthKit and never writes it. Keep it that way:
 - Entitlement: only `com.apple.developer.healthkit`, in `Bighelp.entitlements` (also Vision
   Pro) and `BighelpCarPlay.entitlements` (iPhone and iPad). No clinical records, no background
   delivery, nothing in `BighelpCatalyst.entitlements`: the Mac has no Health data.
-- Info.plist: `NSHealthShareUsageDescription` only. There is no `NSHealthUpdateUsageDescription`
-  because nothing asks to share (`toShare: []`); add one only if a device shows iOS needs it.
+- Info.plist: `NSHealthShareUsageDescription` says what is read and where it goes. App Store
+  Connect refuses any build with the HealthKit entitlement and no `NSHealthUpdateUsageDescription`
+  (ITMS-90683), even though nothing asks to share (`toShare: []`), so it says that bighelp never
+  writes.
 - App Review (2.5.1) looks for the health feature: Settings › Device access › Apple Health, and
   in a chat ("How did I sleep this week?") the card, the Health sheet, an Apple Health step and
   a chart. Review notes for each build say where it is, with a screen recording.

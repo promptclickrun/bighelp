@@ -326,6 +326,12 @@ final class DirectHermesHTTP {
             && (method == "POST" || (method == "PUT" && route == "/api/plugins/loopdy/native/telemetry"))
     }
 
+    /// The plugin lists at most 64 features to an app that doesn't ask for all of them: releases before
+    /// this one refuse a longer list, and with it every plugin feature. This one asks.
+    static func featureListHeader(route: String, method: String) -> (name: String, value: String)? {
+        route == "/api/plugins/loopdy/native/context" && method == "GET" ? ("X-Bighelp-Features", "all") : nil
+    }
+
     func send(route: String, method: String = "GET", query: [URLQueryItem] = [],
               body: [String: BighelpJSONValue]? = nil, bearer: String? = nil,
               legacyToken: String? = nil, cookie: String? = nil, accept: String = "application/json",
@@ -346,6 +352,9 @@ final class DirectHermesHTTP {
         request.httpShouldHandleCookies = false
         request.setValue(accept, forHTTPHeaderField: "Accept")
         request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        if let header = Self.featureListHeader(route: route, method: method) {
+            request.setValue(header.value, forHTTPHeaderField: header.name)
+        }
         if let nativeGuard {
             guard Self.allowsNativeGuard(route: route, method: method),
                   (bearer != nil) != (legacyToken != nil), cookie == nil else {

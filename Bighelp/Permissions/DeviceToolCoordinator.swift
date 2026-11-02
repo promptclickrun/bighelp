@@ -92,7 +92,8 @@ final class DeviceToolCoordinator {
         guard request.version == 1, request.type == "device.tool.request",
               request.authorizationEpoch > 0, request.sentAt > 0,
               request.expiresAt > request.sentAt,
-              request.expiresAt - request.sentAt <= 120,
+              // The channel holds each call to its own window; a call that asks with a card may wait longest.
+              request.expiresAt - request.sentAt <= NativeDeviceToolSession.askWindow,
               request.sentAt <= clock() + 5,
               [request.requestId, request.deviceId, request.hostId, request.sessionId,
                request.agentId, request.turnId].allSatisfy(Self.validIdentifier),

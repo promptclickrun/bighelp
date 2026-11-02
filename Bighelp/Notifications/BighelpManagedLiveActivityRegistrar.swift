@@ -130,7 +130,7 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
         // An already acknowledged unchanged registration need not replay an old
         // mobile timestamp. The host PUT below performs CURRENT cloud readback of
         // the persisted exact activity/session owner before confirming subscription.
-        let client = try service.client(for: host)
+        let client = try service.client(for: host, profile: owner.profile)
         let subscribed = try await client.request("/enrollments/\(grant.grantId)/live-activities/\(owner.relayActivityID)", method: "PUT", body: [
             "version": .integer(1), "profile": .string(owner.profile), "sessionId": .string(owner.storedSessionID),
             "sessionReference": .string(ManagedNotificationValidation.sessionReference(profile: owner.profile, session: owner.storedSessionID)),
@@ -187,7 +187,7 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
             Task { await direct?.removeActivity(id: relayID) }
         }
         // Host removal only stops this local subscription; it is NOT revocation.
-        let client = try service.client(for: host)
+        let client = try service.client(for: host, profile: owner.profile)
         _ = try await client.request("/enrollments/\(grant.grantId)/live-activities/\(owner.relayActivityID)", method: "DELETE", body: nil,
             isCurrent: { (try? self.check()) != nil })
         try check()

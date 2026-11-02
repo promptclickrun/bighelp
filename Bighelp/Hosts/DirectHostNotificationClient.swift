@@ -58,10 +58,15 @@ final class DirectHostNotificationClient: DirectHostNotificationServing {
     private let host: BighelpConfiguredHost
     private let vault: any DirectHermesCredentialVault
     private let connectionIsCurrent: @MainActor () -> Bool
+    /// The agent whose notifications these requests are about. Each agent keeps its own
+    /// notification journal and host key on the computer, so its routes go to it with
+    /// `?profile=`; without it they reach the agent the dashboard runs as.
+    private let profile: String?
 
-    init(host: BighelpConfiguredHost, vault: any DirectHermesCredentialVault,
+    init(host: BighelpConfiguredHost, vault: any DirectHermesCredentialVault, profile: String? = nil,
          connectionIsCurrent: @escaping @MainActor () -> Bool) {
         self.host = host; self.vault = vault; self.connectionIsCurrent = connectionIsCurrent
+        self.profile = profile.flatMap { ManagedNotificationValidation.profile($0) ? $0 : nil }
     }
 
     func request(_ suffix: String, method: String = "GET", body: [String: BighelpJSONValue]? = nil,
@@ -71,7 +76,7 @@ final class DirectHostNotificationClient: DirectHostNotificationServing {
         }
         if let body { try DirectHermesWire.validateValueSize(.object(body), limit: 262_144) }
         let response = try await authenticated(isCurrent: isCurrent) { send in
-            try await send("/api/plugins/loopdy/notifications" + suffix, method, body, nil, 262_144)
+            try await send(Self.notificationsRoot + suffix, method, body, nil, 262_144)
         }
         if response.http.statusCode == 404, suffix == "/capabilities" {
             throw DirectHostNotificationError.backendRestartRequired
@@ -130,6 +135,8 @@ final class DirectHostNotificationClient: DirectHostNotificationServing {
         return .rejected(status: status, code: code)
     }
 
+    private static let notificationsRoot = "/api/plugins/loopdy/notifications"
+
     private static func validSuffix(_ suffix: String) -> Bool {
         suffix.utf8.count <= 512 && suffix.hasPrefix("/") && !suffix.contains("..")
             && !suffix.contains("%") && !suffix.contains("?") && !suffix.contains("#") && !suffix.contains("\\")
@@ -163,8 +170,11 @@ final class DirectHostNotificationClient: DirectHostNotificationServing {
         case .bearer(let token, _, _): bearer = token; legacy = nil
         case .legacyLoopbackToken(let token), .dashboardSession(let token, _): bearer = nil; legacy = token
         }
+        let agent = profile.map { [URLQueryItem(name: "profile", value: $0)] } ?? []
         return try await work { [vault] route, method, body, nativeGuard, maximum in
-            let response = try await auth.http.send(route: route, method: method, body: body, bearer: bearer,
+            let response = try await auth.http.send(route: route, method: method,
+                                                    query: route.hasPrefix(Self.notificationsRoot) ? agent : [],
+                                                    body: body, bearer: bearer,
                                                     legacyToken: legacy, maximumResponseBytes: maximum,
                                                     nativeGuard: nativeGuard)
             try check()

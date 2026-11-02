@@ -798,6 +798,11 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   delivered receipt for a push that has a `bk.messageId`; a direct push gets none. The shared Live Activity's token is
   registered directly under its group ID (the `groupId` of the version 3 registration), never a per-turn or per-chat
   alias, and removed when the physical card ends.
+- Notifications are set up per agent. The computer keeps a journal and host key for each agent, and an agent's
+  replies alert (and move its Live Activity) only through a grant in its own journal. Every notification route
+  names its agent (`?profile=`, `DirectHostNotificationClient(profile:)`); without it a request reached the
+  dashboard's own agent. Setup enrolls the agent in use, and opening another agent's chat on a computer with
+  notifications on enrolls that agent (`enrollAgentIfNeeded`), never asking for permission.
 - Every setup failure gets its own code where it happens (`BighelpNotificationErrorCode`, never reused or renumbered);
   the FAQ is [docs/NOTIFICATION_ERROR_CODES.md](docs/NOTIFICATION_ERROR_CODES.md).
 

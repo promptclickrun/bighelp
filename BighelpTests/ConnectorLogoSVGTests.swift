@@ -70,6 +70,25 @@ struct ConnectorLogoSVGTests {
         #expect(isClose(pixel(image, 32, 32), 0x53, 0x3A, 0xFD))
     }
 
+    @Test func anEmbeddedImagePatternDrawsTheBrand() throws {
+        let png = Self.redPNG().base64EncodedString()
+        let image = try #require(render("""
+            <svg viewBox="0 0 10 10"><rect width="10" height="10" fill="url(#brand)"/>
+            <defs><pattern id="brand" patternContentUnits="objectBoundingBox" width="1" height="1">
+            <use href="#picture" transform="scale(0.25)"/></pattern>
+            <image id="picture" width="4" height="4" href="data:image/png;base64,\(png)"/></defs></svg>
+            """))
+        #expect(isClose(pixel(image, 32, 32), 255, 0, 0))
+    }
+
+    @Test func aPatternCannotReferToItselfForever() {
+        #expect(render("""
+            <svg viewBox="0 0 10 10"><rect width="10" height="10" fill="url(#loop)"/>
+            <defs><pattern id="loop" patternContentUnits="objectBoundingBox">
+            <rect width="1" height="1" fill="url(#loop)"/></pattern></defs></svg>
+            """) == nil)
+    }
+
     @Test func aMaskShowsOnlyWhereItsPainted() throws {
         let image = try #require(render("""
             <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">

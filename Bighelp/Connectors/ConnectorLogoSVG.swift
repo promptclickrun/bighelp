@@ -570,12 +570,21 @@ struct SVGPainter {
             context.fillPath(using: style.evenOddFill ? .evenOdd : .winding)
             drewSomething = true
         case .reference(let id):
-            guard let gradient = definitions[id] else { return }
+            guard references < 64, let gradient = definitions[id] else { return }
+            references += 1
             context.saveGState()
             context.addPath(shape)
             context.clip(using: style.evenOddFill ? .evenOdd : .winding)
             if style.fillOpacity < 1 { context.setAlpha(style.fillOpacity) }
-            if paintGradient(gradient, box: shape.boundingBoxOfPath) { drewSomething = true }
+            if gradient.name == "pattern", gradient.attribute("patternContentUnits") == "objectBoundingBox" {
+                let box = shape.boundingBoxOfPath
+                guard box.width > 0, box.height > 0 else { context.restoreGState(); return }
+                context.translateBy(x: box.minX, y: box.minY)
+                context.scaleBy(x: box.width, y: box.height)
+                drawChildren(of: gradient, style: style)
+            } else if paintGradient(gradient, box: shape.boundingBoxOfPath) {
+                drewSomething = true
+            }
             context.restoreGState()
         }
     }
@@ -684,7 +693,10 @@ struct SVGPainter {
               data.count <= ConnectorLogoSVG.maximumBytes,
               let source = CGImageSourceCreateWithData(data as CFData, nil),
               let type = CGImageSourceGetType(source) as String?, type == "public.png" || type == "public.jpeg",
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return }
+              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                  kCGImageSourceCreateThumbnailFromImageAlways: true,
+                  kCGImageSourceThumbnailMaxPixelSize: 1_024,
+              ] as CFDictionary) else { return }
         let frame = CGRect(x: node.length("x") ?? 0, y: node.length("y") ?? 0,
                            width: node.length("width") ?? CGFloat(image.width), height: node.length("height") ?? CGFloat(image.height))
         guard frame.width > 0, frame.height > 0 else { return }

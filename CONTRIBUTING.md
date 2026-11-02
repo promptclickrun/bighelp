@@ -36,11 +36,11 @@ authorized service:
 
 ## Pull request expectations
 
-- The maintainer reviews and merges every pull request. Checks on pull requests
-  from forks start after a maintainer approves them.
-- When the maintainer runs several agent sessions at once, one release captain
-  session merges and ships for them, and the others hand it their pull requests.
-  See [Agent orchestration](docs/AGENT_ORCHESTRATION.md).
+- The maintainer reviews and merges pull requests from contributors. Checks on
+  pull requests from forks start after a maintainer approves them.
+- When the maintainer runs agent sessions, a session merges its own pull request
+  once checks and review pass. See
+  [Agent orchestration](docs/AGENT_ORCHESTRATION.md).
 - Explain the user-visible behavior and trust-boundary impact.
 - Add or update Swift Testing coverage.
 - For changes affecting chat, record native/UI regression results and any

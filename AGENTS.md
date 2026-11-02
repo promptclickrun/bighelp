@@ -924,10 +924,10 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
 
 ## Many sessions at once
 
-When several agent sessions work on bighelp together, the maintainer names one the **release captain**. It is the
-only session that merges, bumps versions, writes release notes and ships. The others are factory sessions: each
-owns one issue, opens its PR and hands the link to the captain. Two sessions never build the same feature. The
-whole process is in [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md).
+When several agent sessions work on bighelp together, one session owns a change from start to finish: it builds
+and tests it on the Mac, opens the PR and merges it once checks and review pass. Two sessions never build the same
+feature: check open PRs, issues and the other sessions first. The maintainer starts a release, and the session the
+maintainer asks runs it. The whole process is in [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md).
 
 ## Git, commits and releases
 
@@ -940,11 +940,11 @@ whole process is in [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md).
   - Explain the visible behavior and any trust-boundary impact.
   - List what you tested, and where: demo, real host or device. Give the results from the Mac, never a CI run, and
     never list a missing CI run as a blocker (see Build and test).
-  - The maintainer merges, or the release captain session the maintainer names. Factory sessions never merge.
+  - The maintainer merges, or a session merges its own PR once checks and review pass.
 - **Versions** live in `project.yml`: `MARKETING_VERSION`, and `CURRENT_PROJECT_VERSION` in every target. Regenerate
   after bumping.
 - **Releases are batched.** Merge pull requests whenever they're ready; releasing is a separate step the
-  maintainer starts, or the release captain runs for them:
+  maintainer starts, and the session the maintainer asks runs it from start to finish:
   - Internal TestFlight builds can go out whenever they're useful.
   - Public TestFlight builds go out only when the maintainer says so. They cover everything since the last public
     build, with one set of notes, because every build notifies every tester.

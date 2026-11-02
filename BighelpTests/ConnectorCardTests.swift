@@ -340,6 +340,10 @@ struct ConnectorAppsModelTests {
         #expect(model.sections.map { $0.apps.map(\.name) } == [["Shopify", "Stripe"], ["Resend"], ["Mystery"]],
                 "A connected app shows under Connected, not in its category")
         model.category = "Communication"
+        #expect(model.connected.map(\.name) == ["Slack"])
+        model.category = "Commerce"
+        #expect(model.connected.isEmpty)
+        model.category = "Communication"
         #expect(model.sections.map(\.name) == ["Communication"])
         model.category = nil
         model.search = "str"

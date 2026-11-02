@@ -29,6 +29,20 @@ struct ConnectorLogoSVGTests {
             && abs(value.alpha - alpha) <= slack
     }
 
+    @Test func nonFiniteLogoNumbersAreRejected() {
+        for text in ["nan", "inf", "1e999", "-1e999"] {
+            #expect(SVGNode.number(text) == nil)
+        }
+        var scanner = SVGNumberScanner("1e999")
+        #expect(scanner.number() == nil)
+    }
+
+    @Test func extremeArcGeometryDoesNotCrash() {
+        let path = SVGPathParser.path("M0 0 A1e300 1e300 0 0 1 100 100")
+        #expect(!path.isEmpty)
+        _ = SVGPathParser.path("M0 0 A1e999 1e999 1e999 0 1 100 100")
+    }
+
     @Test func aFilledShapeDrawsInItsColorTheRightWayUp() throws {
         let image = try #require(render("""
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
@@ -38,6 +52,11 @@ struct ConnectorLogoSVGTests {
             """))
         #expect(isClose(pixel(image, 32, 8), 255, 0, 0), "The top half is the first rectangle")
         #expect(isClose(pixel(image, 32, 56), 0, 0, 255), "The bottom half is the path")
+    }
+
+    @Test func rootFillReachesTheLogoPaths() throws {
+        let image = try #require(render("<svg viewBox=\"0 0 10 10\" fill=\"#FF0000\"><path d=\"M0 0h10v10H0z\"/></svg>"))
+        #expect(isClose(pixel(image, 32, 32), 255, 0, 0))
     }
 
     @Test func aClipPathRoundsTheCorners() throws {

@@ -52,6 +52,8 @@ struct FleetAgent: Codable, Equatable, Sendable, Identifiable {
     /// What its Bot Chat was doing when its host was read; nil when that host's plugin can't say
     /// (`native-agents-activity-v1`).
     var botChat: FleetBotChat? = nil
+    /// The avatar designer look, so other gateways can draw its animations too.
+    var look: AgentAvatarLook? = nil
 
     var id: String { FleetID.make(hostID, profileID) }
     var isHidden: Bool { placement?.isHidden == true }

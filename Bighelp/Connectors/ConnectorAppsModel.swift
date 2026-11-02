@@ -85,7 +85,9 @@ final class ConnectorAppsModel {
         self.service = service
     }
 
-    var connected: [App] { filtered.filter(\.isConnected) }
+    var connected: [App] {
+        filtered.filter { $0.isConnected && (category == nil || $0.categoryName == category) }
+    }
     var others: [App] { filtered.filter { !$0.isConnected } }
 
     /// Every category the catalog has, for the chips, in the order the sections show.

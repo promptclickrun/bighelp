@@ -54,13 +54,13 @@ struct ConnectorAppsView: View {
         if let message = model.message {
             Section { Text(message).foregroundStyle(.secondary) }
         }
-        if !model.connected.isEmpty, model.category == nil {
+        if !model.connected.isEmpty {
             Section("Connected") {
                 ForEach(model.connected) { app in connectedRow(app) }
             }
         }
         let sections = model.sections
-        if sections.isEmpty {
+        if sections.isEmpty, model.connected.isEmpty {
             Section {
                 Text(model.search.isEmpty && model.category == nil ? "Every app is connected." : "No apps match.")
                     .foregroundStyle(.secondary)

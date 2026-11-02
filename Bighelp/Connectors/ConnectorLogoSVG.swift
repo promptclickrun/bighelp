@@ -31,7 +31,7 @@ enum ConnectorLogoSVG {
         context.translateBy(x: (side - box.width * scale) / 2, y: (side - box.height * scale) / 2)
         context.scaleBy(x: scale, y: scale)
         context.translateBy(x: -box.minX, y: -box.minY)
-        painter.drawChildren(of: root, style: SVGStyle())
+        painter.draw(root, inherited: SVGStyle())
         guard painter.drewSomething else { return nil }
         return context.makeImage()
     }
@@ -62,7 +62,8 @@ struct SVGNode {
     }
 
     static func number(_ text: String) -> CGFloat? {
-        Double(text.trimmingCharacters(in: .whitespaces)).map { CGFloat($0) }
+        guard let value = Double(text.trimmingCharacters(in: .whitespaces)), value.isFinite else { return nil }
+        return CGFloat(value)
     }
 
     static func declarations(_ style: String) -> [String: String] {
@@ -307,7 +308,8 @@ struct SVGNumberScanner {
                 while index < bytes.count, ASCIIText.isDigit(bytes[index]) { index += 1 }
             }
         }
-        return Double(String(decoding: bytes[start..<index], as: UTF8.self)).map { CGFloat($0) }
+        guard let value = Double(String(decoding: bytes[start..<index], as: UTF8.self)), value.isFinite else { return nil }
+        return CGFloat(value)
     }
 
     private mutating func skipSeparators() {
@@ -442,6 +444,10 @@ enum SVGPathParser {
         func mapped(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
             CGPoint(x: center.x + rx * cosPhi * x - ry * sinPhi * y, y: center.y + rx * sinPhi * x + ry * cosPhi * y)
         }
+        // Finite inputs can still overflow during arc geometry. Keep the endpoint instead of
+        // converting a non-finite angle to Int, which traps.
+        guard delta.isFinite, startAngle.isFinite, center.x.isFinite, center.y.isFinite,
+              rx.isFinite, ry.isFinite else { path.addLine(to: end); return }
         let segments = max(1, Int(ceil(abs(delta) / (.pi / 2) - 0.001)))
         let step = delta / CGFloat(segments)
         let handle = 4 / 3 * tan(step / 4)

@@ -28,6 +28,23 @@ struct AgentFaceTests {
         #expect(store.looks[CompanionStore.agentKey(agentScope: "computer:b", agentID: "one")]?.look == shape)
     }
 
+    @Test func otherGatewaysRetainHermesLooksWithoutReplacingTheLiveGateway() throws {
+        let store = AgentLookStore()
+        let live = UUID(), other = UUID()
+        let look = AgentAvatarLook(style: .shape, shape: "hexagon", color: "#336699")
+        let liveScope = CompanionSurfaceScope.computer(live.uuidString)
+        store.publish(scope: liveScope, profiles: [profile("bot", look: look)])
+        let remote = FleetAgent(hostID: other, profileID: "bot", name: "Remote", role: "", isPinned: false,
+                                isDefault: false, look: look)
+        let snapshot = FleetSnapshot(agents: [remote], refreshedAt: .now)
+        let restored = try JSONDecoder().decode(FleetSnapshot.self, from: JSONEncoder().encode(snapshot))
+        #expect(restored.agents.first?.look == look)
+        store.publish(fleet: [other: restored, live: FleetSnapshot(refreshedAt: .now)], excluding: liveScope)
+        #expect(store.looks[CompanionStore.agentKey(agentScope: CompanionSurfaceScope.computer(other.uuidString),
+                                                  agentID: "bot")]?.look == look)
+        #expect(store.looks[CompanionStore.agentKey(agentScope: liveScope, agentID: "bot")]?.look == look)
+    }
+
     @Test func faceOrderIsCharacterThenHermesThenMarkThenPicture() {
         let scope = "computer:face-order-\(UUID().uuidString)"
         let companions = CompanionStore(defaults: UserDefaults(suiteName: "agent-face-\(UUID().uuidString)")!)

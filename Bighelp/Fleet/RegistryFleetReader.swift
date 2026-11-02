@@ -232,7 +232,7 @@ final class RegistryFleetReader: FleetHostReading {
             FleetAgent(hostID: hostID, profileID: profile.id, name: profile.name, role: profile.role,
                        avatarFile: profile.avatar.flatMap { avatars.store($0) }, isPinned: pinned.contains(profile.id),
                        isDefault: profile.isDefault, activity: activity[profile.id], placement: profile.placement,
-                       botChat: botChats[profile.id].map(FleetBotChat.init))
+                       botChat: botChats[profile.id].map(FleetBotChat.init), look: profile.look)
         }
         // Codex and Claude Code chats on that computer; an older Hermes can't list them.
         let defaultProfile = profiles.first(where: \.isDefault)?.id ?? profiles.first?.id ?? "default"

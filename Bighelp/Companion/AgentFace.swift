@@ -43,6 +43,17 @@ final class AgentLookStore {
     /// By `CompanionStore.agentKey`.
     private(set) var looks: [String: Entry] = [:]
 
+    func publish(fleet: [UUID: FleetSnapshot], excluding liveScope: String) {
+        for (hostID, snapshot) in fleet {
+            let scope = CompanionSurfaceScope.computer(hostID.uuidString)
+            guard scope != liveScope else { continue }
+            publish(scope: scope, profiles: snapshot.agents.map {
+                AgentProfile(id: $0.profileID, name: $0.name, role: $0.role, summary: "", instructions: "",
+                             isDefault: $0.isDefault, look: $0.look)
+            })
+        }
+    }
+
     /// The computer's agents, replacing what it had: a face or shape draws live, a photo or no look
     /// leaves the picture.
     func publish(scope: String, profiles: [AgentProfile]) {
@@ -62,13 +73,18 @@ final class AgentLookStore {
 struct AgentLookPublishing: ViewModifier {
     let scope: String
     let profiles: [AgentProfile]
+    var fleet: [UUID: FleetSnapshot] = [:]
 
     func body(content: Content) -> some View {
         content
+            .onChange(of: fleet, initial: true) { _, snapshots in
+                AgentLookStore.shared.publish(fleet: snapshots, excluding: scope)
+            }
             .onChange(of: profiles, initial: true) { _, profiles in
                 AgentLookStore.shared.publish(scope: scope, profiles: profiles)
             }
             .onChange(of: scope) { _, scope in
+                AgentLookStore.shared.publish(fleet: fleet, excluding: scope)
                 AgentLookStore.shared.publish(scope: scope, profiles: profiles)
             }
     }

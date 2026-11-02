@@ -60,6 +60,7 @@ final class ConnectorCardUITests: BighelpUITestCase {
 
             app.buttons["connector.apps.category.Communication"].tap()
             XCTAssertTrue(app.buttons["connector.apps.connect.resend_mcp"].waitForExistence(timeout: 5))
+            XCTAssertTrue(slack.exists, "Connected apps remain available in their category")
             XCTAssertFalse(app.buttons["connector.apps.connect.shopify"].exists, "A chip narrows to its category")
             evidence("apps-category-\(appearance)", app)
             app.buttons["connector.apps.category.Communication"].tap()

@@ -3,6 +3,14 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.53
+
+### Fixed
+
+- **Native App Connections:** when Hermes on your computer is not signed in to Nous Portal, the page shows a Sign in button with the Nous Portal logo. Sign in, and your apps show.
+- **Bot avatars:** a face that you recolor keeps its new color on every screen. Before, some screens showed the old color, also after you changed between bots.
+- **Agent talk:** a message from one agent to another shows as agent talk in more cases.
+
 ## 2.6.52
 
 ### Changed

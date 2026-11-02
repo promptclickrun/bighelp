@@ -60,11 +60,13 @@ struct AgentTalkCall: Equatable, Sendable {
             let name = basename(first)
             if isAssignment(first) {
                 words = words.dropFirst()
-            } else if runners.contains(name) {
+            } else if let takesValue = runners[name] {
                 words = words.dropFirst()
                 while let next = words.first, next.hasPrefix("-") || isAssignment(next)
                         || next.allSatisfy({ $0.isNumber || $0 == "." || $0 == "s" || $0 == "m" }) {
                     words = words.dropFirst()
+                    // `env -u NAME`: the name is the option's, not the program.
+                    if takesValue.contains(next), !words.isEmpty { words = words.dropFirst() }
                 }
             } else {
                 break
@@ -136,7 +138,14 @@ struct AgentTalkCall: Equatable, Sendable {
         "--in", "--max-turns", "--run-budget", "--source", "--image", "--format", "-c", "--continue",
     ]
 
-    private static let runners: Set<String> = ["timeout", "gtimeout", "env", "nohup", "exec", "command", "time", "nice"]
+    /// Commands that run another one, and their options that take a separate value (`env -u NAME`,
+    /// `timeout -s KILL`); the attached forms (`-uNAME`, `--unset=NAME`) are one word already.
+    private static let runners: [String: Set<String>] = [
+        "env": ["-u", "--unset", "-C", "--chdir"],
+        "timeout": ["-s", "--signal", "-k", "--kill-after"], "gtimeout": ["-s", "--signal", "-k", "--kill-after"],
+        "nice": ["-n", "--adjustment"],
+        "nohup": [], "exec": [], "command": [], "time": [],
+    ]
 
     private static func isAssignment(_ word: String) -> Bool {
         guard let equals = word.firstIndex(of: "="), equals != word.startIndex else { return false }

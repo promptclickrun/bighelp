@@ -136,10 +136,16 @@ struct TimelineMetadata: Codable, Equatable, Sendable {
     /// Display only, never saved: an agent message written on the way to the
     /// answer (more work followed in the same turn). See ChatInterimReplies.
     var isInterimReply = false
-    /// Live only, never saved: Hermes sent this message as its turn's answer
-    /// (`message.complete`), so it never becomes an interim note, whatever
-    /// lands after it. Saved history ends each turn with its answer anyway.
-    var endsTurn = false
+    /// Keep completed answers visible when validation or background work follows,
+    /// including after a reload. Recorded duration belongs to the final history row.
+    private var recordedTurnEnd: Bool?
+    var endsTurn: Bool {
+        get {
+            recordedTurnEnd == true
+                || turnDurationMilliseconds.map { (0...86_400_000).contains($0) } == true
+        }
+        set { recordedTurnEnd = newValue ? true : nil }
+    }
     /// The tapbacks Hermes had saved on this message when its history was read
     /// (`display_metadata.reactions`). Nil: none, or a copy from before they were
     /// kept. A live change for the message (`nativeMessageReactionSnapshots`) wins.
@@ -156,6 +162,7 @@ struct TimelineMetadata: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case source, freshness, delivery, timestamp, turnDurationMilliseconds, sourceOrder,
              platformMessageID, contentReference, reactions
+        case recordedTurnEnd = "endsTurn"
     }
 
     init(
@@ -170,7 +177,7 @@ struct TimelineMetadata: Codable, Equatable, Sendable {
         endsTurn: Bool = false,
         reactions: [NativeMessageReaction]? = nil
     ) {
-        self.endsTurn = endsTurn
+        self.recordedTurnEnd = endsTurn ? true : nil
         self.reactions = reactions?.isEmpty == false ? reactions : nil
         self.contentReference = contentReference
         self.turnDurationMilliseconds = turnDurationMilliseconds

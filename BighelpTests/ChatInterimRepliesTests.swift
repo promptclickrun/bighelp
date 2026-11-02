@@ -103,6 +103,38 @@ struct ChatInterimRepliesTests {
                                                       activityEvents: [hiddenTool("later", 8)])).isEmpty)
     }
 
+    @Test func savedAnswerStaysVisibleAfterValidationFollowup() throws {
+        guard case .message(let item) = reply("answer") else { return }
+        let restored = try JSONDecoder().decode(TimelineItem.self,
+            from: JSONEncoder().encode(item.endingTurn()))
+        let entries = [human("q"), .message(restored), work("validation"), reply("follow-up")]
+        for sending in [false, true] {
+            let marked = ChatInterimReplies.marking(entries, isSending: sending, isBotMode: false)
+            #expect(interimIDs(marked).isEmpty)
+            for placement in [ChatInterimReplyPlacement.fold, .hidden] {
+                let rows = ChatCompletedTurnProjection.rows(from: marked, isSending: sending,
+                    enabled: true, interimReplies: placement, style: .card)
+                #expect(rows.contains { $0.id == "message:answer" })
+                #expect(rows.contains { $0.id == "message:follow-up" })
+            }
+        }
+    }
+
+    @Test func legacyMetadataWithoutAnswerMarkerStillDecodes() throws {
+        let metadata = try JSONDecoder().decode(TimelineMetadata.self, from: Data("{}".utf8))
+        #expect(!metadata.endsTurn)
+    }
+
+    @Test func invalidRecordedDurationsDoNotProtectInterimNotes() {
+        for duration in [-1, 86_400_001] {
+            let item = TimelineItem(id: "note", role: .assistant, sender: agent,
+                content: .message("Checking"), metadata: .init(turnDurationMilliseconds: duration))
+            let entries = [human("q"), .message(item), work("validation"), reply("answer")]
+            #expect(interimIDs(ChatInterimReplies.marking(entries,
+                isSending: false, isBotMode: false)) == ["note"])
+        }
+    }
+
     @Test func theInterimMarkIsNeverSaved() throws {
         guard case .message(let item) = reply("a") else { return }
         let data = try JSONEncoder().encode(item.markedInterim())

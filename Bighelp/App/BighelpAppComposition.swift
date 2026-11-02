@@ -66,13 +66,7 @@ struct BighelpAppComposition {
            arguments.indices.contains(index + 1), let scale = Double(arguments[index + 1]) {
             companion.sizeScale = scale
         }
-        if usesFixtures,
-           let index = arguments.firstIndex(of: "-test-companion-character"),
-           arguments.indices.contains(index + 1),
-           let character = CompanionCharacter(id: arguments[index + 1]) {
-            companion.defaultAppearance = CompanionAppearance(character: character, usesCharacterColors: true)
-            companion.isEnabled = true
-        }
+        if usesFixtures, arguments.contains("-test-companion-enabled") { companion.isEnabled = true }
         if usesFixtures, arguments.contains("-test-companion-disabled") { companion.isEnabled = false }
         // "-test-agent-companion finance:octopus": one demo agent wears a creator look.
         // A catalog ID ("finance:bighelp-biggie") is a character as the creator saves it now.
@@ -145,6 +139,18 @@ struct BighelpAppComposition {
             initialAgentProfiles = AgentsAcceptanceFixture.profiles
             do { try agentRepository.save(initialAgentProfiles) }
             catch { preconditionFailure("The synthetic Agents fixture could not be saved.") }
+        }
+        // "-test-agent-look travel:face" (or "travel:shape"): one demo agent wears a Hermes look, as
+        // Hermes Desktop or the avatar designer saves it.
+        if usesFixtures, let index = arguments.firstIndex(of: "-test-agent-look"), arguments.indices.contains(index + 1) {
+            for pair in arguments[index + 1].split(separator: ",") {
+                let parts = pair.split(separator: ":").map(String.init)
+                guard parts.count == 2, let at = initialAgentProfiles.firstIndex(where: { $0.id == parts[0] }) else { continue }
+                initialAgentProfiles[at].look = parts[1] == "shape"
+                    ? AgentAvatarLook(style: .shape, shape: "hexagon", color: "hsl(150 68% 58%)")
+                    : AgentAvatarLook(style: .face, shape: "blobatar:demo-face", color: nil)
+            }
+            try? agentRepository.save(initialAgentProfiles)
         }
         #endif
         let userIdentity = UserIdentityStore(

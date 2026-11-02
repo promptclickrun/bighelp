@@ -358,7 +358,7 @@ extension View {
 }
 
 struct CompanionComposerAdventureLayer: View {
-    let appearance: CompanionAppearance
+    let pet: AgentPetIdentity
     let reaction: CompanionReaction
     let sizeScale: Double
     let isAdventurous: Bool
@@ -425,12 +425,11 @@ struct CompanionComposerAdventureLayer: View {
             ? CGFloat(1 - abs(sin(.pi * 2 * sample.phaseProgress)) * 0.08)
             : 1
 
-        return CompanionAvatar(
-            appearance: appearance,
+        return AgentPet(
+            identity: pet,
             reaction: reaction,
             isAnimating: isVisible && scenePhase == .active,
-            ambientMotion: ambientMotion,
-            showsBackground: false
+            ambientMotion: ambientMotion
         )
         .frame(width: side, height: side)
         .scaleEffect(x: 2 - bounceScale, y: bounceScale)

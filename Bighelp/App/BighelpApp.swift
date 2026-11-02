@@ -707,6 +707,8 @@ struct BighelpApp: App {
             .environment(\.companionStore, companion)
             .environment(\.providerLogoStore, providerLogoStore)
             .environment(\.companionAgentScope, companionAgentScope)
+            .modifier(AgentLookPublishing(scope: companionAgentScope,
+                                          profiles: (nativeWorkspaces.current?.agents ?? agentDirectory).profiles))
             .environment(\.bighelpCardDataClient, usesFixtureWorkspace
                 ? bighelpCardDataClient : BighelpCardStaticDataClient() as any BighelpCardDataFetching)
             .onChange(of: navigation.activeConversationID) { _, _ in

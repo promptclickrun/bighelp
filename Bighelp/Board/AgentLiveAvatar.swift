@@ -32,8 +32,9 @@ extension ChatModel {
     }
 }
 
-/// The agent's face across the app. A designed pet plays a move for each kind
-/// of work, a petdex pet plays its own sheet's move, and a photo avatar gets a
+/// The agent's face across the app (`AgentFace`). A designed pet plays a move for each kind
+/// of work, a petdex pet plays its own sheet's move, a Hermes face or shape plays the
+/// designer's state for it, a mark acts out the same moods, and a photo avatar gets a
 /// matching motion. A small badge names the work (code, web, images…) so the
 /// difference reads at a glance.
 struct AgentLiveAvatar: View {
@@ -70,23 +71,12 @@ struct AgentLiveAvatar: View {
         .accessibilityValue(activity.label)
     }
 
-    private var look: CompanionAppearance? {
-        guard let companionStore, !companionAgentScope.isEmpty else { return nil }
-        return companionStore.override(for: CompanionStore.agentKey(agentScope: companionAgentScope, agentID: agentID))
-    }
-
-    private var petFrames: [CGImage]? {
-        guard !companionAgentScope.isEmpty else { return nil }
-        let move = activity == .idle && restingState == .listening ? .waiting : PetdexMove(activity: activity)
-        return PetAvatarStore.shared.frames(
-            for: CompanionStore.agentKey(agentScope: companionAgentScope, agentID: agentID), move: move)
-    }
-
     @ViewBuilder
     private var face: some View {
         // Characters and pets stand on nothing, like Hermes's faces: no circle behind them
         // (`AgentAvatarBackdropTests`).
-        if let look {
+        switch AgentFace.resolve(agentID: agentID, scope: companionAgentScope, companions: companionStore) {
+        case .character(let look):
             CompanionAvatar(
                 appearance: look,
                 reaction: companionReaction,
@@ -94,14 +84,30 @@ struct AgentLiveAvatar: View {
                 activityMood: activity.moodID
             )
             .frame(width: size * 0.82, height: size * 0.82)
-        } else if let petFrames {
-            PetdexAnimatedAvatar(frames: petFrames)
-                .frame(width: size * 0.86, height: size * 0.86)
-        } else {
-            AvatarView(stableID: agentID, displayName: displayName, imageURL: imageURL,
-                       size: size, state: liveState)
-                .modifier(ActivityMotion(activity: activity, enabled: !reduceMotion && movesPhoto))
+        case .pet(let key):
+            let move = activity == .idle && restingState == .listening ? .waiting : PetdexMove(activity: activity)
+            if let frames = PetAvatarStore.shared.frames(for: key, move: move) {
+                PetdexAnimatedAvatar(frames: frames)
+                    .frame(width: size * 0.86, height: size * 0.86)
+            } else {
+                picture
+            }
+        case .hermes(let look, let name):
+            HermesLookPlayer(look: look, name: name,
+                             state: activity == .idle && restingState == .listening ? .listen : activity.hermesPlayState)
+                .frame(width: size * 0.92, height: size * 0.92)
+        case .mark(let mark):
+            SimpleBotMarkView(mark: mark, size: size * 0.86, state: liveState,
+                              mood: activity.moodID ?? (restingState == .listening ? "listening" : nil))
+        case .picture:
+            picture
         }
+    }
+
+    private var picture: some View {
+        AvatarView(stableID: agentID, displayName: displayName, imageURL: imageURL,
+                   size: size, state: liveState)
+            .modifier(ActivityMotion(activity: activity, enabled: !reduceMotion && movesPhoto))
     }
 
     private var companionReaction: CompanionReaction {

@@ -1269,11 +1269,19 @@ struct RootShellView: View {
         return ConnectorAppsModel(service: DemoConnectorAppsService())
     }
 
+    /// Home's pet: the primary agent's own avatar.
+    var homeCompanionPet: AgentPetIdentity? {
+        let profile = agents.profiles.first { $0.id == agents.primaryAgentID }
+            ?? agents.profiles.first(where: \.isDefault) ?? agents.profiles.first
+        return profile.map { AgentPetIdentity(agentID: $0.id, name: $0.name, imageURL: agents.avatarURL(for: $0)) }
+    }
+
     var workspaceActivity: some View {
         DashboardView(
             model: featureStore.dashboardModel,
             connection: HostConnectionStatus(dashboardIsConnected: nativeRuntime != nil
                 ? currentWorkspaceOwner != nil : dashboardFixtureIsConnected),
+            companionPet: homeCompanionPet,
             onInboxItemTap: openDashboardInboxItem,
             onAttentionItemTap: openDashboardAttentionItem,
             onWorkItemTap: openDashboardWorkItem

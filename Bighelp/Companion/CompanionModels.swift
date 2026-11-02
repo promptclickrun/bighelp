@@ -440,11 +440,9 @@ final class CompanionStore {
     nonisolated static let maximumSizeScale = 1.5
     nonisolated static let defaultSizeScale = 1.0
 
+    /// Settings › Companion pet: each agent's pet is its own avatar (`AgentPet`), so the page has
+    /// only this switch, the size and Adventurous Pet.
     var isEnabled: Bool {
-        didSet { persistIfReady() }
-    }
-
-    var defaultAppearance: CompanionAppearance {
         didSet { persistIfReady() }
     }
 
@@ -462,16 +460,14 @@ final class CompanionStore {
         didSet { persistIfReady() }
     }
 
+    /// Agents' kit characters, saved by Agent Studio as their avatars (`AgentEditorModel.applySavedLook`).
     private(set) var agentOverrides: [String: CompanionAppearance] {
         didSet { persistIfReady() }
     }
 
-    /// A new phone's pet: bighelp's first character, in its own colors.
-    static var firstPet: CompanionAppearance {
-        var appearance = CompanionAppearance(usesCharacterColors: true)
-        appearance.catalogAvatar = AvatarCatalog.bundled.avatars(in: .bighelp, at: .now).first.map(AvatarCatalogReference.init)
-        return appearance
-    }
+    /// Builds before each pet was its agent's avatar need a default look to read the rest; nothing
+    /// here draws it.
+    private nonisolated static let legacyDefaultAppearance = CompanionAppearance(usesCharacterColors: true)
 
     private static let storageKey = "loopdy.companion.preferences"
     private let defaults: UserDefaults
@@ -481,16 +477,10 @@ final class CompanionStore {
         self.defaults = defaults
         let persisted = Self.readPersistedState(from: defaults, key: Self.storageKey)
         isEnabled = persisted?.isEnabled ?? false
-        defaultAppearance = Self.sanitized(persisted?.defaultAppearance ?? Self.firstPet)
         storedSizeScale = Self.sanitizedSizeScale(persisted?.sizeScale ?? Self.defaultSizeScale)
         isAdventurous = persisted?.isAdventurous ?? false
         agentOverrides = persisted?.agentOverrides ?? [:]
         isReadyToPersist = true
-    }
-
-    func appearance(for agentKey: String?) -> CompanionAppearance {
-        guard let agentKey else { return defaultAppearance }
-        return agentOverrides[agentKey] ?? defaultAppearance
     }
 
     func override(for agentKey: String) -> CompanionAppearance? {
@@ -509,7 +499,6 @@ final class CompanionStore {
             let state = PersistedState(
                 schemaVersion: Self.currentSchemaVersion,
                 isEnabled: isEnabled,
-                defaultAppearance: Self.sanitized(defaultAppearance),
                 sizeScale: sizeScale,
                 isAdventurous: isAdventurous,
                 agentOverrides: candidate
@@ -524,11 +513,6 @@ final class CompanionStore {
         }
     }
 
-    func clearAgentOverrides() {
-        guard !agentOverrides.isEmpty else { return }
-        agentOverrides.removeAll(keepingCapacity: false)
-    }
-
     static func agentKey(agentScope: String, agentID: String) -> String {
         "\(agentScope.utf8.count):\(agentScope)\(agentID.utf8.count):\(agentID)"
     }
@@ -536,7 +520,6 @@ final class CompanionStore {
     private struct PersistedState: Codable {
         let schemaVersion: Int
         let isEnabled: Bool
-        let defaultAppearance: CompanionAppearance
         let sizeScale: Double
         let isAdventurous: Bool
         let agentOverrides: [String: CompanionAppearance]
@@ -553,14 +536,12 @@ final class CompanionStore {
         init(
             schemaVersion: Int,
             isEnabled: Bool,
-            defaultAppearance: CompanionAppearance,
             sizeScale: Double,
             isAdventurous: Bool,
             agentOverrides: [String: CompanionAppearance]
         ) {
             self.schemaVersion = schemaVersion
             self.isEnabled = isEnabled
-            self.defaultAppearance = defaultAppearance
             self.sizeScale = CompanionStore.sanitizedSizeScale(sizeScale)
             self.isAdventurous = isAdventurous
             self.agentOverrides = agentOverrides
@@ -570,7 +551,6 @@ final class CompanionStore {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
             isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
-            defaultAppearance = try container.decode(CompanionAppearance.self, forKey: .defaultAppearance)
             sizeScale = CompanionStore.sanitizedSizeScale(
                 (try? container.decode(Double.self, forKey: .sizeScale))
                     ?? CompanionStore.defaultSizeScale
@@ -581,6 +561,16 @@ final class CompanionStore {
                 forKey: .agentOverrides
             )
         }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(schemaVersion, forKey: .schemaVersion)
+            try container.encode(isEnabled, forKey: .isEnabled)
+            try container.encode(CompanionStore.legacyDefaultAppearance, forKey: .defaultAppearance)
+            try container.encode(sizeScale, forKey: .sizeScale)
+            try container.encode(isAdventurous, forKey: .isAdventurous)
+            try container.encode(agentOverrides, forKey: .agentOverrides)
+        }
     }
 
     private func persistIfReady() {
@@ -588,7 +578,6 @@ final class CompanionStore {
         let state = PersistedState(
             schemaVersion: Self.currentSchemaVersion,
             isEnabled: isEnabled,
-            defaultAppearance: Self.sanitized(defaultAppearance),
             sizeScale: sizeScale,
             isAdventurous: isAdventurous,
             agentOverrides: agentOverrides
@@ -612,7 +601,6 @@ final class CompanionStore {
         return PersistedState(
             schemaVersion: currentSchemaVersion,
             isEnabled: decoded.isEnabled,
-            defaultAppearance: sanitized(decoded.defaultAppearance),
             sizeScale: sanitizedSizeScale(decoded.sizeScale),
             isAdventurous: decoded.isAdventurous,
             agentOverrides: decoded.agentOverrides.mapValues(sanitized)

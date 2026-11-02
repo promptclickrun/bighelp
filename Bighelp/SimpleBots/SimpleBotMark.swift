@@ -210,31 +210,74 @@ struct SimpleBotMarkView: View {
     var isPrimary = false
     /// Blinks now and then, so the bot looks alive (never with Reduce Motion).
     var blinks = false
-    /// Thinking looks up with narrowed eyes; needing you opens them wide. A still pose, not a motion.
+    /// Thinking looks up with narrowed eyes; needing you opens them wide. The still pose, which
+    /// shows when the mark can't move (Reduce Motion, Low Power Mode).
     var state: AgentLiveState = .idle
+    /// A character mood (`BuddyPose`) the mark acts out while it works, as the kit's characters do.
+    var mood: String? = nil
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @BighelpLoaderMotionReader private var motion
     @State private var isBlinking = false
 
     var body: some View {
-        ZStack {
-            SimpleBotShapeOutline(shape: mark.shape)
-                .fill(mark.color.color)
-                .overlay {
-                    if mark.color == .black, colorScheme == .dark {
-                        SimpleBotShapeOutline(shape: mark.shape).stroke(Color.white.opacity(0.28), lineWidth: 1)
-                    }
+        Group {
+            if let mood, motion.animates {
+                TimelineView(.animation) { timeline in
+                    posed(BuddyPose.make(mood: mood, time: timeline.date.timeIntervalSinceReferenceDate
+                        .truncatingRemainder(dividingBy: 3600)))
                 }
-            eyes
+            } else {
+                ZStack {
+                    outline
+                    eyes
+                }
+            }
         }
         .frame(width: size, height: size)
         .overlay(alignment: .bottomTrailing) {
             if isPrimary { SimpleBotPrimaryBadge(size: size * 0.3) }
         }
-        .task(id: blinks && !reduceMotion) { await blink() }
+        .task(id: blinks && !reduceMotion && mood == nil) { await blink() }
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: state)
         .accessibilityHidden(true)
+    }
+
+    private var outline: some View {
+        SimpleBotShapeOutline(shape: mark.shape)
+            .fill(mark.color.color)
+            .overlay {
+                if mark.color == .black, colorScheme == .dark {
+                    SimpleBotShapeOutline(shape: mark.shape).stroke(Color.white.opacity(0.28), lineWidth: 1)
+                }
+            }
+    }
+
+    /// One frame of a mood: the mark hops, leans and squashes on its base, and its eyes blink,
+    /// look, squint, close or smile with the pose.
+    private func posed(_ pose: BuddyPose) -> some View {
+        let unit = size / 100
+        let center = mark.shape.eyeCenter
+        let eyes: (height: CGFloat, look: CGPoint) = switch pose.eyes {
+        case let .open(openness, look): (max(0.1, openness), look)
+        case let .wide(look): (1.15, look)
+        case let .squint(look): (0.45, look)
+        case .sad: (0.7, CGPoint(x: 0, y: 0.5))
+        case .closed: (0.1, .zero)
+        case .happy: (0.3, CGPoint(x: 0, y: -0.3))
+        }
+        return ZStack {
+            outline
+            HStack(spacing: size * 0.11) { eye; eye }
+                .scaleEffect(x: 1, y: eyes.height)
+                .position(x: size * center.x + eyes.look.x * size * 0.04,
+                          y: size * center.y + eyes.look.y * size * 0.04)
+        }
+        .frame(width: size, height: size)
+        .scaleEffect(x: pose.squash, y: 1 / pose.squash, anchor: .bottom)
+        .rotationEffect(.degrees(pose.rotation))
+        .offset(x: pose.offset.width * unit, y: pose.offset.height * unit)
     }
 
     private var eyes: some View {
@@ -282,7 +325,8 @@ struct SimpleBotMarkView: View {
     }
 }
 
-/// What a bot is doing, on its face: a still badge, so it reads with Reduce Motion and on any look.
+/// What a bot is doing, on its face, when the face can't act it out: a still badge, so it reads with
+/// Reduce Motion and on a photo.
 /// Working shows the kind of work (a globe while it browses); needing you, a raised hand.
 struct SimpleBotActivityBadge: View {
     let activity: BotChatActivity
@@ -345,10 +389,11 @@ final class SimpleBotMarkStore {
     }
 }
 
-/// A bot's face in Bots mode: the mark picked here; else the picture,
-/// character or pet it already has; else its starting mark. While its Bot Chat
-/// works or needs you, a still badge says so on every look; characters and pets
-/// also play the move for that work.
+/// A bot's face in Bots mode, in `AgentFace`'s order: its character, pet, Hermes face or mark,
+/// else its picture, else its starting mark. While its Bot Chat works, the face acts the work out
+/// (a mark or character plays the mood for it, a Hermes face the designer's state, a pet its move);
+/// a photo, or any face that can't move, shows a still badge instead. Needing you always shows
+/// its raised hand.
 struct SimpleBotFace: View {
     let agentID: String
     let name: String
@@ -362,34 +407,52 @@ struct SimpleBotFace: View {
 
     @Environment(\.companionAgentScope) private var scope
     @Environment(\.companionStore) private var companions
+    @BighelpLoaderMotionReader private var motion
 
     private var busy: BotChatActivity? { activity?.isBusy == true ? activity : nil }
 
     var body: some View {
+        let face = AgentFace.resolve(agentID: agentID, scope: scope, companions: companions)
         Group {
-            if let mark = SimpleBotMarkStore.shared.mark(scope: scope, agentID: agentID) {
-                SimpleBotMarkView(mark: mark, size: size, isPrimary: isPrimary, blinks: blinks,
-                                  state: busy?.liveState ?? .idle)
-            } else if hasOwnPicture {
-                // A photo stays still: the badge says it. Characters and pets play their move.
+            switch face {
+            case .mark(let mark):
+                markView(mark)
+            case .picture where !hasOwnPicture:
+                markView(.defaultMark(for: agentID))
+            default:
+                // Characters, pets and Hermes faces play the move for the work; a photo stays still.
                 AgentLiveAvatar(agentID: agentID, displayName: name, imageURL: imageURL,
                                 activity: busy?.activityKind ?? .idle, size: size, showsBadge: false,
                                 movesPhoto: false)
                     .overlay(alignment: .bottomTrailing) {
                         if isPrimary { SimpleBotPrimaryBadge(size: size * 0.3) }
                     }
-            } else {
-                SimpleBotMarkView(mark: .defaultMark(for: agentID), size: size, isPrimary: isPrimary, blinks: blinks,
-                                  state: busy?.liveState ?? .idle)
             }
         }
         .frame(width: size, height: size)
         .overlay(alignment: .topTrailing) {
-            if let busy { SimpleBotActivityBadge(activity: busy, size: min(28, max(18, size * 0.28))) }
+            if let busy, Self.showsBadge(for: busy, faceMoves: (face.moves || !hasOwnPicture) && motion.animates) {
+                SimpleBotActivityBadge(activity: busy, size: min(28, max(18, size * 0.28)))
+            }
         }
         // The row or tile it's in says the state, once, as its value.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(name)
+    }
+
+    /// Needing you always shows its hand. The kind of work shows as a badge only on a face that
+    /// can't act it out: a photo, or any face with Reduce Motion or Low Power Mode.
+    static func showsBadge(for activity: BotChatActivity, faceMoves: Bool) -> Bool {
+        switch activity {
+        case .idle: false
+        case .waiting: true
+        case .working: !faceMoves
+        }
+    }
+
+    private func markView(_ mark: SimpleBotMark) -> some View {
+        SimpleBotMarkView(mark: mark, size: size, isPrimary: isPrimary, blinks: blinks,
+                          state: busy?.liveState ?? .idle, mood: busy?.activityKind.moodID)
     }
 
     private var hasOwnPicture: Bool {

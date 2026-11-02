@@ -2,7 +2,6 @@ import SwiftUI
 
 struct VoiceView: View {
     @Environment(\.companionStore) private var companionStore
-    @Environment(\.companionAgentScope) private var companionAgentScope
     @State private var model: VoiceModel
     @State private var isVoiceVisible = false
     @GestureState private var walkieGestureActive = false
@@ -345,8 +344,9 @@ struct VoiceView: View {
     private func orb(size: CGFloat) -> some View {
         if let companionStore, companionStore.isEnabled {
             let companionSide = size * CGFloat(min(1, companionStore.sizeScale))
-            CompanionAvatar(
-                appearance: voiceCompanionAppearance(from: companionStore),
+            AgentPet(
+                identity: AgentPetIdentity(agentID: agentID ?? model.agentName, name: model.agentName,
+                                           imageURL: agentImageURL),
                 reaction: voiceCompanionReaction,
                 isAnimating: isVoiceVisible && scenePhase == .active && model.isActive,
                 audioLevel: model.isPlaybackActive ? model.outputLevel : 0,
@@ -374,13 +374,6 @@ struct VoiceView: View {
             .accessibilityHidden(true)
             .frame(maxWidth: .infinity)
         }
-    }
-
-    private func voiceCompanionAppearance(from store: CompanionStore) -> CompanionAppearance {
-        guard let agentID, !companionAgentScope.isEmpty else { return store.defaultAppearance }
-        return store.appearance(
-            for: CompanionStore.agentKey(agentScope: companionAgentScope, agentID: agentID)
-        )
     }
 
     private var voiceCompanionReaction: CompanionReaction {

@@ -526,7 +526,7 @@ struct SettingsView: View {
                               isCurrent: voiceSettingsIsCurrent)
         case .companion:
             if let companionStore {
-                CompanionSettingsView(store: companionStore, agents: agents, agentScope: companionAgentScope)
+                CompanionSettingsView(store: companionStore)
             }
         case .appearance:
             appearancePage

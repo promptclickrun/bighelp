@@ -7,7 +7,6 @@ struct CompanionStoreTests {
     @Test func sizeAndAdventurePersistWithoutReplacingCharacterOverrides() throws {
         let defaults = isolatedDefaults()
         let store = CompanionStore(defaults: defaults)
-        store.defaultAppearance = .init(character: .robot, colorHex: "#8844EE", matchesTheme: false)
         store.setOverride(.init(character: .dragon), for: "my-host:my-agent")
         store.sizeScale = 1.35
         store.isAdventurous = true
@@ -16,20 +15,32 @@ struct CompanionStoreTests {
         #expect(restored.sizeScale == 1.35)
         #expect(restored.isAdventurous)
         #expect(!restored.isEnabled)
-        #expect(restored.defaultAppearance == store.defaultAppearance)
         #expect(restored.agentOverrides == store.agentOverrides)
     }
 
     @Test func schemaOneWithoutNewKeysKeepsExistingPetChoices() throws {
         let defaults = isolatedDefaults()
-        let bytes = Data(##"{"schemaVersion":1,"isEnabled":true,"defaultAppearance":{"character":"clip","colorHex":"#123456","matchesTheme":false},"agentOverrides":{}}"##.utf8)
+        let bytes = Data(##"{"schemaVersion":1,"isEnabled":true,"defaultAppearance":{"character":"clip","colorHex":"#123456","matchesTheme":false},"agentOverrides":{"host:agent":{"character":"fox","colorHex":"#123456","matchesTheme":false}}}"##.utf8)
         defaults.set(bytes, forKey: "loopdy.companion.preferences")
         let restored = CompanionStore(defaults: defaults)
         #expect(restored.isEnabled)
-        #expect(restored.defaultAppearance.character == .robot)
-        #expect(restored.defaultAppearance.colorHex == "#123456")
+        #expect(restored.override(for: "host:agent")?.character == .fox, "Agents' characters stay their avatars")
         #expect(restored.sizeScale == 1)
         #expect(!restored.isAdventurous)
+    }
+
+    /// Each pet is its agent's avatar now, but an older build reads these preferences only with
+    /// the app default it had: it still gets one, so going back keeps the switch, size and characters.
+    @Test func savedPreferencesStillReadInOlderBuilds() throws {
+        let defaults = isolatedDefaults()
+        let store = CompanionStore(defaults: defaults)
+        store.isEnabled = true
+        store.setOverride(.init(character: .owl), for: "host:agent")
+        let data = try #require(defaults.data(forKey: "loopdy.companion.preferences"))
+        let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let legacy = try #require(object["defaultAppearance"] as? [String: Any])
+        #expect(legacy["character"] as? String != nil && legacy["colorHex"] as? String != nil)
+        #expect(object["isEnabled"] as? Bool == true)
     }
 
     @Test func companionScaleRejectsNonfiniteAndOutOfRangeValues() {
@@ -52,35 +63,29 @@ struct CompanionStoreTests {
         ]))
     }
 
-    @Test func overrideIsExactAndDoesNotChangeHomeDefault() {
+    @Test func anAgentsCharacterIsExactlyItsOwn() {
         let store = CompanionStore(defaults: isolatedDefaults())
-        let standard = CompanionAppearance(character: .dog, colorHex: "#8844EE", matchesTheme: false)
         let override = CompanionAppearance(character: .robot, colorHex: "#33AADD", matchesTheme: false)
-        store.defaultAppearance = standard
         store.setOverride(override, for: "host-a:agent-a")
-        #expect(store.appearance(for: nil) == standard)
-        #expect(store.appearance(for: "host-a:agent-a") == override)
-        #expect(store.appearance(for: "host-b:agent-a") == standard)
-        #expect(store.appearance(for: "host-a:agent-b") == standard)
+        #expect(store.override(for: "host-a:agent-a") == override)
+        #expect(store.override(for: "host-b:agent-a") == nil)
+        #expect(store.override(for: "host-a:agent-b") == nil)
         store.setOverride(nil, for: "host-a:agent-a")
-        #expect(store.appearance(for: "host-a:agent-a") == standard)
+        #expect(store.override(for: "host-a:agent-a") == nil)
     }
 
     @Test func disablingRetainsChoicesAcrossReopen() {
         let defaults = isolatedDefaults()
         let store = CompanionStore(defaults: defaults)
-        let standard = CompanionAppearance(character: .messenger, colorHex: "#CC4488", matchesTheme: false)
         let override = CompanionAppearance(character: .octopus, colorHex: "#3366AA", matchesTheme: true)
         store.isEnabled = true
-        store.defaultAppearance = standard
         store.setOverride(override, for: "host:agent")
         store.isEnabled = false
         let restored = CompanionStore(defaults: defaults)
         #expect(!restored.isEnabled)
-        #expect(restored.defaultAppearance == standard)
-        #expect(restored.appearance(for: "host:agent") == override)
+        #expect(restored.override(for: "host:agent") == override)
         restored.isEnabled = true
-        #expect(restored.appearance(for: "host:agent") == override)
+        #expect(restored.override(for: "host:agent") == override)
     }
 
     @Test func everyAcceptedOverrideSurvivesTheStorageByteLimit() {
@@ -99,13 +104,4 @@ struct CompanionStoreTests {
                 != CompanionStore.agentKey(agentScope: "a", agentID: "b:c"))
     }
 
-    @Test func accountBoundaryClearsOverridesButKeepsAppearancePreference() {
-        let store = CompanionStore(defaults: isolatedDefaults())
-        let standard = CompanionAppearance(character: .dragon, colorHex: "#FFBB66", matchesTheme: true)
-        store.defaultAppearance = standard
-        store.setOverride(.init(character: .robot, colorHex: "#123456", matchesTheme: false), for: "host:agent")
-        store.clearAgentOverrides()
-        #expect(store.appearance(for: "host:agent") == standard)
-        #expect(store.defaultAppearance == standard)
-    }
 }

@@ -84,6 +84,8 @@ struct DashboardView: View {
     @State private var companionReaction: CompanionReaction = .idle
     @State private var companionReactionTask: Task<Void, Never>?
     let connection: HostConnectionStatus
+    /// The agent whose pet plays here: the primary agent of the computer in use.
+    let companionPet: AgentPetIdentity?
     let onInboxItemTap: (DashboardInboxItem) -> Void
     let onAttentionItemTap: (DashboardAttentionItem) -> Void
     let onWorkItemTap: (DashboardWorkItem) -> Void
@@ -91,12 +93,14 @@ struct DashboardView: View {
     init(
         model: DashboardModel,
         connection: HostConnectionStatus = .init(dashboardIsConnected: true),
+        companionPet: AgentPetIdentity? = nil,
         onInboxItemTap: @escaping (DashboardInboxItem) -> Void = { _ in },
         onAttentionItemTap: @escaping (DashboardAttentionItem) -> Void = { _ in },
         onWorkItemTap: @escaping (DashboardWorkItem) -> Void = { _ in }
     ) {
         _model = State(initialValue: model)
         self.connection = connection
+        self.companionPet = companionPet
         self.onInboxItemTap = onInboxItemTap
         self.onAttentionItemTap = onAttentionItemTap
         self.onWorkItemTap = onWorkItemTap
@@ -158,9 +162,9 @@ struct DashboardView: View {
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            if let companionStore, companionStore.isEnabled, !showsInitialHomeLoading {
+            if let companionStore, companionStore.isEnabled, let companionPet, !showsInitialHomeLoading {
                 CompanionInteractionLayer(
-                    appearance: companionStore.defaultAppearance,
+                    pet: companionPet,
                     reaction: floatingHomeCompanionReaction,
                     itemSize: homeCompanionSize,
                     insets: CompanionSurfaceInsets(top: 0, leading: 8, bottom: 8, trailing: 12),
@@ -752,14 +756,10 @@ struct DashboardView: View {
 
     private var loading: some View {
         VStack(spacing: BighelpTokens.space12) {
-            if let companionStore, companionStore.isEnabled {
-                CompanionAvatar(
-                    appearance: companionStore.defaultAppearance,
-                    reaction: .thinking,
-                    isAnimating: true
-                )
-                .frame(width: homeCompanionSize, height: homeCompanionSize)
-                .accessibilityIdentifier("companion-home-loading")
+            if let companionStore, companionStore.isEnabled, let companionPet {
+                AgentPet(identity: companionPet, reaction: .thinking)
+                    .frame(width: homeCompanionSize, height: homeCompanionSize)
+                    .accessibilityIdentifier("companion-home-loading")
             } else {
                 ProgressView()
             }

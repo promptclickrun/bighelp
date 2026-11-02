@@ -294,7 +294,8 @@ describe("BuzzKit notification provider replaces relay enrollment", () => {
       async () => {},
     );
     expect(result.state).toBe("accepted");
-    expect(calls[0]?.body?.title).toBe("Loopdy test notification");
+    expect(calls[0]?.body?.title).toBe("bighelp test notification");
+    expect(calls[0]?.body?.body).toBe("This is your successful test notification from bighelp!");
     expect(calls).toHaveLength(2);
   });
 

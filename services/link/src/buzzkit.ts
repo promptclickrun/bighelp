@@ -230,11 +230,11 @@ export async function buzzKitIdentity(
 
 export const TEST_NOTIFICATION_TTL_SECONDS = 300;
 
-/** The test notification, in BuzzKit's shape and without its recipient. */
+/** The test notification, in BuzzKit's shape and without its recipient. Its words name only bighelp. */
 export function testNotificationBody(requestId: string): Record<string, unknown> {
   return {
-    title: "Loopdy test notification",
-    body: "This is your requested BuzzKit notification test.",
+    title: "bighelp test notification",
+    body: "This is your successful test notification from bighelp!",
     data: { loopdy_test: { version: 1, requestId } },
     channel: "push",
     sound: "default",

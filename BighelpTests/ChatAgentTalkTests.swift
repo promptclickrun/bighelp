@@ -21,6 +21,22 @@ struct ChatAgentTalkTests {
         #expect(call.message == #"It's "done"?"#)
     }
 
+    /// Teamwork's teammate command clears the asking chat's session source first (bighelp-plugin #253). Every
+    /// way of writing that, spaced or attached, still reads as a message to the named agent (#754).
+    @Test(arguments: [
+        "env -u HERMES_SESSION_SOURCE hermes -p nova chat -Q -q 'Message from Avery (@default): Is Monday free?'",
+        "env -uHERMES_SESSION_SOURCE hermes -p nova chat -Q -q 'Message from Avery (@default): Is Monday free?'",
+        "env --unset HERMES_SESSION_SOURCE hermes -p nova chat -Q -q 'Message from Avery (@default): Is Monday free?'",
+        "env --unset=HERMES_SESSION_SOURCE hermes -p nova chat -Q -q 'Message from Avery (@default): Is Monday free?'",
+        "env HERMES_X=1 hermes -p nova chat -Q -q 'Message from Avery (@default): Is Monday free?'",
+        "timeout -s KILL 180 env -u HERMES_SESSION_SOURCE hermes -p nova chat -q 'Message from Avery (@default): Is Monday free?'",
+    ])
+    func commandsThatClearTheSessionSourceStillRead(command: String) throws {
+        let call = try #require(terminalCall(command))
+        #expect(call.targetID == "nova")
+        #expect(call.message == "Message from Avery (@default): Is Monday free?")
+    }
+
     @Test func otherHermesCommandsAreOrdinaryTools() {
         #expect(terminalCall("hermes -p nova chat --help") == nil)
         // Without -p the target is whichever agent the shell points at.

@@ -66,6 +66,9 @@ struct AgentAvatarLook: Codable, Equatable, Sendable {
             break
         case .face:
             if let shape = savedShape(profileID: profileID) { result["shape"] = .string(shape) }
+            // A face's color is Desktop's too (`meta.color || profileColor(name)`); kept, a recolored face
+            // saved its new picture over the old look.
+            if let color { result["color"] = .string(color) } else { result.removeValue(forKey: "color") }
         case .shape:
             if let shape { result["shape"] = .string(shape) }
             if let color { result["color"] = .string(color) } else { result.removeValue(forKey: "color") }

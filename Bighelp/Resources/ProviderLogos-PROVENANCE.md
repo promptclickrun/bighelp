@@ -180,10 +180,27 @@ Retrieved and re-verified 2026-08-31. Provider names and marks remain trademarks
 - Usage basis: GitHub's current brand toolkit identifies the Invertocat as its primary logo, specifies black or white highest-contrast use, and states that beginning in 2025 GitHub Copilot no longer has a standalone logo that heroes the deprecated Copilot icon.
 - Placement restrictions honored by renderer: official artwork is permitted in labeled contexts when the actual visible label passed to the policy equals `GitHub Copilot`, and in the top chat model chip where the compact control itself identifies the selected model. Noncanonical wire names and other unlabeled model rows use the neutral fallback. Labeled call sites reuse one canonical visible identity for the mark and text while preserving the raw provider ID. The exact black/white Invertocat vectors render transparently at their original aspect ratio with 10% clear space, no enclosing well, frame, recoloring, effects, distortion, or clipping.
 
+## Nous Research
+
+- Official source: https://github.com/NousResearch/hermes-agent (Hermes, by Nous Research; MIT license), files `assets/nous-girl-black.svg` and `assets/nous-girl-white.svg`, the mark Hermes uses for itself and for Nous Portal sign-in
+- Version: pinned commit `1fa5fea74f69566196707c7039c35c26155cfb9d`
+- Semantic asset name: `ProviderLogoNous`
+- Any source filename: `assets/nous-girl-black.svg`
+- Any source SHA-256: `d105c5357560610b0d5357b0311e89f814ea7b5e86203d922a3386572c8e66ef`
+- Any bundled filename: `ProviderLogoNous-Light.svg`
+- Any bundled SHA-256: `387f54b58385c3c885f19ecbde701eaf595b6deb53c639252c60cd15b9230337`
+- Dark source filename: `assets/nous-girl-white.svg`
+- Dark source SHA-256: `d84d87421e321d94bb210f914e6fd55307e045655ab122446547f516d3aaf06e`
+- Dark bundled filename: `ProviderLogoNous-Dark.svg`
+- Dark bundled SHA-256: `35ef3ad75444ac4ad2cc9b045a4df3e73ee9628c6fb42346cfc3c4e96ba41206`
+- Usage basis: Nous Research publishes the mark in Hermes under the MIT license (notice in `ProviderLogos-NOTICES.txt`). bighelp shows it only to name Nous Portal, where people sign in to it.
+- Derivation: each source's single path is kept with its fill. Only the editor's metadata (guides, grid, page settings, unused clip paths) is removed, and the path's points are scaled uniformly (with the light source's own uniform `matrix` transform applied to them) into a 512 × 512 view box, centered, as the exporter requires. Nothing is recolored, cropped or reshaped.
+- Placement restrictions honored by renderer: the mark renders transparently with no enclosing well, frame, recoloring, or effects; original aspect ratio and 10% renderer clear space are retained.
+
 ## License notices
 
 - Bundled notices filename: `ProviderLogos-NOTICES.txt`
-- Bundled notices SHA-256: `c4ab872b788cf09d7e82c77fd077e6d93dac55fa9746ecf25c91160b98b090ce`
+- Bundled notices SHA-256: `2fb63da38899b340d442ec77135cc2e89ad156baf694bfa853a05c627ad0b17d`
 - OpenRouter license source: `OpenRouterTeam/sign-in-with-openrouter/LICENSE` at commit `872aaa56b2df753b6ff3812f71a6964870e2ff30`
 - OpenRouter license SHA-256: `a9578921a6dc44cfe53b45131fe08ad522e1da416d7eb98ad92472c370da2ccf`
 - Notice content: the pinned OpenRouter MIT license file is reproduced verbatim in the bundled notices resource; the GitHub Invertocat is supplied under GitHub's trademark guidelines rather than the removed Primer Octicons MIT source.
@@ -204,4 +221,4 @@ for the export, verification and independently authorized publishing procedure.
 
 ## Neutral fallback providers
 
-No artwork ships for Azure OpenAI, Amazon Bedrock, Cerebras, Cohere, DeepSeek, Fireworks AI, Groq, MiniMax, Moonshot/Kimi, NVIDIA, Nous Research, Ollama, Perplexity, Together AI, xAI, Z.ai, or unknown/custom providers. Their registry identities, aliases, raw provider/model values, picker identifiers, and App Intents values remain unchanged. The neutral circular well appears only around fallback monograms.
+No artwork ships for Azure OpenAI, Amazon Bedrock, Cerebras, Cohere, DeepSeek, Fireworks AI, Groq, MiniMax, Moonshot/Kimi, NVIDIA, Ollama, Perplexity, Together AI, xAI, Z.ai, or unknown/custom providers. Their registry identities, aliases, raw provider/model values, picker identifiers, and App Intents values remain unchanged. The neutral circular well appears only around fallback monograms.

@@ -314,6 +314,29 @@ struct ConnectorAppsModelTests {
         #expect(model.phase == phase)
     }
 
+    /// Hermes keeps apps closed (4031) while it has no usable Nous Portal sign-in, as on a computer whose
+    /// sign-in lapsed. The page offers to sign in; after a finished sign-in the apps load, or, still closed,
+    /// the page names the setting. A sign-in closed without finishing changes nothing.
+    @Test func closedAppsOfferANousPortalSignIn() async {
+        let service = Service()
+        service.failures["connectors.catalog"] = DirectHermesError.rpcRejected(code: 4031)
+        let model = ConnectorAppsModel(service: service, nousSignIn: { nil })
+        await model.appear()
+        #expect(model.phase == .turnedOff)
+        #expect(model.nousSignIn != nil && !model.signedInStillOff)
+
+        await model.nousSignInClosed(signedIn: false)
+        #expect(model.phase == .turnedOff && !model.signedInStillOff, "Cancelled: keep offering the sign-in")
+
+        await model.nousSignInClosed(signedIn: true)
+        #expect(model.signedInStillOff, "Signed in and still closed: a setting on the computer")
+
+        service.failures["connectors.catalog"] = nil
+        await model.nousSignInClosed(signedIn: true)
+        #expect(model.phase == .ready && !model.signedInStillOff)
+        #expect(model.others.map(\.name) == ["Example Notes"])
+    }
+
     /// Apps not connected yet show by the catalog's category, alphabetically, with unplaced apps last;
     /// a chip narrows to one category and the search narrows inside it.
     @Test func appsShowByCategory() async {

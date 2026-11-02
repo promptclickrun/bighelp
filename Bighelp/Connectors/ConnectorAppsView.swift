@@ -7,6 +7,8 @@ import SwiftUI
 struct ConnectorAppsView: View {
     @State var model: ConnectorAppsModel
     @State private var browser = ProviderSignInBrowser()
+    /// The Nous Portal sign-in open over the page, with the store that runs it on the computer.
+    @State private var nousSignIn: NousSignIn?
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -16,8 +18,12 @@ struct ConnectorAppsView: View {
                 Section { ProgressView("Loading apps…").frame(maxWidth: .infinity) }
                     .accessibilityIdentifier("connector.apps.loading")
             case .turnedOff:
-                note("Apps are turned off on this computer.",
-                     detail: "Turn on tools.connectors in Hermes' settings, then come back.")
+                if model.nousSignIn != nil, !model.signedInStillOff {
+                    nousSignInCard
+                } else {
+                    note("Apps are turned off on this computer.",
+                         detail: "Turn on tools.connectors in Hermes' settings, then come back.")
+                }
             case .needsUpdate:
                 note("Update Hermes to connect apps.",
                      detail: "Your computer runs a Hermes that's older than app connections.")
@@ -38,7 +44,76 @@ struct ConnectorAppsView: View {
             Task { await model.pageClosed() }
         }
         .onDisappear { browser.finish() }
+        .bighelpSheet(item: $nousSignIn, onDismiss: nousSignInClosed) { signIn in
+            ProviderSignInSheet(store: signIn.store, provider: Self.nous)
+                .bighelpSheetSize(.standard)
+        }
         .accessibilityIdentifier("connector.apps")
+    }
+
+    /// Hermes keeps apps closed while it has no usable Nous Portal sign-in, the usual cause (a lapsed
+    /// sign-in leaves Hermes nothing to connect with). Signing in again here opens them.
+    private var nousSignInCard: some View {
+        Section {
+            VStack(spacing: BighelpTokens.space12) {
+                AIProviderMarkView(providerID: Self.nous.logoID, providerName: Self.nous.name,
+                                   context: .chatQuickChoice, size: 40)
+                    .frame(width: 64, height: 64)
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(theme.isDarkPalette ? Color(white: 0.16) : .white))
+                    .accessibilityHidden(true)
+                Text("Sign in to Nous Portal")
+                    .font(.bighelp(.headline))
+                Text("Apps connect through Nous Portal. Sign in on this computer, then come back to pick your apps.")
+                    .font(.bighelp(.subheadline))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                Button {
+                    startNousSignIn()
+                } label: {
+                    Text("Sign in")
+                        .font(.bighelp(.body).weight(.semibold))
+                        .foregroundStyle(theme.actionForeground)
+                        .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
+                }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
+                .tint(theme.action)
+                .accessibilityLabel("Sign in to Nous Portal")
+                .accessibilityIdentifier("connector.apps.nous-sign-in")
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, BighelpTokens.space8)
+        }
+    }
+
+    private static let nous = ProviderSignInTarget(id: "nous", name: "Nous Portal", logoID: "nous")
+
+    /// One sign-in sheet and the store it runs on, handed to the sheet together.
+    private struct NousSignIn: Identifiable {
+        let id = UUID()
+        let store: ProviderAccountsStore
+    }
+
+    /// The sheet that last opened, so its store is closed when it goes.
+    @State private var openedNousSignIn: NousSignIn?
+
+    private func startNousSignIn() {
+        guard nousSignIn == nil, let store = model.nousSignIn?() else { return }
+        let signIn = NousSignIn(store: store)
+        openedNousSignIn = signIn
+        nousSignIn = signIn
+    }
+
+    private func nousSignInClosed() {
+        guard let store = openedNousSignIn?.store else { return }
+        openedNousSignIn = nil
+        let signedIn = if case .connected = store.signInProgress(for: Self.nous).step { true } else { false }
+        Task {
+            await store.closeSignIn(Self.nous)
+            store.retire()
+            await model.nousSignInClosed(signedIn: signedIn)
+        }
     }
 
     @ViewBuilder

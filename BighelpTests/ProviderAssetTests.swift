@@ -18,6 +18,7 @@ struct ProviderAssetTests {
         "ProviderLogoHuggingFace",
         "ProviderLogoVenice",
         "ProviderLogoGitHubCopilot",
+        "ProviderLogoNous",
     ]
 
     private let fallbackAssetNames = [
@@ -31,7 +32,6 @@ struct ProviderAssetTests {
         "ProviderLogoMinimax",
         "ProviderLogoMoonshot",
         "ProviderLogoNVIDIA",
-        "ProviderLogoNous",
         "ProviderLogoOllama",
         "ProviderLogoPerplexity",
         "ProviderLogoTogether",
@@ -470,6 +470,7 @@ struct ProviderAssetTests {
         (providerHeading: "GitHub Copilot", assetName: "ProviderLogoGitHubCopilot"),
         (providerHeading: "Claude", assetName: "ProviderLogoClaude"),
         (providerHeading: "Codex", assetName: "ProviderLogoCodex"),
+        (providerHeading: "Nous Research", assetName: "ProviderLogoNous"),
     ]
 
     private let openRouterMITLicense = """

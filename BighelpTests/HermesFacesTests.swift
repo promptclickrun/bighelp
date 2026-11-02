@@ -95,6 +95,20 @@ struct HermesFacesTests {
         #expect(photo["color"] == .string("#abc"))
     }
 
+    /// A face's color is saved like a shape's. Before, a face kept the color Hermes had, so a recolored
+    /// face saved its new picture with the old look, and every face drawn from the look stayed old.
+    @Test func aFaceSavesItsColor() {
+        let namespace: [String: BighelpJSONValue] = ["color": .string("#D8AD35"), "shape": .string("blobatar:ox0:organic")]
+        let recolored = AgentAvatarLook(style: .face, shape: "blobatar:ox0:organic", color: "#C02060")
+            .applied(to: namespace, profileID: "garden")
+        #expect(recolored["color"] == .string("#C02060"))
+        #expect(AgentAvatarLook(namespace: recolored)?.color == "#C02060", "Read back as saved")
+
+        let nameColor = AgentAvatarLook(style: .face, shape: "blobatar:ox0:organic", color: nil)
+            .applied(to: namespace, profileID: "garden")
+        #expect(nameColor["color"] == nil, "No color means the name's color, as for a shape")
+    }
+
     @Test func aFaceDrawnFromAnotherNameIsLockedToThatName() {
         // A new agent's face follows the name it was drawn with; if the host
         // picks a different profile name, Desktop must still draw that face.

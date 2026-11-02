@@ -25,7 +25,7 @@ NOTICES = ROOT / "Bighelp/Resources/ProviderLogos-NOTICES.txt"
 APPROVED_NAMES = frozenset(
     "ProviderLogo" + name for name in (
         "Anthropic", "Claude", "Codex", "GitHubCopilot", "Google", "HuggingFace",
-        "LMStudio", "Mistral", "OpenAI", "OpenRouter", "Venice",
+        "LMStudio", "Mistral", "Nous", "OpenAI", "OpenRouter", "Venice",
     )
 )
 MAX_IMAGE_BYTES = 1024 * 1024

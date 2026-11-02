@@ -91,7 +91,8 @@ enum AIProviderBrand: String, CaseIterable, Equatable, Sendable {
         case .huggingFace: .official(assetName: "ProviderLogoHuggingFace")
         case .venice: .official(assetName: "ProviderLogoVenice")
         case .githubCopilot: .official(assetName: "ProviderLogoGitHubCopilot")
-        case .nous, .xAI, .deepSeek, .groq, .cerebras,
+        case .nous: .official(assetName: "ProviderLogoNous")
+        case .xAI, .deepSeek, .groq, .cerebras,
              .together, .fireworks, .perplexity, .azure, .bedrock, .cohere,
              .ollama, .moonshot, .minimax, .zAI, .nvidia, .custom:
             .fallback

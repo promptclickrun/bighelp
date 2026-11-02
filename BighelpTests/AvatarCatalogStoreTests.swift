@@ -195,7 +195,6 @@ struct AvatarCatalogStoreTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         let entry = try #require(AvatarCatalog.bundled.avatars(in: .bighelp, at: .now).first)
         let store = CompanionStore(defaults: defaults)
-        #expect(store.defaultAppearance.catalogAvatar != nil, "A new phone's pet is a bighelp character")
         var look = CompanionAppearance(usesCharacterColors: false)
         look.catalogAvatar = AvatarCatalogReference(entry)
         look.colorHex = "#3F6FD8"

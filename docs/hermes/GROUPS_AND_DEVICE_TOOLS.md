@@ -891,15 +891,19 @@ are a related but separate owner surface.
 
 ### Account-scoped app management
 
-The current Settings Apps client deliberately waits for the person to choose
-setup before making account calls, because a call can create the host's free
-connector identity. A port should preserve that explicit setup boundary.
+Settings › Apps › Native App Connections opens straight on the list: it reads
+the catalog and the accounts, which Hermes (0.22.5 and later) answers without
+creating the host's free connector identity; only the first Connect makes it.
+A computer with no identity answers no accounts (or `4032` on accounts, read as
+none). Hermes releases before 0.22.5 still make the identity on these reads,
+as their own Hermes Desktop page did. The list groups apps by the catalog's
+`category` (alphabetical, apps without one last as Other) under chips, and
+draws each `logo_url`, which is usually an SVG (`ConnectorLogoSVG`).
 
 | Operation | Current RPC params / result fields used |
 | --- | --- |
-| Initial setup | `connectors.list {owner:{type:"account"}}`; successful answer enables the list. |
-| Catalog | `connectors.catalog {}`; reads `connectors` rows including `slug`, name/logo metadata, `description`, `category`. |
-| Accounts | `connectors.accounts {}`; reads `accounts` rows with `connection_id`, `connector`, `label`, `alias`, `status`, `active`, `disabled`. An account works when status is `active`, `active:true`, `disabled:false`. |
+| Catalog | `connectors.catalog {}`; reads `connectors` rows including `slug`, name, `logo_url`, `description`, `category`. |
+| Accounts | `connectors.accounts {}`; reads `accounts` rows with `connection_id`, `connector`, `label`, `alias`, `status`, `active`, `disabled`. An account works when status is `active`, `active:true`, `disabled:false`. `4032` means no identity yet: no accounts. |
 | Connect | `connectors.connect {owner:{type:"account"},connectors:[slug],alias?}`; same operation snapshot as a chat card. |
 | Repair account | Also send `reconnect:true`, `connection_id` to `connectors.connect`. |
 | Wake / status | `connectors.operation.wake` / `connectors.operation.status` with `{owner:{type:"account"},op_id}`. |
@@ -910,7 +914,7 @@ The settings client polls the operation every two seconds while waiting (up to
 five minutes, or eight seconds after the person closes the sign-in page), then
 reloads accounts. Closing a page or a local wait timer never proves a successful
 account connection. RPC errors distinguish method absent (`-32601`), connectors
-turned off (`4031`), setup required (`4032`), insufficient organization permission
+turned off (`4031`), no connector identity yet (`4032`), insufficient organization permission
 (`4030`), and alias conflict (`4090`). These are outside the plugin native HTTP
 response envelope.
 

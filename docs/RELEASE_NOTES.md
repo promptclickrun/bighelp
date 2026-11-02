@@ -3,6 +3,20 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.52
+
+### Changed
+
+- **Native App Connections:** the list opens at once, with app logos, category sections and filters. Connect an app from its row.
+- **Pet companions:** each agent uses its own avatar. Settings has three controls: Show pet companion, Pet size and Adventurous Pet.
+- **Working bots:** Hermes faces and bighelp characters play their animations while the agent works. With Reduce Motion, a badge shows the activity instead.
+- **Bot menu:** New Chat, Pin, Rearrange, Mark Read or Unread, Bot Profile and Hide are in one long-press menu.
+
+### Fixed
+
+- **Tool calls:** long tool names shorten to keep the disclosure arrows in place.
+- **Gemini Live:** the microphone gate clears leftover speech when the agent starts a reply.
+
 ## 2.6.51
 
 ### New

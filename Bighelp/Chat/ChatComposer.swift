@@ -32,7 +32,7 @@ struct ChatComposerHost: View {
     let isDraftFocused: Bool
     let onDismissKeyboard: () -> Void
     let onWillSend: () -> Void
-    let companionAppearance: CompanionAppearance?
+    let companionPet: AgentPetIdentity?
     let companionReaction: CompanionReaction
     let companionSizeScale: Double
     let companionIsAdventurous: Bool
@@ -51,7 +51,7 @@ struct ChatComposerHost: View {
         return ChatComposer(
             model: model, agentName: agentName, sessionCatalog: sessionCatalog, actions: actions,
             offersAttachments: onAttachmentTap != nil, draftFocus: draftFocus, isDraftFocused: isDraftFocused,
-            companionAppearance: companionAppearance, companionReaction: companionReaction,
+            companionPet: companionPet, companionReaction: companionReaction,
             companionSizeScale: companionSizeScale, companionIsAdventurous: companionIsAdventurous,
             referenceHub: referenceHub, referenceSkills: referenceSkills
         )
@@ -75,7 +75,7 @@ struct ChatComposer: View, Equatable {
     /// `draftFocus` as the chat screen drew it. Two copies of one binding read the same
     /// value, so this is what `==` compares.
     let isDraftFocused: Bool
-    let companionAppearance: CompanionAppearance?
+    let companionPet: AgentPetIdentity?
     let companionReaction: CompanionReaction
     let companionSizeScale: Double
     let companionIsAdventurous: Bool
@@ -101,7 +101,7 @@ struct ChatComposer: View, Equatable {
         lhs.model === rhs.model && lhs.agentName == rhs.agentName
             && lhs.sessionCatalog === rhs.sessionCatalog && lhs.actions === rhs.actions
             && lhs.offersAttachments == rhs.offersAttachments && lhs.isDraftFocused == rhs.isDraftFocused
-            && lhs.companionAppearance == rhs.companionAppearance
+            && lhs.companionPet == rhs.companionPet
             && lhs.companionReaction == rhs.companionReaction
             && lhs.companionSizeScale == rhs.companionSizeScale
             && lhs.companionIsAdventurous == rhs.companionIsAdventurous
@@ -178,9 +178,9 @@ struct ChatComposer: View, Equatable {
         .padding(.vertical, BighelpTokens.space8)
         .frame(maxWidth: .infinity)
         .overlayPreferenceValue(CompanionComposerAnchorPreferenceKey.self) { anchors in
-            if let companionAppearance {
+            if let companionPet {
                 CompanionComposerAdventureLayer(
-                    appearance: companionAppearance,
+                    pet: companionPet,
                     reaction: companionReaction,
                     sizeScale: companionSizeScale,
                     isAdventurous: companionIsAdventurous,
@@ -366,7 +366,7 @@ struct ChatComposer: View, Equatable {
     }
 
     private var companionRailReservation: CGFloat {
-        guard companionAppearance != nil else { return 0 }
+        guard companionPet != nil else { return 0 }
         let scale = companionSizeScale.isFinite ? min(max(companionSizeScale, 0.6), 1.5) : 1
         return min(72 * CGFloat(scale), 116) + CompanionComposerPathSampler.restGap
     }

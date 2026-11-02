@@ -3,7 +3,7 @@ import Foundation
 import SwiftUI
 
 struct CompanionInteractionLayer: View {
-    let appearance: CompanionAppearance
+    let pet: AgentPetIdentity
     let reaction: CompanionReaction
     var audioLevel: Double = 0
     var itemSize: CGFloat = 92
@@ -29,9 +29,9 @@ struct CompanionInteractionLayer: View {
             let resting = CGPoint(x: bounds.maxX - side / 2,
                                   y: restsAtTop ? bounds.minY + side / 2 : bounds.maxY - side / 2)
             if side >= 24 {
-                CompanionAvatar(appearance: appearance, reaction: CompanionAcceptanceFixture.reaction(reaction),
-                                isAnimating: isVisible && scenePhase == .active,
-                                audioLevel: audioLevel, isInteracting: isDragActive, showsBackground: false)
+                AgentPet(identity: pet, reaction: CompanionAcceptanceFixture.reaction(reaction),
+                         isAnimating: isVisible && scenePhase == .active,
+                         audioLevel: audioLevel, isInteracting: isDragActive)
                     .allowsHitTesting(false)
                     .scaleEffect(x: 2 - squish, y: squish)
                     .frame(width: side, height: side)
@@ -40,7 +40,7 @@ struct CompanionInteractionLayer: View {
                         touchSurface(bounds: bounds, size: size, resting: resting)
                     }
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("\(appearance.character.displayName) companion")
+                    .accessibilityLabel("\(pet.name) companion")
                     .accessibilityValue(CompanionAcceptanceFixture.reaction(reaction).accessibilityDescription)
                     .accessibilityIdentifier(accessibilityID)
                     .accessibilityAction(named: "Return companion to its resting place") {
@@ -62,7 +62,7 @@ struct CompanionInteractionLayer: View {
         .onDisappear { isVisible = false; stopMotion() }
         .onChange(of: scenePhase) { _, phase in if phase != .active { stopMotion() } }
         .onChange(of: reduceMotion) { _, enabled in if enabled { stopMotion() } }
-        .onChange(of: appearance.character) { _, _ in stopMotion(); physics = nil }
+        .onChange(of: pet.agentID) { _, _ in stopMotion(); physics = nil }
         .onChange(of: isDragActive) { _, active in
             // GestureState also resets on cancellation, when onEnded is absent.
             if !active, physics?.isDragging == true { stopMotion() }

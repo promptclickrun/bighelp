@@ -1,16 +1,20 @@
 import SwiftUI
 
-/// Settings › Apps: the apps your agents can use through Hermes' connectors.
+/// Settings › Apps › Native App Connections: the apps your agents can use through Hermes'
+/// connectors, by the catalog's categories. Connect signs in from the row; a connected app opens
+/// its accounts.
 @MainActor
 struct ConnectorAppsView: View {
     @State var model: ConnectorAppsModel
+    @State private var browser = ProviderSignInBrowser()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        Form {
+        List {
             switch model.phase {
-            case .intro: intro
             case .loading:
                 Section { ProgressView("Loading apps…").frame(maxWidth: .infinity) }
+                    .accessibilityIdentifier("connector.apps.loading")
             case .turnedOff:
                 note("Apps are turned off on this computer.",
                      detail: "Turn on tools.connectors in Hermes' settings, then come back.")
@@ -24,66 +28,92 @@ struct ConnectorAppsView: View {
             }
         }
         .bighelpFormSurface()
-        .navigationTitle("Apps")
+        .navigationTitle("Native App Connections")
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.appear() }
         .refreshable { if model.phase == .ready { await model.load() } }
-        .accessibilityIdentifier("connector.apps")
-    }
-
-    private var intro: some View {
-        Section {
-            VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                Text("Let your agents use your other apps")
-                    .font(.bighelp(.headline))
-                Text("Sign in to an app once, like your email or notes, and your agents can use it in any chat.")
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.vertical, BighelpTokens.space4)
-            Button("Set up apps") { Task { await model.setUp() } }
-                .fontWeight(.semibold)
-                .accessibilityIdentifier("connector.apps.set-up")
-        } footer: {
-            Text("Your sign-ins are kept by the Hermes app service, not on this phone. Hermes makes a free account there for your computer.")
+        .onChange(of: scenePhase) { _, phase in
+            // The Mac signs in in the default browser; coming back to bighelp means done.
+            guard phase == .active, model.signIn != nil else { return }
+            Task { await model.pageClosed() }
         }
+        .onDisappear { browser.finish() }
+        .accessibilityIdentifier("connector.apps")
     }
 
     @ViewBuilder
     private var list: some View {
-        BighelpSearchField(text: $model.search, prompt: "Search apps", accessibilityIdentifier: "connector.apps.search")
-            .bighelpListSearchRow()
+        Section {
+            BighelpSearchField(text: $model.search, prompt: "Search apps", accessibilityIdentifier: "connector.apps.search")
+                .bighelpListSearchRow()
+            if model.categoryNames.count > 1 {
+                ConnectorCategoryChips(names: model.categoryNames, selection: $model.category)
+                    .templateChipsRow()
+            }
+        }
         if let message = model.message {
             Section { Text(message).foregroundStyle(.secondary) }
         }
         if !model.connected.isEmpty {
             Section("Connected") {
-                ForEach(model.connected) { app in appRow(app) }
+                ForEach(model.connected) { app in connectedRow(app) }
             }
         }
-        Section(model.connected.isEmpty ? "Apps" : "More apps") {
-            if model.others.isEmpty {
-                Text(model.search.isEmpty ? "Every app is connected." : "No apps match.")
+        let sections = model.sections
+        if sections.isEmpty, model.connected.isEmpty {
+            Section {
+                Text(model.search.isEmpty && model.category == nil ? "Every app is connected." : "No apps match.")
                     .foregroundStyle(.secondary)
             }
-            ForEach(model.others) { app in appRow(app) }
+        }
+        ForEach(sections) { category in
+            Section {
+                ForEach(category.apps) { app in appRow(app) }
+            } header: {
+                Text(category.name)
+                    .accessibilityIdentifier("connector.apps.section.\(category.name)")
+            }
+        }
+        Section {
+        } footer: {
+            Text("Your agents can use the apps you connect, in any chat. Hermes keeps your sign-ins in its app service, and makes a free account there for this computer when you connect your first app.")
         }
     }
 
-    private func appRow(_ app: ConnectorAppsModel.App) -> some View {
+    private func connectedRow(_ app: ConnectorAppsModel.App) -> some View {
         NavigationLink {
             ConnectorAppDetailView(model: model, appID: app.id)
         } label: {
-            HStack(spacing: BighelpTokens.space12) {
-                ConnectorLogo(url: app.logoURL, name: app.name)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(app.name).font(.bighelp(.body))
-                    Text(app.isConnected ? accountSummary(app) : app.summary)
-                        .font(.bighelp(.footnote))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+            ConnectorAppLabel(app: app, detail: accountSummary(app))
+        }
+        .accessibilityIdentifier("connector.apps.app.\(app.id)")
+    }
+
+    private func appRow(_ app: ConnectorAppsModel.App) -> some View {
+        HStack(spacing: BighelpTokens.space12) {
+            ConnectorAppLabel(app: app, detail: app.summary)
+            Spacer(minLength: 0)
+            if model.signIn?.appID == app.id {
+                Button("Stop") { model.stopWaiting(); browser.finish() }
+                    .font(.bighelp(.subheadline).weight(.semibold))
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.capsule)
+                    .accessibilityLabel("Stop waiting for \(app.name)")
+                    .accessibilityIdentifier("connector.apps.stop-waiting")
+            } else {
+                Button("Connect") {
+                    Task { await ConnectorAppSignIn.connect(app, model: model, browser: browser) }
                 }
+                .font(.bighelp(.subheadline).weight(.semibold))
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
+                .tint(theme.action)
+                .disabled(model.isWorking(app.id) || model.signIn != nil)
+                .accessibilityLabel("Connect \(app.name)")
+                .accessibilityIdentifier("connector.apps.connect.\(app.id)")
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("connector.apps.app.\(app.id)")
     }
 
@@ -100,6 +130,93 @@ struct ConnectorAppsView: View {
             }
             .padding(.vertical, BighelpTokens.space4)
         }
+    }
+
+    @BighelpThemeReader private var theme
+}
+
+/// An app's logo, name and one line about it, in the list and on its page.
+private struct ConnectorAppLabel: View {
+    let app: ConnectorAppsModel.App
+    let detail: String
+
+    var body: some View {
+        HStack(spacing: BighelpTokens.space12) {
+            ConnectorLogo(url: app.logoURL, name: app.name, size: 40)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(app.name).font(.bighelp(.body))
+                if !detail.isEmpty {
+                    Text(detail)
+                        .font(.bighelp(.footnote))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+        }
+    }
+}
+
+/// All, then each category the catalog has. Tapping the chosen one again goes back to All.
+private struct ConnectorCategoryChips: View {
+    let names: [String]
+    @Binding var selection: String?
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: BighelpTokens.space8) {
+                chip(nil, title: String(localized: "All"))
+                ForEach(names, id: \.self) { chip($0, title: $0) }
+            }
+            .padding(.horizontal, BighelpTokens.space16)
+            .padding(.vertical, 2)
+        }
+        .scrollIndicators(.hidden)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Categories")
+        .accessibilityIdentifier("connector.apps.categories")
+    }
+
+    private func chip(_ name: String?, title: String) -> some View {
+        let isOn = selection == name
+        return Button {
+            withAnimation(.snappy) { selection = isOn ? nil : name }
+        } label: {
+            Text(title)
+                .lineLimit(1)
+                .font(.bighelp(.subheadline).weight(.semibold))
+                .foregroundStyle(isOn ? theme.actionForeground : theme.primaryText)
+                .padding(.horizontal, BighelpTokens.space12)
+                .frame(minHeight: chipHeight)
+                .background(isOn ? theme.action : theme.surface, in: .capsule)
+                .overlay { Capsule().strokeBorder(isOn ? .clear : theme.border) }
+                .contentShape(.capsule)
+        }
+        .bighelpPlainButtonStyle(.capsule)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+        .accessibilityIdentifier("connector.apps.category.\(name ?? "all")")
+    }
+
+    private var chipHeight: CGFloat {
+        #if os(visionOS)
+        BighelpTokens.hitTarget
+        #else
+        BighelpTokens.scaled(36)
+        #endif
+    }
+}
+
+/// Signs in to an app: opens Hermes' page, then closes it for the person once Hermes sees the account.
+@MainActor
+enum ConnectorAppSignIn {
+    static func connect(_ app: ConnectorAppsModel.App, model: ConnectorAppsModel, browser: ProviderSignInBrowser,
+                        alias: String? = nil, repairing account: ConnectorAppsModel.Account? = nil) async {
+        guard let url = await model.connect(app, alias: alias, repairing: account) else { return }
+        browser.start(url) {
+            Task { await model.pageClosed() }
+        }
+        _ = await model.watchSignIn()
+        browser.finish()
     }
 }
 
@@ -266,13 +383,6 @@ struct ConnectorAppDetailView: View {
 
     private func connect(_ app: ConnectorAppsModel.App, alias: String? = nil,
                          repairing account: ConnectorAppsModel.Account? = nil) async {
-        guard let url = await model.connect(app, alias: alias, repairing: account) else { return }
-        let model = model
-        browser.start(url) {
-            Task { await model.pageClosed() }
-        }
-        // Closes the page for the person once Hermes sees the account.
-        _ = await model.watchSignIn()
-        browser.finish()
+        await ConnectorAppSignIn.connect(app, model: model, browser: browser, alias: alias, repairing: account)
     }
 }

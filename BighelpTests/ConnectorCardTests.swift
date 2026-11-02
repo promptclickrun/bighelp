@@ -270,37 +270,89 @@ struct ConnectorAppsModelTests {
         }
     }
 
-    private func model(_ service: Service, setUp: Bool) -> ConnectorAppsModel {
-        let defaults = UserDefaults(suiteName: "connector-apps-tests-\(UUID().uuidString)")!
-        if setUp { defaults.set(true, forKey: "bighelp.connectors.set-up.host") }
-        return ConnectorAppsModel(service: service, scope: "host", defaults: defaults)
+    final class FixedService: ConnectorAppsService {
+        let answers: [String: BighelpJSONValue]
+        init(answers: [String: BighelpJSONValue]) { self.answers = answers }
+        func call(_ method: String, params: [String: BighelpJSONValue]) async throws -> BighelpJSONValue {
+            answers[method] ?? .object([:])
+        }
     }
 
-    @Test func openingThePageCallsNothingUntilThePersonSetsItUp() async {
+    private func model(_ service: Service) -> ConnectorAppsModel {
+        ConnectorAppsModel(service: service)
+    }
+
+    /// Native App Connections opens on the list: Hermes reads the catalog and accounts without making
+    /// the computer's connector identity, so there's no Set up step (and no `connectors.list`).
+    @Test func openingThePageListsTheAppsAtOnce() async {
         let service = Service()
-        let model = model(service, setUp: false)
+        let model = model(service)
         await model.appear()
-        #expect(model.phase == .intro)
-        #expect(service.calls.isEmpty, "Any account call makes Hermes create the computer's connector identity")
-        await model.setUp()
-        #expect(service.calls == ["connectors.list", "connectors.catalog", "connectors.accounts"])
         #expect(model.phase == .ready)
+        #expect(service.calls == ["connectors.catalog", "connectors.accounts"])
         #expect(model.connected.map(\.name) == ["Example Mail"])
         #expect(model.others.map(\.name) == ["Example Notes"])
     }
 
-    @Test(arguments: [(-32601, ConnectorAppsModel.Phase.needsUpdate), (4031, .turnedOff), (4032, .intro)])
+    /// A computer that never connected an app has no connector identity; its catalog still lists.
+    @Test func aComputerWithNoConnectorAccountStillLists() async {
+        let service = Service()
+        service.failures["connectors.accounts"] = DirectHermesError.rpcRejected(code: 4032)
+        let model = model(service)
+        await model.appear()
+        #expect(model.phase == .ready)
+        #expect(model.connected.isEmpty)
+        #expect(model.others.map(\.name) == ["Example Mail", "Example Notes"])
+    }
+
+    @Test(arguments: [(-32601, ConnectorAppsModel.Phase.needsUpdate), (4031, .turnedOff)])
     func hostAnswersBecomePlainStates(code: Int, phase: ConnectorAppsModel.Phase) async {
         let service = Service()
         service.failures["connectors.catalog"] = DirectHermesError.rpcRejected(code: code)
-        let model = model(service, setUp: true)
+        let model = model(service)
         await model.appear()
         #expect(model.phase == phase)
     }
 
+    /// Apps not connected yet show by the catalog's category, alphabetically, with unplaced apps last;
+    /// a chip narrows to one category and the search narrows inside it.
+    @Test func appsShowByCategory() async {
+        func row(_ slug: String, _ name: String, _ category: String?) -> BighelpJSONValue {
+            var object: [String: BighelpJSONValue] = ["slug": .string(slug), "name": .string(name),
+                                                      "description": .string("About \(name)")]
+            if let category { object["category"] = .string(category) }
+            return .object(object)
+        }
+        let catalog = BighelpJSONValue.object(["connectors": .array([
+            row("slack", "Slack", "Communication"), row("shopify", "Shopify", "Commerce"),
+            row("resend_mcp", "Resend", "Communication"), row("mystery", "Mystery", nil),
+            row("stripe_mcp", "Stripe", "Commerce"),
+        ])])
+        let accounts = BighelpJSONValue.object(["accounts": .array([.object([
+            "connection_id": .string("acc-1"), "connector": .string("slack"), "status": .string("active"),
+            "label": .string("sam@example.com"), "active": .boolean(true), "disabled": .boolean(false),
+        ])])])
+        let model = ConnectorAppsModel(service: FixedService(answers: ["connectors.catalog": catalog,
+                                                                       "connectors.accounts": accounts]))
+        await model.appear()
+        #expect(model.categoryNames == ["Commerce", "Communication", "Other"])
+        #expect(model.sections.map(\.name) == ["Commerce", "Communication", "Other"])
+        #expect(model.sections.map { $0.apps.map(\.name) } == [["Shopify", "Stripe"], ["Resend"], ["Mystery"]],
+                "A connected app shows under Connected, not in its category")
+        model.category = "Communication"
+        #expect(model.connected.map(\.name) == ["Slack"])
+        model.category = "Commerce"
+        #expect(model.connected.isEmpty)
+        model.category = "Communication"
+        #expect(model.sections.map(\.name) == ["Communication"])
+        model.category = nil
+        model.search = "str"
+        #expect(model.sections.flatMap(\.apps).map(\.name) == ["Stripe"])
+    }
+
     @Test func connectingOpensThePageThenWaitsForTheAccount() async throws {
         let service = Service()
-        let model = model(service, setUp: true)
+        let model = model(service)
         await model.appear()
         let notes = try #require(model.others.first)
         let url = await model.connect(notes)
@@ -314,7 +366,7 @@ struct ConnectorAppsModelTests {
     @Test func closingThePageWithoutSigningInStopsTheWait() async throws {
         let service = Service()
         service.statusState = "initiated"
-        let model = model(service, setUp: true)
+        let model = model(service)
         await model.appear()
         let notes = try #require(model.others.first)
         _ = await model.connect(notes)

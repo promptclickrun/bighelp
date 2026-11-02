@@ -160,7 +160,7 @@ struct HermesBlobFacePaths {
         face.scaleBy(x: pose.squash, y: 1 / pose.squash)
         face.translateBy(x: -50, y: -50 - feet)
         for part in body { face.fill(part, with: .color(head)) }
-        for path in eyes { drawEye(path, pose: pose, in: face) }
+        for path in eyes { Self.drawEye(path, pose: pose, color: eye, in: face) }
 
         guard pose.effect != nil else { return }
         var overlay = context
@@ -170,7 +170,8 @@ struct HermesBlobFacePaths {
             .effect(72, 24)
     }
 
-    private func drawEye(_ path: Path, pose: BuddyPose, in context: GraphicsContext) {
+    /// One eye in the pose: open, wide, squinting, closed or smiling, looking where the pose looks.
+    static func drawEye(_ path: Path, pose: BuddyPose, color eye: Color, in context: GraphicsContext) {
         let box = path.boundingRect
         let center = CGPoint(x: box.midX, y: box.midY)
         func reshaped(scaleX: CGFloat = 1, scaleY: CGFloat, look: CGPoint = .zero) -> Path {
@@ -201,7 +202,7 @@ struct HermesBlobFacePaths {
     }
 
     /// `BuddyPalette` takes hex; a face color can be `hsl()`.
-    private static func hex(_ css: String) -> String {
+    static func hex(_ css: String) -> String {
         guard let rgb = HermesCSSColor.rgb(css) else { return "#8B5CF6" }
         return CompanionColor.hex(red: rgb.red, green: rgb.green, blue: rgb.blue)
     }

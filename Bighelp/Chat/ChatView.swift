@@ -499,14 +499,14 @@ struct ChatView: View {
         )
     }
 
-    private func companionAppearance(from store: CompanionStore) -> CompanionAppearance {
-        guard let agentID = chatClarifications.first?.agentID ?? model.memberIDs.first,
-              !companionAgentScope.isEmpty else {
-            return store.defaultAppearance
-        }
-        return store.appearance(
-            for: CompanionStore.agentKey(agentScope: companionAgentScope, agentID: agentID)
-        )
+    /// The pet is the avatar of the agent asking, else the chat's agent.
+    private var companionPet: AgentPetIdentity? {
+        let participants = resolvedIdentityParticipants
+        let agentID = chatClarifications.first?.agentID ?? model.memberIDs.first ?? participants.first?.stableID
+        guard let agentID else { return nil }
+        let participant = participants.first { $0.stableID == agentID }
+        return AgentPetIdentity(agentID: agentID, name: participant?.displayName ?? agentName,
+                                imageURL: participant?.imageURL)
     }
 
     private func reconcileCompanion(_ signal: CompanionChatSignal) {
@@ -787,9 +787,7 @@ struct ChatView: View {
             isDraftFocused: isDraftFocused,
             onDismissKeyboard: dismissKeyboard,
             onWillSend: { timelineController.scrollToLatest(animated: false) },
-            companionAppearance: companionStore.flatMap { store in
-                store.isEnabled ? companionAppearance(from: store) : nil
-            },
+            companionPet: companionStore?.isEnabled == true ? companionPet : nil,
             companionReaction: companionReaction,
             companionSizeScale: companionStore?.sizeScale ?? 1,
             companionIsAdventurous: companionStore?.isAdventurous == true,

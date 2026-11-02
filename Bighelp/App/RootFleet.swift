@@ -551,7 +551,7 @@ extension RootShellView {
                        avatarFile: fleet.liveAvatarFile(from: agents.avatarURL(for: profile)),
                        isPinned: key.pinned.contains(profile.id), isDefault: profile.isDefault,
                        activity: chats.contains { $0.profileID == profile.id && $0.isActive } ? .working : nil,
-                       placement: profile.placement)
+                       placement: profile.placement, look: profile.look)
         }
         let names = Dictionary(key.agents.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         let canDelete = botModeRooms.nativeCapabilities?.supports("groups.disband") == true

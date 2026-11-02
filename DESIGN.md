@@ -62,8 +62,11 @@ are historical (`docs/ui-v3-design.md`).
   mouth, top and cheeks), a tone-on-tone pattern, and an idle move. The characters come from `Design/AvatarKit`
   (edit `tools/build.py`, then run `tools/build.py` and `tools/export_native.py`); the app draws them natively
   from `Bighelp/Resources/AvatarKit.json`, acting out the agent's state (listening, thinking, waiting on you,
-  talking, happy, sleeping) plus extra moves for its current work. The look is saved as the agent's avatar picture and as its
-  chat companion.
+  talking, happy, sleeping) plus extra moves for its current work. The look is saved as the agent's avatar picture.
+- Every surface draws an agent's face in one order (`AgentFace`): its kit character, its petdex pet, its Hermes face
+  or shape (the look Hermes keeps in its profile, drawn live and played with the avatar designer's states), its
+  Bots mode mark, then its picture. Each agent's pet companion is that same face (`AgentPet`); Settings › Companion
+  pet holds only Show pet companion, Pet size and Adventurous Pet.
 - Menu, Hermes tools and Settings icons are bighelp's own line glyphs (`Design/Glyphs`, `BighelpGlyph`): a 24-pt
   grid, round 2-pt strokes and the brand's dot, with agents drawn as the orb with two eyes. Call sites still name SF
   Symbols; ones without a glyph fall back to the symbol. Edit `glyphs.py`, then run `export_assets.py`.
@@ -479,12 +482,14 @@ text is SF Pro, as everywhere.
   menus, chats or blinking, and every bot and group chat drags into place, on top (the primary bot too) or in
   the list. Save keeps the order per computer (`SimpleBotsOrderStore`); a bot or group chat not placed yet leads
   the list, by its latest message. Hidden bots stay off the home; search's filter shows them.
-- **Working and Needs you**: a bot whose Bot Chat is on a turn gets a still badge on its face (the kind of work:
-  a globe while it browses, in the page's ink) and, in the list, a line in place of its latest message
-  ("Browsing the web…", "Working…"); one waiting on you (an approval, a question) gets a raised hand in ember
-  and "Needs you", which wins over working. Marks also look up while they work; characters and pets play the
-  move for the work; photos stay still. It's only what the computer says (`BotChatActivityStore`): unknown
-  or out of date shows nothing, and it clears when the turn ends.
+- **Working and Needs you**: a bot whose Bot Chat is on a turn acts the work out on its face: a mark or kit
+  character plays the mood for it (`AgentActivityKind.moodID`: scanning for code, looking around while it
+  browses), a Hermes face or shape the designer's state for it (`hermesPlayState`), a pet its move. In the list,
+  a line takes the place of its latest message ("Browsing the web…", "Working…"). A face that can't act it out
+  (a photo, or any face with Reduce Motion or Low Power Mode) gets a still badge for the kind of work instead
+  (a globe while it browses, in the page's ink). One waiting on you (an approval, a question) gets a raised hand
+  in ember and "Needs you", which wins over working. It's only what the computer says (`BotChatActivityStore`):
+  unknown or out of date shows nothing, and it clears when the turn ends.
 - **Touch and hold** a bot: its latest message, then New Chat, Pin (Unpin when pinned), Rearrange,
   Mark Read/Unread (kept on this device), Bot Profile, a divider, and Hide. Actions stay in that order;
   the primary bot has no Pin or Hide. Primary selection stays in Chats settings, and Routines in Bot Profile.

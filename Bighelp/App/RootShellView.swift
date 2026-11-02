@@ -1259,16 +1259,21 @@ struct RootShellView: View {
         return ComposioAppsModel(account: .shared, agentHost: agentHost)
     }
 
-    /// Settings › Apps for the computer in use, while it's connected; made-up apps in demo mode.
+    /// Settings › Apps for the computer in use, while it's connected; sample apps in demo mode.
     func connectorAppsModel() -> ConnectorAppsModel? {
-        if let workspace = hostRegistry?.selectedWorkspace, let hostID = hostRegistry?.selectedHostID {
+        if let workspace = hostRegistry?.selectedWorkspace, hostRegistry?.selectedHostID != nil {
             guard workspace.isConnected else { return nil }
-            return ConnectorAppsModel(service: DirectHermesConnectorAppsService(workspace: workspace),
-                                      scope: hostID.uuidString)
+            return ConnectorAppsModel(service: DirectHermesConnectorAppsService(workspace: workspace))
         }
         guard usesWorkspaceFixtures else { return nil }
-        return ConnectorAppsModel(service: DemoConnectorAppsService(), scope: "demo",
-                                  defaults: UserDefaults(suiteName: "bighelp.demo.connectors") ?? .standard)
+        return ConnectorAppsModel(service: DemoConnectorAppsService())
+    }
+
+    /// Home's pet: the primary agent's own avatar.
+    var homeCompanionPet: AgentPetIdentity? {
+        let profile = agents.profiles.first { $0.id == agents.primaryAgentID }
+            ?? agents.profiles.first(where: \.isDefault) ?? agents.profiles.first
+        return profile.map { AgentPetIdentity(agentID: $0.id, name: $0.name, imageURL: agents.avatarURL(for: $0)) }
     }
 
     var workspaceActivity: some View {
@@ -1276,6 +1281,7 @@ struct RootShellView: View {
             model: featureStore.dashboardModel,
             connection: HostConnectionStatus(dashboardIsConnected: nativeRuntime != nil
                 ? currentWorkspaceOwner != nil : dashboardFixtureIsConnected),
+            companionPet: homeCompanionPet,
             onInboxItemTap: openDashboardInboxItem,
             onAttentionItemTap: openDashboardAttentionItem,
             onWorkItemTap: openDashboardWorkItem

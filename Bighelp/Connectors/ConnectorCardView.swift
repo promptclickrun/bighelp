@@ -248,20 +248,23 @@ struct ConnectorInlineCard: View {
     @BighelpThemeReader private var theme
 }
 
-/// The app's own logo from Hermes' catalog, or a plain symbol.
+/// The app's own logo from the catalog, or a plain symbol while it loads or when there's none.
 struct ConnectorLogo: View {
     let url: URL?
     let name: String
     var kind: ConnectorOperation.TargetKind = .connector
     var size: CGFloat = 36
+    @State private var logo: ConnectorLogoLoader.Logo?
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Group {
-            if let url {
-                AsyncImage(url: url) { image in
-                    image.resizable().scaledToFit()
-                } placeholder: {
-                    symbol
+            if let logo = logo ?? url.flatMap(ConnectorLogoLoader.shared.cached) {
+                if logo.isDarkInk, colorScheme == .dark {
+                    // A black mark on nothing would vanish into the page.
+                    picture(logo).padding(size * 0.12).background(Color.white)
+                } else {
+                    picture(logo)
                 }
             } else {
                 symbol
@@ -269,7 +272,16 @@ struct ConnectorLogo: View {
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
+        .task(id: url) {
+            logo = nil
+            guard let url else { return }
+            logo = await ConnectorLogoLoader.shared.logo(for: url)
+        }
         .accessibilityHidden(true)
+    }
+
+    private func picture(_ logo: ConnectorLogoLoader.Logo) -> some View {
+        Image(decorative: logo.image, scale: 1).resizable().interpolation(.high).scaledToFit()
     }
 
     private var symbol: some View {

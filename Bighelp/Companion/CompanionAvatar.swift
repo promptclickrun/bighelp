@@ -97,13 +97,18 @@ struct CompanionAvatar: View {
         .accessibilityValue(accessibilityDescription)
     }
 
+    private var mood: String? {
+        Self.mood(reaction: reaction, activityMood: activityMood, ambientMotion: ambientMotion, idleMood: appearance.vibe?.moodID)
+    }
+
     /// Semantic reactions win; otherwise the agent's activity, then the
     /// composer's ambient motion, then the chosen idle move.
-    private var mood: String? {
+    static func mood(reaction: CompanionReaction, activityMood: String?, ambientMotion: CompanionAmbientMotion,
+                     idleMood: String?) -> String {
         guard reaction == .idle else { return reaction == .question ? "curious" : reaction.characterMood }
         if let activityMood { return activityMood }
         switch ambientMotion {
-        case .none: return appearance.vibe?.moodID ?? reaction.characterMood
+        case .none: return idleMood ?? reaction.characterMood
         case .bounce: return "bounce"
         case .dance: return "dance"
         }

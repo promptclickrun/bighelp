@@ -43,7 +43,7 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
         case .appearance: String(localized: "Colors, light and dark, chat layout")
         case .permissions: String(localized: "Microphone, camera, photos, usage sharing and more")
         case .connectivityAndNotifications: String(localized: "Your computers, Hermes updates and restarts")
-        case .companion: String(localized: "Character, motion and agent")
+        case .companion: String(localized: "Size and movement")
         case .help: String(localized: "Report a problem, guides and version")
         case .watch: String(localized: "Pairing and connection")
         case .carPlay: String(localized: "The agent and computer it talks to")

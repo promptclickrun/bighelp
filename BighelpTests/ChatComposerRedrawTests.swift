@@ -65,7 +65,7 @@ struct ChatComposerRedrawTests {
         func box(_ model: ChatModel, focused: Bool = false, attachments: Bool = true) -> ChatComposer {
             ChatComposer(model: model, agentName: "Juno", sessionCatalog: nil, actions: actions,
                          offersAttachments: attachments, draftFocus: .constant(focused), isDraftFocused: focused,
-                         companionAppearance: nil, companionReaction: .idle, companionSizeScale: 1,
+                         companionPet: nil, companionReaction: .idle, companionSizeScale: 1,
                          companionIsAdventurous: false, referenceHub: hub, referenceSkills: nil)
         }
         var voiceTaps: [String] = []

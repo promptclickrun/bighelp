@@ -288,6 +288,8 @@ change in both repos.
   - The route only runs when `/native/context` lists its feature. Otherwise it fails as unsupported, and the UI
     should say "update the plugin", never show a raw error.
   - Requests send `If-Match` (the context ETag) and `X-Loopdy-Request-ID`, which must be a lowercase UUID.
+  - Context reads send `X-Bighelp-Features: all` (`DirectHermesHTTP.featureListHeader`): plugins list at most 64
+    features to apps without it, because older releases refuse a longer list. The app takes up to 256.
   - On a `conflict` (context changed), reload the context and retry once.
 - **Plugin releases (no pin):**
   - The app installs and offers the plugin's latest GitHub Release (`Bighelp/Hosts/PluginLatestRelease.swift`).

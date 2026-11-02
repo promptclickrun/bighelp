@@ -3,6 +3,24 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.54
+
+### New
+
+- **Default Model has Advanced models:** open a bot's profile and tap Default Model. The chat model is first, with its thinking level and Fast. Tap Advanced to choose a model for subagents, scheduled tasks and helper tasks. An example of a helper task is "Naming chats". Each one can use the same model as the chat.
+- **Choose models on the page:** the list of models and the thinking levels open below the row that you change. They do not open in a separate window. The change saves when you tap a model.
+
+### Changed
+
+- **Hermes tools (Nerd Mode):** MCP servers, Toolsets, installed plugins and skills, Webhooks, Messaging, Memory and Shell hooks look like Native App Connections. Each list has search, filters, logos and a switch on each row.
+- **Test notification:** the test notification says "This is your successful test notification from bighelp!".
+
+### Fixed
+
+- **Plugins:** when you turn a plugin off or remove it, the change shows at once and the screen does not freeze.
+- **Plugins and Skills Hub:** the pages open faster. When you open a page again, it shows at once.
+- **Gemini Live:** when you ask for something in your home, for example "turn my TV off", your agent does the work. Before, Gemini sometimes said that it cannot control your home. To get this fix, update the bighelp plugin to 3.42.1.
+
 ## 2.6.53
 
 ### Fixed

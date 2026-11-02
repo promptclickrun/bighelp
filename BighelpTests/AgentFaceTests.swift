@@ -45,6 +45,32 @@ struct AgentFaceTests {
         #expect(store.looks[CompanionStore.agentKey(agentScope: liveScope, agentID: "bot")]?.look == look)
     }
 
+    /// Opening a bot on another gateway makes this computer one of the others, whose faces come from its saved
+    /// all-hosts copy. A copy saved before the app last read this computer live (before an avatar change, say)
+    /// must not bring the old face back; a newer copy still replaces it.
+    @Test func anOlderCopyOfAGatewayNeverBringsBackAnOldFace() {
+        let store = AgentLookStore()
+        let host = UUID()
+        let scope = CompanionSurfaceScope.computer(host.uuidString)
+        let elsewhere = CompanionSurfaceScope.computer(UUID().uuidString)
+        let key = CompanionStore.agentKey(agentScope: scope, agentID: "bot")
+        let old = AgentAvatarLook(style: .face, shape: "blobatar:seed", color: "#D8AD35")
+        let new = AgentAvatarLook(style: .face, shape: "blobatar:seed", color: "#C02060")
+        func copy(_ look: AgentAvatarLook, at date: Date) -> [UUID: FleetSnapshot] {
+            [host: FleetSnapshot(agents: [FleetAgent(hostID: host, profileID: "bot", name: "Bot", role: "",
+                                                     isPinned: false, isDefault: false, look: look)],
+                                 refreshedAt: date)]
+        }
+
+        store.publish(scope: scope, profiles: [profile("bot", look: new)])
+        store.publish(fleet: copy(old, at: Date(timeIntervalSinceNow: -60)), excluding: elsewhere)
+        #expect(store.looks[key]?.look == new, "The older copy keeps the face read live")
+
+        let newer = AgentAvatarLook(style: .face, shape: "blobatar:seed", color: "#2080C0")
+        store.publish(fleet: copy(newer, at: Date(timeIntervalSinceNow: 60)), excluding: elsewhere)
+        #expect(store.looks[key]?.look == newer, "A copy read after that replaces it")
+    }
+
     @Test func faceOrderIsCharacterThenHermesThenMarkThenPicture() {
         let scope = "computer:face-order-\(UUID().uuidString)"
         let companions = CompanionStore(defaults: UserDefaults(suiteName: "agent-face-\(UUID().uuidString)")!)

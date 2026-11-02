@@ -42,12 +42,16 @@ final class AgentLookStore {
 
     /// By `CompanionStore.agentKey`.
     private(set) var looks: [String: Entry] = [:]
+    /// When each computer's looks were last read live. A saved all-hosts copy from before that is older
+    /// than what the app shows, and must not bring an old face back when another gateway is opened.
+    @ObservationIgnored private var readLive: [String: Date] = [:]
 
     func publish(fleet: [UUID: FleetSnapshot], excluding liveScope: String) {
         for (hostID, snapshot) in fleet {
             let scope = CompanionSurfaceScope.computer(hostID.uuidString)
             guard scope != liveScope else { continue }
-            publish(scope: scope, profiles: snapshot.agents.map {
+            if let readLive = readLive[scope], snapshot.refreshedAt < readLive { continue }
+            replace(scope: scope, profiles: snapshot.agents.map {
                 AgentProfile(id: $0.profileID, name: $0.name, role: $0.role, summary: "", instructions: "",
                              isDefault: $0.isDefault, look: $0.look)
             })
@@ -58,6 +62,11 @@ final class AgentLookStore {
     /// leaves the picture.
     func publish(scope: String, profiles: [AgentProfile]) {
         guard !scope.isEmpty else { return }
+        readLive[scope] = .now
+        replace(scope: scope, profiles: profiles)
+    }
+
+    private func replace(scope: String, profiles: [AgentProfile]) {
         let prefix = "\(scope.utf8.count):\(scope)"
         var next = looks.filter { !$0.key.hasPrefix(prefix) }
         for profile in profiles.prefix(512) {

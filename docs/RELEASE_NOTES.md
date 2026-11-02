@@ -3,6 +3,20 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.51
+
+### New
+
+- **Apple Health:** your agent can read the Health data that you allow, for example your sleep, steps and heart rate, and answer with a chart. Go to Settings › Device access › Apple Health, or ask your agent, for example "How did I sleep this week?". bighelp never changes your Health data. To use this, update the bighelp plugin to 3.42.0.
+- **Turn on a tool from the chat:** when your agent needs a Device access tool that is off, for example Calendar or Reminders, the chat shows a card. Tap **Turn on**, and the agent continues. Tap **Not now** to keep the tool off. This needs bighelp's plugin version 3.42.0 or later.
+- **Search, sort and filter files:** a bot's Files tab and the Files page have a search field, Sort (name, date changed, date made) and Filter (folders, documents, images, video, audio).
+- **Numbered sources:** in an agent's answer, tap a number such as [1] to open its source.
+
+### Fixed
+
+- **Answers stay in view:** when more work follows an agent's answer, the answer keeps its bubble. It does not fold into the agent's notes.
+- **iPad:** the bot switcher stays below the battery and Wi-Fi icons.
+
 ## 2.6.50
 
 ### Fixed

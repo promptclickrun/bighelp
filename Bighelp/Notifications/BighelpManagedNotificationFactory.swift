@@ -37,9 +37,9 @@ struct BighelpManagedNotificationFactory {
                 default: return false
                 }
             }, registry: registry, ledger: try BighelpManagedNotificationLedger(),
-            hostClient: { [weak registry] host in
+            hostClient: { [weak registry] host, profile in
                 guard let registry else { throw DirectHermesError.notConnected }
-                return DirectHostNotificationClient(host: host, vault: registry.credentialVault(for: host),
+                return DirectHostNotificationClient(host: host, vault: registry.credentialVault(for: host), profile: profile,
                     connectionIsCurrent: { [weak registry] in
                         registry?.accountScope == host.accountScope && registry?.hosts.contains(where: {
                             $0.id == host.id && $0.principalIdentity == host.principalIdentity

@@ -70,7 +70,9 @@ extension BighelpBuzzKitRuntime: BighelpManagedNotificationProvider {}
 
 @MainActor
 final class BighelpManagedNotificationService: HostNotificationSetupServing {
-    typealias HostClientFactory = @MainActor (BighelpConfiguredHost) throws -> any DirectHostNotificationServing
+    /// A client for one agent's notification routes on a computer: each agent keeps its own journal there.
+    /// Without a profile, requests reach the agent the dashboard runs as.
+    typealias HostClientFactory = @MainActor (BighelpConfiguredHost, _ profile: String?) throws -> any DirectHostNotificationServing
     private let buzzKit: any BighelpManagedNotificationProvider
     private let identity: BighelpNotificationIdentityCoordinator
     private let api: any BighelpManagedNotificationAccountAPI
@@ -117,6 +119,13 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
 
     func enroll(host: BighelpConfiguredHost, connection: DirectHermesSavedConnection,
                 isCurrent: @escaping @MainActor () -> Bool) async throws -> HostNotificationSetupResult {
+        try await enroll(host: host, connection: connection, agent: nil, isCurrent: isCurrent)
+    }
+
+    /// Sets up notifications for one agent on `host`: the agent in use, or `agent` when the phone
+    /// sets up another agent of a computer it already has notifications for (`onChatOpened`).
+    func enroll(host: BighelpConfiguredHost, connection: DirectHermesSavedConnection, agent: String?,
+                isCurrent: @escaping @MainActor () -> Bool) async throws -> HostNotificationSetupResult {
         var host = host
         // Turning notifications on again replaces an unfinished turn-off.
         defaults.removeObject(forKey: Self.turnOffPendingKey)
@@ -144,7 +153,7 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         retiredHosts.remove(host.notificationScope + ":" + host.hostConnectionID)
         try at(.contextCheck) { try requireCurrent(host, credentials: credentials) }
         try at(.savingSetup) { try ledger.pruneExpiredRevocations(accountScope: host.notificationScope, now: timestamp) }
-        let profile = registry.workspace(for: host).selectedProfile
+        let profile = agent ?? registry.workspace(for: host).selectedProfile
         guard ManagedNotificationValidation.profile(profile), connection.endpoint == host.endpoint,
               host.owns(connection) else {
             throw Self.named(.computerSignInChanged, .contextCheck, "connection_changed", was: DirectHermesError.identityChanged)
@@ -158,7 +167,7 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         @MainActor func check() throws {
             do {
                 try requireCurrent(host, credentials: credentials)
-                guard isCurrent(), registry.workspace(for: host).selectedProfile == profile else {
+                guard isCurrent(), agent != nil || registry.workspace(for: host).selectedProfile == profile else {
                     throw DirectHermesError.secureStorageChanged
                 }
             } catch {
@@ -214,7 +223,7 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         try check()
         // Alongside BuzzKit's registration, on its own task: it never stops or delays setup.
         if let registrar = pushRegistrar { Task { await registrar.enrollmentFinished() } }
-        let client = try at(.computerCheck) { try hostClient(host) }
+        let client = try at(.computerCheck) { try hostClient(host, profile) }
         let loaded: BighelpManagedCapabilities? = try await during(.computerCheck) {
             do {
                 return try ManagedNotificationValidation.decode(BighelpManagedCapabilities.self,
@@ -386,8 +395,8 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         try check()
         // Enrollment from Settings can occur after the selected chat was already
         // opened. Subscribe that exact authenticated session now; later chats use
-        // the normal onChatOpened hook.
-        if let chat = registry.workspace(for: host).selectedChat {
+        // the normal onChatOpened hook, which also subscribes the chat that set up `agent`.
+        if agent == nil, let chat = registry.workspace(for: host).selectedChat {
             try await during(.computerEnroll) { try await onChatOpened(host: host, chat: chat) }
             try check()
         }
@@ -454,14 +463,17 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
     /// Subscription begins only after the actual native chat has opened/recovered.
     func onChatOpened(host: BighelpConfiguredHost, chat: DirectHermesChat) async throws {
         let profile = chat.client.profile; let session = chat.client.storedID
-        // Ordinary chat opening is not notification opt-in. Do not require a
-        // notification identity or contact either service without a live grant.
-        guard ManagedNotificationValidation.coordinate(session),
-              var record = ledger.record(host: host, profile: profile), record.enabled, !record.revokePending,
+        guard ManagedNotificationValidation.coordinate(session) else { return }
+        // Opening a chat never turns notifications on. A computer that has them on for one agent
+        // gets this chat's agent set up too: each agent's replies alert only through its own setup.
+        if ledger.record(host: host, profile: profile)?.enabled != true {
+            guard await enrollAgentIfNeeded(host: host, profile: profile) else { return }
+        }
+        guard var record = ledger.record(host: host, profile: profile), record.enabled, !record.revokePending,
               let grant = record.grant, grant.state == "active", grant.expiresAt > timestamp else { return }
         let credentials = try self.credentials(for: host)
         guard ownsChat(host: host, client: chat.client) else { return }
-        let client = try hostClient(host)
+        let client = try hostClient(host, profile)
         let loaded = try ManagedNotificationValidation.decode(BighelpManagedCapabilities.self,
             from: await client.request("/capabilities", method: "GET", body: nil,
                 isCurrent: { (try? self.requireCurrent(host, credentials: credentials)) != nil }))
@@ -503,6 +515,29 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
             throw Self.named(.chatAlertsUnconfirmed, .computerEnroll, "chat_subscription_differs")
         }
         record = current; record.subscriptions.insert(session); try ledger.save(record)
+    }
+
+    /// Sets up `profile` on `host` when the phone has notifications on for another agent there.
+    /// The computer keeps one notification journal per agent, and an agent's replies alert only
+    /// through a grant in its own: set up for the agent in use, a second agent's chats stayed
+    /// silent, and its Live Activities never moved. True once the agent is set up.
+    private func enrollAgentIfNeeded(host: BighelpConfiguredHost, profile: String) async -> Bool {
+        guard ManagedNotificationValidation.profile(profile), !turnOffPending,
+              ledger.record(host: host, profile: profile)?.revokePending != true,
+              ledger.enrollments.contains(where: {
+                  $0.accountScope == host.notificationScope && $0.hostConnectionID == host.hostConnectionID
+                      && $0.profile != profile && $0.enabled && !$0.revokePending
+                      && $0.grant.map { $0.state == "active" && $0.expiresAt > timestamp } == true
+              }),
+              let connection = try? registry.credentialVault(for: host).load() else { return false }
+        do {
+            let result = try await enroll(host: host, connection: connection, agent: profile,
+                                          isCurrent: { !Task.isCancelled })
+            return result == .enabled && ledger.record(host: host, profile: profile)?.enabled == true
+        } catch let failure as BighelpNotificationSetupFailure {
+            failure.log()
+        } catch {}
+        return false
     }
 
     /// Peer chats (agents talking to each other) alert this phone only when it turned them on; each
@@ -553,7 +588,7 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
                       $0.hostConnectionID == record.hostConnectionID && $0.notificationScope == record.accountScope
                   }),
                   let credentials = try? self.credentials(for: host),
-                  let client = try? hostClient(host) else { continue }
+                  let client = try? hostClient(host, record.profile) else { continue }
             let isCurrent: @MainActor () -> Bool = { (try? self.requireCurrent(host, credentials: credentials)) != nil }
             guard let raw = try? await client.request("/capabilities", method: "GET", body: nil, isCurrent: isCurrent),
                   let loaded = try? ManagedNotificationValidation.decode(BighelpManagedCapabilities.self, from: raw),
@@ -575,7 +610,7 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
                       $0.hostConnectionID == record.hostConnectionID && $0.notificationScope == record.accountScope
                   }),
                   let credentials = try? self.credentials(for: host),
-                  let client = try? hostClient(host) else { continue }
+                  let client = try? hostClient(host, record.profile) else { continue }
             let isCurrent: @MainActor () -> Bool = { (try? self.requireCurrent(host, credentials: credentials)) != nil }
             guard let raw = try? await client.request("/capabilities", method: "GET", body: nil, isCurrent: isCurrent),
                   let loaded = try? ManagedNotificationValidation.decode(BighelpManagedCapabilities.self, from: raw),
@@ -635,7 +670,7 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
                       $0.hostConnectionID == record.hostConnectionID && $0.notificationScope == record.accountScope
                   }),
                   let credentials = try? self.credentials(for: host),
-                  let client = try? hostClient(host) else { continue }
+                  let client = try? hostClient(host, record.profile) else { continue }
             let isCurrent: @MainActor () -> Bool = { (try? self.requireCurrent(host, credentials: credentials)) != nil }
             if (try? await syncQuietHours(host: host, profile: record.profile, grant: grant, client: client,
                                           isCurrent: isCurrent)) == false, !outdated.contains(host.name) {
@@ -727,7 +762,7 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
             try requireCurrent(host, credentials: credentials)
             guard isCurrent(), opening == navigation, registry.generation == generation else { throw DirectHermesError.secureStorageChanged }
         }
-        let client = try hostClient(host)
+        let client = try hostClient(host, record.profile)
         guard let activeGrant = record.grant else { throw DirectHermesError.invalidCredentials }
         let response = try await client.request("/enrollments/\(activeGrant.grantId)/events/\(eventID)", method: "GET", body: nil,
             isCurrent: { (try? check()) != nil })
@@ -867,7 +902,7 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
     func resetHost(_ host: BighelpConfiguredHost) async {
         let grants = Set(ledger.enrollments.filter {
             $0.accountScope == host.notificationScope && $0.hostConnectionID == host.hostConnectionID
-        }.compactMap { $0.grant?.grantId })
+        }.compactMap(Self.cleanupEntry))
         if !grants.isEmpty {
             var cleanups = pendingHostCleanups
             cleanups[host.id.uuidString, default: []].formUnion(grants)
@@ -951,7 +986,7 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         for host in registry.hosts {
             let grants = ledger.enrollments.filter {
                 $0.accountScope == host.notificationScope && $0.hostConnectionID == host.hostConnectionID
-            }.compactMap { $0.grant?.grantId }
+            }.compactMap(Self.cleanupEntry)
             if !grants.isEmpty { cleanups[host.id.uuidString, default: []].formUnion(grants) }
         }
         pendingHostCleanups = cleanups
@@ -1007,15 +1042,17 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         for (hostID, grants) in pendingHostCleanups.sorted(by: { $0.key < $1.key }) {
             guard let host = registry.hosts.first(where: { $0.id.uuidString == hostID }) else { continue }
             var left = Set<String>()
-            for grant in grants.sorted() {
+            for entry in grants.sorted() {
+                // An entry from before agents had their own setups names no agent: it's the dashboard's own.
+                let (grant, profile) = Self.cleanupParts(entry)
                 do {
-                    let client = try hostClient(host)
+                    let client = try hostClient(host, profile)
                     let removed = try await client.request("/enrollments/\(grant)", method: "DELETE", body: nil,
                                                            isCurrent: { true })
                     guard removed.object?["grantId"]?.string == grant,
                           removed.object?["state"]?.string == "removed" else { throw DirectHermesError.invalidResponse }
                 } catch {
-                    left.insert(grant)
+                    left.insert(entry)
                 }
             }
             if !left.isEmpty {
@@ -1038,7 +1075,7 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
             let stored = defaults.dictionary(forKey: Self.pendingHostCleanupKey) as? [String: [String]] ?? [:]
             return stored.reduce(into: [:]) { result, entry in
                 guard UUID(uuidString: entry.key) != nil else { return }
-                let grants = Set(entry.value.filter(ManagedNotificationValidation.uuid))
+                let grants = Set(entry.value.filter { ManagedNotificationValidation.uuid(Self.cleanupParts($0).grant) })
                 if !grants.isEmpty { result[entry.key] = grants }
             }
         }
@@ -1046,6 +1083,17 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
             if newValue.isEmpty { defaults.removeObject(forKey: Self.pendingHostCleanupKey) }
             else { defaults.set(newValue.mapValues { $0.sorted() }, forKey: Self.pendingHostCleanupKey) }
         }
+    }
+
+    /// A grant the computer still has to delete, with the agent whose journal holds it: `grant@agent`.
+    private static func cleanupEntry(_ record: BighelpManagedEnrollmentRecord) -> String? {
+        record.grant.map { "\($0.grantId)@\(record.profile)" }
+    }
+
+    private static func cleanupParts(_ entry: String) -> (grant: String, profile: String?) {
+        let parts = entry.split(separator: "@", maxSplits: 1).map(String.init)
+        let profile = parts.count == 2 && ManagedNotificationValidation.profile(parts[1]) ? parts[1] : nil
+        return (parts.first ?? "", profile)
     }
 
     static let turnOffPendingKey = "bighelp.notifications.turn-off-pending"
@@ -1069,7 +1117,9 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
             throw DirectHermesError.secureStorageChanged
         }
     }
-    func client(for host: BighelpConfiguredHost) throws -> any DirectHostNotificationServing { try hostClient(host) }
+    func client(for host: BighelpConfiguredHost, profile: String) throws -> any DirectHostNotificationServing {
+        try hostClient(host, profile)
+    }
     func accountAPI() -> any BighelpManagedNotificationAccountAPI { api }
     func notificationContextScope() -> String {
         guard let credentials = try? identity.current() else { return "automatic-notification-identity" }

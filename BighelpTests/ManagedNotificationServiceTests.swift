@@ -1020,6 +1020,29 @@ import UserNotifications
         #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.grant == nil)
     }
 
+    /// Notifications are set up per agent: the computer keeps a journal for each, and an agent's
+    /// replies alert only through a grant in its own. With them on for the agent in use, opening
+    /// another agent's chat sets that agent up, through its own routes, and subscribes the chat.
+    @Test func openingAnotherAgentsChatSetsThatAgentUp() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        // The phone's saved sign-in for the computer, as a connected phone has it.
+        try fixture.registry.credentialVault(for: fixture.host).save(fixture.connection)
+        let client = try DirectHermesConversationClient(rpc: IdleRPC(), hostIdentity: fixture.host.principalIdentity,
+            profile: "meddy", runtimeID: "runtime", storedID: "stored", title: "Fixture", epoch: "epoch",
+            drafts: DirectHermesDraftStore(root: fixture.root.appending(path: "drafts")))
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        try await fixture.service.onChatOpened(host: fixture.host, chat: DirectHermesChat(id: client.conversationID, client: client, model: model))
+        let meddy = try #require(fixture.ledger.record(host: fixture.host, profile: "meddy"))
+        #expect(meddy.enabled)
+        #expect(meddy.grant?.profile == "meddy")
+        #expect(meddy.subscriptions.contains("stored"))
+        #expect(fixture.hostAPI.profiles.contains("meddy"))
+        #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.enabled == true)
+    }
+
     @Test func firstChatSubscribesBeforeLazyProducersHaveRun() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }
@@ -1423,7 +1446,7 @@ import UserNotifications
                 postBodies.append(try #require(body))
                 let intent = try JSONDecoder().decode(BighelpManagedGrantIntent.self, from: #require(body))
                 grant = BighelpManagedGrant(grantId: template.grantId, instanceId: template.instanceId, hostKeyId: template.hostKeyId, hostPublicKey: template.hostPublicKey,
-                    authorizationEpoch: template.authorizationEpoch, profile: template.profile, eventTypes: eventTypesOverride ?? template.eventTypes,
+                    authorizationEpoch: template.authorizationEpoch, profile: intent.profile, eventTypes: eventTypesOverride ?? template.eventTypes,
                     createdAt: intent.expiresAt - 2_592_000, expiresAt: intent.expiresAt, revision: 1,
                     provider: "buzzkit", subscriberScope: template.subscriberScope, state: "active")
                 if loseFirstCreate { loseFirstCreate = false; throw DirectHermesError.disconnected(outcomeUnknown: true) }
@@ -1467,6 +1490,8 @@ import UserNotifications
         var workContinuation: CheckedContinuation<Void, Never>?
         var enrollRejection: DirectHostNotificationError?
         var removedGrants: [String] = []
+        /// The agent each client was made for (`?profile=`), in order.
+        var profiles: [String?] = []
         func request(_ suffix: String, method: String, body: [String: BighelpJSONValue]?, isCurrent: @escaping @MainActor () -> Bool) async throws -> BighelpJSONValue {
             guard isCurrent() else { throw DirectHermesError.secureStorageChanged }
             if offline { throw DirectHermesError.notConnected }
@@ -1763,7 +1788,7 @@ import UserNotifications
             )))
             let identity = BighelpNotificationIdentityCoordinator(vault: identityVault, broker: broker)
             service=BighelpManagedNotificationService(identity:identity,api:account,requestPermission:{permissionGranted},registry:registry,ledger:ledger,
-                activityKeys:BighelpManagedActivityKeychain(service:"app.loopdy.test.activities."+UUID().uuidString),hostClient:{_ in hostClient},now:{Date(timeIntervalSince1970:1_800_000_100)},buzzKit:providerOverride ?? provider,
+                activityKeys:BighelpManagedActivityKeychain(service:"app.loopdy.test.activities."+UUID().uuidString),hostClient:{_, profile in hostClient.profiles.append(profile); return hostClient},now:{Date(timeIntervalSince1970:1_800_000_100)},buzzKit:providerOverride ?? provider,
                 sealedRecipientKeys:sealedKeys,sealedSenders:sealedSenders,defaults:defaults)
         }
         /// A Live Activity's owner as the registrar saves it when the activity starts.

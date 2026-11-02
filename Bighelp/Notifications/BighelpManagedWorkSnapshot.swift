@@ -83,7 +83,7 @@ extension BighelpManagedNotificationService {
             }
         }
         try check()
-        let client = try client(for: host)
+        let client = try client(for: host, profile: profile)
         let value = try await client.request("/enrollments/\(grant.grantId)/work", method: "POST", body: [
             "version": .integer(1), "profile": .string(profile), "sessionId": .string(storedSessionID)
         ], isCurrent: { (try? check()) != nil })

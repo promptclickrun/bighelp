@@ -70,7 +70,7 @@ import Testing
                 requestPermission: { true }, registry: registry,
                 ledger: try BighelpManagedNotificationLedger(root: root.appending(path: "ledger")),
                 activityKeys: BighelpManagedActivityKeychain(service: "app.loopdy.test.activities." + UUID().uuidString),
-                hostClient: { _ in throw DirectHermesError.notConnected }, buzzKit: provider,
+                hostClient: { _, _ in throw DirectHermesError.notConnected }, buzzKit: provider,
                 sealedRecipientKeys: sealedKeys, sealedSenders: sealedSenders, defaults: defaults)
             service.activityRuntime = BighelpManagedNativeActivityRuntime(
                 service: service, environment: .sandbox, topic: "app.loopdy.test")

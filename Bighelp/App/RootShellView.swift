@@ -1259,16 +1259,14 @@ struct RootShellView: View {
         return ComposioAppsModel(account: .shared, agentHost: agentHost)
     }
 
-    /// Settings › Apps for the computer in use, while it's connected; made-up apps in demo mode.
+    /// Settings › Apps for the computer in use, while it's connected; sample apps in demo mode.
     func connectorAppsModel() -> ConnectorAppsModel? {
-        if let workspace = hostRegistry?.selectedWorkspace, let hostID = hostRegistry?.selectedHostID {
+        if let workspace = hostRegistry?.selectedWorkspace, hostRegistry?.selectedHostID != nil {
             guard workspace.isConnected else { return nil }
-            return ConnectorAppsModel(service: DirectHermesConnectorAppsService(workspace: workspace),
-                                      scope: hostID.uuidString)
+            return ConnectorAppsModel(service: DirectHermesConnectorAppsService(workspace: workspace))
         }
         guard usesWorkspaceFixtures else { return nil }
-        return ConnectorAppsModel(service: DemoConnectorAppsService(), scope: "demo",
-                                  defaults: UserDefaults(suiteName: "bighelp.demo.connectors") ?? .standard)
+        return ConnectorAppsModel(service: DemoConnectorAppsService())
     }
 
     var workspaceActivity: some View {

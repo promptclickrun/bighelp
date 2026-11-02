@@ -21,14 +21,13 @@ final class DirectHermesConnectorAppsService: ConnectorAppsService {
 }
 
 /// Settings › Apps: the apps Hermes can reach through its hosted connectors, which of them have an
-/// account, and connect, name and remove. Any account call makes Hermes create the computer's free
-/// connector identity, so nothing is called until the person taps Set up apps once.
+/// account, and connect, name and remove. Opening the list only reads: Hermes answers the catalog
+/// and accounts without making the computer's free connector identity, which only a Connect makes
+/// (Hermes 0.22.5's `connectors.catalog` and `connectors.accounts`, `creates_guest=False`).
 @MainActor
 @Observable
 final class ConnectorAppsModel {
     enum Phase: Equatable {
-        /// Not set up on this computer yet (as far as this phone knows).
-        case intro
         case loading
         case ready
         /// `tools.connectors.enabled: false` or `nous.guest: false` on the computer.
@@ -58,28 +57,54 @@ final class ConnectorAppsModel {
         let logoURL: URL?
         var accounts: [Account]
 
+        static let otherCategory = String(localized: "Other")
+
         var liveAccounts: [Account] { accounts.filter { !$0.isRetired } }
+        var categoryName: String { category.isEmpty ? Self.otherCategory : category }
         var isConnected: Bool { liveAccounts.contains(where: \.isWorking) }
     }
 
-    private(set) var phase: Phase = .intro
+    /// A catalog category as a section of the list, its apps by name.
+    struct Category: Identifiable, Equatable, Sendable {
+        let name: String
+        let apps: [App]
+        var id: String { name }
+    }
+
+    private(set) var phase: Phase = .loading
     private(set) var apps: [App] = []
     private(set) var working: Set<String> = []
     var message: String?
     var search = ""
+    /// The chosen category chip; nil shows every category.
+    var category: String?
 
     private let service: any ConnectorAppsService
-    private let scope: String
-    private let defaults: UserDefaults
 
-    init(service: any ConnectorAppsService, scope: String, defaults: UserDefaults = .standard) {
+    init(service: any ConnectorAppsService) {
         self.service = service
-        self.scope = scope
-        self.defaults = defaults
     }
 
     var connected: [App] { filtered.filter(\.isConnected) }
     var others: [App] { filtered.filter { !$0.isConnected } }
+
+    /// Every category the catalog has, for the chips, in the order the sections show.
+    var categoryNames: [String] { Self.ordered(Set(apps.map(\.categoryName))) }
+
+    /// The apps not connected yet, by category, narrowed by the search and the chosen chip.
+    var sections: [Category] {
+        let byCategory = Dictionary(grouping: others.filter { category == nil || $0.categoryName == category },
+                                    by: \.categoryName)
+        return Self.ordered(Set(byCategory.keys)).map { Category(name: $0, apps: byCategory[$0] ?? []) }
+    }
+
+    /// Alphabetical, with apps the catalog doesn't place last.
+    private static func ordered(_ names: Set<String>) -> [String] {
+        names.sorted { first, second in
+            if (first == App.otherCategory) != (second == App.otherCategory) { return second == App.otherCategory }
+            return first.localizedCaseInsensitiveCompare(second) == .orderedAscending
+        }
+    }
 
     private var filtered: [App] {
         let query = search.trimmingCharacters(in: .whitespaces)
@@ -90,31 +115,20 @@ final class ConnectorAppsModel {
         }
     }
 
-    private var setUpKey: String { "bighelp.connectors.set-up.\(scope)" }
-
-    func appear() async {
-        if defaults.bool(forKey: setUpKey) { await load() } else { phase = .intro }
-    }
-
-    /// The person asked for apps: Hermes creates the computer's connector identity if it has none.
-    func setUp() async {
-        phase = .loading
-        do {
-            _ = try await service.call("connectors.list", params: ["owner": .object(["type": .string("account")])])
-            defaults.set(true, forKey: setUpKey)
-            await load()
-        } catch {
-            fail(error)
-        }
-    }
+    func appear() async { await load() }
 
     func load() async {
         if apps.isEmpty { phase = .loading }
         do {
             let catalog = try await service.call("connectors.catalog", params: [:])
-            let accounts = try await service.call("connectors.accounts", params: [:])
+            let accounts: BighelpJSONValue
+            do {
+                accounts = try await service.call("connectors.accounts", params: [:])
+            } catch DirectHermesError.rpcRejected(code: 4032, _) {
+                // No connector identity on this computer yet: nothing is connected until the first Connect.
+                accounts = .object(["accounts": .array([])])
+            }
             apps = Self.merge(catalog: catalog, accounts: accounts)
-            defaults.set(true, forKey: setUpKey)
             phase = .ready
         } catch {
             fail(error)
@@ -268,9 +282,6 @@ final class ConnectorAppsModel {
         switch error {
         case DirectHermesError.rpcRejected(code: -32601, _): phase = .needsUpdate
         case DirectHermesError.rpcRejected(code: 4031, _): phase = .turnedOff
-        case DirectHermesError.rpcRejected(code: 4032, _):
-            defaults.removeObject(forKey: setUpKey)
-            phase = .intro
         default:
             phase = apps.isEmpty ? .failed(Self.sentence(for: error, fallback: "Hermes couldn't load your apps.")) : .ready
             if !apps.isEmpty { message = "Hermes couldn't refresh your apps." }
@@ -294,28 +305,40 @@ final class ConnectorAppsModel {
     private func end(_ id: String) { working.remove(id) }
 }
 
-/// Demo mode: made-up apps in memory; connecting succeeds at once.
+/// Demo mode: a slice of Hermes' real catalog (names, categories and logos as the public catalog
+/// lists them) and a made-up account, in memory; connecting succeeds at once.
 @MainActor
 final class DemoConnectorAppsService: ConnectorAppsService {
     private var accounts: [[String: BighelpJSONValue]] = [
-        ["connection_id": .string("demo-1"), "connector": .string("example_mail"), "status": .string("active"),
+        ["connection_id": .string("demo-1"), "connector": .string("slack"), "status": .string("active"),
          "label": .string("sam@example.com"), "alias": .null, "active": .boolean(true), "disabled": .boolean(false),
          "created_at": .string("2026-10-01T10:00:00Z"), "updated_at": .string("2026-10-01T10:00:00Z")],
     ]
 
+    static let catalog: [(slug: String, name: String, summary: String, category: String)] = [
+        ("shopify", "Shopify", "Manage products, orders, and customers", "Commerce"),
+        ("stripe_mcp", "Stripe", "Read and manage customers, products, and payments", "Commerce"),
+        ("discordbot", "Discord Bot", "Post and moderate in a server as a bot", "Communication"),
+        ("resend_mcp", "Resend", "Send and manage transactional email", "Communication"),
+        ("sendgrid", "SendGrid", "Send email and manage lists and templates", "Communication"),
+        ("slack", "Slack", "Read and post messages, and search channels", "Communication"),
+        ("better_stack_mcp", "Better Stack", "Investigate monitors, incidents, and logs", "Data and monitoring"),
+        ("clickhouse_mcp", "ClickHouse", "Query ClickHouse Cloud data", "Data and monitoring"),
+        ("datadog_mcp", "Datadog", "Investigate metrics, logs, incidents, and dashboards", "Data and monitoring"),
+        ("canva_mcp", "Canva", "Find, create, and edit designs", "Design and media"),
+        ("notion", "Notion", "Search, read, and edit pages and databases", "Files and docs"),
+        ("airtable", "Airtable", "Read and edit bases, tables, and records", "Files and docs"),
+        ("asana", "Asana", "Read and manage tasks and projects", "Work management"),
+        ("linear", "Linear", "Search, create, and update issues and projects", "Work management"),
+    ]
+
     func call(_ method: String, params: [String: BighelpJSONValue]) async throws -> BighelpJSONValue {
         switch method {
-        case "connectors.list":
-            return .object(["available": .boolean(true), "connectors": .array([])])
         case "connectors.catalog":
-            let rows: [(String, String, String, String)] = [
-                ("example_mail", "Example Mail", "Read, sort and send email.", "Communication"),
-                ("example_notes", "Example Notes", "Find and write notes and pages.", "Productivity"),
-                ("example_tracker", "Example Tracker", "Create and update issues.", "Developer tools"),
-                ("example_calendar", "Example Calendar", "See and plan events.", "Productivity"),
-            ]
-            return .object(["connectors": .array(rows.map {
-                .object(["slug": .string($0.0), "name": .string($0.1), "description": .string($0.2), "category": .string($0.3)])
+            return .object(["connectors": .array(Self.catalog.map {
+                .object(["slug": .string($0.slug), "name": .string($0.name), "description": .string($0.summary),
+                         "category": .string($0.category),
+                         "logo_url": .string("https://logos.composio.dev/api/\($0.slug)")])
             })])
         case "connectors.accounts":
             return .object(["accounts": .array(accounts.map(BighelpJSONValue.object))])

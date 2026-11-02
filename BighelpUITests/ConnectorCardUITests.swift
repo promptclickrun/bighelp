@@ -35,7 +35,8 @@ final class ConnectorCardUITests: BighelpUITestCase {
         XCTAssertTrue(apps.waitForNonExistence(timeout: 5), "Every row answered: the card leaves")
     }
 
-    /// Settings › Apps in demo mode: set up once, then connect an app.
+    /// Settings › Apps › Native App Connections in demo mode: the list opens straight away (no Set
+    /// up step), by category with chips, and Connect on a row signs in and moves the app to Connected.
     @MainActor
     func testAppsInSettings() {
         for appearance in ["light", "dark"] {
@@ -46,23 +47,34 @@ final class ConnectorCardUITests: BighelpUITestCase {
                 .firstMatch.waitForExistence(timeout: 60)
             openSettings(in: app)
             settingsRow("settings.apps", in: app).tap()
-            let setUp = app.buttons["connector.apps.set-up"]
-            if setUp.waitForExistence(timeout: 5) {
-                evidence("apps-intro-\(appearance)", app)
-                setUp.tap()
-            }
-            let mail = app.buttons["connector.apps.app.example_mail"]
-            XCTAssertTrue(mail.waitForExistence(timeout: 10), "The connected app is listed")
+            let native = app.buttons["apps.native"]
+            if native.waitForExistence(timeout: 5) { native.tap() }
+            XCTAssertFalse(app.buttons["connector.apps.set-up"].waitForExistence(timeout: 2), "No Set up step")
+            let slack = app.buttons["connector.apps.app.slack"]
+            XCTAssertTrue(slack.waitForExistence(timeout: 10), "The connected app is listed")
+            XCTAssertTrue(app.descendants(matching: .any)["connector.apps.categories"].exists, "Category chips show")
+            XCTAssertTrue(app.descendants(matching: .any)["connector.apps.section.Commerce"].exists,
+                          "Apps show under their category")
+            sleep(3) // Logos come from the catalog's logo service.
             evidence("apps-list-\(appearance)", app)
-            let notes = app.buttons["connector.apps.app.example_notes"]
-            if notes.waitForExistence(timeout: 3) {
-                notes.tap()
-                app.buttons["connector.apps.connect"].tap()
-                XCTAssertTrue(app.descendants(matching: .any).matching(
-                    NSPredicate(format: "identifier BEGINSWITH %@", "connector.apps.account.")).firstMatch
-                    .waitForExistence(timeout: 10), "The new account shows")
-                evidence("apps-connected-\(appearance)", app)
-            }
+
+            app.buttons["connector.apps.category.Communication"].tap()
+            XCTAssertTrue(app.buttons["connector.apps.connect.resend_mcp"].waitForExistence(timeout: 5))
+            XCTAssertFalse(app.buttons["connector.apps.connect.shopify"].exists, "A chip narrows to its category")
+            evidence("apps-category-\(appearance)", app)
+            app.buttons["connector.apps.category.Communication"].tap()
+
+            let connect = app.buttons["connector.apps.connect.shopify"]
+            XCTAssertTrue(connect.waitForExistence(timeout: 5))
+            connect.tap()
+            let shopify = app.buttons["connector.apps.app.shopify"]
+            XCTAssertTrue(shopify.waitForExistence(timeout: 10), "Connected, it opens its accounts")
+            XCTAssertFalse(app.buttons["connector.apps.connect.shopify"].exists)
+            shopify.tap()
+            XCTAssertTrue(app.descendants(matching: .any).matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "connector.apps.account.")).firstMatch
+                .waitForExistence(timeout: 10), "The new account shows")
+            evidence("apps-connected-\(appearance)", app)
             app.terminate()
         }
     }

@@ -1,65 +1,113 @@
 import SwiftUI
 
+/// Settings › Hermes tools › Toolsets: the profile's toolsets by state, each with its switch, or
+/// Needs setup when it wants a provider or key first. A toolset's name opens its page.
 @MainActor
 struct ToolsetManagementView: View {
     @Bindable var model: ToolsetManagementModel
     let hostName: String
     let profileName: String
     @State private var search = ""
+    @State private var filter: HermesToolFilter = .all
+    /// The toolset whose switch is changing, so only its row shows the new value.
+    @State private var changing: HermesToolChange?
+    @State private var opened: String?
 
     var body: some View {
         List {
-            CapabilitiesScopeSection(hostName: hostName, profileName: profileName)
+            HermesToolSearchSection(search: $search, prompt: String(localized: "Search toolsets"),
+                                    searchIdentifier: "toolsets.search",
+                                    filters: [.all, .on, .off, .needsSetup],
+                                    filter: $filter, filtersIdentifier: "toolsets.filters")
             CapabilitiesStatusSections(
-                support: model.support, isBusy: model.isBusy,
+                support: model.support, isBusy: model.isBusy && changing == nil,
                 errorMessage: model.errorMessage, successMessage: model.successMessage,
                 retry: { Task { await model.load() } }
             )
             if let snapshot = model.snapshot {
-                let toolsets = snapshot.toolsets.filter {
-                    ManagementSearch.matches(search, $0.label, $0.name, $0.summary, $0.platformLabel)
-                }
-                if ManagementSearch.isActive(search), toolsets.isEmpty {
-                    ManagementSearchEmptySection(search: search)
-                } else {
-                    Section {
-                        if snapshot.toolsets.isEmpty { Text("No configurable toolsets were reported.").foregroundStyle(.secondary) }
-                        ForEach(toolsets) { toolset in
-                            NavigationLink {
-                                ToolsetDetailView(model: model, toolsetName: toolset.name)
-                            } label: {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                                        Text(toolset.label)
-                                        Text("\(toolset.platformLabel) • \(toolset.isEnabled ? "Enabled" : "Disabled")")
-                                            .font(.bighelp(.caption)).foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                    if toolset.isConfigured { Image(systemName: "checkmark.seal").accessibilityLabel("Configured") }
-                                }
-                                .frame(minHeight: BighelpTokens.hitTarget)
-                            }
-                        }
-                    } header: { Text("Toolsets") }
-                      footer: {
-                        Text("Changes apply to new sessions in this profile; the current conversation and Hermes process are unchanged.")
-                    }
-                }
+                content(snapshot)
             }
+            CapabilitiesScopeSection(hostName: hostName, profileName: profileName)
         }
-        .listStyle(.insetGrouped)
-        .searchable(text: $search, prompt: "Search toolsets")
+        .bighelpFormSurface()
         .bighelpRefreshable { await model.load() }
         .task { if model.snapshot == nil { await model.load() } }
+        .navigationDestination(item: $opened) { name in
+            ToolsetDetailView(model: model, toolsetName: name)
+        }
+    }
+
+    @ViewBuilder
+    private func content(_ snapshot: ToolsetSnapshot) -> some View {
+        let toolsets = snapshot.toolsets.filter {
+            ManagementSearch.matches(search, $0.label, $0.name, $0.summary, $0.platformLabel)
+                && filter.admits(isOn: $0.isEnabled, needsSetup: !$0.isConfigured)
+        }
+        if ManagementSearch.isActive(search), toolsets.isEmpty {
+            ManagementSearchEmptySection(search: search)
+        } else if snapshot.toolsets.isEmpty {
+            Section { Text("No configurable toolsets were reported.").foregroundStyle(.secondary) }
+        } else if toolsets.isEmpty {
+            Section { Text("No toolsets match this filter.").foregroundStyle(.secondary) }
+        } else {
+            section(String(localized: "On"), toolsets.filter(\.isEnabled))
+            section(String(localized: "Off"), toolsets.filter { !$0.isEnabled })
+            Section {
+            } footer: {
+                Text("Changes apply to new sessions in this profile; the current conversation and Hermes process are unchanged.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func section(_ title: String, _ toolsets: [ToolsetSummary]) -> some View {
+        if !toolsets.isEmpty {
+            Section(HermesTools.heading(title, toolsets.count)) {
+                ForEach(toolsets) { row($0) }
+            }
+        }
+    }
+
+    private func row(_ toolset: ToolsetSummary) -> some View {
+        HermesToolRow(art: ToolsetSummary.art(toolset.name), name: toolset.label,
+                      detail: toolset.summary.isEmpty ? toolset.platformLabel : toolset.summary,
+                      open: { opened = toolset.name }) {
+            if toolset.isConfigured {
+                HermesToolSwitch(title: toolset.label, isOn: toolset.isEnabled,
+                                 pending: changing?.pending(for: toolset.id), isLocked: model.isBusy,
+                                 identifier: "toolsets.switch.\(toolset.name)") { set($0, toolset) }
+            } else {
+                HermesToolStatus(text: String(localized: "Needs setup"), tone: .warning)
+            }
+        }
+        .accessibilityIdentifier("toolsets.toolset.\(toolset.name)")
+    }
+
+    private func set(_ isOn: Bool, _ toolset: ToolsetSummary) {
+        guard changing == nil, !model.isBusy else { return }
+        changing = HermesToolChange(id: toolset.id, isOn: isOn)
+        Task {
+            await model.setEnabled(isOn, toolset: toolset)
+            changing = nil
+        }
     }
 }
 
+private extension ToolsetSummary {
+    /// Toolsets have no logo or topic from the host: a symbol for what they do, colored by name.
+    static func art(_ name: String) -> HermesToolArt {
+        .symbol(HermesTools.toolsetSymbol(name), key: name)
+    }
+}
+
+/// One toolset: its switch, its providers and keys, model routing, the tools it adds, Advanced.
 @MainActor
 private struct ToolsetDetailView: View {
     @Bindable var model: ToolsetManagementModel
     let toolsetName: String
-    @State private var confirmsToggle = false
     @State private var credentialProvider: ToolsetProvider?
+    /// The new value while this page's switch is changing.
+    @State private var changing: Bool?
 
     private var toolset: ToolsetSummary? {
         model.details[toolsetName]?.summary ?? model.snapshot?.toolsets.first { $0.name == toolsetName }
@@ -68,32 +116,46 @@ private struct ToolsetDetailView: View {
 
     var body: some View {
         List {
-            CapabilitiesStatusSections(
-                support: model.support, isBusy: model.isBusy,
-                errorMessage: model.errorMessage, successMessage: model.successMessage,
-                retry: { Task { await model.loadDetail(toolsetName) } }
-            )
             if let toolset {
-                Section("Overview") {
-                    LabeledContent("Status", value: toolset.isEnabled ? "Enabled" : "Disabled")
-                    LabeledContent("Configuration", value: toolset.isConfigured ? "Ready" : "Needs setup")
-                    LabeledContent("Platform", value: toolset.platformLabel)
-                    if !toolset.summary.isEmpty { Text(toolset.summary) }
-                    Button(toolset.isEnabled ? "Disable" : "Enable") { confirmsToggle = true }
-                        .disabled(model.isBusy)
+                Section {
+                    HermesToolHeader(art: ToolsetSummary.art(toolset.name), name: toolset.label,
+                                     summary: toolset.summary)
+                }
+                CapabilitiesStatusSections(
+                    support: model.support, isBusy: model.isBusy && changing == nil,
+                    errorMessage: model.errorMessage, successMessage: model.successMessage,
+                    retry: { Task { await model.loadDetail(toolsetName) } }
+                )
+                Section {
+                    HermesToolSwitch(title: String(localized: "Turned on"), isOn: toolset.isEnabled,
+                                     pending: changing, isLocked: model.isBusy, showsTitle: true,
+                                     identifier: "toolsets.enabled") { set($0, toolset) }
+                    if !toolset.isConfigured {
+                        LabeledContent("Setup") {
+                            HermesToolStatus(text: String(localized: "Needs setup"), tone: .warning)
+                        }
+                    }
+                } footer: {
+                    Text("Only this toolset changes, for this profile. New chats get the change.")
                 }
                 if let detail {
                     providerSections(detail, toolset: toolset)
                     modelSection(detail, toolset: toolset)
-                    Section("Advanced · Included tools") {
+                    Section("Tools it adds") {
                         if toolset.tools.isEmpty { Text("No concrete tools were reported.").foregroundStyle(.secondary) }
                         ForEach(toolset.tools.prefix(200), id: \.self) { Text($0).font(.bighelp(.footnote).monospaced()) }
                     }
+                }
+                Section("Advanced") {
+                    LabeledContent("Name", value: toolset.name)
+                    LabeledContent("Platform", value: toolset.platformLabel)
+                    LabeledContent("Configuration", value: toolset.isConfigured ? "Ready" : "Needs setup")
                 }
             } else {
                 ContentUnavailableView("Toolset unavailable", systemImage: "wrench.and.screwdriver")
             }
         }
+        .bighelpFormSurface()
         .navigationTitle(toolset?.label ?? toolsetName)
         .navigationBarTitleDisplayMode(.inline)
         .task { if model.details[toolsetName] == nil { await model.loadDetail(toolsetName) } }
@@ -106,15 +168,14 @@ private struct ToolsetDetailView: View {
                 .bighelpSheetSize(.standard)
             }
         }
-        .confirmationDialog("Change this toolset?", isPresented: $confirmsToggle, titleVisibility: .visible) {
-            if let toolset {
-                Button(toolset.isEnabled ? "Disable \(toolset.label)" : "Enable \(toolset.label)") {
-                    Task { await model.setEnabled(!toolset.isEnabled, toolset: toolset) }
-                }
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Only the selected toolset is changed for this profile. New sessions receive the updated tool inventory.")
+    }
+
+    private func set(_ isOn: Bool, _ toolset: ToolsetSummary) {
+        guard changing == nil, !model.isBusy else { return }
+        changing = isOn
+        Task {
+            await model.setEnabled(isOn, toolset: toolset)
+            changing = nil
         }
     }
 
@@ -126,26 +187,33 @@ private struct ToolsetDetailView: View {
                     Text("No providers are available for this toolset.").foregroundStyle(.secondary)
                 }
                 ForEach(detail.configuration.providers) { provider in
-                    VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                        HStack {
-                            Text(provider.name).font(.bighelp(.headline))
-                            Spacer()
-                            if provider.isActive { Image(systemName: "checkmark").accessibilityLabel("Active provider") }
-                        }
-                        if !provider.badge.isEmpty || !provider.tag.isEmpty {
-                            Text([provider.badge, provider.tag].filter { !$0.isEmpty }.joined(separator: " • "))
-                                .font(.bighelp(.caption)).foregroundStyle(.secondary)
-                        }
-                        LabeledContent("Readiness", value: provider.status.replacingOccurrences(of: "_", with: " ").capitalized)
-                        if provider.requiresNousAuthentication {
-                            Text("Requires Nous Portal authentication.").font(.bighelp(.footnote)).foregroundStyle(.secondary)
-                        }
-                        providerButtons(provider, toolset: toolset)
-                    }
-                    .padding(.vertical, BighelpTokens.space4)
+                    providerRow(provider, toolset: toolset)
                 }
             }
         }
+    }
+
+    private func providerRow(_ provider: ToolsetProvider, toolset: ToolsetSummary) -> some View {
+        VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+            HStack(spacing: BighelpTokens.space12) {
+                HermesToolLabel(
+                    art: .brand(id: provider.name, name: provider.name,
+                                fallback: .symbol(HermesTools.toolsetSymbol(toolset.name), key: provider.name)),
+                    name: provider.name,
+                    detail: HermesTools.line(HermesTools.readable(provider.status), provider.badge, provider.tag)
+                )
+                Spacer(minLength: 0)
+                if provider.isActive {
+                    HermesToolStatus(text: String(localized: "In use"), tone: .positive)
+                        .accessibilityLabel("Active provider")
+                }
+            }
+            if provider.requiresNousAuthentication {
+                Text("Requires Nous Portal authentication.").font(.bighelp(.footnote)).foregroundStyle(.secondary)
+            }
+            providerButtons(provider, toolset: toolset)
+        }
+        .padding(.vertical, BighelpTokens.space4)
     }
 
     @ViewBuilder
@@ -160,11 +228,12 @@ private struct ToolsetDetailView: View {
                 }
                 Button("Both capabilities") { Task { await model.selectProvider(provider.name, capability: nil, toolset: toolset) } }
             }
-        } else {
-            Button(provider.isActive ? "Selected provider" : "Select provider") {
+            .disabled(model.isBusy)
+        } else if !provider.isActive {
+            Button("Use this provider") {
                 Task { await model.selectProvider(provider.name, capability: nil, toolset: toolset) }
             }
-            .disabled(provider.isActive)
+            .disabled(model.isBusy)
         }
         if !provider.environment.isEmpty {
             Button("Enter provider credentials") { credentialProvider = provider }
@@ -238,6 +307,7 @@ private struct ToolsetCredentialForm: View {
                     Text("Blank fields stay unchanged. Entered secrets go only to this Hermes profile and are discarded when the form closes.")
                 }
             }
+            .bighelpFormSurface()
             .navigationTitle(provider.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).bighelpToolbarText() } }

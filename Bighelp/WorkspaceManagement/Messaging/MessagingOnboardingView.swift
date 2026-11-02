@@ -2,6 +2,8 @@ import CoreImage.CIFilterBuiltins
 import SwiftUI
 import UIKit
 
+/// Settings › Hermes tools › Messaging: the chat apps Hermes can reach, connected first, then
+/// Telegram and WhatsApp setup. A platform's name opens its settings.
 @MainActor
 struct MessagingOnboardingView: View {
     @Bindable var store: MessagingOnboardingStore
@@ -13,34 +15,30 @@ struct MessagingOnboardingView: View {
     @State private var confirmsApply = false
     @State private var confirmsCancel = false
     @State private var search = ""
+    @State private var filter: HermesToolFilter = .all
+    @State private var opened: String?
 
     var body: some View {
         Group {
             if store.ownsScope {
                 List {
+                    HermesToolSearchSection(search: $search, prompt: String(localized: "Search platforms"),
+                                            searchIdentifier: "messaging.search",
+                                            filters: [.all, .connected, .notSetUp],
+                                            filter: $filter, filtersIdentifier: "messaging.filters")
+                    status
+                    if let catalog = store.catalog {
+                        platformSections(catalog.platforms)
+                        if !ManagementSearch.isActive(search), filter == .all {
+                            onboardingSection
+                        }
+                    }
                     Section("Workspace") {
                         LabeledContent("Host", value: store.hostName)
                         LabeledContent("Profile", value: store.profileID)
                     }
-                    status
-                    if let catalog = store.catalog {
-                        if ManagementSearch.isActive(search) {
-                            let platforms = catalog.platforms.filter {
-                                ManagementSearch.matches(search, $0.name, $0.description)
-                            }
-                            if platforms.isEmpty {
-                                ManagementSearchEmptySection(search: search)
-                            } else {
-                                platformSection(platforms)
-                            }
-                        } else {
-                            platformSection(catalog.platforms)
-                            onboardingSection
-                        }
-                    }
                 }
-                .listStyle(.insetGrouped)
-                .searchable(text: $search, prompt: "Search platforms")
+                .bighelpFormSurface()
                 .bighelpRefreshable { await store.refresh() }
             } else {
                 ContentUnavailableView(
@@ -52,6 +50,9 @@ struct MessagingOnboardingView: View {
         }
         .navigationTitle("Messaging")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(item: $opened) { id in
+            MessagingPlatformConfigurationView(store: store, platformID: id)
+        }
         .task { if store.catalog == nil { await store.load() } }
         .task(id: store.onboarding?.pairingID) {
             while !Task.isCancelled, store.ownsScope,
@@ -116,29 +117,46 @@ struct MessagingOnboardingView: View {
         }
     }
 
-    private func platformSection(_ platforms: [HermesMessagingPlatform]) -> some View {
-        Section("Platforms") {
-            ForEach(platforms) { platform in
-                NavigationLink {
-                    MessagingPlatformConfigurationView(store: store, platformID: platform.id)
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(platform.name)
-                            Spacer()
-                            Text(platform.isEnabled ? "Enabled" : "Disabled")
-                                .font(.bighelp(.caption))
-                                .foregroundStyle(.secondary)
-                        }
-                        Text(platform.description)
-                            .font(.bighelp(.caption))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-                    .frame(minHeight: BighelpTokens.hitTarget)
-                }
+    @ViewBuilder
+    private func platformSections(_ all: [HermesMessagingPlatform]) -> some View {
+        let platforms = all.filter {
+            ManagementSearch.matches(search, $0.name, $0.description) && filter.admits(isOn: $0.isConnected)
+        }
+        if ManagementSearch.isActive(search), platforms.isEmpty {
+            ManagementSearchEmptySection(search: search)
+        } else if platforms.isEmpty {
+            Section { Text("No platforms match this filter.").foregroundStyle(.secondary) }
+        }
+        platformSection(String(localized: "Connected"), platforms.filter(\.isConnected))
+        platformSection(String(localized: "Not set up"), platforms.filter { !$0.isConnected })
+    }
+
+    @ViewBuilder
+    private func platformSection(_ title: String, _ platforms: [HermesMessagingPlatform]) -> some View {
+        if !platforms.isEmpty {
+            Section(HermesTools.heading(title, platforms.count)) {
+                ForEach(platforms) { platformRow($0) }
             }
         }
+    }
+
+    private func platformRow(_ platform: HermesMessagingPlatform) -> some View {
+        HermesToolRow(art: platform.art, name: platform.name, detail: platform.description,
+                      open: { opened = platform.id }) {
+            if platform.errorMessage != nil {
+                HermesToolStatus(text: String(localized: "Needs attention"), tone: .warning)
+            } else if platform.isConnected {
+                HermesToolStatus(text: String(localized: "Connected"), tone: .positive)
+            } else if platform.isConfigured {
+                HermesToolStatus(text: String(localized: "Off"))
+            } else {
+                Image(systemName: "chevron.right")
+                    .font(.bighelp(.footnote).weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .accessibilityIdentifier("messaging.platform.\(platform.id)")
     }
 
     @ViewBuilder
@@ -274,77 +292,74 @@ struct MessagingOnboardingView: View {
     }
 }
 
+private extension HermesMessagingPlatform {
+    /// Connected: set up and turned on.
+    var isConnected: Bool { isConfigured && isEnabled }
+
+    /// Platforms have no logo from the host, and the app guesses no brand: a symbol for what kind
+    /// of messages it carries, its color by ID.
+    var art: HermesToolArt {
+        let symbol = switch id.lowercased() {
+        case "email": "envelope"
+        case "sms": "message"
+        case "homeassistant": "house"
+        case "webhook", "webhooks": "arrow.down.right.circle"
+        case "api_server", "api": "server.rack"
+        default: "bubble.left.and.bubble.right"
+        }
+        return .symbol(symbol, key: id)
+    }
+}
+
+/// One platform: its switch, its keys (reviewed before they're sent), Test Connection, Advanced.
 @MainActor
 private struct MessagingPlatformConfigurationView: View {
     let store: MessagingOnboardingStore
     let platformID: String
 
-    @State private var desiredEnabled: Bool?
     @State private var replacements: [String: String] = [:]
     @State private var clears: Set<String> = []
     @State private var confirmsSave = false
+    /// The new value while this page's switch is changing.
+    @State private var changing: Bool?
 
     private var platform: HermesMessagingPlatform? { store.platform(id: platformID) }
 
     var body: some View {
         List {
             if let platform {
-                Section("Status") {
-                    Text(platform.description)
-                    LabeledContent("Configuration", value: platform.isConfigured ? "Complete" : "Incomplete")
-                    LabeledContent("Gateway", value: platform.isGatewayRunning ? "Running" : "Stopped")
-                    LabeledContent("Connection", value: platform.state.replacingOccurrences(of: "_", with: " ").capitalized)
+                Section {
+                    HermesToolHeader(art: platform.art, name: platform.name, summary: platform.description)
+                }
+                Section {
+                    HermesToolSwitch(title: String(localized: "Turned on"), isOn: platform.isEnabled,
+                                     pending: changing, isLocked: !store.canAct, showsTitle: true,
+                                     identifier: "messaging.platform.enabled") { set($0, platform) }
                     if let message = platform.errorMessage {
                         Label(message, systemImage: "exclamationmark.triangle")
                     }
-                    if let URL = platform.documentationURL { Link("Setup documentation", destination: URL) }
-                    if let URL = platform.ingressURL { LabeledContent("Ingress", value: URL.absoluteString) }
+                } footer: {
+                    Text("Hermes may need its gateway restarted before messages connect.")
                 }
-                Section("Settings") {
-                    Toggle("Enabled", isOn: Binding(
-                        get: { desiredEnabled ?? platform.isEnabled },
-                        set: { desiredEnabled = $0 }
-                    ))
-                    ForEach(platform.environment) { field in
-                        VStack(alignment: .leading, spacing: 8) {
-                            if field.isSecret {
-                                SecureField(field.label, text: replacement(field.key))
-                                    .textContentType(.password)
-                                    .privacySensitive()
-                            } else {
-                                TextField(field.label, text: replacement(field.key))
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
-                            }
-                            HStack {
-                                Text(field.isSet ? "Saved on Hermes" : field.isRequired ? "Required" : "Not set")
-                                    .font(.bighelp(.caption)).foregroundStyle(.secondary)
-                                Spacer()
-                                if field.isSet {
-                                    Button(clears.contains(field.key) ? "Keep" : "Clear", role: clears.contains(field.key) ? nil : .destructive) {
-                                        if clears.contains(field.key) { clears.remove(field.key) }
-                                        else { clears.insert(field.key); replacements[field.key] = nil }
-                                    }
-                                }
-                            }
-                            if !field.description.isEmpty { Text(field.description).font(.bighelp(.footnote)).foregroundStyle(.secondary) }
-                            if let URL = field.documentationURL { Link("Field documentation", destination: URL).font(.bighelp(.footnote)) }
-                        }
-                    }
-                    Button("Review Changes") { confirmsSave = true }
-                        .disabled(!store.canAct || !hasChanges(platform))
-                        .accessibilityIdentifier("messaging.platform.review")
-                }
+                settingsSection(platform)
                 Section("Connection") {
                     Button("Test Connection", systemImage: "checkmark.arrow.trianglehead.counterclockwise") {
                         Task { await store.testPlatform(id: platform.id) }
                     }
                     .disabled(!store.canAct)
+                    if let URL = platform.documentationURL { Link("Setup documentation", destination: URL) }
+                }
+                Section("Advanced") {
+                    LabeledContent("Configuration", value: platform.isConfigured ? "Complete" : "Incomplete")
+                    LabeledContent("Gateway", value: platform.isGatewayRunning ? "Running" : "Stopped")
+                    LabeledContent("Connection", value: HermesTools.readable(platform.state))
+                    if let URL = platform.ingressURL { LabeledContent("Ingress", value: URL.absoluteString) }
                 }
             } else {
                 ContentUnavailableView("Platform unavailable", systemImage: "bubble.left.and.exclamationmark.bubble.right")
             }
         }
+        .bighelpFormSurface()
         .navigationTitle(platform?.name ?? "Messaging")
         .navigationBarTitleDisplayMode(.inline)
         .confirmationDialog("Apply messaging changes?", isPresented: $confirmsSave) {
@@ -359,6 +374,47 @@ private struct MessagingPlatformConfigurationView: View {
         }
     }
 
+    @ViewBuilder
+    private func settingsSection(_ platform: HermesMessagingPlatform) -> some View {
+        if !platform.environment.isEmpty {
+            Section("Setup") {
+                ForEach(platform.environment) { field in
+                    fieldEditor(field)
+                }
+                Button("Review Changes") { confirmsSave = true }
+                    .disabled(!store.canAct || !hasChanges)
+                    .accessibilityIdentifier("messaging.platform.review")
+            }
+        }
+    }
+
+    private func fieldEditor(_ field: HermesMessagingEnvironmentField) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if field.isSecret {
+                SecureField(field.label, text: replacement(field.key))
+                    .textContentType(.password)
+                    .privacySensitive()
+            } else {
+                TextField(field.label, text: replacement(field.key))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            }
+            HStack {
+                Text(field.isSet ? "Saved on Hermes" : field.isRequired ? "Required" : "Not set")
+                    .font(.bighelp(.caption)).foregroundStyle(.secondary)
+                Spacer()
+                if field.isSet {
+                    Button(clears.contains(field.key) ? "Keep" : "Clear", role: clears.contains(field.key) ? nil : .destructive) {
+                        if clears.contains(field.key) { clears.remove(field.key) }
+                        else { clears.insert(field.key); replacements[field.key] = nil }
+                    }
+                }
+            }
+            if !field.description.isEmpty { Text(field.description).font(.bighelp(.footnote)).foregroundStyle(.secondary) }
+            if let URL = field.documentationURL { Link("Field documentation", destination: URL).font(.bighelp(.footnote)) }
+        }
+    }
+
     private func replacement(_ key: String) -> Binding<String> {
         Binding(
             get: { replacements[key] ?? "" },
@@ -369,22 +425,28 @@ private struct MessagingPlatformConfigurationView: View {
         )
     }
 
-    private func hasChanges(_ platform: HermesMessagingPlatform) -> Bool {
-        desiredEnabled.map { $0 != platform.isEnabled } == true
-            || replacements.values.contains(where: { !$0.isEmpty })
-            || !clears.isEmpty
+    private var hasChanges: Bool {
+        replacements.values.contains(where: { !$0.isEmpty }) || !clears.isEmpty
+    }
+
+    /// The switch goes to Hermes at once, on its own: keys typed below wait for Review Changes.
+    private func set(_ isOn: Bool, _ platform: HermesMessagingPlatform) {
+        guard changing == nil, store.canAct else { return }
+        changing = isOn
+        Task {
+            await store.updatePlatform(id: platform.id, enabled: isOn, replacements: [:], clear: [])
+            changing = nil
+        }
     }
 
     private func save() {
         guard let platform else { return }
         let values = replacements.filter { !$0.value.isEmpty }
         let clear = Array(clears)
-        let enabled = desiredEnabled.flatMap { $0 == platform.isEnabled ? nil : $0 }
         replacements.removeAll(keepingCapacity: false)
         clears.removeAll(keepingCapacity: false)
-        desiredEnabled = nil
         Task {
-            await store.updatePlatform(id: platform.id, enabled: enabled, replacements: values, clear: clear)
+            await store.updatePlatform(id: platform.id, enabled: nil, replacements: values, clear: clear)
         }
     }
 }

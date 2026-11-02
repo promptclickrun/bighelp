@@ -1,5 +1,7 @@
 import SwiftUI
 
+/// Settings › Hermes tools › MCP Servers: the profile's servers by state, each with its switch, then
+/// the host's catalog under Add more. A server's name opens its page.
 @MainActor
 struct MCPManagementView: View {
     @Bindable var model: MCPManagementModel
@@ -8,80 +10,32 @@ struct MCPManagementView: View {
     @State private var showsAdd = false
     @State private var catalogCandidate: MCPCatalogEntry?
     @State private var search = ""
+    @State private var filter: HermesToolFilter = .all
+    /// The server whose switch is changing, so only its row shows the new value.
+    @State private var changing: HermesToolChange?
+    @State private var opened: String?
 
     var body: some View {
         List {
-            CapabilitiesScopeSection(hostName: hostName, profileName: profileName)
+            HermesToolSearchSection(search: $search, prompt: String(localized: "Search MCP servers"),
+                                    searchIdentifier: "mcp.search", filters: [.all, .on, .off],
+                                    filter: $filter, filtersIdentifier: "mcp.filters")
             CapabilitiesStatusSections(
-                support: model.support, isBusy: model.isBusy,
+                support: model.support, isBusy: model.isBusy && changing == nil,
                 errorMessage: model.errorMessage, successMessage: model.successMessage,
                 retry: { Task { await model.load() } }
             )
             if let snapshot = model.snapshot {
-                let servers = snapshot.servers.filter { ManagementSearch.matches(search, $0.name, $0.transport) }
-                let catalog = snapshot.catalog.filter {
-                    ManagementSearch.matches(search, $0.name, $0.summary, $0.transport)
-                }
-                if ManagementSearch.isActive(search), servers.isEmpty, catalog.isEmpty {
-                    ManagementSearchEmptySection(search: search)
-                } else {
-                    Section("Your servers") {
-                        if snapshot.servers.isEmpty { Text("No MCP servers configured.").foregroundStyle(.secondary) }
-                        ForEach(servers) { server in
-                            NavigationLink {
-                                MCPServerDetailView(model: model, serverName: server.name)
-                            } label: {
-                                VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                                    Text(server.name)
-                                    Text("\(server.transport.uppercased()) • \(server.isEnabled ? "Enabled" : "Disabled")")
-                                        .font(.bighelp(.caption)).foregroundStyle(.secondary)
-                                    if let runtime = model.runtimeStatus(for: server.name) {
-                                        Text("Runtime: \(runtime.state.displayName) • \(runtime.toolCount) tools")
-                                            .font(.bighelp(.caption)).foregroundStyle(.secondary)
-                                    }
-                                }
-                                .frame(minHeight: BighelpTokens.hitTarget)
-                            }
-                        }
-                        Button("Add server", systemImage: "plus") { showsAdd = true }
-                            .disabled(model.isBusy)
-                            .frame(minHeight: BighelpTokens.hitTarget)
-                    }
-
-                    Section {
-                        ForEach(catalog) { entry in
-                            VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                                HStack {
-                                    Text(entry.name).font(.bighelp(.headline))
-                                    Spacer()
-                                    if entry.isInstalled { Image(systemName: "checkmark.circle.fill").accessibilityLabel("Installed") }
-                                }
-                                if !entry.summary.isEmpty { Text(entry.summary).font(.bighelp(.subheadline)) }
-                                Text("\(entry.transport.uppercased()) • \(entry.authType)")
-                                    .font(.bighelp(.caption)).foregroundStyle(.secondary)
-                                Button(entry.isInstalled ? "Already installed" : "Review installation") {
-                                    catalogCandidate = entry
-                                }
-                                .buttonStyle(.bordered)
-                                .disabled(entry.isInstalled || model.isBusy)
-                            }
-                            .padding(.vertical, BighelpTokens.space4)
-                        }
-                    } header: { Text("Add from catalog") }
-                      footer: { Text("Only declared fields are sent to Hermes. Secrets are not saved in bighelp.") }
-
-                    if !snapshot.diagnostics.isEmpty, !ManagementSearch.isActive(search) {
-                        Section("Advanced · Catalog diagnostics") {
-                            ForEach(snapshot.diagnostics, id: \.self) { Text($0).font(.bighelp(.footnote)) }
-                        }
-                    }
-                }
+                content(snapshot)
             }
+            CapabilitiesScopeSection(hostName: hostName, profileName: profileName)
         }
-        .listStyle(.insetGrouped)
-        .searchable(text: $search, prompt: "Search MCP servers")
+        .bighelpFormSurface()
         .bighelpRefreshable { await model.load() }
         .task { if model.snapshot == nil { await model.load() } }
+        .navigationDestination(item: $opened) { name in
+            MCPServerDetailView(model: model, serverName: name)
+        }
         .bighelpSheet(isPresented: $showsAdd) {
             MCPServerFormView(isBusy: model.isBusy) { draft in
                 showsAdd = false
@@ -95,6 +49,108 @@ struct MCPManagementView: View {
                 Task { await model.install(entry, environment: environment, enable: enabled) }
             }
             .bighelpSheetSize(.standard)
+        }
+    }
+
+    @ViewBuilder
+    private func content(_ snapshot: MCPSnapshot) -> some View {
+        let servers = snapshot.servers.filter {
+            ManagementSearch.matches(search, $0.name, $0.transport) && filter.admits(isOn: $0.isEnabled)
+        }
+        let catalog = filter != .all ? [] : snapshot.catalog.filter({
+            !$0.isInstalled && ManagementSearch.matches(search, $0.name, $0.summary, $0.transport)
+        })
+        if servers.isEmpty, catalog.isEmpty, ManagementSearch.isActive(search) {
+            ManagementSearchEmptySection(search: search)
+        } else {
+            if snapshot.servers.isEmpty {
+                Section { Text("No MCP servers yet.").foregroundStyle(.secondary) }
+            } else if servers.isEmpty {
+                Section { Text("No servers match this filter.").foregroundStyle(.secondary) }
+            }
+            serverSection(String(localized: "On"), servers.filter(\.isEnabled))
+            serverSection(String(localized: "Off"), servers.filter { !$0.isEnabled })
+            Section {
+                Button("Add server", systemImage: "plus") { showsAdd = true }
+                    .disabled(model.isBusy)
+                    .frame(minHeight: BighelpTokens.hitTarget)
+            }
+            if !catalog.isEmpty {
+                Section {
+                    ForEach(catalog) { catalogRow($0) }
+                } header: {
+                    Text(HermesTools.heading(String(localized: "Add more"), catalog.count))
+                } footer: {
+                    Text("Only declared fields are sent to Hermes. Secrets are not saved in bighelp.")
+                }
+            }
+            if !snapshot.diagnostics.isEmpty, !ManagementSearch.isActive(search), filter == .all {
+                Section("Advanced · Catalog diagnostics") {
+                    ForEach(snapshot.diagnostics, id: \.self) { Text($0).font(.bighelp(.footnote)) }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func serverSection(_ title: String, _ servers: [MCPServer]) -> some View {
+        if !servers.isEmpty {
+            Section(HermesTools.heading(title, servers.count)) {
+                ForEach(servers) { serverRow($0) }
+            }
+        }
+    }
+
+    private func serverRow(_ server: MCPServer) -> some View {
+        HermesToolRow(art: MCPServer.art(server.name), name: server.name, detail: detail(server),
+                      open: { opened = server.name }) {
+            HermesToolSwitch(title: server.name, isOn: server.isEnabled,
+                             pending: changing?.pending(for: server.id), isLocked: model.isBusy,
+                             identifier: "mcp.server.switch.\(server.name)") { set($0, server) }
+        }
+        .accessibilityIdentifier("mcp.server.\(server.name)")
+    }
+
+    private func catalogRow(_ entry: MCPCatalogEntry) -> some View {
+        HermesToolRow(art: .symbol("shippingbox", key: entry.name), name: entry.name,
+                      detail: entry.summary.isEmpty ? MCPServer.transportName(entry.transport) : entry.summary) {
+            HermesToolGetButton(accessibilityLabel: "Get \(entry.name)",
+                                identifier: "mcp.catalog.get.\(entry.name)",
+                                isDisabled: model.isBusy) { catalogCandidate = entry }
+        }
+        .accessibilityIdentifier("mcp.catalog.\(entry.name)")
+    }
+
+    private func detail(_ server: MCPServer) -> String {
+        guard let runtime = model.runtimeStatus(for: server.name) else {
+            return MCPServer.transportName(server.transport)
+        }
+        return HermesTools.line(runtime.state.displayName,
+                                runtime.toolCount == 1 ? "1 tool" : "\(runtime.toolCount.formatted()) tools")
+    }
+
+    private func set(_ isOn: Bool, _ server: MCPServer) {
+        guard changing == nil, !model.isBusy else { return }
+        changing = HermesToolChange(id: server.id, isOn: isOn)
+        Task {
+            await model.setEnabled(isOn, server: server)
+            changing = nil
+        }
+    }
+}
+
+private extension MCPServer {
+    /// MCP servers have no logo or topic from the host: a plug tile, its color by name.
+    static func art(_ name: String) -> HermesToolArt {
+        .symbol("point.3.connected.trianglepath.dotted", key: name)
+    }
+
+    /// "http" and "stdio" in everyday words.
+    static func transportName(_ transport: String) -> String {
+        switch transport.lowercased() {
+        case "http", "sse", "streamable-http": String(localized: "Online server")
+        case "stdio": String(localized: "Runs on the computer")
+        default: transport.uppercased()
         }
     }
 }
@@ -157,6 +213,7 @@ private struct MCPServerFormView: View {
                     }
                 }
             }
+            .bighelpFormSurface()
             .navigationTitle("Add MCP server")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -235,6 +292,7 @@ private struct MCPCatalogInstallView: View {
                     Text("Only this entry and its declared fields are sent to Hermes. Values are not stored in bighelp.")
                 }
             }
+            .bighelpFormSurface()
             .navigationTitle("Install MCP server")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).bighelpToolbarText() } }
@@ -246,6 +304,8 @@ private struct MCPCatalogInstallView: View {
     }
 }
 
+/// One server: its switch, its connection (test, sign in, API key), the tools it adds, Advanced
+/// details and Remove.
 @MainActor
 private struct MCPServerDetailView: View {
     @Bindable var model: MCPManagementModel
@@ -255,86 +315,42 @@ private struct MCPServerDetailView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var confirmsRemoval = false
     @State private var showsCredentialUpdate = false
+    /// The new value while this page's switch is changing.
+    @State private var changing: Bool?
 
     private var server: MCPServer? { model.snapshot?.servers.first { $0.name == serverName } }
 
     var body: some View {
         List {
-            CapabilitiesStatusSections(
-                support: model.support, isBusy: model.isBusy,
-                errorMessage: model.errorMessage, successMessage: model.successMessage,
-                retry: { Task { if let server { await model.test(server) } } }
-            )
             if let server {
-                Section("Overview") {
-                    LabeledContent("Transport", value: server.transport.uppercased())
-                    LabeledContent("Status", value: server.isEnabled ? "Enabled" : "Disabled")
-                    if let url = server.url { LabeledContent("URL", value: url).textSelection(.enabled) }
-                    if let command = server.command { LabeledContent("Command", value: command).textSelection(.enabled) }
-                    if let auth = server.auth { LabeledContent("Authentication", value: auth) }
-                    if !server.environmentKeys.isEmpty { LabeledContent("Environment", value: server.environmentKeys.joined(separator: ", ")) }
+                Section {
+                    HermesToolHeader(art: .symbol("point.3.connected.trianglepath.dotted", key: server.name),
+                                     name: server.name, summary: summary(server))
                 }
-                if let runtime = model.runtimeStatus(for: server.name) {
-                    Section {
-                        LabeledContent("State", value: runtime.state.displayName)
-                        LabeledContent("Connected", value: runtime.isConnected ? "Yes" : "No")
-                        LabeledContent("Registered tools", value: runtime.toolCount.formatted())
-                        if let checkedAt = model.runtimeSnapshot?.checkedAt {
-                            LabeledContent("Checked", value: checkedAt.formatted(date: .abbreviated, time: .standard))
-                        }
-                    } header: {
-                        Text("Advanced · Runtime details")
-                    } footer: {
-                        Text("Cached status only; viewing it does not connect or authorize.")
-                    }
+                CapabilitiesStatusSections(
+                    support: model.support, isBusy: model.isBusy && changing == nil,
+                    errorMessage: model.errorMessage, successMessage: model.successMessage,
+                    retry: { Task { await model.test(server) } }
+                )
+                Section {
+                    HermesToolSwitch(title: String(localized: "Turned on"), isOn: server.isEnabled,
+                                     pending: changing, isLocked: model.isBusy, showsTitle: true,
+                                     identifier: "mcp.server.enabled") { set($0, server) }
+                } footer: {
+                    Text("New chats in this profile use the change.")
                 }
-                Section("Manage server") {
-                    Button(server.isEnabled ? "Disable" : "Enable") {
-                        Task { await model.setEnabled(!server.isEnabled, server: server) }
-                    }
-                    Button("Test connection", systemImage: "stethoscope") { Task { await model.test(server) } }
-                    if server.auth != "oauth" {
-                        Button("Update API key", systemImage: "key") { showsCredentialUpdate = true }
-                            .disabled(model.isBusy)
-                    }
-                    if server.auth == "oauth" && server.transport == "http" {
-                        Button("Authorize in browser", systemImage: "safari") {
-                            Task {
-                                if let url = await model.startOAuth(server) { openURL(url) }
-                            }
-                        }
-                        if let flow = model.oauthFlows[server.name] {
-                            LabeledContent("Authorization", value: flow.status.rawValue.replacingOccurrences(of: "_", with: " ").capitalized)
-                            Button("Check authorization") { Task { await model.pollOAuth(server) } }
-                            Button("Cancel authorization", role: .destructive) { Task { await model.cancelOAuth(server) } }
-                        }
-                    }
+                connectionSection(server)
+                toolsSection(server)
+                advancedSections(server)
+                Section {
                     Button("Remove server", role: .destructive) { confirmsRemoval = true }
-                }
-                if let probe = model.probes[server.name] {
-                    Section("Advanced · Latest test") {
-                        LabeledContent("Result", value: probe.succeeded ? "Connected" : "Failed")
-                        LabeledContent("Tools on this server", value: probe.toolCount.formatted())
-                        LabeledContent("Prompts", value: probe.promptCount.formatted())
-                        LabeledContent("Resources", value: probe.resourceCount.formatted())
-                        if let error = probe.error { Text(error).foregroundStyle(.secondary) }
-                        if probe.toolCount > probe.tools.count {
-                            Text("Showing the first \(probe.tools.count.formatted()). Hermes uses only the tools your MCP settings include.")
-                                .font(.bighelp(.footnote))
-                                .foregroundStyle(.secondary)
-                        }
-                        ForEach(probe.tools) { tool in
-                            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                                Text(tool.name)
-                                if !tool.summary.isEmpty { Text(tool.summary).font(.bighelp(.caption)).foregroundStyle(.secondary) }
-                            }
-                        }
-                    }
+                        .disabled(model.isBusy)
                 }
             } else {
                 ContentUnavailableView("Server unavailable", systemImage: "externaldrive.badge.questionmark")
             }
         }
+        .bighelpFormSurface()
         .navigationTitle(serverName)
         .navigationBarTitleDisplayMode(.inline)
         // Back from signing in in the browser: check right away.
@@ -356,6 +372,110 @@ private struct MCPServerDetailView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("This removes only the selected profile’s server configuration. Hermes-managed OAuth tokens for that server follow the host’s removal policy.")
+        }
+    }
+
+    private func summary(_ server: MCPServer) -> String {
+        guard let runtime = model.runtimeStatus(for: server.name) else {
+            return MCPServer.transportName(server.transport)
+        }
+        return HermesTools.line(MCPServer.transportName(server.transport), runtime.state.displayName)
+    }
+
+    @ViewBuilder
+    private func connectionSection(_ server: MCPServer) -> some View {
+        Section("Connection") {
+            Button("Test connection", systemImage: "stethoscope") { Task { await model.test(server) } }
+                .disabled(model.isBusy)
+            if server.auth != "oauth" {
+                Button("Update API key", systemImage: "key") { showsCredentialUpdate = true }
+                    .disabled(model.isBusy)
+            }
+            if server.auth == "oauth" && server.transport == "http" {
+                Button("Authorize in browser", systemImage: "safari") {
+                    Task {
+                        if let url = await model.startOAuth(server) { openURL(url) }
+                    }
+                }
+                if let flow = model.oauthFlows[server.name] {
+                    LabeledContent("Authorization", value: HermesTools.readable(flow.status.rawValue))
+                    Button("Check authorization") { Task { await model.pollOAuth(server) } }
+                    Button("Cancel authorization", role: .destructive) { Task { await model.cancelOAuth(server) } }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func toolsSection(_ server: MCPServer) -> some View {
+        Section("Tools it adds") {
+            if let probe = model.probes[server.name] {
+                if let error = probe.error { Text(error).foregroundStyle(.secondary) }
+                if probe.tools.isEmpty, probe.error == nil {
+                    Text("This server offers no tools.").foregroundStyle(.secondary)
+                }
+                if probe.toolCount > probe.tools.count {
+                    Text("Showing the first \(probe.tools.count.formatted()). Hermes uses only the tools your MCP settings include.")
+                        .font(.bighelp(.footnote))
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(probe.tools) { tool in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(tool.name).font(.bighelp(.body))
+                        if !tool.summary.isEmpty {
+                            Text(tool.summary).font(.bighelp(.footnote)).foregroundStyle(.secondary).lineLimit(3)
+                        }
+                    }
+                }
+            } else if let runtime = model.runtimeStatus(for: server.name) {
+                Text(runtime.toolCount == 1 ? "1 tool. Test the connection to see it."
+                     : "\(runtime.toolCount.formatted()) tools. Test the connection to see them.")
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Test the connection to see its tools.").foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func advancedSections(_ server: MCPServer) -> some View {
+        Section("Advanced") {
+            LabeledContent("Transport", value: server.transport.uppercased())
+            if let url = server.url { LabeledContent("URL", value: url).textSelection(.enabled) }
+            if let command = server.command { LabeledContent("Command", value: command).textSelection(.enabled) }
+            if let auth = server.auth { LabeledContent("Authentication", value: auth) }
+            if !server.environmentKeys.isEmpty { LabeledContent("Environment", value: server.environmentKeys.joined(separator: ", ")) }
+        }
+        if let runtime = model.runtimeStatus(for: server.name) {
+            Section {
+                LabeledContent("State", value: runtime.state.displayName)
+                LabeledContent("Connected", value: runtime.isConnected ? "Yes" : "No")
+                LabeledContent("Registered tools", value: runtime.toolCount.formatted())
+                if let checkedAt = model.runtimeSnapshot?.checkedAt {
+                    LabeledContent("Checked", value: checkedAt.formatted(date: .abbreviated, time: .standard))
+                }
+            } header: {
+                Text("Advanced · Runtime details")
+            } footer: {
+                Text("Cached status only; viewing it does not connect or authorize.")
+            }
+        }
+        if let probe = model.probes[server.name] {
+            Section("Advanced · Latest test") {
+                LabeledContent("Result", value: probe.succeeded ? "Connected" : "Failed")
+                LabeledContent("Tools on this server", value: probe.toolCount.formatted())
+                LabeledContent("Prompts", value: probe.promptCount.formatted())
+                LabeledContent("Resources", value: probe.resourceCount.formatted())
+            }
+        }
+    }
+
+    private func set(_ isOn: Bool, _ server: MCPServer) {
+        guard changing == nil, !model.isBusy else { return }
+        changing = isOn
+        Task {
+            await model.setEnabled(isOn, server: server)
+            changing = nil
         }
     }
 }
@@ -413,6 +533,7 @@ private struct MCPServerCredentialEditorView: View {
                     ContentUnavailableView("Server unavailable", systemImage: "externaldrive.badge.questionmark")
                 }
             }
+            .bighelpFormSurface()
             .navigationTitle("Update API Key")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).bighelpToolbarText() } }
@@ -453,7 +574,7 @@ private extension MCPRuntimeState {
     var displayName: String {
         switch self {
         case .connected: "Connected"
-        case .disabled: "Disabled"
+        case .disabled: "Turned off"
         case .connecting: "Connecting"
         case .failed: "Failed"
         case .configured: "Configured"

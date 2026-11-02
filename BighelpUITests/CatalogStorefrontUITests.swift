@@ -45,6 +45,14 @@ final class CatalogStorefrontUITests: BighelpUITestCase {
             XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Install confirms before anything changes")
             let cancel = app.buttons["Cancel"]
             if cancel.exists { cancel.tap() } else { app.tap() }
+            goBack(in: app)
+
+            // Installed plugins: the app list, a switch on each row.
+            let installed = app.buttons["plugins.installed.open"]
+            XCTAssertTrue(installed.waitForExistence(timeout: 5))
+            installed.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["plugins.installed"].waitForExistence(timeout: 5))
+            evidence("plugins-installed-\(appearance)", app)
 
             app.terminate()
             let skillsApp = launch(appearance: appearance)
@@ -55,6 +63,10 @@ final class CatalogStorefrontUITests: BighelpUITestCase {
             XCTAssertTrue(skillsApp.buttons["skills.mine"].exists, "The agent's own skills are one tap away")
             assertWholeCards("skills.tile.", in: skillsApp)
             evidence("skills-home-\(appearance)", skillsApp)
+            skillsApp.buttons["skills.mine"].tap()
+            XCTAssertTrue(skillsApp.descendants(matching: .any)["skills.installed"].waitForExistence(timeout: 5))
+            evidence("skills-installed-\(appearance)", skillsApp)
+            goBack(in: skillsApp)
 
             let tile = skillsApp.buttons["skills.tile.official/finance/three-statement-model"]
             XCTAssertTrue(tile.waitForExistence(timeout: 5))

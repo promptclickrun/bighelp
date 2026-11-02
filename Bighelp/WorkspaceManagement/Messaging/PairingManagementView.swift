@@ -210,6 +210,8 @@ final class PairingManagementStore {
     }
 }
 
+/// Settings › Hermes tools › Pairing: people waiting to message Hermes, with Approve, then the
+/// people who can, with Revoke. Both ask first.
 @MainActor
 struct PairingManagementView: View {
     @Bindable var store: PairingManagementStore
@@ -218,19 +220,21 @@ struct PairingManagementView: View {
         Group {
             if store.ownsScope {
                 List {
-                    Section("Workspace") {
-                        LabeledContent("Host", value: store.hostName)
-                        LabeledContent("Profile", value: store.profileID)
-                        Text("Messaging pairing approves people who can contact Hermes. It does not register this \(BighelpPlatform.isMac ? "Mac" : "phone") for bighelp notifications.")
-                            .font(.bighelp(.footnote)).foregroundStyle(.secondary)
-                    }
                     status
                     if let catalog = store.catalog {
                         pending(catalog.pending)
                         approved(catalog.approved)
                     }
+                    Section {
+                        LabeledContent("Host", value: store.hostName)
+                        LabeledContent("Profile", value: store.profileID)
+                    } header: {
+                        Text("Workspace")
+                    } footer: {
+                        Text("Messaging pairing approves people who can contact Hermes. It does not register this \(BighelpPlatform.isMac ? "Mac" : "phone") for bighelp notifications.")
+                    }
                 }
-                .listStyle(.insetGrouped)
+                .bighelpFormSurface()
                 .bighelpRefreshable { await store.refresh() }
             } else {
                 ContentUnavailableView(
@@ -283,18 +287,19 @@ struct PairingManagementView: View {
     private func pending(_ requests: [HermesPairingPendingRequest]) -> some View {
         Section {
             ForEach(requests) { request in
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(request.userName.isEmpty ? request.userID : request.userName).font(.bighelp(.headline))
-                    LabeledContent("Platform", value: request.platform)
-                    LabeledContent("User ID", value: request.userID)
-                    LabeledContent("Waiting", value: "\(request.ageMinutes) min")
+                HermesToolRow(art: .symbol("person.crop.circle.badge.questionmark", key: request.userID),
+                              name: request.userName.isEmpty ? request.userID : request.userName,
+                              detail: HermesTools.line(HermesTools.readable(request.platform),
+                                                       "waiting \(request.ageMinutes) min",
+                                                       request.userName.isEmpty ? nil : request.userID)) {
                     if request.canApproveByExactID {
-                        Button("Approve") { store.review = .approve(request) }
-                            .disabled(!store.canAct)
-                            .frame(minHeight: BighelpTokens.hitTarget)
+                        HermesToolGetButton(title: String(localized: "Approve"),
+                                            accessibilityLabel: "Approve \(request.userName.isEmpty ? request.userID : request.userName)",
+                                            identifier: "pairing.approve.\(request.userID)",
+                                            isDisabled: !store.canAct) { store.review = .approve(request) }
                     } else {
-                        Text("This legacy request has no exact request ID and cannot be approved from bighelp.")
-                            .font(.bighelp(.footnote)).foregroundStyle(.secondary)
+                        HermesToolStatus(text: String(localized: "Can't approve here"))
+                            .accessibilityHint("This legacy request has no exact request ID and cannot be approved from bighelp.")
                     }
                 }
             }
@@ -305,20 +310,29 @@ struct PairingManagementView: View {
                 }
                 .disabled(!store.canAct)
             }
-        } header: { Text("Requests") }
+        } header: {
+            Text(HermesTools.heading(String(localized: "Requests"), requests.count))
+        } footer: {
+            if requests.contains(where: { !$0.canApproveByExactID }) {
+                Text("Requests marked Can't approve here are from an older Hermes with no exact request ID.")
+            }
+        }
     }
 
     private func approved(_ users: [HermesPairingApprovedUser]) -> some View {
-        Section("People with access") {
+        Section(HermesTools.heading(String(localized: "People with access"), users.count)) {
             ForEach(users) { user in
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(user.userName.isEmpty ? user.userID : user.userName).font(.bighelp(.headline))
-                    LabeledContent("Platform", value: user.platform)
-                    LabeledContent("User ID", value: user.userID)
-                    if let date = user.approvedAt { LabeledContent("Approved", value: date.formatted()) }
+                HermesToolRow(art: .symbol("person.crop.circle", key: user.userID),
+                              name: user.userName.isEmpty ? user.userID : user.userName,
+                              detail: HermesTools.line(HermesTools.readable(user.platform),
+                                                       user.userName.isEmpty ? nil : user.userID,
+                                                       user.approvedAt.map { "since \($0.formatted(date: .abbreviated, time: .omitted))" })) {
                     Button("Revoke", role: .destructive) { store.review = .revoke(user) }
+                        .font(.bighelp(.subheadline).weight(.semibold))
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.capsule)
                         .disabled(!store.canAct)
-                        .frame(minHeight: BighelpTokens.hitTarget)
+                        .accessibilityLabel("Revoke \(user.userName.isEmpty ? user.userID : user.userName)")
                 }
             }
             if users.isEmpty { Text("No approved users.").foregroundStyle(.secondary) }

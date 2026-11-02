@@ -18,11 +18,11 @@ struct PluginLifecycleManagementView: View {
                     .padding(.horizontal, CatalogMetrics.margin)
                     .padding(.top, BighelpTokens.space8)
                 status
-                if let snapshot = model.snapshot {
+                if let snapshot = model.snapshot, let storefront = model.storefront {
                     if ManagementSearch.isActive(search) {
                         results(PluginStorefront.matching(search, in: snapshot.catalog))
                     } else {
-                        storefront(snapshot)
+                        self.storefront(snapshot, storefront)
                     }
                 }
             }
@@ -30,7 +30,7 @@ struct PluginLifecycleManagementView: View {
         }
         .catalogPage()
         .bighelpRefreshable { await model.load() }
-        .task { if model.snapshot == nil { await model.load() } }
+        .task { await model.loadIfNeeded() }
         .toolbar {
             if let snapshot = model.snapshot {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -53,8 +53,7 @@ struct PluginLifecycleManagementView: View {
     }
 
     @ViewBuilder
-    private func storefront(_ snapshot: PluginSnapshot) -> some View {
-        let storefront = PluginStorefront(catalog: snapshot.catalog)
+    private func storefront(_ snapshot: PluginSnapshot, _ storefront: PluginStorefront) -> some View {
         if snapshot.catalog.isEmpty {
             Text("This computer's plugin catalog is empty.")
                 .foregroundStyle(theme.secondaryText)
@@ -181,119 +180,204 @@ private struct PluginHeroCard: View {
     @BighelpThemeReader private var theme
 }
 
-/// Every installed plugin on the computer, with Rescan; a row opens it.
+/// Every installed plugin on the computer by state, each with its switch, with Rescan. A plugin's
+/// name opens its page.
 @MainActor
 private struct InstalledPluginsView: View {
     @Bindable var model: PluginLifecycleManagementModel
     let hostName: String
+    @State private var search = ""
+    @State private var filter: HermesToolFilter = .all
+    @State private var opened: String?
 
     var body: some View {
         List {
-            CapabilitiesScopeSection(hostName: hostName, profileName: nil)
+            HermesToolSearchSection(search: $search, prompt: String(localized: "Search installed plugins"),
+                                    searchIdentifier: "plugins.installed.search",
+                                    filters: [.all, .on, .off, .updates],
+                                    filter: $filter, filtersIdentifier: "plugins.installed.filters")
             CapabilitiesStatusSections(
-                support: model.support, isBusy: model.isBusy,
+                support: model.support, isBusy: model.isBusy && model.change == nil,
                 errorMessage: model.errorMessage, successMessage: model.successMessage,
                 retry: { Task { await model.load() } }
             )
             if let snapshot = model.snapshot {
-                Section {
-                    if snapshot.installed.isEmpty { Text("No installed plugins were reported.").foregroundStyle(.secondary) }
-                    ForEach(snapshot.installed) { plugin in
-                        NavigationLink {
-                            InstalledPluginDetailView(model: model, pluginName: plugin.name)
-                        } label: {
-                            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                                Text(plugin.name)
-                                Text("\(plugin.source) • \(plugin.runtimeStatus.capitalized)")
-                                    .font(.bighelp(.caption)).foregroundStyle(.secondary)
-                            }
-                            .frame(minHeight: BighelpTokens.hitTarget)
-                        }
-                    }
-                    Button("Rescan installed plugins", systemImage: "arrow.clockwise") {
-                        Task { await model.rescan() }
-                    }
-                    .disabled(model.isBusy)
-                    .frame(minHeight: BighelpTokens.hitTarget)
-                } header: { Text("Installed") }
-                  footer: { Text("Rescan refreshes discovery only; it does not install, enable, or restart plugins.") }
-
-                if !snapshot.removedCatalogEntries.isEmpty {
-                    Section("Advanced · Removed from catalog") {
-                        ForEach(snapshot.removedCatalogEntries, id: \.self) { Text($0).font(.bighelp(.footnote)) }
-                    }
-                }
+                content(snapshot)
             }
+            CapabilitiesScopeSection(hostName: hostName, profileName: nil)
         }
-        .listStyle(.insetGrouped)
+        .bighelpFormSurface()
         .navigationTitle("Installed")
         .navigationBarTitleDisplayMode(.inline)
         .bighelpRefreshable { await model.load() }
+        .navigationDestination(item: $opened) { name in
+            InstalledPluginDetailView(model: model, pluginName: name)
+        }
         .accessibilityIdentifier("plugins.installed")
+    }
+
+    @ViewBuilder
+    private func content(_ snapshot: PluginSnapshot) -> some View {
+        let listings = InstalledPluginListing.byName(snapshot.catalog)
+        let plugins = snapshot.installed.filter { plugin in
+            let listing = listings[plugin.name]
+            return ManagementSearch.matches(search, plugin.name, listing?.title, plugin.summary, plugin.source)
+                && filter.admits(isOn: plugin.isEnabled, hasUpdate: listing?.updateAvailable == true)
+        }
+        if ManagementSearch.isActive(search), plugins.isEmpty {
+            ManagementSearchEmptySection(search: search)
+        } else if snapshot.installed.isEmpty {
+            Section { Text("No installed plugins were reported.").foregroundStyle(.secondary) }
+        } else if plugins.isEmpty {
+            Section { Text("No plugins match this filter.").foregroundStyle(.secondary) }
+        }
+        section(String(localized: "On"), plugins.filter(\.isEnabled), listings: listings)
+        section(String(localized: "Off"), plugins.filter { !$0.isEnabled }, listings: listings)
+        Section {
+            Button("Rescan installed plugins", systemImage: "arrow.clockwise") {
+                Task { await model.rescan() }
+            }
+            .disabled(model.isBusy)
+            .frame(minHeight: BighelpTokens.hitTarget)
+        } footer: {
+            Text("Rescan refreshes discovery only; it does not install, enable, or restart plugins.")
+        }
+        if !snapshot.removedCatalogEntries.isEmpty, filter == .all, !ManagementSearch.isActive(search) {
+            Section("Advanced · Removed from catalog") {
+                ForEach(snapshot.removedCatalogEntries, id: \.self) { Text($0).font(.bighelp(.footnote)) }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func section(_ title: String, _ plugins: [InstalledPlugin],
+                         listings: [String: PluginCatalogEntry]) -> some View {
+        if !plugins.isEmpty {
+            Section(HermesTools.heading(title, plugins.count)) {
+                ForEach(plugins) { row($0, listing: listings[$0.name]) }
+            }
+        }
+    }
+
+    private func row(_ plugin: InstalledPlugin, listing: PluginCatalogEntry?) -> some View {
+        let change = model.change?.pluginName == plugin.name ? model.change?.kind : nil
+        let hasUpdate = listing?.updateAvailable == true
+        return HermesToolRow(
+            art: InstalledPluginListing.art(listing),
+            name: listing?.displayName ?? plugin.name,
+            detail: change?.word ?? (hasUpdate ? String(localized: "Update available")
+                                     : plugin.summary.isEmpty ? plugin.source : plugin.summary),
+            detailColor: change == nil && hasUpdate ? theme.warning : nil,
+            open: { opened = plugin.name }
+        ) {
+            HermesToolSwitch(title: listing?.displayName ?? plugin.name, isOn: plugin.isEnabled,
+                             pending: change?.target, isLocked: model.isBusy,
+                             identifier: "plugins.installed.switch.\(plugin.name)") { isOn in
+                Task { await model.setEnabled(isOn, plugin: plugin) }
+            }
+        }
+        .accessibilityIdentifier("plugins.installed.plugin.\(plugin.name)")
+    }
+
+    @BighelpThemeReader private var theme
+}
+
+/// What the catalog says about installed plugins: their title, banner, topic and updates.
+private enum InstalledPluginListing {
+    /// The catalog's entries for plugins it lists as installed, by name.
+    static func byName(_ catalog: [PluginCatalogEntry]) -> [String: PluginCatalogEntry] {
+        Dictionary(catalog.lazy.filter(\.isInstalled).map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    /// The listed banner over its topic's tile, or the General tile for a plugin the catalog doesn't list.
+    static func art(_ listing: PluginCatalogEntry?) -> HermesToolArt {
+        guard let listing else { return .topic(.general) }
+        return .artwork(listing.listedImageURL, listing.catalogCategory)
     }
 }
 
-/// One installed plugin: enable or disable, update from Git, remove.
+private extension PluginChange.Kind {
+    /// What a row or page says while the change runs.
+    var word: String {
+        switch self {
+        case .turningOn: String(localized: "Enabling…")
+        case .turningOff: String(localized: "Disabling…")
+        case .updating: String(localized: "Updating…")
+        case .removing: String(localized: "Removing…")
+        }
+    }
+
+    /// The value the switch shows while it runs; updates and removals leave it as it was.
+    var target: Bool? {
+        switch self {
+        case .turningOn: true
+        case .turningOff: false
+        case .updating, .removing: nil
+        }
+    }
+}
+
+/// One installed plugin: its switch, its setup, update from Git, Advanced details and Remove.
 @MainActor
 struct InstalledPluginDetailView: View {
     @Bindable var model: PluginLifecycleManagementModel
     let pluginName: String
     @Environment(\.dismiss) private var dismiss
     @State private var confirmsRemoval = false
-    @State private var confirmsToggle = false
 
     private var plugin: InstalledPlugin? { model.snapshot?.installed.first { $0.name == pluginName } }
+    private var listing: PluginCatalogEntry? {
+        model.snapshot?.catalog.first { $0.name == pluginName && $0.isInstalled }
+    }
 
     var body: some View {
         List {
-            CapabilitiesStatusSections(
-                support: model.support, isBusy: model.isBusy,
-                errorMessage: model.errorMessage, successMessage: model.successMessage,
-                retry: { Task { await model.load() } }
-            )
             if let plugin {
-                Section("Overview") {
-                    LabeledContent("Version", value: plugin.version.isEmpty ? "Not reported" : plugin.version)
-                    LabeledContent("Source", value: plugin.source)
-                    LabeledContent("Runtime", value: plugin.runtimeStatus.capitalized)
-                    if !plugin.summary.isEmpty { Text(plugin.summary) }
+                let change = model.change?.pluginName == plugin.name ? model.change?.kind : nil
+                Section {
+                    HermesToolHeader(art: InstalledPluginListing.art(listing),
+                                     name: listing?.displayName ?? plugin.name,
+                                     summary: change?.word ?? plugin.summary)
+                }
+                CapabilitiesStatusSections(
+                    support: model.support, isBusy: model.isBusy && model.change == nil,
+                    errorMessage: model.errorMessage, successMessage: model.successMessage,
+                    retry: { Task { await model.load() } }
+                )
+                Section {
+                    HermesToolSwitch(title: String(localized: "Turned on"), isOn: plugin.isEnabled,
+                                     pending: change?.target, isLocked: model.isBusy, showsTitle: true,
+                                     identifier: "plugins.installed.enabled") { isOn in
+                        Task { await model.setEnabled(isOn, plugin: plugin) }
+                    }
                     if let removed = plugin.removedReason {
                         Label(removed, systemImage: "exclamationmark.shield").foregroundStyle(.red)
                     }
+                } footer: {
+                    Text("Only this plugin changes. Hermes may need a restart before its code changes take effect.")
                 }
-                if plugin.requiresAuthentication {
-                    Section("Authentication") {
-                        Text("This plugin requires host-side authentication.")
-                        if !plugin.authenticationCommand.isEmpty {
-                            Text(plugin.authenticationCommand).font(.bighelp(.footnote).monospaced()).textSelection(.enabled)
+                setupSections(plugin, change: change)
+                Section("Advanced") {
+                    LabeledContent("Name", value: plugin.name)
+                    LabeledContent("Version", value: plugin.version.isEmpty ? "Not reported" : plugin.version)
+                    LabeledContent("Source", value: plugin.source)
+                    LabeledContent("Runtime", value: plugin.runtimeStatus.capitalized)
+                }
+                if plugin.canRemove {
+                    Section {
+                        Button(change == .removing ? "Removing…" : "Remove plugin", role: .destructive) {
+                            confirmsRemoval = true
                         }
-                    }
-                }
-                Section("Manage plugin") {
-                    Button(plugin.isEnabled ? "Disable" : "Enable") { confirmsToggle = true }
-                    if plugin.canUpdate {
-                        Button("Update from its configured Git source") { Task { await model.update(plugin) } }
-                    }
-                    if plugin.canRemove {
-                        Button("Remove plugin", role: .destructive) { confirmsRemoval = true }
+                        .disabled(model.isBusy)
                     }
                 }
             } else {
                 ContentUnavailableView("Plugin unavailable", systemImage: "puzzlepiece.extension")
             }
         }
+        .bighelpFormSurface()
         .navigationTitle(pluginName)
         .navigationBarTitleDisplayMode(.inline)
-        .confirmationDialog("Change this plugin’s runtime state?", isPresented: $confirmsToggle, titleVisibility: .visible) {
-            if let plugin {
-                Button(plugin.isEnabled ? "Disable \(plugin.name)" : "Enable \(plugin.name)") {
-                    Task { await model.setEnabled(!plugin.isEnabled, plugin: plugin) }
-                }
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Only the selected plugin is changed. Hermes may require a later restart before runtime-loaded code changes take effect.")
-        }
         .confirmationDialog("Remove this plugin?", isPresented: $confirmsRemoval, titleVisibility: .visible) {
             if let plugin {
                 Button("Remove \(plugin.name)", role: .destructive) {
@@ -303,6 +387,31 @@ struct InstalledPluginDetailView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Hermes will remove only this user or Git plugin. Bundled and project plugins are not presented as removable.")
+        }
+    }
+
+    @ViewBuilder
+    private func setupSections(_ plugin: InstalledPlugin, change: PluginChange.Kind?) -> some View {
+        if plugin.requiresAuthentication {
+            Section("Setup") {
+                Text("This plugin requires host-side authentication.")
+                if !plugin.authenticationCommand.isEmpty {
+                    Text(plugin.authenticationCommand).font(.bighelp(.footnote).monospaced()).textSelection(.enabled)
+                }
+            }
+        }
+        if plugin.canUpdate {
+            Section {
+                if listing?.updateAvailable == true {
+                    LabeledContent("Update") {
+                        HermesToolStatus(text: String(localized: "Available"), tone: .warning)
+                    }
+                }
+                Button(change == .updating ? "Updating…" : "Update from its configured Git source") {
+                    Task { await model.update(plugin) }
+                }
+                .disabled(model.isBusy)
+            }
         }
     }
 }

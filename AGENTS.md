@@ -924,10 +924,13 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
 
 ## Many sessions at once
 
-When several agent sessions work on bighelp together, one session owns a change from start to finish: it builds
-and tests it on the Mac, opens the PR and merges it once checks and review pass. Two sessions never build the same
-feature: check open PRs, issues and the other sessions first. The maintainer starts a release, and the session the
-maintainer asks runs it. The whole process is in [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md).
+When several agent sessions work on bighelp together, one working session does the work. New issues and
+features go to the session that is already working, which builds them itself: no session per feature and no handoffs
+to sub-sessions for normal work. It groups related changes into one branch and PR where it makes sense, builds and
+tests the combined change once on the Mac, and merges once checks and review pass. It starts a second session only
+when the maintainer asks, or when two pieces of work must run at the same time on different files. Two sessions
+never build the same feature: check open PRs, issues and the other sessions first. The maintainer starts a release,
+and the session the maintainer asks runs it. The whole process is in [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md).
 
 ## Git, commits and releases
 
@@ -940,7 +943,7 @@ maintainer asks runs it. The whole process is in [docs/AGENT_ORCHESTRATION.md](d
   - Explain the visible behavior and any trust-boundary impact.
   - List what you tested, and where: demo, real host or device. Give the results from the Mac, never a CI run, and
     never list a missing CI run as a blocker (see Build and test).
-  - The maintainer merges, or a session merges its own PR once checks and review pass.
+  - The maintainer merges, or the working session merges its own PR once checks and review pass.
 - **Versions** live in `project.yml`: `MARKETING_VERSION`, and `CURRENT_PROJECT_VERSION` in every target. Regenerate
   after bumping.
 - **Releases are batched.** Merge pull requests whenever they're ready; releasing is a separate step the

@@ -1,29 +1,33 @@
 # Many agent sessions at once
 
-Several agent sessions can work on bighelp at the same time. There are no special roles. One session owns a change
-from start to finish: it builds the change, tests it, opens the PR and merges it. Releasing is a separate step that
-the maintainer starts.
+One working session does the work on bighelp. There are no special roles and no session per feature. New issues
+and features go to the session that is already working, and it builds them itself, merges them and runs the
+release when the maintainer says so.
 
 This keeps three things from happening:
 - Two sessions build the same feature in different branches, and their PRs fight over the same files.
 - Every session builds, tests and archives at the same time, and the shared Mac runs out of memory.
 - A change waits for hours in a queue for another session to look at it.
 
-## One session owns a change
+## One working session
 
-- The session that takes an issue or feature does all of it itself: it writes the change, builds and tests it on the
-  Mac, opens the PR, fixes review findings and failed checks, and merges the PR once checks and review pass. It
-  does not hand normal work to other sessions.
-- Big work can be split. The owning session does the split and stays the owner of the result. It can start
-  helper sessions for the parts and review what they send back. The helpers' work is part of the owner's change.
+- New issues and features go to the session that is already working on bighelp. That session writes the change,
+  builds and tests it on the Mac, opens the PR, fixes review findings and failed checks, and merges the PR once
+  checks and review pass. It does not hand normal work to other sessions: no new session per feature and no
+  handoffs to sub-sessions.
+- Group related changes into one branch and one PR where it makes sense. Build and test the combined change once
+  on the Mac, not once for each feature.
 - Changes to chat, transport, sign-in, security or notifications get a second pair of eyes before the merge: the
-  maintainer, or an independent review session.
+  maintainer, or an independent review.
 - Merging and releasing are separate. A merge does not start a release.
 
-## One feature, one owner
+## A second session
 
-- Before starting, look at open PRs, open issues and what the other sessions are doing. If another session
-  already owns the feature or the same files, don't start a second copy. Tell the maintainer.
+- Start a second session only when the maintainer asks for one, or when two pieces of work really must run at the
+  same time and touch different files.
+- Even then, one feature has one owner. Before starting, look at open PRs, open issues and what the other sessions
+  are doing. If another session already owns the feature or the same files, don't start a second copy. Tell the
+  maintainer.
 - When two sessions turn out to overlap, the maintainer names one owner. The other hands over its branch, its
   findings and anything it was told by the maintainer, then stops work on it.
 - Mockups, specs and decisions the maintainer gave one session belong to the feature's owner. Pass them on
@@ -39,9 +43,9 @@ A change is done when it is merged to `main`, not when the code compiles.
 3. Every change must still build for the Mac and Vision Pro (AGENTS.md › Mac, Vision Pro). Build those platforms
    yourself when the diff touches code for them: `#if os(visionOS)`, `targetEnvironment(macCatalyst)`,
    entitlements, or platform settings in `project.yml`. The release builds prove it for other changes.
-4. Open the PR (one issue, squash-merge, closes the issue). Its description has:
+4. Open the PR (squash-merge, closes the issues it covers). Its description has:
    - what changes for the person using bighelp, in plain words
-   - the issue it closes
+   - the issues it closes
    - what was tested, and where: demo fixtures, a real host or a device
    - any plugin change it needs (the plugin PR or the `/native/context` feature), so the release ships the plugin
      first
@@ -79,8 +83,8 @@ A release is a step the maintainer starts. The session the maintainer asks runs 
    and what was held back and why.
 
 Rules for releases:
-- Only the session running the release touches versions, release notes, tags, uploads and published builds. Other
-  sessions keep merging features. Their PRs go in the next release.
+- Only the session running the release touches versions, release notes, tags, uploads and published builds. Features
+  that merge during the release go in the next one.
 - Don't hold a ready release for one slow PR. Ship what is ready; the slow one goes in the next release.
 - If a merge breaks `main`, revert it first, then fix it in the PR that broke it.
 

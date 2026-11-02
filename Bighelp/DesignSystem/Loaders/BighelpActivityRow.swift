@@ -462,7 +462,7 @@ struct BighelpActivityStepRow: View {
                 .font(.bighelp(.footnote))
                 .foregroundStyle(theme.secondaryText)
                 .lineLimit(1)
-                .fixedSize()
+                .truncationMode(.tail)
             if let detail = step.detail, !detail.isEmpty {
                 Text(detail)
                     .font(.bighelp(.caption, design: .monospaced))

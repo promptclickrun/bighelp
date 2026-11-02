@@ -95,6 +95,23 @@ struct DeviceToolPermissionsTests {
         #expect(store.revision != before)
     }
 
+    /// A framework that never answers its status (HealthKit's daemon stuck, say) holds up nothing: the
+    /// phone's channel opens after a refresh, so every other tool would wait on the slowest one.
+    @Test(.timeLimit(.minutes(1))) func aStatusThatNeverAnswersHoldsUpNoOtherTool() async {
+        let stuck = PendingDevicePermission()
+        let store = DeviceToolPermissions(
+            status: { kind in kind == .health ? await stuck.value() : .available },
+            request: { _ in .available }, isForeground: { true },
+            readGrants: { _ in nil }, writeGrants: { _, _ in }, statusDeadline: 0.2)
+        store.bind(scope)
+        let started = ContinuousClock.now
+        await store.refresh()
+        #expect(ContinuousClock.now - started < .seconds(5), "Refresh doesn't wait on the stuck one")
+        #expect(store.status(for: .reminders) == .available)
+        #expect(store.status(for: .health) == .notRequested, "No answer keeps what was known")
+        stuck.resolve(.available)
+    }
+
     @Test func deniedPermissionCannotEnableAgentAccess() async {
         let fixture = DevicePermissionFixture()
         fixture.result = .denied

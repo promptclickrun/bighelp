@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// The phone lease belongs to the foreground workspace, not the visibility of
 /// the navigation root. Retire one lease before opening its replacement.
@@ -63,6 +64,9 @@ final class NativeDeviceToolSession {
     static let askWindow = 300
     /// Every other call's longest window.
     static let callWindow = 120
+    /// Why a chat's channel opened or ended, in fixed words (`DeviceTools`), for a phone whose agent
+    /// can't reach its tools.
+    static let log = Logger(subsystem: "app.loopdy.mobile", category: "DeviceTools")
     /// Appearance and Navigation are on by default and share nothing, so a channel with only them polls
     /// every 8 seconds: well inside the plugin's 30-second lease and tool timeout, a quarter of the
     /// traffic. An agent calls tools only while it answers, and the person who asked "show me" is
@@ -155,6 +159,7 @@ final class NativeDeviceToolSession {
             throw WorkspaceClientError.invalidResponse
         }
         connected = true
+        Self.log.notice("channel open: \(self.enabled.count) on, \(self.askable.count) can ask")
     }
 
     func pollOnce() async throws {
@@ -225,10 +230,21 @@ final class NativeDeviceToolSession {
                 try await waitForNextPoll()
             }
         } catch {
+            Self.log.notice("channel ended: \(Self.logReason(error), privacy: .public)")
             await close()
             throw error
         }
         await close()
+    }
+
+    /// An error as fixed words: the plugin's refusal code, or the case, never a message.
+    static func logReason(_ error: any Error) -> String {
+        switch error {
+        case WorkspaceClientError.rejected(let code, _): code ?? "rejected"
+        case WorkspaceClientError.unavailable(let reason): "unavailable \(reason)"
+        case let error as WorkspaceClientError: "\(error)"
+        default: String(describing: type(of: error))
+        }
     }
 
     /// Sleeps until the next poll in short slices, so a slow channel speeds up as soon as the chat's
@@ -274,15 +290,19 @@ final class NativeDeviceToolSession {
             method: .post, body: payload, maximumResponseBytes: 262_144), requestGuard: guardValue)
         if !closing { try check() }
         guard currentOwner() == owner else { throw WorkspaceClientError.ownerChanged }
-        guard response.body.count <= 262_144,
-              response.http.value(forHTTPHeaderField: "X-Loopdy-Request-ID") == guardValue.requestIDHeader else {
+        let echoed = response.http.value(forHTTPHeaderField: "X-Loopdy-Request-ID") == guardValue.requestIDHeader
+        let tagged = DirectHermesNativeRequestGuard.contextTag(response.http.value(forHTTPHeaderField: "ETag")) == guardValue.etag
+        if !echoed || response.http.statusCode != 200 || !tagged {
+            Self.log.notice("\(action, privacy: .public) answered \(response.http.statusCode) \(Self.refusalCode(response) ?? "-", privacy: .public), id \(echoed ? "echoed" : "missing", privacy: .public), tag \(tagged ? "matches" : "differs", privacy: .public)")
+        }
+        guard response.body.count <= 262_144, echoed else {
             throw WorkspaceClientError.invalidResponse
         }
         // The plugin's refusals carry no ETag; their code says why.
         guard response.http.statusCode == 200 else {
             throw WorkspaceClientError.rejected(code: Self.refusalCode(response))
         }
-        guard DirectHermesNativeRequestGuard.contextTag(response.http.value(forHTTPHeaderField: "ETag")) == guardValue.etag else {
+        guard tagged else {
             throw WorkspaceClientError.invalidResponse
         }
         return try response.object()

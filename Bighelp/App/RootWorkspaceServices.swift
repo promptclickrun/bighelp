@@ -147,6 +147,7 @@ extension RootShellView {
         guard let conversationID = appState.activeConversationID,
               let coordinate = nativeRuntime?.bridge.currentCoordinate(for: conversationID),
               coordinate.owner == owner else {
+            NativeDeviceToolSession.log.notice("no channel: the chat has no session yet")
             permissionCenter.nativeDeviceToolStatus = DeviceToolChannelNote.noChat(enabled: enabled)
             return
         }

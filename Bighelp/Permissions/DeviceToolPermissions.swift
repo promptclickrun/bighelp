@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import CryptoKit
+import os
 
 /// The order here is the order of Settings › Device access.
 enum DeviceToolCapability: String, CaseIterable, Codable, Identifiable, Sendable {
@@ -184,6 +185,10 @@ final class DeviceToolPermissions {
     private let saveAppearanceAllowed: (Bool) -> Void
     private let saveNavigationAllowed: (Bool) -> Void
     private let saveHealthSharingAgreed: (Bool) -> Void
+    /// How long one iOS status read may take. The phone's channel opens after a refresh, so a framework
+    /// that never answers (HealthKit's daemon stuck, say) must not hold up every other tool.
+    private let statusDeadline: TimeInterval
+    private static let log = Logger(subsystem: "app.loopdy.mobile", category: "DeviceTools")
     init(
         status: @escaping (DeviceToolCapability) async -> DeviceToolSystemAccess,
         request: @escaping (DeviceToolCapability) async -> DeviceToolSystemAccess,
@@ -196,7 +201,8 @@ final class DeviceToolPermissions {
         navigationAllowed: Bool = true,
         saveNavigationAllowed: @escaping (Bool) -> Void = { _ in },
         healthSharingAgreed: Bool = false,
-        saveHealthSharingAgreed: @escaping (Bool) -> Void = { _ in }
+        saveHealthSharingAgreed: @escaping (Bool) -> Void = { _ in },
+        statusDeadline: TimeInterval = 3
     ) {
         readStatus = status
         requestAccess = request
@@ -208,6 +214,7 @@ final class DeviceToolPermissions {
         self.saveNavigationAllowed = saveNavigationAllowed
         self.healthSharingAgreed = healthSharingAgreed
         self.saveHealthSharingAgreed = saveHealthSharingAgreed
+        self.statusDeadline = statusDeadline
         let saved = readGrants(Self.grantsKey)
         let names = saved ?? legacyGrants().flatMap { $0 }
         enabled = Set(names.compactMap(DeviceToolCapability.init(rawValue:)).filter(\.sharesPersonalData))
@@ -279,7 +286,12 @@ final class DeviceToolPermissions {
         for kind in DeviceToolCapability.allCases where kind.sharesPersonalData {
             guard requestInFlight != kind else { continue }
             let owner = revision
-            let value = await readStatus(kind)
+            let read = readStatus
+            guard let value = try? await DeviceLocationDeadline.run(seconds: statusDeadline, { await read(kind) }) else {
+                // No answer in time: keep what was known, and ask again at the next refresh.
+                Self.log.notice("\(kind.rawValue, privacy: .public) status didn't answer in time")
+                continue
+            }
             guard revision == owner, requestInFlight != kind else { continue }
             let previous = statuses[kind]
             statuses[kind] = value

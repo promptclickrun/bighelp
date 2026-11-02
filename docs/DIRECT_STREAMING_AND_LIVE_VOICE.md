@@ -71,6 +71,11 @@ first): Show call sound report shows it once a second, and Copy report button pu
 Bots mode's voice bar menu. Its Restart sound stops and starts the player of the Gemini Live call in progress
 only (`LiveVoiceCurrentCall`, a weak reference the call clears as it ends).
 
+When Gemini interrupts a reply, the report keeps the last ten microphone-gate decisions at that moment:
+RMS level, threshold, and whether the chunk was blocked, sent during playback, or sent while the agent
+was quiet (`idle`). It keeps no audio or transcript. A new reply clears the gate's held speech and hangover
+from the person's preceding turn; talking over the reply still opens it after two loud chunks.
+
 ## Team call
 
 A group chat with two or more members can start a team call from its header (`Bighelp/TeamCall/`). It is turn-based

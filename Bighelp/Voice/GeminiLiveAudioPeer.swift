@@ -232,7 +232,7 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
     // MARK: LiveVoiceAudioReporting
 
     func audioReport() -> String {
-        diagnostics.report(GeminiLiveAudioState(engine: engine, player: player))
+        diagnostics.report(GeminiLiveAudioState(engine: engine, player: player)) + "\n" + uplink.echoReport
     }
 
     func restartPlayback() {
@@ -382,6 +382,7 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
         case .stopPlayback:
             diagnostics.count { $0.geminiStops += 1 }
             diagnostics.event("Gemini stopped its reply; playback cleared")
+            diagnostics.event(uplink.echoReport)
             diagnostics.playerStopping()
             player.stop()
             playbackEndsAt = Date()
@@ -566,6 +567,12 @@ final class GeminiLiveUplink: @unchecked Sendable {
     /// When the agent's voice already scheduled stops playing (`timeIntervalSinceReferenceDate`).
     private var agentPlaysUntil = 0.0
 
+    var echoReport: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return "Microphone \(muted ? "muted" : "on"); \(echoGate.report)"
+    }
+
     var counters: (bytes: UInt64, frames: UInt64, level: Double, muted: Bool) {
         lock.lock()
         defer { lock.unlock() }
@@ -670,16 +677,12 @@ final class GeminiLiveUplink: @unchecked Sendable {
     }
 }
 
-/// The microphone while the agent's voice plays, one 100 ms chunk at a time. Echo cancelling never
-/// takes all of the agent's voice out of the microphone, and Gemini stops talking for its own voice
-/// however faint (and for a room that starts talking under a reply), so the first replies of a call,
-/// before echo cancelling settles, were cut off before they could be heard. While the agent plays, Gemini
-/// gets silence unless the person talks over it: two chunks in a row clearly louder than the room was
-/// while the agent was quiet. Then the microphone stays open half a second after the last loud chunk,
-/// and the first loud chunk goes too, so Gemini hears the start of the words. Measured on the real
-/// service: the agent's echo and a TV under its reply no longer cut it off; talking over it still does.
+/// The microphone while the agent's voice plays, one 100 ms chunk at a time. Residual speaker echo can
+/// trigger Gemini's speech detector. During playback this gate requires two loud chunks, includes the
+/// first when it opens, and stays open half a second between words. Loudness alone cannot distinguish
+/// a person from strong residual echo; the cutoff report retains the recent decisions for device checks.
 struct GeminiLiveEchoGate {
-    /// The quietest talking over the agent that opens the microphone, above the loudest echo measured.
+    /// Minimum RMS for a cut-in; the room's baseline can raise it.
     static let minimumLevel = 0.06
     /// How much louder than the room the person must be.
     static let roomFactor = 2.5
@@ -691,28 +694,60 @@ struct GeminiLiveEchoGate {
     private var loudRun = 0
     private var openFor = 0
     private var held: Data?
+    private var wasAgentPlaying = false
+    // Levels and decisions only; never keep microphone bytes for diagnostics.
+    private var recent: [(level: Double, threshold: Double, playing: Bool, sent: Int)] = []
+    static let maximumReportChunks = 10
+
+    var report: String {
+        let samples = recent.map { sample in
+            let decision = !sample.playing ? "idle" : sample.sent == 0 ? "blocked" : "sent \(sample.sent)"
+            return String(format: "%.3f/%.3f %@", sample.level, sample.threshold, decision)
+        }.joined(separator: "; ")
+        return "gate last \(recent.count) chunks, oldest first (RMS/threshold): \(samples)"
+    }
 
     /// What to send for `chunk`, whose RMS is `level`: the chunk, silence, or the held chunk and this one.
     mutating func pass(_ chunk: Data, level: Double, agentPlaying: Bool) -> [Data] {
+        if agentPlaying && !wasAgentPlaying {
+            // Speech before the reply isn't a cut-in. Its held chunk and hangover would otherwise
+            // send the first speaker echo straight back to Gemini, or repeat the person's last words.
+            loudRun = 0
+            openFor = 0
+            held = nil
+        }
+        wasAgentPlaying = agentPlaying
         if !agentPlaying {
             room.append(level)
             if room.count > Self.roomChunks { room.removeFirst(room.count - Self.roomChunks) }
         }
         let roomLevel = room.isEmpty ? 0 : room.sorted()[Int(0.3 * Double(room.count - 1))]
-        let loud = level >= max(Self.minimumLevel, Self.roomFactor * roomLevel)
+        let threshold = max(Self.minimumLevel, Self.roomFactor * roomLevel)
+        var sent = 0
+        defer {
+            recent.append((level, threshold, agentPlaying, sent))
+            if recent.count > Self.maximumReportChunks { recent.removeFirst() }
+        }
+        let loud = level >= threshold
         loudRun = loud ? loudRun + 1 : 0
         let previous = held
         held = loud ? chunk : nil
         if loudRun >= 2 {
             let opening = openFor == 0
             openFor = Self.openChunks
-            if opening, agentPlaying, let previous { return [previous, chunk] }
+            if opening, agentPlaying, let previous {
+                sent = 2
+                return [previous, chunk]
+            }
+            sent = 1
             return [chunk]
         }
         if openFor > 0 {
             openFor -= 1
+            sent = 1
             return [chunk]
         }
+        sent = agentPlaying ? 0 : 1
         return agentPlaying ? [Data(count: chunk.count)] : [chunk]
     }
 }

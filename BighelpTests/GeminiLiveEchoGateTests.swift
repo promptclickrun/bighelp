@@ -9,6 +9,23 @@ struct GeminiLiveEchoGateTests {
 
     private func chunk(_ tag: UInt8) -> Data { Data(repeating: tag, count: 3_200) }
 
+    @Test func thePersonsTurnDoesNotLeaveTheGateOpenForTheReply() {
+        var gate = GeminiLiveEchoGate()
+        for _ in 0..<10 { _ = gate.pass(chunk(1), level: 0.005, agentPlaying: false) }
+        for _ in 0..<3 { _ = gate.pass(chunk(2), level: 0.15, agentPlaying: false) }
+        #expect(gate.pass(chunk(3), level: 0.04, agentPlaying: true) == [Self.silence],
+                "The person's previous turn must not admit the agent's echo")
+    }
+
+    @Test func speechBeforePlaybackDoesNotCountAsTalkingOverTheAgent() {
+        var gate = GeminiLiveEchoGate()
+        for _ in 0..<10 { _ = gate.pass(chunk(1), level: 0.005, agentPlaying: false) }
+        _ = gate.pass(chunk(2), level: 0.15, agentPlaying: false)
+        #expect(gate.pass(chunk(3), level: 0.15, agentPlaying: true) == [Self.silence])
+        #expect(gate.pass(chunk(4), level: 0.15, agentPlaying: true) == [chunk(3), chunk(4)],
+                "A fresh interruption still includes its first chunk, without replaying the previous turn")
+    }
+
     @Test func theAgentsEchoBecomesSilence() {
         var gate = GeminiLiveEchoGate()
         for _ in 0..<10 { _ = gate.pass(chunk(1), level: 0.005, agentPlaying: false) }
@@ -53,5 +70,20 @@ struct GeminiLiveEchoGateTests {
         for level in [0.001, 0.04, 0.3] {
             #expect(gate.pass(chunk(7), level: level, agentPlaying: false) == [chunk(7)])
         }
+    }
+
+    @Test func theCutoffReportKeepsRecentGateDecisionsWithoutAudio() {
+        var gate = GeminiLiveEchoGate()
+        for _ in 0..<20 { _ = gate.pass(chunk(1), level: 0.005, agentPlaying: false) }
+        _ = gate.pass(chunk(2), level: 0.04, agentPlaying: true)
+        _ = gate.pass(chunk(3), level: 0.15, agentPlaying: true)
+        _ = gate.pass(chunk(4), level: 0.15, agentPlaying: true)
+        let cutoff = gate.report
+        #expect(cutoff.contains("last 10 chunks"))
+        #expect(cutoff.contains("0.040/0.060 blocked"))
+        #expect(cutoff.contains("0.150/0.060 blocked; 0.150/0.060 sent 2"))
+        for _ in 0..<20 { _ = gate.pass(chunk(5), level: 0.005, agentPlaying: false) }
+        #expect(!gate.report.contains("sent 2"))
+        #expect(cutoff.contains("sent 2"), "The event retains the decisions from the cutoff, not later audio")
     }
 }

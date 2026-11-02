@@ -485,8 +485,9 @@ text is SF Pro, as everywhere.
   and "Needs you", which wins over working. Marks also look up while they work; characters and pets play the
   move for the work; photos stay still. It's only what the computer says (`BotChatActivityStore`): unknown
   or out of date shows nothing, and it clears when the turn ends.
-- **Touch and hold** a bot: its latest message, then Mark Unread (kept on this device), Pin, Replace
-  Primary Bot… or Make Primary Bot, Rearrange, and More (profile, new chat, routines, then Hide at the bottom).
+- **Touch and hold** a bot: its latest message, then New Chat, Pin (Unpin when pinned), Rearrange,
+  Mark Read/Unread (kept on this device), Bot Profile, a divider, and Hide. Actions stay in that order;
+  the primary bot has no Pin or Hide. Primary selection stays in Chats settings, and Routines in Bot Profile.
   A group chat's menu has Mark Unread and Rearrange.
 - **Marks**: thirteen shapes in eleven colors with two white eyes (`SimpleBotMark`). Picking one in a
   bot's profile or in Create New Bot saves it as the bot's picture on its computer, so every screen,

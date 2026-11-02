@@ -64,11 +64,11 @@ final class SimpleBotsUITests: BighelpUITestCase {
 
             // Touch and hold the primary bot.
             primary.press(forDuration: 1.2)
-            XCTAssertTrue(app.buttons["Replace Primary Bot…"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["New Chat"].waitForExistence(timeout: 5))
+            XCTAssertFalse(app.buttons["Replace Primary Bot…"].exists)
+            XCTAssertFalse(app.buttons["More"].exists)
             save("simple-menu-\(appearance)", app)
-            app.buttons["Replace Primary Bot…"].tap()
-            XCTAssertTrue(app.buttons["simple-bots.primary-pick.travel"].waitForExistence(timeout: 5))
-            app.buttons["Cancel"].tap()
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.06)).tap()
 
             // The primary bot's chat, then its profile from its name.
             primary.tap()
@@ -507,17 +507,47 @@ final class SimpleBotsUITests: BighelpUITestCase {
         let listed = app.buttons["simple-bots.bot.travel"]
         XCTAssertTrue(listed.waitForExistence(timeout: 15))
         listed.press(forDuration: 1.2)
-        app.buttons["Pin"].tap()
+        tapBotMenuAction("Pin", in: app)
         let pinned = app.buttons["simple-bots.pinned.travel"]
         XCTAssertTrue(pinned.waitForExistence(timeout: 5), "Pinned bots sit beside the primary one")
         XCTAssertFalse(listed.exists, "And leave the list")
         save("simple-home-pinned-dark", app)
         pinned.press(forDuration: 1.2)
-        app.buttons["Unpin"].tap()
+        tapBotMenuAction("Unpin", in: app)
         XCTAssertTrue(listed.waitForExistence(timeout: 5), "Unpinned, it's back in the list")
     }
 
-    /// Touch and hold a bot: Rearrange (no Save as Template; Hide is under More). Rearrange lets the top
+    @MainActor
+    func testBotMenuShowsActionsInOrderWithoutMore() throws {
+        for appearance in ["light", "dark"] {
+            let app = launch(appearance: appearance)
+            let bot = app.buttons["simple-bots.bot.travel"]
+            XCTAssertTrue(bot.waitForExistence(timeout: 15))
+            bot.press(forDuration: 1.2)
+            let labels = ["New Chat", "Pin", "Rearrange", "Mark Unread", "Bot Profile", "Hide"]
+            for label in labels {
+                XCTAssertTrue(app.buttons[label].waitForExistence(timeout: 3), "First-level action: \(label)")
+                XCTAssertTrue(app.buttons[label].isHittable)
+            }
+            for (before, after) in zip(labels, labels.dropFirst()) {
+                XCTAssertLessThan(app.buttons[before].frame.midY, app.buttons[after].frame.midY)
+            }
+            for removed in ["More", "Make Primary Bot", "Replace Primary Bot…", "Routines"] {
+                XCTAssertFalse(app.buttons[removed].exists)
+            }
+            save("simple-bot-menu-\(appearance)", app)
+            app.buttons["Mark Unread"].tap()
+            bot.press(forDuration: 1.2)
+            XCTAssertTrue(app.buttons["Mark Read"].waitForExistence(timeout: 3))
+            app.buttons["Mark Read"].tap()
+            bot.press(forDuration: 1.2)
+            app.buttons["Bot Profile"].tap()
+            XCTAssertTrue(app.descendants(matching: .any)["simple-bots.profile"].waitForExistence(timeout: 5))
+            app.terminate()
+        }
+    }
+
+    /// Touch and hold a bot: Rearrange and Hide are first-level actions. Rearrange lets the top
     /// bots be dragged (the primary bot too); Save keeps the order, Cancel drops it.
     @MainActor
     func testRearrangeReordersTheListAndTheTop() throws {
@@ -538,20 +568,15 @@ final class SimpleBotsUITests: BighelpUITestCase {
         app.buttons[draggedID].press(forDuration: 1.2)
         XCTAssertTrue(app.buttons["Rearrange"].waitForExistence(timeout: 5), "The menu offers Rearrange")
         XCTAssertFalse(app.buttons["Save as Template"].exists, "Save as Template is gone")
-        XCTAssertFalse(app.buttons["Hide"].exists, "Hide moved into More")
-        app.buttons["More"].tap()
-        XCTAssertTrue(app.buttons["Hide"].waitForExistence(timeout: 5), "Hide is at the bottom of More")
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.06)).tap()
-        let listed = app.buttons[draggedID]
-        XCTAssertTrue(listed.waitForExistence(timeout: 5))
-        listed.press(forDuration: 1.2)
-        app.buttons["Pin"].tap()
+        XCTAssertTrue(app.buttons["Hide"].exists, "Hide is at the bottom of the first menu")
+        XCTAssertFalse(app.buttons["More"].exists)
+        tapBotMenuAction("Pin", in: app)
         XCTAssertTrue(app.buttons["simple-bots.pinned.\(agentID)"].waitForExistence(timeout: 5))
 
         // A bot still in the list moves up; the pinned one goes before the primary bot.
         let other = bots.element(boundBy: bots.count - 1).identifier
         app.buttons[other].press(forDuration: 1.2)
-        app.buttons["Rearrange"].tap()
+        tapBotMenuAction("Rearrange", in: app)
         let saveButton = app.buttons["simple-bots.rearrange.save"]
         XCTAssertTrue(saveButton.waitForExistence(timeout: 5), "Rearrange shows Save")
         save("simple-rearrange-dark", app)
@@ -568,7 +593,7 @@ final class SimpleBotsUITests: BighelpUITestCase {
 
         // Cancel drops a change.
         app.buttons["simple-bots.pinned.\(agentID)"].press(forDuration: 1.2)
-        app.buttons["Rearrange"].tap()
+        tapBotMenuAction("Rearrange", in: app)
         let pinnedAgain = app.descendants(matching: .any)["simple-bots.pinned.\(agentID)"]
         pinnedAgain.press(forDuration: 0.1, thenDragTo: app.descendants(matching: .any)["simple-bots.primary"],
                           withVelocity: .slow, thenHoldForDuration: 0.3)
@@ -578,8 +603,23 @@ final class SimpleBotsUITests: BighelpUITestCase {
                           "Cancel keeps the saved order")
 
         app.buttons["simple-bots.pinned.\(agentID)"].press(forDuration: 1.2)
-        app.buttons["Unpin"].tap()
+        tapBotMenuAction("Unpin", in: app)
         XCTAssertTrue(app.buttons[draggedID].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    private func tapBotMenuAction(_ title: String, in app: XCUIApplication) {
+        let action = app.buttons[title]
+        XCTAssertTrue(action.waitForExistence(timeout: 5))
+        var frame = CGRect.zero
+        var unchangedSince = Date()
+        XCTAssertTrue(waitUntil {
+            guard action.isHittable else { unchangedSince = Date(); return false }
+            let next = action.frame
+            if next != frame { frame = next; unchangedSince = Date() }
+            return Date().timeIntervalSince(unchangedSince) >= 0.5
+        }, "Wait for the context menu's presentation to settle before tapping")
+        action.tap()
     }
 
     @MainActor

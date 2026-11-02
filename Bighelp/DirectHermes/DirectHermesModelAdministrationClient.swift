@@ -119,6 +119,8 @@ struct DirectHermesModelAnalytics: Equatable, Sendable {
 enum DirectHermesModelAssignmentScope: Equatable, Sendable {
     case main
     case auxiliary(task: String)
+    /// One helper task back on the chat model (Hermes' `auto`).
+    case automaticAuxiliary(task: String)
     case resetAuxiliary
 }
 
@@ -458,6 +460,12 @@ final class DirectHermesModelAdministrationClient {
                   row.providerID == request.providerID, row.modelID == request.modelID else {
                 throw WorkspaceClientError.outcomeUnknown
             }
+        case .automaticAuxiliary(let task):
+            let state = try await auxiliaryModels(profileID: profile)
+            guard let row = state.tasks.first(where: { $0.task == task }),
+                  row.providerID == "auto", row.modelID.isEmpty else {
+                throw WorkspaceClientError.outcomeUnknown
+            }
         case .resetAuxiliary:
             let state = try await auxiliaryModels(profileID: profile)
             guard state.tasks.allSatisfy({ $0.providerID == "auto" && $0.modelID.isEmpty }) else {
@@ -484,6 +492,8 @@ final class DirectHermesModelAdministrationClient {
             provider = try DirectHermesProviderClient.identifier(request.providerID)
             guard !request.modelID.isEmpty, request.modelID.utf8.count <= 256 else { throw WorkspaceClientError.invalidRequest }
             model = request.modelID
+        case .automaticAuxiliary(let rawTask):
+            scope = "auxiliary"; task = try DirectHermesProviderClient.identifier(rawTask); provider = "auto"; model = ""
         case .resetAuxiliary:
             scope = "auxiliary"; task = "__reset__"; provider = "auto"; model = ""
         }

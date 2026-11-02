@@ -15,7 +15,7 @@ enum ModelAdministrationAssignmentTarget: Identifiable, Equatable {
     var title: String {
         switch self {
         case .main: "Default model"
-        case .auxiliary(let task): task.replacingOccurrences(of: "_", with: " ").capitalized
+        case .auxiliary(let task): DirectHermesAuxiliaryModelAssignment.title(for: task)
         }
     }
 }
@@ -82,11 +82,13 @@ final class ModelAdministrationStore {
         successMessage = nil
     }
 
-    func assign(providerID: String, modelID: String, target: ModelAdministrationAssignmentTarget) async -> Bool {
+    /// `automatic` puts a helper task back on the chat model (Hermes' `auto`).
+    func assign(providerID: String, modelID: String, target: ModelAdministrationAssignmentTarget,
+                automatic: Bool = false) async -> Bool {
         let scope: DirectHermesModelAssignmentScope
         switch target {
         case .main: scope = .main
-        case .auxiliary(let task): scope = .auxiliary(task: task)
+        case .auxiliary(let task): scope = automatic ? .automaticAuxiliary(task: task) : .auxiliary(task: task)
         }
         let request = DirectHermesModelAssignmentRequest(
             scope: scope, providerID: providerID, modelID: modelID,
@@ -338,9 +340,14 @@ struct ModelAdministrationView: View {
         .task(id: store.snapshot?.info) {
             if store.snapshot != nil { await fastModeDefaults?.load() }
         }
-        .bighelpSheet(item: $assignmentTarget) { target in
-            ModelAdministrationPicker(store: store, target: target, agentName: agentName) { assignmentTarget = nil }
-                .bighelpSheetSize(.standard)
+        .alert("Confirm model cost?", isPresented: Binding(
+            get: { store.pendingConfirmation != nil },
+            set: { if !$0 { store.cancelAssignmentConfirmation() } }
+        )) {
+            Button("Use it") { Task { if await store.confirmAssignment() { assignmentTarget = nil } } }
+            Button("Cancel", role: .cancel) { store.cancelAssignmentConfirmation() }
+        } message: {
+            Text(store.pendingConfirmation?.message ?? "Review this model assignment before continuing.")
         }
         .confirmationDialog("Reset every auxiliary assignment?", isPresented: $confirmAuxiliaryReset, titleVisibility: .visible) {
             Button("Reset to Automatic", role: .destructive) { Task { await store.resetAuxiliary() } }
@@ -472,12 +479,13 @@ struct ModelAdministrationView: View {
                 emptyTitle: "Not configured",
                 isEnabled: !store.isBusy && !snapshot.providers.isEmpty
             ) {
-                assignmentTarget = .main
+                toggleChoices(.main)
             }
             .accessibilityLabel("Choose \(agentName)'s default model")
             .accessibilityValue(snapshot.info.modelID.isEmpty ? "Not configured"
                                 : ModelNameCatalogStore.shared.displayName(for: snapshot.info.modelID))
             .accessibilityIdentifier("models.main")
+            if assignmentTarget == .main { choices(for: .main, in: snapshot) }
             if snapshot.info.effectiveContextLength > 0 {
                 LabeledContent("Context", value: snapshot.info.effectiveContextLength.formatted())
             }
@@ -563,23 +571,62 @@ struct ModelAdministrationView: View {
             ForEach(auxiliary.tasks) { task in
                 let isAutomatic = task.providerID == "auto"
                 BighelpModelChoiceRow(
-                    label: ModelAdministrationAssignmentTarget.auxiliary(task.task).title,
+                    label: task.title,
                     providerID: isAutomatic ? "" : task.providerID,
                     providerName: isAutomatic ? "Hermes" : providerName(task.providerID, in: store.snapshot),
                     modelID: isAutomatic ? "" : task.modelID,
-                    emptyTitle: "Automatic",
+                    emptyTitle: "Same as chat",
                     detail: task.isLocalEndpoint ? "Local endpoint" : nil,
-                    isEnabled: !store.isBusy
+                    isEnabled: !store.isBusy && !task.isSetOnComputer
                 ) {
-                    assignmentTarget = .auxiliary(task.task)
+                    toggleChoices(.auxiliary(task.task))
                 }
                 .accessibilityIdentifier("models.auxiliary.\(task.task)")
+                if assignmentTarget == .auxiliary(task.task), let snapshot = store.snapshot {
+                    choices(for: .auxiliary(task.task), in: snapshot)
+                }
             }
-            Button("Reset all auxiliary tasks", role: .destructive) { confirmAuxiliaryReset = true }
+            Button("Reset all to the chat model", role: .destructive) { confirmAuxiliaryReset = true }
                 .disabled(store.isBusy)
-        } header: { Text("Advanced · Auxiliary tasks") } footer: {
-            Text("Reset is explicit; leaving an assignment out does not clear its saved Hermes override.")
+        } header: { Text("Advanced · Helper tasks") } footer: {
+            Text("Small jobs Hermes does beside a chat. Same as chat uses the chat model.")
         }
+    }
+
+    private func toggleChoices(_ target: ModelAdministrationAssignmentTarget) {
+        withAnimation(reduceMotion ? nil : .snappy) { assignmentTarget = assignmentTarget == target ? nil : target }
+    }
+
+    /// The model list under the row it changes; a pick saves at once.
+    private func choices(for target: ModelAdministrationAssignmentTarget,
+                         in snapshot: DirectHermesModelAdministrationSnapshot) -> some View {
+        let current: (providerID: String, modelID: String)?
+        switch target {
+        case .main:
+            current = snapshot.info.modelID.isEmpty ? nil : (snapshot.info.providerID, snapshot.info.modelID)
+        case .auxiliary(let name):
+            let task = snapshot.auxiliary?.tasks.first { $0.task == name }
+            current = task.flatMap { $0.usesChatModel ? nil : ($0.providerID, $0.modelID) }
+        }
+        let save: (String, String, Bool) -> Void = { providerID, modelID, automatic in
+            // Picking what's already chosen just closes the list.
+            guard automatic ? current != nil : (current?.providerID != providerID || current?.modelID != modelID) else {
+                return toggleChoices(target)
+            }
+            Task {
+                if await store.assign(providerID: providerID, modelID: modelID, target: target, automatic: automatic) {
+                    assignmentTarget = nil
+                }
+            }
+        }
+        return BighelpInlineModelChooser(
+            providers: snapshot.providers.map(BighelpLinkModelProvider.init(administration:)),
+            currentProviderID: current?.providerID ?? (target == .main ? nil : snapshot.info.providerID),
+            currentModelID: current?.modelID,
+            onSameAsChat: target == .main ? nil : { save("auto", "", true) },
+            isEnabled: !store.isBusy,
+            identifier: "models.choices.\(target.id)"
+        ) { providerID, modelID in save(providerID, modelID, false) }
     }
 
     private func moaSection(_ configuration: DirectHermesMoAConfiguration) -> some View {
@@ -624,71 +671,8 @@ struct ModelAdministrationView: View {
         }
     }
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @BighelpThemeReader private var theme
-}
-
-/// The chat's model picker for an agent's default model or an auxiliary task.
-@MainActor
-private struct ModelAdministrationPicker: View {
-    let store: ModelAdministrationStore
-    let target: ModelAdministrationAssignmentTarget
-    let agentName: String
-    let close: () -> Void
-
-    var body: some View {
-        let current = currentSelection
-        BighelpModelPickerSheet(
-            title: target.title,
-            scopeLabel: target == .main
-                ? "New chats with \(agentName)"
-                : "Auxiliary task for \(agentName)",
-            providers: (store.snapshot?.providers ?? []).map(BighelpLinkModelProvider.init(administration:)),
-            currentProviderID: current?.providerID,
-            currentModelID: current?.modelID,
-            isLoading: store.isLoading && store.snapshot == nil,
-            isApplying: store.operationTitle != nil,
-            errorMessage: store.errorMessage,
-            onClearError: store.clearError,
-            onRetry: { Task { await store.refresh() } },
-            onSelect: { _, _ in },
-            applyTitle: target == .main ? "Save as default" : "Save for this task",
-            defaultModelTitle: target == .main ? "Not configured" : "Automatic",
-            onApply: { draft in
-                guard let providerID = draft.providerID, let modelID = draft.modelID else { return }
-                Task {
-                    if await store.assign(providerID: providerID, modelID: modelID, target: target) { close() }
-                }
-            }
-        )
-        .presentationDetents([.large])
-        .bighelpSheet(isPresented: Binding(
-            get: { store.pendingConfirmation != nil },
-            set: { if !$0 { store.cancelAssignmentConfirmation() } }
-        )) {
-            BighelpModelWarningSheet(
-                title: "Confirm model cost?",
-                message: store.pendingConfirmation?.message ?? "Review this model assignment before continuing."
-            ) {
-                Task { if await store.confirmAssignment() { close() } }
-            } onCancel: {
-                store.cancelAssignmentConfirmation()
-            }
-        }
-        .accessibilityIdentifier("models.picker")
-    }
-
-    private var currentSelection: (providerID: String, modelID: String)? {
-        guard let snapshot = store.snapshot else { return nil }
-        switch target {
-        case .main:
-            guard !snapshot.info.modelID.isEmpty else { return nil }
-            return (snapshot.info.providerID, snapshot.info.modelID)
-        case .auxiliary(let taskName):
-            guard let task = snapshot.auxiliary?.tasks.first(where: { $0.task == taskName }),
-                  task.providerID != "auto", !task.modelID.isEmpty else { return nil }
-            return (task.providerID, task.modelID)
-        }
-    }
 }
 
 @MainActor

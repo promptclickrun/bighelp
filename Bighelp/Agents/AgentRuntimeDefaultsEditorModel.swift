@@ -103,6 +103,19 @@ final class AgentRuntimeDefaultsEditorModel {
         errorMessage = nil
     }
 
+    /// Subagents and scheduled tasks back on the chat model: Hermes reads an empty model as
+    /// "the same as the agent's own".
+    func useChatModel(for scope: AgentRuntimeScope) {
+        guard scope != .mainChats else { return }
+        guard support.modelUnavailableReasons[scope] == nil else {
+            errorMessage = support.modelUnavailableReasons[scope]
+            return
+        }
+        draft[scope].providerID = ""
+        draft[scope].modelID = ""
+        errorMessage = nil
+    }
+
     func selectReasoning(_ value: String, for scope: AgentRuntimeScope) {
         guard support.reasoningUnavailableReasons[scope] == nil else {
             errorMessage = support.reasoningUnavailableReasons[scope]

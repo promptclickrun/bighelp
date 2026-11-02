@@ -300,7 +300,7 @@ private final class DeferredModelProviderClient: ModelProviderDiscoveryClient {
 }
 
 @MainActor
-private final class AgentRuntimeDefaultsClientFixture: AgentRuntimeDefaultsClient {
+final class AgentRuntimeDefaultsClientFixture: AgentRuntimeDefaultsClient {
     enum Failure: Error { case save, load }
 
     let defaults: AgentRuntimeDefaults

@@ -13,6 +13,8 @@ struct SimpleBotProfileContext {
     let onEditDetails: (AgentProfile) -> Void
     /// The bot's default model and reasoning, where the computer lets the app read and change them.
     var makeModelDefaults: ((String) -> AgentRuntimeDefaultsEditorModel?)? = nil
+    /// The bot's helper task models (Default Model › Advanced); nil where the computer can't list them.
+    var makeHelperModels: ((String) -> AgentHelperModelsModel?)? = nil
     /// The bot's default voice (Default Voice): its own voice type here, its speech provider on the
     /// computer; nil without a computer.
     var makeVoiceSettings: ((String) -> SimpleBotVoiceSettings?)? = nil
@@ -86,6 +88,7 @@ struct SimpleBotProfileView: View {
     @State private var savedTemplateTitle: String?
     @State private var isStudioPresented = false
     @State private var modelDefaults: AgentRuntimeDefaultsEditorModel?
+    @State private var helperModels: AgentHelperModelsModel?
     @State private var isModelPresented = false
     @State private var voice: SimpleBotVoiceModel?
     @State private var isVoicePresented = false
@@ -133,6 +136,7 @@ struct SimpleBotProfileView: View {
         .toolbar(.hidden, for: .navigationBar)
         .task(id: agentID) {
             modelDefaults = context.canEdit ? context.makeModelDefaults?(agentID) : nil
+            helperModels = modelDefaults == nil ? nil : context.makeHelperModels?(agentID)
             await modelDefaults?.loadIfNeeded()
         }
         .task(id: "\(agentID)|\(context.canEdit)") {
@@ -240,12 +244,11 @@ struct SimpleBotProfileView: View {
                 .bighelpSheetSize(.large)
             }
         }
-        .bighelpSheet(isPresented: $isModelPresented) {
+        // A page of its own on the profile's stack: its lists open in place, never in a sheet over it.
+        .navigationDestination(isPresented: $isModelPresented) {
             if let profile, let modelDefaults {
-                SimpleBotDefaultModelSheet(defaults: modelDefaults, botName: profile.name) { isModelPresented = false }
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-                    .bighelpSheetSize(.standard)
+                AgentDefaultModelsView(defaults: modelDefaults, helpers: helperModels, botName: profile.name)
+                    .toolbar(.visible, for: .navigationBar)
             }
         }
         .bighelpSheet(isPresented: $isVoicePresented) {

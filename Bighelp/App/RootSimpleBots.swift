@@ -304,6 +304,7 @@ extension RootShellView {
                 }) == true else { return nil }
                 return AgentRuntimeDefaultsEditorModel(agentID: id, client: agentRuntimeDefaults)
             },
+            makeHelperModels: { id in makeHelperModels(for: id) },
             makeVoiceSettings: { id in makeSimpleBotVoiceSettings(for: id) },
             makeCredentialVault: { makeCredentialVault(for: $0) },
             makeAdvancedOptions: { makeAdvancedOptions(for: $0) },
@@ -317,6 +318,23 @@ extension RootShellView {
                 onAsk: { id, text in askSimpleBot(id, text, sends: false) },
                 onSend: { id, text in askSimpleBot(id, text, sends: true) })
         )
+    }
+
+    /// A bot's helper task models (Default Model › Advanced), read and saved like Hermes tools ›
+    /// Models does. Demo runs use the same made-up host as that page.
+    func makeHelperModels(for agentID: String) -> AgentHelperModelsModel? {
+        #if DEBUG
+        if usesWorkspaceFixtures, let owner = administrationOwner {
+            let transport = DemoModels.transport
+            return AgentHelperModelsModel(agentID: agentID, client: DirectHermesModelAdministrationClient(
+                rpc: transport, http: transport, owner: owner, currentOwner: { administrationOwner }))
+        }
+        #endif
+        guard let owner = currentWorkspaceOwner,
+              let direct = workspaceConnections?.hosts.selectedWorkspace?.nativeClient,
+              currentWorkspaceCapabilities.supports(.modelsRead, owner: owner, profileID: agentID) else { return nil }
+        return AgentHelperModelsModel(agentID: agentID, client: DirectHermesModelAdministrationClient(
+            rpc: direct, http: direct, owner: owner, currentOwner: { currentWorkspaceOwner }))
     }
 
     /// The bot's own chat with the text in its message box (a Dashboard's Ask, Do it or template).

@@ -3,6 +3,13 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.56
+
+### Fixed
+
+- **Commands that do not finish:** when a command on your computer stops with an error, the chat shows the reason from Hermes. For example, a quick command can stop after 30 seconds. You can send your next message at once. Before, the chat said "Command delivery is unconfirmed" and Send did not work until you opened the chat again.
+- **Messages in a Bot Chat:** when another agent writes in a chat that is open, your last message and the last reply of your agent stay on the screen. Before, they sometimes went away until you refreshed the chat.
+
 ## 2.6.55
 
 ### Fixed

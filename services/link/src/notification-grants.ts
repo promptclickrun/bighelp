@@ -1569,7 +1569,11 @@ export async function handleNotificationRequest(
         now,
       });
       if (activity.status !== "active" || activity.sessionReference !== body.sessionReference
-          || activity.leaseExpires <= now) return fail(403, "notification_activity_inactive");
+          || activity.leaseExpires <= now) {
+        // 410, as the egress check answers: a host reads 403 and 404 here as "remove the grant",
+        // so a late update for an ended card turned off every alert for that phone.
+        return fail(410, "notification_activity_inactive");
+      }
       const externalId = await buzzKitRecipientExternalId(env, row.owner_coordinate, row.owner_kind);
       const terminal = body.phase === "completed" || body.phase === "failed";
       const reservation = await notificationStateBinding(env, row.owner_coordinate).beginNotificationActivityUpdate({

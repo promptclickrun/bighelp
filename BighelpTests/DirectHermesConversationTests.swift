@@ -203,7 +203,8 @@ struct DirectHermesConversationTests {
         model.draft = original
         await model.send()
         await model.retry()
-        let methods = rpc.requests.map(\.method).filter { $0 != "session.control.read" }
+        // A lost receipt then reads the chat back once; only these two would send anything.
+        let methods = rpc.requests.map(\.method).filter { ["command.dispatch", "prompt.submit"].contains($0) }
         #expect(methods == (outcome.hasPrefix("expanded") ? ["command.dispatch", "prompt.submit"] : ["command.dispatch"]))
         #expect(!model.canRetry)
         #expect(!model.isSending)
@@ -224,6 +225,91 @@ struct DirectHermesConversationTests {
             #expect(client.journal.unresolved.first?.text == original)
             #expect(client.needsRecovery)
         }
+    }
+
+    /// A quick command past Hermes' 30 s answers with an error. That answer ends the
+    /// command, so the chat says what Hermes said and takes the next message at once.
+    @Test func commandHermesAnsweredWithAnErrorKeepsSendOn() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let rpc = DirectTestRPC()
+        rpc.handler = { method, _ in
+            switch method {
+            case "command.dispatch":
+                throw DirectHermesError.rpcRejected(code: -32000, message: .init(
+                    "handler error: Command '/fixture/bedtime' timed out after 30 seconds"))
+            case "prompt.submit":
+                return .object(["status": .string("queued")])
+            default:
+                return .object([:])
+            }
+        }
+        let client = try DirectHermesConversationClient(rpc: rpc, hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch", drafts: .init(root: root))
+        defer { client.suspend() }
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        model.selectSlashCommand(.init(name: "bedtime", description: "Fixture command", category: "User commands",
+            argsHint: "", aliases: [], argumentMode: .none, source: .user, requiresArguments: false))
+        model.draft = "/bedtime"
+        await model.send()
+        #expect(model.failureMessage == "This command didn't finish. Hermes said: handler error: "
+            + "Command '/fixture/bedtime' timed out after 30 seconds")
+        #expect(!model.canRetry)
+        #expect(client.journal.unresolved.isEmpty)
+        #expect(!client.needsRecovery)
+        model.draft = "Good night"
+        #expect(model.canSend)
+        await model.send()
+        #expect(rpc.requests.map(\.method).filter { $0 != "session.control.read" } == ["command.dispatch", "prompt.submit"])
+    }
+
+    /// A command whose answer never came recovers like a message does: Send comes
+    /// back for new input, and the command itself is never sent again.
+    @Test func lostCommandReceiptRecoversReadinessWithoutResending() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let rpc = DirectTestRPC()
+        var reads = 0
+        rpc.handler = { method, _ in
+            switch method {
+            case "command.dispatch":
+                throw DirectHermesError.timedOut(outcomeUnknown: true)
+            case "session.events.since":
+                reads += 1
+                return .object(["epoch": .string("epoch"), "latest_seq": .integer(0),
+                    "truncated": .boolean(false), "events": .array([])])
+            case "session.activate":
+                return .object(["session_id": .string("runtime"), "stored_session_id": .string("saved"),
+                    "session_key": .string("saved"), "running": .boolean(false), "messages": .array([])])
+            case "subagent.list":
+                return .object(["subagents": .array([])])
+            case "prompt.submit":
+                return .object(["status": .string("queued")])
+            default:
+                return .object([:])
+            }
+        }
+        let client = try DirectHermesConversationClient(rpc: rpc, hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch", drafts: .init(root: root))
+        defer { client.suspend() }
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        model.selectSlashCommand(.init(name: "bedtime", description: "Fixture command", category: "User commands",
+            argsHint: "", aliases: [], argumentMode: .none, source: .user, requiresArguments: false))
+        model.draft = "/bedtime"
+        await model.send()
+        for _ in 0..<1000 where reads == 0 || (client.connected && !client.isReadyForSubmission) {
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        #expect(model.failureMessage == "Hermes didn't confirm this command. It won't be sent again on its own.")
+        #expect(!client.needsRecovery)
+        #expect(client.journal.unresolved.map(\.method) == ["command.dispatch"])
+        model.draft = "Good night"
+        #expect(model.canSend)
+        await model.send()
+        let sends = rpc.requests.map(\.method).filter { ["command.dispatch", "prompt.submit"].contains($0) }
+        #expect(sends == ["command.dispatch", "prompt.submit"])
     }
 
     @Test(arguments: ["recovered", "readback-failed", "owner-retired", "no-live-events", "malformed-no-live"])

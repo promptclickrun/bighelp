@@ -13,6 +13,11 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
 
     /// The native command router explicitly refused execution before admission.
     struct RejectedCommand: Error {}
+    /// Hermes ran the command and answered with an error (a quick command past its 30 s, say).
+    /// Its answer ends the command: nothing is left running on the host.
+    struct FailedCommand: Error {
+        let reason: HermesRefusalMessage
+    }
 
     var supportedAttachmentKinds: Set<ChatAttachment.Kind> { [.file, .image] }
     var allowsLocalAgentReassignment: Bool { false }

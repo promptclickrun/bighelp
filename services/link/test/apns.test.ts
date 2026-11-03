@@ -1420,6 +1420,16 @@ describe("Live Activity updates", () => {
     installation = await insertInstallation(installationKeys, hostKeys);
   });
 
+  it("answers an update for a card that has ended with 410, which hosts never read as the grant gone", async () => {
+    const ended = { ...state(), notificationActivity: async () => ({
+      activityId, grantId: installation.grantId, sessionReference, revision: 1, leaseExpires: NOW + 900, status: "terminal",
+    }) };
+    const response = await send(targetEnvironment({ APNS_ENVIRONMENTS: "sandbox" }, ended), "responding");
+    expect(response.status).toBe(410);
+    expect((await response.json() as { error: { code: string } }).error.code).toBe("notification_activity_inactive");
+    expect(apnsCalls).toHaveLength(0);
+  });
+
   it("goes direct to the activity's own token, with Unix-second dates and the same content state", async () => {
     const targetEnv = targetEnvironment({ APNS_ENVIRONMENTS: "sandbox" }, state());
     await addTarget(targetEnv, installation, { kind: "liveactivity", activityId, token: OTHER_TOKEN, environment: "sandbox" });

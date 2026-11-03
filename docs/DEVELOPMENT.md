@@ -1,7 +1,7 @@
 # Development guide
 
 Production transport contract: **native Hermes only for chat**. Cloud services
-are used only for optional notifications and Live Activities, which BuzzKit delivers. The current composition,
+are used only for optional notifications and Live Activities, which bighelp's own notification service sends. The current composition,
 voice boundary, enrollment isolation and verification requirements are defined
 in [Native transport](NATIVE_TRANSPORT.md). Retained Link/paired-Direct protocol
 sections below describe legacy compatibility code, not a selectable chat path.

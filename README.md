@@ -20,9 +20,9 @@ makes work with your agents feel like texting a friend.
 
 - **Three ways to use it.** You choose one at the end of setup, and you can change it later in Settings:
   - **Bots:** a calm home with only your bots, like a messaging app.
-  - **Sessions:** the full app, with every chat, tool and setting.
-  - **Code (Bighelp IDE):** each message starts a coding session in its own worktree. Then you look at the
-    changes and ship them.
+  - **Chat:** the full app, with every chat, tool and setting.
+  - **Code:** each message starts a coding session in its own worktree. Then you look at the changes and ship
+    them.
 - **Chat** with one agent, or with a group of agents, also agents on your other computers. Replies stream in
   live. You can react to messages, see the agent's reasoning and tool use, and send files and photos.
 - **Agents** that you make from templates, or save as templates. Each agent has an avatar from the catalog or your
@@ -32,9 +32,10 @@ makes work with your agents feel like texting a friend.
 - **Projects, Kanban, Workflows and Scheduled tasks** for longer work, and **Usage** for your AI plans and limits.
 - **Voice:** talk in turns, or live.
 - **Apps:** connect apps for your agents through Composio or Hermes' own connectors (Settings › Apps).
-- **Device tools:** let agents use Health, Calendar, Reminders and Location. Each one is off until you turn it on.
+- **Device tools:** let agents use Calendar, Reminders, Contacts, Photos, Health, Location and more. Each one is
+  off until you turn it on.
 - **Several computers:** see the agents of all your computers in one list.
-- **Notifications, Live Activities, widgets, Shortcuts and an Apple Watch app.**
+- **Notifications, Live Activities, widgets, Shortcuts, CarPlay and an Apple Watch app.**
 - **Apple Vision Pro:** your agent can stand in the room with you, in 3D.
 - **Themes** with light and dark modes, and **Nerd Mode** for host tools such as files, plugins, MCP and logs.
 
@@ -51,8 +52,11 @@ makes work with your agents feel like texting a friend.
   Ideas and Goals, cards, live voice, Teamwork, files and media from your agents, your own templates, device tools,
   and chats that stay open when your phone sleeps. When a feature needs a newer plugin, the app tells you and
   offers the update.
-- bighelp's notification service sends push notifications and Live Activities through [BuzzKit](https://buzzkit.dev).
-- Sign-in details stay in the Keychain on your device. The app has no ads and no analytics.
+- bighelp's own notification service sends push notifications and Live Activities.
+- Sign-in details stay in the Keychain on your device. The app has no ads.
+- The app sends usage and diagnostics numbers, so that the maintainers can find what is slow or broken. It never
+  sends your messages, files or file names. You can turn it off in Settings › Permissions › Device access. See
+  [docs/SECURITY_AND_PRIVACY.md](docs/SECURITY_AND_PRIVACY.md).
 - Hermes behind Cloudflare Access, a password proxy, or a proxy that checks its own headers (for example Pangolin)
   also works. See [docs/HOST_ACCESS.md](docs/HOST_ACCESS.md).
 
@@ -108,7 +112,7 @@ xcodebuild test -project Bighelp.xcodeproj -scheme Bighelp \
 | `BighelpMacUpdater/` | The Mac app's updates (Sparkle) |
 | `BighelpTests/`, `BighelpUITests/`, `BighelpVisionUITests/`, `BighelpWatchUITests/` | Tests |
 | `BighelpMac/`, `BighelpMacTests/` | An early desktop prototype on sample data. It is not the Mac app. |
-| `services/` | Cloudflare Workers: the notification service, the template and avatar catalogs, and the provider logos |
+| `services/` | Cloudflare Workers: the notification service and relay, usage and diagnostics, the template and avatar catalogs, and the provider logos |
 | `Scripts/` | Tests against real Hermes hosts, the Mac release, and other tools |
 | `Design/AvatarKit/` | Avatar artwork and the tools that export it |
 | `docs/` | Contracts and deep dives |
@@ -129,6 +133,6 @@ Please report security problems privately, as [SECURITY.md](SECURITY.md) describ
 
 ## License
 
-[Apache 2.0](LICENSE). Bundled third-party code keeps its own license: BuzzKit (MIT), ThinkingOrbsKit (MIT),
-Sparkle (MIT), Noto Sans (SIL Open Font License) and WebRTC (BSD 3-Clause; the Apple Vision Pro build uses
-LiveKit's build of WebRTC). Provider logos belong to their owners and only identify those providers.
+[Apache 2.0](LICENSE). Bundled third-party code keeps its own license: Sparkle (MIT), Phonon (MIT or Apache 2.0)
+and WebRTC (BSD 3-Clause; the Apple Vision Pro build uses LiveKit's build of WebRTC). Provider logos belong to
+their owners and only identify those providers.

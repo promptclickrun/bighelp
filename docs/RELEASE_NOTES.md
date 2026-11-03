@@ -3,6 +3,14 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.55
+
+### Fixed
+
+- **Notifications for every agent:** replies from all your agents send notifications. Before, only the agent that you used when you set up notifications sent them. Open a chat with an agent one time, and its replies send notifications.
+- **Notifications that stopped:** when your computer no longer has the notification setup of your phone, bighelp sets up notifications again by itself. You do not have to tap Set Up Again.
+- **Live Activity:** the Live Activity shows when you tap Send. It also shows the work of your agent when you leave the app right after you send. This is true for a message with a photo or a file too.
+
 ## 2.6.54
 
 ### New

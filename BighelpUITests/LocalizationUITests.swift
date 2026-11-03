@@ -85,7 +85,7 @@ final class LocalizationUITests: BighelpUITestCase {
             XCTAssertTrue(settings.label.contains(language == "en" ? "Settings" : "设置"))
             capture("menu", language, appearance)
             settings.tap()
-            XCTAssertTrue(app.textFields["profile.display-name"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["settings.you"].waitForExistence(timeout: 5))
             capture("settings-identity", language, appearance)
             let appearanceRow = settingsRow("settings.themes", in: app)
             XCTAssertTrue(appearanceRow.waitForExistence(timeout: 5))

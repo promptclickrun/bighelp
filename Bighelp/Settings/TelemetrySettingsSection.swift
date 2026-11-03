@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Settings › Permissions (the "Device access" page): the switch for usage numbers and crash
+/// Settings › Help & feedback: the switch for usage numbers and crash
 /// reports. On unless turned off. Off stops sending at once, throws away what was waiting and tells
 /// the connected computers to stop theirs. What is and isn't sent: docs/SECURITY_AND_PRIVACY.md.
 @MainActor

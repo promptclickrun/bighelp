@@ -2,7 +2,8 @@ import SwiftUI
 import UIKit
 
 extension SettingsView {
-    /// Settings › Appearance: colors, light and dark, and the rest of the look on one page.
+    /// Settings › Appearance: colors, light and dark, and the rest of the look on one page, with
+    /// Chat layout, App layout and the companion pet a row each.
     var appearancePage: some View {
         AppearanceStudioView(settings: settings) {
             settingsLink(to: .chatLayout) {
@@ -21,6 +22,16 @@ extension SettingsView {
             .buttonStyle(.plain)
             .accessibilityIdentifier("settings.appearance.app-layout")
             .driveTarget("settings.appearance.app-layout")
+            if companionStore != nil {
+                settingsLink(to: .section(.companion)) {
+                    AppearanceStudioRow(title: SettingsMenuSection.companion.title,
+                                        detail: SettingsMenuSection.companion.detail,
+                                        systemImage: SettingsMenuSection.companion.systemImage)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(SettingsMenuSection.companion.accessibilityIdentifier)
+                .driveTarget(SettingsMenuSection.companion.accessibilityIdentifier)
+            }
             #if os(visionOS)
             transparency
                 .padding(BighelpTokens.space16)

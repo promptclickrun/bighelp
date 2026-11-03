@@ -1,6 +1,6 @@
 import XCTest
 
-/// Settings › Permissions › Device access › Share usage and diagnostics, on the demo data. Demo mode
+/// Settings › Help & feedback › Share usage and diagnostics, on the demo data. Demo mode
 /// sends nothing; its stand-in host only records what it would have been told.
 final class TelemetrySettingsUITests: BighelpUITestCase {
     @MainActor
@@ -87,8 +87,8 @@ final class TelemetrySettingsUITests: BighelpUITestCase {
     @MainActor
     private func openSwitch(in app: XCUIApplication) -> XCUIElement {
         openSettings(in: app)
-        settingsRow("settings.menu.permissions", in: app).tap()
-        let form = app.descendants(matching: .any)["settings.permissions"].firstMatch
+        settingsRow("settings.menu.help", in: app).tap()
+        let form = app.descendants(matching: .any)["settings.help"].firstMatch
         let target = app.switches["settings.telemetry.toggle"].firstMatch
         // Scroll until the switch and the line under it sit well inside the screen, not on its edge.
         let bottom = app.windows.firstMatch.frame.maxY

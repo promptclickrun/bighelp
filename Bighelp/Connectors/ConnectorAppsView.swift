@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Settings › Apps › Native App Connections: the apps your agents can use through Hermes'
+/// Settings › Connections › Native App Connections: the apps your agents can use through Hermes'
 /// connectors, by the catalog's categories. Connect signs in from the row; a connected app opens
 /// its accounts.
 @MainActor

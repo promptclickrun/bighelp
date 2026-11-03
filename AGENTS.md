@@ -24,8 +24,13 @@ change in both repos.
     value.
   - Everyday controls must never live only behind Nerd Mode.
 - **One place for each thing.**
-  - There's one ☰ menu (`BighelpMenu`) and one Settings. Settings is a short list of rows that each open one page;
-    Nerd Mode adds its Hermes section (System, Hermes tools) at the bottom.
+  - There's one ☰ menu (`BighelpMenu`) and one Settings. Settings is a short list of rows that each open one page,
+    in groups: You (one row), Agents (Default model, AI providers, Connections, Teamwork, Personalities), App
+    (Modes, Appearance, Chat, Voice, Notifications), then System, Apple Watch, CarPlay and Help & feedback.
+    Nerd Mode adds its Hermes section (Hermes tools) at the bottom.
+  - Connections (`AppsHubView`) is everything agents can use: This device (Device access, every phone tool and
+    iOS permission) first, then the apps, then the credential vault. Modes holds the mode switches, Appearance
+    the companion pet, and Help & feedback the usage-sharing switch.
   - Don't add a second menu, drawer or settings copy for a feature. Add a row where people already look.
   - People choose the bottom bar (Chat plus up to three, around New chat in the middle) and ☰'s order in
     Appearance › App layout
@@ -48,13 +53,13 @@ change in both repos.
   - Code mode is a second home, not a second app: Settings turns it on and picks the mode a launch opens in
     (`settings.codeModeEnabled`, `startExperience`); ☰ gets a mode switch on top and Code's places while it's the
     home (`AppTab.code`, `appState.homeTab`). Chat stays the out-of-box home.
-  - The modes are Bots, Chat and Code (`BighelpMode`; `settings.switchMode`). Settings › Experience ›
+  - The modes are Bots, Chat and Code (`BighelpMode`; `settings.switchMode`). Settings › Modes ›
     Unified Mode Toggle (`unifiedModeToggleEnabled`, off by default) puts them in one pill
     (`BighelpModePill`) at the top of each home: the Chat tab's own chat or its list, Code's home and Bots'
     home (where Search and Filter by Gateway move to a row under it). ☰ drops its Chat and Code switch
     then. Edge swipes can switch modes too (Next mode, Bots, Chat, Code), also from Bots mode; on the
     Mac, ⌃⌘1–⌃⌘3.
-  - Bots mode (Settings › Experience, `settings.simpleBotsEnabled`) is the one exception to ☰ and the bar:
+  - Bots mode (Settings › Modes, `settings.simpleBotsEnabled`) is the one exception to ☰ and the bar:
     its home (`SimpleBotsHomeView`) takes the Chat tab's place with neither, and the person's circle opens its
     short Settings (`SimpleBotsSettingsView`), whose All Settings row and Bots mode switch lead back.
     Everything in it uses the same stores and chat; `Bighelp/SimpleBots/` holds its screens. It wins over the
@@ -104,8 +109,8 @@ change in both repos.
 | `Bighelp/Settings/` | Settings screens and `SettingsStore` |
 | `Bighelp/Agents/`, `Board/`, `Companion/` | Agents, Feed/Ideas/Goals, the avatar kit renderer |
 | `Bighelp/Kanban/` | Kanban on Hermes' Kanban plugin: board model, lanes, cards, Vision Pro window and pinch-drag |
-| `Bighelp/Code/` | Code mode (Settings › Code mode): its home (`CodeHomeView`), the message box's chips (project, new worktree or local, branch), `CodeLauncher`, Changes and Ship |
-| `Bighelp/Connectors/` | Settings › Apps (`AppsHubView`): Hermes' connectors as Native App Connections (the inline connect cards in chat, `connection.request`, `ConnectorCardStore`; `ConnectorAppsModel`) and Composio Apps (`Composio/`, [docs/COMPOSIO_APPS.md](docs/COMPOSIO_APPS.md)) |
+| `Bighelp/Code/` | Code mode (Settings › Modes › Code mode): its home (`CodeHomeView`), the message box's chips (project, new worktree or local, branch), `CodeLauncher`, Changes and Ship |
+| `Bighelp/Connectors/` | Settings › Connections (`AppsHubView`): Hermes' connectors as Native App Connections (the inline connect cards in chat, `connection.request`, `ConnectorCardStore`; `ConnectorAppsModel`) and Composio Apps (`Composio/`, [docs/COMPOSIO_APPS.md](docs/COMPOSIO_APPS.md)) |
 | `Bighelp/BotScreen/` | Bot Screen: an agent's Linux screen (Hermes `display.*`) in its profile's Screen tab, a native RFB client (`RFB/`) and the full-screen viewer with take control and hand back |
 | `Bighelp/Driving/` | An agent showing the person a place (`iphone_navigation`, #662): the place catalog and its playbooks (`DriveCatalog`), the navigator that plays one (`DriveNavigator`), and the overlay (island bar, chat dock) in its own window |
 | `Bighelp/Usage/` | The Usage page (☰ › Usage): plans and limits (`ProviderUsageStore`), Hermes' own analytics per agent and computer (`UsageStore`, `HostUsageLoader`), charts |
@@ -115,7 +120,7 @@ change in both repos.
 | `Bighelp/CarPlay/` | CarPlay's hands-free voice chat (`CarPlayVoiceSession`) and its scene |
 | `Bighelp/DesignSystem/` | `BighelpTheme`, `BighelpTokens`, glass surfaces, fonts, provider logos, `BighelpDeferredSection`, the Noodle brand and its motions (`Noodle/`) |
 | `Bighelp/Hosts/`, `Bighelp/LiveActivity/`, `Bighelp/Notifications/`, `Bighelp/Shortcuts/` | Host setup, Live Activities, notifications, App Intents |
-| `Bighelp/Telemetry/` | Usage and crash numbers (Settings › Permissions › Device access › Share usage and diagnostics): the client, MetricKit, the switch that also tells hosts |
+| `Bighelp/Telemetry/` | Usage and crash numbers (Settings › Help & feedback › Share usage and diagnostics): the client, MetricKit, the switch that also tells hosts |
 | `BighelpTests/` (Swift Testing), `BighelpUITests/` (XCUITest) | Tests. The UI test base class `BighelpUITestCase` is in `ReferenceHubUITests.swift` |
 | `BighelpVisionUITests/` | Vision Pro UI tests, run with the `BighelpVision` scheme |
 | `Scripts/` | Real-host probes, logo export, CI helpers, Mac release |
@@ -342,7 +347,7 @@ change in both repos.
   `native-workspace-files-agents-v1`) and read that agent's working folder with the same refusals. A bot's Files
   tab sends its ID (`DirectHermesManagedFilesClient(agentID:)`); the serving agent never names itself, so older
   plugins keep working for it, and other bots say to update the plugin.
-- **Phone tools** (Settings › Device access; contract in
+- **Phone tools** (Settings › Connections › Device access; contract in
   [docs/IPHONE_DEVICE_TOOLS.md](docs/IPHONE_DEVICE_TOOLS.md)): an agent's `iphone_*` call reaches the phone over the
   chat's device-tool channel. `DeviceToolCatalog` lists every operation and which are journaled; each capability with
   its own iOS permission is a `DeviceCapabilityTool` that `DeviceToolRouter` checks before it runs. A new one needs a
@@ -817,7 +822,7 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
 
 ### Usage and diagnostics (telemetry)
 
-- On by default, with an off switch in Settings › Permissions › Device access. What is sent, and what never is:
+- On by default, with an off switch in Settings › Help & feedback. What is sent, and what never is:
   [docs/SECURITY_AND_PRIVACY.md](docs/SECURITY_AND_PRIVACY.md). Keep that page and `PrivacyInfo.xcprivacy` true.
 - Everything goes through `Telemetry` (`Bighelp/Telemetry/`). Event names, props and values are enums and numbers
   (`TelemetryEvent`); never add a `String` parameter that could carry chat text, a file name or a path. A new event

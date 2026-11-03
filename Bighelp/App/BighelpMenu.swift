@@ -68,8 +68,6 @@ struct BighelpMenuDestinations {
     var folder: (name: String, open: () -> Void)?
     /// Usage: plans, limits and what the agents used. None while no computer is connected.
     var onUsage: (() -> Void)? = nil
-    /// Logins, cards and addresses an agent's browser can use (Hermes' vault).
-    var onCredentialVault: (() -> Void)? = nil
     var onSettings: () -> Void
     /// ☰'s places in the person's order: whatever the bottom bar doesn't hold,
     /// and always Agents and Settings (Appearance › App layout).
@@ -102,7 +100,8 @@ struct BighelpMenuDestinations {
 /// Agents, Projects, Kanban, Workflows, Scheduled tasks, Usage and Settings, then recent chats
 /// with See all. With all hosts showing, Agents is All agents and the one-host
 /// places stay out, so each view keeps to its purpose. The host switcher is one
-/// compact row on top; the rest (the credential vault, Nerd Mode's folder) waits below the chats.
+/// compact row on top; Nerd Mode's folder waits below the chats. Settings holds the rest
+/// (the credential vault is in Settings › Connections).
 struct BighelpMenu<Recent: View>: View {
 
     let hosts: BighelpMenuHosts
@@ -362,16 +361,13 @@ struct BighelpMenu<Recent: View>: View {
 
     @ViewBuilder
     private var moreSection: some View {
-        if destinations.onCredentialVault != nil || destinations.folder != nil || isVision {
+        if destinations.folder != nil || isVision {
             Section("More") {
                 #if os(visionOS)
                 row(String(localized: "Simple mode"), symbol: "figure.stand", id: "menu.simple-mode") {
                     SpatialSimpleMode.enter(spatialAvatar, openWindow: openWindow)
                 }
                 #endif
-                if let onCredentialVault = destinations.onCredentialVault {
-                    row(String(localized: "Secure credential vault"), symbol: "lock.shield", id: "menu.vault", action: onCredentialVault)
-                }
                 if let folder = destinations.folder {
                     row(String(localized: "Folder"), detail: folder.name, symbol: "folder.badge.gearshape", id: "menu.folder",
                         action: folder.open)

@@ -903,6 +903,23 @@
         }
       }
     },
+    "Add your name": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add your name"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "添加你的名字"
+          }
+        }
+      }
+    },
     "Adds a filter button beside Search, to show one gateway's bots.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -1392,6 +1409,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "琥珀色"
+          }
+        }
+      }
+    },
+    "App": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "App"
           }
         }
       }
@@ -1974,6 +2008,23 @@
         }
       }
     },
+    "Bots, Chat and Code": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bots, Chat and Code"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "机器人、聊天和代码"
+          }
+        }
+      }
+    },
     "Bottom bar": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -2378,6 +2429,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "聊天"
+          }
+        }
+      }
+    },
+    "Chat and Code": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat and Code"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "聊天和代码"
           }
         }
       }
@@ -3346,6 +3414,23 @@
         }
       }
     },
+    "Connect to your computer to add apps.": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to your computer to add apps."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "连接到你的电脑后即可添加应用。"
+          }
+        }
+      }
+    },
     "Connect to your computer to change this.": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -3359,6 +3444,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "连接电脑后即可更改。"
+          }
+        }
+      }
+    },
+    "Connect to your computer to open it.": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to your computer to open it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "连接到你的电脑后即可打开。"
           }
         }
       }
@@ -3455,6 +3557,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Connection details"
+          }
+        }
+      }
+    },
+    "Connections": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connections"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "连接"
           }
         }
       }
@@ -3965,6 +4084,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "开发工厂"
+          }
+        }
+      }
+    },
+    "Device access": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device access"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "设备访问"
           }
         }
       }
@@ -5006,6 +5142,23 @@
         }
       }
     },
+    "Health, calendar, location, microphone and more": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health, calendar, location, microphone and more"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "健康、日历、位置、麦克风等"
+          }
+        }
+      }
+    },
     "Heart": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -5839,6 +5992,23 @@
         }
       }
     },
+    "Let agents use this device's health, calendar, reminders, contacts and location.": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let agents use this device's health, calendar, reminders, contacts and location."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "让智能体使用此设备的健康、日历、提醒事项、通讯录和位置。"
+          }
+        }
+      }
+    },
     "Let agents use your email, notes and more": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -6039,6 +6209,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "正在载入通知类别…"
+          }
+        }
+      }
+    },
+    "Logins": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logins"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "登录信息"
+          }
+        }
+      }
+    },
+    "Logins and cards your agents can use on websites": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logins and cards your agents can use on websites"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的智能体可在网站上使用的登录信息和卡片"
           }
         }
       }
@@ -6413,6 +6617,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "模型与推理"
+          }
+        }
+      }
+    },
+    "Modes": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "模式"
           }
         }
       }
@@ -9486,6 +9707,23 @@
         }
       }
     },
+    "Report a problem, usage sharing and version": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Report a problem, usage sharing and version"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "报告问题、使用情况共享和版本"
+          }
+        }
+      }
+    },
     "Research": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -11146,6 +11384,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "简易模式"
+          }
+        }
+      }
+    },
+    "Size and movement": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Size and movement"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "大小和动作"
           }
         }
       }
@@ -12848,6 +13103,23 @@
         }
       }
     },
+    "This device": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此设备"
+          }
+        }
+      }
+    },
     "This device stops getting notifications from bighelp. Its notification data is deleted from bighelp's notification service and from every computer that sends it notifications. You can turn them on again later.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -12861,6 +13133,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "此设备将不再收到 bighelp 的通知。它的通知数据会从 bighelp 的通知服务以及所有向它发送通知的电脑中删除。你之后可以重新开启通知。"
+          }
+        }
+      }
+    },
+    "This device, your apps and saved logins": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device, your apps and saved logins"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此设备、你的应用和已保存的登录信息"
           }
         }
       }
@@ -14342,6 +14631,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "智能体会邀请彼此协作，一起完成任务。"
+          }
+        }
+      }
+    },
+    "Your agents can use the apps you connect, in any chat.": {
+      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your agents can use the apps you connect, in any chat."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的智能体可在任何聊天中使用你连接的应用。"
           }
         }
       }

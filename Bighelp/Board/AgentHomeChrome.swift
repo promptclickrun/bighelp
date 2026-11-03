@@ -21,7 +21,7 @@ struct AgentHomeChrome {
     var unreadTabs: Set<AppTab> = []
     /// The bar's tabs: Chat, then what's pinned (Appearance › App layout).
     var barTabs: [AppTab] = AppTab.allCases
-    /// The Unified Mode Toggle, on the Chat tab's own chat only (Settings › Experience).
+    /// The Unified Mode Toggle, on the Chat tab's own chat only (Settings › Modes).
     var modeSwitch: BighelpModeSwitch?
 
     /// New chat lives in the bar under the message box. A chat without that bar (Code mode, the

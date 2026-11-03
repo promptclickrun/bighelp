@@ -219,7 +219,7 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case imageDraftsFinish = "image-drafts.finish"
     case imageDraftsDiscard = "image-drafts.discard"
     case imageDraftsReopen = "image-drafts.reopen"
-    /// Composio Connect in Hermes, for Settings › Apps › Composio Apps (plugin `native-composio-v1`).
+    /// Composio Connect in Hermes, for Settings › Connections › Composio Apps (plugin `native-composio-v1`).
     case composioStatus = "composio.status"
     case composioInstall = "composio.install"
     /// Instant alerts while bighelp is open (plugin, `native-live-alerts-v1`).

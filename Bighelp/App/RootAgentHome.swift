@@ -901,7 +901,6 @@ extension RootShellView {
                 ? (name: activeHermesWorkspaceName, open: { afterClosingHomeSheets { presentHermesWorkspaces() } })
                 : nil,
             onUsage: usage.isAvailable ? { afterClosingHomeSheets { showUsage() } } : nil,
-            onCredentialVault: canOpenCredentialVault ? { afterClosingHomeSheets { openCredentialVault() } } : nil,
             onSettings: { afterClosingHomeSheets { openSettingsPage() } },
             places: settings.appLayout.menuPlaces,
             onBoard: { tab in afterClosingHomeSheets { openBoard(tab) } },

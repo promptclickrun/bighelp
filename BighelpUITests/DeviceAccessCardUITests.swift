@@ -55,7 +55,7 @@ final class DeviceAccessCardUITests: BighelpUITestCase {
         try appleHealthRow(appearance: "dark")
     }
 
-    /// Where App Review looks: Settings › Device access › Apple Health, off until the person turns it on,
+    /// Where App Review looks: Settings › Connections › Device access › Apple Health, off until the person turns it on,
     /// with every kind of data it reads named, and a note about where the data goes before iOS asks.
     @MainActor
     private func appleHealthRow(appearance: String) throws {
@@ -116,8 +116,7 @@ final class DeviceAccessCardUITests: BighelpUITestCase {
 
     @MainActor
     private func openDeviceAccess(in app: XCUIApplication) {
-        openSettings(in: app)
-        settingsRow("settings.menu.permissions", in: app).tap()
+        openDeviceAccessSettings(in: app)
     }
 
     private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {

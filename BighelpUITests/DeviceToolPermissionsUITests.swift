@@ -8,8 +8,7 @@ final class DeviceToolPermissionsUITests: BighelpUITestCase {
             "-preview-ui-v3", "-loopdy.appearance.interface-version", "v3",
             "-loopdy.demo.appearance", "light"]
         app.launch()
-        openSettings(in: app)
-        settingsRow("settings.menu.permissions", in: app).tap()
+        openDeviceAccessSettings(in: app)
 
         for capability in ["calendar", "reminders", "location"] {
             let toggle = deviceToolSwitch(capability, in: app)
@@ -56,8 +55,7 @@ final class DeviceToolPermissionsUITests: BighelpUITestCase {
             "-preview-ui-v3", "-loopdy.appearance.interface-version", "v3",
             "-loopdy.demo.appearance", appearance]
         app.launch()
-        openSettings(in: app)
-        settingsRow("settings.menu.permissions", in: app).tap()
+        openDeviceAccessSettings(in: app)
         let titles = ["contacts": "Contacts", "photos": "Photos", "geofences": "Arriving and leaving",
                       "alarms": "Alarms and timers", "music": "Music", "focus": "Focus", "shortcuts": "Shortcuts"]
         var shot = 0
@@ -99,8 +97,7 @@ final class DeviceToolPermissionsUITests: BighelpUITestCase {
             "-preview-ui-v3", "-loopdy.appearance.interface-version", "v3",
             "-loopdy.demo.appearance", appearance]
         app.launch()
-        openSettings(in: app)
-        settingsRow("settings.menu.permissions", in: app).tap()
+        openDeviceAccessSettings(in: app)
 
         let toggle = deviceToolSwitch("location", in: app)
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))

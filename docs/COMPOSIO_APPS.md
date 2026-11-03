@@ -1,6 +1,6 @@
 # Composio Apps
 
-Settings › Apps has two parts:
+Settings › Connections lists this device's access first (Device access), then the apps, in two parts:
 
 - **Native App Connections:** Hermes' own connectors on the computer in use (`Bighelp/Connectors/`,
   `ConnectorAppsModel`). Unchanged.

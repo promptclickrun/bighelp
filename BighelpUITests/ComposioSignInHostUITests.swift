@@ -1,6 +1,6 @@
 import XCTest
 
-/// Settings › Apps › Composio Apps › Sign in to Composio, the real way (no demo data): Composio's page
+/// Settings › Connections › Composio Apps › Sign in to Composio, the real way (no demo data): Composio's page
 /// opens in the system sign-in sheet. Set BIGHELP_COMPOSIO_HOST (TEST_RUNNER_…) to an open Hermes
 /// host's address; skipped without it. Uninstall bighelp from the simulator first.
 final class ComposioSignInHostUITests: BighelpUITestCase {

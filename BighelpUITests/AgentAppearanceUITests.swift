@@ -27,8 +27,7 @@ final class AgentAppearanceUITests: BighelpUITestCase {
     func testTurnedOffTheAgentCannotChangeTheLook() throws {
         let app = launch(startingIn: "light", call: #"{"mode":"dark","color":"rose"}"#,
                          extra: ["-bighelp.device-tools.appearance", "NO"])
-        openSettings(in: app)
-        settingsRow("settings.menu.permissions", in: app).tap()
+        openDeviceAccessSettings(in: app)
         let toggle = appearanceSwitch(in: app)
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         XCTAssertEqual(toggle.value as? String, "0")
@@ -53,8 +52,7 @@ final class AgentAppearanceUITests: BighelpUITestCase {
     @MainActor
     private func deviceAccessShowsTheSwitch(appearance: String) throws {
         let app = launch(startingIn: appearance, call: nil)
-        openSettings(in: app)
-        settingsRow("settings.menu.permissions", in: app).tap()
+        openDeviceAccessSettings(in: app)
         let toggle = appearanceSwitch(in: app)
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         XCTAssertEqual(toggle.value as? String, "1", "On until the person turns it off")

@@ -187,7 +187,7 @@ additional HTTP service or model-supplied executable code.
 
 `health.read` (`AppleDeviceToolService`, `LiveAppleDeviceToolNativeBoundary`). Read only:
 the app asks HealthKit with `requestAuthorization(toShare: [], read: …)` and has no write
-operation. Settings › Device access › Apple Health shows only where
+operation. Settings › Connections › Device access › Apple Health shows only where
 `HKHealthStore.isHealthDataAvailable()` is true (iPhone, iPad, Vision Pro; never the Mac),
 and its detail names every kind of data it reads (App Review 5.1.3(i)).
 
@@ -566,7 +566,7 @@ The app reads HealthKit and never writes it. Keep it that way:
   Connect refuses any build with the HealthKit entitlement and no `NSHealthUpdateUsageDescription`
   (ITMS-90683), even though nothing asks to share (`toShare: []`), so it says that bighelp never
   writes.
-- App Review (2.5.1) looks for the health feature: Settings › Device access › Apple Health, and
+- App Review (2.5.1) looks for the health feature: Settings › Connections › Device access › Apple Health, and
   in a chat ("How did I sleep this week?") the card, the Health sheet, an Apple Health step and
   a chart. Review notes for each build say where it is, with a screen recording.
 - The App ID needs the HealthKit capability; automatic signing with

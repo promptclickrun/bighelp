@@ -21,25 +21,16 @@ extension SettingsView {
                     onOpenWorkspaceDestination(.keys)
                 }
             }
-            if let composio = composioApps?() {
-                settingsLink(to: .apps) {
-                    rowLabel(String(localized: "Apps"), detail: String(localized: "Let agents use your email, notes and more"),
-                             symbol: "app.connected.to.app.below.fill", showsChevron: BighelpPlatform.drawsOwnLinkChevron)
-                        .bighelpSettingsLinkLabel()
-                }
-                .bighelpSettingsLink()
-                .accessibilityIdentifier("settings.apps")
-                .driveTarget("settings.apps")
-            } else if let connectorApps, let apps = connectorApps() {
-                settingsLink(to: .apps) {
-                    rowLabel(String(localized: "Apps"), detail: String(localized: "Let agents use your email, notes and more"),
-                             symbol: "app.connected.to.app.below.fill", showsChevron: BighelpPlatform.drawsOwnLinkChevron)
-                        .bighelpSettingsLinkLabel()
-                }
-                .bighelpSettingsLink()
-                .accessibilityIdentifier("settings.apps")
-                .driveTarget("settings.apps")
+            // Always here: Device access works before any computer is connected.
+            settingsLink(to: .apps) {
+                rowLabel(String(localized: "Connections"),
+                         detail: String(localized: "This device, your apps and saved logins"),
+                         symbol: "app.connected.to.app.below.fill", showsChevron: BighelpPlatform.drawsOwnLinkChevron)
+                    .bighelpSettingsLinkLabel()
             }
+            .bighelpSettingsLink()
+            .accessibilityIdentifier("settings.apps")
+            .driveTarget("settings.apps")
             if let teamworkModel {
                 TeamworkToggle(model: teamworkModel) { detail in
                     rowLabel(String(localized: "Teamwork"), detail: detail, symbol: "person.3.fill",
@@ -55,7 +46,7 @@ extension SettingsView {
             .bighelpSettingsButton()
             .accessibilityIdentifier("profile.personalities")
         } header: {
-            Text("Assistants")
+            Text("Agents")
         }
         .listRowBackground(theme.surface)
         // Asked once per Settings visit; the switch reads and saves through the plugin.

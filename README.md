@@ -31,9 +31,9 @@ makes work with your agents feel like texting a friend.
 - **Feed, Ideas and Goals.** Your agent fills them, but only after you ask it to.
 - **Projects, Kanban, Workflows and Scheduled tasks** for longer work, and **Usage** for your AI plans and limits.
 - **Voice:** talk in turns, or live.
-- **Apps:** connect apps for your agents through Composio or Hermes' own connectors (Settings › Apps).
-- **Device tools:** let agents use Calendar, Reminders, Contacts, Photos, Health, Location and more. Each one is
-  off until you turn it on.
+- **Apps:** connect apps for your agents through Composio or Hermes' own connectors (Settings › Connections).
+- **Device tools:** let agents use Calendar, Reminders, Contacts, Photos, Health, Location and more (Settings ›
+  Connections › Device access). Each one is off until you turn it on.
 - **Several computers:** see the agents of all your computers in one list.
 - **Notifications, Live Activities, widgets, Shortcuts, CarPlay and an Apple Watch app.**
 - **Apple Vision Pro:** your agent can stand in the room with you, in 3D.
@@ -55,7 +55,7 @@ makes work with your agents feel like texting a friend.
 - bighelp's own notification service sends push notifications and Live Activities.
 - Sign-in details stay in the Keychain on your device. The app has no ads.
 - The app sends usage and diagnostics numbers, so that the maintainers can find what is slow or broken. It never
-  sends your messages, files or file names. You can turn it off in Settings › Permissions › Device access. See
+  sends your messages, files or file names. You can turn it off in Settings › Help & feedback. See
   [docs/SECURITY_AND_PRIVACY.md](docs/SECURITY_AND_PRIVACY.md).
 - Hermes behind Cloudflare Access, a password proxy, or a proxy that checks its own headers (for example Pangolin)
   also works. See [docs/HOST_ACCESS.md](docs/HOST_ACCESS.md).

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Settings › Apps › Composio Apps: one Composio sign-in, then any of its apps by category.
+/// Settings › Connections › Composio Apps: one Composio sign-in, then any of its apps by category.
 @MainActor
 struct ComposioAppsView: View {
     @State var model: ComposioAppsModel

@@ -1,6 +1,6 @@
 import XCTest
 
-/// Settings › Apps on the demo: Native App Connections and Composio Apps. Composio Apps shows the
+/// Settings › Connections on the demo: Native App Connections and Composio Apps. Composio Apps shows the
 /// connected apps, turns Composio on for the agent, browses a category and connects an app.
 final class ComposioAppsUITests: BighelpUITestCase {
     @MainActor

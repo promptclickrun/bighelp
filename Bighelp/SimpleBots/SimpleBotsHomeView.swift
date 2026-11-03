@@ -25,7 +25,7 @@ struct SimpleBotsContext {
     /// Which bots are working or need you, kept current while the home shows.
     var activity: BotChatActivityStore? = nil
     var activitySource: BotChatActivitySource? = nil
-    /// The Unified Mode Toggle (Settings › Experience); nil while it's off.
+    /// The Unified Mode Toggle (Settings › Modes); nil while it's off.
     var modeSwitch: BighelpModeSwitch? = nil
 }
 

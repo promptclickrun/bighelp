@@ -23,8 +23,7 @@ final class DeviceAccessHostUITests: BighelpUITestCase {
                       "The call that asked went on and its answer reached the agent")
         save("device-2-came-back", app)
 
-        openSettings(in: app)
-        settingsRow("settings.menu.permissions", in: app).tap()
+        openDeviceAccessSettings(in: app)
         let form = app.descendants(matching: .any)["settings.permissions"].firstMatch
         let toggle = app.switches["permissions.device-tools.reminders"].firstMatch
         for _ in 0..<6 where !toggle.exists || !toggle.isHittable { form.swipeUp() }
@@ -54,15 +53,14 @@ final class DeviceAccessHostUITests: BighelpUITestCase {
         save("device-5-no-second-card", app)
     }
 
-    /// What App Review follows (guideline 2.5.1): Apple Health in Settings › Device access, then "How did I
+    /// What App Review follows (guideline 2.5.1): Apple Health in Settings › Connections › Device access, then "How did I
     /// sleep this week?" in a chat. The card turns Health on, the one-time note says where the data goes,
     /// iOS's own Health sheet asks, and the agent answers with a chart of what Health gave. Reads the
     /// simulator's own Health data; run it with a few nights of sleep added there, and record the screen.
     @MainActor
     func testHowDidISleepThisWeekReadsAppleHealth() throws {
         let app = try openNewChat()
-        openSettings(in: app)
-        settingsRow("settings.menu.permissions", in: app).tap()
+        openDeviceAccessSettings(in: app)
         let health = app.switches["permissions.device-tools.health"].firstMatch
         XCTAssertTrue(health.waitForExistence(timeout: 10), "Apple Health is in Device access")
         XCTAssertEqual(health.value as? String, "0")

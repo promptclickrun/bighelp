@@ -24,7 +24,7 @@ struct ComposioConnectStart: Equatable, Sendable {
     let pendingAccountID: String?
 }
 
-/// What Settings › Apps › Composio asks of Composio Connect.
+/// What Settings › Connections › Composio asks of Composio Connect.
 @MainActor
 protocol ComposioConnecting: AnyObject {
     /// The apps Composio lists as connected for this account.

@@ -40,6 +40,10 @@ final class BighelpManagedNativeActivityRuntime {
     private let now: () -> Date
     private var entries: [String: Entry] = [:]
     private var retired = Set<String>()
+    /// Rows armed at Send, by the chat's opaque session ID, until a turn takes the row or they go.
+    private var armed: [String: String] = [:]
+    /// How long an armed row waits for its turn: a send that never reached Hermes leaves no card behind.
+    static let armedRowLifetime: Duration = .seconds(120)
 
     init(service: BighelpManagedNotificationService, driver: any BighelpLiveActivityDriving = BighelpActivityKitDriver(),
          environment: BighelpLinkPushEnvironment, topic: String, now: @escaping () -> Date = Date.init) {
@@ -56,6 +60,42 @@ final class BighelpManagedNativeActivityRuntime {
         guard let group = nativeDriver as? BighelpActivityGroupDriver else { return }
         await group.invalidate(id: owner.nativeActivityID)
         Task { @MainActor [weak self] in await self?.flushPendingOperations() }
+    }
+
+    /// T3 Code's playbook: the card starts when the person sends, while bighelp is in front, because iOS
+    /// starts a Live Activity only for an app in front. A turn Hermes takes later, after bighelp left the
+    /// front (a file still going up, a slow connection), then joins this card as an update instead of
+    /// starting none. The armed row is the chat's own row (its opaque session ID), so the turn's row takes
+    /// its place; one no turn takes goes after `armedRowLifetime`. A card already showing this chat stays.
+    func arm(host: BighelpConfiguredHost, chat: DirectHermesChat) {
+        guard let service, (try? service.credentials(for: host)) != nil else { return }
+        let profile = chat.client.profile; let session = chat.client.storedID
+        guard service.ownsChat(host: host, client: chat.client), ManagedNotificationValidation.coordinate(session),
+              let enrollment = service.ledger.record(host: host, profile: profile), enrollment.enabled,
+              enrollment.richLiveActivitySupported, !enrollment.revokePending, let grant = enrollment.grant,
+              grant.state == "active", grant.expiresAt > Int(now().timeIntervalSince1970) else { return }
+        let opaque = ManagedNotificationValidation.nativeSessionID(host: host, profile: profile, session: session)
+        guard armed[opaque] == nil, !entries.values.contains(where: { $0.opaqueID == opaque && !$0.nativeParentFinished }),
+              let attributes = LoopdySessionActivityAttributes.make(sessionID: opaque, sessionTitle: "Active session",
+                                                                     agentID: profile, agentName: "Your agent") else { return }
+        let state = LoopdySessionActivityAttributes.ContentState(
+            phase: .thinking, currentAction: "Sending your message", progress: 0, completedSteps: 0,
+            activeSubagentCount: 0, latestTool: nil, timestamp: Int(now().timeIntervalSince1970))
+        guard let id = try? nativeDriver.start(attributes: attributes, state: state) else { return }
+        armed[opaque] = id
+        BighelpLiveActivityLog.note(.cardArmed)
+        Task { [weak self] in
+            try? await Task.sleep(for: Self.armedRowLifetime)
+            await self?.disarm(opaque, id: id, state: state)
+        }
+    }
+
+    private func disarm(_ opaque: String, id: String, state: LoopdySessionActivityAttributes.ContentState) async {
+        guard armed[opaque] == id else { return }
+        armed[opaque] = nil
+        // A turn took the row: its own entry owns it now.
+        guard !entries.values.contains(where: { $0.opaqueID == opaque }) else { return }
+        await nativeDriver.dismiss(id: id, state: state)
     }
 
     /// canonicalHostTurnID must be supplied from a real authenticated producer,

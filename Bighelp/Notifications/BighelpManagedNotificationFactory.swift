@@ -234,6 +234,10 @@ enum BighelpManagedActivityBridge {
         // the exact captured session/epoch/registry generation after every await.
         let binding = Binding()
         let chatID = chat.id
+        chat.client.onSendStarted = { [weak service, weak client = chat.client, weak model = chat.model] in
+            guard let service, let client, let model else { return }
+            service.activityRuntime?.arm(host: host, chat: DirectHermesChat(id: chatID, client: client, model: model))
+        }
         chat.client.onAdmittedActivity = { [weak service, weak client = chat.client, weak model = chat.model] change, turn, failed in
             guard let service, let client, model != nil,
                   !change.activities.isEmpty || change.terminal else { return }

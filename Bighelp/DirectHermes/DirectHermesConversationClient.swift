@@ -189,6 +189,9 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
     /// Background tasks someone waits on (`runBackgroundTask`), by Hermes' task ID.
     @ObservationIgnored var backgroundTaskWaiters: [String: CheckedContinuation<String, any Error>] = [:]
     @ObservationIgnored var onAdmittedActivity: ((DirectHermesProjection.Change, String, Bool) -> Void)?
+    /// The person tapped Send in this chat, before any file goes up or Hermes takes the message: the
+    /// Live Activity is armed then, while bighelp is in front (`BighelpManagedNativeActivityRuntime.arm`).
+    @ObservationIgnored var onSendStarted: (@MainActor () -> Void)?
     @ObservationIgnored var isReplayingActivity = false
     @ObservationIgnored var workspaceRecord: SessionRecord?
     /// Saved history was held back because a reply still looked unfinished.

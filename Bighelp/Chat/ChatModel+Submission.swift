@@ -46,6 +46,9 @@ extension ChatModel {
         // (or queues) through sendMidSession, which has its own checks.
         guard permitsOrdinaryComposerSend,
               isBotMode || isMidSessionTurnLive || directTransportIsReady || stagesComposerMessage else { return }
+        // iOS starts a Live Activity only while bighelp is in front, and a turn with a file starts after
+        // the file is up, often after the person left: the card starts now and the turn joins it.
+        if !isBotMode, !isMidSessionTurnLive { nativeConversationClient?.onSendStarted?() }
         // A chat that can't hand the message to Hermes yet (still connecting, opening or catching up,
         // or a turn it just started) takes it anyway: it waits in the chat and goes out in order.
         // Only a staged row is safe there: as a turn, a catch-up's readback would take it for stale.

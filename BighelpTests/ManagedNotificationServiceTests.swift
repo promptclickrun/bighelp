@@ -560,6 +560,47 @@ import UserNotifications
         await runtime.resetForAccountBoundary()
     }
 
+    /// iOS starts a Live Activity only for an app in front, and a turn with a file starts once the file
+    /// is up, often after the person left: that turn got no card. Armed at Send (T3 Code's playbook), the
+    /// card exists, and the turn's row takes the armed row's place as an update.
+    @Test(arguments: [true, false])
+    func aTurnThatStartsInTheBackgroundJoinsTheCardArmedAtSend(armed: Bool) async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let system = NativeActivityDriver()
+        var infos: [String: BighelpActivitySessionInfo] = [:]
+        let group = BighelpActivityGroupDriver(underlying: system, loadInfos: { infos }, saveInfos: { infos = $0 })
+        let runtime = BighelpManagedNativeActivityRuntime(service: fixture.service, driver: group,
+            environment: .sandbox, topic: "app.loopdy.mobile", now: { Date(timeIntervalSince1970: 1_800_000_100) })
+        fixture.service.activityRuntime = runtime
+        let client = try DirectHermesConversationClient(rpc: UnenrolledChatRPC(), hostIdentity: fixture.host.principalIdentity,
+            profile: "default", runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch",
+            drafts: .init(root: fixture.root.appending(path: "drafts")))
+        defer { client.suspend() }
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        let chat = DirectHermesChat(id: "saved", client: client, model: model)
+
+        if armed { runtime.arm(host: fixture.host, chat: chat) }
+        #expect(system.starts == (armed ? 1 : 0))
+        // Now bighelp is in the background, where ActivityKit starts nothing.
+        system.refuseStart = true
+        let event = ChatActivityEvent(eventID: "work", sessionID: client.conversationID, turnID: "turn",
+            kind: .reasoning, lifecycle: .running, title: "Working", summary: nil, detail: nil, occurredAt: 1_800_000_100)
+        try await runtime.receive(host: fixture.host, chat: chat, event: event, canonicalHostTurnID: nil)
+        for _ in 0..<200 { await Task.yield() }
+
+        let cards = system.existingActivities()
+        #expect(cards.count == (armed ? 1 : 0))
+        if armed {
+            let rows = try #require(cards.first?.state.sessions)
+            #expect(rows.count == 1, "The turn's row took the armed row's place")
+            #expect(rows.first?.state.currentAction != "Sending your message")
+        }
+        await runtime.resetForAccountBoundary()
+    }
+
     @Test func endedSharedCardRecreatesStillRunningWorkAndNextTurnStartsBeforeSnapshot() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }

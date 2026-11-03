@@ -788,6 +788,10 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   Attention comes first; the payload holds five rows and a total count. A chat finishing cannot end another chat's card.
   The service aggregates scoped per-turn updates before sending to the shared native token (docs/LIVE_ACTIVITY_GROUPS.md).
   The finished card leaves about 30 seconds after all work ends, and opening the app clears it.
+- The card starts when the person taps Send (T3 Code's playbook, `BighelpManagedNativeActivityRuntime.arm`, a
+  "Sending your message" row under the chat's own opaque ID): iOS starts a Live Activity only for an app in front,
+  and a turn with a file starts once the file is up, often after the person left, so it got no card. A turn that
+  starts later joins the card as an update and takes that row's place; a row no turn takes goes after two minutes.
 - The Live Activity uses the app's palette and real host phases, never a guessed percentage. Titles stay in the
   phone's App Group; only opaque row IDs and bounded status reach the push service. Stale rows say Paused.
 - Direct push (`BighelpPushRegistrar`, docs/ARCHITECTURE.md › Direct push registration): a phone that already has a

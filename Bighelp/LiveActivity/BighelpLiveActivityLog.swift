@@ -6,6 +6,7 @@ import OSLog
 enum BighelpLiveActivityLog {
     enum Code: String {
         case cardStarted = "card-started"
+        case cardArmed = "card-armed"
         case cardStartFailed = "card-start-failed"
         case cardRequestDisabled = "card-request-disabled"
         case cardRequestFailed = "card-request-failed"

@@ -3,6 +3,14 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.57
+
+### Changed
+
+- **Simpler Settings:** Settings has short groups now. Your name and photo are one row at the top. Under Agents, Connections replaces Apps. Under App, Modes holds the switches for Bots mode, Code mode and the Unified Mode Toggle.
+- **Connections:** Device access is in Settings › Connections, above your apps. The Secure credential vault is on the same page. It is no longer in ☰.
+- **Other settings that moved:** the companion pet is in Settings › Appearance. The "Share usage and diagnostics" switch is in Settings › Help & feedback.
+
 ## 2.6.56
 
 ### Fixed

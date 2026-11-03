@@ -69,16 +69,13 @@ final class CredentialVaultUITests: BighelpUITestCase {
     }
 
     @MainActor
-    func testTheMenuOpensTheSameVaultAndACardGoesOnAnotherWebsite() throws {
+    func testSettingsOpensTheSameVaultAndACardGoesOnAnotherWebsite() throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", "light"]
         app.launch()
-        let menu = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"])).firstMatch
-        XCTAssertTrue(menu.waitForExistence(timeout: 15))
-        menu.tap()
-        let vault = app.buttons["menu.vault"]
-        for _ in 0..<6 where !(vault.exists && vault.isHittable) { app.swipeUp() }
-        vault.tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"]))
+            .firstMatch.waitForExistence(timeout: 15))
+        openConnectionsRow("settings.connections.vault", in: app)
 
         let unlinked = app.buttons["vault.wallet.demo-card-3"]
         XCTAssertTrue(unlinked.waitForExistence(timeout: 10))
@@ -108,12 +105,9 @@ final class CredentialVaultUITests: BighelpUITestCase {
         let app = makeApp()
         app.launch()
         try onboardOpenHost(app, address: address)
-        let menu = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"])).firstMatch
-        XCTAssertTrue(menu.waitForExistence(timeout: 30))
-        menu.tap()
-        let vault = app.buttons["menu.vault"]
-        for _ in 0..<6 where !(vault.exists && vault.isHittable) { app.swipeUp() }
-        vault.tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"]))
+            .firstMatch.waitForExistence(timeout: 30))
+        openConnectionsRow("settings.connections.vault", in: app)
 
         let tile = button(app, containing: card)
         XCTAssertTrue(tile.waitForExistence(timeout: 20), "The host's saved card is in the wallet")

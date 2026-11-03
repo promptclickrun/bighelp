@@ -14,7 +14,7 @@ policy, App Store disclosure review, or independent security audit.
 ## Optional iPhone tools
 
 The next release candidate adds independent, default-off Health, Calendar,
-Reminders and Location controls in Permissions. Health data is read only for the user's health
+Reminders and Location controls in Settings › Connections › Device access. Health data is read only for the user's health
 and fitness questions. Before Health's first grant, a one-time note says that shared Health data goes to
 the person's Hermes computer and its AI provider, is not used for advertising, and can be turned off
 at any time. When an agent asks for a tool that's off, a card in the chat can turn on the same
@@ -55,7 +55,7 @@ Health empty-result semantics and the physical-device acceptance requirements.
 ## Usage and diagnostics
 
 bighelp counts how it is used and how it performs so the maintainers can fix what is slow or
-broken. It is on by default and has an off switch: Settings › Permissions › Device access ›
+broken. It is on by default and has an off switch: Settings › Help & feedback ›
 **Share usage and diagnostics**. What follows is what the code sends (`Bighelp/Telemetry/`).
 Nothing here is for advertising or sold, it holds no name, email or account, and bighelp does not
 track people across other companies' apps or sites. The numbers are tied to a random install ID, so

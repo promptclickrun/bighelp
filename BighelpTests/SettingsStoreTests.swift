@@ -537,6 +537,7 @@ struct SettingsStoreTests {
 
     @Test func settingsMenuUsesFocusedSubsectionsInsteadOfOneLongForm() {
         #expect(SettingsMenuSection.allCases == [
+            .modes,
             .appearance,
             .workspace,
             .agentsAndPersonalities,
@@ -548,9 +549,10 @@ struct SettingsStoreTests {
             .companion,
             .help,
             .watch,
+            .carPlay,
         ])
-        #expect(Set(SettingsMenuSection.allCases.map(\.title)).count == 11)
-        #expect(Set(SettingsMenuSection.allCases.map(\.accessibilityIdentifier)).count == 11)
+        #expect(Set(SettingsMenuSection.allCases.map(\.title)).count == 13)
+        #expect(Set(SettingsMenuSection.allCases.map(\.accessibilityIdentifier)).count == 13)
     }
 
     @Test func currentEdgeGestureChoicesExcludeTheLegacyInboxDestination() {

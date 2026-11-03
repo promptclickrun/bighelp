@@ -437,7 +437,7 @@ final class DirectHermesWorkspaceStore {
         return result
     }
 
-    /// Settings › Apps: Hermes' connector methods for the computer's own account, on this socket.
+    /// Settings › Connections: Hermes' connector methods for the computer's own account, on this socket.
     func connectorRequest(_ method: String, params: [String: BighelpJSONValue]) async throws -> BighelpJSONValue {
         guard ConnectorCardStore.methods.contains(method) || Self.connectorAccountMethods.contains(method) else {
             throw DirectHermesError.invalidResponse

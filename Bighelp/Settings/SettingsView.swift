@@ -33,10 +33,15 @@ struct SettingsView: View {
     var onOpenWorkspaceDestination: ((WorkspaceDestination) -> Void)?
     /// Opens another app route (Hermes tools hub, activity, direct links, ...).
     var onOpenRoute: ((AppRoute) -> Void)?
-    /// Settings › Apps for the computer in use (demo mode: made-up apps); nil hides the row.
+    /// Connections › Native App Connections for the computer in use (demo mode: made-up apps); nil hides it.
     var connectorApps: (@MainActor () -> ConnectorAppsModel?)?
-    /// Settings › Apps › Composio Apps (one Composio sign-in for every computer); nil hides it.
+    /// Connections › Composio Apps (one Composio sign-in for every computer); nil hides it.
     var composioApps: (@MainActor () -> ComposioAppsModel?)?
+    /// Connections › Secure credential vault: nil hides the row (no computer chosen), and nil from
+    /// the closure means the computer isn't connected right now.
+    var credentialVault: (@MainActor () -> CredentialVaultModel?)?
+    @State private var openVault: CredentialVaultModel?
+    @State private var vaultNeedsComputer = false
     /// Settings › Teamwork for the computer in use; nil hides the row.
     var teamwork: (@MainActor () -> TeamworkModel?)?
     /// Every gateway, for Settings › System's Manage all gateways; nil hides that switch.
@@ -70,7 +75,7 @@ struct SettingsView: View {
     @State var isClearingLocalCache = false
     @State var localCacheStatusMessage: String?
     @Environment(\.reflectiveVisionCamera) var reflectiveVisionCamera
-    @Environment(\.companionStore) private var companionStore
+    @Environment(\.companionStore) var companionStore
     @Environment(\.companionAgentScope) private var companionAgentScope
 
     /// In the Settings sheet: Done on its pages too, beside Back. Done closes Settings.
@@ -127,6 +132,7 @@ struct SettingsView: View {
         onOpenRoute: ((AppRoute) -> Void)? = nil,
         connectorApps: (@MainActor () -> ConnectorAppsModel?)? = nil,
         composioApps: (@MainActor () -> ComposioAppsModel?)? = nil,
+        credentialVault: (@MainActor () -> CredentialVaultModel?)? = nil,
         teamwork: (@MainActor () -> TeamworkModel?)? = nil,
         fleet: SettingsFleetAccess? = nil
     ) {
@@ -134,6 +140,7 @@ struct SettingsView: View {
         self.onOpenRoute = onOpenRoute
         self.connectorApps = connectorApps
         self.composioApps = composioApps
+        self.credentialVault = credentialVault
         self.teamwork = teamwork
         self.fleet = fleet
         self.focusedDestination = focusedDestination
@@ -210,9 +217,10 @@ struct SettingsView: View {
     private func page(for destination: SettingsDestination) -> some View {
         switch destination {
         case .section(let section): self.destination(for: section)
+        case .you: settingsPage(title: String(localized: "You")) { localIdentity }
         case .chatLayout: ChatLayoutSettingsView()
         case .appLayout: AppLayoutSettingsView(settings: settings)
-        case .apps: appsPage
+        case .apps: connectionsPage
         case .nativeAppConnections:
             if let apps = connectorApps?() {
                 ConnectorAppsView(model: apps)
@@ -231,16 +239,26 @@ struct SettingsView: View {
         }
     }
 
-    /// Settings › Apps: the hub when Composio is there, else the computer's own connectors.
-    @ViewBuilder
-    private var appsPage: some View {
-        if let composio = composioApps?() {
-            AppsHubView(native: connectorApps?() ?? nil, composio: composio)
-        } else if let connectorApps, let apps = connectorApps() {
-            ConnectorAppsView(model: apps)
-        } else {
-            appsUnavailable
+    /// Settings › Connections: what this device lets agents use, the apps they can use, and the
+    /// vault of logins their browser can use. One page for all of it, also in Bots mode.
+    private var connectionsPage: some View {
+        AppsHubView(native: connectorApps?() ?? nil, composio: composioApps?() ?? nil,
+                    onOpenVault: credentialVault.map { make in
+                        {
+                            openVault = make()
+                            vaultNeedsComputer = openVault == nil
+                        }
+                    },
+                    vaultNeedsComputer: vaultNeedsComputer) {
+            settingsLink(to: .section(.permissions)) {
+                DeviceAccessRowLabel()
+                    .bighelpSettingsLinkLabel()
+            }
+            .bighelpSettingsLink()
+            .accessibilityIdentifier("settings.connections.device-access")
+            .driveTarget("settings.connections.device-access")
         }
+        .modifier(CredentialVaultSheet(model: $openVault))
     }
 
     private var appsUnavailable: some View {
@@ -251,20 +269,21 @@ struct SettingsView: View {
     private var menuPage: some View {
         // Each section is deferred and type-erased: inlined together they overflow
         // the device's main-thread stack in Release builds (see BighelpDeferredSection).
-        // Every row opens one page, so the first screen stays a short list.
+        // Every row opens one page, so the first screen stays a short list: you, your agents and
+        // what they can use (Device access is in Connections), the app, then the computers,
+        // other devices and help.
         Form {
-            BighelpDeferredSection { localIdentity }
-            BighelpDeferredSection { experienceSection }
+            BighelpDeferredSection { youRow }
             BighelpDeferredSection { assistantBasics }
             BighelpDeferredSection {
-                settingsMenuGroup(sections: [.appearance, .chat, .voice, .notifications])
+                settingsMenuGroup(header: String(localized: "App"),
+                                  sections: [.modes, .appearance, .chat, .voice, .notifications])
             }
             #if os(visionOS)
             BighelpDeferredSection { SpatialAvatarSettingsSection(settings: settings) }
             #endif
             BighelpDeferredSection {
-                settingsMenuGroup(sections: [.connectivityAndNotifications, .permissions] + Self.watchSection + Self.carPlaySection
-                                  + (companionStore == nil ? [] : [.companion]) + [.help])
+                settingsMenuGroup(sections: [.connectivityAndNotifications] + Self.watchSection + Self.carPlaySection + [.help])
             }
             BighelpDeferredSection { nerdModeToggle }
             if settings.nerdModeEnabled {
@@ -330,6 +349,7 @@ struct SettingsView: View {
                 currentConnection
             case .contact:
                 helpAndFeedback
+                signatureSection
             case .watch:
                 appleWatch
             default: EmptyView()
@@ -423,6 +443,20 @@ struct SettingsView: View {
         }
     }
 
+    /// Settings › Help & feedback, with the switch for sharing usage and crash reports.
+    private var helpPage: some View {
+        settingsPage(title: SettingsMenuSection.help.title) {
+            helpAndFeedback
+            TelemetrySettingsSection()
+            signatureSection
+        }
+        .accessibilityIdentifier("settings.help")
+    }
+
+    private var signatureSection: some View {
+        Section {} footer: { BighelpBunnySignature() }
+    }
+
     private var helpAndFeedback: some View {
         Section {
             Link("Report a problem", destination: URL(string: "https://github.com/promptclickrun/bighelp/issues")!)
@@ -435,8 +469,6 @@ struct SettingsView: View {
             #endif
         } header: {
             Text("Help & feedback")
-        } footer: {
-            BighelpBunnySignature()
         }
     }
 
@@ -494,20 +526,15 @@ struct SettingsView: View {
         case .chat:
             settingsDone(destination(for: .chat))
         case .apps:
-            if let composio = composioApps?() {
-                settingsDone(AppsHubView(native: connectorApps?() ?? nil, composio: composio))
-            } else if let connectorApps, let apps = connectorApps() {
-                settingsDone(ConnectorAppsView(model: apps))
-            } else {
-                ContentUnavailableView("Apps need your computer", systemImage: "app.connected.to.app.below.fill",
-                                       description: Text("Connect to your computer, then come back."))
-            }
+            settingsDone(connectionsPage)
         }
     }
 
     @ViewBuilder
     func destination(for section: SettingsMenuSection) -> some View {
         switch section {
+        case .modes:
+            settingsPage(title: section.title) { experienceSection }
         case .workspace:
             settingsPage(title: section.title) {
                 workspace
@@ -547,7 +574,7 @@ struct SettingsView: View {
         case .permissions:
             PermissionsSettingsView(center: permissionCenter)
         case .help:
-            settingsPage(title: section.title) { helpAndFeedback }
+            helpPage
         case .watch:
             settingsPage(title: section.title) { appleWatch }
         case .carPlay:
@@ -594,12 +621,12 @@ struct SettingsView: View {
         #endif
     }
 
-    /// A Mac pairs with no Apple Watch.
+    /// Only an iPhone pairs with an Apple Watch.
     private static var watchSection: [SettingsMenuSection] {
         #if targetEnvironment(macCatalyst)
         []
         #else
-        [.watch]
+        WCSession.isSupported() ? [.watch] : []
         #endif
     }
 

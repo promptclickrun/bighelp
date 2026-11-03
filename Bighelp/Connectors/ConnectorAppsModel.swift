@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// What Settings › Apps calls on the host: Hermes' connector methods for the computer's own account
+/// What Settings › Connections calls on the host: Hermes' connector methods for the computer's own account
 /// (`owner: account`), never a chat's.
 @MainActor
 protocol ConnectorAppsService: AnyObject {
@@ -20,7 +20,7 @@ final class DirectHermesConnectorAppsService: ConnectorAppsService {
     }
 }
 
-/// Settings › Apps: the apps Hermes can reach through its hosted connectors, which of them have an
+/// Settings › Connections: the apps Hermes can reach through its hosted connectors, which of them have an
 /// account, and connect, name and remove. Opening the list only reads: Hermes answers the catalog
 /// and accounts without making the computer's free connector identity, which only a Connect makes
 /// (Hermes 0.22.5's `connectors.catalog` and `connectors.accounts`, `creates_guest=False`).

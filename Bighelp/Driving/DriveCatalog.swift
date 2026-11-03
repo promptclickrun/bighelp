@@ -209,6 +209,17 @@ enum DriveCatalog {
         (section.title, .section(section), section.accessibilityIdentifier)
     }
 
+    /// Settings › Connections, and Bots mode's way to the same page.
+    private static var connections: (String, SettingsDestination, String?) {
+        (String(localized: "Connections"), .apps, "settings.apps")
+    }
+    private static var botsConnections: (String, SettingsDestination, String?) {
+        (String(localized: "Connect apps"), .bots(.apps), "simple-bots.settings.apps")
+    }
+    private static var deviceAccess: (String, SettingsDestination, String?) {
+        (SettingsMenuSection.permissions.title, .section(.permissions), "settings.connections.device-access")
+    }
+
     private static var settingsPlaces: [DrivePlace] {
         [
             settings("settings", String(localized: "Settings"), String(localized: "All of bighelp's settings."),
@@ -240,39 +251,49 @@ enum DriveCatalog {
             settings("settings.notifications", String(localized: "Notifications"), String(localized: "Alerts from your agents."),
                      keywords: ["notifications", "alerts", "push", "sounds", "badges"], full: [section(.notifications)],
                      bots: [(String(localized: "Notifications"), .bots(.notifications), "simple-bots.settings.notifications")]),
-            settings("settings.permissions", String(localized: "Permissions"),
-                     String(localized: "Which iPhone features your agents may use, and usage sharing."),
-                     keywords: ["permissions", "device access", "privacy", "calendar", "location", "contacts", "photos"],
-                     full: [section(.permissions)]),
+            settings("settings.permissions", String(localized: "Device access"),
+                     String(localized: "Which iPhone features your agents may use, like Health, Calendar and location."),
+                     keywords: ["permissions", "device access", "privacy", "calendar", "location", "contacts", "photos",
+                                "health", "microphone", "camera"],
+                     full: [connections, deviceAccess], bots: [botsConnections, deviceAccess]),
             settings("settings.permissions.navigation", String(localized: "Let agents show you around bighelp"),
                      String(localized: "The switch for this: agents opening pages and pointing at settings."),
                      keywords: ["show me around", "driving", "agents open pages"],
-                     full: [section(.permissions)],
+                     full: [connections, deviceAccess], bots: [botsConnections, deviceAccess],
                      point: (String(localized: "Let agents show you around bighelp"), "permissions.device-tools.navigation")),
             settings("settings.permissions.appearance", String(localized: "Let agents change how bighelp looks"),
                      String(localized: "The switch that lets agents change light or dark mode and your chat color."),
                      keywords: ["agent appearance", "agents change theme"],
-                     full: [section(.permissions)],
+                     full: [connections, deviceAccess], bots: [botsConnections, deviceAccess],
                      point: (String(localized: "Let agents change how bighelp looks"), "permissions.device-tools.appearance")),
-            settings("settings.apps", String(localized: "Apps"),
-                     String(localized: "Let your agents use your other apps, like email and notes."),
-                     keywords: ["apps", "connect", "connectors", "integrations", "email", "gmail", "composio"],
-                     full: [(String(localized: "Apps"), .apps, "settings.apps")],
-                     bots: [(String(localized: "Connect apps"), .bots(.apps), "simple-bots.settings.apps")]),
+            settings("settings.apps", String(localized: "Connections"),
+                     String(localized: "What your agents can use: this device, your other apps like email and notes, and saved logins."),
+                     keywords: ["apps", "connect", "connections", "connectors", "integrations", "email", "gmail", "composio"],
+                     full: [connections], bots: [botsConnections]),
+            settings("settings.vault", String(localized: "Secure credential vault"),
+                     String(localized: "Logins and cards your agents can use on websites."),
+                     keywords: ["vault", "passwords", "logins", "credentials", "cards", "keychain"],
+                     full: [connections],
+                     point: (String(localized: "Secure credential vault"), "settings.connections.vault")),
             settings("settings.you", String(localized: "You"),
                      String(localized: "Your name and photo on your messages."),
-                     keywords: ["my name", "my photo", "profile", "me"], full: [],
+                     keywords: ["my name", "my photo", "profile", "me"], full: [(String(localized: "You"), .you, "settings.you")],
                      bots: [(String(localized: "You"), .bots(.you), "simple-bots.settings.you")]),
+            settings("settings.modes", String(localized: "Modes"),
+                     String(localized: "Bots mode, Code mode and the switch between them at the top of each home."),
+                     keywords: ["modes", "bots mode", "code mode", "mode switch", "unified mode toggle", "experience"],
+                     full: [section(.modes)]),
             settings("settings.system", String(localized: "System"),
                      String(localized: "Your computers, Hermes updates and restarts."),
                      keywords: ["system", "computers", "hosts", "update hermes", "plugin", "restart"],
                      full: [section(.connectivityAndNotifications)]),
             settings("settings.companion", String(localized: "Companion pet"),
                      String(localized: "An optional little pet that keeps you company."),
-                     keywords: ["pet", "companion", "mascot"], full: [section(.companion)]),
+                     keywords: ["pet", "companion", "mascot"], full: [section(.appearance), section(.companion)]),
             settings("settings.help", String(localized: "Help & feedback"),
                      String(localized: "Report a problem, read guides and see the app's version."),
-                     keywords: ["help", "feedback", "bug", "version", "about", "support"], full: [section(.help)]),
+                     keywords: ["help", "feedback", "bug", "version", "about", "support", "usage sharing", "diagnostics",
+                                "analytics", "crash reports"], full: [section(.help)]),
         ]
     }
 

@@ -441,18 +441,14 @@ final class HostSignInMatrixUITests: BighelpUITestCase {
         save("media-10-card-arrived", app)
     }
 
-    /// ☰ › Secure credential vault on a real Hermes: a login typed here and
+    /// Settings › Connections › Secure credential vault on a real Hermes: a login typed here and
     /// two imported from a CSV export land in that host's own vault.
     @MainActor func testVaultSavesAndImportsLoginsOnTheHost() throws {
         let app = try beginSetup(mode: "media", extraArguments: ["-test-vault-import"])
         try connect(app)
         app.buttons["host-setup.continue"].tap()
-        let menu = app.buttons["home.drawer.open"]
-        XCTAssertTrue(menu.waitForExistence(timeout: 20))
-        menu.tap()
-        let row = app.buttons["menu.vault"]
-        for _ in 0..<6 where !(row.exists && row.isHittable) { app.swipeUp() }
-        row.tap()
+        XCTAssertTrue(app.buttons["home.drawer.open"].waitForExistence(timeout: 20))
+        openConnectionsRow("settings.connections.vault", in: app)
         XCTAssertTrue(app.staticTexts["vault.empty"].waitForExistence(timeout: 20), "A new host's vault is empty")
         app.buttons["vault.add"].tap()
         let site = app.textFields["vault.site"]

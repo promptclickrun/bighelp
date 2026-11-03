@@ -1,6 +1,6 @@
 import XCTest
 
-/// Hermes' connect card in chat, and Settings › Apps.
+/// Hermes' connect card in chat, and Settings › Connections.
 final class ConnectorCardUITests: BighelpUITestCase {
     /// `-test-connector-card`: two requests wait inline in one chat (made-up names). Each answer goes
     /// to Hermes, and a card leaves the chat once every row has its answer.
@@ -35,7 +35,7 @@ final class ConnectorCardUITests: BighelpUITestCase {
         XCTAssertTrue(apps.waitForNonExistence(timeout: 5), "Every row answered: the card leaves")
     }
 
-    /// Settings › Apps › Native App Connections in demo mode: the list opens straight away (no Set
+    /// Settings › Connections › Native App Connections in demo mode: the list opens straight away (no Set
     /// up step), by category with chips, and Connect on a row signs in and moves the app to Connected.
     @MainActor
     func testAppsInSettings() {

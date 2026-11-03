@@ -28,7 +28,7 @@ protocol ComposioAgentHost: AnyObject {
     func signInStatus(flowID: String) async throws -> MCPOAuthFlow
 }
 
-/// Settings › Apps › Composio Apps: sign in to Composio once, browse its apps by category,
+/// Settings › Connections › Composio Apps: sign in to Composio once, browse its apps by category,
 /// connect and remove them, and let the agent on this computer use them.
 @MainActor
 @Observable

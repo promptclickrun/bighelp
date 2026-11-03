@@ -237,13 +237,13 @@ final class SettingsStore {
         return isBotsMode ? botsMode : action
     }
 
-    /// Settings › Experience › Unified Mode Toggle: Bots, Chat and Code in a pill at the top of each
+    /// Settings › Modes › Unified Mode Toggle: Bots, Chat and Code in a pill at the top of each
     /// home. Off by default; ☰ keeps its Chat and Code switch while it's off.
     var unifiedModeToggleEnabled: Bool {
         didSet { defaults.set(unifiedModeToggleEnabled, forKey: Keys.unifiedModeToggle) }
     }
 
-    /// Settings › Experience › Chat switcher: the bots (Bots mode) or running sessions (Code mode)
+    /// Settings › Modes › Chat switcher: the bots (Bots mode) or running sessions (Code mode)
     /// beside a chat. On by default on phones, where only the iPhone Duo folded shows it; iPad and
     /// Mac show it in landscape once it's turned on (`BighelpChatSwitcher`).
     var chatSwitcherEnabled: Bool {

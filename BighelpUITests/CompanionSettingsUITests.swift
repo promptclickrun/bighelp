@@ -13,7 +13,11 @@ final class CompanionSettingsUITests: BighelpUITestCase {
             _ = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu", "tab.profile"]))
                 .firstMatch.waitForExistence(timeout: 60)
             openSettings(in: app)
-            settingsRow("companion-settings-entry", in: app).tap()
+            // The pet is a row in Appearance, under Chat layout and App layout.
+            settingsRow("settings.themes", in: app).tap()
+            let entry = app.buttons["companion-settings-entry"].firstMatch
+            for _ in 0..<8 where !(entry.exists && entry.isHittable) { app.swipeUp() }
+            entry.tap()
 
             let page = app.descendants(matching: .any)["companion.settings"]
             XCTAssertTrue(page.waitForExistence(timeout: 10))

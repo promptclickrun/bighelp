@@ -234,7 +234,7 @@ struct ConnectorCardTests {
     }
 }
 
-/// Settings › Apps.
+/// Settings › Connections.
 @MainActor
 struct ConnectorAppsModelTests {
     final class Service: ConnectorAppsService {

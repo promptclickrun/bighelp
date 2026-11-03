@@ -835,7 +835,8 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 15))
         openChatWorkspaceMenu(in: app)
         app.buttons["menu.settings"].tap()
-        app.buttons["settings.menu.permissions"].tap()
+        app.buttons["settings.apps"].tap()
+        app.buttons["settings.connections.device-access"].tap()
         app.buttons["permissions.open.calendar"].firstMatch.tap()
         let toggle = app.switches["permissions.device-tools.calendar"].firstMatch
         XCTAssertTrue(toggle.waitForExistence(timeout: 10))
@@ -935,7 +936,8 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         capture("real-host-voice-plugin-settings-116", app)
         app.navigationBars.buttons.firstMatch.tap()
         app.navigationBars.buttons.firstMatch.tap()
-        app.buttons["settings.menu.permissions"].tap()
+        app.buttons["settings.apps"].tap()
+        app.buttons["settings.connections.device-access"].tap()
         let devicePlugin = app.descendants(matching: .any).matching(identifier: "settings.plugin-status.deviceAccess").firstMatch
         XCTAssertTrue(devicePlugin.waitForExistence(timeout: 10))
         capture("real-host-device-plugin-settings-116", app)
@@ -1548,10 +1550,11 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             )], timeout: 20), .completed)
             capture("native-reviewed-plugin-voice-ready", app)
             app.navigationBars.buttons.firstMatch.tap()
-            let permissions = app.buttons["settings.menu.permissions"]
-            for _ in 0..<5 where !permissions.isHittable { app.collectionViews["settings.screen"].swipeUp() }
-            guard permissions.isHittable else { XCTFail("Permissions must be reachable from Settings."); return }
-            permissions.tap()
+            let connections = app.buttons["settings.apps"]
+            for _ in 0..<5 where !connections.isHittable { app.collectionViews["settings.screen"].swipeUp() }
+            guard connections.isHittable else { XCTFail("Connections must be reachable from Settings."); return }
+            connections.tap()
+            app.buttons["settings.connections.device-access"].tap()
             let device = app.staticTexts["settings.plugin-status.deviceAccess"].firstMatch
             for _ in 0..<6 where !device.exists || !device.isHittable { app.swipeUp() }
             guard device.waitForExistence(timeout: 15) else { XCTFail("Device plugin status must be visible."); return }

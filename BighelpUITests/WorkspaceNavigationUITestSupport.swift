@@ -38,6 +38,24 @@ extension BighelpUITestCase {
                       "The Settings destination must open through ☰.", file: file, line: line)
     }
 
+    /// Settings › Connections, then one of its rows: Device access (`settings.connections.device-access`)
+    /// or the credential vault (`settings.connections.vault`).
+    @MainActor
+    func openConnectionsRow(_ identifier: String, in app: XCUIApplication,
+                            file: StaticString = #filePath, line: UInt = #line) {
+        openSettings(in: app, file: file, line: line)
+        settingsRow("settings.apps", in: app, file: file, line: line).tap()
+        let row = app.buttons[identifier].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "Connections lists \(identifier)", file: file, line: line)
+        row.tap()
+    }
+
+    /// Settings › Connections › Device access.
+    @MainActor
+    func openDeviceAccessSettings(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        openConnectionsRow("settings.connections.device-access", in: app, file: file, line: line)
+    }
+
     /// Settings is a sheet: Done closes it and shows the screen under it again.
     @MainActor
     func closeSettings(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {

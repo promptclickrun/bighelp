@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Settings' first screen: the groups of pages, one row each.
 extension SettingsView {
-    func settingsMenuGroup(sections: [SettingsMenuSection]) -> some View {
+    func settingsMenuGroup(header: String? = nil, sections: [SettingsMenuSection]) -> some View {
         Section {
             ForEach(sections) { section in
                 settingsLink(to: .section(section)) {
@@ -13,8 +13,51 @@ extension SettingsView {
                 .accessibilityIdentifier(section.accessibilityIdentifier)
                 .driveTarget(section.accessibilityIdentifier)
             }
+        } header: {
+            if let header { Text(header) }
         }
         .listRowBackground(theme.surface)
+    }
+
+    /// The first row: your photo and name, which open the page that changes them.
+    var youRow: some View {
+        Section {
+            settingsLink(to: .you) {
+                HStack(spacing: BighelpTokens.space12) {
+                    AvatarView(stableID: UserIdentity.stableID, displayName: userIdentity.identity.displayName,
+                               imageURL: userIdentity.avatarURL(), size: 44, kind: .person)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(userIdentity.identity.name.isEmpty ? String(localized: "Add your name") : userIdentity.identity.name)
+                            .bighelpFont(.body, weight: .semibold)
+                            .foregroundStyle(theme.primaryText)
+                            .lineLimit(1)
+                        Text("Your name and photo in chats")
+                            .bighelpFont(.metadata)
+                            .foregroundStyle(theme.secondaryText)
+                    }
+                    Spacer(minLength: BighelpTokens.space8)
+                    if BighelpPlatform.drawsOwnLinkChevron {
+                        Image(systemName: "chevron.right")
+                            .font(.bighelp(.footnote).weight(.semibold))
+                            .foregroundStyle(theme.tertiaryText)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .frame(minHeight: 60)
+                .padding(.horizontal, BighelpMenuRowLayout.labelInset)
+                .bighelpSettingsLinkLabel()
+            }
+            .bighelpSettingsLink()
+            .accessibilityIdentifier("settings.you")
+            .driveTarget("settings.you")
+        }
+        .listRowBackground(theme.surface)
+    }
+
+    /// The homes in use, as the Modes row says them.
+    private var modesDetail: String {
+        if settings.simpleBotsEnabled { return String(localized: "Bots mode") }
+        return settings.codeModeEnabled ? String(localized: "Chat and Code") : String(localized: "Chat")
     }
 
     /// The agent Voice settings opens on (`VoiceSettingsView`), so the row says what that page shows.
@@ -35,6 +78,7 @@ extension SettingsView {
     func menuDetail(_ section: SettingsMenuSection) -> String {
         switch section {
         case .appearance: appearanceSummary
+        case .modes: modesDetail
         case .voice: voiceDetail
         default: section.detail
         }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Settings › Experience: Bots mode, Code mode, which home a launch opens in once Code is on,
+/// Settings › Modes: Bots mode, Code mode, which home a launch opens in once Code is on,
 /// and the Unified Mode Toggle that puts Bots, Chat and Code at the top of each home.
 extension SettingsView {
     var experienceSection: some View {
@@ -46,8 +46,6 @@ extension SettingsView {
             if (settings.simpleBotsEnabled || settings.codeModeEnabled), BighelpChatSwitcher.isOffered(screen: screen) {
                 chatSwitcherToggle
             }
-        } header: {
-            Text("Experience")
         } footer: {
             if settings.unifiedModeToggleEnabled {
                 Text("You can switch modes any time from the top of each home.")

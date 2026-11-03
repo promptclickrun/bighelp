@@ -59,7 +59,6 @@ struct RootShellView: View {
     /// Offered as "Try Again" in the error alert.
     @State var actionErrorRetry: (@MainActor () -> Void)?
     @State var isHermesWorkspacePresented = false
-    @State var credentialVault: CredentialVaultModel?
     @State var sessionRestoreRequest: SessionRestoreRequest?
     @State var sessionRestoreTask: Task<Void, Never>?
     @State var canonicalChatCoordinator = CanonicalChatCoordinator()
@@ -224,7 +223,6 @@ struct RootShellView: View {
         agentHomeSheets(rootContent)
         .modifier(AIDataConsentGate(inFirstSetup: presentsFirstRunOnboarding || hostRegistry?.isWorkspaceReady != true,
                                     usesDemoData: usesWorkspaceFixtures))
-        .modifier(CredentialVaultSheet(model: $credentialVault))
         .modifier(FleetSheets(
             fleet: fleet, gate: $fleetGateRequest, isNewChatPresented: $isFleetNewChatPresented,
             onGate: { destination, hostID in openFleet(.destination(destination), on: hostID) },
@@ -1218,6 +1216,7 @@ struct RootShellView: View {
             },
             connectorApps: { connectorAppsModel() },
             composioApps: { composioAppsModel() },
+            credentialVault: homeCredentialVault,
             teamwork: { teamworkModel() },
             fleet: fleet.map { fleet in
                 SettingsFleetAccess(maintenance: { fleet.maintenance() }, gatewayCount: { fleet.hosts.count })
@@ -1235,7 +1234,7 @@ struct RootShellView: View {
             workspace: { [weak workspaceConnections] in workspaceConnections?.workspace }))
     }
 
-    /// Settings › Apps › Composio Apps: your Composio sign-in, and the agent in use on the
+    /// Settings › Connections › Composio Apps: your Composio sign-in, and the agent in use on the
     /// computer in use; made-up apps in demo mode.
     func composioAppsModel() -> ComposioAppsModel? {
         if usesWorkspaceFixtures {
@@ -1259,7 +1258,7 @@ struct RootShellView: View {
         return ComposioAppsModel(account: .shared, agentHost: agentHost)
     }
 
-    /// Settings › Apps for the computer in use, while it's connected; sample apps in demo mode.
+    /// Settings › Connections for the computer in use, while it's connected; sample apps in demo mode.
     func connectorAppsModel() -> ConnectorAppsModel? {
         if let workspace = hostRegistry?.selectedWorkspace, hostRegistry?.selectedHostID != nil {
             guard workspace.isConnected else { return nil }

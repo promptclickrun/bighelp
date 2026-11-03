@@ -271,7 +271,7 @@ extension RootShellView {
         }
     }
 
-    /// Settings › Experience › Unified Mode Toggle: Bots, Chat and Code at the top of each home
+    /// Settings › Modes › Unified Mode Toggle: Bots, Chat and Code at the top of each home
     /// (and ⌃⌘1–⌃⌘3 on the Mac). Nil while it's off.
     var modeSwitch: BighelpModeSwitch? {
         guard settings.unifiedModeToggleEnabled else { return nil }

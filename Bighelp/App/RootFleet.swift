@@ -148,9 +148,6 @@ extension RootShellView {
         // Workflows ask which computer, then open that one's.
         destinations.onWorkflows = { afterClosingHomeSheets { fleetGate(.workflows) } }
         // Usage covers every host while all show; no host to pick.
-        if destinations.onCredentialVault != nil {
-            destinations.onCredentialVault = { afterClosingHomeSheets { fleetGate(.credentialVault) } }
-        }
         if let folder = destinations.folder {
             destinations.folder = (name: folder.name, open: { afterClosingHomeSheets { fleetGate(.folder) } })
         }
@@ -496,7 +493,6 @@ extension RootShellView {
             case .kanban:
                 if canOpenKanban { openKanban() } else { actionErrorMessage = "Kanban isn't set up on this host." }
             case .workflows: openWorkflows()
-            case .credentialVault: openCredentialVault()
             case .folder: presentHermesWorkspaces()
             }
         }

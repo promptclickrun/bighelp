@@ -8,7 +8,7 @@ enum CredentialVaultRoute: Hashable {
     case managers
 }
 
-/// The Credential Vault (a bot's profile › Info, and ☰ › Secure credential vault): what an
+/// The Credential Vault (a bot's profile › Info, and Settings › Connections › Secure credential vault): what an
 /// agent's browser can sign in and check out with. The wallet holds saved cards and addresses,
 /// each once however many websites use it; under it, every website and what's saved for it.
 /// Lists only names and websites; secrets are typed here once and go straight to Hermes.
@@ -923,7 +923,7 @@ private struct CredentialVaultUnlockView: View {
     }
 }
 
-/// Presents the vault from the root, outside RootShellView's large body.
+/// Presents the vault over Settings › Connections.
 struct CredentialVaultSheet: ViewModifier {
     @Binding var model: CredentialVaultModel?
 
@@ -948,15 +948,19 @@ extension RootShellView {
         return usesWorkspaceFixtures ? DemoCredentialVaultService() : nil
     }
 
-    /// ☰ › Secure credential vault: every agent's, starting on the home agent's.
-    func openCredentialVault() {
-        guard let service = makeCredentialVaultService() else {
-            if hostRegistry?.selectedWorkspace != nil { actionErrorMessage = "Connect to your computer to open the vault." }
-            return
-        }
+    /// Settings › Connections › Secure credential vault; nil hides the row.
+    var homeCredentialVault: (@MainActor () -> CredentialVaultModel?)? {
+        guard canOpenCredentialVault else { return nil }
+        return { makeHomeCredentialVault() }
+    }
+
+    /// The vault Settings opens: every agent's, starting on the home agent's; nil while the computer
+    /// isn't connected.
+    func makeHomeCredentialVault() -> CredentialVaultModel? {
+        guard let service = makeCredentialVaultService() else { return nil }
         var list = agents.profiles.map { CredentialVaultModel.Agent(id: $0.id, name: $0.name) }
         if list.isEmpty { list = [.init(id: "default", name: "Default agent")] }
-        credentialVault = CredentialVaultModel(service: service, agents: list, agentID: homeAgent?.id ?? "default")
+        return CredentialVaultModel(service: service, agents: list, agentID: homeAgent?.id ?? "default")
     }
 
     /// One bot's own vault, for its profile in Bots mode; nil while the computer isn't connected.

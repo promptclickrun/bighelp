@@ -103,7 +103,7 @@ final class ConnectorCardStore {
     }
 
     /// `connection.request` and `connection.update` from the socket. Account-owned updates belong
-    /// to Settings › Apps, which reads its own operation.
+    /// to Settings › Connections, which reads its own operation.
     func accept(_ event: DirectHermesEvent, connection expected: DirectHermesPromptConnection) {
         guard connection == expected, event.type == "connection.request" || event.type == "connection.update",
               let runtimeID = event.sessionID, bindings[runtimeID] != nil else { return }

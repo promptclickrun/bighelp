@@ -114,8 +114,8 @@ model and reasoning, then Activity, Approvals, Schedules, Identity), tap the nam
 chat, and ☰ for everything else. ☰'s first screen fits without
 scrolling: the host as one switcher row on top, then New chat (Group beside it), Agents, Sessions (every chat), Projects, Kanban, Workflows
 (where the computer's plugin has them or says why it can't run them; with All hosts on it asks which computer),
-Scheduled tasks, Usage and Settings, then Recent chats with See all. The Secure credential vault and Nerd Mode's folder
-sit under More at the bottom.
+Scheduled tasks, Usage and Settings, then Recent chats with See all. Nerd Mode's folder sits under More at the
+bottom; the Secure credential vault is in Settings › Connections, with the apps and Device access.
 Keep it that short: a new destination goes where people already look, not on the first screen. Headers keep their
 own New chat only where there's no bar to hold it: Code mode, the iPhone Duo's side strip, Vision Pro's tab
 ornament, and a board opened with Back. The chat list (and the all-hosts view's All sessions) searches from the system
@@ -139,7 +139,7 @@ chat's title when Settings › Chat › Session title is on (off by default; nev
 held (`BighelpScreenPosture`). Folded, the cover screen is wide and short, with the camera and status in a column on
 its trailing edge: the bar's places go down that column as iOS's own toolbar items (`BighelpStripTabs`), under the
 screen's own buttons (☰, the brand, a filter), which iOS moves there too, so chats get their height back, and in Bots and Code mode the column holds the chat switcher instead (`BighelpChatSwitcher`: the bots on top
-of the home, or the running sessions, each with its live state; Settings › Experience › Chat switcher, on by default
+of the home, or the running sessions, each with its live state; Settings › Modes › Chat switcher, on by default
 there and opt-in on iPad and Mac in landscape). Open and held wide, the list (Bots mode's home, the chat list, or
 Code's home) sits left of the fold and what it opens sits right of it, like a book (`BighelpSplitColumn`); nothing
 crosses the fold. Held upright it's a big phone, never the cover screen's layout, and half-folded like a small
@@ -468,7 +468,7 @@ keyboard.
 
 ## Bots mode
 
-An opt-in calm home (Settings › Experience › Bots mode): just your bots and their chats. No tab bar
+An opt-in calm home (Settings › Modes › Bots mode): just your bots and their chats. No tab bar
 and no ☰. The page is the light and dark theme picked in Appearance, your bubbles are black (ink after dark) unless you
 picked a bubble color in Appearance, and buttons and tinted text are the page's ink (white after dark). The
 text is SF Pro, as everywhere.
@@ -519,7 +519,7 @@ text is SF Pro, as everywhere.
   and its provider, model and voice from lists (saved per bot). Advanced Options is the bot's one simple doorway
   to its Nerd Mode settings: plain rows with a tip each (Approvals: Smart, Manual or Off), and links to its Nerd
   Mode pages under For experts, without Nerd Mode turned on.
-- **Credential Vault** (a bot's Info, with how many websites; ☰ › Secure credential vault opens the same screens
+- **Credential Vault** (a bot's Info, with how many websites; Settings › Connections › Secure credential vault opens the same screens
   for any agent): the Wallet on top, a row of saved cards (small dark cards with their last digits) and addresses
   (gray tiles), each once however many websites use it; then Websites, each with its letter, its login and small
   icons for what's saved there; Password managers and Import from a file under them; Add a Website at the bottom.
@@ -553,7 +553,7 @@ When the person asks where something is, the agent can open it (`iphone_navigati
 
 ## Code mode
 
-An opt-in second home for coding (Settings › Code mode; Chat stays the default). Its home is the
+An opt-in second home for coding (Settings › Modes › Code mode; Chat stays the default). Its home is the
 Launchpad: filter chips (All, Running, Needs you, Ready), one card per session (a still status dot, its name, its
 branch in code type, what it's doing now) and a message box pinned at the bottom in place of the bottom bar. Under
 the box, three chips choose the project, where it runs (New worktree, the default, or Local checkout) and the

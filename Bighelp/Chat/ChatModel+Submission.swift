@@ -320,6 +320,11 @@ extension ChatModel {
                 }
                 failureMessage = "Hermes did not run this command. Your text is ready to edit."
                 retryRequest = nil
+            } else if let failed = error as? DirectHermesConversationClient.FailedCommand {
+                // It ran, maybe in part, so it isn't put back in the box or retried.
+                failureMessage = ["This command didn't finish.", failed.reason.sentence]
+                    .compactMap(\.self).joined(separator: " ")
+                retryRequest = nil
             } else if let refusal = error as? DirectHermesConversationClient.RejectedPrompt {
                 restoreRefusedPrompt(refusal, humanID: localHumanID, message: message,
                                      attachments: attachments, orderedAttachments: orderedAttachments,
@@ -330,7 +335,9 @@ extension ChatModel {
                         || nativeConversationClient?.journal.unresolved.contains(where: {
                             !nativeAdmissionIDs.contains($0.id)
                         }) == true {
-                failureMessage = "\(message.hasPrefix("/") ? "Command" : "Message") delivery is unconfirmed. It will not be sent again automatically."
+                failureMessage = message.hasPrefix("/")
+                    ? "Hermes didn't confirm this command. It won't be sent again on its own."
+                    : "Message delivery is unconfirmed. It will not be sent again automatically."
                 retryRequest = nil
             } else if let refused = error as? ChatAttachmentError, let reason = refused.errorDescription {
                 // Nothing was sent: say why, instead of a delivery failure.

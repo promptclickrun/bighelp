@@ -196,6 +196,15 @@ extension DirectHermesConversationClient {
                         // malformed receipt does not; no fallback transport or resend.
                         let commandRejected = command && !expandedToPrompt
                             && (error as? DirectHermesError) == .rpcRejected(code: 4018)
+                        if command, !expandedToPrompt, !commandRejected,
+                           case .rpcRejected(_, let reason) = error as? DirectHermesError {
+                            // Hermes' error answer is the command's outcome, not a lost receipt.
+                            self.retireSubmission(submission.id)
+                            self.needsRecovery = self.journal.unresolved.contains { $0.id == submission.id }
+                            self.status = "Ready"
+                            self.finish(throwing: FailedCommand(reason: reason))
+                            return
+                        }
                         if !command, let code = Self.definitePromptRefusalCode(error) {
                             do {
                                 try self.retainRejectedSubmission(submission, code: code)
@@ -220,12 +229,14 @@ extension DirectHermesConversationClient {
                         } else { self.needsRecovery = true }
                         self.status = Self.safeMessage(error)
                         self.finish(throwing: commandRejected ? RejectedCommand() : error)
-                        if !command, self.needsRecovery, self.connected,
+                        if self.needsRecovery, self.connected,
                            self.generation == owner, !Task.isCancelled {
                             // Receiving a reply cannot prove a lost admission
                             // receipt. Reuse exact-owner snapshot/replay once to
                             // restore readiness for independent new input. Keep
                             // the original journal untouched; never resubmit it.
+                            // A lost command receipt too: skipped, Send stayed off
+                            // until the chat was opened again.
                             try? await self.recover(epoch: self.projection.epoch)
                         }
                     }

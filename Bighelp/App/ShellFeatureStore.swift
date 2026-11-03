@@ -1468,14 +1468,18 @@ final class ShellFeatureStore {
         // A draft from the journal isn't in the chat yet: its next save writes it there.
         if !openingDraft.utf8.elementsEqual(session.draft.utf8) { model.persistSession(draftOnly: true) }
         // Turns Hermes runs on its own (a background process finished, another agent wrote in) never stream
-        // their messages here, so the chat reads the saved history again, as it does after Stop.
+        // their messages here, so the chat reads its newest saved page again, as it does back in the app.
+        // A metadata refresh here put the chat list's older copy over the chat, and the newest rows (the
+        // person's last message, the agent's last reply) went until a manual refresh.
         model.hostHistoryRefresh = { [weak self, weak catalog] in
             guard let self, let catalog, self.accountGeneration == referenceGeneration,
                   let referenceModel, self.chatModels[session.id] === referenceModel,
                   !referenceModel.isSending else { return }
-            let authoritative = try await catalog.refreshExistingSession(id: session.id)
-            guard self.chatModels[session.id] === referenceModel, !referenceModel.isSending else { return }
-            referenceModel.reconcileHydratedSession(authoritative)
+            let source = try catalog.restoreSessionContent(id: session.id)
+            let page = try await catalog.refreshHeldHistory(id: session.id)
+            guard self.accountGeneration == referenceGeneration,
+                  self.chatModels[session.id] === referenceModel, !referenceModel.isSending else { return }
+            referenceModel.reconcileHydratedSession(try catalog.installSessionStateSnapshot(page, source: source))
         }
         if let runtime = session.sessionRuntime {
             runtimeControls?.reconcileSessionRuntime(runtime)

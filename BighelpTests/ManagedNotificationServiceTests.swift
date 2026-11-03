@@ -1043,6 +1043,38 @@ import UserNotifications
         #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.enabled == true)
     }
 
+    /// A computer that dropped this phone's grant left the phone believing it was set up, and
+    /// nothing alerted until someone tapped Set Up Again. The phone now notices and sets up again.
+    @Test func aComputerThatDroppedThePhonesSetupIsSetUpAgain() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        try fixture.registry.credentialVault(for: fixture.host).save(fixture.connection)
+        let grant = try #require(fixture.ledger.record(host: fixture.host, profile: "default")?.grant?.grantId)
+        fixture.hostAPI.droppedGrants = [grant]
+
+        #expect(await fixture.service.repairIfDropped(host: fixture.host))
+
+        #expect(fixture.hostAPI.removedGrants.contains(grant))
+        #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.enabled == true)
+        #expect(fixture.registry.hosts.first { $0.id == fixture.host.id }?.notificationState == .enabled)
+        // A setup the computer still holds is left alone, and checks wait an hour.
+        #expect(await fixture.service.repairIfDropped(host: fixture.host) == false)
+    }
+
+    @Test func aComputerThatStillHoldsTheSetupIsLeftAlone() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        try fixture.registry.credentialVault(for: fixture.host).save(fixture.connection)
+        let grant = fixture.ledger.record(host: fixture.host, profile: "default")?.grant
+
+        #expect(await fixture.service.repairIfDropped(host: fixture.host, force: true) == false)
+
+        #expect(fixture.hostAPI.removedGrants.isEmpty)
+        #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.grant == grant)
+    }
+
     @Test func firstChatSubscribesBeforeLazyProducersHaveRun() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }
@@ -1492,6 +1524,9 @@ import UserNotifications
         var removedGrants: [String] = []
         /// The agent each client was made for (`?profile=`), in order.
         var profiles: [String?] = []
+        /// Grants this computer no longer holds, answered as the plugin does once the service
+        /// said a grant was unknown or changed. Claiming a grant again holds it again.
+        var droppedGrants: Set<String> = []
         func request(_ suffix: String, method: String, body: [String: BighelpJSONValue]?, isCurrent: @escaping @MainActor () -> Bool) async throws -> BighelpJSONValue {
             guard isCurrent() else { throw DirectHermesError.secureStorageChanged }
             if offline { throw DirectHermesError.notConnected }
@@ -1561,7 +1596,11 @@ import UserNotifications
                     "profile":.string(profile),"sessionId":.string(session),"enabled":.boolean(true),
                     "sessionReference":.string(ManagedNotificationValidation.sessionReference(profile:profile,session:session))])
             }
+            if method == "GET", suffix.hasPrefix("/enrollments/"), droppedGrants.contains(String(suffix.dropFirst(13))) {
+                throw DirectHostNotificationError.rejected(status: 404, code: "notification_enrollment_inactive")
+            }
             if suffix == "/enroll" {
+                droppedGrants.removeAll()
                 // The plugin's own refusal, as the real client reads `{"detail": {"code": …}}`.
                 if let enrollRejection { throw enrollRejection }
                 sawPinnedClaim = hasPersistedGrant()

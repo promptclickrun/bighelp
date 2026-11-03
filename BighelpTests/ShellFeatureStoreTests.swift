@@ -2187,6 +2187,38 @@ struct ShellFeatureStoreTests {
         #expect(music.isPlaying && music.starts == 1)
     }
 
+    /// Another agent's turn in a Bot Chat ends while the chat is open: the chat reads what Hermes saved.
+    /// It once put the chat list's older copy over the chat instead, and the newest rows (the person's
+    /// last message, the agent's last reply) went until a manual refresh.
+    @Test func aHostTurnReadsSavedHistoryNotTheChatListCopy() async throws {
+        func row(_ id: String, _ role: TimelineRole, _ text: String) -> TimelineItem {
+            TimelineItem(id: id, role: role,
+                         sender: role == .human ? .user(snapshot: .init(name: "You"))
+                            : .agent(id: "finance", snapshot: .init(name: "Juno")),
+                         content: .message(text), metadata: .init(delivery: role == .human ? "Sent" : "Received"))
+        }
+        let listed = SessionRecord(id: "session_bot_chat_0001", kind: .direct, agentIDs: ["finance"], title: "Bot Chat",
+            items: [row("row-1", .human, "Ask Pip about the trip budget"), row("row-2", .assistant, "Asking Pip now.")])
+        var saved = listed
+        saved.items += [row("row-3", .human, "And the hotel?"), row("row-4", .assistant, "Pip says the hotel fits.")]
+        let catalog = SessionCatalogStore(client: SavedHistoryCatalogClient(listed: listed, saved: saved),
+                                          records: [listed])
+        let store = ShellFeatureStore(timing: .immediate, catalog: catalog)
+        let route = AppRoute.chat(conversationID: listed.id)
+        #expect(store.prepare(route))
+        guard case .chat(let model) = store.preparedModel(for: route) else {
+            Issue.record("Expected prepared Chat model")
+            return
+        }
+        model.reconcileHydratedSession(saved)
+        #expect(model.items.map(\.id) == ["row-1", "row-2", "row-3", "row-4"])
+
+        let refresh = try #require(model.hostHistoryRefresh)
+        try await refresh()
+
+        #expect(model.items.map(\.id) == ["row-1", "row-2", "row-3", "row-4"])
+    }
+
     private func makeStore(
         records: [SessionRecord],
         holdMusic: (any VoiceHoldMusicPlaying)? = nil,
@@ -2611,5 +2643,28 @@ private final class CatchUpDashboardSource: DashboardDataSource {
     func loadDashboard() async throws -> DashboardSnapshot {
         loadCount += 1
         return DashboardSnapshot(inbox: [], attentionItems: [], completedItems: [], agents: [])
+    }
+}
+
+/// Hermes' saved history is newer than the chat list's copy of the chat, as right after a turn.
+@MainActor
+private final class SavedHistoryCatalogClient: SessionCatalogClient {
+    private let listed: SessionRecord
+    private let saved: SessionRecord
+
+    init(listed: SessionRecord, saved: SessionRecord) {
+        self.listed = listed
+        self.saved = saved
+    }
+
+    func list() async throws -> [SessionRecord] { [listed] }
+
+    func create(kind: SessionKind, agentIDs: [String]) async throws -> SessionRecord {
+        throw SessionCatalogError.invalidSession
+    }
+
+    func hydratePage(_ record: SessionRecord, offset: Int?, turnLimit: Int) async throws -> SessionHydrationPage {
+        guard offset == nil else { throw SessionCatalogError.invalidSession }
+        return SessionHydrationPage(record: saved, nextOffset: nil)
     }
 }

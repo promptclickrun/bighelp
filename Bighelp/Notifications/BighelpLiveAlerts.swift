@@ -166,6 +166,10 @@ final class BighelpLiveAlertListener {
     private let knownAvatars: @MainActor () -> [String]
     private let pause: @MainActor (Duration) async throws -> Void
     private let now: @MainActor () -> ContinuousClock.Instant
+    /// The computer says this device has no notifications there while the phone thinks it does: once
+    /// a run, the phone checks its setups there and sets them up again (`repairIfDropped`).
+    private let notEnrolled: @MainActor () async -> Void
+    private var reportedNotEnrolled = false
     /// One per run: a newer listen from this device takes over from an older one.
     let listenerID = UUID().uuidString.lowercased()
     private(set) var waitSeconds = BighelpLiveAlertListener.longestWait
@@ -178,13 +182,15 @@ final class BighelpLiveAlertListener {
          present: @escaping @MainActor (BighelpLiveAlert) async -> BighelpLiveAlertPresenter.Outcome,
          knownAvatars: @escaping @MainActor () -> [String] = { BighelpNotificationAvatarCache.shared.hashes() },
          pause: @escaping @MainActor (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
-         now: @escaping @MainActor () -> ContinuousClock.Instant = { ContinuousClock.now }) {
+         now: @escaping @MainActor () -> ContinuousClock.Instant = { ContinuousClock.now },
+         notEnrolled: @escaping @MainActor () async -> Void = {}) {
         self.workspace = workspace
         self.grants = grants
         self.present = present
         self.knownAvatars = knownAvatars
         self.pause = pause
         self.now = now
+        self.notEnrolled = notEnrolled
     }
 
     /// Listens until the task is cancelled (bighelp left the front), then tells the
@@ -214,6 +220,12 @@ final class BighelpLiveAlertListener {
         do {
             response = try await workspace.perform(.liveAlertsListen, payload: listenPayload(grants), owner: owner)
         } catch {
+            if case WorkspaceClientError.rejected(let code, _) = error, code == "live_alerts_not_enrolled",
+               !reportedNotEnrolled {
+                reportedNotEnrolled = true
+                await notEnrolled()
+                return .again
+            }
             return next(after: error, heldFor: now() - started)
         }
         failures = 0
@@ -316,7 +328,11 @@ extension BighelpLiveAlertListener {
         let listener = BighelpLiveAlertListener(
             workspace: { connections.workspace },
             grants: { connections.selectedDirectHost.map(service.liveAlertGrants(host:)) ?? [] },
-            present: { await presenter.present($0) }
+            present: { await presenter.present($0) },
+            notEnrolled: {
+                guard let host = connections.selectedDirectHost else { return }
+                await service.repairIfDropped(host: host, force: true)
+            }
         )
         await listener.run()
     }

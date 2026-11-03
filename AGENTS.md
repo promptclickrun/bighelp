@@ -803,6 +803,11 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   names its agent (`?profile=`, `DirectHostNotificationClient(profile:)`); without it a request reached the
   dashboard's own agent. Setup enrolls the agent in use, and opening another agent's chat on a computer with
   notifications on enrolls that agent (`enrollAgentIfNeeded`), never asking for permission.
+- A computer drops a grant for good when the notification service answers its check (`GET /enrollments/<grant>`)
+  with unknown, retired or changed, while the phone still believes it's set up: nothing alerted until someone
+  tapped Set Up Again. The phone asks each computer about its setups (`repairIfDropped`) when it comes to the
+  front (at most hourly), when instant alerts answer `live_alerts_not_enrolled` and when a chat's subscription
+  is refused, and on `notification_enrollment_*` sets up again by itself: Set Up Again's cleanup, then each agent.
 - Every setup failure gets its own code where it happens (`BighelpNotificationErrorCode`, never reused or renumbered);
   the FAQ is [docs/NOTIFICATION_ERROR_CODES.md](docs/NOTIFICATION_ERROR_CODES.md).
 

@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 struct BighelpManagedNotificationSetupError: Error, LocalizedError, Equatable, Sendable {
     enum Stage: String, Equatable, Sendable {
@@ -87,6 +88,9 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
     private let sealedSenders: BighelpSealedAlertSenderStore
     private let defaults: UserDefaults
     private var enrolling = Set<String>()
+    /// Computers whose setup is being checked or repaired now, and when each was last checked.
+    private var repairing = Set<String>()
+    private var repairChecks: [String: Date] = [:]
     private var revocationInFlight = false
     private var opening: UUID?
     private var retiredHosts = Set<String>()
@@ -462,6 +466,10 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
 
     /// Subscription begins only after the actual native chat has opened/recovered.
     func onChatOpened(host: BighelpConfiguredHost, chat: DirectHermesChat) async throws {
+        try await onChatOpened(host: host, chat: chat, mayRepair: true)
+    }
+
+    private func onChatOpened(host: BighelpConfiguredHost, chat: DirectHermesChat, mayRepair: Bool) async throws {
         let profile = chat.client.profile; let session = chat.client.storedID
         guard ManagedNotificationValidation.coordinate(session) else { return }
         // Opening a chat never turns notifications on. A computer that has them on for one agent
@@ -502,9 +510,19 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         _ = try? await syncQuietHours(host: host, profile: profile, grant: grant, client: client,
                                       isCurrent: { (try? self.requireCurrent(host, credentials: credentials)) != nil })
         try requireCurrent(host, credentials: credentials)
-        let value = try await client.request("/enrollments/\(grant.grantId)/sessions", method: "PUT", body: [
-            "version": .integer(1), "profile": .string(profile), "sessionId": .string(session), "enabled": .boolean(true)
-        ], isCurrent: { (try? self.requireCurrent(host, credentials: credentials)) != nil })
+        let value: BighelpJSONValue
+        do {
+            value = try await client.request("/enrollments/\(grant.grantId)/sessions", method: "PUT", body: [
+                "version": .integer(1), "profile": .string(profile), "sessionId": .string(session), "enabled": .boolean(true)
+            ], isCurrent: { (try? self.requireCurrent(host, credentials: credentials)) != nil })
+        } catch DirectHostNotificationError.rejected(let status, let code)
+                    where (status == 403 || status == 404) && code.hasPrefix("notification_") {
+            // The computer no longer holds this setup: set it up again, then subscribe this chat.
+            guard mayRepair, await repairIfDropped(host: host, force: true) else {
+                throw DirectHostNotificationError.rejected(status: status, code: code)
+            }
+            return try await onChatOpened(host: host, chat: chat, mayRepair: false)
+        }
         try requireCurrent(host, credentials: credentials)
         guard let object = value.object, object["grantId"]?.string == grant.grantId,
               object["profile"]?.string == profile, object["sessionId"]?.string == session,
@@ -516,6 +534,70 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         }
         record = current; record.subscriptions.insert(session); try ledger.save(record)
     }
+
+    /// Asks the computer about each of this phone's setups there and, if it no longer holds one, sets
+    /// notifications up again by itself: the cleanup of Set Up Again, then each agent that had them on.
+    /// A computer that removed a grant (the service said it was unknown, retired or changed) kept the
+    /// phone believing it was set up, and its replies stopped alerting until someone tapped Set Up Again.
+    /// Checks a computer at most once every `repairCheckInterval`, unless `force` (a refusal just seen).
+    @discardableResult
+    func repairIfDropped(host: BighelpConfiguredHost, force: Bool = false) async -> Bool {
+        let key = host.notificationScope + ":" + host.hostConnectionID
+        guard !turnOffPending, !repairing.contains(key) else { return false }
+        let records = ledger.enrollments.filter {
+            $0.accountScope == host.notificationScope && $0.hostConnectionID == host.hostConnectionID
+                && $0.enabled && !$0.revokePending && $0.grant != nil
+        }
+        guard !records.isEmpty else { return false }
+        let checkedAt = now()
+        if !force, let last = repairChecks[key], checkedAt.timeIntervalSince(last) < Self.repairCheckInterval { return false }
+        repairChecks[key] = checkedAt
+        repairing.insert(key)
+        defer { repairing.remove(key) }
+        var dropped: String?
+        for record in records {
+            guard let grant = record.grant, let client = try? hostClient(host, record.profile) else { continue }
+            do {
+                _ = try await client.request("/enrollments/" + grant.grantId, method: "GET", body: nil, isCurrent: { true })
+            } catch DirectHostNotificationError.rejected(let status, let code)
+                        where (status == 403 || status == 404) && code.hasPrefix("notification_") {
+                dropped = code
+                break
+            } catch {
+                // Offline, a reconnect, an older plugin: nothing says the setup is gone.
+            }
+        }
+        guard let dropped, let connection = try? registry.credentialVault(for: host).load() else { return false }
+        Self.repairLog.notice("The computer dropped this phone's notification setup (\(dropped, privacy: .public)); setting up again")
+        let profiles = records.map(\.profile)
+        await resetHost(host)
+        var repaired = false
+        for profile in profiles {
+            do {
+                repaired = try await enroll(host: host, connection: connection, agent: profile,
+                                            isCurrent: { !Task.isCancelled }) == .enabled || repaired
+            } catch let failure as BighelpNotificationSetupFailure {
+                failure.log()
+            } catch {}
+        }
+        if repaired, var current = registry.hosts.first(where: { $0.id == host.id }) {
+            current.notificationState = .enabled
+            try? registry.update(current)
+        }
+        return repaired
+    }
+
+    /// The computers this phone has notifications on for.
+    func hostsWithNotifications() -> [BighelpConfiguredHost] {
+        registry.hosts.filter { host in
+            ledger.enrollments.contains {
+                $0.accountScope == host.notificationScope && $0.hostConnectionID == host.hostConnectionID && $0.enabled
+            }
+        }
+    }
+
+    static let repairCheckInterval: TimeInterval = 3_600
+    private static let repairLog = Logger(subsystem: "app.loopdy.mobile", category: "NotificationSetup")
 
     /// Sets up `profile` on `host` when the phone has notifications on for another agent there.
     /// The computer keeps one notification journal per agent, and an agent's replies alert only

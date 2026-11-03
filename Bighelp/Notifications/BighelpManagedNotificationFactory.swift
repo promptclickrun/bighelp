@@ -177,6 +177,11 @@ struct BighelpManagedNotificationIntegration {
                 // shown. After BuzzKit identified, because the person's alert choices come from BuzzKit.
                 await service.pushRegistrar?.refreshAtForeground()
                 try await recoverDelivery(isCurrent)
+                // A computer that dropped this phone's setup is set up again here, without Set Up Again.
+                for host in service.hostsWithNotifications() {
+                    guard isCurrent() else { break }
+                    await service.repairIfDropped(host: host)
+                }
             },
             // A content-free wake reconciles existing delivery state. It must
             // not re-identify the shared provider and invalidate enrollment.

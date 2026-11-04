@@ -88,5 +88,11 @@
     "name": "Snap",
     "role": "Catches the moment",
     "file": "bitty-bots-snap.svg"
+  },
+  {
+    "id": "bitty-bots-big-red",
+    "name": "Big Red",
+    "role": "Never misses a kickoff",
+    "file": "bitty-bots-big-red.svg"
   }
 ]

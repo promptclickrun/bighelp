@@ -23,7 +23,7 @@ paths return 404. Do not give the app Cloudflare credentials or cookies.
 |---|---|---|---:|---|
 | bighelp | bighelp | bighelp | 10 | none |
 | bighelp | bighelp | pocket-curios | 20 | none |
-| bighelp | bighelp | bitty-bots | 15 | none |
+| bighelp | bighelp | bitty-bots | 16 | none |
 | faces | Faces | faces | 10 | none |
 | shapes | Shapes | shapes | 8 | none |
 | seasonal | Seasonal | halloween | 10 | 2026-11-03T00:00:00-06:00 |
@@ -77,7 +77,7 @@ from the supplied authored packs in `sources/packs/`, including all seven states
 static conversions. Their idle style is the fallback for other states. Legacy SVG/PNG assets remain
 source previews; render the JSON for authoritative authored appearance and state-aware previews.
 Pocket Curios, Bitty Bots, Thanksgiving and Christmas SVG/PNG previews are derived from their native idle JSON
-with the backdrop disc off (`scripts/preview-svg.py`). Pocket Curios' 20 and Bitty Bots' 15 characters are permanent
+with the backdrop disc off (`scripts/preview-svg.py`). Pocket Curios' 20 and Bitty Bots' 16 characters are permanent
 additions under the first-party bighelp category, with no expiry.
 
 Bitty Bots, Thanksgiving and Christmas characters are one color each: the art uses only `@p`, `@ink` and shade

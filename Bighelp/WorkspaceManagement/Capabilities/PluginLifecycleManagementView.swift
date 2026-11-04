@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Plugins as a storefront (Settings › Hermes tools › Plugins): search, an official plugin, the official and verified ones, then a shelf per topic. A card opens the plugin's page,
+/// Plugins as a storefront (Settings › Hermes tools › Plugins): search, this week's featured plugin, the
+/// official and verified ones, the most starred and newest, then a shelf per topic. A card opens the plugin's page,
 /// whose one Install button installs the pinned commit it shows. Installed plugins are a toolbar
 /// button away.
 @MainActor
@@ -61,8 +62,9 @@ struct PluginLifecycleManagementView: View {
         }
         if let hero = storefront.hero {
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                // Hermes has no featured list: this is the first official plugin it lists.
-                Text("Official pick")
+                // Nous' pick of the week, as the marketplace shows it; without the plugin's facts, the
+                // first official plugin Hermes lists.
+                Text(storefront.heroIsFeatured ? "Featured" : "Official pick")
                     .font(.bighelp(.footnote, weight: .bold))
                     .tracking(0.6)
                     .textCase(.uppercase)
@@ -76,6 +78,12 @@ struct PluginLifecycleManagementView: View {
         }
         if !storefront.trusted.isEmpty {
             shelf(String(localized: "Official and verified"), id: "trusted", entries: storefront.trusted, count: nil)
+        }
+        if !storefront.popular.isEmpty {
+            shelf(String(localized: "Popular"), id: "popular", entries: storefront.popular, count: nil)
+        }
+        if !storefront.recent.isEmpty {
+            shelf(String(localized: "New this month"), id: "recent", entries: storefront.recent, count: nil)
         }
         ForEach(storefront.shelves) { shelf in
             BighelpDeferredSection {
@@ -317,7 +325,8 @@ private extension PluginChange.Kind {
     }
 }
 
-/// One installed plugin: its switch, its setup, update from Git, Advanced details and Remove.
+/// One installed plugin: its switch, its setup, update from Git (and what Hermes asks before one),
+/// Advanced details and Remove.
 @MainActor
 struct InstalledPluginDetailView: View {
     @Bindable var model: PluginLifecycleManagementModel
@@ -378,6 +387,8 @@ struct InstalledPluginDetailView: View {
         .bighelpFormSurface()
         .navigationTitle(pluginName)
         .navigationBarTitleDisplayMode(.inline)
+        // A question left open asks about an update the person walked away from.
+        .onDisappear { if model.updateQuestion?.pluginName == pluginName { model.dismissUpdateQuestion() } }
         .confirmationDialog("Remove this plugin?", isPresented: $confirmsRemoval, titleVisibility: .visible) {
             if let plugin {
                 Button("Remove \(plugin.name)", role: .destructive) {
@@ -411,7 +422,62 @@ struct InstalledPluginDetailView: View {
                     Task { await model.update(plugin) }
                 }
                 .disabled(model.isBusy)
+                .accessibilityIdentifier("plugins.installed.update")
+            }
+            if let question = model.updateQuestion, question.pluginName == plugin.name {
+                updateQuestionSection(question)
             }
         }
     }
+
+    /// Hermes stopped before the update to ask: what it adds, or what its security check found.
+    private func updateQuestionSection(_ question: PluginUpdateQuestion) -> some View {
+        Section {
+            Text(Self.questionText(question.kind))
+                .font(.bighelp(.body, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+            ForEach(question.additions, id: \.self) { line in
+                Text(line)
+                    .font(.bighelp(.footnote).monospaced())
+                    .textSelection(.enabled)
+            }
+            ForEach(question.findings.prefix(20)) { finding in
+                VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                    Text("\(finding.severity.capitalized) · \(finding.category)")
+                        .font(.bighelp(.footnote, weight: .semibold))
+                    Text([finding.detail, finding.file.isEmpty ? nil
+                          : finding.line.map { "\(finding.file):\($0)" } ?? finding.file]
+                        .compactMap { $0 }.joined(separator: "\n"))
+                        .font(.bighelp(.footnote))
+                        .foregroundStyle(theme.secondaryText)
+                        .textSelection(.enabled)
+                }
+            }
+            if let approval = question.approval {
+                Button(approval == .capabilities ? "Update and allow them" : "Update anyway") {
+                    Task { await model.answerUpdateQuestion() }
+                }
+                .disabled(model.isBusy)
+                .accessibilityIdentifier("plugins.installed.update.approve")
+            }
+            Button(question.approval == nil ? "OK" : "Not now", role: .cancel) { model.dismissUpdateQuestion() }
+                .disabled(model.isBusy)
+        } header: {
+            Text("Hermes asks first")
+        } footer: {
+            if let words = question.message.sentence { Text(words) }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("plugins.installed.update.question")
+    }
+
+    static func questionText(_ kind: PluginUpdateQuestion.Kind) -> String {
+        switch kind {
+        case .addsCapabilities: String(localized: "This update adds new parts to the plugin. Nothing changes until you allow them.")
+        case .scanCaution: String(localized: "Hermes' security check found things to look at in this update. Nothing changes until you choose.")
+        case .scanBlocked: String(localized: "Hermes' security check blocked this update, so Hermes won't install it.")
+        }
+    }
+
+    @BighelpThemeReader private var theme
 }

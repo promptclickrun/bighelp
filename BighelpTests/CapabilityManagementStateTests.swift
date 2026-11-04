@@ -294,7 +294,9 @@ private final class CapabilityStateFixture: SkillsHubManagementClient, MCPManage
     func cancelOAuth(flowID: String) async throws -> MCPOAuthFlow.Status { throw ProbeError.failed }
     func installCatalog(name: String, expectedCommitSHA: String) async throws -> InstalledPlugin { throw ProbeError.failed }
     func setEnabled(_ enabled: Bool, pluginName: String) async throws -> InstalledPlugin { throw ProbeError.failed }
-    func update(pluginName: String) async throws -> InstalledPlugin { throw ProbeError.failed }
+    func update(pluginName: String, approvals: Set<PluginUpdateApproval>) async throws -> PluginUpdateResult {
+        throw ProbeError.failed
+    }
     func remove(pluginName: String) async throws { throw ProbeError.failed }
     func setEnabled(_ enabled: Bool, name: String) async throws -> ToolsetSummary { throw ProbeError.failed }
     func selectProvider(_ provider: String, name: String, capability: ToolsetWebCapability?) async throws -> ToolsetDetail { throw ProbeError.failed }

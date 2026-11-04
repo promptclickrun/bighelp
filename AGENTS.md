@@ -343,6 +343,13 @@ change in both repos.
   rail (`ChatSentFileLine`), exactly what a reread rebuilds. A host path or `@file:` ref never shows as text; a
   tap opens the bot's Files on the file (`BotProfileOpening.file`, `SimpleBotFilesModel.reveal`), a long press
   shows the path. Hosts without the feature keep the 8 MiB limit and say to update the plugin.
+- **Plugins and Hermes' marketplace:** the host's catalog route has no stars, featured picks or dates. The plugin's
+  `marketplace/plugins` (`native-marketplace-v1`) reads them from Hermes' marketplace feed and adds Hermes' own
+  install check (`installRefusal`), so Install goes off without the app comparing versions. The featured pick
+  turns weekly exactly as Hermes' `featuredPicks` does (`PluginStorefront.featuredPicks`), so bighelp, the website
+  and Hermes Desktop feature the same plugin. An update can stop and ask (`consent_required`, a caution
+  `scan_blocked`): that's a `PluginUpdateQuestion`, never an error, and each retry sends every yes so far. A
+  refused plugin change's 400 `detail` shows as Hermes' words (`DirectHermesHTTP.pluginChangeRefusal`).
 - **Each agent's own files:** the plugin's `workspace-files/*` routes take an optional `profile` (plugin 3.20.0,
   `native-workspace-files-agents-v1`) and read that agent's working folder with the same refusals. A bot's Files
   tab sends its ID (`DirectHermesManagedFilesClient(agentID:)`); the serving agent never names itself, so older

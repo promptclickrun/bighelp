@@ -285,11 +285,48 @@ struct PluginCatalogCard: View {
             }
             // In a shelf the card is as tall as the row's tallest, and Get sits at the bottom.
             Spacer(minLength: 0)
-            CatalogGetLabel(text: entry.isInstalled ? String(localized: "Open") : String(localized: "Get"),
-                            prominent: !entry.isInstalled)
+            // Get and the stars share a line, or stack when large text leaves no room for both.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: BighelpTokens.space8) {
+                    getLabel
+                    Spacer(minLength: 0)
+                    stars
+                }
+                VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                    getLabel
+                    stars
+                }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .contentShape(.rect)
+    }
+
+    private var getLabel: some View {
+        CatalogGetLabel(text: entry.isInstalled ? String(localized: "Open") : String(localized: "Get"),
+                        prominent: !entry.isInstalled)
+    }
+
+    @ViewBuilder
+    private var stars: some View {
+        if let stars = entry.marketplace.stars, stars > 0 { CatalogStars(count: stars) }
+    }
+
+    @BighelpThemeReader private var theme
+}
+
+/// A plugin's GitHub stars, from Hermes' marketplace: "★ 4.1K".
+struct CatalogStars: View {
+    let count: Int
+
+    var body: some View {
+        Label(count.formatted(.number.notation(.compactName)), systemImage: "star.fill")
+            .labelStyle(.titleAndIcon)
+            .font(.bighelp(.caption, weight: .semibold))
+            .foregroundStyle(theme.secondaryText)
+            .lineLimit(1)
+            .fixedSize()
+            .accessibilityLabel(Text("\(count.formatted()) stars on GitHub"))
     }
 
     @BighelpThemeReader private var theme

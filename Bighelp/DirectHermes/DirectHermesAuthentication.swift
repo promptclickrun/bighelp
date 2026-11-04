@@ -481,6 +481,17 @@ final class DirectHermesHTTP {
         return .rpcRejected(code: status, message: HermesRefusalMessage(detail))
     }
 
+    /// Hermes refuses a plugin install, update or removal with a 400 whose `detail` says why in words
+    /// people can act on ("lantern needs Hermes >=0.23.0; this is 0.22.6. Update Hermes…"), so the
+    /// plugin pages show them instead of a generic failure.
+    static func pluginChangeRefusal(_ request: DirectHermesHTTPRequest, _ response: Response) -> DirectHermesError? {
+        guard response.http.statusCode == 400, request.method == .post || request.method == .delete,
+              request.path.hasPrefix("/api/dashboard/agent-plugins/"),
+              let detail = (try? response.object())?["detail"]?.string else { return nil }
+        let message = HermesRefusalMessage(detail)
+        return message.text == nil ? nil : .rpcRejected(code: 400, message: message)
+    }
+
     /// Hermes' `detail` is a bare reason (`revision_conflict`) or a reason, a colon and words
     /// (`client_upgrade_required: …`).
     static func sessionEditReason(_ text: String) -> String? {

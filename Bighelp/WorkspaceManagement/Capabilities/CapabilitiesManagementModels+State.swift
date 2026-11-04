@@ -472,6 +472,10 @@ final class PluginLifecycleManagementModel: CapabilityOperationState {
     fileprivate(set) var successMessage: String?
     /// The change under way on an installed plugin, so its page says what's happening.
     private(set) var change: PluginChange?
+    /// What Hermes asked before the last update, until the person answers or leaves it.
+    private(set) var updateQuestion: PluginUpdateQuestion?
+    /// The yes answers given to this update's questions so far, sent again with each retry.
+    @ObservationIgnored private var updateApprovals: Set<PluginUpdateApproval> = []
 
     @ObservationIgnored private let client: any PluginLifecycleManagementClient
     @ObservationIgnored private let keptCopies: CapabilitiesKeptCopies?
@@ -543,14 +547,43 @@ final class PluginLifecycleManagementModel: CapabilityOperationState {
         }
     }
 
+    /// Updates `plugin`. If Hermes asks first (new tools or hooks, scan findings), its question stays in
+    /// `updateQuestion` and nothing changes until `answerUpdateQuestion()`.
     func update(_ plugin: InstalledPlugin) async {
+        updateApprovals = []
+        await runUpdate(plugin)
+    }
+
+    /// The person's yes to `updateQuestion`: the same update again, with every yes so far.
+    func answerUpdateQuestion() async {
+        guard let question = updateQuestion, let approval = question.approval,
+              let plugin = snapshot?.installed.first(where: { $0.name == question.pluginName }) else { return }
+        updateApprovals.insert(approval)
+        await runUpdate(plugin)
+    }
+
+    func dismissUpdateQuestion() {
+        updateQuestion = nil
+        updateApprovals = []
+    }
+
+    private func runUpdate(_ plugin: InstalledPlugin) async {
+        updateQuestion = nil
+        var updated = false
         await change(.updating, plugin) {
-            let confirmed = try await client.update(pluginName: plugin.name)
-            replaceInstalled(plugin.name, with: confirmed)
-            successMessage = "Hermes updated the selected plugin and confirmed it is still installed."
+            switch try await client.update(pluginName: plugin.name, approvals: updateApprovals) {
+            case .updated(let confirmed):
+                replaceInstalled(plugin.name, with: confirmed)
+                successMessage = "Hermes updated the selected plugin and confirmed it is still installed."
+                updated = true
+            case .asks(let question):
+                updateQuestion = question
+            }
         }
+        guard updated else { return }
+        updateApprovals = []
         // Update available and the pinned commit come from the catalog.
-        if errorMessage == nil { readCatalogAgain() }
+        readCatalogAgain()
     }
 
     func remove(_ plugin: InstalledPlugin) async {

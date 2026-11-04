@@ -2,7 +2,8 @@ import SwiftUI
 
 /// A catalog plugin's page: banner, tier and topic, name and maintainer, one Install button, then
 /// what installing it brings (the tools and hooks it declares, the keys it needs, the pinned
-/// commit) before its description and screenshots. Install installs exactly that commit.
+/// commit) before its description and screenshots. Install installs exactly that commit; it is off
+/// when the computer's own check says Hermes there won't install it (`installRefusal`).
 @MainActor
 struct PluginCatalogPageView: View {
     @Bindable var model: PluginLifecycleManagementModel
@@ -33,6 +34,11 @@ struct PluginCatalogPageView: View {
                         CatalogBadge(text: entry.tier, style: .tier)
                         CatalogBadge(text: entry.catalogCategory.title)
                         if let version = entry.version { CatalogBadge(text: "v\(version)") }
+                        if entry.marketplace.featuredRank != nil { CatalogBadge(text: String(localized: "Featured")) }
+                        if let stars = entry.marketplace.stars, stars > 0 {
+                            CatalogBadge(text: String(localized: "★ \(stars.formatted(.number.notation(.compactName)))"))
+                                .accessibilityLabel(Text("\(stars.formatted()) stars on GitHub"))
+                        }
                         if entry.updateAvailable { CatalogBadge(text: String(localized: "Update available")) }
                     }
                     .accessibilityElement(children: .combine)
@@ -122,6 +128,15 @@ struct PluginCatalogPageView: View {
                     Label("Installed", systemImage: "checkmark.circle")
                         .font(.bighelp(.body, weight: .semibold))
                 }
+            } else if let refusal = entry.marketplace.installRefusal {
+                CatalogPrimaryButton(title: String(localized: "Install on \(hostName)"), isEnabled: false) {}
+                    .accessibilityIdentifier("plugin.install")
+                Text(HermesRefusalMessage(refusal).sentence ?? refusal)
+                    .font(.bighelp(.footnote))
+                    .foregroundStyle(theme.secondaryText)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("plugin.install.refusal")
             } else {
                 CatalogPrimaryButton(title: model.isBusy ? String(localized: "Installing…")
                                                          : String(localized: "Install on \(hostName)"),
@@ -173,6 +188,15 @@ struct PluginCatalogPageView: View {
                 if !entry.requiredHermesVersion.isEmpty {
                     CatalogFactDivider()
                     CatalogFactRow(title: String(localized: "Needs Hermes"), value: entry.requiredHermesVersion)
+                }
+                if let added = entry.marketplace.addedAt {
+                    CatalogFactDivider()
+                    CatalogFactRow(title: String(localized: "Added"), value: added.formatted(date: .abbreviated, time: .omitted))
+                }
+                if let updated = entry.marketplace.updatedAt {
+                    CatalogFactDivider()
+                    CatalogFactRow(title: String(localized: "Last changed"),
+                                   value: updated.formatted(date: .abbreviated, time: .omitted))
                 }
                 if !entry.knownIssues.isEmpty {
                     CatalogFactDivider()

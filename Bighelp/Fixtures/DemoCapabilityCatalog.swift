@@ -228,7 +228,7 @@ final class DemoCapabilityCatalogHost: DirectHermesAuthenticatedHTTP {
             return .object(["ok": .boolean(true), "action": .string("skills-update")])
         default:
             if path.hasPrefix("/api/dashboard/agent-plugins/") {
-                return try pluginAction(path)
+                return try pluginAction(path, body: request.body)
             }
             throw WorkspaceClientError.invalidRequest
         }
@@ -276,11 +276,21 @@ final class DemoCapabilityCatalogHost: DirectHermesAuthenticatedHTTP {
         return .object(row)
     }
 
-    private func pluginAction(_ path: String) throws -> BighelpJSONValue {
+    private func pluginAction(_ path: String, body: [String: BighelpJSONValue]?) throws -> BighelpJSONValue {
         let parts = path.split(separator: "/").map(String.init)
         guard parts.count >= 4 else { throw WorkspaceClientError.invalidRequest }
         let name = parts[3]
         let action = parts.count > 4 ? parts[4] : "remove"
+        // Scene Builder's next pin adds a tool, so Hermes asks first, as it does for a real re-pin.
+        if action == "update", name == "scene-builder", body?["accept_capabilities"]?.boolean != true {
+            return .object([
+                "ok": .boolean(false), "consent_required": .boolean(true), "name": .string(name),
+                "sha": .string(Self.sha("scene-builder-next")),
+                "error": .string("Updating 'scene-builder' to \(Self.sha("scene-builder-next").prefix(8)) adds tools: scene_export. Confirm to continue."),
+                "delta": .object(["tools": .array([.string("scene_export")])]),
+                "delta_lines": .array([.string("tools: scene_export")]),
+            ])
+        }
         if let index = bundledPlugins.firstIndex(where: { $0.name == name }), action != "remove" {
             bundledPlugins[index].enabled = action == "enable"
         } else if let index = plugins.firstIndex(where: { $0.name == name }), action == "remove" {
@@ -297,6 +307,23 @@ final class DemoCapabilityCatalogHost: DirectHermesAuthenticatedHTTP {
     }
 
     static func banner(_ name: String) -> String { "https://example.com/bighelp-demo-banner/\(name).png" }
+
+    /// Made-up marketplace facts for the demo catalog (`DemoPluginMarketplace`).
+    static func marketplaceFacts(now: Date = .now) -> [String: PluginMarketplaceFacts] {
+        let day: TimeInterval = 24 * 60 * 60
+        return [
+            "recall": .init(stars: 4_120, featuredRank: 1, addedAt: now - 120 * day, updatedAt: now - 3 * day),
+            "voice-studio": .init(stars: 4_120, featuredRank: 2, addedAt: now - 9 * day, updatedAt: now - 2 * day),
+            "notes-to-tasks": .init(stars: 860, featuredRank: 3, addedAt: now - 4 * day, updatedAt: now - 4 * day),
+            "memory-wiki": .init(stars: 4_120, addedAt: now - 200 * day, updatedAt: now - 40 * day),
+            "scene-builder": .init(stars: 2_310, addedAt: now - 60 * day, updatedAt: now - 6 * day),
+            "local-models": .init(stars: 18_400, addedAt: now - 15 * day, updatedAt: now - 1 * day,
+                                  installRefusal: "local-models needs Hermes >=0.30.0; this is 0.22.6. Update Hermes (`hermes update`) and install again."),
+            "habit-memory": .init(stars: 9_870, addedAt: now - 300 * day, updatedAt: now - 90 * day),
+            "price-watch": .init(stars: 42, addedAt: now - 2 * day, updatedAt: now - 2 * day),
+            "model-router": .init(stars: 1_204, addedAt: now - 75 * day, updatedAt: now - 20 * day),
+        ]
+    }
 
     // MARK: Skills
 
@@ -328,5 +355,11 @@ private extension String {
     func cycled(to length: Int) -> String {
         String((0..<length).map { Array(self)[$0 % count] })
     }
+}
+
+/// Demo runs: the marketplace facts the bighelp plugin adds, for the made-up catalog.
+@MainActor
+final class DemoPluginMarketplace: PluginMarketplaceReading {
+    func plugins() async -> [String: PluginMarketplaceFacts]? { DemoCapabilityCatalogHost.marketplaceFacts() }
 }
 #endif

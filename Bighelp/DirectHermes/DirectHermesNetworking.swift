@@ -425,6 +425,7 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
             guard generation == owner, !terminallyClosed else { throw WorkspaceClientError.ownerChanged }
             try Task.checkCancellation()
             if let refusal = DirectHermesHTTP.sessionEditRefusal(request, response) { throw refusal }
+            if let refusal = DirectHermesHTTP.pluginChangeRefusal(request, response) { throw refusal }
             try DirectHermesHTTP.requireSuccess(response)
             let value = try await response.parsedValue()
             guard generation == owner, !terminallyClosed else { throw WorkspaceClientError.ownerChanged }

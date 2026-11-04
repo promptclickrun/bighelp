@@ -8,18 +8,39 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
 
     private let http: any DirectHermesAuthenticatedHTTP
     private let currentOwner: @MainActor () -> WorkspaceOwner?
+    private let marketplace: (any PluginMarketplaceReading)?
 
+    /// `marketplace` adds Hermes' marketplace facts (stars, featured picks, install refusals) to the
+    /// catalog; without it the storefront goes by the catalog alone.
     init(
         http: any DirectHermesAuthenticatedHTTP,
         owner: WorkspaceOwner,
-        currentOwner: @escaping @MainActor () -> WorkspaceOwner?
+        currentOwner: @escaping @MainActor () -> WorkspaceOwner?,
+        marketplace: (any PluginMarketplaceReading)? = nil
     ) {
         self.http = http
         self.owner = owner
         self.currentOwner = currentOwner
+        self.marketplace = marketplace
     }
 
     func load() async throws -> PluginSnapshot {
+        async let facts = marketplace?.plugins()
+        let snapshot = try await loadCatalog()
+        guard let facts = await facts, !facts.isEmpty else { return snapshot }
+        try requireOwner()
+        return PluginSnapshot(
+            installed: snapshot.installed,
+            catalog: snapshot.catalog.map { entry in
+                var entry = entry
+                entry.marketplace = facts[entry.name] ?? PluginMarketplaceFacts()
+                return entry
+            },
+            removedCatalogEntries: snapshot.removedCatalogEntries, skippedCatalogRows: snapshot.skippedCatalogRows)
+    }
+
+    /// The host's lists alone, for the reads an install checks itself against.
+    private func loadCatalog() async throws -> PluginSnapshot {
         async let installedValue = loadInstalled()
         async let catalogValue = request(.catalog)
         let installed = try await installedValue
@@ -50,7 +71,7 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
     func installCatalog(name: String, expectedCommitSHA: String) async throws -> InstalledPlugin {
         let name = try CapabilitiesPayload.identifier(name, maximumBytes: 64)
         let expectedCommitSHA = try commit(expectedCommitSHA)
-        let before = try await load()
+        let before = try await loadCatalog()
         guard let entry = before.catalog.first(where: { $0.name == name }),
               entry.commitSHA == expectedCommitSHA, !entry.isInstalled, entry.removedReason == nil else {
             throw CapabilitiesManagementError.invalidRequest
@@ -63,7 +84,7 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
             "ref": .string(expectedCommitSHA),
         ]))
         guard payload["ok"]?.boolean == true else { throw CapabilitiesManagementError.invalidResponse }
-        let after = try await load()
+        let after = try await loadCatalog()
         guard let catalogReadback = after.catalog.first(where: { $0.name == name }),
               catalogReadback.isInstalled, catalogReadback.commitSHA == expectedCommitSHA,
               catalogReadback.runtimeStatus == "enabled" else {
@@ -87,17 +108,26 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
         return plugin
     }
 
-    func update(pluginName: String) async throws -> InstalledPlugin {
+    /// Hermes may stop before changing anything and ask: a new catalog pin that adds tools or hooks, or a
+    /// security scan with findings. Its question comes back as `.asks`, and the same update with the
+    /// person's yes in `approvals` applies it.
+    func update(pluginName: String, approvals: Set<PluginUpdateApproval>) async throws -> PluginUpdateResult {
         let name = try pluginNameValue(pluginName)
         guard let plugin = try await loadInstalled().first(where: { $0.name == name }), plugin.canUpdate else {
             throw CapabilitiesManagementError.invalidRequest
         }
-        let payload = try await request(.update(name: name))
-        guard payload["ok"]?.boolean == true else { throw CapabilitiesManagementError.invalidResponse }
+        let payload = try await request(.update(name: name, approvals: approvals))
+        guard payload["ok"]?.boolean == true else {
+            if let question = Self.updateQuestion(payload, pluginName: name) { return .asks(question) }
+            if let words = HermesRefusalMessage(payload["error"]?.string).sentence {
+                throw CapabilitiesManagementError.rejected(words)
+            }
+            throw CapabilitiesManagementError.invalidResponse
+        }
         guard let readback = try await loadInstalled().first(where: { $0.name == name }) else {
             throw CapabilitiesManagementError.readbackFailed
         }
-        return readback
+        return .updated(readback)
     }
 
     func remove(pluginName: String) async throws {
@@ -116,7 +146,8 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
     private enum Route {
         case hub, catalog, rescan
         case install(body: [String: BighelpJSONValue])
-        case enable(name: String), disable(name: String), update(name: String), remove(name: String)
+        case enable(name: String), disable(name: String), remove(name: String)
+        case update(name: String, approvals: Set<PluginUpdateApproval>)
 
         var isCapabilityProbe: Bool {
             switch self {
@@ -142,8 +173,13 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
                 return DirectHermesHTTPRequest(path: "/api/dashboard/agent-plugins/\(name)/enable", method: .post)
             case .disable(let name):
                 return DirectHermesHTTPRequest(path: "/api/dashboard/agent-plugins/\(name)/disable", method: .post)
-            case .update(let name):
-                return DirectHermesHTTPRequest(path: "/api/dashboard/agent-plugins/\(name)/update", method: .post)
+            case .update(let name, let approvals):
+                // Hermes' answers to its own questions: `consent_required` and a caution `scan_blocked`.
+                var body: [String: BighelpJSONValue] = [:]
+                if approvals.contains(.capabilities) { body["accept_capabilities"] = .boolean(true) }
+                if approvals.contains(.scanFindings) { body["force"] = .boolean(true) }
+                return DirectHermesHTTPRequest(path: "/api/dashboard/agent-plugins/\(name)/update", method: .post,
+                                               body: body.isEmpty ? nil : body)
             case .remove(let name):
                 return DirectHermesHTTPRequest(path: "/api/dashboard/agent-plugins/\(name)", method: .delete)
             }
@@ -160,6 +196,9 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
             throw CapabilitiesManagementError.unsupportedHost("This Hermes host does not expose plugin lifecycle management.")
         } catch DirectHermesError.unsupportedAuthentication {
             throw CapabilitiesManagementError.invalidResponse
+        } catch DirectHermesError.rpcRejected(_, let message) {
+            // Hermes' reason for a refused install or update (`DirectHermesHTTP.pluginChangeRefusal`).
+            throw CapabilitiesManagementError.rejected(message.sentence ?? "Hermes refused this plugin change.")
         }
     }
 
@@ -251,6 +290,39 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
             version: Self.label(row["version"], maximumBytes: 64),
             knownIssues: Self.knownIssues(row["known_issues"])
         )
+    }
+
+    /// Hermes' question in an update it didn't make: the parts a new pin adds, or its scan's findings.
+    nonisolated static func updateQuestion(_ payload: [String: BighelpJSONValue],
+                                           pluginName: String) -> PluginUpdateQuestion? {
+        let message = HermesRefusalMessage(payload["error"]?.string)
+        if payload["consent_required"]?.boolean == true {
+            var lines = (payload["delta_lines"]?.array ?? []).compactMap { label($0, maximumBytes: 2_048) }
+            if lines.isEmpty, let delta = payload["delta"]?.object {
+                lines = delta.keys.sorted().compactMap { surface in
+                    let names = (delta[surface]?.array ?? []).compactMap { label($0, maximumBytes: 256) }
+                    return names.isEmpty ? nil : "\(surface): \(names.prefix(50).joined(separator: ", "))"
+                }
+            }
+            return PluginUpdateQuestion(pluginName: pluginName, kind: .addsCapabilities,
+                                        additions: Array(lines.prefix(20)), findings: [], message: message)
+        }
+        if payload["scan_blocked"]?.boolean == true {
+            let findings = (payload["scan_findings"]?.array ?? []).prefix(100).compactMap(Self.scanFinding)
+            // Only a caution verdict can be applied anyway; anything else stays blocked.
+            let kind: PluginUpdateQuestion.Kind = payload["scan_verdict"]?.string == "caution" ? .scanCaution : .scanBlocked
+            return PluginUpdateQuestion(pluginName: pluginName, kind: kind, additions: [],
+                                        findings: Array(findings), message: message)
+        }
+        return nil
+    }
+
+    private nonisolated static func scanFinding(_ value: BighelpJSONValue) -> SkillHubScanFinding? {
+        guard let row = value.object, let severity = label(row["severity"], maximumBytes: 32),
+              let detail = label(row["description"], maximumBytes: 8_192) else { return nil }
+        let line = row["line"]?.integer.flatMap { (0...10_000_000).contains($0) ? $0 : nil }
+        return SkillHubScanFinding(severity: severity, category: label(row["category"], maximumBytes: 128) ?? "",
+                                   file: label(row["file"], maximumBytes: 4_096) ?? "", line: line, detail: detail)
     }
 
     // The storefront's fields are display-only: a missing or odd value is nil, never a refused row.

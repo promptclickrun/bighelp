@@ -371,6 +371,8 @@ struct PluginCatalogEntry: Identifiable, Equatable, Sendable {
     var screenshotURLs: [URL] = []
     var version: String? = nil
     var knownIssues: [String] = []
+    /// What Hermes' marketplace adds, through the bighelp plugin; empty without it.
+    var marketplace = PluginMarketplaceFacts()
     var id: String { name }
     /// What the storefront calls it: its title, else its catalog name.
     var displayName: String { title ?? name }
@@ -391,12 +393,70 @@ struct InstalledPlugin: Identifiable, Equatable, Sendable {
     var isEnabled: Bool { runtimeStatus == "enabled" }
 }
 
+/// What Hermes' marketplace page shows about a catalog plugin and the host's catalog doesn't: GitHub
+/// stars, the curated featured rank, when it was added and last changed, and, from the computer's own
+/// install check, why Hermes won't install it there (the plugin's `marketplace/plugins` route).
+struct PluginMarketplaceFacts: Equatable, Sendable {
+    var stars: Int?
+    /// 1-based. The storefront features these in turn, a week each, as the marketplace does.
+    var featuredRank: Int?
+    var addedAt: Date?
+    var updatedAt: Date?
+    /// Hermes' own words, like "lantern needs Hermes >=0.23.0; this is 0.22.6. Update Hermes…".
+    var installRefusal: String?
+}
+
+@MainActor
+protocol PluginMarketplaceReading: AnyObject, Sendable {
+    /// Each catalog plugin's facts by catalog name; nil when the computer can't say.
+    func plugins() async -> [String: PluginMarketplaceFacts]?
+}
+
 struct PluginSnapshot: Equatable, Sendable {
     let installed: [InstalledPlugin]
     let catalog: [PluginCatalogEntry]
     let removedCatalogEntries: [String]
     /// Catalog rows that didn't decode and were left out.
     var skippedCatalogRows = 0
+}
+
+/// What Hermes asks before an update it won't make without the person: nothing changed yet.
+struct PluginUpdateQuestion: Equatable, Sendable {
+    enum Kind: Equatable, Sendable {
+        /// The new pin adds tools, hooks or other parts (`consent_required`).
+        case addsCapabilities
+        /// Hermes' security scan found things to look at (`scan_blocked`, verdict caution).
+        case scanCaution
+        /// Hermes' security scan blocked the update; no answer applies it.
+        case scanBlocked
+    }
+
+    let pluginName: String
+    let kind: Kind
+    /// One line per part the update adds, as Hermes words it ("Tools: notes_search, notes_add").
+    let additions: [String]
+    let findings: [SkillHubScanFinding]
+    let message: HermesRefusalMessage
+
+    /// The answer that applies the update, if one does.
+    var approval: PluginUpdateApproval? {
+        switch kind {
+        case .addsCapabilities: .capabilities
+        case .scanCaution: .scanFindings
+        case .scanBlocked: nil
+        }
+    }
+}
+
+/// The person's yes to a `PluginUpdateQuestion`. Each retry sends every yes given so far, so a second
+/// question can't undo the first answer.
+enum PluginUpdateApproval: Hashable, Sendable {
+    case capabilities, scanFindings
+}
+
+enum PluginUpdateResult: Equatable, Sendable {
+    case updated(InstalledPlugin)
+    case asks(PluginUpdateQuestion)
 }
 
 @MainActor
@@ -407,7 +467,7 @@ protocol PluginLifecycleManagementClient: AnyObject {
     func rescan() async throws -> PluginSnapshot
     func installCatalog(name: String, expectedCommitSHA: String) async throws -> InstalledPlugin
     func setEnabled(_ enabled: Bool, pluginName: String) async throws -> InstalledPlugin
-    func update(pluginName: String) async throws -> InstalledPlugin
+    func update(pluginName: String, approvals: Set<PluginUpdateApproval>) async throws -> PluginUpdateResult
     func remove(pluginName: String) async throws
 }
 

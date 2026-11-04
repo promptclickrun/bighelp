@@ -28,20 +28,21 @@ final class CompactChatMenuUITests: BighelpUITestCase {
             options.tap()
             evidence("compact-menu-\(appearance)")
             let rootRows = large
-                ? ["chat.options.model-speed", "chat.options.this-chat", "chat.options.more"]
-                : ["chat.file-changes", "chat.options.model-speed", "chat.options.this-chat", "chat.options.usage", "chat.options.advanced"]
+                ? ["chat.options.model-speed", "chat.options.this-chat", "chat.options.agent", "chat.options.more"]
+                : ["chat.options.model-speed", "chat.rename", "chat.move-project", "chat.files", "chat.edit-current-agent",
+                   "chat.options.usage", "chat.file-changes", "chat.options.advanced"]
             for title in rootRows {
-                let row = app.buttons[title].firstMatch
+                let row = chatMenuElement(title, in: app)
                 XCTAssertTrue(row.waitForExistence(timeout: 5), title)
                 XCTAssertTrue(row.isHittable, "\(title) must be reachable without scrolling")
                 XCTAssertTrue(app.windows.firstMatch.frame.contains(row.frame), "\(title) must fit on screen")
             }
-            app.buttons["chat.options.model-speed"].tap()
-            let fast = app.buttons["chat.fast-mode"].firstMatch
+            chatMenuElement("chat.options.model-speed", in: app).tap()
+            let fast = chatMenuElement("chat.fast-mode", in: app)
             XCTAssertTrue(fast.waitForExistence(timeout: 8))
-            XCTAssertTrue(app.buttons["chat.session-controls"].isHittable)
+            XCTAssertTrue(chatMenuElement("chat.session-controls", in: app).isHittable)
             fast.tap()
-            let on = app.buttons["chat.fast-mode.on"].firstMatch
+            let on = chatMenuElement("chat.fast-mode.on", in: app)
             XCTAssertTrue(on.waitForExistence(timeout: 8))
             XCTAssertTrue(on.isHittable)
             XCTAssertTrue(app.windows.firstMatch.frame.contains(on.frame), "The cost notice must fit, too")
@@ -53,14 +54,13 @@ final class CompactChatMenuUITests: BighelpUITestCase {
             // Demo chats have no native session, so Force refresh is absent.
             // More and This chat still exercise full rows.
             let submenus = large ? [
-                ["chat.options.settings", "chat.files", "chat.edit-current-agent"],
-                ["chat.rename", "chat.appearance"],
+                ["chat.rename", "chat.move-project", "chat.files"],
+                ["chat.switch-agent", "chat.edit-current-agent"],
                 ["chat.file-changes", "chat.options.usage", "chat.options.advanced"],
                 ["chat.provider-usage", "chat.context-window", "chat.compact"],
                 ["chat.options.display"],
                 ["chat.visibility.reasoning", "chat.visibility.tool-calls"]
             ] : [
-                ["chat.rename", "chat.files", "chat.appearance", "chat.edit-current-agent"],
                 ["chat.provider-usage", "chat.context-window", "chat.compact"],
                 ["chat.visibility.reasoning", "chat.visibility.tool-calls"]
             ]
@@ -78,24 +78,28 @@ final class CompactChatMenuUITests: BighelpUITestCase {
         }
     }
 
-    /// Nerd Mode is kept per device, so a Mac or an iPad can have it off while the
-    /// iPhone has it on. Compact is an everyday action: ⋯ › Usage has it there too.
+    /// The ⋯ menu doesn't depend on Nerd Mode: File changes, Advanced and Context window
+    /// show with it off, and Compact works.
     @MainActor
-    func testUsageHasCompactWithNerdModeOff() {
+    func testEveryMenuItemShowsWithNerdModeOff() {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat",
-                               "-loopdy.settings.nerd-mode", "NO"]
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3",
+                               "-test-v3-header-context", "-loopdy.settings.nerd-mode", "NO"]
         app.launch()
         let options = app.buttons["chat.options"].firstMatch
         XCTAssertTrue(options.waitForExistence(timeout: 20))
         options.tap()
-        let usage = app.buttons["chat.options.usage"].firstMatch
+        for identifier in ["chat.file-changes", "chat.options.advanced", "chat.move-project"] {
+            XCTAssertTrue(chatMenuElement(identifier, in: app).waitForExistence(timeout: 5), identifier)
+        }
+        let usage = chatMenuElement("chat.options.usage", in: app)
         XCTAssertTrue(usage.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["chat.options.advanced"].exists, "Advanced stays Nerd Mode's")
         usage.tap()
+        let contextWindow = app.buttons.matching(NSPredicate(
+            format: "identifier == %@ OR label BEGINSWITH %@", "chat.context-window", "Context window")).firstMatch
+        XCTAssertTrue(contextWindow.waitForExistence(timeout: 5), "Context window without Nerd Mode")
         let compact = chatMenuElement("chat.compact", in: app)
         XCTAssertTrue(compact.waitForExistence(timeout: 5), "Usage has Compact without Nerd Mode")
-        XCTAssertFalse(app.buttons["chat.context-window"].exists, "The context window stays Nerd Mode's")
         evidence("usage-nerd-off")
         compact.tap()
         let running = app.descendants(matching: .any)["chat.compaction.running"].firstMatch

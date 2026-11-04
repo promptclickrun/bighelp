@@ -4,7 +4,6 @@ import SwiftUI
 struct PeopleAndChatView: View {
     let model: ChatModel
     let agents: AgentDirectoryStore
-    let appearanceStore: SessionAppearanceStore?
     let nativeSessionControls: NativeSessionControlsPresentation?
     let filesAction: ChatSessionFilesAction?
 
@@ -17,13 +16,11 @@ struct PeopleAndChatView: View {
     init(
         model: ChatModel,
         agents: AgentDirectoryStore,
-        appearanceStore: SessionAppearanceStore? = nil,
         nativeSessionControls: NativeSessionControlsPresentation? = nil,
         filesAction: ChatSessionFilesAction? = nil
     ) {
         self.model = model
         self.agents = agents
-        self.appearanceStore = appearanceStore
         self.nativeSessionControls = nativeSessionControls
         self.filesAction = filesAction
     }
@@ -33,7 +30,6 @@ struct PeopleAndChatView: View {
         ChatSessionSettingsView(
             model: model,
             agents: agents,
-            appearanceStore: appearanceStore,
             nativeSessionControls: nativeSessionControls,
             filesAction: filesAction,
             managementDestination: managementDestination

@@ -93,6 +93,12 @@ extension ChatModel {
         sessionTitle = title
     }
 
+    /// Move to Project…: the project Hermes confirmed, until the chat next reads its session.
+    func applyMovedProject(_ project: HermesWorkspaceSummary) {
+        sourceSession?.workspaceID = project.id
+        sourceSession?.workspaceName = project.name
+    }
+
     func reconcileTodos(_ snapshot: SessionTodoSnapshot) {
         guard snapshot.sessionID == conversationID,
               snapshot.supersedes(sessionTodos) else { return }

@@ -10,7 +10,6 @@ struct ChatActionMenuSheet: View {
     let runtimeControls: SessionRuntimeControlModel?
     let slashCommandCatalog: () -> SlashCommandCatalogModel?
     let skillsAndTools: SkillsAndToolsStore
-    let workspaces: HermesWorkspaceStore
     let onSelect: (ChatActionMenuAction) -> Void
     let onChooseAgent: (AgentProfile) -> DirectChatAgentSelectionResult
     let onSelectSlashCommand: (SlashCommandDescriptor) -> Void
@@ -89,11 +88,6 @@ struct ChatActionMenuSheet: View {
             switch page {
             case .skillsAndTools:
                 await skillsAndTools.load(agentID: effectiveAgentID)
-            case .workspaces:
-                await workspaces.load(
-                    agentID: effectiveAgentID,
-                    sessionID: sessionID
-                )
             case .modelAndReasoning:
                 await runtimeControls?.loadPickersIfNeeded()
             case .main, .agents:
@@ -150,14 +144,6 @@ struct ChatActionMenuSheet: View {
         case .modelAndReasoning:
             // Retained page identity for fixture compatibility; model selection uses its sheet.
             actionList
-        case .workspaces:
-            HermesWorkspaceManagerContent(
-                store: workspaces,
-                agentID: effectiveAgentID,
-                sessionID: sessionID
-            ) {
-                page = .main
-            }
         }
     }
 
@@ -186,9 +172,9 @@ struct ChatActionMenuSheet: View {
             .listRowBackground(theme.surface)
 
             Section("Chat") {
-                // Skills and the Hermes project folder are host tools: Nerd Mode only.
+                // Skills are a host tool: Nerd Mode only.
                 ForEach(nerdModeEnabled
-                    ? [ChatActionMenuAction.chooseAgent, .changeModel, .skillsAndTools, .workspace, .startSession]
+                    ? [ChatActionMenuAction.chooseAgent, .changeModel, .skillsAndTools, .startSession]
                     : [ChatActionMenuAction.chooseAgent, .changeModel, .startSession]
                 ) { action in
                     nativeActionRow(action)
@@ -321,7 +307,6 @@ struct ChatActionMenuSheet: View {
         case .agents: String(localized: "Choose agent")
         case .skillsAndTools: String(localized: "Skills & Plugins")
         case .modelAndReasoning: String(localized: "Model & reasoning")
-        case .workspaces: String(localized: "Workspace")
         }
     }
 
@@ -348,7 +333,6 @@ struct ChatActionMenuSheet: View {
         case .startSession: String(localized: "New chat")
         case .chooseAgent: String(localized: "Choose agent")
         case .skillsAndTools: String(localized: "Skills & Plugins")
-        case .workspace: String(localized: "Workspace")
         case .changeModel: String(localized: "Change model")
         default: ""
         }
@@ -361,7 +345,6 @@ struct ChatActionMenuSheet: View {
         case .startSession: String(localized: "Start fresh with \(effectiveAgentName)")
         case .chooseAgent: String(localized: "\(effectiveAgentName) is active for this chat")
         case .skillsAndTools: String(localized: "Capabilities on this Hermes host")
-        case .workspace: activeWorkspaceName
         case .changeModel: currentModelName
         default: ""
         }
@@ -378,7 +361,6 @@ struct ChatActionMenuSheet: View {
         case .chooseAgent: "person.crop.circle.badge.checkmark"
         case .skillsAndTools: "briefcase"
         case .changeModel: "cpu"
-        case .workspace: "square.stack.3d.up"
         }
     }
 
@@ -621,13 +603,6 @@ struct ChatActionMenuSheet: View {
         .foregroundStyle(theme.primaryText)
         .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
         .contentShape(.rect)
-    }
-
-    private var activeWorkspaceName: String {
-        HermesWorkspaceSelectionPresentation.selectedName(
-            store: workspaces,
-            sessionID: sessionID
-        ) ?? "Choose a Hermes Workspace"
     }
 
     private var effectiveAgentID: String {

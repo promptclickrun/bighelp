@@ -13,6 +13,16 @@ extension RootShellView {
         return nil
     }
 
+    /// Move to Project… in a chat's ⋯ menu and in Chats; nil while this computer can't move chats.
+    var chatProjectMove: ChatProjectMove? {
+        guard let owner = currentWorkspaceOwner,
+              currentWorkspaceCapabilities.supports(.sessionWorkspaceEdit, owner: owner, profileID: nil) else { return nil }
+        let featureStore = featureStore
+        return ChatProjectMove(store: hermesWorkspaces) { project, sessionID in
+            featureStore.recordMovedProject(project, sessionID: sessionID)
+        }
+    }
+
     /// A screen opened for this computer and sign-in stays up through a
     /// reconnect, including while the connection is on its way back.
     func isCurrentSignIn(_ owner: WorkspaceOwner) -> Bool {

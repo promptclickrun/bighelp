@@ -398,20 +398,25 @@ use checked) and Add a computer; a computer's page leads with Use this computer,
 plugin and notifications, with its address and access folded away and Remove at the bottom.
 
 Nerd Mode (`settings.nerdModeEnabled`, also the `nerdModeEnabled` environment value) also gates technical detail
-inside everyday screens: the chat ⋯ Advanced submenu, the chat Info sheet's visibility toggles and host details,
-Project Changes, the context window (⋯ › Usage › Context window; nothing sits
-above the message box for it) and the subagent rail, Skills/Workspace/Session rows in the + sheet, Agent
-Studio's Advanced page and templates, the task editor/detail Advanced groups, and the extra sections on
+inside everyday screens: the chat Info sheet's visibility toggles and host details, the subagent rail,
+Skills/Session rows in the + sheet, Agent Studio's Advanced page and templates, the task editor/detail Advanced groups, and the extra sections on
 Settings › Chat. Everyday controls must never live only behind it.
 
-The chat's ⋯ menu has at most five rows: File changes when available, Model & speed, This chat, Usage and
-Nerd Mode's Advanced. Model & speed contains Model & reasoning and Fast Mode. This chat contains Rename chat,
-New Bot Chat (in an agent's Bot Chat), Chat files, Chat appearance and Edit this agent. Usage contains provider usage,
-Nerd Mode's Context window and Compact, which never needs Nerd Mode.
-Existing technical controls stay in Advanced. Keep every level short enough to navigate without scrolling.
-At accessibility text sizes, keep the full font size: the top level is Model & speed, This chat and More.
-More holds File changes, Usage and Advanced; This chat groups Rename and Appearance under Settings, and
-Advanced groups its visibility switches under Display. Omit secondary summaries and shorten redundant labels.
+The chat's ⋯ menu is one list, the same with Nerd Mode on or off: Model & speed; then the chat's own actions
+(Rename…, Move to Project… with the chat's project, Files, New Bot Chat in an agent's Bot Chat, Switch agent in
+the home chat, Edit agent; a group chat's Chat info, where its members are); then Usage; then File changes when
+available and Advanced. Model & speed contains Model & reasoning and Fast Mode. Usage contains provider usage,
+Context window and Compact. Existing technical controls stay in Advanced. Keep every level short enough to
+navigate without scrolling. At accessibility text sizes, keep the full font size: the top level is Model (Model &
+speed), This chat (Rename…, Move…, Files; a group's Chat info), Agent (New Bot Chat, Switch agent, Edit agent) and More
+(File changes, Usage and Advanced), and Advanced groups its visibility switches under Display. Omit secondary
+summaries and shorten labels there.
+
+Move to Project… (`MoveChatToProjectSheet`) also sits in a chat's hold menu in Chats and a pinned chat's
+right-click menu on the Mac, wherever the computer can move chats (`sessionWorkspaceEdit`). It lists the agent's
+projects with a tick on the chat's own, and moves the chat only once Hermes confirms it; then Chats, the open
+chat and File changes show the new project. Chats have no backgrounds of their own: Settings › Appearance sets the
+look of every screen.
 
 Fast Mode is explicit about scope: the chat menu changes only this chat; Settings › Default model changes the
 selected agent's default for new chats. Fast Mode may cost more. Read the host's current value and verify saves;

@@ -41,15 +41,6 @@ final class ChatContextWindowUITests: BighelpUITestCase {
         }
     }
 
-    /// Without Nerd Mode the token readout stays out of the menu, as the ring did.
-    @MainActor
-    func testEverydayMenuHasNoContextWindow() {
-        let app = launch(appearance: "light", extra: ["-loopdy.settings.nerd-mode", "NO"])
-        let model = chatMenuItem("chat.session-controls", in: app)
-        XCTAssertTrue(model.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["chat.context-window"].exists)
-    }
-
     /// Native menu rows can expose their title instead of their identifier.
     @MainActor
     private func menuButton(_ identifier: String, _ title: String, in app: XCUIApplication,

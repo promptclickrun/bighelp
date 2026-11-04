@@ -261,6 +261,24 @@ final class HermesWorkspaceStore {
         if let home = HermesFolderPath.home(listed: "~", fullPath: page.parentPath) { homePath = home }
     }
 
+    /// Move to Project…: an agent's projects, read without replacing the catalog this store
+    /// shows, since a chat in Chats can belong to another agent.
+    func projects(agentID: String) async throws -> [HermesWorkspaceSummary] {
+        try await client.load(agentID: agentID).workspaces
+    }
+
+    /// Move to Project…: moves one chat into a project and returns the project once Hermes
+    /// confirms the chat is in it. Only the chat's own project changes here.
+    func moveSession(_ sessionID: String, agentID: String, to projectID: String) async throws -> HermesWorkspaceSummary {
+        let moved = try await client.select(id: projectID, agentID: agentID, sessionID: sessionID)
+        guard moved.sessionWorkspaceID == projectID,
+              let project = moved.workspaces.first(where: { $0.id == projectID }) else {
+            throw WorkspaceClientError.outcomeUnknown
+        }
+        reconcileSessionWorkspace(id: projectID, sessionID: sessionID)
+        return project
+    }
+
     func workspaceID(forSessionID sessionID: String) -> String? {
         selectedWorkspaceIDsBySession[sessionID]
     }

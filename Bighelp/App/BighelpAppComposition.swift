@@ -106,6 +106,7 @@ struct BighelpAppComposition {
         let dataDirectory = acceptanceStorageID.map {
             baseDirectory.appending(path: "native-acceptance-" + $0.uuidString, directoryHint: .isDirectory)
         } ?? baseDirectory
+        RetiredChatAppearance.removeSavedData(defaults: defaults, dataDirectory: baseDirectory)
         let protectedDataAvailability: any BighelpProtectedDataAvailabilityProviding = usesFixtures
             ? BighelpFixtureProtectedDataAvailability()
             : BighelpSystemProtectedDataAvailability()

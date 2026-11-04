@@ -1110,7 +1110,8 @@ struct RootShellView: View {
             onOpenBroughtIn: { openBroughtInChat($0) },
             // All sessions and a picked computer's Sessions share the Hermes, Codex, Claude Code choice.
             appFilter: fleetModeOn ? $fleetChatsFilter.app : nil,
-            requestedOtherAppChat: $requestedOtherAppChat
+            requestedOtherAppChat: $requestedOtherAppChat,
+            projectMove: chatProjectMove
         )
     }
 

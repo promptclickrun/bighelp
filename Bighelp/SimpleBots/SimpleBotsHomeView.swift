@@ -683,7 +683,7 @@ struct SimpleBotsHomeView: View {
             openBot(bot)
         } label: {
             VStack(spacing: BighelpTokens.space12) {
-                SimpleBotLiveFace(bot: bot, size: size, isPrimary: isPrimary, blinks: true, activity: context.activity)
+                SimpleBotLiveFace(bot: bot, size: size, blinks: true, activity: context.activity)
                 HStack(spacing: BighelpTokens.space4) {
                     Text(bot.name)
                         .font(.bighelp(.subheadline))
@@ -897,7 +897,7 @@ struct SimpleBotsHomeView: View {
         let ids = top.map(\.id), key = "top:\(bot.id)"
         return VStack(spacing: BighelpTokens.space12) {
             SimpleBotFace(agentID: bot.profileID, name: bot.name, imageURL: bot.imageURL,
-                          size: size, isPrimary: isPrimary, blinks: false)
+                          size: size, blinks: false)
                 .companionScope(bot.faceScope)
             Text(bot.name)
                 .font(.bighelp(.subheadline))
@@ -1146,13 +1146,12 @@ private extension View {
 struct SimpleBotLiveFace: View {
     let bot: SimpleBotsBot
     let size: CGFloat
-    var isPrimary = false
     var blinks = false
     let activity: BotChatActivityStore?
 
     var body: some View {
         SimpleBotFace(agentID: bot.profileID, name: bot.name, imageURL: bot.imageURL, size: size,
-                      isPrimary: isPrimary, blinks: blinks, activity: activity?.activity(bot.activityKey))
+                      blinks: blinks, activity: activity?.activity(bot.activityKey))
             .companionScope(bot.faceScope)
     }
 }

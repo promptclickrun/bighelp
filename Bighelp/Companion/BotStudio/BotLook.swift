@@ -194,7 +194,10 @@ struct BotLook: Codable, Equatable, Hashable, Sendable {
     var stretch = 0.0
     var scale = 1.0
     var mirror = false
-    var move = Move.bounce
+    /// Calm unless the person picks a move: an avatar never starts with one.
+    var move = Move.calm
+    /// 2 since moves start calm. Looks saved before it bounced only because that was the default.
+    var version = 2
 
     init(body: BotBody) {
         self.body = body
@@ -215,7 +218,9 @@ struct BotLook: Codable, Equatable, Hashable, Sendable {
         // Choices a later app adds read as the default here.
         eyes = value(.eyes) ?? .classic
         mouth = value(.mouth) ?? .none
-        move = value(.move) ?? .bounce
+        move = value(.move) ?? .calm
+        let saved: Int = value(.version) ?? 1
+        if saved < 2, move == .bounce { move = .calm }
         cheeks = value(.cheeks) ?? false
         mirror = value(.mirror) ?? false
         eyeSize = number(.eyeSize, Self.eyeSizes, 1)
@@ -243,11 +248,10 @@ struct BotLook: Codable, Equatable, Hashable, Sendable {
     static let darkEyes = "#1C1A19"
     static let lightEyes = "#F4EFE6"
 
-    /// A body change keeps everything picked except the colors, which start from the new body's own.
+    /// A new body starts as it comes: its own colors, classic eyes and shape, and no move. Choices made
+    /// for another body never carry over.
     mutating func use(_ body: BotBody) {
-        self.body = body
-        main = body.colors.main
-        accent = nil
+        self = BotLook(body: body)
     }
 
     /// `#RRGGBB` in capitals, or nil for anything else.
@@ -289,7 +293,7 @@ extension BotLook {
     static let eyeColors = ["#1C1A19", "#F4EFE6", "#0F766E", "#B45309", "#5B5FE6"]
 
     /// Something new to start from: any body on offer, a color from the palette, and small
-    /// differences in eyes, shape and move, so two surprises rarely look alike.
+    /// differences in eyes and shape, so two surprises rarely look alike. It never adds a move.
     static func surprise(from bodies: [BotBody], using generator: inout some RandomNumberGenerator) -> BotLook? {
         guard let body = bodies.randomElement(using: &generator) else { return nil }
         var look = BotLook(body: body)
@@ -305,7 +309,6 @@ extension BotLook {
         look.lean = Double.random(in: -6...6, using: &generator)
         look.stretch = Double.random(in: -0.25...0.25, using: &generator)
         look.mirror = Bool.random(using: &generator)
-        look.move = Move.allCases.randomElement(using: &generator) ?? .bounce
         return look
     }
 

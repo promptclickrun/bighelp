@@ -207,7 +207,6 @@ private struct SimpleBotShapeOutline: Shape {
 struct SimpleBotMarkView: View {
     let mark: SimpleBotMark
     var size: CGFloat
-    var isPrimary = false
     /// Blinks now and then, so the bot looks alive (never with Reduce Motion).
     var blinks = false
     /// Thinking looks up with narrowed eyes; needing you opens them wide. The still pose, which
@@ -236,9 +235,6 @@ struct SimpleBotMarkView: View {
             }
         }
         .frame(width: size, height: size)
-        .overlay(alignment: .bottomTrailing) {
-            if isPrimary { SimpleBotPrimaryBadge(size: size * 0.3) }
-        }
         .task(id: blinks && !reduceMotion && mood == nil) { await blink() }
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: state)
         .accessibilityHidden(true)
@@ -344,21 +340,6 @@ struct SimpleBotActivityBadge: View {
     }
 }
 
-/// The star on the primary bot.
-struct SimpleBotPrimaryBadge: View {
-    let size: CGFloat
-
-    var body: some View {
-        Image(systemName: "star.fill")
-            .font(.system(size: size * 0.48, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(Circle().fill(SimpleBotColor.amber.color))
-            .overlay(Circle().stroke(Color(uiColor: .systemBackground), lineWidth: max(2, size * 0.12)))
-            .accessibilityHidden(true)
-    }
-}
-
 /// Marks people picked, kept on this device per computer and bot. The host
 /// keeps each one's picture; this lets the app draw it crisply at any size.
 @MainActor
@@ -399,7 +380,6 @@ struct SimpleBotFace: View {
     let name: String
     let imageURL: URL?
     var size: CGFloat
-    var isPrimary = false
     /// Marks blink now and then; characters and pets move on their own.
     var blinks = false
     /// What its Bot Chat is doing; nil or idle shows nothing.
@@ -424,9 +404,6 @@ struct SimpleBotFace: View {
                 AgentLiveAvatar(agentID: agentID, displayName: name, imageURL: imageURL,
                                 activity: busy?.activityKind ?? .idle, size: size, showsBadge: false,
                                 movesPhoto: false)
-                    .overlay(alignment: .bottomTrailing) {
-                        if isPrimary { SimpleBotPrimaryBadge(size: size * 0.3) }
-                    }
             }
         }
         .frame(width: size, height: size)
@@ -451,7 +428,7 @@ struct SimpleBotFace: View {
     }
 
     private func markView(_ mark: SimpleBotMark) -> some View {
-        SimpleBotMarkView(mark: mark, size: size, isPrimary: isPrimary, blinks: blinks,
+        SimpleBotMarkView(mark: mark, size: size, blinks: blinks,
                           state: busy?.liveState ?? .idle, mood: busy?.activityKind.moodID)
     }
 

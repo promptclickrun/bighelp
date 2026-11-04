@@ -73,8 +73,6 @@ struct SimpleBotProfileView: View {
     @State private var tabFrames = SimpleBotTabFrameStore()
     @State private var isArrangingTabs = false
     @State private var tabNotice: String?
-    @State private var isCharacterPresented = false
-    @State private var opensStudioAfterCharacter = false
     @State private var dashboard: BoardDashboardModel?
     @State private var mark: SimpleBotMark?
     @State private var saveTask: Task<Void, Never>?
@@ -204,26 +202,6 @@ struct SimpleBotProfileView: View {
             if let profile {
                 SimpleBotPhotoActionsSheet(agentID: profile.id, agentName: profile.name)
                     .bighelpSheetSize(.large)
-            }
-        }
-        .bighelpSheet(isPresented: $isCharacterPresented, onDismiss: {
-            // After the sheet has gone, so the studio can show.
-            guard opensStudioAfterCharacter else { return }
-            opensStudioAfterCharacter = false
-            isStudioPresented = true
-        }) {
-            if let profile {
-                SimpleBotCharacterSheet(
-                    mark: markBinding(profile), canEdit: context.canEdit, status: markStatus,
-                    onReset: { pick(.defaultMark(for: profile.id), for: profile) },
-                    onMoreAvatars: {
-                        opensStudioAfterCharacter = true
-                        isCharacterPresented = false
-                    },
-                    onDone: { isCharacterPresented = false })
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .bighelpSheetSize(.standard)
             }
         }
         .bighelpSheet(isPresented: $isStudioPresented) {
@@ -387,18 +365,18 @@ struct SimpleBotProfileView: View {
     }
 
     private func face(_ profile: AgentProfile) -> some View {
-        face(profile, size: 132, isPrimary: isPrimary)
+        face(profile, size: 132)
             .padding(.top, BighelpTokens.space8)
             .animation(.snappy, value: mark)
     }
 
     @ViewBuilder
-    private func face(_ profile: AgentProfile, size: CGFloat, isPrimary: Bool) -> some View {
+    private func face(_ profile: AgentProfile, size: CGFloat) -> some View {
         if let mark {
-            SimpleBotMarkView(mark: mark, size: size, isPrimary: isPrimary)
+            SimpleBotMarkView(mark: mark, size: size)
         } else {
             SimpleBotFace(agentID: profile.id, name: profile.name,
-                          imageURL: context.agents.avatarURL(for: profile), size: size, isPrimary: isPrimary)
+                          imageURL: context.agents.avatarURL(for: profile), size: size)
         }
     }
 
@@ -476,7 +454,7 @@ struct SimpleBotProfileView: View {
         case .templates(let kind): dashboard?.sheet = .templates(kind)
         case .blueprints(let kind): dashboard?.sheet = .blueprints(kind)
         case .seeAll(let kind): dashboard?.sheet = .seeAll(kind)
-        case .character: isCharacterPresented = true
+        case .character: isStudioPresented = true
         case .instructions: isInstructionsPresented = true
         case .photoActions: isPhotoActionsPresented = true
         case .defaultModel: isModelPresented = true
@@ -668,11 +646,11 @@ struct SimpleBotProfileView: View {
     private func info(_ profile: AgentProfile) -> some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
             SimpleBotsCard {
-                // The shape and color picker, Reset to default and More avatars, in a sheet.
-                Button { isCharacterPresented = true } label: {
+                // Edit avatar: Bot Studio, PetDex or a photo.
+                Button { isStudioPresented = true } label: {
                     SimpleBotsRow(title: String(localized: "Character"), leading: Image(systemName: "face.smiling")) {
                         HStack(spacing: BighelpTokens.space8) {
-                            face(profile, size: 28, isPrimary: false)
+                            face(profile, size: 28)
                                 .accessibilityHidden(true)
                             SimpleBotsDisclosure()
                         }

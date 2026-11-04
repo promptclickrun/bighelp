@@ -58,69 +58,6 @@ enum SimpleBotAvatarSaving {
     }
 }
 
-/// Info › Character: the bot's shape and color, Reset to default, and More avatars (the full studio,
-/// which the profile opens once this sheet has gone).
-struct SimpleBotCharacterSheet: View {
-    @Binding var mark: SimpleBotMark
-    let canEdit: Bool
-    let status: String
-    let onReset: () -> Void
-    let onMoreAvatars: () -> Void
-    let onDone: () -> Void
-    @BighelpThemeReader private var theme
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-                    SimpleBotsCard {
-                        SimpleBotMarkPicker(mark: $mark)
-                            .padding(.vertical, BighelpTokens.space24)
-                            .padding(.horizontal, BighelpTokens.space8)
-                            .disabled(!canEdit)
-                        SimpleBotsDivider()
-                        link("Reset to default", identifier: "simple-bots.profile.reset-mark", action: onReset)
-                        SimpleBotsDivider()
-                        link("More avatars", identifier: "simple-bots.profile.more-avatars", action: onMoreAvatars)
-                    }
-                    Text(status)
-                        .font(.bighelp(.subheadline))
-                        .foregroundStyle(theme.tertiaryText)
-                        .padding(.horizontal, BighelpTokens.space20)
-                        .accessibilityIdentifier("simple-bots.profile.mark-status")
-                }
-                .padding(.horizontal, BighelpTokens.space20)
-                .padding(.vertical, BighelpTokens.space16)
-                .frame(maxWidth: 720)
-                .frame(maxWidth: .infinity)
-            }
-            .background(theme.canvas.ignoresSafeArea())
-            .navigationTitle("Character")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done", action: onDone)
-                        .accessibilityIdentifier("simple-bots.character.done")
-                }
-            }
-        }
-    }
-
-    private func link(_ title: LocalizedStringKey, identifier: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.bighelp(.body))
-                .foregroundStyle(theme.information)
-                .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-                .padding(.horizontal, BighelpTokens.space20)
-                .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .disabled(!canEdit)
-        .accessibilityIdentifier(identifier)
-    }
-}
-
 /// The profile's tab frames, kept without redrawing the profile: at large text sizes the tab row
 /// scrolls and they change every frame, and only a hold reads them.
 final class SimpleBotTabFrameStore {

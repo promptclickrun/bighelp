@@ -74,6 +74,18 @@ final class AvatarCreatorUITests: BighelpUITestCase {
         XCTAssertTrue(stage.label.hasSuffix("Peak"), "Opens on the saved avatar: \(stage.label)")
         app.buttons["bot.studio.tab.eyes"].firstMatch.tap()
         XCTAssertTrue(app.buttons["bot.studio.choice.Wide"].firstMatch.isSelected, "With its own eyes")
+
+        // Another body starts as it comes: its own eyes and no move, nothing from the last one.
+        app.buttons["bot.studio.tab.body"].firstMatch.tap()
+        app.buttons["bot.studio.choice.Ball"].firstMatch.tap()
+        XCTAssertTrue(stage.label.hasSuffix("Ball"))
+        app.buttons["bot.studio.tab.eyes"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["bot.studio.choice.Classic"].firstMatch.isSelected, "Not the last body's eyes")
+        app.buttons["bot.studio.tab.moves"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["bot.studio.chip.calm"].firstMatch.isSelected, "No move until one is picked")
+        app.buttons["bot.studio.surprise"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["bot.studio.chip.calm"].firstMatch.isSelected, "Surprise me adds no move")
+        save("studio-new-body-\(appearance)", app)
     }
 
     /// PetDex shows only pets, opened on the agent's own.

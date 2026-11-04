@@ -14,8 +14,6 @@ settings:
 packages:
   BuzzKit:
     path: Vendor/BuzzKit
-  ThinkingOrbsKit:
-    path: Packages/ThinkingOrbsKit
   # On-device voices (Phonon). Its compiled core has no visionOS or Intel slices.
   PhononTTS:
     path: Packages/PhononTTS
@@ -65,7 +63,6 @@ targets:
         copy:
           destination: plugins
         destinationFilters: [macCatalyst]
-      - package: ThinkingOrbsKit
       # iPhone and iPad only: the Mac app ships for Intel too, and visionOS has no build.
       - package: PhononTTS
         destinationFilters: [iOS]

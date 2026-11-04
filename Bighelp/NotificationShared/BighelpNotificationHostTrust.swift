@@ -60,11 +60,6 @@ struct BighelpNotificationHostGrant: Codable, Equatable, Sendable {
             && eventTypes.contains(eventType)
     }
 
-    var senderKey: BighelpRelaySenderKey {
-        BighelpRelaySenderKey(keyID: hostKeyID, publicKey: hostPublicKey, state: .current,
-                            notBefore: createdAt, notAfter: expiresAt)
-    }
-
     private static func coordinate(_ value: String) -> Bool {
         !value.isEmpty && value.utf8.count <= 180 && value.utf8.allSatisfy {
             (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0)

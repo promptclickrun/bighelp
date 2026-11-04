@@ -13,11 +13,6 @@ sections below describe legacy compatibility code, not a selectable chat path.
 - XcodeGen 2.43 or newer
 - An iOS 17+ simulator or physical device
 
-ThinkingOrbsKit is vendored under `Packages/ThinkingOrbsKit` because the
-upstream monorepo does not expose its nested Swift package at a remotely
-resolvable SwiftPM root. Keep its MIT license and `PROVENANCE.md` with the
-package, and verify the pinned upstream files before updating it.
-
 ## Generate the Xcode project
 
 The project is configured by `project.yml`:
@@ -168,8 +163,10 @@ messages and receives context, tool and text updates. See
 [Shortcuts and live chat reliability](SHORTCUTS_AND_LIVE_CHAT_RELIABILITY.md).
 For wait-enabled intent changes, separately verify the existing saved Shortcut
 on a physical iPhone with both a quick answer and an answer taking over 30
-seconds. Confirm the next action receives the final text. Simulator service
-tests and generated App Intents metadata do not prove the OS execution lifetime.
+seconds. Confirm the next action receives final text for the quick answer and
+a queued acknowledgement when the 25-second wait expires; check the eventual
+answer in bighelp. Simulator service tests and generated App Intents metadata
+do not prove the OS execution lifetime.
 Individual Swift Testing selectors require the function signature, including
 `()` or parameter labels; inspect the executed count even if discovery succeeded.
 

@@ -3,7 +3,7 @@ import Testing
 
 struct LiquidOrbPresentationTests {
     @Test func voiceSurfaceUsesAnExplicitOrbAndCompactControls() {
-        #expect(VoiceOrbPresentation.usesThinkingOrbsKitSurface)
+        #expect(VoiceOrbPresentation.usesExplicitOrbSurface)
         #expect(!VoiceViewPresentation.statusUsesFullWidthSurface)
         #expect(VoiceViewPresentation.controlMinimumHeight == 64)
     }

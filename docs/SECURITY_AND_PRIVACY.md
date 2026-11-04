@@ -223,17 +223,20 @@ recognition, request/session matching, and bounded decoding.
 ### Encrypted alerts
 
 Each mobile device owns a notification recipient key. Alert encryption uses an
-ephemeral key agreement, HKDF, and AES-GCM. The relay signs the complete
-envelope. The device validates a bounded, validity-windowed sender-key set
-provided during authenticated push registration.
+ephemeral key agreement, HKDF, and AES-GCM. The Hermes host that sends the
+alert signs the complete envelope with its notification key. The device pins
+that host key per grant during authenticated enrollment, and accepts an alert
+only when its sender key ID matches the pin for the envelope's grant and its
+issue time does not exceed the stored grant expiry. The v2 opener does not
+compare that time with the current clock or enforce a separate maximum age.
 
-Notification content is rendered only after signature, freshness, recipient,
+Notification content is rendered only after signature, grant, recipient,
 and authenticated-decryption checks succeed.
 
-The account service provisions the sender-key set. No independent out-of-band
-transparency or continuity mechanism anchors it. This protects against
-modification in APNs transit and relay storage, while the account service
-remains in the notification trust boundary.
+The notification service carries the host key during enrollment. No independent
+out-of-band transparency or continuity mechanism anchors it. This protects
+against modification in APNs transit, relay storage and BuzzKit, while the
+notification service remains in the notification trust boundary.
 
 ## 3. Trust model
 
@@ -403,7 +406,7 @@ the person's review. Other phone tools keep their own switches and rules.
 
 Signing out attempts a signed request to revoke this device and its push/Live
 Activity authorization, then deletes bighelp Link runtime credentials,
-notification recipient keys, sender-key pins, account-scoped defaults, local
+notification recipient keys, pinned host keys, account-scoped defaults, local
 content files, and all account-scoped in-memory state. Local erasure still runs
 if the remote revocation is unavailable, and the app surfaces that revocation
 could not be confirmed. Uninstall behavior alone should not be treated as

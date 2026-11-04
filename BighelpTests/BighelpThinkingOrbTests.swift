@@ -4,7 +4,21 @@ import Testing
 
 @MainActor
 struct BighelpThinkingOrbTests {
-    @Test func scenariosResolveToTheIntendedPackageStates() {
+    @Test func accessibilityLabelsStayUnchanged() {
+        let cases: [(BighelpThinkingOrbScenario, String)] = [
+            (.working, "Working…"), (.searching, "Searching…"),
+            (.reasoning, "Solving…"), (.listening, "Listening…"),
+            (.connecting, "Connecting…"), (.coordinating, "Weaving…"),
+            (.composing, "Composing…"), (.waiting, "Thinking…"),
+            (.shaping, "Shaping…")
+        ]
+        for (scenario, label) in cases {
+            #expect(BighelpThinkingOrbPresentation.resolve(
+                scenario: scenario, scale: .standard).state.label == label)
+        }
+    }
+
+    @Test func scenariosResolveToTheIntendedStates() {
         let cases: [(BighelpThinkingOrbScenario, String)] = [
             (.working, "working"),
             (.searching, "searching"),
@@ -27,7 +41,7 @@ struct BighelpThinkingOrbTests {
         }
     }
 
-    @Test func presentationScalesPreserveThePurposeTunedPackageSizes() {
+    @Test func presentationScalesPreserveTheLoaderSizes() {
         let inline = BighelpThinkingOrbPresentation.resolve(
             scenario: .working,
             scale: .inline
@@ -43,7 +57,7 @@ struct BighelpThinkingOrbTests {
         #expect(standard.displaySize == nil)
     }
 
-    @Test func visibleLabelsSuppressThePackagesDuplicateAccessibilityElement() {
+    @Test func visibleLabelsSuppressTheDuplicateAccessibilityElement() {
         let unlabeled = BighelpThinkingOrbPresentation.resolve(
             scenario: .working,
             scale: .inline

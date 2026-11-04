@@ -257,6 +257,14 @@ struct DirectHermesHistoryProjection: Equatable, Sendable {
             let order = sourceOrderBase.addingReportingOverflow(index)
             guard !order.overflow else { throw WorkspaceClientError.capacityExceeded }
             if row.hasUnsupportedContent { unsupported.append(row.id) }
+            // Helpers or a background command reporting back: a card, still the turn's opening row.
+            if row.role == "user", let result = ChatBackgroundResult(
+                displayKind: row.displayKind, metadata: row.raw["display_metadata"]?.object, text: row.text) {
+                messages.append(.backgroundResult(result, id: "\(appID):row:\(row.id)", metadata: .init(
+                    source: source.map { "Hermes · \($0)" } ?? "Hermes", delivery: "Saved",
+                    timestamp: row.timestamp, sourceOrder: order.partialValue)))
+                continue
+            }
             let isModelSwitch = row.displayKind == "model_switch"
             var text = row.role == "user" && !isModelSwitch ? HermesUserMessageDisplay.text(row.text) : row.text
             // Hermes' rule with the turn's real kind (ChatSilentReply): quiet unless a person's

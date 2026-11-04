@@ -422,14 +422,23 @@ struct DirectHermesProjection {
         reasoning = ""
         historyAliases = [:]
         seedHistory(currentUser.map { Array(messages.prefix($0 + 1)) } ?? messages)
-        if currentUser == nil, let user = snapshot["inflight"]?.object?["user"]?.string, !user.isEmpty {
+        if currentUser == nil, let inflight = snapshot["inflight"]?.object, let user = inflight["user"]?.string,
+           !user.isEmpty {
             // Timestamp-free legacy history may already contain the current
             // user. Keep that source in detail instead of guessing by text.
             let trailingUser = messages.last?.object?["role"]?.string == "user"
             if !trailingUser {
                 arrival += 1
-                items.append(item(id: "\(storedID):inflight-user:\(started ?? 0)", text: user,
-                    human: true, delivery: "Received", order: arrival, timestamp: started))
+                let id = "\(storedID):inflight-user:\(started ?? 0)"
+                if let result = ChatBackgroundResult(displayKind: inflight["display_kind"]?.string,
+                                                     metadata: inflight["display_metadata"]?.object, text: user) {
+                    items.append(.backgroundResult(result, id: id, metadata: .init(
+                        source: "Direct Hermes", delivery: "Received",
+                        timestamp: started.map { Date(timeIntervalSince1970: $0) }, sourceOrder: arrival)))
+                } else {
+                    items.append(item(id: id, text: user, human: true, delivery: "Received", order: arrival,
+                                      timestamp: started))
+                }
             } else {
                 retainSourceDetail(key: "bootstrap-input", title: "Native in-flight input",
                     detail: user, summary: "Input supplied by the native snapshot; history has no turn timestamp to bind another row.")
@@ -534,8 +543,16 @@ struct DirectHermesProjection {
             let id = row["row_id"]?.integer.map { "row:\($0)" } ?? "position:\(index)"
             let scopedID = "\(storedID):\(id)"
             let raw = row["text"]?.string ?? ""
-            let body = role == "user" ? HermesUserMessageDisplay.text(raw) : raw
             if role == "user" { historyTurn = scopedID }
+            if role == "user", let result = ChatBackgroundResult(
+                displayKind: row["display_kind"]?.string, metadata: row["display_metadata"]?.object, text: raw) {
+                arrival += 1
+                items.append(.backgroundResult(result, id: scopedID, metadata: .init(
+                    source: "Direct Hermes", delivery: "Saved",
+                    timestamp: row["timestamp"]?.number.map { Date(timeIntervalSince1970: $0) }, sourceOrder: arrival)))
+                continue
+            }
+            let body = role == "user" ? HermesUserMessageDisplay.text(raw) : raw
             if role == "tool" {
                 arrival += 1
                 // Stock session.history intentionally omits tool result and call ID.

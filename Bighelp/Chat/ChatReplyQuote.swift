@@ -77,6 +77,7 @@ struct ChatReplyQuote: Equatable, Sendable {
         case .approvalRequest: words = "Approval request"
         case .generativeUI(let card): words = card.title
         case .bighelpCard(let card): words = card.title
+        case .backgroundResult(let result): words = result.headline
         }
         guard words.allSatisfy(\.isWhitespace) else { return words }
         return item.attachments.contains { $0.kind == .image } ? "Photo"

@@ -22,15 +22,18 @@ remote = subprocess.check_output(ssh + ['mktemp -d "${TMPDIR:-/tmp/}avatar-nativ
 q = shlex.quote(remote)
 archive = io.BytesIO()
 with tarfile.open(fileobj=archive, mode='w') as tar:
-    for name in ['AvatarKit.swift', 'AvatarKitRenderer.swift']:
-        tar.add(repo / 'Bighelp/Companion/AvatarKit' / name, arcname=name)
+    # The decoder checks packs with the catalog's own validator (AvatarCatalog.swift), which uses
+    # CompanionModels.swift's ASCIIText; both are Foundation-only.
+    for name in ['AvatarKit/AvatarKit.swift', 'AvatarKit/AvatarKitRenderer.swift',
+                 'AvatarCatalog/AvatarCatalog.swift', 'CompanionModels.swift']:
+        tar.add(repo / 'Bighelp/Companion' / name, arcname=pathlib.PurePosixPath(name).name)
     tar.add(service / 'scripts/verify-native.swift', arcname='probe.swift')
     data = json.dumps(json.loads((service / 'catalog.json').read_text())['kit']).encode()
     info = tarfile.TarInfo('kit.json'); info.size = len(data)
     tar.addfile(info, io.BytesIO(data))
 try:
     subprocess.run(ssh + [f'tar -xf - -C {q}'], input=archive.getvalue(), check=True)
-    subprocess.run(ssh + [f'cd {q} && swiftc -module-cache-path ./cache AvatarKit.swift AvatarKitRenderer.swift probe.swift -o probe && ./probe kit.json out'], check=True)
+    subprocess.run(ssh + [f'cd {q} && swiftc -module-cache-path ./cache AvatarKit.swift AvatarKitRenderer.swift AvatarCatalog.swift CompanionModels.swift probe.swift -o probe && ./probe kit.json out'], check=True)
     images = subprocess.check_output(ssh + [f'COPYFILE_DISABLE=1 tar -cf - -C {q}/out .'])
     output.mkdir(parents=True, exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(images)) as tar:

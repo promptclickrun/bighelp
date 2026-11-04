@@ -1,0 +1,32 @@
+[
+  {
+    "id": "christmas-spruce",
+    "name": "Spruce",
+    "role": "Lights up the room",
+    "file": "christmas-spruce.svg"
+  },
+  {
+    "id": "christmas-flurry",
+    "name": "Flurry",
+    "role": "Keeps its cool",
+    "file": "christmas-flurry.svg"
+  },
+  {
+    "id": "christmas-ginger",
+    "name": "Ginger",
+    "role": "Fresh from the oven",
+    "file": "christmas-ginger.svg"
+  },
+  {
+    "id": "christmas-bauble",
+    "name": "Bauble",
+    "role": "Hangs in there",
+    "file": "christmas-bauble.svg"
+  },
+  {
+    "id": "christmas-bow",
+    "name": "Bow",
+    "role": "Wraps things up",
+    "file": "christmas-bow.svg"
+  }
+]

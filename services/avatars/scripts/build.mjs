@@ -15,7 +15,8 @@ const palettes = JSON.parse(await readFile(path.join(root, 'sources/palettes.jso
 const kitSettings = JSON.parse(await readFile(path.join(root, 'sources/kit-settings.json'), 'utf8'));
 const staticKitSettings = structuredClone(kitSettings);
 const authored = new Map();
-const authoredPacks = [['bighelp', 'helpers', 10], ['halloween', 'halloween', 10], ['pocket-curios', 'pocket-curios', 20]];
+const authoredPacks = [['bighelp', 'helpers', 10], ['halloween', 'halloween', 10], ['pocket-curios', 'pocket-curios', 20],
+  ['bitty-bots', 'bitty-bots', 15], ['thanksgiving', 'thanksgiving', 5], ['christmas', 'christmas', 5]];
 for (const [setId, file, count] of authoredPacks) {
   const pack = JSON.parse(await readFile(path.join(root, `sources/packs/${file}.json`), 'utf8'));
   if (pack.version !== 1 || pack.characters.length !== count) throw new Error('Invalid authored pack');

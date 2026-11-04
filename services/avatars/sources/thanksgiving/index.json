@@ -1,0 +1,32 @@
+[
+  {
+    "id": "thanksgiving-gobble",
+    "name": "Gobble",
+    "role": "Gives thanks",
+    "file": "thanksgiving-gobble.svg"
+  },
+  {
+    "id": "thanksgiving-slice",
+    "name": "Slice",
+    "role": "Saves room for pie",
+    "file": "thanksgiving-slice.svg"
+  },
+  {
+    "id": "thanksgiving-nutmeg",
+    "name": "Nutmeg",
+    "role": "Stores up for later",
+    "file": "thanksgiving-nutmeg.svg"
+  },
+  {
+    "id": "thanksgiving-maple",
+    "name": "Maple",
+    "role": "Rakes up loose ends",
+    "file": "thanksgiving-maple.svg"
+  },
+  {
+    "id": "thanksgiving-plenty",
+    "name": "Plenty",
+    "role": "Brings plenty",
+    "file": "thanksgiving-plenty.svg"
+  }
+]

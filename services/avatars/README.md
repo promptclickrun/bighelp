@@ -23,15 +23,20 @@ paths return 404. Do not give the app Cloudflare credentials or cookies.
 |---|---|---|---:|---|
 | bighelp | bighelp | bighelp | 10 | none |
 | bighelp | bighelp | pocket-curios | 20 | none |
+| bighelp | bighelp | bitty-bots | 15 | none |
 | faces | Faces | faces | 10 | none |
 | shapes | Shapes | shapes | 8 | none |
 | seasonal | Seasonal | halloween | 10 | 2026-11-03T00:00:00-06:00 |
+| seasonal | Seasonal | thanksgiving | 5 | 2026-11-30T00:00:00-06:00 |
+| seasonal | Seasonal | christmas | 5 | 2027-01-02T00:00:00-06:00 |
 
 `bighelp` is official first-party art; its category carries `isFirstParty: true`.
 Its optional `role` strings preserve the supplied mascot taglines.
 
 Halloween's initial cutoff is midnight **starting November 3, 2026 in America/Chicago**,
-`2026-11-03T06:00:00Z`. Expiry removes choices from discovery, not from people's saved avatars.
+`2026-11-03T06:00:00Z`. Thanksgiving ends at midnight starting November 30, 2026 (`2026-11-30T06:00:00Z`) and
+Christmas at midnight starting January 2, 2027 (`2027-01-02T06:00:00Z`), both in America/Chicago.
+Expiry removes choices from discovery, not from people's saved avatars.
 
 ## Discovery schema
 
@@ -67,12 +72,18 @@ The arrays above illustrate field types; live responses contain the actual theme
 The combined response additionally has `nextChangeAt` and `revision`, ignored by the existing decoder.
 Character IDs exactly match discovery IDs. Each character has `name`, `role`, `family: "classic"`,
 a numeric `look`, `colors` and a native geometry `tree`. Coordinates are normalized into the renderer's 200×200
-art space. The official bighelp, Pocket Curios and Halloween characters come unchanged from the supplied authored packs in
-`sources/packs/`, including all seven states and shared animation keyframes. Faces and Shapes remain
+art space. The official bighelp, Pocket Curios, Bitty Bots, Halloween, Thanksgiving and Christmas characters come unchanged
+from the supplied authored packs in `sources/packs/`, including all seven states and shared animation keyframes. Faces and Shapes remain
 static conversions. Their idle style is the fallback for other states. Legacy SVG/PNG assets remain
 source previews; render the JSON for authoritative authored appearance and state-aware previews.
-Pocket Curios SVG/PNG previews are derived from its native idle JSON with the backdrop disc off.
-Its 20 characters are permanent additions under the first-party bighelp category, with no expiry.
+Pocket Curios, Bitty Bots, Thanksgiving and Christmas SVG/PNG previews are derived from their native idle JSON
+with the backdrop disc off (`scripts/preview-svg.py`). Pocket Curios' 20 and Bitty Bots' 15 characters are permanent
+additions under the first-party bighelp category, with no expiry.
+
+Bitty Bots, Thanksgiving and Christmas characters are one color each: the art uses only `@p`, `@ink` and shade
+and highlight overlays, never `@s` or `@a`, so the primary color repaints the whole character. Their accent
+(`a`) feeds only the kit's effects (happy sparkles, the waiting badge). They deliberately have **no `bg`** in
+`colors`: the app hides the backdrop disc by default and derives one from the primary color when it needs one.
 
 Colors are not baked into a raster. Editable fills/strokes use `@p`, `@s`, `@a`, `@ink` slots with the
 original colors in `character.colors`. Primary `@p` is present on every avatar. Some accents/highlights
@@ -149,9 +160,10 @@ cron, AI job or deployment is needed at the cutoff itself.
 
 To add artwork:
 
-For official bighelp, Pocket Curios or Halloween updates, replace the corresponding reviewed JSON in `sources/packs/`.
+For official bighelp, Pocket Curios, Bitty Bots or seasonal pack updates, replace the corresponding reviewed JSON in
+`sources/packs/` and run `python3 scripts/preview-svg.py <set-id>` to redraw its previews.
 For new authored collections, register the set/file/count in `scripts/build.mjs`, add `sets.json`
-metadata and `sources/<set-id>/index.json`, then add static idle SVG previews. Use the authored
+metadata and `sources/<set-id>/index.json`, then add static idle SVG previews with `python3 scripts/preview-svg.py <set-id>`. Use the authored
 JSON palette directly, not a second entry in `sources/palettes.json`. Remove fully transparent
 state-only groups from static SVG previews (sleeping Z text is invisible at idle); never remove
 them from the native JSON. Extend the authored equality test and native animation probe for the new set.
@@ -176,12 +188,14 @@ The service is independent of the template catalog.
 ## Reproduction and verification
 
 - `npm test`: scheduling, ETags, read-only routing, SVG safety, clipping conversion, palette tokens,
-  normalized geometry, PNG rendering and expiry editing.
+  normalized geometry, PNG rendering and expiry editing; authored packs published unchanged, and their
+  idle previews still matching them (`preview-svg.py --check`, so it needs `python3`).
 - `npm run build`: validates/converts every source and generates the deployment catalog.
 - From repo root, `bash scripts/export-builtin.sh`: isolated Mac Swift export of existing Faces/Shapes,
   checked against the app's frozen face hashes and shape/eye vectors. Does not build/change the app.
 - `python3 scripts/verify-native.py <output-directory>` from this service: compiles the app's unchanged
-  AvatarKit decoder/renderer in an isolated Mac probe over SSH (`AVATAR_SWIFT_HOST`, optional `AVATAR_SSH_CONFIG`). Decodes and renders
+  AvatarKit decoder/renderer (with the catalog's pack validator from `AvatarCatalog.swift`, and
+  `CompanionModels.swift` it needs) in an isolated Mac probe over SSH (`AVATAR_SWIFT_HOST`, optional `AVATAR_SSH_CONFIG`). Decodes and renders
   every character, overrides primary to magenta and verifies each rendered image changes. PNGs permit
   visual comparisons. It uses a test-only hex Color adapter instead of unrelated app dependencies.
 - `node scripts/verify-live.mjs`: fetches both feeds plus every referenced JSON/SVG/PNG, checks IDs,

@@ -35,6 +35,27 @@
       "category": "seasonal",
       "startsAt": null,
       "expiresAt": "2026-11-03T00:00:00-06:00"
+    },
+    {
+      "id": "bitty-bots",
+      "name": "Bitty Bots",
+      "category": "bighelp",
+      "startsAt": null,
+      "expiresAt": null
+    },
+    {
+      "id": "thanksgiving",
+      "name": "Thanksgiving",
+      "category": "seasonal",
+      "startsAt": null,
+      "expiresAt": "2026-11-30T00:00:00-06:00"
+    },
+    {
+      "id": "christmas",
+      "name": "Christmas",
+      "category": "seasonal",
+      "startsAt": null,
+      "expiresAt": "2027-01-02T00:00:00-06:00"
     }
   ]
 }

@@ -1,0 +1,92 @@
+[
+  {
+    "id": "bitty-bots-ping",
+    "name": "Ping",
+    "role": "Checks in for you",
+    "file": "bitty-bots-ping.svg"
+  },
+  {
+    "id": "bitty-bots-swoop",
+    "name": "Swoop",
+    "role": "Sends it off",
+    "file": "bitty-bots-swoop.svg"
+  },
+  {
+    "id": "bitty-bots-brew",
+    "name": "Brew",
+    "role": "Starts the morning",
+    "file": "bitty-bots-brew.svg"
+  },
+  {
+    "id": "bitty-bots-memo",
+    "name": "Memo",
+    "role": "Minds the inbox",
+    "file": "bitty-bots-memo.svg"
+  },
+  {
+    "id": "bitty-bots-dot",
+    "name": "Dot",
+    "role": "Keeps the dates",
+    "file": "bitty-bots-dot.svg"
+  },
+  {
+    "id": "bitty-bots-juice",
+    "name": "Juice",
+    "role": "Keeps you charged",
+    "file": "bitty-bots-juice.svg"
+  },
+  {
+    "id": "bitty-bots-walkie",
+    "name": "Walkie",
+    "role": "Stays in touch",
+    "file": "bitty-bots-walkie.svg"
+  },
+  {
+    "id": "bitty-bots-bearing",
+    "name": "Bearing",
+    "role": "Finds the way",
+    "file": "bitty-bots-bearing.svg"
+  },
+  {
+    "id": "bitty-bots-octo",
+    "name": "Octo",
+    "role": "Juggles the tasks",
+    "file": "bitty-bots-octo.svg"
+  },
+  {
+    "id": "bitty-bots-hoot",
+    "name": "Hoot",
+    "role": "Up late researching",
+    "file": "bitty-bots-hoot.svg"
+  },
+  {
+    "id": "bitty-bots-toasty",
+    "name": "Toasty",
+    "role": "Pops up reminders",
+    "file": "bitty-bots-toasty.svg"
+  },
+  {
+    "id": "bitty-bots-floppy",
+    "name": "Floppy",
+    "role": "Remembers it all",
+    "file": "bitty-bots-floppy.svg"
+  },
+  {
+    "id": "bitty-bots-quack",
+    "name": "Quack",
+    "role": "Debugs out loud",
+    "file": "bitty-bots-quack.svg"
+  },
+  {
+    "id": "bitty-bots-combo",
+    "name": "Combo",
+    "role": "Plays along",
+    "file": "bitty-bots-combo.svg"
+  },
+  {
+    "id": "bitty-bots-snap",
+    "name": "Snap",
+    "role": "Catches the moment",
+    "file": "bitty-bots-snap.svg"
+  }
+]

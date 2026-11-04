@@ -42,8 +42,9 @@ extension RootShellView {
         #endif
     }
 
+    /// One of the bot's Nerd Mode pages, for the bot itself (the Marketplace opens Messaging here too).
     @ViewBuilder
-    private func advancedOptionsPage(_ page: AdvancedPage, agentID: String) -> some View {
+    func advancedOptionsPage(_ page: AdvancedPage, agentID: String) -> some View {
         let name = agents.profiles.first { $0.id == agentID }?.name ?? agentID
         switch page {
         case .skillsAndTools:

@@ -21,6 +21,17 @@ extension SettingsView {
                     onOpenWorkspaceDestination(.keys)
                 }
             }
+            if marketplace != nil {
+                settingsLink(to: .marketplace) {
+                    rowLabel(String(localized: "Marketplace"),
+                             detail: String(localized: "Apps, skills and plugins for your agents"),
+                             symbol: "storefront.fill", showsChevron: BighelpPlatform.drawsOwnLinkChevron)
+                        .bighelpSettingsLinkLabel()
+                }
+                .bighelpSettingsLink()
+                .accessibilityIdentifier("settings.marketplace")
+                .driveTarget("settings.marketplace")
+            }
             // Always here: Device access works before any computer is connected.
             settingsLink(to: .apps) {
                 rowLabel(String(localized: "Connections"),

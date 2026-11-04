@@ -1,0 +1,88 @@
+import SwiftUI
+
+// The Marketplace (Settings › Marketplace, and each bot's profile): one agent's Apps, Skills,
+// Plugins and Talk anywhere, on the same pages Hermes tools and Advanced Options open. None of it
+// needs Nerd Mode.
+extension RootShellView {
+    /// The Marketplace for `agentID`: Settings passes the agent in use, a bot's profile its own.
+    func makeMarketplace(for agentID: String) -> MarketplaceContext {
+        let name = agents.profiles.first { $0.id == agentID }?.name ?? agentID
+        let dependencies = marketplaceDependencies(agentID: agentID)
+        return MarketplaceContext(
+            hostName: workspaceHostName, agentName: name,
+            plugins: dependencies.map { PluginLifecycleManagementModel(client: $0.plugins, keptCopies: .shared) },
+            page: { section in
+                AnyView(marketplacePage(section, agentID: agentID, name: name, dependencies: dependencies))
+            })
+    }
+
+    @ViewBuilder
+    private func marketplacePage(_ section: MarketplaceSection, agentID: String, name: String,
+                                 dependencies: CapabilitiesManagementDependencies?) -> some View {
+        switch section {
+        case .apps:
+            MarketplaceAppsPage(native: connectorAppsModel(), composio: composioAppsModel(for: agentID))
+        case .skills, .plugins:
+            let destination: WorkspaceDestination = section == .skills ? .skills : .plugins
+            if let dependencies, let page = CapabilitiesManagementView(
+                destination: destination, hostName: workspaceHostName, profileName: name, dependencies: dependencies) {
+                page
+            } else {
+                WorkspaceUnavailableView(destination: destination, hostName: workspaceHostName,
+                                         reason: String(localized: "Connect to your computer, then open this again."))
+            }
+        case .messaging:
+            advancedOptionsPage(.messaging, agentID: agentID)
+        }
+    }
+
+    /// The Skills Hub and Plugins clients for `agentID` on the computer in use; demo mode's
+    /// made-up catalogs (`DemoCapabilityCatalogHost`). Nil without a computer.
+    private func marketplaceDependencies(agentID: String) -> CapabilitiesManagementDependencies? {
+        #if DEBUG
+        if usesDemoCapabilityCatalogs, let owner = currentWorkspaceOwner {
+            let host = DemoCapabilityCatalogHost.shared
+            let current: @MainActor () -> WorkspaceOwner? = { currentWorkspaceOwner }
+            return CapabilitiesManagementDependencies(
+                skills: DirectHermesSkillsHubClient(http: host, owner: owner, profileID: agentID, currentOwner: current),
+                mcp: DirectHermesMCPClient(http: host, owner: owner, profileID: agentID, currentOwner: current),
+                plugins: DirectHermesPluginLifecycleClient(http: host, owner: owner, currentOwner: current,
+                                                           marketplace: DemoPluginMarketplace()),
+                toolsets: DirectHermesToolsetClient(http: host, owner: owner, profileID: agentID, currentOwner: current))
+        }
+        #endif
+        guard let owner = currentWorkspaceOwner, let connections = workspaceConnections,
+              let direct = connections.hosts.selectedWorkspace?.nativeClient else { return nil }
+        let current: @MainActor () -> WorkspaceOwner? = { currentWorkspaceOwner }
+        let status = DirectHermesHostOperationsClient(rpc: direct, http: direct, owner: owner, currentOwner: current)
+        return CapabilitiesManagementDependencies(
+            skills: DirectHermesSkillsHubClient(http: direct, owner: owner, profileID: agentID,
+                                                currentOwner: current, actionStatusClient: status),
+            mcp: DirectHermesMCPClient(http: direct, rpc: direct, owner: owner, profileID: agentID,
+                                       currentOwner: current, actionStatusClient: status),
+            plugins: DirectHermesPluginLifecycleClient(
+                http: direct, owner: owner, currentOwner: current,
+                marketplace: DirectHermesPluginMarketplaceClient { [weak connections] in connections?.workspace }),
+            toolsets: DirectHermesToolsetClient(http: direct, owner: owner, profileID: agentID,
+                                                currentOwner: current, actionStatusClient: status))
+    }
+}
+
+/// Makes the Marketplace once, when its page first shows, and keeps it while the page is on the
+/// stack: `navigationDestination` builds its view again on every update.
+struct MarketplaceHost: View {
+    let make: @MainActor () -> MarketplaceContext
+
+    @State private var context: MarketplaceContext?
+
+    var body: some View {
+        Group {
+            if let context {
+                MarketplaceView(context: context)
+            } else {
+                Color.clear
+            }
+        }
+        .onAppear { if context == nil { context = make() } }
+    }
+}

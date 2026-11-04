@@ -37,6 +37,8 @@ struct SettingsView: View {
     var connectorApps: (@MainActor () -> ConnectorAppsModel?)?
     /// Connections › Composio Apps (one Composio sign-in for every computer); nil hides it.
     var composioApps: (@MainActor () -> ComposioAppsModel?)?
+    /// Settings › Marketplace for the agent in use; nil hides the row.
+    var marketplace: (@MainActor () -> MarketplaceContext)?
     /// Connections › Secure credential vault: nil hides the row (no computer chosen), and nil from
     /// the closure means the computer isn't connected right now.
     var credentialVault: (@MainActor () -> CredentialVaultModel?)?
@@ -132,6 +134,7 @@ struct SettingsView: View {
         onOpenRoute: ((AppRoute) -> Void)? = nil,
         connectorApps: (@MainActor () -> ConnectorAppsModel?)? = nil,
         composioApps: (@MainActor () -> ComposioAppsModel?)? = nil,
+        marketplace: (@MainActor () -> MarketplaceContext)? = nil,
         credentialVault: (@MainActor () -> CredentialVaultModel?)? = nil,
         teamwork: (@MainActor () -> TeamworkModel?)? = nil,
         fleet: SettingsFleetAccess? = nil
@@ -140,6 +143,7 @@ struct SettingsView: View {
         self.onOpenRoute = onOpenRoute
         self.connectorApps = connectorApps
         self.composioApps = composioApps
+        self.marketplace = marketplace
         self.credentialVault = credentialVault
         self.teamwork = teamwork
         self.fleet = fleet
@@ -232,6 +236,10 @@ struct SettingsView: View {
                 ComposioAppsView(model: composio)
             } else {
                 appsUnavailable
+            }
+        case .marketplace:
+            if let marketplace {
+                MarketplaceHost(make: marketplace)
             }
         case .connection: connectionPage
         case .bots(let botsPage): simpleBotsPageContent(botsPage)

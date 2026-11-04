@@ -19,6 +19,9 @@ enum SettingsDestination: Hashable, Sendable {
     case nativeAppConnections
     /// Connections › Composio Apps.
     case composioApps
+    /// Marketplace: Apps, Skills, Plugins and Talk anywhere for the agent in use, and this week's
+    /// featured plugin. For everyone, not Nerd Mode.
+    case marketplace
     /// System › Connection & plugin features (Nerd Mode).
     case connection
     /// One page of Bots mode's short Settings.

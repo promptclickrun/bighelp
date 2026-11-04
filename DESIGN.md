@@ -389,8 +389,10 @@ Kanban, Projects; Last chat, the agent's latest chat, until you pick) and Start 
 last, or one of this computer's agents, kept per computer; Agents (multi) has none). It applies when the app starts,
 not when it comes back; a link, widget or notification that opens the app wins, and Kanban or Projects where the
 computer can't open them fall back to Last chat (`BighelpLanding`).
-Host administration — files, gateways/messaging, plugins, MCP, memory, logs, activity — is hidden until **Nerd
-Mode** is on, which adds a Hermes section at the bottom: **System** (Update Hermes with how many commits behind,
+**Marketplace** (Settings › Agents, and a row on each bot's profile for that bot) is for everyone: this week's
+featured plugin (the pick Hermes' marketplace and Desktop show), four ways in (Apps, Skills, Plugins, Talk anywhere
+for messaging apps) and the plugins with the most stars. Host administration — files, MCP, memory, logs,
+activity — is hidden until **Nerd Mode** is on, which adds a Hermes section at the bottom: **System** (Update Hermes with how many commits behind,
 Restart Hermes Gateway, the plugin's Update button, then everything else folded away) and **Hermes tools** (the
 searchable list of the host's tools). There's no separate Hermes Tools entry in ☰. Pages lead with the action
 people come for (`BighelpActionRow`) and keep explanations to one line. **Hosts** lists your computers (the one in

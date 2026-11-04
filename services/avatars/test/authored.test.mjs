@@ -10,7 +10,7 @@ test('publishes authored packs unchanged with their animation settings', async (
     { file: 'helpers', setId: 'bighelp', category: 'bighelp', count: 10 },
     { file: 'halloween', setId: 'halloween', category: 'seasonal', count: 10 },
     { file: 'pocket-curios', setId: 'pocket-curios', category: 'bighelp', count: 20 },
-    { file: 'bitty-bots', setId: 'bitty-bots', category: 'bighelp', count: 15 },
+    { file: 'bitty-bots', setId: 'bitty-bots', category: 'bighelp', count: 16 },
     { file: 'thanksgiving', setId: 'thanksgiving', category: 'seasonal', count: 5 },
     { file: 'christmas', setId: 'christmas', category: 'seasonal', count: 5 },
   ];
@@ -30,7 +30,7 @@ test('publishes authored packs unchanged with their animation settings', async (
       if (file !== 'helpers' && file !== 'halloween') assert.equal(entry.role, character.role);
     }
   }
-  assert.equal(catalog.avatars.length, 83);
+  assert.equal(catalog.avatars.length, 84);
   assert.deepEqual(catalog.sets.find(s => s.id === 'pocket-curios'), {
     id: 'pocket-curios', name: 'Pocket Curios', category: 'bighelp', startsAt: null, expiresAt: null,
   });

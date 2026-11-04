@@ -80,6 +80,49 @@ final class CatalogStorefrontUITests: BighelpUITestCase {
         }
     }
 
+    /// With the plugin's marketplace facts (`DemoPluginMarketplace`): the Popular and New shelves, Install off
+    /// with Hermes' words for a plugin it won't install here, and an update that asks before adding a tool.
+    @MainActor
+    func testMarketplaceFactsAndAnUpdateThatAsksFirst() {
+        for appearance in ["light", "dark"] {
+            let app = launch(appearance: appearance)
+            openHermesTool("plugins", in: app)
+            XCTAssertTrue(app.buttons["plugins.hero"].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.descendants(matching: .any)["plugins.shelf.popular"].exists, "Most stars have a shelf")
+            XCTAssertTrue(app.descendants(matching: .any)["plugins.shelf.recent"].exists, "New plugins have a shelf")
+            evidence("marketplace-home-\(appearance)", app)
+
+            let refused = app.buttons["plugins.card.local-models"].firstMatch
+            XCTAssertTrue(refused.waitForExistence(timeout: 5))
+            refused.tap()
+            let install = app.buttons["plugin.install"]
+            XCTAssertTrue(install.waitForExistence(timeout: 5))
+            XCTAssertFalse(install.isEnabled, "Install is off for a plugin Hermes won't install here")
+            XCTAssertTrue(app.staticTexts["plugin.install.refusal"].label.contains("needs Hermes >=0.30.0"),
+                          "Hermes' own words say why")
+            evidence("marketplace-refused-\(appearance)", app)
+            goBack(in: app)
+
+            let installed = app.buttons["plugins.card.scene-builder"].firstMatch
+            XCTAssertTrue(installed.waitForExistence(timeout: 5))
+            installed.tap()
+            let open = app.buttons["plugin.open"]
+            XCTAssertTrue(open.waitForExistence(timeout: 5))
+            open.tap()
+            let update = app.buttons["plugins.installed.update"]
+            for _ in 0..<4 where !update.isHittable { app.swipeUp() }
+            update.tap()
+            let approve = app.buttons["plugins.installed.update.approve"]
+            for _ in 0..<4 where !approve.isHittable { app.swipeUp() }
+            XCTAssertTrue(approve.waitForExistence(timeout: 10), "Hermes asks before an update adds a tool")
+            XCTAssertTrue(app.staticTexts["tools: scene_export"].exists, "The question names what it adds")
+            evidence("marketplace-update-question-\(appearance)", app)
+            approve.tap()
+            XCTAssertTrue(approve.waitForNonExistence(timeout: 10), "The yes applies the update")
+            app.terminate()
+        }
+    }
+
     /// A skill Hermes' scan blocks can't be added.
     @MainActor
     func testBlockedSkillCannotBeAdded() {

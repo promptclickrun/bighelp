@@ -79,7 +79,9 @@ extension RootShellView {
                                                         currentOwner: current, actionStatusClient: status),
                     mcp: DirectHermesMCPClient(http: direct, rpc: direct, owner: owner, profileID: agentID,
                                                currentOwner: current, actionStatusClient: status),
-                    plugins: DirectHermesPluginLifecycleClient(http: direct, owner: owner, currentOwner: current),
+                    plugins: DirectHermesPluginLifecycleClient(
+                        http: direct, owner: owner, currentOwner: current,
+                        marketplace: DirectHermesPluginMarketplaceClient { [weak connections] in connections?.workspace }),
                     toolsets: DirectHermesToolsetClient(http: direct, owner: owner, profileID: agentID,
                                                         currentOwner: current, actionStatusClient: status)))
             } else if destination == .logs, let workspace = connections.workspace {

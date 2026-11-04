@@ -185,7 +185,11 @@ extension RootShellView {
                     dependencies: CapabilitiesManagementDependencies(
                         skills: DirectHermesSkillsHubClient(http: direct, owner: owner, profileID: profileID, currentOwner: current, actionStatusClient: actionStatusClient),
                         mcp: DirectHermesMCPClient(http: direct, rpc: direct, owner: owner, profileID: profileID, currentOwner: current, actionStatusClient: actionStatusClient),
-                        plugins: DirectHermesPluginLifecycleClient(http: direct, owner: owner, currentOwner: current),
+                        plugins: DirectHermesPluginLifecycleClient(
+                            http: direct, owner: owner, currentOwner: current,
+                            marketplace: DirectHermesPluginMarketplaceClient { [weak workspaceConnections] in
+                                workspaceConnections?.workspace
+                            }),
                         toolsets: DirectHermesToolsetClient(http: direct, owner: owner, profileID: profileID, currentOwner: current, actionStatusClient: actionStatusClient)
                     )
                 )
@@ -270,7 +274,8 @@ extension RootShellView {
             dependencies: CapabilitiesManagementDependencies(
                 skills: DirectHermesSkillsHubClient(http: host, owner: owner, profileID: profileID, currentOwner: current),
                 mcp: DirectHermesMCPClient(http: host, owner: owner, profileID: profileID, currentOwner: current),
-                plugins: DirectHermesPluginLifecycleClient(http: host, owner: owner, currentOwner: current),
+                plugins: DirectHermesPluginLifecycleClient(http: host, owner: owner, currentOwner: current,
+                                                           marketplace: DemoPluginMarketplace()),
                 toolsets: DirectHermesToolsetClient(http: host, owner: owner, profileID: profileID, currentOwner: current)))
         #else
         return nil

@@ -187,6 +187,9 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case chatStop = "chat.stop"
     /// What each agent's Bot Chat is doing, in one read (plugin, `native-agents-activity-v1`).
     case agentsActivity = "agents.activity"
+    /// Hermes' marketplace facts for the catalog plugins and the ones this computer won't install
+    /// (plugin, `native-marketplace-v1`).
+    case marketplacePlugins = "marketplace.plugins"
     /// An agent's Bot Chat, made by Hermes itself as its own chat (plugin, `native-bot-chat-v1`). A chat the
     /// app makes over its socket is one Hermes replaces when another agent messages that agent.
     case botChatCreate = "bot-chat.create"

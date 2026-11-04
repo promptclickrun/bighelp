@@ -1,8 +1,8 @@
 import Foundation
 
-// The Skills Hub and Plugins storefronts, worked out from what the host lists. Everything here
-// comes from the host's own fields (tier, category, source): nothing is curated, starred or dated
-// by the app, because the host routes say nothing of the kind.
+// The Skills Hub and Plugins storefronts, worked out from what the host lists: its own fields (tier,
+// category, source) and, for plugins, Hermes' marketplace facts the bighelp plugin adds (stars, the
+// curated featured picks, dates). The app curates, stars and dates nothing itself.
 
 /// A catalog topic as the host names it (`memory`, `data-science`), with its name, symbol and
 /// tile color. The same topic always gets the same color.
@@ -71,13 +71,14 @@ extension PluginCatalogEntry {
 
     var isTrusted: Bool { tierRank < 2 }
 
-    /// The banner a list (shelf, hero, grid) may load: official and verified plugins only. A
-    /// community plugin's picture is on its author's server and loads only on its own page.
-    var listedImageURL: URL? { isTrusted ? imageURL : nil }
+    /// The banner a list (shelf, hero, grid) may load: official and verified plugins, and the ones Nous
+    /// features. Another community plugin's picture is on its author's server and loads only on its own page.
+    var listedImageURL: URL? { isTrusted || marketplace.featuredRank != nil ? imageURL : nil }
 }
 
-/// The Plugins home: one featured plugin, a shelf of official and verified ones, then a shelf per
-/// topic. Desktop plugins (JavaScript for the Hermes Desktop app) come last everywhere.
+/// The Plugins home: one featured plugin, a shelf of official and verified ones, the most starred and
+/// the newest, then a shelf per topic. Desktop plugins (JavaScript for the Hermes Desktop app) come last
+/// in the topic shelves.
 struct PluginStorefront: Equatable {
     struct Shelf: Identifiable, Equatable {
         let category: CatalogCategory
@@ -85,20 +86,38 @@ struct PluginStorefront: Equatable {
         var id: String { category.id }
     }
 
-    /// An official plugin, preferring one not installed yet and one with a banner.
+    static let newWindow: TimeInterval = 30 * 24 * 60 * 60
+
+    /// This week's featured pick, as Hermes' marketplace and Desktop show it; without the marketplace's
+    /// picks, an official plugin, preferring one not installed yet and one with a banner.
     let hero: PluginCatalogEntry?
+    /// Whether the hero is one of Nous' featured picks rather than the app's own choice.
+    let heroIsFeatured: Bool
     /// Official before verified, without the hero.
     let trusted: [PluginCatalogEntry]
+    /// Most GitHub stars first; empty without the marketplace's stars.
+    let popular: [PluginCatalogEntry]
+    /// Added in the last 30 days, newest first; empty without the marketplace's dates.
+    let recent: [PluginCatalogEntry]
     /// Biggest topic first, ties by the host's topic name; desktop last.
     let shelves: [Shelf]
 
-    init(catalog: [PluginCatalogEntry]) {
+    init(catalog: [PluginCatalogEntry], now: Date = .now) {
         let listed = catalog.filter { $0.removedReason == nil }
+        let featured = Self.featuredPicks(listed, now: now)
         let candidates = listed.filter { $0.tierRank == 0 && $0.catalogCategory != .desktop }
-        let hero = candidates.stableSorted { entry in
+        let hero = featured.first ?? candidates.stableSorted { entry in
             (entry.isInstalled ? 2 : 0) + (entry.imageURL == nil ? 1 : 0)
         }.first
         self.hero = hero
+        heroIsFeatured = !featured.isEmpty
+
+        popular = listed
+            .filter { ($0.marketplace.stars ?? 0) > 0 }
+            .stableSorted { -($0.marketplace.stars ?? 0) }
+        recent = listed
+            .filter { ($0.marketplace.addedAt ?? .distantPast) > now.addingTimeInterval(-Self.newWindow) }
+            .stableSorted { -Int(($0.marketplace.addedAt ?? .distantPast).timeIntervalSince1970) }
 
         trusted = listed
             .filter { $0.isTrusted && $0.id != hero?.id }
@@ -113,6 +132,19 @@ struct PluginStorefront: Equatable {
                 if left.entries.count != right.entries.count { return left.entries.count > right.entries.count }
                 return left.category.id < right.category.id
             }
+    }
+
+    /// The curated picks in rank order, starting at this week's: Hermes' `featuredPicks`
+    /// (apps/shared/src/catalog-featured.ts), so bighelp features the same plugin as the marketplace
+    /// and Hermes Desktop at the same time.
+    static func featuredPicks(_ catalog: [PluginCatalogEntry], now: Date) -> [PluginCatalogEntry] {
+        let curated = catalog
+            .filter { $0.marketplace.featuredRank != nil }
+            .stableSorted { $0.marketplace.featuredRank ?? 0 }
+        guard !curated.isEmpty else { return [] }
+        let week: Double = 7 * 24 * 60 * 60 * 1_000
+        let start = Int((now.timeIntervalSince1970 * 1_000 / week).rounded(.down)) % curated.count
+        return Array(curated[start...] + curated[..<start])
     }
 
     /// Catalog plugins whose name, title, summary, maintainer, topic or tier mention `query`;

@@ -415,6 +415,10 @@ final class DirectHermesNativePluginClient {
             // Read every few seconds while Bots mode's home or the Agents screen shows; at most 64 agents.
             return Route(path: "agents/activity", feature: DirectHermesBotChatActivityClient.feature,
                          isMutation: false, maximumResponseBytes: 32_768, timeout: 10)
+        case .marketplacePlugins:
+            // About 100 KB for 1,000 plugins. The first read of a day waits on the marketplace feed.
+            return Route(path: "marketplace/plugins", feature: DirectHermesPluginMarketplaceClient.feature,
+                         isMutation: false, maximumResponseBytes: 1_048_576, timeout: 30)
         case .botChatCreate:
             // Hermes may start the agent's own gateway first.
             return Route(path: "bot-chat/create", feature: "native-bot-chat-v1", isMutation: true,

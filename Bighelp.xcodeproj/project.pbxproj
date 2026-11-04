@@ -310,6 +310,7 @@
 		29EC48C57231CCE75BDF7269 /* BotModeRoomHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDEFB7BA37C703C0BAE31F85 /* BotModeRoomHeader.swift */; };
 		2A1A5A34DBC88CDBBD58AB0D /* SettingsPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = E123B0E2B74533F9785306C5 /* SettingsPreferences.swift */; };
 		2A811F391A35F3D5B99B13AD /* sealed-alert-v2-vector.json in Resources */ = {isa = PBXBuildFile; fileRef = 4D5BB3FF93B2BFBE1309307F /* sealed-alert-v2-vector.json */; };
+		2A9B76AAB859A209C1819624 /* PluginMarketplaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A5D4E05C574182D219973E /* PluginMarketplaceTests.swift */; };
 		2AD5EC547A554B6CEDDE45B7 /* ManagementSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 578DE4F4361908BAD8275D2F /* ManagementSearch.swift */; };
 		2B280F14781611D6C34CBDD5 /* ChatTimelineBuiltRowsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C5208F6702E30ED928E2AC /* ChatTimelineBuiltRowsTests.swift */; };
 		2B6D0A06A0AAE3B12BABC044 /* DirectHermesGoalControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 748B753134C12DD4B400F46B /* DirectHermesGoalControl.swift */; };
@@ -392,6 +393,7 @@
 		3636C8733259472FEA47FAB4 /* ReferenceSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B626CC553921E60F230F7A70 /* ReferenceSnapshot.swift */; };
 		366E76186FAAE029F87223E3 /* BighelpSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F02766D9D4984C22732DDBF /* BighelpSurface.swift */; };
 		36B7524D0B1D91AA51D0F9B1 /* DirectHermesProjectLifecycleClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 443A7C01587F2C21EA5FAA7E /* DirectHermesProjectLifecycleClient.swift */; };
+		36C74B81F5DA51EB60A6981B /* DirectHermesPluginMarketplaceClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ABF2AA18FBBB0465589AD8E /* DirectHermesPluginMarketplaceClient.swift */; };
 		36D0665883394BC3945B7E06 /* KanbanStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31FE492B5B8378E9BE51DE32 /* KanbanStore.swift */; };
 		36E55359D4641854EF9DC789 /* ChatQuickActionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFCDE26931664C3249FF5F51 /* ChatQuickActionsView.swift */; };
 		3707BAC5F0A4E65FFD234CEB /* bind.json in Resources */ = {isa = PBXBuildFile; fileRef = 1C51E3C7B81A108AFEBB7280 /* bind.json */; };
@@ -2160,6 +2162,7 @@
 		0A7B774C0D35C14AB87E728E /* BotScreenService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotScreenService.swift; sourceTree = "<group>"; };
 		0AA149A91C174FCC77294C45 /* WorkspaceDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceDestination.swift; sourceTree = "<group>"; };
 		0AB026970720F93BD368C18E /* DevicePhotosTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicePhotosTool.swift; sourceTree = "<group>"; };
+		0ABF2AA18FBBB0465589AD8E /* DirectHermesPluginMarketplaceClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesPluginMarketplaceClient.swift; sourceTree = "<group>"; };
 		0AF9B290647073A148F1F303 /* CompanionComposerPathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionComposerPathTests.swift; sourceTree = "<group>"; };
 		0B2B706F0F95D18D12795BAB /* HermesAgentMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesAgentMetadata.swift; sourceTree = "<group>"; };
 		0B71701C4FEF495DC27B8E39 /* WikiPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikiPersistence.swift; sourceTree = "<group>"; };
@@ -3566,6 +3569,7 @@
 		C271290F18E5D080853ABFAF /* BighelpPullToRefresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpPullToRefresh.swift; sourceTree = "<group>"; };
 		C2736E14A6C1285C6665669A /* SkippedPartsNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkippedPartsNote.swift; sourceTree = "<group>"; };
 		C28FC793B551D3283801E600 /* BotModeActivityFixtureClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotModeActivityFixtureClient.swift; sourceTree = "<group>"; };
+		C2A5D4E05C574182D219973E /* PluginMarketplaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginMarketplaceTests.swift; sourceTree = "<group>"; };
 		C2DF42FA63155EFDF4DFC2E1 /* DirectHermesCatalogListScaleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesCatalogListScaleTests.swift; sourceTree = "<group>"; };
 		C3343ABABDB79BADCF447EEF /* BighelpMenuRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpMenuRow.swift; sourceTree = "<group>"; };
 		C340AD81178E4864E29F460B /* WebRTC-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "WebRTC-LICENSE.txt"; sourceTree = "<group>"; };
@@ -5481,6 +5485,7 @@
 				0F842CFD9DCD39F9FA5F5C67 /* PinnedModelTests.swift */,
 				9E7ADD0C0DF1D016B710F5AC /* PluginChangeSpeedTests.swift */,
 				3D872DDCD20D631822E6FB66 /* PluginLatestReleaseTests.swift */,
+				C2A5D4E05C574182D219973E /* PluginMarketplaceTests.swift */,
 				EE77E909503B789EBF514EC9 /* PluginUpdateStoreTests.swift */,
 				BE5198D653522270B0E3E3BD /* PluginUpdateWorkspaceClientTests.swift */,
 				7D6F7B0C6B71878310AF32D1 /* PrimaryNavigationSelectionTests.swift */,
@@ -6478,6 +6483,7 @@
 				8D3876EEE966594BB31EE4EB /* DirectHermesPayloadDecoding.swift */,
 				18306E9412C2D2A2A5013368 /* DirectHermesPDFAttachments.swift */,
 				8A1418805D01E397603B568C /* DirectHermesPluginLifecycleClient.swift */,
+				0ABF2AA18FBBB0465589AD8E /* DirectHermesPluginMarketplaceClient.swift */,
 				CBF81A312E1F1FE2ABE65A48 /* DirectHermesProfileLifecycleClient.swift */,
 				CD6C73C58CE6825A6B97228F /* DirectHermesProjectClient.swift */,
 				3AFA6E2F7D42A8AB897FBA47 /* DirectHermesProjectGitClient.swift */,
@@ -7916,6 +7922,7 @@
 				422D06B571DBDD21DCE31AC8 /* DirectHermesPairingClient.swift in Sources */,
 				AAABBBF74D7023621067377F /* DirectHermesPayloadDecoding.swift in Sources */,
 				8C6E9258ED83517A22EB52BD /* DirectHermesPluginLifecycleClient.swift in Sources */,
+				36C74B81F5DA51EB60A6981B /* DirectHermesPluginMarketplaceClient.swift in Sources */,
 				A1C4720F9CA1AAB927977006 /* DirectHermesProfileLifecycleClient.swift in Sources */,
 				35F9E51CCF032CAFC59A2CAC /* DirectHermesProjectClient.swift in Sources */,
 				1B94A32B9D32D30BB823D2F6 /* DirectHermesProjectGitClient.swift in Sources */,
@@ -8950,6 +8957,7 @@
 				053EB5E11B8F26BDA0FCDB09 /* PinnedModelTests.swift in Sources */,
 				7280ACE3BC73929C6303667A /* PluginChangeSpeedTests.swift in Sources */,
 				C20D6BD01B004645500872FB /* PluginLatestReleaseTests.swift in Sources */,
+				2A9B76AAB859A209C1819624 /* PluginMarketplaceTests.swift in Sources */,
 				595DFFBFA88D2E6B6FFA9AB6 /* PluginUpdateStoreTests.swift in Sources */,
 				5AC0BB82A250434BD7BC12E5 /* PluginUpdateWorkspaceClientTests.swift in Sources */,
 				AAFC950C49292EDF9A0EA8B6 /* PrimaryNavigationSelectionTests.swift in Sources */,

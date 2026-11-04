@@ -3,6 +3,18 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.59
+
+### Fixed
+
+- **Character opens Bot Studio:** in a bot's profile, tap Character to open Edit avatar. You can then choose Bot Studio, PetDex or a photo.
+- **Avatars do not move until you choose a move:** a new avatar is Calm. Surprise me does not add a move.
+- **A new body starts with its own defaults:** a different body does not keep the eyes, tilt, lean, size or move of the last body.
+
+### Changed
+
+- **Primary bot:** the star on the primary bot is gone.
+
 ## 2.6.58
 
 ### New

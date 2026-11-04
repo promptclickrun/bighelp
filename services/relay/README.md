@@ -126,10 +126,20 @@ is not a production deployment configuration. Never deploy it.
 The current checks are `Scripts/managed-relay-build.test.mjs` for byte-exact
 baseline assembly and derivative parsing, and
 `Scripts/managed-relay-runtime.test.mjs` for the managed-notification derivative's
-behavior. Run them from the repository root:
+behavior. The runtime check needs the `services/link` dependencies (including
+Wrangler), a Python environment with `cryptography`, and a compatible
+`bighelp-plugin` checkout. Set `HERMES_PYTHON` to that Python executable and
+`BIGHELP_PLUGIN_DIR` to the plugin checkout; the defaults are
+`~/.hermes/hermes-agent/.venv/bin/python` and `.ci/plugin` respectively.
+
+From the repository root, install the dependencies and run the checks in order.
+The build check generates `worker-notifications.js`, which the runtime check
+reads; do not run the two files concurrently.
 
 ```sh
-node --test Scripts/managed-relay-build.test.mjs Scripts/managed-relay-runtime.test.mjs
+(cd services/link && pnpm install --frozen-lockfile)
+node --test Scripts/managed-relay-build.test.mjs &&
+  node --test Scripts/managed-relay-runtime.test.mjs
 ```
 
 The original recovery also recorded this local packaging check:

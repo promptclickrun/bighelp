@@ -181,6 +181,7 @@ final class SimpleBotsUITests: BighelpUITestCase {
     func testProfileOpensTheStudioAndTheModelPicker() throws {
         let app = launch(appearance: "dark")
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
+        save("simple-home-dark", app)
         app.buttons["simple-bots.primary"].tap()
         let identity = app.buttons["chat.identity"]
         XCTAssertTrue(identity.waitForExistence(timeout: 10))
@@ -191,10 +192,8 @@ final class SimpleBotsUITests: BighelpUITestCase {
         info.tap()
         save("simple-profile-rows-dark", app)
 
+        // Character opens Edit avatar at once: Bot Studio, PetDex or a photo.
         app.buttons["simple-bots.profile.character"].tap()
-        let more = app.buttons["simple-bots.profile.more-avatars"]
-        XCTAssertTrue(more.waitForExistence(timeout: 5))
-        more.tap()
         let studio = app.descendants(matching: .any)["avatar.chooser.studio"].firstMatch
         XCTAssertTrue(studio.waitForExistence(timeout: 5), "Edit avatar offers Bot Studio")
         XCTAssertTrue(app.descendants(matching: .any)["avatar.chooser.petdex"].firstMatch.exists, "And PetDex")

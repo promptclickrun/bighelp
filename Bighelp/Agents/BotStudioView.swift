@@ -122,7 +122,9 @@ struct BotStudioView: View {
                 Spacer()
                 Button {
                     let bodies = library.catalog.available(at: .now).flatMap(\.bodies)
-                    guard let surprise = BotLook.surprise(from: bodies) else { return }
+                    guard var surprise = BotLook.surprise(from: bodies) else { return }
+                    // A move the person picked stays; Surprise me never adds one.
+                    surprise.move = look.move
                     change { $0 = surprise }
                 } label: {
                     Label("Surprise me", systemImage: "dice")
@@ -222,10 +224,10 @@ struct BotStudioView: View {
             chips([("", "All")] + sets.map { ($0.set.id, $0.set.name) },
                   selected: setID ?? "") { setID = $0.isEmpty ? nil : $0 }
             tiles(shown, id: \.id) { body in
-                var preview = look
-                preview.use(body)
-                return (preview, body.id == look.body.id, body.name)
+                // Each body as it comes, which is what picking it gives.
+                (body.id == look.body.id ? look : BotLook(body: body), body.id == look.body.id, body.name)
             } pick: { body in
+                guard body.id != look.body.id else { return }
                 change { $0.use(body) }
             }
         }
@@ -306,7 +308,7 @@ struct BotStudioView: View {
     private var movesRow: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
             chips(BotLook.Move.allCases.map { ($0.rawValue, $0.title) }, selected: look.move.rawValue) { raw in
-                change { $0.move = BotLook.Move(rawValue: raw) ?? .bounce }
+                change { $0.move = BotLook.Move(rawValue: raw) ?? .calm }
                 trying = nil
             }
             Text("Try how it looks while your agent works")

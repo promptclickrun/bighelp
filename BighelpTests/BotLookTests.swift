@@ -63,7 +63,7 @@ struct BotLookTests {
         """
         let look = try JSONDecoder().decode(BotLook.self, from: Data(json.utf8))
         #expect(look.eyes == .classic)
-        #expect(look.move == .bounce)
+        #expect(look.move == .calm, "An unknown move is no move")
         #expect(look.tilt == BotLook.tilts.upperBound)
         #expect(look.eyeSize == BotLook.eyeSizes.lowerBound)
         #expect(look.main == look.body.colors.main)
@@ -133,6 +133,45 @@ struct BotLookTests {
         }
         look.eyeColor = "#0F766E"
         #expect(look.resolvedEyeColor == "#0F766E")
+    }
+
+    /// No avatar starts with a move: not a new one, not a surprise, and not one 2.6.58 saved with its
+    /// old default. A move the person picks is kept.
+    @Test func avatarsStartCalm() throws {
+        let body = try #require(BotBodyCatalog.bundled.body(id: "bits.bop"))
+        #expect(BotLook(body: body).move == .calm)
+        var generator = SystemRandomNumberGenerator()
+        for _ in 0..<50 {
+            #expect(BotLook.surprise(from: BotBodyCatalog.bundled.bodies, using: &generator)?.move == .calm)
+        }
+        let saved = try JSONEncoder().encode(body)
+        func read(_ extra: String) throws -> BotLook {
+            try JSONDecoder().decode(BotLook.self, from: Data(#"{"body": \#(String(decoding: saved, as: UTF8.self))\#(extra)}"#.utf8))
+        }
+        #expect(try read(#", "move": "bounce""#).move == .calm, "2.6.58 saved its default")
+        #expect(try read(#", "move": "dance""#).move == .dance, "A picked move stays")
+        #expect(try read(#", "move": "bounce", "version": 2"#).move == .bounce, "Picked since, it stays")
+        var picked = BotLook(body: body)
+        picked.move = .bounce
+        #expect(try JSONDecoder().decode(BotLook.self, from: JSONEncoder().encode(picked)).move == .bounce)
+    }
+
+    /// Choices made for one body never carry over to the next.
+    @Test func newBodyStartsAsItComes() throws {
+        let catalog = BotBodyCatalog.bundled
+        var look = BotLook(body: try #require(catalog.body(id: "shapes.peak")))
+        look.eyes = .visor
+        look.tilt = 20
+        look.lean = -15
+        look.stretch = 0.8
+        look.scale = 1.1
+        look.mirror = true
+        look.cheeks = true
+        look.mouth = .smile
+        look.move = .dance
+        let mug = try #require(catalog.body(id: "bitty-bots.brew"))
+        look.use(mug)
+        #expect(look == BotLook(body: mug))
     }
 
     @Test func surpriseStaysInRange() throws {

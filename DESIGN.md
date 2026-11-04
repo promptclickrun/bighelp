@@ -480,7 +480,7 @@ picked a bubble color in Appearance, and buttons and tinted text are the page's 
 text is SF Pro, as everywhere.
 
 - **Home**: your circle top left opens Settings; search and + (New Bot, New Group Chat) top right. The
-  primary bot (with a star) and pinned bots share the top, all the same size: one large, else two or three
+  primary bot (no badge) and pinned bots share the top, all the same size: one large, else two or three
   across, six at most in two rows. Only pins the top shows count toward the six, not the primary bot, hidden bots
   or ones this computer no longer has. Their marks blink now and then (never with Reduce Motion). Under them every
   other bot and each group chat, with the latest message and its time; a bot's role is a small gray label after
@@ -518,9 +518,9 @@ text is SF Pro, as everywhere.
   one), Files and Media. Holding a tab shows a glass bar above it with Set Default (the tab profiles open on;
   Dashboard until one is set; a note confirms it) and Rearrange (the tabs become glass chips to drag where they
   are, the tab below fades, Done in the header). Both are one choice for every bot (`SimpleBotProfileTabs`); the
-  Mac also offers them on a right-click. Character is Info's first row, with the bot's mark at its end; it opens a
-  sheet with the shapes, colors, Reset to default and More avatars. More avatars opens the full avatar studio
-  (`AvatarCreatorView`) with the marks as its Bots section; Save applies the pick at once. Default Model is the
+  Mac also offers them on a right-click. Character is Info's first row, with the bot's face at its end; it opens Edit avatar at once
+  (`AvatarChooserView`: Bot Studio, PetDex or a photo), and Save applies the pick at once. An avatar starts Calm:
+  a move plays only once the person picks one, and Surprise me never adds one. Default Model is the
   model and reasoning picker, saved as the bot's default for chats. Default Voice picks this bot's TTS or GPT Live
   and its provider, model and voice from lists (saved per bot). Advanced Options is the bot's one simple doorway
   to its Nerd Mode settings: plain rows with a tip each (Approvals: Smart, Manual or Off), and links to its Nerd

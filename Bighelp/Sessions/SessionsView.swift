@@ -34,6 +34,8 @@ struct SessionsView: View {
 
     @State private var model: SessionsModel
     @State private var actionDialog: ActionDialog?
+    /// The chat whose "Move to Project" sheet is open.
+    @State private var projectMoveTarget: SessionSummary?
     @State private var renameDraft = ""
     @State private var mutatingSessionIDs = Set<String>()
     @State private var draggedSessionSectionKey: SessionSectionKey?
@@ -64,6 +66,9 @@ struct SessionsView: View {
     let sharedAppFilter: Binding<SessionAppFilter>?
     /// A Codex or Claude Code chat to preview once the list is there (picked on All sessions).
     let requestedOtherAppChat: Binding<HermesForeignSessionItem?>?
+    /// Files a chat into another of its computer's projects. Nil leaves
+    /// "Move to Project" out of a chat's menu.
+    let chatProjectMove: (any ChatProjectMoving)?
 
     init(
         model: SessionsModel,
@@ -79,8 +84,10 @@ struct SessionsView: View {
         otherApps: (source: any OtherAppChatsSource, id: String)? = nil,
         onOpenBroughtIn: ((String) -> Void)? = nil,
         appFilter: Binding<SessionAppFilter>? = nil,
-        requestedOtherAppChat: Binding<HermesForeignSessionItem?>? = nil
+        requestedOtherAppChat: Binding<HermesForeignSessionItem?>? = nil,
+        chatProjectMove: (any ChatProjectMoving)? = nil
     ) {
+        self.chatProjectMove = chatProjectMove
         self.otherApps = otherApps
         self.sharedAppFilter = appFilter
         self.requestedOtherAppChat = requestedOtherAppChat
@@ -222,6 +229,20 @@ struct SessionsView: View {
                 Text("Delete “\(session.title)” permanently? This cannot be undone.")
             case .error(let message):
                 Text(message)
+            }
+        }
+        .sheet(item: $projectMoveTarget) { session in
+            if let chatProjectMove, let agentID = session.agentIDs.first {
+                MoveChatProjectSheet(
+                    chatTitle: session.title,
+                    agentID: agentID,
+                    sessionID: session.id,
+                    currentProjectID: session.workspaceID,
+                    mover: chatProjectMove,
+                    onMoved: { project in
+                        model.recordMovedProject(project, sessionID: session.id)
+                    }
+                )
             }
         }
         .agentActionsPresentation(agentActions, config: agentActionsConfig)
@@ -861,6 +882,15 @@ struct SessionsView: View {
             }
             .accessibilityIdentifier("session.action.rename.\(session.id)")
 
+            if chatProjectMove != nil, !session.agentIDs.isEmpty {
+                Button {
+                    projectMoveTarget = session
+                } label: {
+                    Label("Move to Project", systemImage: "folder.badge.plus")
+                }
+                .accessibilityIdentifier("session.action.move-project.\(session.id)")
+            }
+
             Button {
                 performMutation(sessionID: session.id) {
                     try await model.setSessionPinned(id: session.id, pinned: !session.isPinned)
@@ -900,6 +930,13 @@ struct SessionsView: View {
                 renameDraft = session.title
                 actionDialog = .rename(session)
             },
+        ]
+        if chatProjectMove != nil, !session.agentIDs.isEmpty {
+            items.append(MacTileMenu.Item(title: "Move to Project", systemImage: "folder.badge.plus") {
+                projectMoveTarget = session
+            })
+        }
+        items.append(contentsOf: [
             MacTileMenu.Item(title: session.isPinned ? "Unpin" : "Pin",
                              systemImage: session.isPinned ? "pin.slash" : "pin") {
                 performMutation(sessionID: session.id) {
@@ -911,7 +948,7 @@ struct SessionsView: View {
                     try await model.archiveSession(id: session.id)
                 }
             },
-        ]
+        ])
         if model.canDeleteConversation {
             items.append(MacTileMenu.Item(title: "Delete", systemImage: "trash", isDestructive: true, startsGroup: true) {
                 actionDialog = .delete(session)
@@ -1396,4 +1433,135 @@ private struct OtherAppsKey: Equatable {
 private struct RequestedPreviewKey: Equatable {
     let item: String?
     let list: String?
+}
+
+/// Files one chat into another of its computer's projects. Hermes is the source
+/// of truth: the chat is only listed under the new project once the host
+/// confirms it, and a refusal leaves this sheet open with the reason.
+struct MoveChatProjectSheet: View {
+    let chatTitle: String
+    let agentID: String
+    let sessionID: String
+    let currentProjectID: String?
+    let mover: any ChatProjectMoving
+    let onMoved: (ChatProjectChoice) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var projects: [ChatProjectChoice] = []
+    @State private var isLoading = true
+    @State private var movingID: String?
+    @State private var loadError: String?
+    @State private var moveError: String?
+
+    var body: some View {
+        NavigationStack {
+            content
+                .navigationTitle("Move to Project")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                            .accessibilityIdentifier("move-project.cancel")
+                    }
+                }
+        }
+        .task(id: agentID) { await load() }
+        .presentationDetents([.medium, .large])
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if isLoading {
+            ProgressView("Loading projects")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let loadError {
+            ContentUnavailableView {
+                Label("Projects could not be loaded", systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(loadError)
+            } actions: {
+                Button("Try again") { Task { await load() } }
+                    .accessibilityIdentifier("move-project.retry")
+            }
+        } else if projects.isEmpty {
+            ContentUnavailableView {
+                Label("No projects yet", systemImage: "folder")
+            } description: {
+                Text("Create a project on this chat's computer first, then move the chat into it.")
+            }
+        } else {
+            List {
+                Section {
+                    ForEach(projects) { project in
+                        row(project)
+                    }
+                } footer: {
+                    if let moveError {
+                        Text(moveError)
+                            .foregroundStyle(.red)
+                            .accessibilityIdentifier("move-project.error")
+                    }
+                }
+            }
+        }
+    }
+
+    /// A project to move into. The one the chat is already in says so, and does
+    /// nothing if picked.
+    private func row(_ project: ChatProjectChoice) -> some View {
+        Button {
+            guard movingID == nil, project.id != currentProjectID else { return }
+            movingID = project.id
+            moveError = nil
+            Task {
+                defer { movingID = nil }
+                do {
+                    if let moved = try await mover.move(
+                        sessionID: sessionID,
+                        agentID: agentID,
+                        projectID: project.id
+                    ) {
+                        onMoved(moved)
+                        dismiss()
+                    } else {
+                        moveError = "Hermes did not move “\(chatTitle)”. Try again."
+                    }
+                } catch is CancellationError {
+                } catch {
+                    moveError = "bighelp could not move “\(chatTitle)”. Try again."
+                }
+            }
+        } label: {
+            HStack {
+                Text(project.name)
+                    .foregroundStyle(theme.primaryText)
+                Spacer()
+                if project.id == currentProjectID {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(theme.secondaryText)
+                } else if movingID == project.id {
+                    ProgressView()
+                }
+            }
+            .contentShape(.rect)
+        }
+        .disabled(movingID != nil)
+        .accessibilityIdentifier("move-project.row.\(project.id)")
+        .accessibilityAddTraits(project.id == currentProjectID ? .isSelected : [])
+    }
+
+    private func load() async {
+        isLoading = true
+        loadError = nil
+        do {
+            projects = try await mover.projects(agentID: agentID)
+        } catch is CancellationError {
+            return
+        } catch {
+            loadError = "The project list did not come back from this chat's computer."
+        }
+        isLoading = false
+    }
+
+    @BighelpThemeReader private var theme
 }

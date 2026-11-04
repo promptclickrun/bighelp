@@ -41,6 +41,8 @@ struct ChatDestinationView: View {
     @State private var opensMenuAfterVoice = false
     @State private var modelPickerRequest = 0
     @State private var isProjectChangesPresented = false
+    /// This chat asked to move to another project (This chat › Move to Project).
+    @State private var projectMoveRequest: ChatProjectMoveRequest?
     @State private var projectChangesPanelWidth: CGFloat = ProjectChangesPanelWidthPolicy.minimum
     @State private var projectChangesPanelDragStartWidth: CGFloat?
 
@@ -191,6 +193,23 @@ struct ChatDestinationView: View {
                                     permissionCenter: permissionCenter))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("chat.canvas")
+            .sheet(item: $projectMoveRequest) { request in
+                MoveChatProjectSheet(
+                    chatTitle: request.title,
+                    agentID: request.agentID,
+                    sessionID: request.id,
+                    currentProjectID: request.currentProjectID,
+                    mover: hermesWorkspaces.chatProjectMover(),
+                    onMoved: { project in
+                        catalog.reconcileSessionWorkspace(
+                            id: project.id,
+                            name: project.name,
+                            sessionID: request.id
+                        )
+                        projectChanges.requestRefresh()
+                    }
+                )
+            }
             .background {
                 ChatReplyReading(model: model, reader: replyReader,
                                  isOn: settings.autoSpeakRepliesEnabled && voicePresentation == nil && voiceBar == nil,
@@ -387,6 +406,15 @@ struct ChatDestinationView: View {
             onApprovalTap: onOpenApproval,
             onPeopleTap: { isPeopleAndChatPresented = true },
             onChatFilesTap: { isSessionFilesPresented = true },
+            onMoveToProject: {
+                projectMoveRequest = ChatProjectMoveRequest(
+                    id: model.conversationID,
+                    title: model.sourceSession?.title ?? "this chat",
+                    agentID: model.agentID,
+                    currentProjectID: hermesWorkspaces.workspaceID(forSessionID: model.conversationID)
+                        ?? model.sessionWorkspaceID
+                )
+            },
             onChatAppearanceTap: sessionAppearance == nil ? nil : { isChatAppearancePresented = true },
             onNewChatTap: onNewChat,
             onOpenProviderAccounts: model.nativeConversationClient == nil ? nil : onOpenProviderAccounts,
@@ -1067,4 +1095,13 @@ private struct ProjectChangesRefreshTrigger: ViewModifier {
             String(model.isSending),
         ].joined(separator: "|")
     }
+}
+
+/// A chat the person asked to file into another project, from This chat ›
+/// Move to Project.
+struct ChatProjectMoveRequest: Identifiable {
+    let id: String
+    let title: String
+    let agentID: String
+    let currentProjectID: String?
 }

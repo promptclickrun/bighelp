@@ -144,6 +144,9 @@ struct ChatView: View {
     /// This chat's files, look and (Nerd Mode) Hermes session tools, from the ⋯ menu.
     /// Nil leaves the item out.
     let onChatFilesTap: (() -> Void)?
+    /// Files this chat under another of its agent's projects (This chat ›
+    /// Move to Project). Nil leaves the item out.
+    let onMoveToProject: (() -> Void)?
     let onChatAppearanceTap: (() -> Void)?
     let onNewChatTap: () -> Void
     /// Settings › AI providers, for a failed turn's Fix sign-in. Nil leaves the button out.
@@ -230,6 +233,7 @@ struct ChatView: View {
         onApprovalTap: @escaping (ApprovalRequest) -> Void = { _ in },
         onPeopleTap: @escaping () -> Void = {},
         onChatFilesTap: (() -> Void)? = nil,
+        onMoveToProject: (() -> Void)? = nil,
         onChatAppearanceTap: (() -> Void)? = nil,
         onNewChatTap: @escaping () -> Void = {},
         onOpenProviderAccounts: (() -> Void)? = nil,
@@ -277,6 +281,7 @@ struct ChatView: View {
         self.onApprovalTap = onApprovalTap
         self.onPeopleTap = onPeopleTap
         self.onChatFilesTap = onChatFilesTap
+        self.onMoveToProject = onMoveToProject
         self.onChatAppearanceTap = onChatAppearanceTap
         self.onNewChatTap = onNewChatTap
         self.onOpenProviderAccounts = onOpenProviderAccounts
@@ -1174,6 +1179,13 @@ struct ChatView: View {
                     onChatFilesTap()
                 }
                 .accessibilityIdentifier("chat.files")
+            }
+            if let onMoveToProject, sessionCatalog != nil, !model.isBotMode {
+                Button("Move to Project", systemImage: "folder.badge.plus") {
+                    dismissKeyboard()
+                    onMoveToProject()
+                }
+                .accessibilityIdentifier("chat.move-project")
             }
             if !dynamicTypeSize.isAccessibilitySize { chatAppearanceMenuItem }
             if !model.isBotMode {

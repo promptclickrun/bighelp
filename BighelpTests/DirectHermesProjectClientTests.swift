@@ -393,3 +393,122 @@ private final class ProjectPerformer: WorkspaceOperationPerforming {
         return result
     }
 }
+
+/// Move to Project: the transport could always file a chat under a project
+/// (`select` with a `sessionID`); nothing in the UI asked for it. These cover
+/// the mover the two chat menus use, which must claim a move only when the
+/// host confirms it.
+@MainActor
+struct ChatProjectMoverTests {
+    @Test func listsAComputersProjectsAsChoices() async throws {
+        let client = StubProjectCatalogClient()
+        client.catalog = fixtureCatalog(sessionWorkspaceID: nil)
+        let mover = HermesWorkspaceChatProjectMover(client: client)
+
+        let projects = try await mover.projects(agentID: "research")
+
+        #expect(projects.map(\.id) == ["p_notes", "p_archive"])
+        #expect(projects.map(\.name) == ["Notes", "Archive"])
+        #expect(client.loadAgentIDs == ["research"])
+    }
+
+    @Test func moveAsksTheHostToRehomeTheChatAndConfirmsIt() async throws {
+        let client = StubProjectCatalogClient()
+        client.catalog = fixtureCatalog(sessionWorkspaceID: nil)
+        let mover = HermesWorkspaceChatProjectMover(client: client)
+
+        let moved = try await mover.move(sessionID: "visible-chat", agentID: "research", projectID: "p_notes")
+
+        #expect(moved?.id == "p_notes")
+        #expect(moved?.name == "Notes")
+        #expect(client.selectCalls.count == 1)
+        #expect(client.selectCalls.first?.id == "p_notes")
+        #expect(client.selectCalls.first?.agentID == "research")
+        #expect(client.selectCalls.first?.sessionID == "visible-chat")
+    }
+
+    @Test func moveReadsBackWhenTheHostWithholdsTheAnchors() async throws {
+        let client = StubProjectCatalogClient()
+        client.catalog = fixtureCatalog(sessionWorkspaceID: nil)
+        client.selectReturnsAnchor = false
+        client.readback = fixtureCatalog(sessionWorkspaceID: "p_notes")
+        let mover = HermesWorkspaceChatProjectMover(client: client)
+
+        let moved = try await mover.move(sessionID: "visible-chat", agentID: "research", projectID: "p_notes")
+
+        #expect(moved?.id == "p_notes")
+        #expect(client.readbackAgentIDs == ["research"])
+    }
+
+    @Test func moveReportsNoMoveWhenTheHostKeepsTheChatElsewhere() async throws {
+        let client = StubProjectCatalogClient()
+        client.catalog = fixtureCatalog(sessionWorkspaceID: nil)
+        client.selectReturnsAnchor = false
+        client.readback = fixtureCatalog(sessionWorkspaceID: "p_archive")
+        let mover = HermesWorkspaceChatProjectMover(client: client)
+
+        let moved = try await mover.move(sessionID: "visible-chat", agentID: "research", projectID: "p_notes")
+
+        #expect(moved == nil)
+    }
+}
+
+@MainActor
+private func fixtureCatalog(sessionWorkspaceID: String?) -> HermesWorkspaceCatalog {
+    HermesWorkspaceCatalog(
+        activeWorkspaceID: "p_notes",
+        sessionWorkspaceID: sessionWorkspaceID,
+        workspaces: [
+            HermesWorkspaceSummary(id: "p_notes", name: "Notes", description: "", folderCount: 1, isActive: true),
+            HermesWorkspaceSummary(id: "p_archive", name: "Archive", description: "", folderCount: 1, isActive: false),
+        ]
+    )
+}
+
+@MainActor
+private final class StubProjectCatalogClient: HermesWorkspaceCatalogClient {
+    var catalog = HermesWorkspaceCatalog(activeWorkspaceID: nil, workspaces: [])
+    var readback: HermesWorkspaceCatalog?
+    /// Direct Hermes returns the moved chat's anchor; a legacy host does not.
+    var selectReturnsAnchor = true
+    var loadAgentIDs: [String] = []
+    var readbackAgentIDs: [String] = []
+    var selectCalls: [(id: String, agentID: String, sessionID: String?)] = []
+
+    func load(agentID: String) async throws -> HermesWorkspaceCatalog {
+        loadAgentIDs.append(agentID)
+        return catalog
+    }
+
+    func load(agentID: String, sessionID: String?) async throws -> HermesWorkspaceCatalog {
+        readbackAgentIDs.append(agentID)
+        return readback ?? catalog
+    }
+
+    func select(id: String, agentID: String, sessionID: String?) async throws -> HermesWorkspaceCatalog {
+        selectCalls.append((id, agentID, sessionID))
+        return HermesWorkspaceCatalog(
+            activeWorkspaceID: catalog.activeWorkspaceID,
+            sessionWorkspaceID: selectReturnsAnchor ? id : nil,
+            workspaces: catalog.workspaces
+        )
+    }
+
+    func create(name: String, folderPath: String, agentID: String) async throws -> HermesWorkspaceCatalog {
+        catalog
+    }
+
+    func archive(id: String, agentID: String) async throws -> HermesWorkspaceCatalog {
+        catalog
+    }
+
+    func folderSuggestions(
+        parentPath: String,
+        prefix: String,
+        offset: Int,
+        limit: Int,
+        agentID: String
+    ) async throws -> HermesWorkspaceFolderPage {
+        HermesWorkspaceFolderPage(parentPath: parentPath, folders: [], nextOffset: nil)
+    }
+}

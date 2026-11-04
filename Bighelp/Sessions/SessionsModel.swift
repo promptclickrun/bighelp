@@ -412,6 +412,12 @@ final class SessionsModel {
         try await catalog.archiveSession(id: id)
     }
 
+    /// Hermes confirmed the chat moved: file it under that project now, so the
+    /// list's sections and the project filter agree with the computer.
+    func recordMovedProject(_ project: ChatProjectChoice, sessionID: String) {
+        catalog?.reconcileSessionWorkspace(id: project.id, name: project.name, sessionID: sessionID)
+    }
+
     func deleteSession(id: String) async throws {
         guard let catalog, canManageConversation(id: id) else {
             throw SessionCatalogError.invalidSession

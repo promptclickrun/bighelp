@@ -298,3 +298,63 @@ final class HermesWorkspaceStore {
         selectedWorkspaceIDsBySession.removeAll()
     }
 }
+
+/// One of a computer's projects, as a chat can be moved into it.
+struct ChatProjectChoice: Identifiable, Equatable, Sendable {
+    let id: String
+    let name: String
+}
+
+/// Reads a computer's projects and moves one chat into one of them.
+///
+/// Deliberately stateless: the Sessions list shows chats from more than one
+/// agent, so filing a chat must not rewrite the shared
+/// `HermesWorkspaceStore` catalog that the active project lives in.
+@MainActor
+protocol ChatProjectMoving: AnyObject {
+    func projects(agentID: String) async throws -> [ChatProjectChoice]
+    /// Moves `sessionID` into `projectID` and returns the project only when
+    /// Hermes confirms the chat now sits there. Nil means it did not move.
+    func move(sessionID: String, agentID: String, projectID: String) async throws -> ChatProjectChoice?
+}
+
+/// The stateless mover `HermesWorkspaceStore.chatProjectMover()` hands out.
+@MainActor
+final class HermesWorkspaceChatProjectMover: ChatProjectMoving {
+    private let client: any HermesWorkspaceCatalogClient
+
+    init(client: any HermesWorkspaceCatalogClient) {
+        self.client = client
+    }
+
+    func projects(agentID: String) async throws -> [ChatProjectChoice] {
+        try await client.load(agentID: agentID).workspaces.map {
+            ChatProjectChoice(id: $0.id, name: $0.name)
+        }
+    }
+
+    func move(sessionID: String, agentID: String, projectID: String) async throws -> ChatProjectChoice? {
+        let selected = try await client.select(id: projectID, agentID: agentID, sessionID: sessionID)
+        var confirmed = selected.sessionWorkspaceID == projectID ? selected : nil
+        if confirmed == nil {
+            // Link-era hosts acknowledge the selection without returning the
+            // chat's anchor. Read it back before saying the chat moved.
+            let readback = try await client.load(agentID: agentID, sessionID: sessionID)
+            if readback.sessionWorkspaceID == projectID {
+                confirmed = readback
+            }
+        }
+        guard let confirmed,
+              let project = confirmed.workspaces.first(where: { $0.id == projectID }) else {
+            return nil
+        }
+        return ChatProjectChoice(id: project.id, name: project.name)
+    }
+}
+
+extension HermesWorkspaceStore {
+    /// Files one chat into a project without touching this store's catalog.
+    func chatProjectMover() -> any ChatProjectMoving {
+        HermesWorkspaceChatProjectMover(client: client)
+    }
+}

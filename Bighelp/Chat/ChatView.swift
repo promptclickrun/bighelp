@@ -115,7 +115,6 @@ struct ChatView: View {
     }
 
     let model: ChatModel
-    let sessionAppearance: SessionAppearanceSnapshot
     let onForceRefresh: (@MainActor () async throws -> Void)?
     let foldCompletedTurns: Bool
     /// Settings › Chat › Agent's work. A group chat keeps its own folders (`workStyleInUse`).
@@ -141,14 +140,14 @@ struct ChatView: View {
     let onVoiceTap: () -> Void
     let onApprovalTap: (ApprovalRequest) -> Void
     let onPeopleTap: () -> Void
-    /// This chat's files, look and (Nerd Mode) Hermes session tools, from the ⋯ menu.
-    /// Nil leaves the item out.
+    /// This chat's files, from ⋯ › Files. Nil leaves the item out.
     let onChatFilesTap: (() -> Void)?
-    let onChatAppearanceTap: (() -> Void)?
+    /// ⋯ › Move to Project…. Nil leaves the item out.
+    let projectMenuItem: ChatProjectMenuItem?
     let onNewChatTap: () -> Void
     /// Settings › AI providers, for a failed turn's Fix sign-in. Nil leaves the button out.
     let onOpenProviderAccounts: (() -> Void)?
-    /// Set when this chat is its agent's Bot Chat: starts a new one (This chat › New Bot Chat).
+    /// Set when this chat is its agent's Bot Chat: starts a new one (⋯ › New Bot Chat).
     let onNewBotChat: (() -> Void)?
     /// Hermes refused a message because another Hermes process holds this chat: go on in a branch.
     let onContinueInBranch: ((ChatBranchContinuation) -> Void)?
@@ -230,7 +229,7 @@ struct ChatView: View {
         onApprovalTap: @escaping (ApprovalRequest) -> Void = { _ in },
         onPeopleTap: @escaping () -> Void = {},
         onChatFilesTap: (() -> Void)? = nil,
-        onChatAppearanceTap: (() -> Void)? = nil,
+        projectMenuItem: ChatProjectMenuItem? = nil,
         onNewChatTap: @escaping () -> Void = {},
         onOpenProviderAccounts: (() -> Void)? = nil,
         onNewBotChat: (() -> Void)? = nil,
@@ -245,11 +244,9 @@ struct ChatView: View {
         workStyle: ChatWorkStyle = .card,
         showsHeader: Bool = true,
         sessionControlAccessory: ChatSessionControlAccessory? = nil,
-        sessionAppearance: SessionAppearanceSnapshot = .inherited,
         onForceRefresh: (@MainActor () async throws -> Void)? = nil
     ) {
         self.model = model
-        self.sessionAppearance = sessionAppearance
         self.onForceRefresh = onForceRefresh
         self.foldCompletedTurns = foldCompletedTurns
         self.workStyle = workStyle
@@ -277,7 +274,7 @@ struct ChatView: View {
         self.onApprovalTap = onApprovalTap
         self.onPeopleTap = onPeopleTap
         self.onChatFilesTap = onChatFilesTap
-        self.onChatAppearanceTap = onChatAppearanceTap
+        self.projectMenuItem = projectMenuItem
         self.onNewChatTap = onNewChatTap
         self.onOpenProviderAccounts = onOpenProviderAccounts
         self.onNewBotChat = onNewBotChat
@@ -289,8 +286,6 @@ struct ChatView: View {
         self.referenceSkills = referenceSkills
         self.onReferenceSend = onReferenceSend
     }
-
-    @Environment(\.nerdModeEnabled) private var nerdModeEnabled
 
     var workStyleInUse: ChatWorkStyle? {
         model.isBotMode ? nil : workStyle
@@ -305,11 +300,7 @@ struct ChatView: View {
         return chatCanvas
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background {
-            ZStack {
-                theme.canvas
-                SessionAppearanceBackgroundView(snapshot: sessionAppearance)
-            }
-            .ignoresSafeArea()
+            theme.canvas.ignoresSafeArea()
         }
         .bighelpSheet(item: $agentEditorRoute) { route in
             AgentEditorView(
@@ -470,7 +461,7 @@ struct ChatView: View {
 
     private func registerChatDissolve() {
         chatDissolve?.register(conversationID: model.conversationID, tint: UIColor(theme.danger),
-                               backdrop: sessionAppearance.choice == .inherit ? UIColor(theme.canvas) : nil,
+                               backdrop: UIColor(theme.canvas),
                                scrollView: { [weak timelineController] in timelineController?.scrollView })
     }
 
@@ -1055,39 +1046,45 @@ struct ChatView: View {
         }
     }
 
-    /// Five rows normally; three at accessibility sizes, without reducing the font.
+    /// One list: Model & speed, the chat's and its agent's actions, Usage, then File changes and
+    /// Advanced. At accessibility sizes, This chat, Agent and More hold all but Model & speed, so no
+    /// level needs scrolling without reducing the font.
     private var chatOptionsMenu: some View {
         Menu {
-            if !dynamicTypeSize.isAccessibilitySize { fileChangesMenuItem }
-            if sessionControlAccessory != nil || model.runtimeControls != nil {
-                Menu {
-                    modelAndReasoningMenuItem
-                    if let controls = model.runtimeControls {
-                        SessionFastModeMenu(controls: controls, isAllocating: model.isAwaitingAuthoritativeSessionAllocation)
-                    }
-                } label: {
-                    Text("Model & speed")
-                    if !dynamicTypeSize.isAccessibilitySize, let summary = modelSummary { Text(summary) }
-                    Image(systemName: "slider.horizontal.3")
-                }
-                .accessibilityIdentifier("chat.options.model-speed")
-            }
-            thisChatMenu
+            modelAndSpeedMenu
             if dynamicTypeSize.isAccessibilitySize {
-                if projectChangesSummary != nil || canCompact || offersContextWindow
-                    || providerUsage?.isAvailable == true || nerdModeEnabled {
-                    Menu {
-                        fileChangesMenuItem
-                        usageMenu
-                        advancedMenu
-                    } label: {
-                        Label("More", systemImage: "ellipsis")
-                    }
-                    .accessibilityIdentifier("chat.options.more")
+                Menu {
+                    chatItems
+                } label: {
+                    Label("This chat", systemImage: "bubble.left")
                 }
+                .accessibilityIdentifier("chat.options.this-chat")
+                if onNewBotChat != nil || !model.isBotMode {
+                    Menu {
+                        agentItems
+                    } label: {
+                        Label("Agent", systemImage: "person.crop.circle")
+                    }
+                    .accessibilityIdentifier("chat.options.agent")
+                }
+                Menu {
+                    fileChangesMenuItem
+                    usageMenu
+                    advancedMenu
+                } label: {
+                    Label("More", systemImage: "ellipsis")
+                }
+                .accessibilityIdentifier("chat.options.more")
             } else {
-                usageMenu
-                advancedMenu
+                Section {
+                    chatItems
+                    agentItems
+                }
+                Section { usageMenu }
+                Section {
+                    fileChangesMenuItem
+                    advancedMenu
+                }
             }
         } label: {
             Image(systemName: "ellipsis")
@@ -1107,13 +1104,28 @@ struct ChatView: View {
         .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY } action: { optionsButtonBottom = $0 }
         #endif
         .accessibilityLabel("Conversation options")
-        .accessibilityHint(nerdModeEnabled
-            ? "File changes, model and speed, this chat, usage and advanced options"
-            : "Model and speed, this chat and usage")
+        .accessibilityHint("Model and speed, this chat, usage, file changes and advanced options")
         .accessibilityIdentifier("chat.options")
-        .bighelpChatPanelAnchor(.appearance)
         .modifier(ChatFastModeLoader(controls: model.runtimeControls,
                                     isAllocating: model.isAwaitingAuthoritativeSessionAllocation))
+    }
+
+    @ViewBuilder
+    private var modelAndSpeedMenu: some View {
+        if sessionControlAccessory != nil || model.runtimeControls != nil {
+            Menu {
+                modelAndReasoningMenuItem
+                if let controls = model.runtimeControls {
+                    SessionFastModeMenu(controls: controls, isAllocating: model.isAwaitingAuthoritativeSessionAllocation)
+                }
+            } label: {
+                // One line at accessibility sizes, so all four rows fit without scrolling.
+                Text(dynamicTypeSize.isAccessibilitySize ? "Model" : "Model & speed")
+                if !dynamicTypeSize.isAccessibilitySize, let summary = modelSummary { Text(summary) }
+                Image(systemName: "slider.horizontal.3")
+            }
+            .accessibilityIdentifier("chat.options.model-speed")
+        }
     }
 
     @ViewBuilder
@@ -1134,59 +1146,65 @@ struct ChatView: View {
         }
     }
 
-    private var thisChatMenu: some View {
-        Menu {
-            // Chat Info (the title, details, files, look and session tools) for every chat;
-            // one-on-one chats have no other way in, since their name switches agents.
+    /// Rename, Move to Project and Files, and a group's Chat info (its members).
+    @ViewBuilder
+    private var chatItems: some View {
+        if model.isBotMode {
             Button("Chat info", systemImage: "info.circle") {
                 dismissKeyboard()
                 onPeopleTap()
             }
             .accessibilityIdentifier("chat.info")
-            if dynamicTypeSize.isAccessibilitySize {
-                Menu {
-                    renameChatMenuItem
-                    chatAppearanceMenuItem
-                } label: {
-                    Label("Settings", systemImage: "slider.horizontal.3")
-                }
-                .accessibilityIdentifier("chat.options.settings")
-            } else {
-                renameChatMenuItem
-            }
-            if let onNewBotChat {
-                Button("New Bot Chat", systemImage: "arrow.trianglehead.counterclockwise") {
-                    dismissKeyboard()
-                    onNewBotChat()
-                }
-                .accessibilityIdentifier("chat.new-bot-chat")
-            }
-            if homeChrome.isEnabled, !model.isBotMode {
-                Button("Switch agent", systemImage: "person.2") {
-                    dismissKeyboard()
-                    homeChrome.onSwitchAgent()
-                }
-                .accessibilityIdentifier("chat.switch-agent")
-            }
-            if let onChatFilesTap {
-                Button(dynamicTypeSize.isAccessibilitySize ? "Files" : "Chat files", systemImage: "folder") {
-                    dismissKeyboard()
-                    onChatFilesTap()
-                }
-                .accessibilityIdentifier("chat.files")
-            }
-            if !dynamicTypeSize.isAccessibilitySize { chatAppearanceMenuItem }
-            if !model.isBotMode {
-                Button(dynamicTypeSize.isAccessibilitySize ? "Edit agent" : "Edit this agent", systemImage: "person.crop.circle") {
-                    presentCurrentAgentEditor()
-                }
-                .disabled(!canEditCurrentAgent)
-                .accessibilityIdentifier("chat.edit-current-agent")
-            }
-        } label: {
-            Label("This chat", systemImage: "bubble.left")
         }
-        .accessibilityIdentifier("chat.options.this-chat")
+        if sessionCatalog != nil {
+            Button("Rename…", systemImage: "pencil", action: presentSessionTitleRename)
+                .disabled(isRenamingSessionTitle)
+                .accessibilityIdentifier("chat.rename")
+        }
+        if let projectMenuItem {
+            Button {
+                dismissKeyboard()
+                projectMenuItem.open()
+            } label: {
+                Text(dynamicTypeSize.isAccessibilitySize ? "Move…" : "Move to Project…")
+                if !dynamicTypeSize.isAccessibilitySize, let name = projectMenuItem.projectName { Text(name) }
+                Image(systemName: "folder")
+            }
+            .accessibilityIdentifier("chat.move-project")
+        }
+        if let onChatFilesTap {
+            Button("Files", systemImage: "paperclip") {
+                dismissKeyboard()
+                onChatFilesTap()
+            }
+            .accessibilityIdentifier("chat.files")
+        }
+    }
+
+    /// Edit agent, plus a Bot Chat's New Bot Chat and the home chat's Switch agent.
+    @ViewBuilder
+    private var agentItems: some View {
+        if let onNewBotChat {
+            Button("New Bot Chat", systemImage: "arrow.trianglehead.counterclockwise") {
+                dismissKeyboard()
+                onNewBotChat()
+            }
+            .accessibilityIdentifier("chat.new-bot-chat")
+        }
+        if homeChrome.isEnabled, !model.isBotMode {
+            Button("Switch agent", systemImage: "person.2") {
+                dismissKeyboard()
+                homeChrome.onSwitchAgent()
+            }
+            .accessibilityIdentifier("chat.switch-agent")
+        }
+        if !model.isBotMode {
+            Button("Edit agent", systemImage: "person.crop.circle") {
+                presentCurrentAgentEditor()
+            }
+            .disabled(!canEditCurrentAgent)
+            .accessibilityIdentifier("chat.edit-current-agent")
+        }
     }
 
     /// A branch made for a refused message sends it once the branch is connected; if it
@@ -1213,26 +1231,6 @@ struct ChatView: View {
             } catch {
                 compactError = "Hermes couldn't compact this chat. Try again when the agent isn't replying."
             }
-        }
-    }
-
-    @ViewBuilder
-    private var renameChatMenuItem: some View {
-        if sessionCatalog != nil {
-            Button(dynamicTypeSize.isAccessibilitySize ? "Rename" : "Rename chat", systemImage: "pencil", action: presentSessionTitleRename)
-                .disabled(isRenamingSessionTitle)
-                .accessibilityIdentifier("chat.rename")
-        }
-    }
-
-    @ViewBuilder
-    private var chatAppearanceMenuItem: some View {
-        if let onChatAppearanceTap {
-            Button(dynamicTypeSize.isAccessibilitySize ? "Appearance" : "Chat appearance", systemImage: "photo.on.rectangle.angled") {
-                dismissKeyboard()
-                onChatAppearanceTap()
-            }
-            .accessibilityIdentifier("chat.appearance")
         }
     }
 
@@ -1266,31 +1264,28 @@ struct ChatView: View {
         }
     }
 
-    @ViewBuilder
     private var advancedMenu: some View {
-        if nerdModeEnabled {
-            Menu {
-                if dynamicTypeSize.isAccessibilitySize {
-                    Menu {
-                        displayMenuItems
-                    } label: {
-                        Label("Display", systemImage: "eye")
-                    }
-                    .accessibilityIdentifier("chat.options.display")
-                } else {
+        Menu {
+            if dynamicTypeSize.isAccessibilitySize {
+                Menu {
                     displayMenuItems
+                } label: {
+                    Label("Display", systemImage: "eye")
                 }
-                if onForceRefresh != nil {
-                    Button(isForceRefreshing ? "Refreshing…" : (dynamicTypeSize.isAccessibilitySize ? "Refresh" : "Force refresh"),
-                           systemImage: "arrow.clockwise", action: forceRefresh)
-                        .disabled(isForceRefreshing)
-                        .accessibilityIdentifier("chat.force-refresh")
-                }
-            } label: {
-                Label("Advanced", systemImage: "gearshape.2")
+                .accessibilityIdentifier("chat.options.display")
+            } else {
+                displayMenuItems
             }
-            .accessibilityIdentifier("chat.options.advanced")
+            if onForceRefresh != nil {
+                Button(isForceRefreshing ? "Refreshing…" : (dynamicTypeSize.isAccessibilitySize ? "Refresh" : "Force refresh"),
+                       systemImage: "arrow.clockwise", action: forceRefresh)
+                    .disabled(isForceRefreshing)
+                    .accessibilityIdentifier("chat.force-refresh")
+            }
+        } label: {
+            Label("Advanced", systemImage: "gearshape.2")
         }
+        .accessibilityIdentifier("chat.options.advanced")
     }
 
     @ViewBuilder
@@ -1338,7 +1333,7 @@ struct ChatView: View {
             Button(action: openContextWindow) {
                 Text("Context window")
                 if !dynamicTypeSize.isAccessibilitySize {
-                    Text(contextWindowSnapshot.map {
+                    Text(model.sessionContext.map {
                         "\(SessionContextRingPresentation.remainingLabel(usedPercent: $0.contextPercent)) left"
                     } ?? "Not reported yet")
                 }
@@ -1358,17 +1353,12 @@ struct ChatView: View {
         }
     }
 
-    /// Token context is a technical readout: Nerd Mode only, as the ring was.
-    private var contextWindowSnapshot: SessionContextSnapshot? {
-        nerdModeEnabled ? model.sessionContext : nil
-    }
-
     /// Hermes reports a chat's context size only once the agent has answered in its
     /// current session (a new chat, or any chat after Hermes restarts, has none yet),
-    /// so a Hermes chat always offers Context window in Nerd Mode, saying when it's
-    /// still to come, rather than the item and Usage disappearing.
+    /// so a Hermes chat always offers Context window, saying when it's still to come,
+    /// rather than the item and Usage disappearing.
     private var offersContextWindow: Bool {
-        nerdModeEnabled && (model.sessionContext != nil || directHermesClient != nil)
+        model.sessionContext != nil || directHermesClient != nil
     }
 
     /// The pop-up hangs from the ⋯ button. The menu has already closed when its

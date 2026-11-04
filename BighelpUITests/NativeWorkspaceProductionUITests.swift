@@ -498,7 +498,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         app.buttons["chat.options"].firstMatch.tap()
         let force = app.buttons["Force refresh"].firstMatch
         if !force.waitForExistence(timeout: 3) {
-            app.buttons["chat.options.advanced"].firstMatch.tap()
+            chatMenuElement("chat.options.advanced", in: app).tap()
         }
         if force.waitForExistence(timeout: 5) { force.tap() }
         XCTAssertTrue(shows("Saved before Force refresh", within: 20), "Force refresh must reload saved history.")
@@ -1383,9 +1383,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         if ProcessInfo.processInfo.environment["NATIVE_PROBE_VERIFY_REACTIONS"] == "1" {
             // Live frame IDs are intentionally not durable reaction authority.
             // Re-enter through the existing native refresh before choosing rows.
-            app.buttons["chat.options"].tap()
-            app.buttons["chat.options.advanced"].tap()
-            let refresh = app.buttons["chat.force-refresh"]
+            let refresh = chatMenuItem("chat.force-refresh", in: app)
             XCTAssertTrue(refresh.waitForExistence(timeout: 5))
             refresh.tap()
             XCTAssertFalse(app.buttons["Message reactions"].exists,

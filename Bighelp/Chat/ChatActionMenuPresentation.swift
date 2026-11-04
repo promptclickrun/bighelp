@@ -11,7 +11,6 @@ enum ChatActionMenuAction: String, CaseIterable, Identifiable, Sendable {
     case chooseAgent
     case skillsAndTools
     case changeModel
-    case workspace
 
     var id: Self { self }
 
@@ -26,7 +25,6 @@ enum ChatActionMenuAction: String, CaseIterable, Identifiable, Sendable {
         case .chooseAgent: "chat.action.choose-agent"
         case .skillsAndTools: "chat.action.skills-tools"
         case .changeModel: "chat.action.change-model"
-        case .workspace: "chat.action.workspace"
         }
     }
 
@@ -35,7 +33,6 @@ enum ChatActionMenuAction: String, CaseIterable, Identifiable, Sendable {
         case .chooseAgent: .agents
         case .skillsAndTools: .skillsAndTools
         case .changeModel: .modelAndReasoning
-        case .workspace: .workspaces
         case .camera, .photo, .file, .scanDocument, .voice, .startSession: nil
         }
     }
@@ -46,7 +43,6 @@ enum ChatActionMenuPage: Equatable, Sendable {
     case agents
     case skillsAndTools
     case modelAndReasoning
-    case workspaces
 }
 
 enum ChatActionMenuLayout {
@@ -62,7 +58,6 @@ enum ChatActionMenuLayout {
         .startSession,
         .chooseAgent,
         .skillsAndTools,
-        .workspace,
         .changeModel,
     ]
     static let rootSurfaceRole: BighelpSurfaceRole = .sheet

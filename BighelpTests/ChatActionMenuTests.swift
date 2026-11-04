@@ -60,7 +60,6 @@ struct ChatActionMenuTests {
             .startSession,
             .chooseAgent,
             .skillsAndTools,
-            .workspace,
             .changeModel,
         ])
         #expect(
@@ -86,7 +85,6 @@ struct ChatActionMenuTests {
         #expect(ChatActionMenuAction.chooseAgent.submenu == .agents)
         #expect(ChatActionMenuAction.skillsAndTools.submenu == .skillsAndTools)
         #expect(ChatActionMenuAction.changeModel.submenu == .modelAndReasoning)
-        #expect(ChatActionMenuAction.workspace.submenu == .workspaces)
         #expect(ChatActionMenuAction.camera.submenu == nil)
         #expect(ChatActionMenuAction.voice.submenu == nil)
     }

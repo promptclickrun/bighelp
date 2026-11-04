@@ -6,9 +6,8 @@ import UniformTypeIdentifiers
 @MainActor
 struct ChatDestinationView: View {
     let model: ChatModel
-    @State private var sessionAppearance: SessionAppearanceStore?
     @State private var isSessionFilesPresented = false
-    @State private var isChatAppearancePresented = false
+    @State private var isProjectMovePresented = false
     @State private var requestsSessionFilesAfterDetails = false
     @State private var isNativeAttentionPresented = false
     /// Briefly after the chat opens or the app returns (a Dynamic Island or
@@ -53,11 +52,11 @@ struct ChatDestinationView: View {
     let botModeRooms: BotModeRoomStore
     let skillsAndTools: SkillsAndToolsStore
     let hermesWorkspaces: HermesWorkspaceStore
+    /// Move to Project… in ⋯; nil where the chat can't move (a group chat, a computer that can't).
+    let projectMove: ChatProjectMove?
     let userIdentity: UserIdentityStore
     let permissionCenter: PermissionCenter
     let selectedTab: AppTab?
-    let sessionOrganizationAccountID: String?
-    let sessionOrganizationHostID: String?
     let responseHapticsCoveredByRoot: Bool
     let appearanceAuthority: WorkspaceAuthority?
     let headerActions: ChatHeaderActions
@@ -75,27 +74,6 @@ struct ChatDestinationView: View {
     let onForkMessage: ((String) -> Void)?
     /// Code mode sessions: Markdown paths in messages open the viewer.
     let hostFiles: HostFileLinkContext?
-
-    private var currentAppearanceScope: SessionAppearanceScope? {
-        let authority = model.nativeConversationClient?.nativeWorkspaceAuthority ?? appearanceAuthority
-        let account = authority.map { value in
-            [value.kind.rawValue, value.providerID ?? "", value.principalID]
-                .map { "\($0.utf8.count):\($0)" }.joined()
-        } ?? sessionOrganizationAccountID
-        let host = authority.map { value in
-            [value.endpointIdentity, value.hostID].map { "\($0.utf8.count):\($0)" }.joined()
-        } ?? sessionOrganizationHostID
-        guard let account, let host,
-              let profile = model.nativeConversationClient?.profile ?? (model.isBotMode ? "bot-mode" : model.memberIDs.first) else { return nil }
-        return try? SessionAppearanceScope(accountID: account, hostID: host, profileID: profile, sessionID: model.conversationID)
-    }
-
-    private func reconcileAppearanceStore() {
-        let scope = currentAppearanceScope
-        guard sessionAppearance?.scope != scope || sessionAppearance?.isRetired == true else { return }
-        sessionAppearance?.retire()
-        sessionAppearance = scope.map { SessionAppearanceStore(scope: $0) }
-    }
 
     private var nativeSessionControls: NativeSessionControlsPresentation? {
         guard let native = model.nativeConversationClient else { return nil }
@@ -130,12 +108,11 @@ struct ChatDestinationView: View {
         botModeRooms: BotModeRoomStore,
         skillsAndTools: SkillsAndToolsStore,
         hermesWorkspaces: HermesWorkspaceStore,
+        projectMove: ChatProjectMove? = nil,
         projectGitClient: any ProjectGitClient,
         userIdentity: UserIdentityStore,
         permissionCenter: PermissionCenter,
         selectedTab: AppTab?,
-        sessionOrganizationAccountID: String?,
-        sessionOrganizationHostID: String?,
         responseHapticsCoveredByRoot: Bool,
         onNewChat: @escaping () -> Void,
         onOpenProviderAccounts: @escaping () -> Void,
@@ -160,12 +137,11 @@ struct ChatDestinationView: View {
         self.botModeRooms = botModeRooms
         self.skillsAndTools = skillsAndTools
         self.hermesWorkspaces = hermesWorkspaces
+        self.projectMove = projectMove
         _projectChanges = State(initialValue: ProjectChangesStore(client: projectGitClient))
         self.userIdentity = userIdentity
         self.permissionCenter = permissionCenter
         self.selectedTab = selectedTab
-        self.sessionOrganizationAccountID = sessionOrganizationAccountID
-        self.sessionOrganizationHostID = sessionOrganizationHostID
         self.responseHapticsCoveredByRoot = responseHapticsCoveredByRoot
         self.appearanceAuthority = appearanceAuthority
         self.hostFiles = hostFiles
@@ -200,9 +176,7 @@ struct ChatDestinationView: View {
         .chatAttention(client: model.nativeConversationClient,
                        agentName: identity?.name ?? model.workingAgentName,
                        isPresented: $isNativeAttentionPresented, canPopUp: canPopUpAttention)
-        .onChange(of: currentAppearanceScope, initial: true) { _, _ in reconcileAppearanceStore() }
         .onAppear {
-            reconcileAppearanceStore()
             armAttentionAutoOpen()
             isHapticsSurfaceVisible = true
             if featureStore.ownsNativeNavigationHydration {
@@ -213,7 +187,6 @@ struct ChatDestinationView: View {
             #if targetEnvironment(macCatalyst)
             pendingMacPanelRequest = nil
             #endif
-            sessionAppearance?.retire()
             isHapticsSurfaceVisible = false
             // NavigationStack updates its path before the outgoing destination
             // finishes disappearing. Retain its prepared model until this
@@ -240,7 +213,7 @@ struct ChatDestinationView: View {
               ), current === model else { return false }
         return !responseHapticsCoveredByRoot
             && !isNativeAttentionPresented
-            && voicePresentation == nil && !isPeopleAndChatPresented && !isChatAppearancePresented
+            && voicePresentation == nil && !isPeopleAndChatPresented && !isProjectMovePresented
             && !attachmentFlow.isActionMenuPresented && !isPhotoPickerPresented
             && !isFilePickerPresented && !isCameraPickerPresented && !isDocumentScannerPresented
             && !isProjectChangesPresented
@@ -253,7 +226,7 @@ struct ChatDestinationView: View {
         appState.path.last == .chat(conversationID: model.conversationID)
             && !responseHapticsCoveredByRoot && !isNativeAttentionPresented
             && voicePresentation == nil
-            && !isPeopleAndChatPresented && !isSessionFilesPresented && !isChatAppearancePresented
+            && !isPeopleAndChatPresented && !isSessionFilesPresented && !isProjectMovePresented
             && !isProjectChangesPresented
     }
 
@@ -263,7 +236,7 @@ struct ChatDestinationView: View {
         scenePhase == .active && voicePresentation == nil
             && appState.path.last == .chat(conversationID: model.conversationID)
             && !responseHapticsCoveredByRoot
-            && !isPeopleAndChatPresented && !isSessionFilesPresented && !isChatAppearancePresented
+            && !isPeopleAndChatPresented && !isSessionFilesPresented && !isProjectMovePresented
             && !isProjectChangesPresented
             && !isNativeSessionControlsPresented && !attachmentFlow.isActionMenuPresented
             && !isPhotoPickerPresented && !isFilePickerPresented
@@ -387,7 +360,7 @@ struct ChatDestinationView: View {
             onApprovalTap: onOpenApproval,
             onPeopleTap: { isPeopleAndChatPresented = true },
             onChatFilesTap: { isSessionFilesPresented = true },
-            onChatAppearanceTap: sessionAppearance == nil ? nil : { isChatAppearancePresented = true },
+            projectMenuItem: projectMenuItem,
             onNewChatTap: onNewChat,
             onOpenProviderAccounts: model.nativeConversationClient == nil ? nil : onOpenProviderAccounts,
             onNewBotChat: onNewBotChat,
@@ -400,7 +373,6 @@ struct ChatDestinationView: View {
             onReferenceSend: sendReferences.action,
             foldCompletedTurns: settings.foldCompletedTurns,
             workStyle: settings.chatWorkStyle,
-            sessionAppearance: sessionAppearance?.snapshot ?? .inherited,
             onForceRefresh: forceRefreshAction
         )
         }
@@ -553,7 +525,6 @@ struct ChatDestinationView: View {
             }
         }) {
             PeopleAndChatView(model: model, agents: agents,
-                appearanceStore: sessionAppearance,
                 nativeSessionControls: nativeSessionControls,
                 filesAction: ChatSessionFilesAction {
                     requestsSessionFilesAfterDetails = true
@@ -563,10 +534,10 @@ struct ChatDestinationView: View {
         .bighelpSheet(isPresented: $isSessionFilesPresented) {
             ChatSessionFilesView(model: model)
         }
-        .bighelpChatPanel(isPresented: $isChatAppearancePresented, anchor: .appearance) {
-            if let sessionAppearance {
-                NavigationStack { SessionAppearanceView(store: sessionAppearance) }
-                    .presentationDragIndicator(.visible)
+        .bighelpSheet(isPresented: $isProjectMovePresented) {
+            if let projectMove {
+                MoveChatToProjectSheet(move: projectMove, chatTitle: model.sessionTitle, agentID: model.agentID,
+                                       sessionID: model.conversationID, currentProjectID: currentProject?.id)
             }
         }
         .onChange(of: voicePresentation != nil) { _, isPresented in
@@ -625,7 +596,6 @@ struct ChatDestinationView: View {
                 runtimeControls: model.runtimeControls,
                 slashCommandCatalog: { model.slashCommandCatalog },
                 skillsAndTools: skillsAndTools,
-                workspaces: hermesWorkspaces,
                 onSelect: performChatAction,
                 onChooseAgent: { agent in
                     featureStore.reassignDirectChat(
@@ -857,10 +827,24 @@ struct ChatDestinationView: View {
         ].joined(separator: "|")
     }
 
-    /// Project Changes (git diffs for a chat's Hermes project) is a developer
-    /// tool, so it appears only with Nerd Mode on.
+    /// File changes (git diffs for a chat's Hermes project), in ⋯ with Nerd Mode on or off.
     private var showsProjectChanges: Bool {
-        settings.nerdModeEnabled && settings.showProjectChanges
+        settings.showProjectChanges
+    }
+
+    /// The chat's project as Hermes last reported it: a load or a move this run, else the saved chat.
+    private var currentProject: (id: String, name: String?)? {
+        if let id = hermesWorkspaces.workspaceID(forSessionID: model.conversationID) {
+            let name = model.sessionWorkspaceID == id ? model.sessionWorkspaceName : nil
+            return (id, name ?? hermesWorkspaces.catalog?.workspaces.first { $0.id == id }?.name)
+        }
+        return model.sessionWorkspaceID.map { ($0, model.sessionWorkspaceName) }
+    }
+
+    /// ⋯ › Move to Project…, showing the chat's project.
+    private var projectMenuItem: ChatProjectMenuItem? {
+        guard projectMove != nil else { return nil }
+        return ChatProjectMenuItem(projectName: currentProject?.name) { isProjectMovePresented = true }
     }
 
     private var compactProjectChangesPresentation: Binding<Bool> {

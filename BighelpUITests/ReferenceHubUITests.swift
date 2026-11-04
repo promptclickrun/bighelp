@@ -74,13 +74,12 @@ class BighelpUITestCase: XCTestCase {
         app.buttons.matching(NSPredicate(format: "identifier IN %@", ["agent.hero.name", "chat.identity"])).firstMatch
     }
 
-    /// Chat Info (People & Chat). Every one-agent chat uses the big avatar
-    /// header now, where Info lives in the ⋯ menu; group chats keep their
-    /// identity button.
+    /// Chat Info (People & Chat): a group chat's members. One-agent chats have
+    /// none; everything it held is in their ⋯ menu.
     @MainActor
     @discardableResult
     func openChatInfo(in app: XCUIApplication, timeout: TimeInterval = 8) -> Bool {
-        // ⋯ › This chat › Chat info, in every chat (a group's name opens it too).
+        // ⋯ › Chat info in a group chat (its name opens it too).
         let item = chatMenuItem("chat.info", in: app, timeout: timeout)
         guard item.exists, item.isHittable else { return false }
         item.tap()
@@ -93,47 +92,73 @@ class BighelpUITestCase: XCTestCase {
         chatMenuItem("chat.compact", in: app)
     }
 
-    /// Opens the chat's ⋯ menu when it's closed and returns one of its items.
+    /// Opens the chat's ⋯ menu when it's closed and returns one of its items. The chat's
+    /// actions sit at the top level; at accessibility sizes they're in This chat and Agent, and
+    /// Usage, File changes and Advanced in More.
     @MainActor
     func chatMenuItem(_ identifier: String, in app: XCUIApplication, timeout: TimeInterval = 5) -> XCUIElement {
-        let item = chatMenuElement(identifier, in: app)
-        if item.exists, item.isHittable { return item }
+        func shown() -> XCUIElement? {
+            let item = chatMenuElement(identifier, in: app)
+            return item.exists && item.isHittable ? item : nil
+        }
+        if let item = shown() { return item }
         let groups: [String]
         switch identifier {
         case "chat.session-controls", "chat.fast-mode": groups = ["chat.options.model-speed"]
         case "chat.context-window", "chat.provider-usage", "chat.compact":
             groups = ["chat.options.more", "chat.options.usage"]
-        case "chat.rename", "chat.appearance": groups = ["chat.options.this-chat", "chat.options.settings"]
-        case "chat.info", "chat.files", "chat.edit-current-agent", "chat.options.settings", "chat.new-bot-chat":
-            groups = ["chat.options.this-chat"]
+        case "chat.info", "chat.rename", "chat.move-project", "chat.files": groups = ["chat.options.this-chat"]
+        case "chat.edit-current-agent", "chat.new-bot-chat", "chat.switch-agent": groups = ["chat.options.agent"]
         case "chat.options.usage", "chat.options.advanced", "chat.file-changes": groups = ["chat.options.more"]
         case "chat.force-refresh", "chat.options.display": groups = ["chat.options.more", "chat.options.advanced"]
         case "chat.visibility.reasoning", "chat.visibility.tool-calls": groups = ["chat.options.more", "chat.options.advanced", "chat.options.display"]
         default: groups = []
         }
-        if !app.buttons["chat.options.this-chat"].exists {
+        let isOpen = ["chat.options.this-chat", "chat.options.agent", "chat.options.more", "chat.options.advanced"]
+            .contains { chatMenuElement($0, in: app).exists }
+        if !isOpen {
             let options = app.buttons["chat.options"].firstMatch
             if options.waitForExistence(timeout: timeout) { options.tap() }
         }
         for group in groups {
+            if chatMenuElement(identifier, in: app).waitForExistence(timeout: 1), let item = shown() { return item }
             // The menu animates open: wait for each submenu before its tap, or the tap is skipped.
-            let submenu = app.buttons[group].firstMatch
+            let submenu = chatMenuElement(group, in: app)
             if submenu.waitForExistence(timeout: 3), submenu.isHittable { submenu.tap() }
         }
+        let item = chatMenuElement(identifier, in: app)
         _ = item.waitForExistence(timeout: timeout)
         return item
     }
 
-    /// A native menu row reports its title instead of its identifier, so look for both.
+    /// Native menu rows often report their title (then a subtitle after a comma, a dot or a colon)
+    /// instead of their identifier, so look for both. Accessibility sizes use the shorter titles.
     @MainActor
     func chatMenuElement(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
-        let titles: [String: String] = [
-            "chat.info": "Chat info", "chat.rename": "Rename chat", "chat.appearance": "Chat appearance",
-            "chat.files": "Chat files", "chat.edit-current-agent": "Edit this agent",
-            "chat.new-bot-chat": "New Bot Chat", "chat.compact": "Compact",
+        let titles: [String: [String]] = [
+            "chat.info": ["Chat info"], "chat.rename": ["Rename…"], "chat.move-project": ["Move to Project…", "Move…"],
+            "chat.files": ["Files"], "chat.edit-current-agent": ["Edit agent"],
+            "chat.new-bot-chat": ["New Bot Chat"], "chat.switch-agent": ["Switch agent"], "chat.compact": ["Compact"],
+            "chat.file-changes": ["File changes"], "chat.options.usage": ["Usage"], "chat.options.advanced": ["Advanced"],
+            "chat.options.model-speed": ["Model & speed", "Model"], "chat.session-controls": ["Model & reasoning", "Model"],
+            "chat.fast-mode": ["Fast Mode"], "chat.fast-mode.on": ["On"], "chat.fast-mode.off": ["Off"],
+            "chat.context-window": ["Context window"], "chat.provider-usage": ["Usage"],
+            "chat.options.display": ["Display"], "chat.visibility.reasoning": ["Show reasoning", "Reasoning"],
+            "chat.visibility.tool-calls": ["Show tool calls", "Tool calls"],
+            "chat.force-refresh": ["Force refresh", "Refresh"],
         ]
-        guard let title = titles[identifier] else { return app.buttons[identifier].firstMatch }
-        return app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", identifier, title)).firstMatch
+        guard let names = titles[identifier] else { return app.buttons[identifier].firstMatch }
+        let byTitle = names.map { title in
+            NSPredicate(format: "label == %@ OR label BEGINSWITH %@ OR label BEGINSWITH %@ OR label BEGINSWITH %@",
+                        title, title + ", ", title + " ·", title + ":")
+        }
+        let matches = app.buttons.matching(NSCompoundPredicate(orPredicateWithSubpredicates:
+            [NSPredicate(format: "identifier == %@", identifier)] + byTitle))
+        // ⋯ › Usage › Usage shares its submenu's title: it's the second "Usage" once the submenu is open.
+        if identifier == "chat.provider-usage" {
+            return matches.count > 1 ? matches.element(boundBy: 1) : app.buttons[identifier].firstMatch
+        }
+        return matches.firstMatch
     }
 
     /// Leaves a pushed chat the way people do: a swipe from the leading edge.
@@ -197,35 +222,6 @@ class BighelpUITestCase: XCTestCase {
             usleep(300_000)
         } while Date.now < deadline
         XCTFail("Could not open \(identifier)", file: file, line: line)
-    }
-
-    @MainActor
-    func dismissActionsAfterWorkspaceSelection(in app: XCUIApplication,
-                                              file: StaticString = #filePath, line: UInt = #line) {
-        // Selecting a workspace asynchronously returns this embedded picker
-        // to the action menu; it does not dismiss the enclosing sheet.
-        let mainAction = app.buttons["chat.action.workspace"]
-        let selectionFinished = mainAction.waitForExistence(timeout: 5)
-        XCTAssertTrue(selectionFinished, "Workspace selection must finish before dismissing actions.",
-                      file: file, line: line)
-        guard selectionFinished else { return }
-        let outside = app.otherElements["PopoverDismissRegion"].firstMatch
-        if outside.exists && outside.isHittable {
-            outside.tap()
-        } else {
-            let grabber = app.buttons["Sheet Grabber"]
-            let canDismiss = grabber.waitForExistence(timeout: 3)
-            XCTAssertTrue(canDismiss, "The action sheet must expose its dismissal handle.",
-                          file: file, line: line)
-            guard canDismiss else { return }
-            grabber.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(
-                forDuration: 0.1,
-                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98))
-            )
-        }
-        XCTAssertTrue(mainAction.waitForNonExistence(timeout: 3),
-                      "Actions must close before interacting with the chat behind them.",
-                      file: file, line: line)
     }
 
     @MainActor

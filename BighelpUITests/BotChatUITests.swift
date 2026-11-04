@@ -31,7 +31,7 @@ final class BotChatUITests: BighelpUITestCase {
             // Native menu rows can expose their title instead of their identifier.
             let newBotChat = app.buttons.matching(NSPredicate(
                 format: "identifier == %@ OR label == %@", "chat.new-bot-chat", "New Bot Chat")).firstMatch
-            XCTAssertTrue(newBotChat.waitForExistence(timeout: 5), "This chat › New Bot Chat in a Bot Chat")
+            XCTAssertTrue(newBotChat.waitForExistence(timeout: 5), "⋯ › New Bot Chat in a Bot Chat")
             save("this-chat-\(appearance)", app)
             app.terminate()
 

@@ -154,12 +154,11 @@ extension RootShellView {
                 botModeRooms: botModeRooms,
                 skillsAndTools: skillsAndTools,
                 hermesWorkspaces: hermesWorkspaces,
+                projectMove: model.isBotMode ? nil : chatProjectMove,
                 projectGitClient: projectGitClient,
                 userIdentity: userIdentity,
                 permissionCenter: permissionCenter,
                 selectedTab: appState.drawerSelectedTab,
-                sessionOrganizationAccountID: sessionOrganizationAccountID,
-                sessionOrganizationHostID: sessionOrganizationHostID,
                 responseHapticsCoveredByRoot: isHomeDrawerPresented
                     || isHostStatusPresented
                     || isHermesWorkspacePresented || actionErrorMessage != nil,

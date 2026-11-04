@@ -39,7 +39,6 @@ struct ChatSessionFilesAction {
 struct ChatSessionSettingsView: View {
     let model: ChatModel
     let agents: AgentDirectoryStore
-    let appearanceStore: SessionAppearanceStore?
     let nativeSessionControls: NativeSessionControlsPresentation?
     let filesAction: ChatSessionFilesAction?
     let managementDestination: ChatSessionSettingsDestination?
@@ -47,22 +46,18 @@ struct ChatSessionSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.nerdModeEnabled) private var nerdModeEnabled
     @BighelpThemeReader private var theme
-    @State private var destination: Destination?
+    @State private var isSessionShown = false
     @State private var isFilesPresented = false
-
-    private enum Destination: Hashable { case appearance, session }
 
     init(
         model: ChatModel,
         agents: AgentDirectoryStore,
-        appearanceStore: SessionAppearanceStore? = nil,
         nativeSessionControls: NativeSessionControlsPresentation? = nil,
         filesAction: ChatSessionFilesAction? = nil,
         managementDestination: ChatSessionSettingsDestination? = nil
     ) {
         self.model = model
         self.agents = agents
-        self.appearanceStore = appearanceStore
         self.nativeSessionControls = nativeSessionControls
         self.filesAction = filesAction
         self.managementDestination = managementDestination
@@ -88,15 +83,10 @@ struct ChatSessionSettingsView: View {
             .tint(theme.action)
             .navigationTitle("Info")
             .navigationBarTitleDisplayMode(.inline)
-            .navigationDestination(item: $destination) { destination in
-                switch destination {
-                case .appearance:
-                    if let appearanceStore { SessionAppearanceView(store: appearanceStore) }
-                case .session:
-                    if let nativeSessionControls {
-                        NativeSessionControlsView(presentation: nativeSessionControls)
-                            .id(nativeSessionControls.clientIdentity)
-                    }
+            .navigationDestination(isPresented: $isSessionShown) {
+                if let nativeSessionControls {
+                    NativeSessionControlsView(presentation: nativeSessionControls)
+                        .id(nativeSessionControls.clientIdentity)
                 }
             }
             .bighelpSheet(isPresented: $isFilesPresented) { ChatSessionFilesView(model: model) }
@@ -136,16 +126,9 @@ struct ChatSessionSettingsView: View {
 
     @ViewBuilder
     private var quickActionsSection: some View {
-        if appearanceStore != nil || filesAction != nil || (nerdModeEnabled && nativeSessionControls != nil) {
+        if filesAction != nil || (nerdModeEnabled && nativeSessionControls != nil) {
             Section {
                 HStack(alignment: .top, spacing: BighelpTokens.space8) {
-                    if appearanceStore != nil {
-                        Button { destination = .appearance } label: {
-                            quickActionLabel("Appearance", systemImage: "photo.on.rectangle.angled")
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("chat.session-info.appearance")
-                    }
                     if let filesAction {
                         Button { isFilesPresented = true } label: {
                             quickActionLabel(filesAction.title, systemImage: "folder")
@@ -155,7 +138,7 @@ struct ChatSessionSettingsView: View {
                         .accessibilityIdentifier("chat.session-info.files")
                     }
                     if nerdModeEnabled, nativeSessionControls != nil {
-                        Button { destination = .session } label: {
+                        Button { isSessionShown = true } label: {
                             quickActionLabel("Session", systemImage: "slider.horizontal.3")
                         }
                         .buttonStyle(.plain)
@@ -276,16 +259,16 @@ struct ChatSessionSettingsView: View {
         .listRowBackground(theme.surface)
     }
 
+    @ViewBuilder
     private var privacySection: some View {
-        Section {
-            Label("Conversation appearance stays on this device", systemImage: "iphone")
-            if model.isBotMode {
+        if model.isBotMode {
+            Section {
                 Label("Earlier direct chats stay private to their original agent", systemImage: "lock.shield")
+            } header: {
+                Text("Privacy")
             }
-        } header: {
-            Text("Privacy")
+            .listRowBackground(theme.surface)
         }
-        .listRowBackground(theme.surface)
     }
 
     private func quickActionLabel(_ title: String, systemImage: String) -> some View {

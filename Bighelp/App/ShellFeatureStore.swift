@@ -1247,6 +1247,13 @@ final class ShellFeatureStore {
         }
     }
 
+    /// Move to Project…: Hermes moved the chat into `project`. The chat list and the open
+    /// chat show it now, without waiting for the next refresh.
+    func recordMovedProject(_ project: HermesWorkspaceSummary, sessionID: String) {
+        catalog.reconcileSessionWorkspace(id: project.id, name: project.name, sessionID: sessionID)
+        chatModels[sessionID]?.applyMovedProject(project)
+    }
+
     func reassignDirectChat(
         sessionID: String,
         to agentID: String

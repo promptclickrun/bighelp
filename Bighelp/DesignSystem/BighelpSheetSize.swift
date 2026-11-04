@@ -110,7 +110,6 @@ extension View {
 /// Other platforms retain their existing sheet presentation.
 enum BighelpChatPanelAnchor: Hashable {
     case attachments
-    case appearance
 }
 
 extension View {
@@ -170,7 +169,7 @@ private struct BighelpChatPanelPresenter<Panel: View>: ViewModifier {
             }
             .popover(isPresented: $isPresented,
                      attachmentAnchor: layout.rect.isEmpty ? .rect(.bounds) : .rect(.rect(layout.rect)),
-                     arrowEdge: anchor == .attachments ? .bottom : .top) {
+                     arrowEdge: .bottom) {
                 panel()
                     .frame(width: min(560, max(280, layout.availableSize.width - 32)),
                            height: min(620, max(300, layout.availableSize.height - 100)))

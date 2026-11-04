@@ -41,6 +41,8 @@ struct SessionsView: View {
     @State private var mutationSuccesses = 0
     @State private var mutationFailures = 0
     @State private var isArchivedPresented = false
+    /// The chat whose Move to Project… sheet is open.
+    @State private var projectMoveTarget: SessionSummary?
     let agents: AgentDirectoryStore
     let settings: SettingsStore
     let organizeByProjects: Bool
@@ -64,6 +66,8 @@ struct SessionsView: View {
     let sharedAppFilter: Binding<SessionAppFilter>?
     /// A Codex or Claude Code chat to preview once the list is there (picked on All sessions).
     let requestedOtherAppChat: Binding<HermesForeignSessionItem?>?
+    /// A chat's hold menu has Move to Project…; nil where this computer can't move chats.
+    let projectMove: ChatProjectMove?
 
     init(
         model: SessionsModel,
@@ -79,8 +83,10 @@ struct SessionsView: View {
         otherApps: (source: any OtherAppChatsSource, id: String)? = nil,
         onOpenBroughtIn: ((String) -> Void)? = nil,
         appFilter: Binding<SessionAppFilter>? = nil,
-        requestedOtherAppChat: Binding<HermesForeignSessionItem?>? = nil
+        requestedOtherAppChat: Binding<HermesForeignSessionItem?>? = nil,
+        projectMove: ChatProjectMove? = nil
     ) {
+        self.projectMove = projectMove
         self.otherApps = otherApps
         self.sharedAppFilter = appFilter
         self.requestedOtherAppChat = requestedOtherAppChat
@@ -225,6 +231,12 @@ struct SessionsView: View {
             }
         }
         .agentActionsPresentation(agentActions, config: agentActionsConfig)
+        .bighelpSheet(item: $projectMoveTarget) { session in
+            if let projectMove, let agentID = session.agentIDs.first {
+                MoveChatToProjectSheet(move: projectMove, chatTitle: session.title, agentID: agentID,
+                                       sessionID: session.id, currentProjectID: session.workspaceID)
+            }
+        }
         .task(id: OtherAppsKey(id: otherApps?.id, app: model.appFilter)) {
             guard let otherApps else {
                 otherAppsStore = nil
@@ -850,6 +862,23 @@ struct SessionsView: View {
             .accessibilityAddTraits(.isHeader)
     }
 
+    /// One agent's own chat, on a computer that can move chats.
+    private func canMoveToProject(_ session: SessionSummary) -> Bool {
+        projectMove != nil && session.kind == .direct && session.agentIDs.count == 1
+    }
+
+    @ViewBuilder
+    private func moveToProjectButton(_ session: SessionSummary) -> some View {
+        if canMoveToProject(session) {
+            Button {
+                projectMoveTarget = session
+            } label: {
+                Label("Move to Project…", systemImage: "folder")
+            }
+            .accessibilityIdentifier("session.action.move-project.\(session.id)")
+        }
+    }
+
     @ViewBuilder
     private func sessionActions(_ session: SessionSummary, model: SessionsModel) -> some View {
         if model.canManageConversation(session) {
@@ -860,6 +889,8 @@ struct SessionsView: View {
                 Label("Rename", systemImage: "pencil")
             }
             .accessibilityIdentifier("session.action.rename.\(session.id)")
+
+            moveToProjectButton(session)
 
             Button {
                 performMutation(sessionID: session.id) {
@@ -900,6 +931,13 @@ struct SessionsView: View {
                 renameDraft = session.title
                 actionDialog = .rename(session)
             },
+        ]
+        if canMoveToProject(session) {
+            items.append(MacTileMenu.Item(title: "Move to Project…", systemImage: "folder") {
+                projectMoveTarget = session
+            })
+        }
+        items += [
             MacTileMenu.Item(title: session.isPinned ? "Unpin" : "Pin",
                              systemImage: session.isPinned ? "pin.slash" : "pin") {
                 performMutation(sessionID: session.id) {
@@ -1093,6 +1131,8 @@ struct SessionsView: View {
                                                 Label("Rename", systemImage: "pencil")
                                             }
                                             .accessibilityIdentifier("session.action.rename.\(session.id)")
+
+                                            moveToProjectButton(session)
 
                                             Button {
                                                 performMutation(sessionID: session.id) {

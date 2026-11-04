@@ -99,7 +99,7 @@ extension ChatDestinationView {
                     try? await Task.sleep(for: .milliseconds(180))
                     onStartSession()
                 }
-            case .chooseAgent, .skillsAndTools, .changeModel, .workspace:
+            case .chooseAgent, .skillsAndTools, .changeModel:
                 // These actions are owned by nested pages inside the drawer.
                 break
             }

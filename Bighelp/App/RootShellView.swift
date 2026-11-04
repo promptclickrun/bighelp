@@ -1217,6 +1217,7 @@ struct RootShellView: View {
             },
             connectorApps: { connectorAppsModel() },
             composioApps: { composioAppsModel() },
+            marketplace: { makeMarketplace(for: workspaceAgentID) },
             credentialVault: homeCredentialVault,
             teamwork: { teamworkModel() },
             fleet: fleet.map { fleet in
@@ -1236,8 +1237,8 @@ struct RootShellView: View {
     }
 
     /// Settings › Connections › Composio Apps: your Composio sign-in, and the agent in use on the
-    /// computer in use; made-up apps in demo mode.
-    func composioAppsModel() -> ComposioAppsModel? {
+    /// computer in use (or `agentID`, a bot's Marketplace); made-up apps in demo mode.
+    func composioAppsModel(for agentID: String? = nil) -> ComposioAppsModel? {
         if usesWorkspaceFixtures {
             #if DEBUG
             return DemoComposio.model()
@@ -1248,10 +1249,11 @@ struct RootShellView: View {
         var agentHost: (any ComposioAgentHost)?
         if let workspace = workspaceConnections?.workspace, let owner = currentWorkspaceOwner,
            let direct = workspaceConnections?.hosts.selectedWorkspace?.nativeClient {
-            let profileID = workspaceAgentID
+            let profileID = agentID ?? workspaceAgentID
+            let agentName = agentID.flatMap { id in agents.profiles.first { $0.id == id }?.name } ?? workspaceProfileName
             let current: @MainActor () -> WorkspaceOwner? = { [weak workspace] in workspace?.owner }
             agentHost = DirectHermesComposioAgentHost(
-                hostName: workspaceHostName, agentName: workspaceProfileName, profileID: profileID,
+                hostName: workspaceHostName, agentName: agentName, profileID: profileID,
                 workspace: workspace,
                 mcp: DirectHermesMCPClient(http: direct, rpc: direct, owner: owner, profileID: profileID,
                                            currentOwner: current, actionStatusClient: nil))

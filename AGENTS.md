@@ -19,13 +19,15 @@ change in both repos.
 
 - **Simple for normal people.**
   - Everyday screens use plain words and short sentences.
-  - Anything that looks like host administration goes behind Settings › Nerd Mode: files, gateways, plugins, MCP,
-    logs, raw IDs, token counts. Nerd Mode is `settings.nerdModeEnabled`, also the `nerdModeEnabled` environment
-    value.
+  - Anything that looks like host administration goes behind Settings › Nerd Mode: files, MCP, logs, raw IDs,
+    token counts. Nerd Mode is `settings.nerdModeEnabled`, also the `nerdModeEnabled` environment value.
+  - What agents can add is for everyone: Settings › Marketplace (`MarketplaceView`) opens Apps, Skills, Plugins and
+    Talk anywhere (messaging apps) with this week's featured plugin, and each bot's profile has its own for that
+    bot. They're the same pages Hermes tools lists.
   - Everyday controls must never live only behind Nerd Mode.
 - **One place for each thing.**
   - There's one ☰ menu (`BighelpMenu`) and one Settings. Settings is a short list of rows that each open one page,
-    in groups: You (one row), Agents (Default model, AI providers, Connections, Teamwork, Personalities), App
+    in groups: You (one row), Agents (Default model, AI providers, Marketplace, Connections, Teamwork, Personalities), App
     (Modes, Appearance, Chat, Voice, Notifications), then System, Apple Watch, CarPlay and Help & feedback.
     Nerd Mode adds its Hermes section (Hermes tools) at the bottom.
   - Connections (`AppsHubView`) is everything agents can use: This device (Device access, every phone tool and

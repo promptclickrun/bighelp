@@ -31,40 +31,7 @@ struct AppsHubView<DeviceAccess: View>: View {
             }
             .listRowBackground(theme.surface)
 
-            Section {
-                if let native {
-                    NavigationLink {
-                        ConnectorAppsView(model: native)
-                    } label: {
-                        row("Native App Connections", detail: "Built into Hermes on this computer",
-                            symbol: "app.connected.to.app.below.fill")
-                    }
-                    .accessibilityIdentifier("apps.native")
-                    .driveTarget("apps.native")
-                }
-                if let composio {
-                    NavigationLink {
-                        ComposioAppsView(model: composio)
-                    } label: {
-                        row("Composio Apps", detail: composio.account.isSignedIn
-                                ? (composio.account.email.map { "Signed in as \($0)" } ?? "Signed in")
-                                : "Sign in to connect hundreds of apps",
-                            symbol: "square.grid.3x3.fill")
-                    }
-                    .accessibilityIdentifier("apps.composio")
-                    .driveTarget("apps.composio")
-                }
-                if native == nil, composio == nil {
-                    Text("Connect to your computer to add apps.")
-                        .bighelpFont(.metadata)
-                        .foregroundStyle(theme.secondaryText)
-                }
-            } header: {
-                Text("Apps")
-            } footer: {
-                Text("Your agents can use the apps you connect, in any chat.")
-            }
-            .listRowBackground(theme.surface)
+            ConnectedAppsSection(native: native, composio: composio)
 
             if let onOpenVault {
                 Section {
@@ -99,6 +66,65 @@ struct AppsHubView<DeviceAccess: View>: View {
     }
 
     private func row(_ title: String, detail: String, symbol: String) -> some View {
+        AppsHubRow(title: title, detail: detail, symbol: symbol)
+    }
+
+    @BighelpThemeReader private var theme
+}
+
+/// The apps agents can use: Hermes' own connectors on this computer and Composio's, one sign-in for
+/// every computer. Connections and the Marketplace's Apps page both show it.
+@MainActor
+struct ConnectedAppsSection: View {
+    let native: ConnectorAppsModel?
+    let composio: ComposioAppsModel?
+
+    var body: some View {
+        Section {
+            if let native {
+                NavigationLink {
+                    ConnectorAppsView(model: native)
+                } label: {
+                    AppsHubRow(title: "Native App Connections", detail: "Built into Hermes on this computer",
+                               symbol: "app.connected.to.app.below.fill")
+                }
+                .accessibilityIdentifier("apps.native")
+                .driveTarget("apps.native")
+            }
+            if let composio {
+                NavigationLink {
+                    ComposioAppsView(model: composio)
+                } label: {
+                    AppsHubRow(title: "Composio Apps", detail: composio.account.isSignedIn
+                                   ? (composio.account.email.map { "Signed in as \($0)" } ?? "Signed in")
+                                   : "Sign in to connect hundreds of apps",
+                               symbol: "square.grid.3x3.fill")
+                }
+                .accessibilityIdentifier("apps.composio")
+                .driveTarget("apps.composio")
+            }
+            if native == nil, composio == nil {
+                Text("Connect to your computer to add apps.")
+                    .bighelpFont(.metadata)
+                    .foregroundStyle(theme.secondaryText)
+            }
+        } header: {
+            Text("Apps")
+        } footer: {
+            Text("Your agents can use the apps you connect, in any chat.")
+        }
+        .listRowBackground(theme.surface)
+    }
+
+    @BighelpThemeReader private var theme
+}
+
+private struct AppsHubRow: View {
+    let title: String
+    let detail: String
+    let symbol: String
+
+    var body: some View {
         HStack(spacing: BighelpTokens.space12) {
             BighelpIconTile(systemName: symbol)
             VStack(alignment: .leading, spacing: 2) {

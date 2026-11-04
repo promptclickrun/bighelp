@@ -22,6 +22,8 @@ struct SimpleBotProfileContext {
     var makeCredentialVault: ((String) -> CredentialVaultModel?)? = nil
     /// The bot's Advanced Options: its settings and Nerd Mode pages; nil without a computer to ask.
     var makeAdvancedOptions: ((String) -> AdvancedOptionsContext?)? = nil
+    /// The bot's own Marketplace (its skills, apps and messaging apps, and the computer's plugins).
+    var makeMarketplace: ((String) -> MarketplaceContext)? = nil
     /// The folder the computer shares (Files); nil without a computer.
     var makeFilesSource: (() -> (any SimpleBotFilesSource)?)? = nil
     /// Photos and videos from the bot's chats (Media); nil while no computer is connected.
@@ -92,6 +94,7 @@ struct SimpleBotProfileView: View {
     @State private var isVoicePresented = false
     @State private var advancedOptions: AdvancedOptionsContext?
     @State private var isAdvancedPresented = false
+    @State private var marketplace: MarketplaceContext?
     @State private var vault: CredentialVaultModel?
     @State private var isVaultPresented = false
     @State private var files: SimpleBotFilesModel?
@@ -244,6 +247,20 @@ struct SimpleBotProfileView: View {
                     .presentationDragIndicator(.visible)
                     .bighelpSheetSize(.standard)
             }
+        }
+        .bighelpSheet(item: $marketplace) { marketplace in
+            NavigationStack {
+                MarketplaceView(context: marketplace)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(String(localized: "Done")) { self.marketplace = nil }
+                                .accessibilityIdentifier("marketplace.done")
+                        }
+                    }
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .bighelpSheetSize(.standard)
         }
         .bighelpSheet(isPresented: $isAdvancedPresented) {
             if let profile, let advancedOptions {
@@ -704,6 +721,16 @@ struct SimpleBotProfileView: View {
                     .buttonStyle(.plain)
                     .driveTarget("simple-bots.profile.credential-vault")
                     .accessibilityIdentifier("simple-bots.profile.credential-vault")
+                }
+                if let makeMarketplace = context.makeMarketplace {
+                    SimpleBotsDivider()
+                    // Made when it opens, so its plugin list is read only then.
+                    Button { marketplace = makeMarketplace(profile.id) } label: {
+                        SimpleBotsRow(title: String(localized: "Marketplace"), leading: Image(systemName: "storefront"))
+                    }
+                    .buttonStyle(.plain)
+                    .driveTarget("simple-bots.profile.marketplace")
+                    .accessibilityIdentifier("simple-bots.profile.marketplace")
                 }
                 if advancedOptions != nil {
                     SimpleBotsDivider()

@@ -69,7 +69,6 @@ enum BighelpShortcutServiceError: LocalizedError, Equatable {
     case reasoningUnavailable
     case deliveryFailed
     case responseUnavailable
-    case foregroundUnavailable
     case emptyMessage
     case scheduledTaskUnavailable
     case scheduledTaskFailed
@@ -102,8 +101,6 @@ enum BighelpShortcutServiceError: LocalizedError, Equatable {
             "Hermes could not complete the message. Open bighelp and try again."
         case .responseUnavailable:
             "No final text response was received. Open the chat in bighelp to check its progress."
-        case .foregroundUnavailable:
-            "Open bighelp to wait for a response, or turn off Wait for response to send in the background."
         case .emptyMessage:
             "Enter a message for your agent."
         case .scheduledTaskUnavailable:
@@ -323,17 +320,12 @@ final class BighelpShortcutService: @unchecked Sendable {
         }
     }
 
-    func send(
-        _ request: BighelpShortcutChatRequest,
-        continueInForeground: @MainActor () async throws -> Void = {}
-    ) async throws -> BighelpShortcutChatResult {
+    func send(_ request: BighelpShortcutChatRequest) async throws -> BighelpShortcutChatResult {
         let message = request.message.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !message.isEmpty else { throw BighelpShortcutServiceError.emptyMessage }
         try Task.checkCancellation()
-        // Waiting no longer requires bighelp in the foreground. The intent runs
-        // in the app process, which keeps the Hermes socket alive while
-        // Shortcuts waits. The hook stays for callers that still opt in.
-        _ = continueInForeground
+        // Waiting never brings bighelp to the front. The intent runs in the app
+        // process, which keeps the Hermes socket alive while Shortcuts waits.
         Self.holdsHostConnection += 1
         // Ask iOS for background execution while the reply streams, so the
         // socket is not frozen when Shortcuts owns the foreground.

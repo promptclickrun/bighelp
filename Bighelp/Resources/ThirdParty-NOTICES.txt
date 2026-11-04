@@ -1,6 +1,6 @@
 bighelp Third-Party Runtime Notices
 
-ThinkingOrbsKit
+ThinkingOrbsKit (retained loader state labels and sizes)
 Upstream: https://github.com/Jakubantalik/Libraries
 Pinned commit: 9d735d1566d60f7af2e1292ba7455ddb85ee54bb
 

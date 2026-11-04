@@ -123,17 +123,34 @@ verified primary relay compatibility date `2026-08-28` and `nodejs_compat` flag.
 It deliberately contains no live database, queue, secret or account bindings and
 is not a production deployment configuration. Never deploy it.
 
-The integration owner independently ran the deterministic assembly, compared
-its bytes with the downloaded module, passed both checks in
-`Scripts/relay-recovery.test.mjs`, and ran this local packaging check:
+The current checks are `Scripts/managed-relay-build.test.mjs` for byte-exact
+baseline assembly and derivative parsing, and
+`Scripts/managed-relay-runtime.test.mjs` for the managed-notification derivative's
+behavior. The runtime check needs the `services/link` dependencies (including
+Wrangler), a Python environment with `cryptography`, and a compatible
+`bighelp-plugin` checkout. Set `HERMES_PYTHON` to that Python executable and
+`BIGHELP_PLUGIN_DIR` to the plugin checkout; the defaults are
+`~/.hermes/hermes-agent/.venv/bin/python` and `.ci/plugin` respectively.
+
+From the repository root, install the dependencies and run the checks in order.
+The build check generates `worker-notifications.js`, which the runtime check
+reads; do not run the two files concurrently.
+
+```sh
+(cd services/link && pnpm install --frozen-lockfile)
+node --test Scripts/managed-relay-build.test.mjs &&
+  node --test Scripts/managed-relay-runtime.test.mjs
+```
+
+The original recovery also recorded this local packaging check:
 
 ```sh
 wrangler deploy --config services/relay/wrangler.recovery.jsonc --dry-run
 ```
 
-The output reported `--dry-run: exiting now`; nothing was uploaded. The two
-recovery checks prove exact byte preservation and JavaScript parsing, not new
-notification behavior. Live `/health` separately returned status `ok` before
+The recorded output reported `--dry-run: exiting now`; nothing was uploaded.
+The baseline assembly check proves byte preservation. The runtime test covers
+the authored derivative, not live notification delivery. Live `/health` separately returned status `ok` before
 this recovery. No APNs send, database/queue mutation, deployment, migration,
 resource creation or production service restart was performed.
 

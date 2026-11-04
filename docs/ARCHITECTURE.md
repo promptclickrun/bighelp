@@ -421,12 +421,15 @@ Shortcuts prepares the authenticated host connection independently of scene
 launch. Agent and model entity queries share one preparation task. A verified
 connection is reused, and a host/account change invalidates waiting actions.
 Background intent preparation is not cancelled merely because no scene is active.
-Wait-enabled sends request the system's foreground continuation before creating
-or sending a chat, activate that session through the normal router, and return
-terminal assistant text after the original send completes. Send-only actions
-remain in the background. Missing final text is an error; interim text is never
-the returned answer. Foreground continuation does not establish unlimited iOS
-intent runtime. Device Shortcuts execution remains a separate acceptance gate.
+Both send modes run in the background without requesting foreground continuation.
+The service holds the host connection and requests a bounded background task.
+Wait-enabled sends activate the new chat through the normal router and return
+terminal assistant text if the send finishes within `responseWait` (25 seconds).
+At the deadline the turn is left running and the intent returns a queued result;
+send-only actions return queued without waiting. Missing final text from a
+completed send is an error; interim text is never the returned answer. These
+holds do not guarantee unlimited background execution. Device Shortcuts execution
+remains a separate acceptance gate.
 
 `ChatCanvasTranscriptProjection` separates work-trail headers and tool details
 into sibling native rows, including inside expanded completed-turn folds.
@@ -664,25 +667,32 @@ configuration is consumed by Hermes on the next synthesis without a gateway rest
 ### Notifications
 
 The app generates a recipient key on device and registers only the public
-delivery material. Alert content is encrypted for that recipient and signed by
-the relay.
+delivery material. When the app enrolls a host for notifications, it pins that
+host's notification public key for the grant (`BighelpSealedAlertSenderStore`).
+The host seals each alert for the recipient key and signs it with its own key
+(`loopdy-sealed-alert-v2`, mirrored by the plugin's `sealed_alerts.py`). The
+notification service and BuzzKit forward opaque bytes.
 
-The notification service extension:
+The notification service extension (`BighelpNotificationProcessor`,
+`BighelpSealedAlert`):
 
-1. Strictly validates the envelope.
-2. Verifies the sender against a bounded, validity-windowed public-key set
-   provisioned during authenticated push registration.
-3. Verifies the signature and validity window.
-4. Derives the recipient key and authenticates/decrypts the payload.
+1. Strictly validates the envelope: the exact key set, version 2, and event and
+   grant IDs that match the push's routing fields.
+2. Looks up the host key pinned for the envelope's grant, and requires the
+   envelope's sender key ID to match it and `issued` not to exceed the stored
+   grant expiry. This is not a wall-clock freshness check.
+3. Verifies the host's signature over the envelope.
+4. Derives the content key from the recipient key and the ephemeral key, then
+   authenticates and decrypts the payload.
 5. Renders the title and body only after all checks succeed.
 
-If any check fails, the extension keeps a generic fallback notification. It
-does not display unverified envelope text.
+If any check fails, the extension shows a generic notification in the agent's
+stack. It does not display unverified envelope text.
 
-This sender-key provisioning protects against modification in APNs transit and
-relay storage. It is not an independent transparency log or out-of-band
-continuity pin against compromise of the account service that provisions the
-key set.
+The pinned host key protects against modification in APNs transit, relay
+storage and BuzzKit. It is not an independent transparency log: the pin is
+accepted during authenticated enrollment through the notification service,
+which stays inside the notification trust boundary.
 
 #### Direct push registration
 
@@ -779,7 +789,7 @@ The Keychain stores:
 - The account content-encryption key
 - Optional direct Hermes gateway credentials
 - The notification recipient private key
-- Pinned relay sender public-key metadata
+- Host notification public keys pinned per grant
 
 Sensitive items are device-only and are not synchronized through iCloud
 Keychain.

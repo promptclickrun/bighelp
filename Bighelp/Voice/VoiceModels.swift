@@ -26,7 +26,7 @@ enum VoiceStatus: String, CaseIterable, Identifiable, Sendable {
 }
 
 enum VoiceOrbPresentation {
-    static let usesThinkingOrbsKitSurface = true
+    static let usesExplicitOrbSurface = true
 
     static func scenario(for status: VoiceStatus) -> BighelpThinkingOrbScenario {
         switch status {

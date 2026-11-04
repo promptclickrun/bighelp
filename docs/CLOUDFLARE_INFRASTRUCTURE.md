@@ -203,9 +203,9 @@ Production operations should preserve these invariants:
   acknowledgement and revocation cleanup.
 - Treat D1 migrations and Durable Object migrations as security-sensitive
   changes.
-- Treat relay sender-key provisioning and rotation as part of the account
-  service trust boundary; pairing-key commitment does not provide notification
-  sender-key transparency.
+- Treat host-key enrollment and rotation for sealed alerts as part of the
+  notification service trust boundary; pairing-key commitment does not provide
+  notification sender-key transparency.
 - Test revocation from both active and offline endpoint states.
 - Review privacy disclosures whenever a new durable field or storage product is
   introduced.

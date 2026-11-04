@@ -84,7 +84,7 @@ that read public events can be forged; see the Azure README.
 
 ## How to turn it off
 
-- **App:** Settings > Privacy > "Share usage and diagnostics". When it is off, the app sends nothing, deletes its
+- **App:** Settings > Help & feedback > "Share usage and diagnostics". When it is off, the app sends nothing, deletes its
   install ID, and tells each connected host to stop too. Turning it back on makes a new install ID.
 - **Host plugin**, any one of these:
   - `hermes bighelp telemetry off` (and `on`, `status`)

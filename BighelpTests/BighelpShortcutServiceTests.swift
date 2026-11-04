@@ -16,9 +16,7 @@ struct BighelpShortcutServiceTests {
     @Test func waitedShortcutNeverAsksToOpenBighelp() async throws {
         let harness = try await ShortcutServiceHarness()
         let result = try await harness.service.send(.init(message: "Check this", agentID: "finance",
-            model: nil, reasoning: nil, attachments: [], waitForResponse: true)) {
-                throw BighelpShortcutServiceError.foregroundUnavailable
-            }
+            model: nil, reasoning: nil, attachments: [], waitForResponse: true))
         #expect(result.delivery == .completed("Finished from Finley"))
         #expect(harness.conversation.waitedMessages.count == 1)
     }
@@ -33,12 +31,10 @@ struct BighelpShortcutServiceTests {
         #expect(harness.conversation.waitedMessages.count == 1)
     }
 
-    @Test func sendOnlyDoesNotRequestForegroundContinuation() async throws {
+    @Test func sendOnlyQueuesWithoutOpeningAChat() async throws {
         let harness = try await ShortcutServiceHarness()
         let result = try await harness.service.send(.init(message: "Check this", agentID: nil,
-            model: nil, reasoning: nil, attachments: [], waitForResponse: false)) {
-                throw BighelpShortcutServiceError.foregroundUnavailable
-            }
+            model: nil, reasoning: nil, attachments: [], waitForResponse: false))
         #expect(result.delivery == .queued)
         #expect(harness.state.path.isEmpty)
         #expect(harness.conversation.queuedMessages.count == 1)

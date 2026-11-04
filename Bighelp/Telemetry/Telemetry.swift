@@ -25,8 +25,8 @@ enum TelemetryEnvironment {
     }
 }
 
-/// Whether the person has telemetry on (Settings › Device access › Usage and
-/// diagnostics). On unless they turned it off.
+/// Whether the person has telemetry on (Settings › Help & feedback › Share usage
+/// and diagnostics). On unless they turned it off.
 struct TelemetryPreference: @unchecked Sendable {
     static let key = "bighelp.privacy.telemetry-enabled"
     let defaults: UserDefaults

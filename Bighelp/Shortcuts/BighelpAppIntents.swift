@@ -316,11 +316,6 @@ struct SendLoopdyChatIntent: AppIntent {
     }
 }
 
-// Preserve the supported foreground continuation on iOS 17 and 18. iOS 26
-// reads supportedModes above instead of the legacy marker protocol.
-@available(iOS, deprecated: 26.0)
-extension SendLoopdyChatIntent: ForegroundContinuableIntent {}
-
 struct StartLoopdyVoiceChatIntent: AppIntent {
     static let title: LocalizedStringResource = "Start voice chat"
     static let description = IntentDescription(

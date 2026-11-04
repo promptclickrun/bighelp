@@ -1,5 +1,4 @@
 import SwiftUI
-import ThinkingOrbsKit
 
 enum BighelpThinkingOrbScenario: Sendable, Equatable {
     case working
@@ -22,17 +21,39 @@ enum BighelpThinkingOrbSurface: Sendable, Equatable {
     case automatic
     case light
     case dark
+}
 
-    var packageTheme: OrbTheme {
+/// What the loader stands for, and the label VoiceOver reads when no visible text says it.
+enum BighelpThinkingOrbState: String, Sendable {
+    case working
+    case searching
+    case solving
+    case listening
+    case connecting
+    case weaving
+    case composing
+    case breathing
+    case shaping
+
+    var label: String {
         switch self {
-        case .automatic:
-            .auto
-        case .light:
-            .light
-        case .dark:
-            .dark
+        case .working: "Working…"
+        case .searching: "Searching…"
+        case .solving: "Solving…"
+        case .listening: "Listening…"
+        case .connecting: "Connecting…"
+        case .weaving: "Weaving…"
+        case .composing: "Composing…"
+        case .breathing: "Thinking…"
+        case .shaping: "Shaping…"
         }
     }
+}
+
+/// The loader's two sizes, in points.
+enum BighelpThinkingOrbSize: Int, Sendable {
+    case px20 = 20
+    case px64 = 64
 }
 
 extension BighelpTheme {
@@ -50,8 +71,8 @@ extension BighelpTheme {
 }
 
 struct BighelpThinkingOrbPresentation: Sendable {
-    let state: OrbState
-    let size: OrbSize
+    let state: BighelpThinkingOrbState
+    let size: BighelpThinkingOrbSize
     let displaySize: Double?
     let visibleLabel: String?
     /// The brand kit's motion for the scenario, and how it plays.
@@ -101,7 +122,7 @@ struct BighelpThinkingOrbPresentation: Sendable {
         explicitly || scenePhase != .active
     }
 
-    private static func state(for scenario: BighelpThinkingOrbScenario) -> OrbState {
+    private static func state(for scenario: BighelpThinkingOrbScenario) -> BighelpThinkingOrbState {
         switch scenario {
         case .working:
             .working
@@ -124,7 +145,7 @@ struct BighelpThinkingOrbPresentation: Sendable {
         }
     }
 
-    private static func size(for scale: BighelpThinkingOrbScale) -> OrbSize {
+    private static func size(for scale: BighelpThinkingOrbScale) -> BighelpThinkingOrbSize {
         switch scale {
         case .inline:
             .px20

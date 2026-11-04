@@ -132,6 +132,10 @@ enum SessionPreviewText {
         if raw.hasPrefix("Message from"), let incoming = AgentTalkIncomingMessage.parse(raw), incoming.body != raw {
             return "\(incoming.senderName): " + markdownPlain(incoming.body)
         }
+        // A helper's report is for the model; a list preview may cut it short, so it doesn't count tasks.
+        if raw.hasPrefix("[ASYNC DELEGATION ") {
+            return raw.hasPrefix("[ASYNC DELEGATION TASK FAILED") ? "A helper failed" : "Helpers reported back"
+        }
         return markdownPlain(raw)
     }
 

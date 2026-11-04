@@ -11,13 +11,16 @@ import UIKit
 /// row). `-test-long-chat-heavy` makes each turn as big as a chat near half a
 /// million tokens: tool results of 20 to 200 KB, long thinking, pasted logs and
 /// long answers with big code blocks. `-test-long-chat-drafts` ends every tenth answer with a photo
-/// draft card (a contact or an event), for measuring what drafts cost a long chat. Made-up vendors,
-/// amounts and files.
+/// draft card (a contact or an event), for measuring what drafts cost a long chat.
+/// `-test-long-chat-helpers` makes every tenth question helpers reporting back (`ChatBackgroundResult`),
+/// shown as their card; `-test-long-chat-helpers raw` shows the same reports as the person's
+/// message, as the chat did before the card. Made-up vendors, amounts and files.
 enum LongChatPerformanceFixture {
     static let turnsArgument = "-test-long-chat"
     static let countArgument = "-test-long-chat-count"
     static let heavyArgument = "-test-long-chat-heavy"
     static let draftsArgument = "-test-long-chat-drafts"
+    static let helpersArgument = "-test-long-chat-helpers"
     static let startArgument = "-start-long-chat"
 
     static func sessionID(_ index: Int) -> String { "demo-long-chat-\(index)" }
@@ -34,9 +37,17 @@ enum LongChatPerformanceFixture {
         let photo = photoAttachment()
         let heavy = arguments.contains(heavyArgument)
         let drafts = arguments.contains(draftsArgument)
+        let helpers = helperReports(in: arguments)
         return (1...count(in: arguments)).map {
-            record(index: $0, turns: turns, heavy: heavy, drafts: drafts, photo: photo)
+            record(index: $0, turns: turns, heavy: heavy, drafts: drafts, helpers: helpers, photo: photo)
         }
+    }
+
+    enum HelperReports { case cards, raw }
+
+    static func helperReports(in arguments: [String]) -> HelperReports? {
+        guard let index = arguments.firstIndex(of: helpersArgument) else { return nil }
+        return arguments.indices.contains(index + 1) && arguments[index + 1] == "raw" ? .raw : .cards
     }
 
     static func count(in arguments: [String]) -> Int {
@@ -48,7 +59,8 @@ enum LongChatPerformanceFixture {
     /// The newest answer's last line, for tests waiting on the bottom of the chat.
     static func sentinel(turns: Int) -> String { "Long chat sentinel \(turns)" }
 
-    private static func record(index: Int, turns: Int, heavy: Bool, drafts: Bool, photo: [ChatAttachment]) -> SessionRecord {
+    private static func record(index: Int, turns: Int, heavy: Bool, drafts: Bool, helpers: HelperReports?,
+                               photo: [ChatAttachment]) -> SessionRecord {
         let sessionID = sessionID(index)
         let agent = TimelineSender.agent(id: "finance", snapshot: .init(name: "Avery Park"))
         let start = Date(timeIntervalSince1970: 1_790_000_000)
@@ -59,11 +71,18 @@ enum LongChatPerformanceFixture {
         for turn in 1...turns {
             let turnID = "\(sessionID)-turn-\(turn)"
             let asked = start.addingTimeInterval(TimeInterval(turn * 300))
-            items.append(TimelineItem(
-                id: "\(sessionID)-human-\(turn)", role: .human, sender: .user(snapshot: .init(name: "You")),
-                content: .message(heavy && turn.isMultiple(of: 4) ? question(turn) + pastedLog(turn) : question(turn)),
-                metadata: .init(delivery: "Saved", timestamp: asked, sourceOrder: next()),
-                attachments: turn.isMultiple(of: 25) ? photo : []))
+            let asking = TimelineMetadata(delivery: "Saved", timestamp: asked, sourceOrder: next())
+            let report = helpers != nil && turn.isMultiple(of: 10) ? helperReport(turn) : nil
+            if let report, helpers == .cards,
+               let result = ChatBackgroundResult(displayKind: ChatBackgroundResult.helpersKind, metadata: nil, text: report) {
+                items.append(.backgroundResult(result, id: "\(sessionID)-human-\(turn)", metadata: asking))
+            } else {
+                items.append(TimelineItem(
+                    id: "\(sessionID)-human-\(turn)", role: .human, sender: .user(snapshot: .init(name: "You")),
+                    content: .message(report ?? (heavy && turn.isMultiple(of: 4) ? question(turn) + pastedLog(turn)
+                                                 : question(turn))),
+                    metadata: asking, attachments: turn.isMultiple(of: 25) ? photo : []))
+            }
             activity.append(ChatActivityEvent(
                 eventID: "\(turnID)-thinking", sessionID: sessionID, turnID: turnID, kind: .reasoning,
                 lifecycle: .succeeded, title: "Reasoning", summary: nil,
@@ -103,6 +122,23 @@ enum LongChatPerformanceFixture {
                                configRevision: base.configRevision, messages: base.messages, marks: base.marks,
                                fields: base.fields)
         return ImageDraftsFixture.fenced(draft, title: base.fields.displayName ?? "Draft")
+    }
+
+    /// Three helpers' report as Hermes words it for the model, each with a summary like a real one.
+    private static func helperReport(_ turn: Int) -> String {
+        let tasks = vendors.prefix(3).enumerated().map { index, vendor in
+            let summary = #"{"checked":\#(30 + index * 7),"late":["INV-\#(turn)\#(index)07","INV-\#(turn)\#(index)19"],"#
+                + #""doubled":[],"files":["/srv/hermes/workspace/invoices/week-\#(turn)/\#(index).csv"],"#
+                + #""notes":"\#(String(repeating: "Matched each line against the payment calendar and the bank export. ", count: 6))"}"#
+            return "--- \(index == 2 ? "✗" : "✓") TASK \(index + 1)/3: Reconcile week \(turn)'s invoices from \(vendor) "
+                + "against the payment calendar  (status=\(index == 2 ? "failed" : "completed"), api_calls=\(12 + index), "
+                + "\(180 + index * 40).5s) ---\n\(summary)\nFull live transcript (complete tool/assistant trace): "
+                + "/srv/hermes/cache/delegation/live/deleg_\(turn)/task-\(index).log"
+        }
+        return "[ASYNC DELEGATION BATCH COMPLETE — deleg_\(turn)]\nA background fan-out unit you dispatched earlier — "
+            + "3 subagent(s) — has finished; its consolidated results are below. You may have moved on since "
+            + "dispatching — act on these or re-dispatch if things have changed.\n\nDispatched: 2026-11-03 17:44:23 "
+            + "(9m14s ago)\nRole: leaf   Model: demo-model   Total duration: 555.01s\n\n" + tasks.joined(separator: "\n\n")
     }
 
     private static let vendors = ["Northwind Supplies", "Blue Harbor Print", "Cedar & Pine Catering",

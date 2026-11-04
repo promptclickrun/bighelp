@@ -473,6 +473,8 @@ final class DirectHermesDashboardDataSource: DashboardDataSource,
             return ("Hermes shared a card.", nil, card)
         case .budgetSummary, .weatherAndTasks, .approvalRequest:
             return ("Hermes shared an update.", nil, nil)
+        case .backgroundResult(let result):
+            return (result.headline, nil, nil)
         }
     }
 

@@ -279,6 +279,7 @@ enum TimelineContent: Codable, Equatable, Sendable {
         case approvalRequest
         case generativeUI
         case bighelpCard = "loopdyCard"
+        case backgroundResult
     }
 
     case message(String)
@@ -287,6 +288,13 @@ enum TimelineContent: Codable, Equatable, Sendable {
     case approvalRequest(ApprovalRequest)
     case generativeUI(GenerativeUICard)
     case bighelpCard(BighelpCardDocument)
+    /// Helpers or a background command reporting back (`ChatBackgroundResult`).
+    case backgroundResult(ChatBackgroundResult)
+
+    var isBackgroundResult: Bool {
+        if case .backgroundResult = self { return true }
+        return false
+    }
 
     var kind: Kind {
         switch self {
@@ -296,6 +304,7 @@ enum TimelineContent: Codable, Equatable, Sendable {
         case .approvalRequest: .approvalRequest
         case .generativeUI: .generativeUI
         case .bighelpCard: .bighelpCard
+        case .backgroundResult: .backgroundResult
         }
     }
 
@@ -306,6 +315,7 @@ enum TimelineContent: Codable, Equatable, Sendable {
         case approvalRequest
         case generativeUI
         case bighelpCard = "loopdyCard"
+        case backgroundResult
     }
 
     init(from decoder: any Decoder) throws {
@@ -322,6 +332,8 @@ enum TimelineContent: Codable, Equatable, Sendable {
             self = .generativeUI(card)
         } else if let card = try container.decodeIfPresent(BighelpCardDocument.self, forKey: .bighelpCard) {
             self = .bighelpCard(card)
+        } else if let result = try container.decodeIfPresent(ChatBackgroundResult.self, forKey: .backgroundResult) {
+            self = .backgroundResult(result)
         } else {
             throw DecodingError.dataCorruptedError(forKey: .message, in: container, debugDescription: "Unknown timeline content")
         }
@@ -342,6 +354,8 @@ enum TimelineContent: Codable, Equatable, Sendable {
             try container.encode(card, forKey: .generativeUI)
         case .bighelpCard(let card):
             try container.encode(card, forKey: .bighelpCard)
+        case .backgroundResult(let result):
+            try container.encode(result, forKey: .backgroundResult)
         }
     }
 }

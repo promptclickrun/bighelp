@@ -166,9 +166,14 @@ struct ChatLongHistoryTests {
         var events: [ChatActivityEvent] = []
         for turn in 0..<12 {
             let base = turn * 10 + 10
-            items.append(TimelineItem(id: "q\(turn)", role: .human, sender: .user(snapshot: .init(name: "You")),
-                                      content: .message("Question \(turn)"),
-                                      metadata: .init(timestamp: Date(timeIntervalSince1970: Double(base)), sourceOrder: base)))
+            let metadata = TimelineMetadata(timestamp: Date(timeIntervalSince1970: Double(base)), sourceOrder: base)
+            if turn == 9 {
+                // Helpers reporting back start their turn as a card.
+                items.append(.backgroundResult(Self.helperResult, id: "q\(turn)", metadata: metadata))
+            } else {
+                items.append(TimelineItem(id: "q\(turn)", role: .human, sender: .user(snapshot: .init(name: "You")),
+                                          content: .message("Question \(turn)"), metadata: metadata))
+            }
             // Two questions in a row: the second groups with the first across the turn.
             if turn == 7 { continue }
             events.append(ChatActivityEvent(eventID: "r\(turn)", sessionID: sessionID, turnID: "t\(turn)", kind: .reasoning,
@@ -224,6 +229,18 @@ struct ChatLongHistoryTests {
             }
         }
         check("history")
+        // The card's turn folds its work and answer under it, as a typed question's turn does.
+        func rowAfter(_ id: String) -> ChatCanvasRow? {
+            guard let index = foldedRows.firstIndex(where: {
+                if case .transcript(.entry(.message(let item))) = $0 { return item.id == id }
+                return false
+            }), index + 1 < foldedRows.count else { return nil }
+            return foldedRows[index + 1]
+        }
+        if case .transcript(.completed)? = rowAfter("q9"), case .transcript(.completed)? = rowAfter("q8") {
+        } else {
+            Issue.record("The card's turn is not folded like a question's: \(String(describing: rowAfter("q9")))")
+        }
         let fold = try #require(foldedRows.compactMap { row -> String? in
             if case .transcript(.completed(let turn)) = row { return turn.id }
             return nil
@@ -359,6 +376,10 @@ struct ChatLongHistoryTests {
             ]
         }
     }
+
+    static let helperResult = ChatBackgroundResult(
+        kind: .helpers, tasks: [.init(goal: "Sort the week's receipts", outcome: .finished, seconds: 30)],
+        seconds: 30, report: "[ASYNC DELEGATION COMPLETE — t]")
 
     static func answer(_ id: String, _ text: String, delivery: String = "Delivered", order: Int? = nil) -> TimelineItem {
         TimelineItem(id: id, role: .assistant, sender: .agent(id: "default", snapshot: .init(name: "Juno")),

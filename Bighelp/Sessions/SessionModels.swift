@@ -340,6 +340,7 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
             agentIDs: agentIDs,
             title: title,
             preview: items.last.flatMap { item in
+                if case .backgroundResult(let result) = item.content { return result.headline }
                 guard case .message(let text) = item.content else { return nil }
                 return HermesUserMessageDisplay.preview(text, attachments: item.attachments)
             } ?? catalogPreview ?? (kind == .botMode ? "Group chat" : ""),

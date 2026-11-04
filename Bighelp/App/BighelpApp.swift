@@ -458,6 +458,15 @@ struct BighelpApp: App {
         #endif
     }
 
+    private var backgroundResultsFixtureEnabled: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-use-demo-fixtures")
+            && ProcessInfo.processInfo.arguments.contains(BackgroundResultsFixtureView.launchArgument)
+        #else
+        false
+        #endif
+    }
+
     private var turnFailureFixtureEnabled: Bool {
         #if DEBUG
         ProcessInfo.processInfo.arguments.contains("-use-demo-fixtures")
@@ -633,6 +642,10 @@ struct BighelpApp: App {
                 } else if turnFailureFixtureEnabled {
                     #if DEBUG
                     ChatTurnFailureFixtureView()
+                    #endif
+                } else if backgroundResultsFixtureEnabled {
+                    #if DEBUG
+                    NavigationStack { BackgroundResultsFixtureView() }
                     #endif
                 } else if let cardCatalogFixtureURL {
                     BighelpCardCatalogView.fixture(

@@ -96,6 +96,7 @@ struct TimelineSenderResolver {
         case .approvalRequest: "Approval request"
         case .generativeUI(let card): card.title
         case .bighelpCard(let card): card.title
+        case .backgroundResult(let result): result.headline
         }
     }
 }
@@ -149,13 +150,16 @@ struct TimelineItemView: View {
 
     var body: some View {
         Group {
-            if uiV3Enabled, showsSenderName, item.role == .assistant {
+            if case .backgroundResult(let result) = item.content {
+                // Hermes' report starts the turn like a message, but it isn't the person's: a card on the agent's side.
+                ChatBackgroundResultCard(result: result)
+            } else if uiV3Enabled, showsSenderName, item.role == .assistant {
                 groupAssistantMessage
             } else {
                 messageColumn
             }
         }
-        .frame(maxWidth: .infinity, alignment: item.role == .human ? .trailing : .leading)
+        .frame(maxWidth: .infinity, alignment: item.role == .human && !item.content.isBackgroundResult ? .trailing : .leading)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(senderResolver.accessibilityDescription(for: item))
         .accessibilityValue(pendingSend?.label ?? "")
@@ -228,6 +232,9 @@ struct TimelineItemView: View {
                 BighelpCardView(card: card)
                     .cardImageCopy(BighelpCardView(card: card))
                     .alignmentGuide(.messageContentBottom) { $0[.bottom] }
+            case .backgroundResult:
+                // Drawn by `body` as a card of its own.
+                EmptyView()
             }
 
             if !sentFiles.files.isEmpty {

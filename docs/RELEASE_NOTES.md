@@ -3,6 +3,24 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.60
+
+### New
+
+- **Marketplace:** open Settings and tap Marketplace, under Agents. The Marketplace shows the featured plugin of this week and the plugins with the most stars. It has four parts: Apps, Skills, Plugins and Talk anywhere. Talk anywhere connects your agent to messaging apps such as Telegram and Discord. You do not need Nerd Mode.
+- **Marketplace for each bot:** open a bot's profile and tap Marketplace. The skills, apps and messaging apps are for that bot. Plugins are for all agents on the computer.
+- **Move a chat to another project:** in a chat, tap ⋯ and then Move to Project…. You can also touch and hold a chat in Chats. The chat moves when Hermes confirms the move.
+- **More on the Plugins page:** the page shows the featured plugin of this week, the same as the Hermes marketplace. It has the shelves Popular and New this month. Each plugin shows its GitHub stars. This needs bighelp plugin 3.43.0 on your computer.
+
+### Changed
+
+- **A shorter ⋯ menu in chats:** the ⋯ menu is one list, with or without Nerd Mode. It has Model & speed, Rename…, Move to Project…, Files, Edit agent, Usage, File changes and Advanced.
+
+### Fixed
+
+- **Plugin updates that ask first:** an update can add tools or hooks, or the security check of Hermes can find problems. Then the plugin's page shows what Hermes asks. Tap Update and allow them, or Update anyway, to continue. Before, the update stopped with an error.
+- **The reason for a refused install:** when Hermes does not install a plugin, the page shows the reason from Hermes. If your computer cannot install a plugin, its Install button is off and the page tells you why.
+
 ## 2.6.59
 
 ### Fixed

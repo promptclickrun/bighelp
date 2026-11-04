@@ -1,0 +1,45 @@
+{
+ "set": {
+  "id": "christmas",
+  "name": "Christmas",
+  "category": "seasonal",
+  "startsAt": "2026-12-01T00:00:00-06:00",
+  "expiresAt": "2027-01-02T00:00:00-06:00"
+ },
+ "bodies": [
+  {
+   "id": "christmas.tree",
+   "name": "Tree",
+   "parts": [
+    {
+     "d": "M20 30H70V70H20Z",
+     "tone": "main",
+     "round": 8
+    },
+    {
+     "d": "M70 40C80 40 80 60 70 60",
+     "tone": "accent",
+     "stroke": 4
+    }
+   ],
+   "eyes": [
+    [
+     40,
+     46,
+     11
+    ],
+    [
+     52,
+     48,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -10,
+   "colors": {
+    "main": "#3B82F6",
+    "accent": "#C9C3BD"
+   }
+  }
+ ]
+}

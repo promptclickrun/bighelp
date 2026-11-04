@@ -79,6 +79,15 @@ struct HermesLookView: View {
     let name: String
 
     var body: some View {
+        if let studio = look.studio {
+            BotLookView(look: studio)
+        } else {
+            hermes
+        }
+    }
+
+    @ViewBuilder
+    private var hermes: some View {
         switch look.style {
         case .face:
             let blob = HermesBlobShape(look.shape) ?? HermesBlobShape()
@@ -122,6 +131,7 @@ enum HermesLookRenderer {
     static let pixelDimension = 160
 
     static func png(look: AgentAvatarLook, name: String) -> Data? {
+        if let studio = look.studio { return BotLookRenderer.png(studio) }
         let side = CGFloat(pixelDimension)
         let renderer = ImageRenderer(content: HermesLookView(look: look, name: name).frame(width: side, height: side))
         renderer.scale = 1

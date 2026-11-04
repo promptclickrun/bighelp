@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { convertCharacter } from './kit.mjs';
 import { validateSets, validateSVG, renderPNG, idPattern } from './assets.mjs';
+import { loadBodies } from './bodies.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const base = 'https://avatars.bighelp.app';
@@ -73,5 +74,8 @@ for (const set of sets) {
 }
 const catalog = { schemaVersion: 1, avatarKitURL: `${base}/v1/avatar-kit.json`, kit: { ...kitSettings, characters }, categories: [{ id: 'bighelp', name: 'bighelp', isFirstParty: true }, { id: 'faces', name: 'Faces' }, { id: 'shapes', name: 'Shapes' }, { id: 'seasonal', name: 'Seasonal' }], sets, avatars };
 await writeFile(path.join(root, 'catalog.json'), JSON.stringify(catalog, null, 2) + '\n');
+// Bot Studio bodies (v2): validated here, so a bad source fails the build. See docs/BOT_BODIES.md.
+const bodies = await loadBodies(path.join(root, 'sources/bodies'));
+await writeFile(path.join(root, 'bodies.json'), JSON.stringify(bodies) + '\n');
 await copyFile(path.join(root, 'NOTICES.txt'), path.join(root, 'public/NOTICES.txt'));
-console.log(JSON.stringify({ avatars: avatars.length, sets: sets.map(s => ({ id: s.id, count: avatars.filter(a => a.setId === s.id).length, expiresAt: s.expiresAt })) }));
+console.log(JSON.stringify({ avatars: avatars.length, sets: sets.map(s => ({ id: s.id, count: avatars.filter(a => a.setId === s.id).length, expiresAt: s.expiresAt })), bodies: { sets: bodies.sets.length, bodies: bodies.bodies.length } }));

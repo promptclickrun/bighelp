@@ -1,0 +1,397 @@
+{
+ "set": {
+  "id": "bighelp",
+  "name": "bighelp",
+  "category": "bighelp",
+  "startsAt": null,
+  "expiresAt": null
+ },
+ "bodies": [
+  {
+   "id": "bighelp.biggie",
+   "name": "Biggie",
+   "role": "Big help, little help",
+   "parts": [
+    {
+     "d": "M55 23a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M16 58a30 30 0 1 0 60 0a30 30 0 1 0 -60 0Z",
+     "tone": "main"
+    }
+   ],
+   "eyes": [
+    [
+     50,
+     52,
+     12
+    ],
+    [
+     61,
+     54,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -10,
+   "colors": {
+    "main": "#F28B32",
+    "accent": "#F7C84A"
+   }
+  },
+  {
+   "id": "bighelp.bubs",
+   "name": "Bubs",
+   "role": "Here to chat",
+   "parts": [
+    {
+     "d": "M26 26H74A12 12 0 0 1 86 38V58A12 12 0 0 1 74 70H44L28 82V70H26A12 12 0 0 1 14 58V38A12 12 0 0 1 26 26Z",
+     "tone": "main",
+     "round": 2
+    }
+   ],
+   "eyes": [
+    [
+     48,
+     44,
+     11
+    ],
+    [
+     59,
+     46,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -6,
+   "colors": {
+    "main": "#7B5BE0"
+   }
+  },
+  {
+   "id": "bighelp.scout",
+   "name": "Scout",
+   "role": "Looks things up",
+   "parts": [
+    {
+     "d": "M62 62L80 80",
+     "tone": "accent",
+     "stroke": 11
+    },
+    {
+     "d": "M18 44a26 26 0 1 0 52 0a26 26 0 1 0 -52 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M27 38A18 18 0 0 1 38 27",
+     "tone": "light",
+     "stroke": 4
+    }
+   ],
+   "eyes": [
+    [
+     46,
+     41,
+     11
+    ],
+    [
+     57,
+     43,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -12,
+   "colors": {
+    "main": "#2F7FE8",
+    "accent": "#F2B90F"
+   }
+  },
+  {
+   "id": "bighelp.echo",
+   "name": "Echo",
+   "role": "Talks it out loud",
+   "parts": [
+    {
+     "d": "M23 54A27 27 0 0 1 77 54",
+     "tone": "accent",
+     "stroke": 6
+    },
+    {
+     "d": "M24 56a26 26 0 1 0 52 0a26 26 0 1 0 -52 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M23 45H23A6 6 0 0 1 29 51V61A6 6 0 0 1 23 67H23A6 6 0 0 1 17 61V51A6 6 0 0 1 23 45Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M77 45H77A6 6 0 0 1 83 51V61A6 6 0 0 1 77 67H77A6 6 0 0 1 71 61V51A6 6 0 0 1 77 45Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M76 66Q75 78 62 79",
+     "tone": "accent",
+     "stroke": 4
+    }
+   ],
+   "eyes": [
+    [
+     50,
+     50,
+     12
+    ],
+    [
+     61,
+     52,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 8,
+   "colors": {
+    "main": "#E04E86",
+    "accent": "#7C5CE6"
+   }
+  },
+  {
+   "id": "bighelp.tock",
+   "name": "Tock",
+   "role": "Runs on schedule",
+   "parts": [
+    {
+     "d": "M20 30a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M60 30a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M50 21V28",
+     "tone": "accent",
+     "stroke": 6
+    },
+    {
+     "d": "M33 82L37 76M67 82L63 76",
+     "tone": "accent",
+     "stroke": 5
+    },
+    {
+     "d": "M23 55a27 27 0 1 0 54 0a27 27 0 1 0 -54 0Z",
+     "tone": "main"
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     48,
+     12
+    ],
+    [
+     63,
+     50,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -10,
+   "colors": {
+    "main": "#14A39A",
+    "accent": "#F2B90F"
+   }
+  },
+  {
+   "id": "bighelp.stack",
+   "name": "Stack",
+   "role": "Gets tasks done",
+   "parts": [
+    {
+     "d": "M46 20H68A12 12 0 0 1 80 32V54A12 12 0 0 1 68 66H46A12 12 0 0 1 34 54V32A12 12 0 0 1 46 20Z",
+     "tone": "main"
+    },
+    {
+     "d": "M46 20H68A12 12 0 0 1 80 32V54A12 12 0 0 1 68 66H46A12 12 0 0 1 34 54V32A12 12 0 0 1 46 20Z",
+     "tone": "shade"
+    },
+    {
+     "d": "M32 34H56A12 12 0 0 1 68 46V70A12 12 0 0 1 56 82H32A12 12 0 0 1 20 70V46A12 12 0 0 1 32 34Z",
+     "tone": "main"
+    },
+    {
+     "d": "M29 68L35 74L45 64",
+     "tone": "light",
+     "stroke": 5
+    }
+   ],
+   "eyes": [
+    [
+     46,
+     50,
+     11
+    ],
+    [
+     57,
+     52,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -8,
+   "colors": {
+    "main": "#2FA35B"
+   }
+  },
+  {
+   "id": "bighelp.patch",
+   "name": "Patch",
+   "role": "Writes the code",
+   "parts": [
+    {
+     "d": "M31 22H69A9 9 0 0 1 78 31V53A9 9 0 0 1 69 62H31A9 9 0 0 1 22 53V31A9 9 0 0 1 31 22Z",
+     "tone": "main"
+    },
+    {
+     "d": "M14 68H86L82 76H18Z",
+     "tone": "main",
+     "round": 4
+    },
+    {
+     "d": "M31 34L37 40L31 46M40 49H47",
+     "tone": "light",
+     "stroke": 4
+    }
+   ],
+   "eyes": [
+    [
+     55,
+     37,
+     11
+    ],
+    [
+     66,
+     39,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 6,
+   "colors": {
+    "main": "#7486A6"
+   }
+  },
+  {
+   "id": "bighelp.errand",
+   "name": "Errand",
+   "role": "Sends and delivers",
+   "parts": [
+    {
+     "d": "M14 52L86 20L64 84L50 62Z",
+     "tone": "main",
+     "round": 4
+    },
+    {
+     "d": "M86 20L50 62L64 84Z",
+     "tone": "shade"
+    }
+   ],
+   "eyes": [
+    [
+     37,
+     48,
+     9
+    ],
+    [
+     47,
+     50,
+     9
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -4,
+   "colors": {
+    "main": "#E5484D"
+   }
+  },
+  {
+   "id": "bighelp.snooze",
+   "name": "Snooze",
+   "role": "Rests when offline",
+   "parts": [
+    {
+     "d": "M49.8 18.1L50.9 18L52 18L53.1 18L54.2 18.1L55.3 18.2L56.4 18.3L57.5 18.5L58.6 18.7L59.7 18.9L60.8 19.2L61.9 19.5L62.9 19.8L64 20.2L65 20.6L66 21L67 21.5L68 22L69 22.6L70 23.1L70.9 23.7L71.8 24.4L72.7 25L73.6 25.7L74.4 26.4L75.2 27.2L76 28L76.8 28.8L77.6 29.6L78.3 30.4L79 31.3L79.6 32.2L80.3 33.1L80.9 34L81.4 35L82 36L82.5 37L83 38L83.4 39L83.8 40L84.2 41.1L84.5 42.1L84.8 43.2L85.1 44.3L85.3 45.4L85.5 46.5L85.7 47.6L85.8 48.7L85.9 49.8L86 50.9L86 52L86 53.1L85.9 54.2L85.8 55.3L85.7 56.4L85.5 57.5L85.3 58.6L85.1 59.7L84.8 60.8L84.5 61.9L84.2 62.9L83.8 64L83.4 65L83 66L82.5 67L82 68L81.4 69L80.9 70L80.3 70.9L79.6 71.8L79 72.7L78.3 73.6L77.6 74.4L76.8 75.2L76 76L75.2 76.8L74.4 77.6L73.6 78.3L72.7 79L71.8 79.6L70.9 80.3L70 80.9L69 81.4L68 82L67 82.5L66 83L65 83.4L64 83.8L62.9 84.2L61.9 84.5L60.8 84.8L59.7 85.1L58.6 85.3L57.5 85.5L56.4 85.7L55.3 85.8L54.2 85.9L53.1 86L52 86L50.9 86L49.8 85.9L48.7 85.8L47.6 85.7L46.5 85.5L45.4 85.3L44.3 85.1L43.2 84.8L42.1 84.5L41.1 84.2L40 83.8L39 83.4L38 83L37 82.5L36 82L35 81.4L34 80.9L33.1 80.3L32.2 79.6L31.3 79L30.4 78.3L29.6 77.6L28.8 76.8L28 76L27.2 75.2L26.4 74.4L25.7 73.6L25 72.7L24.4 71.8L23.7 70.9L23.1 70L22.6 69L22 68L21.5 67L21 66L20.6 65L20.2 64L19.8 62.9L19.5 61.9L19.2 60.8L22.1 62L25.1 63.1L28.2 63.7L31.3 64L34.5 63.9L37.6 63.4L40.7 62.5L43.6 61.3L46.3 59.7L48.9 57.8L51.2 55.6L53.2 53.1L54.8 50.4L56.2 47.6L57.2 44.6L57.8 41.4L58 38.3L57.8 35.1L57.3 32L56.4 29L55.1 26.1L53.5 23.4L51.5 20.8Z",
+     "tone": "main",
+     "round": 4
+    },
+    {
+     "d": "M20 16H28L20 24H28",
+     "tone": "accent",
+     "stroke": 3
+    }
+   ],
+   "eyes": [
+    [
+     62,
+     58,
+     11
+    ],
+    [
+     73,
+     60,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -12,
+   "colors": {
+    "main": "#8070E8",
+    "accent": "#B7A8FF"
+   }
+  },
+  {
+   "id": "bighelp.spark",
+   "name": "Spark",
+   "role": "Brings the ideas",
+   "parts": [
+    {
+     "d": "M25 21L29 25M75 21L71 25M50 12V16",
+     "tone": "accent",
+     "stroke": 4
+    },
+    {
+     "d": "M25 44a25 25 0 1 0 50 0a25 25 0 1 0 -50 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M39 60H61V71H39Z",
+     "tone": "main",
+     "round": 4
+    },
+    {
+     "d": "M40 75H60V82H40Z",
+     "tone": "accent",
+     "round": 4
+    }
+   ],
+   "eyes": [
+    [
+     48,
+     43,
+     11
+    ],
+    [
+     59,
+     45,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -8,
+   "colors": {
+    "main": "#F6C340",
+    "accent": "#A39B95"
+   }
+  }
+ ]
+}

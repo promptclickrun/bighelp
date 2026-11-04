@@ -22,6 +22,9 @@ struct AgentAvatarLook: Codable, Equatable, Sendable {
     /// profile name turns out different, the face is locked to this one so
     /// Hermes Desktop still draws the picture that was saved.
     var faceSeed: String?
+    /// An avatar made in Bot Studio, kept beside the picture (`imageKind: "photo"`): Desktop and
+    /// older apps show the picture, this app draws the avatar itself.
+    var studio: BotLook?
 
     static let photo = AgentAvatarLook(style: .photo)
 
@@ -29,7 +32,10 @@ struct AgentAvatarLook: Codable, Equatable, Sendable {
     init?(namespace: [String: BighelpJSONValue]) {
         let shape = namespace["shape"]?.string.flatMap { $0.isEmpty || $0.utf8.count > 200 ? nil : $0 }
         let color = namespace["color"]?.string.flatMap { $0.utf8.count > 64 ? nil : $0 }
-        if namespace["imageKind"]?.string == "photo" {
+        if let saved = namespace["studio"], let data = try? JSONEncoder().encode(saved),
+           let studio = try? JSONDecoder().decode(BotLook.self, from: data) {
+            self.init(style: .photo, studio: studio)
+        } else if namespace["imageKind"]?.string == "photo" {
             self.init(style: .photo)
         } else if let shape, HermesBlobShape(shape) != nil {
             self.init(style: .face, shape: shape, color: color)
@@ -40,12 +46,16 @@ struct AgentAvatarLook: Codable, Equatable, Sendable {
         }
     }
 
-    init(style: Style, shape: String? = nil, color: String? = nil, faceSeed: String? = nil) {
+    init(style: Style, shape: String? = nil, color: String? = nil, faceSeed: String? = nil, studio: BotLook? = nil) {
         self.style = style
         self.shape = shape
         self.color = color
         self.faceSeed = faceSeed
+        self.studio = studio
     }
+
+    /// The app draws it live: a Hermes face or shape, or a Bot Studio avatar.
+    var drawsLive: Bool { style != .photo || studio != nil }
 
     /// The shape string to save for the profile named `profileID`.
     func savedShape(profileID: String) -> String? {
@@ -61,6 +71,12 @@ struct AgentAvatarLook: Codable, Equatable, Sendable {
         var result = namespace
         result["custom"] = .boolean(true)
         result["imageKind"] = .string(style == .photo ? "photo" : "shape")
+        if let studio, let data = try? JSONEncoder().encode(studio),
+           let saved = try? JSONDecoder().decode(BighelpJSONValue.self, from: data) {
+            result["studio"] = saved
+        } else {
+            result.removeValue(forKey: "studio")
+        }
         switch style {
         case .photo:
             break

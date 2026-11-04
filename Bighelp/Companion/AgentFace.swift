@@ -2,8 +2,8 @@ import Observation
 import SwiftUI
 
 /// What an agent's face is, from what this device and its computer know, in the order every
-/// surface draws them: a kit character, a petdex pet, a Hermes face or shape, a Bots mode mark,
-/// then its picture. One order, so the chat, Bots mode and its pet companion show the same face.
+/// surface draws them: a kit character, a petdex pet, a Hermes face or shape or a Bot Studio
+/// avatar (both saved in Hermes' profile), a Bots mode mark, then its picture. One order, so the chat, Bots mode and its pet companion show the same face.
 enum AgentFace: Equatable {
     case character(CompanionAppearance)
     case pet(key: String)
@@ -70,7 +70,7 @@ final class AgentLookStore {
         let prefix = "\(scope.utf8.count):\(scope)"
         var next = looks.filter { !$0.key.hasPrefix(prefix) }
         for profile in profiles.prefix(512) {
-            guard let look = profile.look, look.style != .photo else { continue }
+            guard let look = profile.look, look.drawsLive else { continue }
             next[CompanionStore.agentKey(agentScope: scope, agentID: profile.id)] = Entry(look: look, name: profile.name)
         }
         if next != looks { looks = next }
@@ -148,6 +148,15 @@ struct HermesLookPlayer: View {
     let state: AvatarPlayState
 
     var body: some View {
+        if let studio = look.studio {
+            BotLookPlayer(look: studio, state: state)
+        } else {
+            hermes
+        }
+    }
+
+    @ViewBuilder
+    private var hermes: some View {
         switch look.style {
         case .face:
             let blob = HermesBlobShape(look.shape) ?? HermesBlobShape()

@@ -1,0 +1,429 @@
+{
+ "set": {
+  "id": "classics",
+  "name": "bighelp Classics",
+  "category": "bighelp",
+  "startsAt": null,
+  "expiresAt": null
+ },
+ "bodies": [
+  {
+   "id": "classics.pinch",
+   "name": "Pinch",
+   "parts": [
+    {
+     "d": "M37 48Q27 44 26 34M63 48Q73 44 74 34",
+     "tone": "main",
+     "stroke": 6
+    },
+    {
+     "d": "M15.6 26.5A6 11 -25 1 0 26.4 21.5A6 11 -25 1 0 15.6 26.5Z",
+     "tone": "main"
+    },
+    {
+     "d": "M25.6 21.5A6 11 25 1 0 36.4 26.5A6 11 25 1 0 25.6 21.5Z",
+     "tone": "main"
+    },
+    {
+     "d": "M63.6 26.5A6 11 -25 1 0 74.4 21.5A6 11 -25 1 0 63.6 26.5Z",
+     "tone": "main"
+    },
+    {
+     "d": "M73.6 21.5A6 11 25 1 0 84.4 26.5A6 11 25 1 0 73.6 21.5Z",
+     "tone": "main"
+    },
+    {
+     "d": "M32 58H25M32 66H26M68 58H75M68 66H74",
+     "tone": "main",
+     "stroke": 4
+    },
+    {
+     "d": "M43 70L36 85Q50 89 64 85L57 70Z",
+     "tone": "main",
+     "round": 4
+    },
+    {
+     "d": "M31 54A19 22 0 1 0 69 54A19 22 0 1 0 31 54Z",
+     "tone": "main"
+    }
+   ],
+   "eyes": [
+    [
+     48,
+     50,
+     11
+    ],
+    [
+     59,
+     52,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -6,
+   "colors": {
+    "main": "#E8553F"
+   }
+  },
+  {
+   "id": "classics.aeria",
+   "name": "Aeria",
+   "parts": [
+    {
+     "d": "M32 40Q21 26 12 27Q13 34 18 35Q16 40 21 42Q20 47 29 50Z",
+     "tone": "main",
+     "round": 3
+    },
+    {
+     "d": "M68 40Q79 26 88 27Q87 34 82 35Q84 40 79 42Q80 47 71 50Z",
+     "tone": "main",
+     "round": 3
+    },
+    {
+     "d": "M24 56a26 26 0 1 0 52 0a26 26 0 1 0 -52 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M28 42Q50 30 72 42",
+     "tone": "accent",
+     "stroke": 5
+    }
+   ],
+   "eyes": [
+    [
+     50,
+     53,
+     12
+    ],
+    [
+     61,
+     55,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 6,
+   "colors": {
+    "main": "#4FBFD8",
+    "accent": "#F2C14E"
+   }
+  },
+  {
+   "id": "classics.biscuit",
+   "name": "Biscuit",
+   "parts": [
+    {
+     "d": "M24 52A26 24 0 1 0 76 52A26 24 0 1 0 24 52Z",
+     "tone": "main"
+    },
+    {
+     "d": "M16.4 51.2A9 17 18 1 0 33.6 56.8A9 17 18 1 0 16.4 51.2Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M66.4 56.8A9 17 -18 1 0 83.6 51.2A9 17 -18 1 0 66.4 56.8Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M38 67A12 8 0 1 0 62 67A12 8 0 1 0 38 67Z",
+     "tone": "light"
+    },
+    {
+     "d": "M45.5 62A4.5 3.5 0 1 0 54.5 62A4.5 3.5 0 1 0 45.5 62Z",
+     "tone": "accent"
+    }
+   ],
+   "eyes": [
+    [
+     45,
+     45,
+     11
+    ],
+    [
+     56,
+     47,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 10,
+   "colors": {
+    "main": "#D9A066",
+    "accent": "#7A4E33"
+   }
+  },
+  {
+   "id": "classics.miso",
+   "name": "Miso",
+   "parts": [
+    {
+     "d": "M22 40L25 18L42 31Q50 29 58 31L75 18L78 40Q84 52 80 64Q72 82 50 82Q28 82 20 64Q16 52 22 40Z",
+     "tone": "main",
+     "round": 6
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     52,
+     11
+    ],
+    [
+     63,
+     54,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -12,
+   "colors": {
+    "main": "#8EA4C8"
+   }
+  },
+  {
+   "id": "classics.bolt",
+   "name": "Bolt",
+   "parts": [
+    {
+     "d": "M49 62L41 76H50L45 89L61 70H52L57 62Z",
+     "tone": "accent",
+     "round": 3
+    },
+    {
+     "d": "M20 48a15 15 0 1 0 30 0a15 15 0 1 0 -30 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M35 40a20 20 0 1 0 40 0a20 20 0 1 0 -40 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M57 51a13 13 0 1 0 26 0a13 13 0 1 0 -26 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M30 46H72A10 10 0 0 1 82 56V56A10 10 0 0 1 72 66H30A10 10 0 0 1 20 56V56A10 10 0 0 1 30 46Z",
+     "tone": "main"
+    }
+   ],
+   "eyes": [
+    [
+     54,
+     46,
+     12
+    ],
+    [
+     65,
+     48,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -8,
+   "colors": {
+    "main": "#6F86E8",
+    "accent": "#F6C343"
+   }
+  },
+  {
+   "id": "classics.rivet",
+   "name": "Rivet",
+   "parts": [
+    {
+     "d": "M50 28V16",
+     "tone": "main",
+     "stroke": 4
+    },
+    {
+     "d": "M45 14a5 5 0 1 0 10 0a5 5 0 1 0 -10 0Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M20 42H22A4 4 0 0 1 26 46V54A4 4 0 0 1 22 58H20A4 4 0 0 1 16 54V46A4 4 0 0 1 20 42Z",
+     "tone": "main"
+    },
+    {
+     "d": "M78 42H80A4 4 0 0 1 84 46V54A4 4 0 0 1 80 58H78A4 4 0 0 1 74 54V46A4 4 0 0 1 78 42Z",
+     "tone": "main"
+    },
+    {
+     "d": "M36 28H64A12 12 0 0 1 76 40V60A12 12 0 0 1 64 72H36A12 12 0 0 1 24 60V40A12 12 0 0 1 36 28Z",
+     "tone": "main"
+    },
+    {
+     "d": "M37 62H54",
+     "tone": "light",
+     "stroke": 4
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     45,
+     12
+    ],
+    [
+     63,
+     47,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 8,
+   "colors": {
+    "main": "#F2B33D",
+    "accent": "#E5484D"
+   }
+  },
+  {
+   "id": "classics.sage",
+   "name": "Sage",
+   "parts": [
+    {
+     "d": "M22 18L38 30Q50 26 62 30L78 18Q82 40 80 56Q76 82 50 84Q24 82 20 56Q18 40 22 18Z",
+     "tone": "main",
+     "round": 6
+    },
+    {
+     "d": "M34 71A16 10 0 1 0 66 71A16 10 0 1 0 34 71Z",
+     "tone": "light"
+    },
+    {
+     "d": "M53 56H60L56.5 61Z",
+     "tone": "accent",
+     "round": 2
+    }
+   ],
+   "eyes": [
+    [
+     50,
+     43,
+     12
+    ],
+    [
+     61,
+     45,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 6,
+   "colors": {
+    "main": "#9579D9",
+    "accent": "#F2B33D"
+   }
+  },
+  {
+   "id": "classics.inky",
+   "name": "Inky",
+   "parts": [
+    {
+     "d": "M30 50Q25 67 16 69M42 58Q41 75 31 82M58 58Q59 75 69 82M70 50Q75 67 84 69",
+     "tone": "main",
+     "stroke": 8
+    },
+    {
+     "d": "M24 40A26 24 0 1 0 76 40A26 24 0 1 0 24 40Z",
+     "tone": "main"
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     38,
+     12
+    ],
+    [
+     63,
+     40,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -8,
+   "colors": {
+    "main": "#F06A9B"
+   }
+  },
+  {
+   "id": "classics.kit",
+   "name": "Kit",
+   "parts": [
+    {
+     "d": "M21 21L37 34Q50 30 63 34L79 21L79 46L87 56L50 82L13 56L21 46Z",
+     "tone": "main",
+     "round": 8
+    },
+    {
+     "d": "M16 57Q33 61 50 70Q67 61 84 57L50 80Z",
+     "tone": "light"
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     47,
+     11
+    ],
+    [
+     63,
+     49,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 10,
+   "colors": {
+    "main": "#EE7A34"
+   }
+  },
+  {
+   "id": "classics.ember",
+   "name": "Ember",
+   "parts": [
+    {
+     "d": "M32 44L15 30L17 42L11 47L18 52L14 60L30 62Z",
+     "tone": "accent",
+     "round": 3
+    },
+    {
+     "d": "M36 37Q27 27 31 16Q37 27 47 31Z",
+     "tone": "main",
+     "round": 3
+    },
+    {
+     "d": "M57 31Q66 24 66 14Q73 26 68 37Z",
+     "tone": "main",
+     "round": 3
+    },
+    {
+     "d": "M68 72Q84 80 86 64",
+     "tone": "main",
+     "stroke": 7
+    },
+    {
+     "d": "M23 56a26 26 0 1 0 52 0a26 26 0 1 0 -52 0Z",
+     "tone": "main"
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     50,
+     12
+    ],
+    [
+     63,
+     52,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -8,
+   "colors": {
+    "main": "#3DB37A",
+    "accent": "#F2994A"
+   }
+  }
+ ]
+}

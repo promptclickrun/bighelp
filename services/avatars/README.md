@@ -130,6 +130,26 @@ SVG source bytes are preserved. Unsupported markup fails the build rather than s
     avatars, and cold/offline rendering. Verify iPhone, Mac Catalyst and visionOS locally, never Apple
     builds in GitHub Actions. Native Mac rendering probes here are not device UI acceptance tests.
 
+## Bot Studio bodies (v2)
+
+Bot Studio (the app's avatar editor) builds every avatar from one **body** in this catalog plus the person's eyes,
+colors and tweaks. The source format and the art style are in [docs/BOT_BODIES.md](docs/BOT_BODIES.md); sources are
+`sources/bodies/<set>.json`, one file per set.
+
+- `GET https://avatars.bighelp.app/v2/bodies.json`: `{schemaVersion: 2, sets, bodies}`. `sets` are
+  `{id, name, category, startsAt, expiresAt}`; each body is its source object plus `set` (its set ID).
+- Set order: shapes, hermes, bighelp, classics, bits, pocket-curios, bitty-bots, then seasonal sets by start and
+  expiry, then any other set by ID. Bodies keep their file order.
+- Seasonal sets ship with their dates and the app applies them (a body outside its dates is hidden, but avatars that
+  use it keep drawing). The build leaves out a set that expired more than 30 days before the build.
+- Same caching, CORS and read-only behavior as `/v1/avatars.json` (ETag, 5 minute cache). v1 is unchanged.
+- `npm run build` validates every source (`scripts/bodies.mjs`: ids, categories, dates, path commands, ranges, colors,
+  at most 12 parts, 60 bodies per set, 512 KB in all) and fails with the file and the rule. It writes the ignored
+  `bodies.json` the Worker serves.
+- `npm run bodies:app` writes the same feed, pretty-printed, to `../../Bighelp/Resources/BotBodies.json`, the copy the
+  app bundles for cold and offline starts.
+- `python3 scripts/bodies-preview.py` draws a contact sheet of a set (see the doc).
+
 ## Maintainer publishing
 
 From `services/avatars`, using the authorized Cloudflare account:
@@ -190,7 +210,7 @@ The service is independent of the template catalog.
 - `npm test`: scheduling, ETags, read-only routing, SVG safety, clipping conversion, palette tokens,
   normalized geometry, PNG rendering and expiry editing; authored packs published unchanged, and their
   idle previews still matching them (`preview-svg.py --check`, so it needs `python3`).
-- `npm run build`: validates/converts every source and generates the deployment catalog.
+- `npm run build`: validates/converts every source and generates the deployment catalog and the v2 bodies feed.
 - From repo root, `bash scripts/export-builtin.sh`: isolated Mac Swift export of existing Faces/Shapes,
   checked against the app's frozen face hashes and shape/eye vectors. Does not build/change the app.
 - `python3 scripts/verify-native.py <output-directory>` from this service: compiles the app's unchanged

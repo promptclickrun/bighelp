@@ -71,7 +71,8 @@ struct AvatarCatalogStoreTests {
         #expect(catalog.avatars.map(\.id) == ["bighelp-biggie", "halloween-ghost"], "Other hosts and bad IDs are dropped")
         let date = try #require(AvatarCatalog.date("2026-10-04T12:00:00Z"))
         #expect(catalog.sets(in: .bighelp, at: date).map(\.id) == ["bighelp", "halloween"])
-        #expect(catalog.sets(in: .other, at: date).isEmpty, "A set with no characters doesn't show")
+        #expect(catalog.sets(in: .hermes, at: date).isEmpty, "A group with no sets shows nothing")
+        #expect(AvatarCatalog.Group.of(category: "community") == .bighelp, "A new category shows with bighelp's art")
         #expect(AvatarCatalog(discovery: Data("{\"schemaVersion\":2}".utf8)) == nil)
         #expect(AvatarCatalog.date("2026-11-03") == nil, "Dates need a time and offset")
     }

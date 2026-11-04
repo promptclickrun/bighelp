@@ -55,10 +55,9 @@ final class AvatarCreatorModel {
         }
     }
 
-    /// The picker's top row: bighelp's own art, Hermes's faces and shapes, petdex, approved
-    /// community art, or a photo.
+    /// The picker's top row: bighelp's own art, Hermes's faces and shapes, petdex, or a photo.
     enum Category: String, CaseIterable, Identifiable {
-        case bots, bighelp, hermes, petdex, other, photo
+        case bots, bighelp, hermes, petdex, photo
 
         var id: String { rawValue }
 
@@ -68,7 +67,6 @@ final class AvatarCreatorModel {
             case .bighelp: "bighelp"
             case .hermes: "hermes"
             case .petdex: "petdex"
-            case .other: "other"
             case .photo: "Photo"
             }
         }
@@ -76,7 +74,11 @@ final class AvatarCreatorModel {
 
     /// Bots mode's marks are offered where that mode opens the creator.
     var offersBotMarks = false
-    var categories: [Category] { Category.allCases.filter { $0 != .bots || offersBotMarks } }
+    /// Opened from Edit avatar's PetDex: pets only, with no other categories.
+    var petsOnly = false
+    var categories: [Category] {
+        petsOnly ? [] : Category.allCases.filter { $0 != .bots || offersBotMarks }
+    }
     /// The Simple Bot mark being made while `style` is `.bots`.
     var botMark = SimpleBotMark(shape: .circle, color: .blue)
 
@@ -86,7 +88,7 @@ final class AvatarCreatorModel {
 
     var category: Category {
         switch style {
-        case .catalog: catalogGroup == .other ? .other : .bighelp
+        case .catalog: .bighelp
         case .face, .shapes: .hermes
         case .pets: .petdex
         case .photo: .photo
@@ -98,7 +100,6 @@ final class AvatarCreatorModel {
         switch category {
         case .bots: style = .bots
         case .bighelp: style = .catalog; catalogGroup = .bighelp
-        case .other: style = .catalog; catalogGroup = .other
         case .hermes: if style != .face, style != .shapes { style = .face }
         case .petdex: style = .pets
         case .photo: style = .photo
@@ -168,7 +169,7 @@ final class AvatarCreatorModel {
         self.appearance = appearance
         if let picked = appearance.catalogAvatar,
            let entry = catalog.avatars.first(where: { $0.id == picked.id }) {
-            catalogGroup = AvatarCatalog.Group.of(category: entry.category) == .other ? .other : .bighelp
+            catalogGroup = .bighelp
         }
         switch look?.style {
         case .face:
@@ -475,11 +476,16 @@ struct AvatarCreatorView: View {
         faceName: String,
         petSource: PetdexSource,
         offersBotMarks: Bool = false,
+        petsOnly: Bool = false,
         useTitle: String = "Use avatar",
         onUse: @escaping (AvatarCreatorResult) -> Void
     ) {
         let model = AvatarCreatorModel(start: start, characters: characters)
         model.offersBotMarks = offersBotMarks
+        if petsOnly {
+            model.petsOnly = true
+            model.select(.petdex)
+        }
         _model = State(initialValue: model)
         _pets = State(initialValue: PetdexGalleryModel(source: petSource))
         self.agentName = agentName
@@ -499,7 +505,7 @@ struct AvatarCreatorView: View {
             }
             .onDisappear { spatialAvatar?.previewAppearance = nil }
             #endif
-            .navigationTitle("Avatar")
+            .navigationTitle(model.petsOnly ? "PetDex" : "Avatar")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -903,9 +909,7 @@ struct AvatarCreatorView: View {
         let _ = store.kitRevision
         let sets = store.catalog.sets(in: model.catalogGroup, at: store.now)
         if sets.isEmpty {
-            Text(model.catalogGroup == .other
-                 ? "Avatars people make will show here once they’re approved."
-                 : "No characters here right now.")
+            Text("No characters here right now.")
                 .font(.bighelp(.body))
                 .foregroundStyle(theme.secondaryText)
                 .multilineTextAlignment(.center)
@@ -1174,8 +1178,10 @@ struct AvatarCreatorView: View {
 
     // MARK: Hermes styles
 
-    /// bighelp, hermes, petdex, other, or a photo.
+    /// bighelp, hermes, petdex, or a photo; nothing when only pets are on offer.
+    @ViewBuilder
     private var styleBar: some View {
+        if !model.categories.isEmpty {
         ScrollView(.horizontal) {
             HStack(spacing: BighelpTokens.space8) {
                 ForEach(model.categories) { category in
@@ -1200,6 +1206,7 @@ struct AvatarCreatorView: View {
             .padding(.horizontal, BighelpTokens.space20)
         }
         .scrollIndicators(.hidden)
+        }
     }
 
     /// hermes: Faces or Shapes.

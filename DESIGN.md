@@ -56,7 +56,13 @@ are historical (`docs/ui-v3-design.md`).
 - Agents are organic blobs and glossy orbs in their own palette color (`AgentPersonaAvatar`, via `AvatarView`).
   The avatar is the live status indicator: idle, listening, thinking, replying, all set, has an update
   (`AgentLiveState`). States must come from real data.
-- Agent Studio's avatar creator (`AvatarCreatorView`) keeps a pet look simple: pick one of the ten kit
+- Edit avatar opens a choice: **Bot Studio** or **PetDex**, with "Use a photo instead" under them
+  (`AvatarChooserView`). Bot Studio (`BotStudioView`) is one editor for every avatar: the avatar fills the top
+  and plays its move, with Undo and Surprise me; a drawer below shows one row of choices at a time, picked from
+  the rail (Body, Eyes, Color, Shape, Moves), so no choice pushes the others off screen. Every body is drawn in
+  one style: one flat main color, tilted, two small slanted eyes up and to the right, and at most a small
+  second-color part (`services/avatars/docs/BOT_BODIES.md`). PetDex opens the creator with only pets.
+- The older avatar creator (`AvatarCreatorView`) keeps a pet look simple: pick one of the ten kit
   characters (Pinch, Aeria, Biscuit, Miso, Bolt, Rivet, Sage, Inky, Kit, Ember) or ten Bits (Bop, Blok, Wedge,
   Hexo, Drip, Tic, Puff, Boo, Bloom, Glim), then a colorway or main color, headwear (a Bit instead picks its eyes,
   mouth, top and cheeks), a tone-on-tone pattern, and an idle move. The characters come from `Design/AvatarKit`

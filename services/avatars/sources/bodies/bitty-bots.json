@@ -1,0 +1,686 @@
+{
+ "set": {
+  "id": "bitty-bots",
+  "name": "Bitty Bots",
+  "category": "bighelp",
+  "startsAt": null,
+  "expiresAt": null
+ },
+ "bodies": [
+  {
+   "id": "bitty-bots.ping",
+   "name": "Ping",
+   "role": "Checks in for you",
+   "parts": [
+    {
+     "d": "M50 76V86",
+     "tone": "accent",
+     "stroke": 7
+    },
+    {
+     "d": "M18 44A32 32 0 0 0 82 44Z",
+     "tone": "main",
+     "round": 6
+    },
+    {
+     "d": "M50 44L57 27",
+     "tone": "accent",
+     "stroke": 4
+    },
+    {
+     "d": "M53 25a5 5 0 1 0 10 0a5 5 0 1 0 -10 0Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M66 15A11 11 0 0 1 70 27",
+     "tone": "accent",
+     "stroke": 3.5
+    }
+   ],
+   "eyes": [
+    [
+     46,
+     56,
+     11
+    ],
+    [
+     57,
+     58,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -28,
+   "colors": {
+    "main": "#8796AE",
+    "accent": "#F2B33D"
+   }
+  },
+  {
+   "id": "bitty-bots.swoop",
+   "name": "Swoop",
+   "role": "Sends it off",
+   "parts": [
+    {
+     "d": "M14 52L86 20L64 84L50 62Z",
+     "tone": "main",
+     "round": 4
+    },
+    {
+     "d": "M86 20L50 62L64 84Z",
+     "tone": "shade"
+    }
+   ],
+   "eyes": [
+    [
+     37,
+     50,
+     10
+    ],
+    [
+     47,
+     52,
+     10
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -4,
+   "colors": {
+    "main": "#3D8EF5"
+   }
+  },
+  {
+   "id": "bitty-bots.brew",
+   "name": "Brew",
+   "role": "Starts the morning",
+   "parts": [
+    {
+     "d": "M66 42C82 42 82 66 66 66",
+     "tone": "main",
+     "stroke": 8
+    },
+    {
+     "d": "M26 32H66V70A10 10 0 0 1 56 80H36A10 10 0 0 1 26 70Z",
+     "tone": "main",
+     "round": 6
+    },
+    {
+     "d": "M40 24C36 18 44 14 40 10M54 24C50 18 58 14 54 10",
+     "tone": "accent",
+     "stroke": 3
+    }
+   ],
+   "eyes": [
+    [
+     42,
+     50,
+     11
+    ],
+    [
+     53,
+     52,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -6,
+   "colors": {
+    "main": "#B47A4E",
+    "accent": "#C9C3BD"
+   }
+  },
+  {
+   "id": "bitty-bots.memo",
+   "name": "Memo",
+   "role": "Minds the inbox",
+   "parts": [
+    {
+     "d": "M18 30H82V72H18Z",
+     "tone": "main",
+     "round": 8
+    },
+    {
+     "d": "M18 30L50 46L82 30Z",
+     "tone": "shade"
+    }
+   ],
+   "eyes": [
+    [
+     51,
+     56,
+     11
+    ],
+    [
+     62,
+     58,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 10,
+   "colors": {
+    "main": "#F4A83A"
+   }
+  },
+  {
+   "id": "bitty-bots.dot",
+   "name": "Dot",
+   "role": "Keeps the dates",
+   "parts": [
+    {
+     "d": "M22 30H78V80H22Z",
+     "tone": "main",
+     "round": 10
+    },
+    {
+     "d": "M17 42V35A10 10 0 0 1 27 25H73A10 10 0 0 1 83 35V42Z",
+     "tone": "shade"
+    },
+    {
+     "d": "M36 18V30M64 18V30",
+     "tone": "accent",
+     "stroke": 6
+    },
+    {
+     "d": "M28 69a5 5 0 1 0 10 0a5 5 0 1 0 -10 0Z",
+     "tone": "accent"
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     57,
+     11
+    ],
+    [
+     63,
+     59,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -10,
+   "colors": {
+    "main": "#E85D75",
+    "accent": "#7E7E88"
+   }
+  },
+  {
+   "id": "bitty-bots.juice",
+   "name": "Juice",
+   "role": "Keeps you charged",
+   "parts": [
+    {
+     "d": "M20 26H70A8 8 0 0 1 78 34V68A8 8 0 0 1 70 76H20A8 8 0 0 1 12 68V34A8 8 0 0 1 20 26Z",
+     "tone": "main"
+    },
+    {
+     "d": "M78 41H84A3 3 0 0 1 87 44V58A3 3 0 0 1 84 61H78Z",
+     "tone": "main"
+    },
+    {
+     "d": "M62 26H70A8 8 0 0 1 78 34V68A8 8 0 0 1 70 76H62ZM78 41H84A3 3 0 0 1 87 44V58A3 3 0 0 1 84 61H78Z",
+     "tone": "shade"
+    }
+   ],
+   "eyes": [
+    [
+     38,
+     47,
+     12
+    ],
+    [
+     49,
+     49,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -10,
+   "colors": {
+    "main": "#3CC46E"
+   }
+  },
+  {
+   "id": "bitty-bots.walkie",
+   "name": "Walkie",
+   "role": "Stays in touch",
+   "parts": [
+    {
+     "d": "M41 30V12",
+     "tone": "accent",
+     "stroke": 6
+    },
+    {
+     "d": "M34 34H68V82H34Z",
+     "tone": "main",
+     "round": 12
+    },
+    {
+     "d": "M44 64H58A4 4 0 0 1 62 68V72A4 4 0 0 1 58 76H44A4 4 0 0 1 40 72V68A4 4 0 0 1 44 64Z",
+     "tone": "shade"
+    },
+    {
+     "d": "M26 46V56",
+     "tone": "accent",
+     "stroke": 5
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     46,
+     11
+    ],
+    [
+     63,
+     48,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 12,
+   "colors": {
+    "main": "#F27A2E",
+    "accent": "#7E7E88"
+   }
+  },
+  {
+   "id": "bitty-bots.bearing",
+   "name": "Bearing",
+   "role": "Finds the way",
+   "parts": [
+    {
+     "d": "M44 18H56V27H44Z",
+     "tone": "main",
+     "round": 5
+    },
+    {
+     "d": "M21 55a29 29 0 1 0 58 0a29 29 0 1 0 -58 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M27 72L53 71L51 61Z",
+     "tone": "light"
+    },
+    {
+     "d": "M77 61L53 71L51 61Z",
+     "tone": "accent"
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     45,
+     12
+    ],
+    [
+     63,
+     47,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 12,
+   "colors": {
+    "main": "#22B39A",
+    "accent": "#E5484D"
+   }
+  },
+  {
+   "id": "bitty-bots.octo",
+   "name": "Octo",
+   "role": "Juggles the tasks",
+   "parts": [
+    {
+     "d": "M32 52C26 66 18 70 14 64",
+     "tone": "main",
+     "stroke": 9
+    },
+    {
+     "d": "M42 58C40 72 34 80 28 82",
+     "tone": "main",
+     "stroke": 9
+    },
+    {
+     "d": "M58 58C60 72 66 80 72 82",
+     "tone": "main",
+     "stroke": 9
+    },
+    {
+     "d": "M68 52C74 66 80 70 84 64",
+     "tone": "main",
+     "stroke": 9
+    },
+    {
+     "d": "M25 40a25 23 0 1 0 50 0a25 23 0 1 0 -50 0Z",
+     "tone": "main"
+    }
+   ],
+   "eyes": [
+    [
+     51,
+     38,
+     11
+    ],
+    [
+     62,
+     40,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -8,
+   "colors": {
+    "main": "#F27BC0"
+   }
+  },
+  {
+   "id": "bitty-bots.hoot",
+   "name": "Hoot",
+   "role": "Up late researching",
+   "parts": [
+    {
+     "d": "M24 34L16 18L40 24Z",
+     "tone": "main",
+     "round": 5
+    },
+    {
+     "d": "M76 34L84 18L60 24Z",
+     "tone": "main",
+     "round": 5
+    },
+    {
+     "d": "M42 82V88M58 82V88",
+     "tone": "accent",
+     "stroke": 5
+    },
+    {
+     "d": "M50 20C72 20 80 38 80 56C80 74 66 84 50 84C34 84 20 74 20 56C20 38 28 20 50 20Z",
+     "tone": "main"
+    },
+    {
+     "d": "M35 71a15 9 0 1 0 30 0a15 9 0 1 0 -30 0Z",
+     "tone": "light"
+    },
+    {
+     "d": "M53 56H63L58 63Z",
+     "tone": "accent",
+     "round": 3
+    }
+   ],
+   "eyes": [
+    [
+     50,
+     42,
+     11
+    ],
+    [
+     61,
+     44,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -10,
+   "colors": {
+    "main": "#9370F0",
+    "accent": "#F2A93B"
+   }
+  },
+  {
+   "id": "bitty-bots.toasty",
+   "name": "Toasty",
+   "role": "Pops up reminders",
+   "parts": [
+    {
+     "d": "M34 42V24A8 8 0 0 1 42 16H58A8 8 0 0 1 66 24V42Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M80 54H88",
+     "tone": "main",
+     "stroke": 6
+    },
+    {
+     "d": "M24 44H76V74H24Z",
+     "tone": "main",
+     "round": 12
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     56,
+     11
+    ],
+    [
+     63,
+     58,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 8,
+   "colors": {
+    "main": "#8CC83C",
+    "accent": "#E8B86A"
+   }
+  },
+  {
+   "id": "bitty-bots.floppy",
+   "name": "Floppy",
+   "role": "Remembers it all",
+   "parts": [
+    {
+     "d": "M24 22H68L78 32V78H24Z",
+     "tone": "main",
+     "round": 8
+    },
+    {
+     "d": "M38 22H62V36H38Z",
+     "tone": "light"
+    },
+    {
+     "d": "M32 62H70V78H32Z",
+     "tone": "light"
+    }
+   ],
+   "eyes": [
+    [
+     48,
+     47,
+     10
+    ],
+    [
+     59,
+     49,
+     10
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 8,
+   "colors": {
+    "main": "#2F6FE0"
+   }
+  },
+  {
+   "id": "bitty-bots.quack",
+   "name": "Quack",
+   "role": "Debugs out loud",
+   "parts": [
+    {
+     "d": "M70 36C78 33 88 35 88 40C87 44 78 45 70 43Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M40 36a17 17 0 1 0 34 0a17 17 0 1 0 -34 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M14 52C24 58 34 58 44 56H70C82 56 87 64 83 72C77 82 63 86 48 86C28 86 16 76 14 62Z",
+     "tone": "main"
+    },
+    {
+     "d": "M34 66C44 59 57 61 61 68C54 75 41 75 34 66Z",
+     "tone": "shade"
+    }
+   ],
+   "eyes": [
+    [
+     51,
+     32,
+     10
+    ],
+    [
+     61,
+     34,
+     10
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -6,
+   "colors": {
+    "main": "#F7C933",
+    "accent": "#F08A2C"
+   }
+  },
+  {
+   "id": "bitty-bots.combo",
+   "name": "Combo",
+   "role": "Plays along",
+   "parts": [
+    {
+     "d": "M31 37H69C80 37 86 48 86 61C86 73 79 77 71 71L63 63H37L29 71C21 77 14 73 14 61C14 48 20 37 31 37Z",
+     "tone": "main",
+     "round": 4
+    },
+    {
+     "d": "M23 52H36M29.5 45.5V58.5",
+     "tone": "accent",
+     "stroke": 5
+    },
+    {
+     "d": "M66 48a4 4 0 1 0 8 0a4 4 0 1 0 -8 0Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M73 56a4 4 0 1 0 8 0a4 4 0 1 0 -8 0Z",
+     "tone": "accent"
+    }
+   ],
+   "eyes": [
+    [
+     48,
+     46,
+     10
+    ],
+    [
+     58,
+     48,
+     10
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -12,
+   "colors": {
+    "main": "#C25BDC",
+    "accent": "#3A3A40"
+   }
+  },
+  {
+   "id": "bitty-bots.snap",
+   "name": "Snap",
+   "role": "Catches the moment",
+   "parts": [
+    {
+     "d": "M36 29H58V39H36Z",
+     "tone": "main",
+     "round": 6
+    },
+    {
+     "d": "M18 39H82V77H18Z",
+     "tone": "main",
+     "round": 10
+    },
+    {
+     "d": "M25 58a13 13 0 1 0 26 0a13 13 0 1 0 -26 0Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M32 58a6 6 0 1 0 12 0a6 6 0 1 0 -12 0Z",
+     "tone": "light"
+    }
+   ],
+   "eyes": [
+    [
+     60,
+     51,
+     11
+    ],
+    [
+     71,
+     53,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -8,
+   "colors": {
+    "main": "#4FC3D9",
+    "accent": "#3A3A40"
+   }
+  },
+  {
+   "id": "bitty-bots.big-red",
+   "name": "Big Red",
+   "role": "Never misses a kickoff",
+   "parts": [
+    {
+     "d": "M24 46L22 16L46 28Z",
+     "tone": "main",
+     "round": 6
+    },
+    {
+     "d": "M76 46L80 16L56 28Z",
+     "tone": "main",
+     "round": 6
+    },
+    {
+     "d": "M20 54a30 30 0 1 0 60 0a30 30 0 1 0 -60 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M39 70a13 9 0 1 0 26 0a13 9 0 1 0 -26 0Z",
+     "tone": "light"
+    },
+    {
+     "d": "M48 64a4 3 0 1 0 8 0a4 3 0 1 0 -8 0Z",
+     "tone": "ink"
+    },
+    {
+     "d": "M14.17 82.88A12 8 -35 1 0 33.83 69.12A12 8 -35 1 0 14.17 82.88Z",
+     "tone": "accent"
+    }
+   ],
+   "eyes": [
+    [
+     53,
+     46,
+     12
+    ],
+    [
+     65,
+     48,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -6,
+   "colors": {
+    "main": "#E23B32",
+    "accent": "#9A6234"
+   }
+  }
+ ]
+}

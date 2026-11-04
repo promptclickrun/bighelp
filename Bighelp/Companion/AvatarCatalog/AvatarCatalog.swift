@@ -70,14 +70,12 @@ struct AvatarCatalog: Codable, Equatable, Sendable {
         case bighelp
         /// Hermes Desktop's faces and shapes, drawn by the app itself.
         case hermes
-        /// Community art the maintainer approved.
-        case other
 
+        /// A category this build doesn't know shows with bighelp's own art.
         static func of(category: String) -> Group {
             switch category {
-            case "bighelp", "seasonal": .bighelp
             case "faces", "shapes": .hermes
-            default: .other
+            default: .bighelp
             }
         }
     }

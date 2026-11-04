@@ -195,19 +195,21 @@ final class SimpleBotsUITests: BighelpUITestCase {
         let more = app.buttons["simple-bots.profile.more-avatars"]
         XCTAssertTrue(more.waitForExistence(timeout: 5))
         more.tap()
-        let bots = app.buttons["avatar.creator.category.bots"]
-        XCTAssertTrue(bots.waitForExistence(timeout: 5), "The studio offers the bot marks")
-        XCTAssertTrue(app.buttons["avatar.creator.category.bighelp"].exists, "And every other avatar")
-        bots.tap()
-        let marks = app.descendants(matching: .any)["avatar.creator.bots"]
-        XCTAssertTrue(marks.waitForExistence(timeout: 5))
-        marks.buttons["simple-bots.shape.heart"].tap()
-        marks.buttons["simple-bots.color.teal"].tap()
+        let studio = app.descendants(matching: .any)["avatar.chooser.studio"].firstMatch
+        XCTAssertTrue(studio.waitForExistence(timeout: 5), "Edit avatar offers Bot Studio")
+        XCTAssertTrue(app.descendants(matching: .any)["avatar.chooser.petdex"].firstMatch.exists, "And PetDex")
+        studio.tap()
+        app.buttons["bot.studio.chip.shapes"].firstMatch.tap()
+        let ball = app.buttons["bot.studio.choice.Ball"].firstMatch
+        XCTAssertTrue(ball.waitForExistence(timeout: 5))
+        ball.tap()
+        app.buttons["bot.studio.tab.color"].firstMatch.tap()
+        app.buttons["bot.studio.choice.Moss"].firstMatch.tap()
         save("simple-studio-dark", app)
-        app.buttons["Save"].tap()
+        app.buttons["bot.studio.save"].firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.profile"].waitForExistence(timeout: 5),
                       "Save comes back to the profile")
-        XCTAssertFalse(app.buttons["avatar.creator.category.bots"].exists)
+        XCTAssertFalse(app.buttons["bot.studio.save"].exists)
 
         let model = app.buttons["simple-bots.profile.default-model"]
         XCTAssertTrue(model.waitForExistence(timeout: 10), "Default Model is under Instructions")

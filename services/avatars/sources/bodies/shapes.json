@@ -1,0 +1,397 @@
+{
+ "set": {
+  "id": "shapes",
+  "name": "Shapes",
+  "category": "shapes",
+  "startsAt": null,
+  "expiresAt": null
+ },
+ "bodies": [
+  {
+   "id": "shapes.peak",
+   "name": "Peak",
+   "parts": [
+    {
+     "d": "M50 20L82 74H18Z",
+     "tone": "main",
+     "round": 18
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     50,
+     11
+    ],
+    [
+     63,
+     52,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -26,
+   "colors": {
+    "main": "#E8459A"
+   }
+  },
+  {
+   "id": "shapes.ball",
+   "name": "Ball",
+   "parts": [
+    {
+     "d": "M18 52a32 32 0 1 0 64 0a32 32 0 1 0 -64 0Z",
+     "tone": "main"
+    }
+   ],
+   "eyes": [
+    [
+     54,
+     44,
+     12
+    ],
+    [
+     66,
+     46,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 0,
+   "colors": {
+    "main": "#3B82F6"
+   }
+  },
+  {
+   "id": "shapes.puff",
+   "name": "Puff",
+   "parts": [
+    {
+     "d": "M17 56a19 19 0 1 0 38 0a19 19 0 1 0 -38 0ZM32 42a20 20 0 1 0 40 0a20 20 0 1 0 -40 0ZM47 56a19 19 0 1 0 38 0a19 19 0 1 0 -38 0ZM31 64a19 19 0 1 0 38 0a19 19 0 1 0 -38 0Z",
+     "tone": "main"
+    }
+   ],
+   "eyes": [
+    [
+     50,
+     50,
+     11
+    ],
+    [
+     61,
+     52,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -8,
+   "colors": {
+    "main": "#EF6F2E"
+   }
+  },
+  {
+   "id": "shapes.tile",
+   "name": "Tile",
+   "parts": [
+    {
+     "d": "M30 30H70V70H30Z",
+     "tone": "main",
+     "round": 16
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     46,
+     11
+    ],
+    [
+     63,
+     48,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -16,
+   "colors": {
+    "main": "#F0A030"
+   }
+  },
+  {
+   "id": "shapes.twinkle",
+   "name": "Twinkle",
+   "parts": [
+    {
+     "d": "M50 12C55 38 62 45 88 50C62 55 55 62 50 88C45 62 38 55 12 50C38 45 45 38 50 12Z",
+     "tone": "main",
+     "round": 9
+    }
+   ],
+   "eyes": [
+    [
+     48,
+     45,
+     10
+    ],
+    [
+     58,
+     47,
+     10
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 10,
+   "colors": {
+    "main": "#58C47A"
+   }
+  },
+  {
+   "id": "shapes.clover",
+   "name": "Clover",
+   "parts": [
+    {
+     "d": "M20 36a16 16 0 1 0 32 0a16 16 0 1 0 -32 0ZM48 36a16 16 0 1 0 32 0a16 16 0 1 0 -32 0ZM20 64a16 16 0 1 0 32 0a16 16 0 1 0 -32 0ZM48 64a16 16 0 1 0 32 0a16 16 0 1 0 -32 0ZM30 50a20 20 0 1 0 40 0a20 20 0 1 0 -40 0Z",
+     "tone": "main"
+    }
+   ],
+   "eyes": [
+    [
+     49,
+     46,
+     11
+    ],
+    [
+     60,
+     48,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 12,
+   "colors": {
+    "main": "#4FB9A8"
+   }
+  },
+  {
+   "id": "shapes.heart",
+   "name": "Heart",
+   "parts": [
+    {
+     "d": "M50 82C32 70 16 58 18 40C20 26 36 22 44 32L50 38L56 32C64 22 80 26 82 40C84 58 68 70 50 82Z",
+     "tone": "main",
+     "round": 8
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     46,
+     11
+    ],
+    [
+     63,
+     48,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -14,
+   "colors": {
+    "main": "#8B5CF6"
+   }
+  },
+  {
+   "id": "shapes.bloom",
+   "name": "Bloom",
+   "parts": [
+    {
+     "d": "M24 50a26 26 0 1 0 52 0a26 26 0 1 0 -52 0ZM62 50a13 13 0 1 0 26 0a13 13 0 1 0 -26 0ZM54.7 67.7a13 13 0 1 0 26 0a13 13 0 1 0 -26 0ZM37 75a13 13 0 1 0 26 0a13 13 0 1 0 -26 0ZM19.3 67.7a13 13 0 1 0 26 0a13 13 0 1 0 -26 0ZM12 50a13 13 0 1 0 26 0a13 13 0 1 0 -26 0ZM19.3 32.3a13 13 0 1 0 26 0a13 13 0 1 0 -26 0ZM37 25a13 13 0 1 0 26 0a13 13 0 1 0 -26 0ZM54.7 32.3a13 13 0 1 0 26 0a13 13 0 1 0 -26 0Z",
+     "tone": "main"
+    }
+   ],
+   "eyes": [
+    [
+     49,
+     46,
+     11
+    ],
+    [
+     60,
+     48,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 8,
+   "colors": {
+    "main": "#E5484D"
+   }
+  },
+  {
+   "id": "shapes.drop",
+   "name": "Drop",
+   "parts": [
+    {
+     "d": "M30 20C48 20 66 26 76 40C86 54 84 72 72 80C60 88 40 88 30 78C20 68 20 50 24 36C26 28 28 22 30 20Z",
+     "tone": "main",
+     "round": 4
+    }
+   ],
+   "eyes": [
+    [
+     53,
+     48,
+     12
+    ],
+    [
+     65,
+     50,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 0,
+   "colors": {
+    "main": "#8B6440"
+   }
+  },
+  {
+   "id": "shapes.bean",
+   "name": "Bean",
+   "parts": [
+    {
+     "d": "M36 32H64A18 18 0 0 1 64 68H36A18 18 0 0 1 36 32Z",
+     "tone": "main"
+    }
+   ],
+   "eyes": [
+    [
+     55,
+     44,
+     10
+    ],
+    [
+     66,
+     46,
+     10
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -10,
+   "colors": {
+    "main": "#2F5FE8"
+   }
+  },
+  {
+   "id": "shapes.house",
+   "name": "House",
+   "parts": [
+    {
+     "d": "M50 20L80 42L70 78H30L20 42Z",
+     "tone": "main",
+     "round": 12
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     50,
+     11
+    ],
+    [
+     63,
+     52,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 14,
+   "colors": {
+    "main": "#EC4F9C"
+   }
+  },
+  {
+   "id": "shapes.splat",
+   "name": "Splat",
+   "parts": [
+    {
+     "d": "M50.0 13.0L59.6 26.9L76.2 23.8L73.1 40.4L87.0 50.0L73.1 59.6L76.2 76.2L59.6 73.1L50.0 87.0L40.4 73.1L23.8 76.2L26.9 59.6L13.0 50.0L26.9 40.4L23.8 23.8L40.4 26.9Z",
+     "tone": "main",
+     "round": 6
+    }
+   ],
+   "eyes": [
+    [
+     49,
+     47,
+     10
+    ],
+    [
+     59,
+     49,
+     10
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 6,
+   "colors": {
+    "main": "#14B8A6"
+   }
+  },
+  {
+   "id": "shapes.gem",
+   "name": "Gem",
+   "parts": [
+    {
+     "d": "M50 20L76 35V65L50 80L24 65V35Z",
+     "tone": "main",
+     "round": 12
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     48,
+     11
+    ],
+    [
+     63,
+     50,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 8,
+   "colors": {
+    "main": "#F2B90F"
+   }
+  },
+  {
+   "id": "shapes.squircle",
+   "name": "Squircle",
+   "parts": [
+    {
+     "d": "M50 18C76 18 82 24 82 50C82 76 76 82 50 82C24 82 18 76 18 50C18 24 24 18 50 18Z",
+     "tone": "main"
+    }
+   ],
+   "eyes": [
+    [
+     54,
+     44,
+     12
+    ],
+    [
+     66,
+     46,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -6,
+   "colors": {
+    "main": "#7A7A7A"
+   }
+  }
+ ]
+}

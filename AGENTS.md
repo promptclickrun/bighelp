@@ -875,17 +875,26 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
   indicator in the chat goes through that focus, not its own animation.
 - The avatar kit's source is `Design/AvatarKit`. `tools/export_native.py` writes `Bighelp/Resources/AvatarKit.json`,
   which the app draws natively.
-- The avatar picker's characters come from the avatar catalog (`avatars.bighelp.app`, `services/avatars`;
-  `Bighelp/Companion/AvatarCatalog/`): bighelp, hermes (the app's own Faces and Shapes), petdex and other.
-  A pick saves the character's immutable pack hash (`AvatarCatalogReference`) and keeps the pack in
-  Application Support, so it keeps drawing after its set expires. Expiry only hides choices. The app ships a
-  copy of the catalog (`AvatarCatalog.json`, `AvatarCatalogKit.json`) for demo mode and first launch;
-  refresh it before a release.
+- Edit avatar (`AvatarChooserView`) offers Bot Studio, PetDex (`AvatarCreatorView` with only pets) or a photo.
+  **Bot Studio** (`BotStudioView`, `Bighelp/Companion/BotStudio/`) makes every avatar from one recipe
+  (`BotLook`): a body from catalog v2 plus eyes, mouth, colors, tilt, lean, taller or wider, size, mirror and an
+  idle move. Every body takes every choice, so all packs edit the same way. Bodies are flat outlines in one
+  style (`services/avatars/docs/BOT_BODIES.md`): draw new ones there, preview them with
+  `scripts/bodies-preview.py`, and run `npm run bodies:app` to refresh the app's copy (`BotBodies.json`).
+  `BotBodyLibrary` downloads `/v2/bodies.json` and falls back to that copy.
+- A Bot Studio avatar is saved in the agent's `ui_meta["hermes-bots"]` as `studio` (`AgentAvatarLook.studio`)
+  with `imageKind: "photo"` and its picture, so it follows the agent; Hermes Desktop and older apps show the
+  picture. The recipe keeps its body, so it draws after the body's set leaves the catalog. It plays the same
+  moods as every face (`BotLookPlayer`, `BuddyPose`).
+- The older characters (`AvatarCatalog`, `Bighelp/Companion/AvatarCatalog/`) still draw for agents that have
+  them; a pick saved the character's immutable pack hash (`AvatarCatalogReference`) and kept the pack in
+  Application Support. Opening Bot Studio on one starts from its redrawn body. The app ships a copy of both
+  catalogs for demo mode and first launch; refresh them before a release.
 - Only first-party or permissively licensed art can ship in this Apache-2.0 repo.
 - The maintainer approves new character art before it ships.
 - An agent's face (`AgentFace`, drawn by `AgentLiveAvatar`, Bots mode's `SimpleBotFace` and its pet
   companion `AgentPet`) is, in order: its saved character (`CompanionStore` override), its petdex pet's moves
-  (`PetAvatarStore`), its Hermes face or shape (`AgentLookStore`, from the profiles' looks), its Bots mode mark
+  (`PetAvatarStore`), its Hermes face, shape or Bot Studio avatar (`AgentLookStore`, from the profiles' looks), its Bots mode mark
   (`SimpleBotMarkStore`), then its picture. The first two live on the device, so saving any other kind of
   avatar must clear them (`AgentEditorModel.applySavedLook`), or chats keep the old one. There is no app-wide
   pet: each agent's pet is its own face.

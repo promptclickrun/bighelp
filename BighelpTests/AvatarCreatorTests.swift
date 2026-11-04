@@ -98,8 +98,6 @@ struct AvatarCreatorTests {
         let shape = model.shape
         model.randomizeShape()
         #expect(model.shape != shape && HermesShapeFace.pickerShapes.contains(model.shape))
-        model.select(.other)
-        #expect(model.style == .catalog && model.catalogGroup == .other && model.category == .other)
         model.select(.petdex)
         #expect(model.style == .pets)
         model.select(.bighelp)

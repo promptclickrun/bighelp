@@ -3,6 +3,20 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.58
+
+### New
+
+- **Bot Studio:** open an agent, tap its avatar and then tap Edit avatar. Choose Bot Studio, PetDex or a photo. In Bot Studio, the avatar fills the top of the screen. Below it, a drawer shows one row of choices at a time: Body, Eyes, Color, Shape and Moves. Every body changes in the same ways: eyes, mouth, colors, tilt, lean, height, size, mirror and how it moves. Tap Surprise me for a new avatar, and tap Undo to remove your last change.
+- **New art for all avatar packs:** every pack has new art in one style, with flat colors, a small tilt and two small eyes. This includes bighelp, the classic characters, Bits, Pocket Curios, Bitty Bots and the seasonal packs.
+- **Avatars that follow your agent:** bighelp saves a Bot Studio avatar on your computer, so the avatar is the same on all your devices. Hermes Desktop shows its picture.
+- **Results from helpers:** when helpers or a background command finish, the chat shows a small card. The card tells you what finished, with one line for each task. Tap See results to read the full results. Before, the chat showed the full report as a message from you.
+
+### Changed
+
+- **PetDex:** pixel pets have their own page. They keep their own look and moves.
+- **Other:** the empty "Other" section is gone.
+
 ## 2.6.57
 
 ### Changed

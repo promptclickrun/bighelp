@@ -231,7 +231,7 @@ struct SessionsView: View {
                 Text(message)
             }
         }
-        .sheet(item: $projectMoveTarget) { session in
+        .bighelpSheet(item: $projectMoveTarget) { session in
             if let chatProjectMove, let agentID = session.agentIDs.first {
                 MoveChatProjectSheet(
                     chatTitle: session.title,
@@ -243,6 +243,7 @@ struct SessionsView: View {
                         model.recordMovedProject(project, sessionID: session.id)
                     }
                 )
+                .bighelpSheetSize(.standard)
             }
         }
         .agentActionsPresentation(agentActions, config: agentActionsConfig)
@@ -1466,7 +1467,6 @@ struct MoveChatProjectSheet: View {
                 }
         }
         .task(id: agentID) { await load() }
-        .presentationDetents([.medium, .large])
     }
 
     @ViewBuilder

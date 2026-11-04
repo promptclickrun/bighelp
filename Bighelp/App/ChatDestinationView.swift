@@ -193,7 +193,7 @@ struct ChatDestinationView: View {
                                     permissionCenter: permissionCenter))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("chat.canvas")
-            .sheet(item: $projectMoveRequest) { request in
+            .bighelpSheet(item: $projectMoveRequest) { request in
                 MoveChatProjectSheet(
                     chatTitle: request.title,
                     agentID: request.agentID,
@@ -201,6 +201,13 @@ struct ChatDestinationView: View {
                     currentProjectID: request.currentProjectID,
                     mover: hermesWorkspaces.chatProjectMover(),
                     onMoved: { project in
+                        // The chat on screen, the Chats list and File changes all
+                        // show the new project at the same time.
+                        model.applyMovedProject(id: project.id, name: project.name)
+                        hermesWorkspaces.reconcileSessionWorkspace(
+                            id: project.id,
+                            sessionID: request.id
+                        )
                         catalog.reconcileSessionWorkspace(
                             id: project.id,
                             name: project.name,
@@ -209,6 +216,7 @@ struct ChatDestinationView: View {
                         projectChanges.requestRefresh()
                     }
                 )
+                .bighelpSheetSize(.standard)
             }
             .background {
                 ChatReplyReading(model: model, reader: replyReader,

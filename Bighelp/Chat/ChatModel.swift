@@ -820,6 +820,17 @@ final class ChatModel {
         isStopping = false
     }
 
+    /// The computer confirmed this chat moved to another project: show the new
+    /// one here too, so This chat and File changes agree with the Chats list.
+    func applyMovedProject(id: String, name: String) {
+        guard var session = sourceSession, session.workspaceID != id || session.workspaceName != name else {
+            return
+        }
+        session.workspaceID = id
+        session.workspaceName = name
+        sourceSession = session
+    }
+
     /// The adapter has already reconciled native identities and retained rows.
     /// Bypass Link hydration's inactive pending-message correlation entirely.
     func adoptNativeSnapshot(from owner: DirectHermesConversationClient, session: SessionRecord) {

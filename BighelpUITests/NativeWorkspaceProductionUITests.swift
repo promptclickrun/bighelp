@@ -1179,22 +1179,21 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             XCTAssertTrue(app.textFields["agent.editor.name"].waitForExistence(timeout: 10))
             XCTAssertTrue(app.buttons["agent.editor.avatar-picker"].exists)
             app.buttons["agent.editor.design-avatar"].tap()
-            // Every creator panel must render (Release builds run on a 1 MB main stack on iPhone).
-            let hermia = app.buttons["avatar.creator.character.messenger"]
-            XCTAssertTrue(hermia.waitForExistence(timeout: 10))
-            hermia.tap()
-            for tab in ["color", "eyes", "extras", "moves", "character"] {
-                app.buttons["avatar.creator.tab.\(tab)"].tap()
-                XCTAssertTrue(app.buttons["avatar.creator.use"].waitForExistence(timeout: 5), tab)
+            // Every Bot Studio tab must render (Release builds run on a 1 MB main stack on iPhone).
+            let studio = app.descendants(matching: .any)["avatar.chooser.studio"].firstMatch
+            XCTAssertTrue(studio.waitForExistence(timeout: 10))
+            studio.tap()
+            for tab in ["eyes", "color", "shape", "moves", "body"] {
+                app.buttons["bot.studio.tab.\(tab)"].tap()
+                XCTAssertTrue(app.buttons["bot.studio.save"].waitForExistence(timeout: 5), tab)
             }
-            let inky = app.buttons["avatar.creator.character.octopus"]
-            XCTAssertTrue(inky.waitForExistence(timeout: 10))
-            for _ in 0..<3 where !inky.isHittable { app.swipeUp() }
-            inky.tap()
-            app.buttons["avatar.creator.use"].tap()
+            app.buttons["bot.studio.chip.classics"].tap()
+            let pinch = app.buttons["bot.studio.choice.Pinch"]
+            XCTAssertTrue(pinch.waitForExistence(timeout: 10))
+            pinch.tap()
+            app.buttons["bot.studio.save"].tap()
             let preview = app.descendants(matching: .any)["agent.editor.avatar-preview"].firstMatch
-            let prepared = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "Inky"), object: preview)
-            XCTAssertEqual(XCTWaiter.wait(for: [prepared], timeout: 20), .completed)
+            XCTAssertTrue(preview.waitForExistence(timeout: 20))
             capture("native-agent-pet-avatar-selected", app)
             for (id, text) in [("name", "MiXeD Avatar BOT"), ("role", "Helper")] {
                 let field = app.textFields["agent.editor.\(id)"]

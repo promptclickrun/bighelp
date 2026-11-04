@@ -1,0 +1,232 @@
+{
+ "set": {
+  "id": "thanksgiving",
+  "name": "Thanksgiving",
+  "category": "seasonal",
+  "startsAt": null,
+  "expiresAt": "2026-11-30T00:00:00-06:00"
+ },
+ "bodies": [
+  {
+   "id": "thanksgiving.gobble",
+   "name": "Gobble",
+   "role": "Gives thanks",
+   "parts": [
+    {
+     "d": "M21.72 56.75A8.5 15 -70 1 0 27.54 40.78A8.5 15 -70 1 0 21.72 56.75Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M27.55 40.76A8.5 15 -35 1 0 41.48 31.01A8.5 15 -35 1 0 27.55 40.76Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M41.5 31a8.5 15 0 1 0 17 0a8.5 15 0 1 0 -17 0Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M58.52 31.01A8.5 15 35 1 0 72.45 40.76A8.5 15 35 1 0 58.52 31.01Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M72.46 40.78A8.5 15 70 1 0 78.28 56.75A8.5 15 70 1 0 72.46 40.78Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M44 80L42 88M60 80L62 88",
+     "tone": "accent",
+     "stroke": 4
+    },
+    {
+     "d": "M27 58a25 25 0 1 0 50 0a25 25 0 1 0 -50 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M55 66H65L60 73Z",
+     "tone": "accent",
+     "round": 3
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     51,
+     11
+    ],
+    [
+     63,
+     53,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -6,
+   "colors": {
+    "main": "#B9754A",
+    "accent": "#F2A93B"
+   }
+  },
+  {
+   "id": "thanksgiving.slice",
+   "name": "Slice",
+   "role": "Saves room for pie",
+   "parts": [
+    {
+     "d": "M14 66L76 36V80H14Z",
+     "tone": "main",
+     "round": 6
+    },
+    {
+     "d": "M71 31H83V82H71Z",
+     "tone": "accent",
+     "round": 6
+    },
+    {
+     "d": "M11 76H76V83H11Z",
+     "tone": "accent",
+     "round": 3
+    }
+   ],
+   "eyes": [
+    [
+     48,
+     61,
+     11
+    ],
+    [
+     59,
+     63,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -6,
+   "colors": {
+    "main": "#EE9A3A",
+    "accent": "#F3D9A4"
+   }
+  },
+  {
+   "id": "thanksgiving.nutmeg",
+   "name": "Nutmeg",
+   "role": "Stores up for later",
+   "parts": [
+    {
+     "d": "M50 22C50 16 54 12 59 11",
+     "tone": "accent",
+     "stroke": 5
+    },
+    {
+     "d": "M26 44H74C74 66 63 81 50 87C37 81 26 66 26 44Z",
+     "tone": "main",
+     "round": 4
+    },
+    {
+     "d": "M20 48C20 30 34 22 50 22C66 22 80 30 80 48Z",
+     "tone": "accent",
+     "round": 6
+    }
+   ],
+   "eyes": [
+    [
+     51,
+     62,
+     11
+    ],
+    [
+     62,
+     64,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 12,
+   "colors": {
+    "main": "#D9A15A",
+    "accent": "#7A5236"
+   }
+  },
+  {
+   "id": "thanksgiving.maple",
+   "name": "Maple",
+   "role": "Rakes up loose ends",
+   "parts": [
+    {
+     "d": "M50 64V88",
+     "tone": "accent",
+     "stroke": 4.5
+    },
+    {
+     "d": "M50 12L56.3 26.4L66.2 19.2L65.3 34.5L78.8 29.1L75.2 44.4L86.9 47.1L75.2 57L78.8 64.2L59.9 62.4L58.1 69.6L50 66L41.9 69.6L40.1 62.4L21.2 64.2L24.8 57L13.1 47.1L24.8 44.4L21.2 29.1L34.7 34.5L33.8 19.2L43.7 26.4Z",
+     "tone": "main",
+     "round": 6
+    }
+   ],
+   "eyes": [
+    [
+     51,
+     42,
+     11
+    ],
+    [
+     62,
+     44,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 14,
+   "colors": {
+    "main": "#E8573B",
+    "accent": "#8A5A36"
+   }
+  },
+  {
+   "id": "thanksgiving.plenty",
+   "name": "Plenty",
+   "role": "Brings plenty",
+   "parts": [
+    {
+     "d": "M33 47C23 50 14 44 15 35C16 27 25 26 27 32",
+     "tone": "main",
+     "stroke": 8
+    },
+    {
+     "d": "M74 28C60 28 44 34 30 42C25 45 25 50 30 52C44 60 58 72 74 72A10 22 0 0 0 74 28Z",
+     "tone": "main",
+     "round": 4
+    },
+    {
+     "d": "M67 50a7 18 0 1 0 14 0a7 18 0 1 0 -14 0Z",
+     "tone": "shade"
+    },
+    {
+     "d": "M71 62a7 7 0 1 0 14 0a7 7 0 1 0 -14 0Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M76.5 48a5.5 5.5 0 1 0 11 0a5.5 5.5 0 1 0 -11 0Z",
+     "tone": "accent"
+    }
+   ],
+   "eyes": [
+    [
+     48,
+     46,
+     11
+    ],
+    [
+     59,
+     48,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -6,
+   "colors": {
+    "main": "#E8A93A",
+    "accent": "#D6453A"
+   }
+  }
+ ]
+}

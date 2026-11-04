@@ -1,0 +1,80 @@
+{
+ "set": {
+  "id": "shapes",
+  "name": "Shapes",
+  "category": "shapes",
+  "startsAt": null,
+  "expiresAt": null
+ },
+ "bodies": [
+  {
+   "id": "shapes.tile",
+   "name": "Tile",
+   "parts": [
+    {
+     "d": "M20 30H70V70H20Z",
+     "tone": "main",
+     "round": 8
+    },
+    {
+     "d": "M70 40C80 40 80 60 70 60",
+     "tone": "accent",
+     "stroke": 4
+    }
+   ],
+   "eyes": [
+    [
+     40,
+     46,
+     11
+    ],
+    [
+     52,
+     48,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -10,
+   "colors": {
+    "main": "#3B82F6",
+    "accent": "#C9C3BD"
+   }
+  },
+  {
+   "id": "shapes.ball",
+   "name": "Ball",
+   "parts": [
+    {
+     "d": "M20 30H70V70H20Z",
+     "tone": "main",
+     "round": 8
+    },
+    {
+     "d": "M70 40C80 40 80 60 70 60",
+     "tone": "accent",
+     "stroke": 4
+    }
+   ],
+   "eyes": [
+    [
+     40,
+     46,
+     11
+    ],
+    [
+     52,
+     48,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -10,
+   "colors": {
+    "main": "#3B82F6",
+    "accent": "#C9C3BD"
+   },
+   "role": "Round and calm"
+  }
+ ]
+}

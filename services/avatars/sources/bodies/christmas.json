@@ -1,0 +1,239 @@
+{
+ "set": {
+  "id": "christmas",
+  "name": "Christmas",
+  "category": "seasonal",
+  "startsAt": null,
+  "expiresAt": "2027-01-02T00:00:00-06:00"
+ },
+ "bodies": [
+  {
+   "id": "christmas.spruce",
+   "name": "Spruce",
+   "role": "Lights up the room",
+   "parts": [
+    {
+     "d": "M44 68H56V86H44Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M50 12L72 42H62L80 70H20L38 42H28Z",
+     "tone": "main",
+     "round": 6
+    }
+   ],
+   "eyes": [
+    [
+     49,
+     52,
+     10
+    ],
+    [
+     59,
+     54,
+     10
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 8,
+   "colors": {
+    "main": "#2FA55A",
+    "accent": "#8A5A36"
+   }
+  },
+  {
+   "id": "christmas.flurry",
+   "name": "Flurry",
+   "role": "Keeps its cool",
+   "parts": [
+    {
+     "d": "M25 64a23 23 0 1 0 46 0a23 23 0 1 0 -46 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M38 32a16 16 0 1 0 32 0a16 16 0 1 0 -32 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M38 46C46 51 58 51 67 46",
+     "tone": "accent",
+     "stroke": 7
+    },
+    {
+     "d": "M60 49L63 61",
+     "tone": "accent",
+     "stroke": 6
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     29,
+     10
+    ],
+    [
+     62,
+     31,
+     10
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -8,
+   "colors": {
+    "main": "#6CB8E8",
+    "accent": "#E5484D"
+   }
+  },
+  {
+   "id": "christmas.ginger",
+   "name": "Ginger",
+   "role": "Fresh from the oven",
+   "parts": [
+    {
+     "d": "M22 50L78 44",
+     "tone": "main",
+     "stroke": 13
+    },
+    {
+     "d": "M42 64L34 81",
+     "tone": "main",
+     "stroke": 13
+    },
+    {
+     "d": "M58 64L66 81",
+     "tone": "main",
+     "stroke": 13
+    },
+    {
+     "d": "M37 40H63V70H37Z",
+     "tone": "main",
+     "round": 10
+    },
+    {
+     "d": "M35 26a15 15 0 1 0 30 0a15 15 0 1 0 -30 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M47 52a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z",
+     "tone": "light"
+    },
+    {
+     "d": "M47 62a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z",
+     "tone": "light"
+    }
+   ],
+   "eyes": [
+    [
+     48,
+     24,
+     10
+    ],
+    [
+     58,
+     26,
+     10
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 10,
+   "colors": {
+    "main": "#C98448"
+   }
+  },
+  {
+   "id": "christmas.bauble",
+   "name": "Bauble",
+   "role": "Hangs in there",
+   "parts": [
+    {
+     "d": "M46 16a4 4 0 1 0 8 0a4 4 0 1 0 -8 0Z",
+     "tone": "accent",
+     "stroke": 3
+    },
+    {
+     "d": "M42 22H58V30H42Z",
+     "tone": "accent",
+     "round": 3
+    },
+    {
+     "d": "M21 58a29 29 0 1 0 58 0a29 29 0 1 0 -58 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M30 52C30 42 35 36 42 33",
+     "tone": "light",
+     "stroke": 5
+    }
+   ],
+   "eyes": [
+    [
+     53,
+     54,
+     12
+    ],
+    [
+     65,
+     56,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 10,
+   "colors": {
+    "main": "#E8455A",
+    "accent": "#F2C14E"
+   }
+  },
+  {
+   "id": "christmas.bow",
+   "name": "Bow",
+   "role": "Wraps things up",
+   "parts": [
+    {
+     "d": "M24 42H76V80H24Z",
+     "tone": "main",
+     "round": 4
+    },
+    {
+     "d": "M20 32H80V44H20Z",
+     "tone": "main",
+     "round": 4
+    },
+    {
+     "d": "M24 46H76V50H24Z",
+     "tone": "shade"
+    },
+    {
+     "d": "M32 30H40V82H32Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M36 32C28 16 14 20 21 29C25 34 31 33 36 32Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M36 32C44 16 58 20 51 29C47 34 41 33 36 32Z",
+     "tone": "accent"
+    }
+   ],
+   "eyes": [
+    [
+     53,
+     59,
+     11
+    ],
+    [
+     64,
+     61,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -6,
+   "colors": {
+    "main": "#8F6BE8",
+    "accent": "#F6C945"
+   }
+  }
+ ]
+}

@@ -1,0 +1,379 @@
+{
+ "set": {
+  "id": "bits",
+  "name": "Bits",
+  "category": "bighelp",
+  "startsAt": null,
+  "expiresAt": null
+ },
+ "bodies": [
+  {
+   "id": "bits.bop",
+   "name": "Bop",
+   "parts": [
+    {
+     "d": "M50 30Q50 20 57 15",
+     "tone": "main",
+     "stroke": 4
+    },
+    {
+     "d": "M53 14a5 5 0 1 0 10 0a5 5 0 1 0 -10 0Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M22 57a28 28 0 1 0 56 0a28 28 0 1 0 -56 0Z",
+     "tone": "main"
+    }
+   ],
+   "eyes": [
+    [
+     54,
+     50,
+     12
+    ],
+    [
+     65,
+     52,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 12,
+   "colors": {
+    "main": "#F26B3A",
+    "accent": "#F5C542"
+   }
+  },
+  {
+   "id": "bits.blok",
+   "name": "Blok",
+   "parts": [
+    {
+     "d": "M50 14L80 30V66L50 82L20 66V30Z",
+     "tone": "main",
+     "round": 8
+    },
+    {
+     "d": "M50 14L80 30L50 46L20 30Z",
+     "tone": "light"
+    },
+    {
+     "d": "M20 30L50 46V82L20 66Z",
+     "tone": "shade"
+    }
+   ],
+   "eyes": [
+    [
+     59,
+     54,
+     11
+    ],
+    [
+     70,
+     56,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -8,
+   "colors": {
+    "main": "#4F7BFF"
+   }
+  },
+  {
+   "id": "bits.wedge",
+   "name": "Wedge",
+   "parts": [
+    {
+     "d": "M74 26Q73 18 68 15",
+     "tone": "accent",
+     "stroke": 4
+    },
+    {
+     "d": "M68 15C62 8 54 10 52 14C56 18 63 18 68 15Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M20 80H80L76 26Z",
+     "tone": "main",
+     "round": 12
+    }
+   ],
+   "eyes": [
+    [
+     58,
+     58,
+     11
+    ],
+    [
+     69,
+     60,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -6,
+   "colors": {
+    "main": "#34B36B",
+    "accent": "#F2C14E"
+   }
+  },
+  {
+   "id": "bits.hexo",
+   "name": "Hexo",
+   "parts": [
+    {
+     "d": "M38 24L36 12L45 18L50 10L55 18L64 12L62 24Z",
+     "tone": "accent",
+     "round": 3
+    },
+    {
+     "d": "M34 28H66L82 55L66 82H34L18 55Z",
+     "tone": "main",
+     "round": 10
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     51,
+     12
+    ],
+    [
+     63,
+     53,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 6,
+   "colors": {
+    "main": "#F4A62A",
+    "accent": "#8B5CF6"
+   }
+  },
+  {
+   "id": "bits.drip",
+   "name": "Drip",
+   "parts": [
+    {
+     "d": "M50 12C58 28 78 42 78 60A28 26 0 0 1 22 60C22 42 42 28 50 12Z",
+     "tone": "main",
+     "round": 4
+    },
+    {
+     "d": "M80 22C82 27 85 29 85 32A5 5 0 0 1 75 32C75 29 78 27 80 22Z",
+     "tone": "main",
+     "round": 2
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     56,
+     12
+    ],
+    [
+     63,
+     58,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 12,
+   "colors": {
+    "main": "#1FB0E8"
+   }
+  },
+  {
+   "id": "bits.tic",
+   "name": "Tic",
+   "parts": [
+    {
+     "d": "M50 14H50A18 18 0 0 1 68 32V68A18 18 0 0 1 50 86H50A18 18 0 0 1 32 68V32A18 18 0 0 1 50 14Z",
+     "tone": "main"
+    },
+    {
+     "d": "M32 52H68V68A18 18 0 0 1 32 68Z",
+     "tone": "light"
+    }
+   ],
+   "eyes": [
+    [
+     46,
+     32,
+     10
+    ],
+    [
+     57,
+     34,
+     10
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 24,
+   "colors": {
+    "main": "#9B5CF6"
+   }
+  },
+  {
+   "id": "bits.puff",
+   "name": "Puff",
+   "parts": [
+    {
+     "d": "M42 18A11 3.5 0 1 0 64 18A11 3.5 0 1 0 42 18Z",
+     "tone": "accent",
+     "stroke": 3
+    },
+    {
+     "d": "M21 54a14 14 0 1 0 28 0a14 14 0 1 0 -28 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M33 44a20 20 0 1 0 40 0a20 20 0 1 0 -40 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M58 55a12 12 0 1 0 24 0a12 12 0 1 0 -24 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M30 52H73A9 9 0 0 1 82 61V61A9 9 0 0 1 73 70H30A9 9 0 0 1 21 61V61A9 9 0 0 1 30 52Z",
+     "tone": "main"
+    }
+   ],
+   "eyes": [
+    [
+     54,
+     50,
+     11
+    ],
+    [
+     65,
+     52,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -8,
+   "colors": {
+    "main": "#8FA8FF",
+    "accent": "#F2C14E"
+   }
+  },
+  {
+   "id": "bits.boo",
+   "name": "Boo",
+   "parts": [
+    {
+     "d": "M24 50C24 30 36 18 50 18C64 18 76 30 76 50V76A6.5 6.5 0 0 1 63 76A6.5 6.5 0 0 1 50 76A6.5 6.5 0 0 1 37 76A6.5 6.5 0 0 1 24 76Z",
+     "tone": "main",
+     "round": 2
+    },
+    {
+     "d": "M66 22L57 15V29Z",
+     "tone": "accent",
+     "round": 2
+    },
+    {
+     "d": "M66 22L75 15V29Z",
+     "tone": "accent",
+     "round": 2
+    },
+    {
+     "d": "M62.5 22a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0Z",
+     "tone": "accent"
+    }
+   ],
+   "eyes": [
+    [
+     46,
+     44,
+     12
+    ],
+    [
+     57,
+     46,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -10,
+   "colors": {
+    "main": "#C9C3FF",
+    "accent": "#FF5FA2"
+   }
+  },
+  {
+   "id": "bits.bloom",
+   "name": "Bloom",
+   "parts": [
+    {
+     "d": "M50 66V86",
+     "tone": "accent",
+     "stroke": 5
+    },
+    {
+     "d": "M50 82C42 82 34 76 32 68C40 68 48 74 50 82Z",
+     "tone": "accent",
+     "round": 2
+    },
+    {
+     "d": "M26 24L39 34L50 18L61 34L74 24V46A24 24 0 0 1 26 46Z",
+     "tone": "main",
+     "round": 6
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     44,
+     11
+    ],
+    [
+     63,
+     46,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 8,
+   "colors": {
+    "main": "#F06AA8",
+    "accent": "#4CAF5C"
+   }
+  },
+  {
+   "id": "bits.glim",
+   "name": "Glim",
+   "parts": [
+    {
+     "d": "M30 22H70L86 40L50 84L14 40Z",
+     "tone": "main",
+     "round": 6
+    },
+    {
+     "d": "M30 22L40 40H14Z",
+     "tone": "light"
+    }
+   ],
+   "eyes": [
+    [
+     48,
+     50,
+     12
+    ],
+    [
+     59,
+     52,
+     12
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -12,
+   "colors": {
+    "main": "#2CC4B0"
+   }
+  }
+ ]
+}

@@ -264,7 +264,7 @@ struct AgentEditorView: View {
             preparePhotoAvatar(selection)
         }
         .bighelpSheet(isPresented: $isAvatarCreatorPresented) {
-            AvatarCreatorView(
+            AvatarChooserView(
                 start: creatorStart ?? currentCreatorStart, characters: surpriseLook, agentName: heroTitle,
                 faceName: model.faceName,
                 petSource: PetdexSource(store: model.store, cacheScope: "\(ObjectIdentifier(model.store))")
@@ -743,7 +743,7 @@ struct AgentEditorView: View {
             CompanionAvatar(appearance: look, reaction: .idle, isAnimating: true)
                 .frame(width: size * 0.8, height: size * 0.8)
                 .frame(width: size, height: size)
-        } else if model.pendingAvatar != nil, let look = model.pendingLook, look.style != .photo {
+        } else if model.pendingAvatar != nil, let look = model.pendingLook, look.drawsLive {
             // A Hermes face stays sharp at any size, as Hermes Desktop draws it.
             HermesLookView(look: look, name: model.faceName)
                 .frame(width: size, height: size)

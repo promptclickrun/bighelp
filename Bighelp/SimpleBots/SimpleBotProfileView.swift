@@ -228,14 +228,14 @@ struct SimpleBotProfileView: View {
         }
         .bighelpSheet(isPresented: $isStudioPresented) {
             if let profile {
-                AvatarCreatorView(
+                AvatarChooserView(
                     start: SimpleBotAvatarSaving.start(for: profile, agents: context.agents, companions: companions,
                                                        scope: scope),
                     characters: AvatarCreatorModel.surprise(), agentName: profile.name,
                     faceName: AgentEditorModel.editing(profile, store: context.agents,
                                                        processor: AvatarImageProcessor()).faceName,
                     petSource: PetdexSource(store: context.agents, cacheScope: "\(ObjectIdentifier(context.agents))"),
-                    offersBotMarks: true, useTitle: String(localized: "Save")
+                    useTitle: String(localized: "Save")
                 ) { result in saveAvatar(result, for: profile) }
                 .presentationDragIndicator(.visible)
                 #if os(visionOS)

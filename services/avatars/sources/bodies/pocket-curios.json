@@ -1,0 +1,852 @@
+{
+ "set": {
+  "id": "pocket-curios",
+  "name": "Pocket Curios",
+  "category": "bighelp",
+  "startsAt": null,
+  "expiresAt": null
+ },
+ "bodies": [
+  {
+   "id": "pocket-curios.spindle",
+   "name": "Spindle",
+   "role": "Connects loose threads",
+   "parts": [
+    {
+     "d": "M31 28H69V72H31Z",
+     "tone": "main"
+    },
+    {
+     "d": "M68 60C80 60 85 67 81 73C77 78 70 75 73 69",
+     "tone": "accent",
+     "stroke": 4
+    },
+    {
+     "d": "M22 20H78V30H22Z",
+     "tone": "main",
+     "round": 5
+    },
+    {
+     "d": "M22 70H78V80H22Z",
+     "tone": "main",
+     "round": 5
+    },
+    {
+     "d": "M31 30H69V34H31Z",
+     "tone": "shade"
+    },
+    {
+     "d": "M31 66H69V70H31Z",
+     "tone": "shade"
+    }
+   ],
+   "eyes": [
+    [
+     51,
+     47,
+     11
+    ],
+    [
+     62,
+     49,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -12,
+   "colors": {
+    "main": "#B48AE0",
+    "accent": "#F2C14E"
+   }
+  },
+  {
+   "id": "pocket-curios.drizzle",
+   "name": "Drizzle",
+   "role": "Helps things grow",
+   "parts": [
+    {
+     "d": "M69 46C85 46 85 70 69 70",
+     "tone": "main",
+     "stroke": 7
+    },
+    {
+     "d": "M35 66L18 40",
+     "tone": "main",
+     "stroke": 7
+    },
+    {
+     "d": "M31 36H71V72A8 8 0 0 1 63 80H39A8 8 0 0 1 31 72Z",
+     "tone": "main",
+     "round": 6
+    },
+    {
+     "d": "M11 37a6 6 0 1 0 12 0a6 6 0 1 0 -12 0Z",
+     "tone": "accent"
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     54,
+     11
+    ],
+    [
+     63,
+     56,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -4,
+   "colors": {
+    "main": "#3FB8A8",
+    "accent": "#F2C14E"
+   }
+  },
+  {
+   "id": "pocket-curios.zephyr",
+   "name": "Zephyr",
+   "role": "Follows fresh ideas",
+   "parts": [
+    {
+     "d": "M50 70C44 76 56 80 50 86",
+     "tone": "accent",
+     "stroke": 3
+    },
+    {
+     "d": "M44 82L50 86L44 90ZM56 82L50 86L56 90Z",
+     "tone": "accent",
+     "round": 2
+    },
+    {
+     "d": "M50 14L75 42L50 72L25 42Z",
+     "tone": "main",
+     "round": 8
+    },
+    {
+     "d": "M25 42L50 72V42Z",
+     "tone": "shade"
+    }
+   ],
+   "eyes": [
+    [
+     49,
+     36,
+     10
+    ],
+    [
+     59,
+     38,
+     10
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 14,
+   "colors": {
+    "main": "#F5A524",
+    "accent": "#8E6CD9"
+   }
+  },
+  {
+   "id": "pocket-curios.riff",
+   "name": "Riff",
+   "role": "Finds the rhythm",
+   "parts": [
+    {
+     "d": "M30 32L36 30L42 32L48 30L54 32L60 30L66 32L70 32V70L64 72L58 70L52 72L46 70L40 72L34 70L30 70Z",
+     "tone": "main",
+     "round": 3
+    },
+    {
+     "d": "M18 26H34V76H18Z",
+     "tone": "main",
+     "round": 6
+    },
+    {
+     "d": "M66 26H82V76H66Z",
+     "tone": "main",
+     "round": 6
+    },
+    {
+     "d": "M18 26H34V76H18Z",
+     "tone": "shade"
+    },
+    {
+     "d": "M66 26H82V76H66Z",
+     "tone": "shade"
+    },
+    {
+     "d": "M71.4 40a2.6 2.6 0 1 0 5.2 0a2.6 2.6 0 1 0 -5.2 0ZM71.4 51a2.6 2.6 0 1 0 5.2 0a2.6 2.6 0 1 0 -5.2 0ZM71.4 62a2.6 2.6 0 1 0 5.2 0a2.6 2.6 0 1 0 -5.2 0Z",
+     "tone": "accent"
+    }
+   ],
+   "eyes": [
+    [
+     46,
+     46,
+     11
+    ],
+    [
+     57,
+     48,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -8,
+   "colors": {
+    "main": "#E36A9A",
+    "accent": "#FFE08A"
+   }
+  },
+  {
+   "id": "pocket-curios.skipper",
+   "name": "Skipper",
+   "role": "Keeps you afloat",
+   "parts": [
+    {
+     "d": "M26 84Q34 79 42 84Q50 89 58 84Q66 79 74 84",
+     "tone": "accent",
+     "stroke": 3.5
+    },
+    {
+     "d": "M50 18L71 51H29Z",
+     "tone": "main",
+     "round": 4
+    },
+    {
+     "d": "M50 18L71 51H50Z",
+     "tone": "shade"
+    },
+    {
+     "d": "M14 50H86L72 75H28Z",
+     "tone": "main",
+     "round": 5
+    }
+   ],
+   "eyes": [
+    [
+     51,
+     59,
+     10
+    ],
+    [
+     62,
+     61,
+     10
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -10,
+   "colors": {
+    "main": "#4FA3E0",
+    "accent": "#A8DCF5"
+   }
+  },
+  {
+   "id": "pocket-curios.nori",
+   "name": "Nori",
+   "role": "Packs a snack",
+   "parts": [
+    {
+     "d": "M50 20L82 74H18Z",
+     "tone": "main",
+     "round": 16
+    },
+    {
+     "d": "M37 60H63V83H37Z",
+     "tone": "accent",
+     "round": 4
+    }
+   ],
+   "eyes": [
+    [
+     45,
+     46,
+     10
+    ],
+    [
+     56,
+     48,
+     10
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 5,
+   "colors": {
+    "main": "#EADCB8",
+    "accent": "#2E4A3A"
+   }
+  },
+  {
+   "id": "pocket-curios.pogo",
+   "name": "Pogo",
+   "role": "Bounces back quickly",
+   "parts": [
+    {
+     "d": "M36 52L64 58L36 64L64 70L36 76",
+     "tone": "main",
+     "stroke": 5.5
+    },
+    {
+     "d": "M28 80H72V86H28Z",
+     "tone": "accent",
+     "round": 3
+    },
+    {
+     "d": "M26 18H74V52H26Z",
+     "tone": "main",
+     "round": 14
+    }
+   ],
+   "eyes": [
+    [
+     51,
+     33,
+     11
+    ],
+    [
+     62,
+     35,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 6,
+   "colors": {
+    "main": "#9B7AE0",
+    "accent": "#F2C14E"
+   }
+  },
+  {
+   "id": "pocket-curios.tally",
+   "name": "Tally",
+   "role": "Makes numbers behave",
+   "parts": [
+    {
+     "d": "M22 24H78V78H22Z",
+     "tone": "main",
+     "round": 10
+    },
+    {
+     "d": "M26 57H74V74H26Z",
+     "tone": "shade"
+    },
+    {
+     "d": "M30 65.5H70",
+     "tone": "accent",
+     "stroke": 3
+    },
+    {
+     "d": "M30 65.5a5 5 0 1 0 10 0a5 5 0 1 0 -10 0ZM41 65.5a5 5 0 1 0 10 0a5 5 0 1 0 -10 0ZM61 65.5a5 5 0 1 0 10 0a5 5 0 1 0 -10 0Z",
+     "tone": "accent"
+    }
+   ],
+   "eyes": [
+    [
+     52,
+     40,
+     11
+    ],
+    [
+     63,
+     42,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -8,
+   "colors": {
+    "main": "#F0A94A",
+    "accent": "#3E8F7A"
+   }
+  },
+  {
+   "id": "pocket-curios.locket",
+   "name": "Locket",
+   "role": "Keeps your secrets",
+   "parts": [
+    {
+     "d": "M36 46V36A14 14 0 0 1 64 36V46",
+     "tone": "accent",
+     "stroke": 8
+    },
+    {
+     "d": "M24 44H76V80H24Z",
+     "tone": "main",
+     "round": 8
+    },
+    {
+     "d": "M38.4 70a3.6 3.6 0 1 0 7.2 0a3.6 3.6 0 1 0 -7.2 0ZM40.6 70H43.4L44 76H40Z",
+     "tone": "shade"
+    }
+   ],
+   "eyes": [
+    [
+     51,
+     57,
+     11
+    ],
+    [
+     62,
+     59,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 10,
+   "colors": {
+    "main": "#6CB98A",
+    "accent": "#A9A4B8"
+   }
+  },
+  {
+   "id": "pocket-curios.crumb",
+   "name": "Crumb",
+   "role": "Warms things up",
+   "parts": [
+    {
+     "d": "M32 44V28A8 8 0 0 1 40 20H60A8 8 0 0 1 68 28V44Z",
+     "tone": "accent",
+     "round": 4
+    },
+    {
+     "d": "M80 50H86V56H80Z",
+     "tone": "main",
+     "round": 3
+    },
+    {
+     "d": "M18 38H80V78H18Z",
+     "tone": "main",
+     "round": 10
+    },
+    {
+     "d": "M18 72H80V78H18Z",
+     "tone": "shade"
+    }
+   ],
+   "eyes": [
+    [
+     50,
+     52,
+     11
+    ],
+    [
+     61,
+     54,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -8,
+   "colors": {
+    "main": "#7CC4B0",
+    "accent": "#E8B06A"
+   }
+  },
+  {
+   "id": "pocket-curios.glint",
+   "name": "Glint",
+   "role": "Lights the way",
+   "parts": [
+    {
+     "d": "M41 24A9 9 0 0 1 59 24",
+     "tone": "accent",
+     "stroke": 4.5
+    },
+    {
+     "d": "M32 32H68V72H32Z",
+     "tone": "main",
+     "round": 10
+    },
+    {
+     "d": "M30 26H70V33H30ZM28 72H72V80H28Z",
+     "tone": "accent",
+     "round": 3
+    }
+   ],
+   "eyes": [
+    [
+     51,
+     48,
+     11
+    ],
+    [
+     62,
+     50,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 8,
+   "colors": {
+    "main": "#F2C14E",
+    "accent": "#6F7FA6"
+   }
+  },
+  {
+   "id": "pocket-curios.pippa",
+   "name": "Pippa",
+   "role": "Picks the good stuff",
+   "parts": [
+    {
+     "d": "M50 22Q51 16 55 12",
+     "tone": "accent",
+     "stroke": 3.5
+    },
+    {
+     "d": "M54 16C58 9 68 8 74 11C70 18 60 20 54 16Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M50 18C58 18 62 26 62 34C62 42 76 48 76 64C76 78 64 84 50 84C36 84 24 78 24 64C24 48 38 42 38 34C38 26 42 18 50 18Z",
+     "tone": "main",
+     "round": 2
+    }
+   ],
+   "eyes": [
+    [
+     50,
+     55,
+     11
+    ],
+    [
+     61,
+     57,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 12,
+   "colors": {
+    "main": "#A7C957",
+    "accent": "#5C7F45"
+   }
+  },
+  {
+   "id": "pocket-curios.flick",
+   "name": "Flick",
+   "role": "Starts something good",
+   "parts": [
+    {
+     "d": "M36 40V30M50 40V26M64 40V30",
+     "tone": "accent",
+     "stroke": 4
+    },
+    {
+     "d": "M31 29a5 5 0 1 0 10 0a5 5 0 1 0 -10 0ZM45 25a5 5 0 1 0 10 0a5 5 0 1 0 -10 0ZM59 29a5 5 0 1 0 10 0a5 5 0 1 0 -10 0Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M22 38H78V80H22Z",
+     "tone": "main",
+     "round": 8
+    },
+    {
+     "d": "M22 72H78V80H22Z",
+     "tone": "shade"
+    }
+   ],
+   "eyes": [
+    [
+     51,
+     53,
+     11
+    ],
+    [
+     62,
+     55,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -10,
+   "colors": {
+    "main": "#F0A04B",
+    "accent": "#D9546B"
+   }
+  },
+  {
+   "id": "pocket-curios.fable",
+   "name": "Fable",
+   "role": "Remembers the story",
+   "parts": [
+    {
+     "d": "M58 70V88L63 84L68 88V70Z",
+     "tone": "accent",
+     "round": 1
+    },
+    {
+     "d": "M28 26H72V72C66 78 60 72 52 76C44 80 36 74 28 78Z",
+     "tone": "main",
+     "round": 4
+    },
+    {
+     "d": "M20 18H80V30H20Z",
+     "tone": "main",
+     "round": 6
+    },
+    {
+     "d": "M20 18H80V30H20Z",
+     "tone": "shade"
+    }
+   ],
+   "eyes": [
+    [
+     46,
+     47,
+     11
+    ],
+    [
+     57,
+     49,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 10,
+   "colors": {
+    "main": "#E3C27A",
+    "accent": "#7A8FD6"
+   }
+  },
+  {
+   "id": "pocket-curios.doodle",
+   "name": "Doodle",
+   "role": "Colors outside lines",
+   "parts": [
+    {
+     "d": "M38 36L47 17Q50 12 53 17L62 36Z",
+     "tone": "main",
+     "round": 3
+    },
+    {
+     "d": "M38 36L47 17Q50 12 53 17L62 36Z",
+     "tone": "shade"
+    },
+    {
+     "d": "M36 34H64V82H36Z",
+     "tone": "main",
+     "round": 4
+    },
+    {
+     "d": "M36 40H64V45H36Z",
+     "tone": "shade"
+    },
+    {
+     "d": "M36 72H64V77H36Z",
+     "tone": "shade"
+    }
+   ],
+   "eyes": [
+    [
+     46,
+     54,
+     10
+    ],
+    [
+     56,
+     56,
+     10
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 20,
+   "colors": {
+    "main": "#7C8CF0"
+   }
+  },
+  {
+   "id": "pocket-curios.tether",
+   "name": "Tether",
+   "role": "Brings things together",
+   "parts": [
+    {
+     "d": "M20 22H42V54A8 8 0 0 0 58 54V22H80V54A30 30 0 0 1 20 54Z",
+     "tone": "main",
+     "round": 4
+    },
+    {
+     "d": "M20 22H42V33H20ZM58 22H80V33H58Z",
+     "tone": "accent",
+     "round": 4
+    }
+   ],
+   "eyes": [
+    [
+     47,
+     70,
+     10
+    ],
+    [
+     58,
+     72,
+     10
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -14,
+   "colors": {
+    "main": "#E5534B",
+    "accent": "#D5DAE2"
+   }
+  },
+  {
+   "id": "pocket-curios.miso",
+   "name": "Miso",
+   "role": "Holds it together",
+   "parts": [
+    {
+     "d": "M28 40a6 6 0 1 0 12 0a6 6 0 1 0 -12 0ZM37.5 34a6.5 6.5 0 1 0 13 0a6.5 6.5 0 1 0 -13 0ZM49.5 34a6.5 6.5 0 1 0 13 0a6.5 6.5 0 1 0 -13 0ZM60 40a6 6 0 1 0 12 0a6 6 0 1 0 -12 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M14 70C14 48 30 34 50 34C70 34 86 48 86 70C86 76 78 78 50 78C22 78 14 76 14 70Z",
+     "tone": "main",
+     "round": 2
+    }
+   ],
+   "eyes": [
+    [
+     51,
+     52,
+     11
+    ],
+    [
+     62,
+     54,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -6,
+   "colors": {
+    "main": "#EBC48E"
+   }
+  },
+  {
+   "id": "pocket-curios.sprig",
+   "name": "Sprig",
+   "role": "Grows through anything",
+   "parts": [
+    {
+     "d": "M44 32V17",
+     "tone": "accent",
+     "stroke": 4
+    },
+    {
+     "d": "M44 22C38 14 30 14 26 18C30 24 38 25 44 22ZM44 20C48 11 58 10 62 14C58 21 50 23 44 20Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M28 30H60V58L74 62C82 64 84 70 84 76V82H28Z",
+     "tone": "main",
+     "round": 6
+    },
+    {
+     "d": "M28 76H84V82H28Z",
+     "tone": "shade"
+    }
+   ],
+   "eyes": [
+    [
+     42,
+     50,
+     11
+    ],
+    [
+     53,
+     52,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -4,
+   "colors": {
+    "main": "#F2B33D",
+    "accent": "#5BAA5E"
+   }
+  },
+  {
+   "id": "pocket-curios.pebble",
+   "name": "Pebble",
+   "role": "Finds your balance",
+   "parts": [
+    {
+     "d": "M39 31a15 10 0 1 0 30 0a15 10 0 1 0 -30 0Z",
+     "tone": "main"
+    },
+    {
+     "d": "M20 62C20 46 34 42 52 42C70 42 82 48 82 62C82 76 70 80 50 80C30 80 20 76 20 62Z",
+     "tone": "main",
+     "round": 2
+    },
+    {
+     "d": "M39 31a15 10 0 1 0 30 0a15 10 0 1 0 -30 0Z",
+     "tone": "shade"
+    }
+   ],
+   "eyes": [
+    [
+     51,
+     56,
+     11
+    ],
+    [
+     62,
+     58,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": 6,
+   "colors": {
+    "main": "#9DB0C6"
+   }
+  },
+  {
+   "id": "pocket-curios.quill",
+   "name": "Quill",
+   "role": "Gets words flowing",
+   "parts": [
+    {
+     "d": "M47 36C34 32 24 22 24 12C36 14 46 24 47 36Z",
+     "tone": "accent"
+    },
+    {
+     "d": "M47 38L30 18",
+     "tone": "accent",
+     "stroke": 2.5
+    },
+    {
+     "d": "M40 30H60V40H40Z",
+     "tone": "main",
+     "round": 3
+    },
+    {
+     "d": "M24 76V60C24 46 36 38 50 38C64 38 76 46 76 60V76Z",
+     "tone": "main",
+     "round": 6
+    }
+   ],
+   "eyes": [
+    [
+     51,
+     56,
+     11
+    ],
+    [
+     62,
+     58,
+     11
+    ]
+   ],
+   "eyeTilt": -24,
+   "rotation": -6,
+   "colors": {
+    "main": "#8A7FE0",
+    "accent": "#F2C14E"
+   }
+  }
+ ]
+}

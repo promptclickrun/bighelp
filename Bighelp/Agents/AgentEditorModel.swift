@@ -338,7 +338,7 @@ final class AgentEditorModel: Identifiable {
         if let pending = pendingAvatar {
             if let look = selectedCompanionAppearance { return .character(look) }
             if let pet = selectedPet { return .pet(slug: pet.slug, picture: pending.data) }
-            if let look = pendingLook, look.style != .photo { return .look(look) }
+            if let look = pendingLook, look.drawsLive { return .look(look) }
             return .photo(pending.data)
         }
         guard isEditing else { return .surprise(surprise) }
@@ -346,7 +346,7 @@ final class AgentEditorModel: Identifiable {
         if let savedCharacter { return .character(savedCharacter) }
         let picture = avatarURL.flatMap { try? Data(contentsOf: $0) }
         if let savedPetSlug { return .pet(slug: savedPetSlug, picture: picture) }
-        if let look = editedProfile?.look, look.style != .photo { return .look(look) }
+        if let look = editedProfile?.look, look.drawsLive { return .look(look) }
         return .photo(picture)
     }
 

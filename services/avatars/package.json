@@ -6,6 +6,7 @@
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "build": "node scripts/build.mjs",
+    "bodies:app": "node scripts/bodies-app.mjs",
     "deploy": "npm run build && wrangler deploy"
   },
   "devDependencies": {

@@ -27,7 +27,8 @@ function matches(header, tag) {
   return found;
 }
 
-export async function respond(request, env, source, now = Date.now()) {
+// `bodies` is the Bot Studio feed from scripts/bodies.mjs, served at /v2/bodies.json.
+export async function respond(request, env, source, now = Date.now(), bodies) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
   if (!['GET', 'HEAD'].includes(request.method)) {
     return new Response('Read only', { status: 405, headers: { ...cors, Allow: 'GET, HEAD, OPTIONS', 'Cache-Control': 'no-store' } });
@@ -41,6 +42,15 @@ export async function respond(request, env, source, now = Date.now()) {
     headers.set('Cache-Control', result.status === 200 || result.status === 304
       ? (path === '/NOTICES.txt' ? 'public, max-age=300' : 'public, max-age=31536000, immutable') : 'no-store');
     return new Response(request.method === 'HEAD' ? null : result.body, { status: result.status, headers });
+  }
+  if (path === '/v2/bodies.json' && bodies) {
+    const body = JSON.stringify(bodies);
+    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body));
+    const etag = `"${Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('')}"`;
+    // Seasonal dates are the app's to apply, so nothing here changes on a clock: a flat 5 minutes like v1.
+    const headers = { ...cors, 'Content-Type': 'application/json; charset=utf-8', ETag: etag, 'Cache-Control': 'public, max-age=300, must-revalidate' };
+    if (matches(request.headers.get('If-None-Match'), etag)) return new Response(null, { status: 304, headers });
+    return new Response(request.method === 'HEAD' ? null : body, { headers });
   }
   if (!['/v1/avatars.json', '/v1/avatar-kit.json'].includes(path)) return new Response('Not found', { status: 404, headers: { ...cors, 'Cache-Control': 'no-store' } });
   const sets = source.sets.filter(s => (!s.startsAt || Date.parse(s.startsAt) <= now) && (!s.expiresAt || now < Date.parse(s.expiresAt)));

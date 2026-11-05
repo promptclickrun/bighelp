@@ -15,8 +15,6 @@ struct HostConnectionStatusTests {
 
     @Test func theIslandKeepsItsWordsAndNoInternetIsDisconnected() {
         let cases: [(ConnectionIslandPhase, BighelpConnectionPhase, String)] = [
-            (.connecting, .connecting, "Connecting…"),
-            (.reconnecting, .reconnecting, "Reconnecting…"),
             (.connected, .connected, "Connected!"),
             (.disconnected, .disconnected, "Not connected"),
             (.noInternet, .disconnected, "No internet"),
@@ -84,6 +82,8 @@ struct HostConnectionStatusTests {
 
         #expect(shown(HostConnectionStatus(dashboardIsConnected: true))! == (.connected, "Connected"))
         #expect(shown(HostConnectionStatus(dashboardIsConnected: false))! == (.reconnecting, "Reconnecting"))
+        #expect(shown(HostConnectionStatus(dashboardIsConnected: false, hasFailed: true))!
+                == (.disconnected, "Not connected"))
     }
 
     @Test func aPluginUpdateIsReconnectingOnlyWhileHermesComesBack() async {
@@ -104,7 +104,7 @@ struct HostConnectionStatusTests {
     /// measures it), and no version or reason where none was given.
     @Test func missingValuesGiveNoDetail() {
         let statuses: [HostConnectionStatus?] = [
-            HostConnectionStatus(island: .reconnecting), HostConnectionStatus(island: .connected),
+            HostConnectionStatus(island: .disconnected), HostConnectionStatus(island: .connected),
             HostConnectionStatus(chat: .reconnecting), HostConnectionStatus(chat: .disconnected),
             HostConnectionStatus(isConnected: true, isConnecting: false),
             HostConnectionStatus(isConnected: false, isConnecting: true),
@@ -115,6 +115,7 @@ struct HostConnectionStatusTests {
             HostConnectionStatus(fleet: .ready, hostName: "Studio Mac"),
             HostConnectionStatus(fleetSwitchTo: "Studio Mac", isConnecting: false, hasTried: true),
             HostConnectionStatus(dashboardIsConnected: false),
+            HostConnectionStatus(dashboardIsConnected: false, hasFailed: true),
         ]
         for status in statuses {
             #expect(status != nil)

@@ -88,8 +88,7 @@ extension RootShellView {
             KanbanScreen(model: model, isNerdMode: settings.nerdModeEnabled, initialTaskID: kanbanTaskToOpen)
         } else if currentWorkspaceOwner == nil, workspaceConnections != nil {
             // Back in the app, the connection opens again in a moment.
-            ProgressView("Connecting to your computer…")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            HostPageWaitingView(hostName: workspaceHostName, hasFailed: connectionKeeper.state == .disconnected)
                 .accessibilityIdentifier("kanban.connecting")
         } else {
             ContentUnavailableView("Kanban isn't available", systemImage: "rectangle.split.3x1",

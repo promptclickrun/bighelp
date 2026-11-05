@@ -1,15 +1,15 @@
 import SwiftUI
 import UIKit
 
-/// What the connection pill shows.
+/// What the connection pill shows: only a connection that failed, and its return.
 enum ConnectionIslandPhase: Equatable, Sendable {
-    case hidden, connecting, reconnecting, connected, disconnected, noInternet
+    case hidden, connected, disconnected, noInternet
 
-    var isWaiting: Bool { self != .hidden && self != .connected }
+    var isProblem: Bool { self == .disconnected || self == .noInternet }
 }
 
 enum ConnectionIslandRules {
-    /// A connection quicker than this shows nothing.
+    /// A failure that's over quicker than this shows nothing.
     static let showDelay: Duration = .milliseconds(700)
     /// How long "Connected!" stays before the pill goes away.
     static let connectedHold: Duration = .seconds(1.6)
@@ -20,22 +20,22 @@ enum ConnectionIslandRules {
         phase == .connected ? connectedHold : nil
     }
 
-    /// What to show next, and how long to wait first (nil: now). `isRecovering`:
-    /// the pill has shown the connection was down.
+    /// What to show next, and how long to wait first (nil: now). The app connects
+    /// and reconnects behind what's on screen, so that shows nothing; only the
+    /// keeper giving up on its quiet tries does. `isRecovering`: the pill has
+    /// shown the connection was down.
     static func next(from phase: ConnectionIslandPhase, state: WorkspaceConnectionState,
-                     hasConnected: Bool, hasNetwork: Bool, isActive: Bool,
+                     hasNetwork: Bool, isActive: Bool,
                      isRecovering: Bool) -> (phase: ConnectionIslandPhase, after: Duration?) {
         guard isActive else { return (.hidden, nil) }
         switch state {
         case .connected:
-            return (phase.isWaiting || isRecovering || phase == .connected ? .connected : .hidden, nil)
-        case .reconnecting, .disconnected:
-            guard !isRecovering || phase.isWaiting else { return (phase, nil) }
-            let target: ConnectionIslandPhase = switch state {
-            case .reconnecting: hasConnected ? .reconnecting : .connecting
-            default: hasNetwork ? .disconnected : .noInternet
-            }
-            return (target, phase.isWaiting ? nil : showDelay)
+            return (phase.isProblem || isRecovering || phase == .connected ? .connected : .hidden, nil)
+        case .reconnecting:
+            // Another try: a failure already shown stays until the connection is back.
+            return (phase, nil)
+        case .disconnected:
+            return (hasNetwork ? .disconnected : .noInternet, phase.isProblem ? nil : showDelay)
         }
     }
 }
@@ -55,15 +55,12 @@ final class ConnectionIslandModel {
     @ObservationIgnored private var hiding: Task<Void, Never>?
     @ObservationIgnored private var isHeldForTesting = false
 
-    /// `hasConnected`: the keeper's word on whether this computer answered yet,
-    /// so the island and the chat agree on "Connecting" or "Reconnecting".
-    func update(state: WorkspaceConnectionState, hasConnected: Bool, hasNetwork: Bool, isActive: Bool) {
+    func update(state: WorkspaceConnectionState, hasNetwork: Bool, isActive: Bool) {
         guard !isHeldForTesting else { return }
         if !isActive { isRecovering = false }
-        let next = ConnectionIslandRules.next(from: phase, state: state, hasConnected: hasConnected,
-                                              hasNetwork: hasNetwork, isActive: isActive,
-                                              isRecovering: isRecovering)
-        // A delayed "Reconnecting…" for a blip that's already over.
+        let next = ConnectionIslandRules.next(from: phase, state: state, hasNetwork: hasNetwork,
+                                              isActive: isActive, isRecovering: isRecovering)
+        // A delayed "Not connected" for a failure that's already over.
         showing?.cancel()
         showing = nil
         guard next.phase != phase else { return }
@@ -99,8 +96,6 @@ final class ConnectionIslandModel {
 extension ConnectionIslandPhase {
     var spokenStatus: String {
         switch self {
-        case .connecting: "Connecting to your computer"
-        case .reconnecting: "Reconnecting to your computer"
         case .connected, .hidden: "Connected"
         case .disconnected: "Not connected to your computer"
         case .noInternet: "No internet connection"
@@ -156,13 +151,12 @@ extension ConnectionIslandModel {
     static let shared = ConnectionIslandModel()
 
     #if DEBUG && (targetEnvironment(simulator) || targetEnvironment(macCatalyst))
-    /// "-test-connection-island reconnecting": holds one status on screen for screenshots.
+    /// "-test-connection-island disconnected": holds one status on screen for screenshots.
     func showForTesting(_ arguments: [String]) {
         guard let index = arguments.firstIndex(of: "-test-connection-island"),
               arguments.indices.contains(index + 1) else { return }
         let phases: [String: ConnectionIslandPhase] = [
-            "connecting": .connecting, "reconnecting": .reconnecting, "connected": .connected,
-            "disconnected": .disconnected, "no-internet": .noInternet,
+            "connected": .connected, "disconnected": .disconnected, "no-internet": .noInternet,
         ]
         guard let phase = phases[arguments[index + 1]] else { return }
         isHeldForTesting = true
@@ -198,8 +192,8 @@ final class ConnectionIslandFollower {
     private func evaluate() {
         tracking &+= 1
         let current = tracking
-        let (state, connected, network) = withObservationTracking {
-            (keeper?.state ?? .connected, keeper?.hasConnected ?? false, keeper?.hasNetwork ?? true)
+        let (state, network) = withObservationTracking {
+            (keeper?.state ?? .connected, keeper?.hasNetwork ?? true)
         } onChange: {
             // Only the latest registration re-arms, so observations never pile up.
             Task { @MainActor in
@@ -207,8 +201,7 @@ final class ConnectionIslandFollower {
                 ConnectionIslandFollower.shared.evaluate()
             }
         }
-        model.update(state: state, hasConnected: connected, hasNetwork: network,
-                     isActive: UIApplication.shared.applicationState == .active)
+        model.update(state: state, hasNetwork: network, isActive: UIApplication.shared.applicationState == .active)
     }
 }
 

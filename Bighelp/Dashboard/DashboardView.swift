@@ -329,14 +329,22 @@ struct DashboardView: View {
         }
     }
 
+    /// The connection shows only when it failed: the app connects and reconnects behind the dashboard.
+    private var connectionProblem: HostConnectionStatus? {
+        connection.phase == .disconnected ? connection : nil
+    }
+
+    @ViewBuilder
     private var v3ConnectionLabel: some View {
-        Label {
-            Text(connection.label)
-        } icon: {
-            BighelpConnectionIndicator(phase: connection.phase)
+        if let problem = connectionProblem {
+            Label {
+                Text(problem.label)
+            } icon: {
+                BighelpConnectionIndicator(phase: problem.phase)
+            }
+                .foregroundStyle(theme.warning)
+                .accessibilityIdentifier("dashboard.connection-status")
         }
-            .foregroundStyle(connection.phase == .connected ? theme.secondaryText : theme.warning)
-            .accessibilityIdentifier("dashboard.connection-status")
     }
 
     private var legacyHeader: some View {
@@ -675,7 +683,7 @@ struct DashboardView: View {
                                     .foregroundStyle(theme.primaryText)
                                     .lineLimit(1)
                                     .truncationMode(.tail)
-                                Text(connection.phase == .connected ? item.subtitle : connection.label)
+                                Text(connectionProblem?.label ?? item.subtitle)
                                     .bighelpFont(.body)
                                     .foregroundStyle(theme.secondaryText)
                                     .lineLimit(1)
@@ -687,7 +695,7 @@ struct DashboardView: View {
                         .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("\(item.title). \(connection.phase == .connected ? item.subtitle : connection.label)")
+                    .accessibilityLabel("\(item.title). \(connectionProblem?.label ?? item.subtitle)")
                     .accessibilityHint("Opens this conversation")
                     .accessibilityIdentifier("dashboard.work.row.\(item.id)")
                     if index < items.count - 1 {

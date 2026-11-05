@@ -740,9 +740,6 @@ final class NativeWorkspaceRuntime {
                 requireCurrent: { try self.require(owner, request: request) }
             ) { id in
                 guard self.sessions.session(id: id) != nil else { return }
-                let refreshing = self.features.preparedChatModel(id: id)
-                refreshing?.beginHostRefresh()
-                defer { refreshing?.endHostRefresh() }
                 let source = try self.sessions.restoreSessionContent(id: id)
                 let recovered = try await self.sessions.refreshHeldHistory(id: id)
                 try self.require(owner, request: request)

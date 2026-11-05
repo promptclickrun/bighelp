@@ -17,6 +17,7 @@ final class NativeWorkspaceSelectionStore {
     struct SynchronizationKey: Hashable {
         let hostID: UUID?
         let owner: WorkspaceOwner?
+        let savedAuthority: WorkspaceAuthority?
     }
 
     private(set) var errorMessage: String?
@@ -42,7 +43,8 @@ final class NativeWorkspaceSelectionStore {
     }
 
     var synchronizationKey: SynchronizationKey {
-        SynchronizationKey(hostID: connections.hosts.selectedHostID, owner: connections.owner)
+        SynchronizationKey(hostID: connections.hosts.selectedHostID, owner: connections.owner,
+                           savedAuthority: connections.savedAuthority)
     }
 
     init(connections: WorkspaceConnectionStore, settings: SettingsStore,
@@ -103,6 +105,7 @@ final class NativeWorkspaceSelectionStore {
         guard let owner = connections.owner else {
             if synchronizedOwner != nil { runtime?.suspend() }
             synchronizedOwner = nil
+            openSavedWorkspace()
             return
         }
         if let synchronizedOwner, synchronizedOwner != owner {
@@ -110,25 +113,7 @@ final class NativeWorkspaceSelectionStore {
         }
         synchronizedOwner = owner
         if runtime?.authority != owner.authority {
-            runtime?.retire()
-            runtime = nil
-            do {
-                runtime = try NativeWorkspaceRuntime(
-                    connections: connections, authority: owner.authority,
-                    settings: settings, userIdentity: userIdentity, directory: directory, peerHosts: peerHosts,
-                    protectedData: protectedData
-                )
-                errorMessage = nil
-            } catch BighelpLocalPersistenceError.protectedDataUnavailable {
-                // Woken while the phone is locked (Background App Refresh, a Shortcut, the Watch): the
-                // saved files open once it's unlocked. Unlocking, coming back and Reconnect try again
-                // (`reopenIfClosed`).
-                errorMessage = nil
-                return
-            } catch {
-                errorMessage = "Saved native workspace data could not be opened. It has not been replaced or adopted by another account."
-                return
-            }
+            guard open(owner.authority) else { return }
         }
         if let workspace = connections.hosts.selectedWorkspace, retirementWorkspace !== workspace {
             retirementWorkspace?.onBeforeConnectionRetired = nil
@@ -139,6 +124,41 @@ final class NativeWorkspaceSelectionStore {
         }
         await runtime?.refresh()
         guard synchronizationKey == requestedKey else { return }
+    }
+
+    /// Before the computer answers, the selected host's workspace opens from what the phone saved for its
+    /// sign-in, so the home shows at once and the connection comes up behind it; the owner then refreshes
+    /// it. `synchronize()` calls it whenever the connection is down.
+    func openSavedWorkspace() {
+        guard runtime == nil, connections.owner == nil, let selectedID = connections.hosts.selectedHostID,
+              let authority = connections.savedAuthority else { return }
+        hostID = selectedID
+        open(authority)
+    }
+
+    /// Replaces the runtime with the saved workspace of `authority`; false when its files didn't open.
+    @discardableResult
+    private func open(_ authority: WorkspaceAuthority) -> Bool {
+        runtime?.retire()
+        runtime = nil
+        do {
+            runtime = try NativeWorkspaceRuntime(
+                connections: connections, authority: authority,
+                settings: settings, userIdentity: userIdentity, directory: directory, peerHosts: peerHosts,
+                protectedData: protectedData
+            )
+            errorMessage = nil
+            return true
+        } catch BighelpLocalPersistenceError.protectedDataUnavailable {
+            // Woken while the phone is locked (Background App Refresh, a Shortcut, the Watch): the
+            // saved files open once it's unlocked. Unlocking, coming back and Reconnect try again
+            // (`reopenIfClosed`).
+            errorMessage = nil
+            return false
+        } catch {
+            errorMessage = "Saved native workspace data could not be opened. It has not been replaced or adopted by another account."
+            return false
+        }
     }
 
     func receive(host: BighelpConfiguredHost, event: DirectHermesEvent) {

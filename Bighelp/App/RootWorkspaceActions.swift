@@ -22,7 +22,8 @@ extension RootShellView {
                     }
             }
         case .reconnecting:
-            WorkspaceReconnectingView(destination: destination, hostName: workspaceHostName)
+            WorkspaceReconnectingView(destination: destination, hostName: workspaceHostName,
+                                      hasFailed: connectionKeeper.state == .disconnected)
         case .unavailable:
             WorkspaceUnavailableView(destination: destination, hostName: workspaceHostName,
                 reason: "Open this feature again after connecting to the selected host and profile.")
@@ -46,7 +47,8 @@ extension RootShellView {
                     onOpenAgentDefaults: { openWorkspaceDestination(.profiles) })
             }
         case .reconnecting:
-            WorkspaceReconnectingView(destination: destination, hostName: workspaceHostName)
+            WorkspaceReconnectingView(destination: destination, hostName: workspaceHostName,
+                                      hasFailed: connectionKeeper.state == .disconnected)
         case .unavailable:
             WorkspaceUnavailableView(destination: destination, hostName: workspaceHostName,
                 reason: "Reopen this feature after connecting to the selected host and profile.")

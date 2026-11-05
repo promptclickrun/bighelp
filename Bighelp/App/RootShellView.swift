@@ -403,7 +403,7 @@ struct RootShellView: View {
                       (needsInitialHostSetup || (registry.onboardingHostID != nil && !registry.isSetupPresented)) {
                 HostSetupView(registry: registry, allowsDismiss: false)
             } else if nativeWorkspaceStore != nil {
-                if nativeRuntime != nil { workspace }
+                if nativeRuntime != nil, !signInEndedBeforeOpening { workspace }
                 // Multi-gateway: the bots stay on screen while the tapped one's gateway connects.
                 else if simpleBotsMultiGatewayOn, let pending = fleet?.pendingOpen { simpleBotsSwitching(to: pending.hostID) }
                 else if fleetModeOn, let fleet {
@@ -413,7 +413,9 @@ struct RootShellView: View {
                             || nativeWorkspaceStore?.isConnected == true,
                         retry: { Task { await nativeWorkspaceStore?.reconnect() } })
                 }
-                else { nativeWorkspace }
+                else if nativeWorkspaceHasProblem { nativeWorkspace }
+                // A moment, as the app starts: the saved workspace opens once iOS lets its files be read.
+                else { theme.canvas.ignoresSafeArea().accessibilityIdentifier("native-workspace.opening") }
             } else if let registry = hostRegistry, registry.connectionMode == .independent, !usesWorkspaceFixtures {
                 BighelpHostsPage(registry: registry)
             } else if usesWorkspaceFixtures {
@@ -507,6 +509,19 @@ struct RootShellView: View {
                 }
             }
         )
+    }
+
+    /// Something to say before the workspace opens: its saved files didn't open, the sign-in ended or the
+    /// connection failed. Otherwise nothing waits on screen for the computer.
+    private var nativeWorkspaceHasProblem: Bool {
+        nativeWorkspaceError != nil || nativeRuntime?.errorMessage != nil
+            || nativeWorkspaceStore?.requiresAuthentication == true || connectionKeeper.state == .disconnected
+    }
+
+    /// The saved workspace shows before its computer answers (`NativeWorkspaceSelectionStore`). A sign-in
+    /// that ended before it connected once this run keeps the opening screen, which has Sign in again.
+    private var signInEndedBeforeOpening: Bool {
+        nativeWorkspaceStore?.requiresAuthentication == true && nativeRuntime?.isReady == false
     }
 
     /// Opening the workspace counts as connecting until it's open, and so do
@@ -1311,7 +1326,8 @@ struct RootShellView: View {
         DashboardView(
             model: featureStore.dashboardModel,
             connection: HostConnectionStatus(dashboardIsConnected: nativeRuntime != nil
-                ? currentWorkspaceOwner != nil : dashboardFixtureIsConnected),
+                ? currentWorkspaceOwner != nil : dashboardFixtureIsConnected,
+                hasFailed: connectionKeeper.state == .disconnected),
             companionPet: homeCompanionPet,
             onInboxItemTap: openDashboardInboxItem,
             onAttentionItemTap: openDashboardAttentionItem,

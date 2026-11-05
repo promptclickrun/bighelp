@@ -29,6 +29,14 @@ final class WorkspaceConnectionStore {
         return try? store.verifiedConnection(for: selected, generation: hosts.generation).owner
     }
 
+    /// The selected host's saved sign-in, known before its connection is up, so its saved workspace can
+    /// open before the computer answers. Nil for a sign-in the host doesn't own.
+    var savedAuthority: WorkspaceAuthority? {
+        guard let selected = hosts.selectedHost, let store = hosts.selectedWorkspace, store.hasSavedConnection,
+              let saved = store.savedConnection, selected.owns(saved) else { return nil }
+        return saved.workspaceAuthority
+    }
+
     var workspace: DirectHermesWorkspaceClient? {
         guard let owner, let client = hosts.selectedWorkspace?.nativeClient else { return nil }
         if cachedOwner == owner { return cachedWorkspace }

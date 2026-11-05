@@ -111,11 +111,17 @@ enum SimpleBotQuickPicks {
         return Array(([current] + firsts).prefix(bodyCount))
     }
 
-    /// The body's own color, then seven from the palette (one more is there for a body whose own
-    /// color is one of them).
+    /// The body's own color, then seven from the palette, leaving out one that looks the same as it
+    /// (the palette has one more for that).
     static func colors(for body: BotBody) -> [Swatch] {
         let own = Swatch(key: "own", hex: body.colors.main, name: "Its own color")
-        return [own] + palette.filter { $0.hex != own.hex }.prefix(7)
+        return [own] + palette.filter { !looksAlike($0.hex, own.hex) }.prefix(7)
+    }
+
+    /// Two colors that read as one side by side (Bop's own orange and the palette's).
+    private static func looksAlike(_ first: String, _ second: String) -> Bool {
+        guard let a = HermesCSSColor.rgb(first), let b = HermesCSSColor.rgb(second) else { return first == second }
+        return pow(a.red - b.red, 2) + pow(a.green - b.green, 2) + pow(a.blue - b.blue, 2) < 0.01
     }
 }
 

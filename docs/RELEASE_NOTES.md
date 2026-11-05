@@ -3,6 +3,24 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.61
+
+### New
+
+- **Core Files for each bot:** open a bot's profile and tap Core Files. You can read and change SOUL.md, USER.md and MEMORY.md. You can also change the AGENTS.md of the bot's project, if the project has one. The bot reads these files when a chat starts. This needs bighelp plugin 3.44.0 on your computer.
+- **Connections for each bot:** a bot's profile has Connections. It shows the bot's apps and Device access.
+
+### Changed
+
+- **One Marketplace on a bot's profile:** the Skills Hub, Plugins and MCP servers are in the bot's Marketplace. They are not separate rows on the profile.
+- **bighelp opens directly in your home:** when you open bighelp, your home shows with the data that your phone saved. bighelp connects to your computer in the background. The "Reconnecting to your selected host" screen does not show.
+- **Connection messages only for problems:** bighelp does not show "Connecting…", "Reconnecting…" or "Updating…" while it connects. It shows "Not connected" or "No internet" only when the connection fails.
+
+### Fixed
+
+- **Plugins and the Skills Hub open fast:** these pages show the last list immediately and update it in the background. Before, the first load could take 20 seconds or more.
+- **Recent runs of scheduled tasks:** Recent runs shows the runs again. Before, it showed "Hermes returned an unsupported or invalid response." Last run shows the time of the newest run.
+
 ## 2.6.60
 
 ### New

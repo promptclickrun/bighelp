@@ -43,6 +43,28 @@ struct CoreFilesTests {
         }
     }
 
+    /// AGENTS.md is the one Hermes loads for the chat (its folder), so each request names the chat when the
+    /// app has one; older plugins refuse the field, so there's none without one.
+    @Test func requestsNameTheChatWhoseAgentsMdToShow() async throws {
+        let host = try CoreFilesHost()
+        _ = try await DirectHermesCoreFilesClient(agentID: "lantern", sessionID: "local-7f3a") { [weak host] in host }.list()
+        #expect(host.payloads.last?["sessionId"] == .string("local-7f3a"))
+        _ = try await host.client().list()
+        #expect(host.payloads.last?["sessionId"] == nil)
+    }
+
+    /// A bot's Active Project page reads and chooses in a store of its own: the shell's Projects keep theirs.
+    @Test func aBotsActiveProjectNeverMovesTheShellsProjects() async {
+        let shell = HermesWorkspaceStore(client: FixtureHermesWorkspaceClient())
+        await shell.load(agentID: "atlas")
+        let bot = shell.separateStore()
+        await bot.load(agentID: "lantern")
+        #expect(await bot.select(id: "home", agentID: "lantern"))
+        #expect(bot.catalog?.activeWorkspaceID == "home")
+        #expect(shell.catalogAgentID == "atlas")
+        #expect(shell.catalog?.activeWorkspaceID == "loopdy")
+    }
+
     @Test func theMarketplaceHoldsTheSkillsHubMCPServersAndPluginsNotAdvancedOptions() {
         let pages = AdvancedOptionsCatalog.groups.flatMap(\.rows).compactMap { row -> AdvancedPage? in
             if case .page(let page) = row { return page }

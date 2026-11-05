@@ -54,6 +54,12 @@ final class HermesWorkspaceStore {
         self.client = client
     }
 
+    /// A store of its own on the same computer, for a page about one agent (a bot's Active Project), so its
+    /// reads and choices never move the catalog this store shows.
+    func separateStore() -> HermesWorkspaceStore {
+        HermesWorkspaceStore(client: client)
+    }
+
     func load(agentID: String, sessionID: String? = nil) async {
         guard !(isLoading && loadingAgentID == agentID && loadingSessionID == sessionID) else {
             return

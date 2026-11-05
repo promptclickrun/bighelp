@@ -392,8 +392,9 @@ computer can't open them fall back to Last chat (`BighelpLanding`).
 **Marketplace** (Settings › Agents, and a row on each bot's profile for that bot) is for everyone: this week's
 featured plugin (the pick Hermes' marketplace and Desktop show), four ways in (Apps, Skills, Plugins, Talk anywhere
 for messaging apps) and the plugins with the most stars; a bot's adds MCP servers. A bot's profile also lists
-Connections and **Core Files** (SOUL.md, USER.md, MEMORY.md and its project's AGENTS.md, each opening in the
-Markdown viewer to read or edit). Host administration — files, MCP, memory, logs,
+Connections, **Core Files** (SOUL.md, USER.md, MEMORY.md and the AGENTS.md Hermes loads for its chat, each opening
+in the Markdown viewer to read or edit) and **Active Project** (the project its new chats start in, a checked list;
+also in Bots mode, where ☰ › Projects isn't). Host administration — files, MCP, memory, logs,
 activity — is hidden until **Nerd Mode** is on, which adds a Hermes section at the bottom: **System** (Update Hermes with how many commits behind,
 Restart Hermes Gateway, the plugin's Update button, then everything else folded away) and **Hermes tools** (the
 searchable list of the host's tools). There's no separate Hermes Tools entry in ☰. Pages lead with the action

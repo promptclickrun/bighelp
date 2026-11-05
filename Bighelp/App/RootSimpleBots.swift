@@ -310,6 +310,8 @@ extension RootShellView {
             makeAdvancedOptions: { makeAdvancedOptions(for: $0) },
             makeMarketplace: { makeMarketplace(for: $0) },
             makeCoreFiles: { makeCoreFiles(for: $0) },
+            makeProjects: { makeBotProjects(for: $0) },
+            onProjectChanged: { botProjectChanged($0) },
             makeConnections: { makeBotConnections(for: $0) },
             makeFilesSource: { makeSimpleBotFilesSource() },
             makeMediaClient: { makeSimpleBotMediaClient() },

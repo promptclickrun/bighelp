@@ -43,8 +43,34 @@ extension RootShellView {
         #if DEBUG
         if usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true { return DemoCoreFiles() }
         #endif
-        guard workspaceConnections?.workspace != nil else { return nil }
-        return DirectHermesCoreFilesClient(agentID: agentID) { [weak workspaceConnections] in workspaceConnections?.workspace }
+        guard let workspace = workspaceConnections?.workspace else { return nil }
+        let chatID = workspace.nativeContext?.features.contains(DirectHermesCoreFilesClient.chatFeature) == true
+            ? coreFilesChatID(for: agentID) : nil
+        return DirectHermesCoreFilesClient(agentID: agentID, sessionID: chatID) { [weak workspaceConnections] in
+            workspaceConnections?.workspace
+        }
+    }
+
+    /// The chat whose folder decides a bot's AGENTS.md, as Hermes decides it: the chat open now when it's this
+    /// bot's, else the bot's Bot Chat.
+    private func coreFilesChatID(for agentID: String) -> String? {
+        let records = sessionCatalog.records
+        let open = appState.activeConversationID.flatMap { id in records.first { $0.id == id } }
+            .flatMap { $0.kind == .direct && $0.agentIDs == [agentID] ? $0 : nil }
+        return (open ?? records.first { $0.isBotChat && $0.agentIDs == [agentID] })?.remoteStoredID
+    }
+
+    /// A bot's projects and the one its new chats start in (its profile › Active Project), in a store of its
+    /// own so the shell's Projects keep theirs. Nil without a computer.
+    func makeBotProjects(for agentID: String) -> HermesWorkspaceStore? {
+        guard usesWorkspaceFixtures || workspaceConnections?.workspace != nil else { return nil }
+        return hermesWorkspaces.separateStore()
+    }
+
+    /// After a bot's Active Project changes, the shell's Projects read again when they show that bot.
+    func botProjectChanged(_ agentID: String) {
+        guard hermesWorkspaces.catalogAgentID == agentID else { return }
+        Task { await hermesWorkspaces.load(agentID: agentID) }
     }
 
     /// A bot's Connections: this device's access and the apps the bot can use, as Settings › Connections

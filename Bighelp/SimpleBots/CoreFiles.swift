@@ -32,7 +32,7 @@ struct CoreFile: Identifiable, Equatable, Sendable {
 
     let kind: Kind
     let exists: Bool
-    /// The active project AGENTS.md belongs to.
+    /// The project (else the folder) of the chat whose AGENTS.md this is.
     var project: String?
     var id: String { kind.rawValue }
 
@@ -55,17 +55,23 @@ protocol CoreFilesSource: HostTextFileAccess {
 
 /// The plugin's `core-files/*` routes (`native-core-files-v1`) for one bot. A save sends the hash of the
 /// text last read, so the computer refuses it when the file changed since (`409 file_changed`).
+/// `sessionID`: the stored ID of the chat whose AGENTS.md to show, the one Hermes loads from that chat's
+/// folder (`native-core-files-chat-v1`); without it the computer shows its active project's.
 @MainActor
 final class DirectHermesCoreFilesClient: CoreFilesSource {
     static let feature = "native-core-files-v1"
+    static let chatFeature = "native-core-files-chat-v1"
 
     private let agentID: String
+    private let sessionID: String?
     private let currentWorkspace: @MainActor () -> (any WorkspaceOperationPerforming)?
     /// The hash of each file as last read; nil for a file that wasn't there.
     private var readHashes: [CoreFile.Kind: String?] = [:]
 
-    init(agentID: String, currentWorkspace: @escaping @MainActor () -> (any WorkspaceOperationPerforming)?) {
+    init(agentID: String, sessionID: String? = nil,
+         currentWorkspace: @escaping @MainActor () -> (any WorkspaceOperationPerforming)?) {
         self.agentID = agentID
+        self.sessionID = sessionID
         self.currentWorkspace = currentWorkspace
     }
 
@@ -100,6 +106,7 @@ final class DirectHermesCoreFilesClient: CoreFilesSource {
         }
         var payload = payload
         payload["profile"] = .string(agentID)
+        if let sessionID { payload["sessionId"] = .string(sessionID) }
         do {
             return try await workspace.perform(operation, payload: payload, owner: owner)
         } catch WorkspaceClientError.conflict where operation != .coreFilesWrite {
@@ -154,7 +161,7 @@ struct CoreFilesPresentation: Identifiable {
     let botName: String
 }
 
-/// A bot's Core Files (its profile › Core Files): SOUL.md, USER.md, MEMORY.md and, when its active project has
+/// A bot's Core Files (its profile › Core Files): SOUL.md, USER.md, MEMORY.md and, when its chat's folder has
 /// one, AGENTS.md. A file opens in the Markdown viewer, whose Edit saves it whole and never over a file that
 /// changed on the computer.
 @MainActor

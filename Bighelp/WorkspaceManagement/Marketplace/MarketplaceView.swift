@@ -95,8 +95,14 @@ struct MarketplaceView: View {
                         NavigationLink {
                             PluginCatalogPageView(model: plugins, hostName: context.hostName, entry: entry)
                         } label: {
+                            // Settings links give a row no padding of their own: the section rows' height and
+                            // room above and below, so the name, the stars and the icons never touch.
                             HermesToolLabel(art: .artwork(entry.listedImageURL, entry.catalogCategory),
                                             name: entry.displayName, detail: Self.popularDetail(entry))
+                                .padding(.vertical, BighelpTokens.space8)
+                                .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+                                .contentShape(.rect)
+                                .bighelpSettingsLinkLabel()
                         }
                         .bighelpSettingsLink()
                         .accessibilityIdentifier("marketplace.popular.\(entry.name)")

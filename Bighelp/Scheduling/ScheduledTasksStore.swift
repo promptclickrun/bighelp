@@ -69,6 +69,11 @@ final class ScheduledTasksStore {
         runsByTask[task.identity] ?? []
     }
 
+    /// When the task last ran: what Hermes says, else its newest run in the history.
+    func lastRun(for task: ScheduledTask) -> Date? {
+        task.lastRun ?? runs(for: task).first?.startedAt
+    }
+
     func runsLoadState(for task: ScheduledTask) -> ScheduledTasksLoadState {
         runsLoadStates[task.identity] ?? .idle
     }

@@ -209,14 +209,73 @@ struct DirectHermesScheduledTasksClientTests {
         }
     }
 
+    /// Recent runs said "Hermes returned an unsupported or invalid response." for every task (#809):
+    /// Hermes names a run `local-…` since its unified runtime, and a script-only run is a
+    /// `cron_output:…` row without a profile. Answers captured from stock Hermes (`Fixtures/HermesCron`).
+    @Test(arguments: ["runs-agent", "runs-script-only"])
+    func recentRunsReadWhatHermesSends(_ vector: String) async throws {
+        let transport = try SchedulerPerformer()
+        let (jobID, response) = try Self.vector(vector)
+        let http = CronHTTP(response)
+        let runs = try await client(transport, http: http).runs(id: jobID, agentID: "default", limit: 20)
+        #expect(runs.count == 1)
+        #expect(runs.allSatisfy { $0.agentID == "default" && !$0.isActive && $0.endedAt != nil })
+        #expect(http.paths == ["/api/cron/jobs/\(jobID)/runs"])
+    }
+
+    /// One row the app can't read leaves out that row, not the whole history.
+    @Test func aRunRowThatDoesntReadIsLeftOut() async throws {
+        let transport = try SchedulerPerformer()
+        let (jobID, response) = try Self.vector("runs-agent")
+        var payload = try #require(response.object)
+        let row = try #require(payload["runs"]?.array?.first)
+        payload["runs"] = .array([row, .object(["id": .string("broken")]), .string("not a row"), row])
+        let runs = try await client(transport, http: CronHTTP(.object(payload)))
+            .runs(id: jobID, agentID: "default", limit: 20)
+        #expect(runs.map(\.id) == [row.object?["id"]?.string], "The broken row and the repeat are left out")
+    }
+
+    @Test func aJobsDetailCarriesItsLastRun() async throws {
+        let transport = try SchedulerPerformer()
+        let (_, response) = try Self.vector("job-detail")
+        let task = try await client(transport, http: CronHTTP(response)).detail(id: "9980bf2edc0e", agentID: "default")
+        #expect(task.lastResult == "ok")
+        let ran = try #require(task.lastRun)
+        #expect(abs(ran.timeIntervalSince(try #require(ISO8601DateFormatter().date(from: "2026-11-05T02:30:35Z")))) < 1)
+    }
+
+    /// "Last run: No runs yet" sat over a task whose last status was "ok" (#809). Without a time from
+    /// Hermes, the newest run in the task's history gives it.
+    @Test func lastRunFallsBackToTheNewestRun() async throws {
+        let transport = try SchedulerPerformer()
+        let (jobID, response) = try Self.vector("runs-agent")
+        transport.responses[.profilesList] = [.success(["profiles": .array([.object(["name": .string("default")])])])]
+        transport.responses[.scheduledTasksList] = [.success(["jobs": .array([.object(job(id: jobID, profile: "default"))])])]
+        let store = ScheduledTasksStore(client: client(transport, http: CronHTTP(response)), initialAgentID: nil)
+        await store.load()
+        let task = try #require(store.task(id: jobID, agentID: "default"))
+        #expect(store.lastRun(for: task) == nil)
+        await store.loadRuns(id: jobID, agentID: "default")
+        let newest = try #require(store.runs(for: task).first)
+        #expect(store.lastRun(for: task) == newest.startedAt)
+    }
+
+    private static func vector(_ name: String) throws -> (jobID: String, response: BighelpJSONValue) {
+        let url = URL(filePath: #filePath).deletingLastPathComponent().appending(path: "Fixtures/HermesCron/\(name).json")
+        let vector = try JSONDecoder().decode([String: BighelpJSONValue].self, from: Data(contentsOf: url))
+        return (vector["jobID"]?.string ?? "", try #require(vector["response"]))
+    }
+
     private var schedule: ScheduleInput { .daily(time: .init(hour: 8, minute: 0), timeZoneID: "UTC") }
 
     private func draft() -> ScheduledTaskDraft {
         .init(agentID: "research", name: "Morning brief", instructions: "Summarize the day.", schedule: schedule, deliveryTarget: "local")
     }
 
-    private func client(_ transport: SchedulerPerformer, servingProfile: String? = "research") -> DirectHermesScheduledTasksClient {
-        .init(workspace: transport, owner: transport.owner!, currentOwner: { transport.owner }, servingProfileID: servingProfile)
+    private func client(_ transport: SchedulerPerformer, servingProfile: String? = "research",
+                        http: CronHTTP? = nil) -> DirectHermesScheduledTasksClient {
+        .init(workspace: transport, owner: transport.owner!, currentOwner: { transport.owner }, servingProfileID: servingProfile,
+              http: http)
     }
 
     private func targets() -> [String: BighelpJSONValue] {
@@ -242,7 +301,8 @@ private final class SchedulerPerformer: WorkspaceOperationPerforming {
     var allowMutations = true
     var replaceOwnerAfterResponse = false
     var capabilities: WorkspaceCapabilities {
-        .init(owner: owner, values: allowMutations ? [.schedulesEdit: .available, .schedulesRun: .available] : [:])
+        .init(owner: owner, values: allowMutations
+              ? [.schedulesRead: .available, .schedulesEdit: .available, .schedulesRun: .available] : [:])
     }
     var calls: [Call] = []
     var responses: [WorkspaceOperation: [Result<[String: BighelpJSONValue], WorkspaceClientError>]] = [:]
@@ -259,5 +319,19 @@ private final class SchedulerPerformer: WorkspaceOperationPerforming {
             self.owner = .init(authority: owner.authority, authenticationGeneration: UUID(), connectionGeneration: UUID())
         }
         return try response.get()
+    }
+}
+
+/// Answers Hermes' cron REST routes with one saved response.
+@MainActor
+private final class CronHTTP: DirectHermesAuthenticatedHTTP {
+    private let response: BighelpJSONValue
+    private(set) var paths: [String] = []
+
+    init(_ response: BighelpJSONValue) { self.response = response }
+
+    func request(_ request: DirectHermesHTTPRequest) async throws -> BighelpJSONValue {
+        paths.append(request.path)
+        return response
     }
 }

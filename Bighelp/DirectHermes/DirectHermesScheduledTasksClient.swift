@@ -52,10 +52,11 @@ final class DirectHermesScheduledTasksClient: ScheduledTasksClient {
         let row = try WorkspaceManagementDecoder.object(response)
         var task = try DirectHermesScheduledTaskCodec.task(response, profile: profile)
         guard task.id.utf8.elementsEqual(id.utf8) else { throw WorkspaceClientError.invalidResponse }
-        task.lastRun = try DirectHermesScheduledTaskCodec.date(row["last_run_at"])
-        task.lastError = try WorkspaceManagementDecoder.optionalText(row["last_error"], maximum: 8_192)
-        task.model = try WorkspaceManagementDecoder.optionalText(row["model"], maximum: 512)
-        task.provider = try WorkspaceManagementDecoder.optionalText(row["provider"], maximum: 256)
+        // Optional extras: one this build can't read hides its own row, never the task's details.
+        task.lastRun = try? DirectHermesScheduledTaskCodec.date(row["last_run_at"])
+        task.lastError = try? WorkspaceManagementDecoder.optionalText(row["last_error"], maximum: 8_192)
+        task.model = try? WorkspaceManagementDecoder.optionalText(row["model"], maximum: 512)
+        task.provider = try? WorkspaceManagementDecoder.optionalText(row["provider"], maximum: 256)
         return task
     }
 
@@ -73,7 +74,7 @@ final class DirectHermesScheduledTasksClient: ScheduledTasksClient {
             ],
             maximumResponseBytes: 1_048_576
         ))
-        return try Self.runs(response, jobID: id, profile: profile, requestedLimit: limit)
+        return try Self.runs(response, profile: profile, requestedLimit: limit)
     }
 
     func blueprints() async throws -> [ScheduledTaskBlueprint] {
@@ -237,46 +238,36 @@ final class DirectHermesScheduledTasksClient: ScheduledTasksClient {
         }
     }
 
+    /// Hermes' run history, newest first: a chat for each agent run (`cron_<job>_<time>` before its
+    /// unified runtime, `local-…` since) and a `cron_output:…` row for each script-only fire, which
+    /// names no profile. A row that doesn't read is left out, never the whole history (#809).
     private static func runs(
         _ value: BighelpJSONValue,
-        jobID: String,
         profile: String,
         requestedLimit: Int
     ) throws -> [ScheduledTaskRun] {
         typealias D = WorkspaceManagementDecoder
-        let payload = try D.object(value)
-        guard payload["limit"]?.integer == requestedLimit else { throw WorkspaceClientError.invalidResponse }
-        let rows = try D.rows(payload["runs"], maximum: requestedLimit)
+        let rows = try D.rows(D.object(value)["runs"], maximum: 100)
         var ids = Set<String>()
-        return try rows.map { value in
-            let row = try D.object(value)
-            let id = try D.text(row["id"], maximum: 240)
-            let rowProfile = try D.text(row["profile"], maximum: 128)
-            guard rowProfile.utf8.elementsEqual(profile.utf8),
-                  row["source"]?.string == "cron",
-                  id.hasPrefix("cron_\(jobID)_"),
-                  ids.insert(id).inserted,
-                  let startedAt = try DirectHermesScheduledTaskCodec.date(row["started_at"]),
-                  let lastActiveAt = try DirectHermesScheduledTaskCodec.date(row["last_active"]),
-                  let isActive = row["is_active"]?.boolean,
-                  let archived = row["archived"]?.boolean,
-                  let messageCount = row["message_count"]?.integer, messageCount >= 0,
-                  let toolCallCount = row["tool_call_count"]?.integer, toolCallCount >= 0 else {
-                throw WorkspaceClientError.invalidResponse
-            }
+        return rows.prefix(requestedLimit).compactMap { value -> ScheduledTaskRun? in
+            guard let row = value.object, let id = try? D.text(row["id"], maximum: 240),
+                  (row["profile"]?.string).map({ $0.utf8.elementsEqual(profile.utf8) }) ?? true,
+                  let started = try? DirectHermesScheduledTaskCodec.date(row["started_at"]),
+                  ids.insert(id).inserted else { return nil }
+            let ended = try? DirectHermesScheduledTaskCodec.date(row["ended_at"])
             return ScheduledTaskRun(
                 id: id,
-                agentID: rowProfile,
-                title: try D.optionalText(row["title"], maximum: 240),
-                preview: try D.optionalText(row["preview"], maximum: 8_192),
-                startedAt: startedAt,
-                lastActiveAt: lastActiveAt,
-                endedAt: try DirectHermesScheduledTaskCodec.date(row["ended_at"]),
-                isActive: isActive,
-                isArchived: archived,
-                model: try D.optionalText(row["model"], maximum: 512),
-                messageCount: messageCount,
-                toolCallCount: toolCallCount
+                agentID: profile,
+                title: try? D.optionalText(row["title"], maximum: 240),
+                preview: try? D.optionalText(row["preview"], maximum: 8_192),
+                startedAt: started,
+                lastActiveAt: (try? DirectHermesScheduledTaskCodec.date(row["last_active"])) ?? ended ?? started,
+                endedAt: ended,
+                isActive: row["is_active"]?.boolean ?? false,
+                isArchived: row["archived"]?.boolean ?? false,
+                model: try? D.optionalText(row["model"], maximum: 512),
+                messageCount: max(0, row["message_count"]?.integer ?? 0),
+                toolCallCount: max(0, row["tool_call_count"]?.integer ?? 0)
             )
         }
     }

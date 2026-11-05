@@ -269,7 +269,7 @@ struct ScheduledTaskDetailView: View {
             detailLine("Results go to", deliveryName(task), systemImage: "paperplane")
             detailLine(
                 "Last run",
-                task.lastRun?.formatted(date: .abbreviated, time: .shortened) ?? "No runs yet",
+                store.lastRun(for: task)?.formatted(date: .abbreviated, time: .shortened) ?? "No runs yet",
                 systemImage: "clock.arrow.circlepath"
             )
             if let lastResult = task.lastResult {

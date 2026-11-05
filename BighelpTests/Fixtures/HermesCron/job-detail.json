@@ -1,0 +1,54 @@
+{
+  "_note": "Captured from stock Hermes (main, 2026-11-05) on an isolated host with a synthetic model; local paths and the system prompt removed.",
+  "response": {
+    "id": "9980bf2edc0e",
+    "name": "Morning brief",
+    "prompt": "Write a short morning brief.",
+    "skills": [],
+    "skill": null,
+    "model": null,
+    "provider": null,
+    "base_url": null,
+    "script": null,
+    "no_agent": false,
+    "monitor_script": null,
+    "monitor_url": null,
+    "monitor_state": null,
+    "context_from": null,
+    "schedule": {
+      "kind": "cron",
+      "expr": "0 3 * * *",
+      "display": "0 3 * * *"
+    },
+    "schedule_display": "0 3 * * *",
+    "repeat": {
+      "times": null,
+      "completed": 0
+    },
+    "enabled": true,
+    "state": "scheduled",
+    "paused_at": null,
+    "paused_reason": null,
+    "created_at": "2026-11-04T20:30:29.126886-06:00",
+    "next_run_at": "2026-11-05T03:00:00-06:00",
+    "last_run_at": "2026-11-04T20:30:35.171307-06:00",
+    "last_status": "ok",
+    "last_error": null,
+    "last_delivery_error": null,
+    "last_delivery_unverified": null,
+    "last_failure": null,
+    "failure_streak": 0,
+    "deliver": "local",
+    "origin": null,
+    "enabled_toolsets": null,
+    "workdir": null,
+    "fire_claim": null,
+    "canonical_completions": [
+      "2805a547576c44638a7351df9d39f721"
+    ],
+    "profile": "default",
+    "profile_name": "default",
+    "is_default_profile": true,
+    "scheduler_heartbeat_age_s": 5.656144142150879
+  }
+}

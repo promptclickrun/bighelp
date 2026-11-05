@@ -99,8 +99,8 @@ enum SimpleBotQuickPicks {
     static let palette = [
         Swatch(key: "red", hex: "#E5484D", name: "Red"), Swatch(key: "orange", hex: "#EF6F2E", name: "Orange"),
         Swatch(key: "yellow", hex: "#F2C94C", name: "Yellow"), Swatch(key: "green", hex: "#58C47A", name: "Green"),
-        Swatch(key: "blue", hex: "#3B82F6", name: "Blue"), Swatch(key: "purple", hex: "#8B5CF6", name: "Purple"),
-        Swatch(key: "pink", hex: "#E8459A", name: "Pink"),
+        Swatch(key: "teal", hex: "#14B8A6", name: "Teal"), Swatch(key: "blue", hex: "#3B82F6", name: "Blue"),
+        Swatch(key: "purple", hex: "#8B5CF6", name: "Purple"), Swatch(key: "pink", hex: "#E8459A", name: "Pink"),
     ]
 
     /// The first body of each set on offer. The bot's own body goes first when it isn't one of them
@@ -111,10 +111,11 @@ enum SimpleBotQuickPicks {
         return Array(([current] + firsts).prefix(bodyCount))
     }
 
-    /// The body's own color, then the palette.
+    /// The body's own color, then seven from the palette (one more is there for a body whose own
+    /// color is one of them).
     static func colors(for body: BotBody) -> [Swatch] {
         let own = Swatch(key: "own", hex: body.colors.main, name: "Its own color")
-        return [own] + palette.filter { $0.hex != own.hex }
+        return [own] + palette.filter { $0.hex != own.hex }.prefix(7)
     }
 }
 

@@ -213,6 +213,10 @@ struct BotLookTests {
         let colors = SimpleBotQuickPicks.colors(for: hoot)
         #expect(colors.first?.hex == hoot.colors.main, "Its own color comes first")
         #expect(colors.count == 8)
+        let peak = try #require(catalog.body(id: "shapes.peak"))
+        #expect(SimpleBotQuickPicks.colors(for: peak).map(\.hex).filter { $0 == peak.colors.main }.count == 1,
+                "A body whose own color is in the palette shows it once")
+        #expect(SimpleBotQuickPicks.colors(for: peak).count == 8)
     }
 
     /// The new bot keeps the look picked on Create New Bot: Hermes gets its picture and the Bot

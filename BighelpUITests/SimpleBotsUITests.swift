@@ -93,15 +93,13 @@ final class SimpleBotsUITests: BighelpUITestCase {
             XCTAssertTrue(app.descendants(matching: .any)["dashboard"].waitForExistence(timeout: 5), "Dashboard opens first")
             app.buttons["simple-bots.profile.tab.info"].tap()
             save("simple-profile-\(appearance)", app)
-            // Info › Character: the picker in a sheet.
+            // Info › Character: Edit avatar in a sheet.
             app.buttons["simple-bots.profile.character"].tap()
-            app.buttons["simple-bots.shape.star"].tap()
-            app.buttons["simple-bots.color.purple"].tap()
-            let status = app.staticTexts["simple-bots.profile.mark-status"]
-            XCTAssertTrue(status.waitForExistence(timeout: 5))
+            let studio = app.descendants(matching: .any)["avatar.chooser.studio"].firstMatch
+            XCTAssertTrue(studio.waitForExistence(timeout: 5))
             save("simple-character-\(appearance)", app)
-            app.buttons["simple-bots.character.done"].tap()
-            XCTAssertTrue(status.waitForNonExistence(timeout: 5), "Done closes the sheet")
+            app.buttons["avatar.chooser.cancel"].tap()
+            XCTAssertTrue(studio.waitForNonExistence(timeout: 5), "Cancel closes the sheet")
             app.swipeUp()
             save("simple-profile-lower-\(appearance)", app)
             app.terminate()

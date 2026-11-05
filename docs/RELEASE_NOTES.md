@@ -3,6 +3,17 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.63
+
+### New
+
+- **Bot Studio in Create New Bot:** when you make a bot, pick a body from Bot Studio and a color, or tap Surprise me. To change the eyes, shape or moves, tap Eyes, shape and moves. To see all bodies, tap More. The bot keeps its look on your other devices and in Hermes Desktop.
+
+### Changed
+
+- **Groups on a bot's Info page:** the rows are in groups: Personality, Defaults, What it can use and Routines. Add routine is at the top of Routines. Advanced Options is at the bottom.
+- **A clear order in the chat ⋯ menu:** New Bot Chat is at the top. Then come the items for this chat, then Model & speed and Usage, then Edit agent and Advanced. You do not have to scroll when File changes shows. If your iPhone uses a large text size, the menu shows This chat, Agent and More.
+
 ## 2.6.62
 
 ### New

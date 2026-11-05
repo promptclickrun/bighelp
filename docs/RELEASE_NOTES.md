@@ -3,6 +3,17 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.62
+
+### New
+
+- **Active Project for each bot:** open a bot's profile and tap Active Project. It shows the project where the bot starts new chats. Tap a different project to change it for that bot. Before, you could change it only in Chat mode, in Projects.
+
+### Fixed
+
+- **The correct AGENTS.md in Core Files:** Core Files shows the AGENTS.md that the bot uses for its chat. When you move a chat to a different project, Core Files shows the AGENTS.md of the new project. This needs bighelp plugin 3.44.1 on your computer.
+- **Popular plugins have room:** on the Marketplace page, the rows under Popular plugins are taller. The names, stars and icons do not touch.
+
 ## 2.6.61
 
 ### New

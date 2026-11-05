@@ -37,7 +37,7 @@ struct BotStudioView: View {
 
     @State private var look: BotLook
     @State private var history: [BotLook] = []
-    @State private var tab = Tab.body
+    @State private var tab: Tab
     /// The set the Body row shows; nil shows every set.
     @State private var setID: String?
     /// A state being tried on the stage; nil plays the move.
@@ -48,9 +48,10 @@ struct BotStudioView: View {
     @BighelpThemeReader private var theme
     private let library = BotBodyLibrary.shared
 
-    init(start: BotLook, agentName: String, saveTitle: String = "Save", onBack: (() -> Void)? = nil,
+    init(start: BotLook, agentName: String, saveTitle: String = "Save", tab: Tab = .body, onBack: (() -> Void)? = nil,
          onSave: @escaping (BotLook) -> Void) {
         _look = State(initialValue: start)
+        _tab = State(initialValue: tab)
         self.agentName = agentName
         self.saveTitle = saveTitle
         self.onBack = onBack

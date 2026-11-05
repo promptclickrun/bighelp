@@ -4377,6 +4377,23 @@
         }
       }
     },
+    "Every body, in Bot Studio": {
+      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every body, in Bot Studio"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在 Bot Studio 中查看所有造型"
+          }
+        }
+      }
+    },
     "Every channel but bighelp. Your channels show here once your computer reports them.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -4475,6 +4492,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "使用模式"
+          }
+        }
+      }
+    },
+    "Eyes, shape and moves": {
+      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eyes, shape and moves"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "眼睛、形状和动作"
           }
         }
       }
@@ -5801,6 +5835,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "使用了 Cloudflare Access 保护"
+          }
+        }
+      }
+    },
+    "Its own color": {
+      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its own color"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "原本的颜色"
           }
         }
       }
@@ -8264,6 +8315,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "正在打开…"
+          }
+        }
+      }
+    },
+    "Opens Bot Studio": {
+      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens Bot Studio"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "打开 Bot Studio"
           }
         }
       }
@@ -11949,6 +12017,23 @@
         }
       }
     },
+    "Surprise me": {
+      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Surprise me"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "随机一个"
+          }
+        }
+      }
+    },
     "Swipe from left edge": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -14328,6 +14413,23 @@
         }
       }
     },
+    "Yellow": {
+      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yellow"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "黄色"
+          }
+        }
+      }
+    },
     "Yes please ☀️": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -14703,6 +14805,23 @@
         }
       }
     },
+    "Your bot's avatar: %@": {
+      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your bot's avatar: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的机器人头像：%@"
+          }
+        }
+      }
+    },
     "Your bots learn about each other and ask each other for help.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -14937,6 +15056,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "你的消息会显示你的名字和照片。智能体也能看到你的名字，知道正在和谁交谈。"
+          }
+        }
+      }
+    },
+    "Your new bot": {
+      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your new bot"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的新机器人"
           }
         }
       }

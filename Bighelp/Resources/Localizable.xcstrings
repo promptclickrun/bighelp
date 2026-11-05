@@ -3986,6 +3986,23 @@
         }
       }
     },
+    "Defaults": {
+      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Defaults"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "默认设置"
+          }
+        }
+      }
+    },
     "Delete": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -8766,6 +8783,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Personalities"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "个性"
+          }
+        }
+      }
+    },
+    "Personality": {
+      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personality"
           }
         },
         "zh-Hans": {
@@ -14154,6 +14188,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "%@做了什么"
+          }
+        }
+      }
+    },
+    "What it can use": {
+      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What it can use"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "可以使用的功能"
           }
         }
       }

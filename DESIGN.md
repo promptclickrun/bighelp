@@ -98,7 +98,7 @@ are historical (`docs/ui-v3-design.md`).
   (iOS's own pop-up menu of accounts or calendars, or the default one until bighelp may list them), anything already
   saved that looks like it (read only), and Discard and Save in the bar. The agent's review note sits at the top as
   its quote. After a decision the same card says what happened. Each agent's Photo actions page (beside its
-  Instructions) sets the offer, how to read each kind, the question for unclear pictures and the review messages,
+  Instructions in Agent Studio, in What it can use on a bot's profile) sets the offer, how to read each kind, the question for unclear pictures and the review messages,
   with Preview and Reset to defaults ([Image drafts](docs/IMAGE_DRAFTS.md)).
 - Attachments in a draft are one small glass tag above the message box, lined up with the field
   (`DraftAttachmentRail`): the count first, then the kinds ("4 attached · 3 photos, 1 PDF"), with photos leading a
@@ -407,15 +407,18 @@ inside everyday screens: the chat Info sheet's visibility toggles and host detai
 Skills/Session rows in the + sheet, Agent Studio's Advanced page and templates, the task editor/detail Advanced groups, and the extra sections on
 Settings › Chat. Everyday controls must never live only behind it.
 
-The chat's ⋯ menu is one list, the same with Nerd Mode on or off: Model & speed; then the chat's own actions
-(Rename…, Move to Project… with the chat's project, Files, New Bot Chat in an agent's Bot Chat, Switch agent in
-the home chat, Edit agent; a group chat's Chat info, where its members are); then Usage; then File changes when
-available and Advanced. Model & speed contains Model & reasoning and Fast Mode. Usage contains provider usage,
-Context window and Compact. Existing technical controls stay in Advanced. Keep every level short enough to
-navigate without scrolling. At accessibility text sizes, keep the full font size: the top level is Model (Model &
-speed), This chat (Rename…, Move…, Files; a group's Chat info), Agent (New Bot Chat, Switch agent, Edit agent) and More
-(File changes, Usage and Advanced), and Advanced groups its visibility switches under Display. Omit secondary
-summaries and shorten labels there.
+The chat's ⋯ menu is one list, the same with Nerd Mode on or off: New Bot Chat in an agent's Bot Chat (Switch agent
+in the home chat); then This chat (a group chat's Chat info, where its members are, Rename…, Move to Project… with
+the chat's project, Files, and File changes when available); then Model (Model & speed, Usage); then More (Edit
+agent, Advanced). Model & speed contains Model & reasoning and Fast Mode. Usage contains provider usage, Context
+window and Compact. Existing technical controls stay in Advanced. The groups have lines between them, not titles:
+iOS keeps a menu under about 60% of the screen's height, and titles made the list scroll. Keep every level short
+enough to navigate without scrolling, File changes included (`CompactChatMenuUITests`). iOS draws the menu at the
+device's text size, not bighelp's, and the whole list fits at the default size; from the device's XL, keep the full
+font size and fold the top level into Model (Model & speed), This chat (Rename…, Move…, Files; a group's Chat
+info), Agent (New Bot Chat, Switch agent, Edit agent) and More (File changes, Usage and Advanced). At accessibility
+sizes, Advanced also groups its visibility switches under Display, and secondary summaries are left out and labels
+shortened.
 
 Move to Project… (`MoveChatToProjectSheet`) also sits in a chat's hold menu in Chats and a pinned chat's
 right-click menu on the Mac, wherever the computer can move chats (`sessionWorkspaceEdit`). It lists the agent's
@@ -526,9 +529,11 @@ text is SF Pro, as everywhere.
   order, and the answer always shows.
 - **Swipes**: from the left edge back to your bots; from the right, this bot's profile (the primary bot's on
   the home). The full app's swipe choices lead to places this mode hides, so they don't apply here.
-- **Profile**: the mark, name and role over every tab (Dashboard too), then the tabs: Dashboard, Info (Character,
-  Instructions, Default Model, Default Voice, Credential Vault, Advanced Options, Routines), Computer (its screen, when the host has
-  one), Files and Media. Holding a tab shows a glass bar above it with Set Default (the tab profiles open on;
+- **Profile**: the mark, name and role over every tab (Dashboard too), then the tabs: Dashboard, Info, Computer (its
+  screen, when the host has one), Files and Media. Info is in named groups: Personality (Character, Instructions,
+  Core Files), Defaults (Default Model, Default Voice, Active Project), What it can use (Connections, Marketplace,
+  Credential Vault, Photo actions) and Routines (Add routine first, then the bot's routines), with Advanced Options
+  alone at the end. A group shows only the rows the computer offers. Holding a tab shows a glass bar above it with Set Default (the tab profiles open on;
   Dashboard until one is set; a note confirms it) and Rearrange (the tabs become glass chips to drag where they
   are, the tab below fades, Done in the header). Both are one choice for every bot (`SimpleBotProfileTabs`); the
   Mac also offers them on a right-click. Character is Info's first row, with the bot's face at its end; it opens Edit avatar at once

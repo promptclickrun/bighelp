@@ -24,8 +24,12 @@ struct SimpleBotProfileContext {
     var makeAdvancedOptions: ((String) -> AdvancedOptionsContext?)? = nil
     /// The bot's own Marketplace (its skills, apps and messaging apps, and the computer's plugins).
     var makeMarketplace: ((String) -> MarketplaceContext)? = nil
-    /// The bot's SOUL.md, USER.md, MEMORY.md and its project's AGENTS.md; nil without a computer.
+    /// The bot's SOUL.md, USER.md, MEMORY.md and its chat's AGENTS.md; nil without a computer.
     var makeCoreFiles: ((String) -> (any CoreFilesSource)?)? = nil
+    /// The bot's projects and the one its new chats start in (Active Project); nil without a computer.
+    var makeProjects: ((String) -> HermesWorkspaceStore?)? = nil
+    /// The bot's Active Project changed (its ID), so the shell's Projects read again.
+    var onProjectChanged: (String) -> Void = { _ in }
     /// The bot's Connections page: this device's access and its apps.
     var makeConnections: ((String) -> AnyView)? = nil
     /// The folder the computer shares (Files); nil without a computer.
@@ -100,6 +104,8 @@ struct SimpleBotProfileView: View {
     @State private var isAdvancedPresented = false
     @State private var marketplace: MarketplaceContext?
     @State private var coreFiles: CoreFilesPresentation?
+    @State private var projects: HermesWorkspaceStore?
+    @State private var isProjectPresented = false
     @State private var isConnectionsPresented = false
     @State private var vault: CredentialVaultModel?
     @State private var isVaultPresented = false
@@ -163,6 +169,16 @@ struct SimpleBotProfileView: View {
             // Like Advanced Options: made once the computer lets the app edit this bot.
             guard context.canEdit, vault?.agentID != agentID else { return }
             vault = context.makeCredentialVault?(agentID)
+        }
+        .task(id: "\(agentID)|\(context.canEdit)") {
+            // Choosing a project is an edit: made once the computer lets the app edit this bot.
+            guard context.canEdit, projects == nil else { return }
+            projects = context.makeProjects?(agentID)
+        }
+        .task(id: "\(projects != nil)|\(shownTab == .info)") {
+            // The row names the current project: read once Info shows.
+            guard shownTab == .info, let projects, projects.catalogAgentID != agentID else { return }
+            await projects.load(agentID: agentID)
         }
         .task(id: vault.map { "\($0.id)|\(shownTab == .info)" }) {
             // The row says how many websites the bot has: read once Info shows, not on every open.
@@ -267,6 +283,24 @@ struct SimpleBotProfileView: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
             .bighelpSheetSize(.standard)
+        }
+        .bighelpSheet(isPresented: $isProjectPresented) {
+            if let projects, let profile {
+                NavigationStack {
+                    BotActiveProjectView(store: projects, agentID: agentID, botName: profile.name) {
+                        context.onProjectChanged(agentID)
+                    }
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(String(localized: "Done")) { isProjectPresented = false }
+                                .accessibilityIdentifier("bot-project.done")
+                        }
+                    }
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .bighelpSheetSize(.standard)
+            }
         }
         .bighelpSheet(isPresented: $isConnectionsPresented) {
             if let makeConnections = context.makeConnections {
@@ -731,6 +765,16 @@ struct SimpleBotProfileView: View {
                     .driveTarget("simple-bots.profile.core-files")
                     .accessibilityIdentifier("simple-bots.profile.core-files")
                 }
+                if let projects {
+                    SimpleBotsDivider()
+                    Button { isProjectPresented = true } label: {
+                        SimpleBotsRow(title: String(localized: "Active Project"), leading: Image(systemName: "folder"),
+                                      value: activeProjectName(projects))
+                    }
+                    .buttonStyle(.plain)
+                    .driveTarget("simple-bots.profile.active-project")
+                    .accessibilityIdentifier("simple-bots.profile.active-project")
+                }
                 SimpleBotsDivider()
                 Button { isPhotoActionsPresented = true } label: {
                     SimpleBotsRow(title: String(localized: "Photo actions"), leading: Image(systemName: "photo.badge.checkmark"))
@@ -806,6 +850,12 @@ struct SimpleBotProfileView: View {
     }
 
     /// How many websites the bot can sign in or check out on, once the vault has been read.
+    /// The project the bot's new chats start in; nothing until its projects are read.
+    private func activeProjectName(_ projects: HermesWorkspaceStore) -> String? {
+        guard projects.catalogAgentID == agentID, let catalog = projects.catalog else { return nil }
+        return catalog.workspaces.first { $0.id == catalog.activeWorkspaceID }?.name ?? String(localized: "None")
+    }
+
     private func vaultSummary(_ vault: CredentialVaultModel) -> String? {
         guard vault.state == .ready else { return nil }
         return switch vault.sites.count {

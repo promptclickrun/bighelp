@@ -24,9 +24,12 @@ change in both repos.
   - What agents can add is for everyone: Settings › Marketplace (`MarketplaceView`) opens Apps, Skills, Plugins and
     Talk anywhere (messaging apps) with this week's featured plugin, and each bot's profile has its own for that
     bot, with MCP servers too. They're the same pages Hermes tools lists; a bot's Advanced Options no longer lists
-    the Skills Hub, Plugins or MCP servers. A bot's profile also has Connections (Device access and its apps) and
-    Core Files: its SOUL.md, USER.md, MEMORY.md and its active project's AGENTS.md, read and saved whole through
-    the plugin's `core-files/*` (`native-core-files-v1`) in the Markdown viewer (`CoreFilesView`).
+    the Skills Hub, Plugins or MCP servers. A bot's profile also has Connections (Device access and its apps),
+    Core Files and Active Project. Core Files: its SOUL.md, USER.md, MEMORY.md and the AGENTS.md Hermes loads for
+    its chat (the chat's folder: the open chat when it's this bot's, else its Bot Chat; plugin
+    `native-core-files-chat-v1`), read and saved whole through the plugin's `core-files/*` in the Markdown viewer
+    (`CoreFilesView`). Active Project (`BotActiveProjectView`) sets the project the bot's new chats start in, in a
+    `HermesWorkspaceStore` of its own (`separateStore()`), so the shell's Projects never move.
   - Everyday controls must never live only behind Nerd Mode.
 - **One place for each thing.**
   - There's one ☰ menu (`BighelpMenu`) and one Settings. Settings is a short list of rows that each open one page,

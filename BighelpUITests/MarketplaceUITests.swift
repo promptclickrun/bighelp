@@ -94,6 +94,70 @@ final class MarketplaceUITests: BighelpUITestCase {
         }
     }
 
+    /// The Popular plugins were squeezed together: their rows had no height or padding of their own, so the
+    /// names, stars and icons touched. Each is as tall as a section row now, and none overlaps the next.
+    @MainActor
+    func testPopularPluginsHaveRoomAtLargeText() {
+        for size in ["L", "XXXL"] {
+            let app = launch(appearance: "light", extra: ["-UIPreferredContentSizeCategoryName",
+                                                          "UICTContentSizeCategory\(size)"])
+            openSettings(in: app)
+            settingsRow("settings.marketplace", in: app).tap()
+            XCTAssertTrue(app.buttons["marketplace.featured"].waitForExistence(timeout: 10))
+            for _ in 0..<3 { app.swipeUp() }
+            evidence("marketplace-popular-\(size.lowercased())", app)
+            assertPopularRowsHaveRoom(in: app)
+            app.terminate()
+        }
+    }
+
+    /// A bot's profile sets the project its new chats start in, for that bot (also in Bots mode).
+    @MainActor
+    func testABotsProfileChoosesItsActiveProject() {
+        for appearance in ["light", "dark"] {
+            let app = launch(appearance: appearance, extra: ["-preview-ui-v3", "-bighelp.settings.simple-bots", "YES"])
+            openPrimaryProfileInfo(app)
+
+            let row = app.buttons["simple-bots.profile.active-project"]
+            for _ in 0..<4 where !row.isHittable { app.swipeUp() }
+            XCTAssertTrue(row.waitForExistence(timeout: 5), "A bot's profile has Active Project")
+            XCTAssertTrue(row.label.contains("bighelp"), "The row names the current project: \(row.label)")
+            row.tap()
+            let current = app.buttons["bot-project.loopdy"]
+            let home = app.buttons["bot-project.home"]
+            XCTAssertTrue(current.waitForExistence(timeout: 10), "Active Project lists the bot's projects")
+            XCTAssertTrue(current.isSelected, "The current project is checked")
+            XCTAssertFalse(home.isSelected)
+            evidence("bot-active-project-\(appearance)", app)
+            home.tap()
+            XCTAssertTrue(waitUntil { home.isSelected && !current.isSelected }, "Choosing a project makes it current")
+            app.buttons["bot-project.done"].tap()
+            XCTAssertTrue(waitUntil { row.label.contains("Home") }, "The row names the new project: \(row.label)")
+            app.terminate()
+        }
+    }
+
+    @MainActor
+    private func assertPopularRowsHaveRoom(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "marketplace.popular."))
+            .allElementsBoundByIndex.filter(\.isHittable).map(\.frame).sorted { $0.minY < $1.minY }
+        XCTAssertGreaterThanOrEqual(rows.count, 2, "Popular plugins show", file: file, line: line)
+        for (above, below) in zip(rows, rows.dropFirst()) {
+            XCTAssertGreaterThanOrEqual(above.height, 60, "A popular plugin row is as tall as a section row", file: file, line: line)
+            XCTAssertLessThanOrEqual(above.maxY, below.minY + 0.5, "Popular plugin rows don't overlap", file: file, line: line)
+        }
+    }
+
+    @MainActor
+    private func waitUntil(_ condition: () -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(5)
+        while Date() < deadline {
+            if condition() { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        return condition()
+    }
+
     @MainActor
     private func openPrimaryProfileInfo(_ app: XCUIApplication) {
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))

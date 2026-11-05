@@ -430,7 +430,8 @@ Image data follows the existing bounded user-attachment preparation path; leavin
 the composer or switching its model invalidates pending imports before staging.
 
 The app stores readable session caches, drafts, attachments, Bot Mode history,
-agent metadata, settings, and avatars in its private container. The JSON
+agent metadata, settings, avatars, and the last Plugins and Skills Hub lists of each
+computer (Caches, at most a month old) in its private container. The JSON
 repositories are versioned and crash-safe but do not add a separate
 application-level encryption layer. JSON and attachment directories explicitly
 use complete-until-first-user-authentication protection so background Link and

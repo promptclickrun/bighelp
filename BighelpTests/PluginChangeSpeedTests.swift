@@ -56,6 +56,63 @@ struct PluginChangeSpeedTests {
     }
 }
 
+/// Hermes builds its plugin lists again for every read, and reads that overlap slow each other down
+/// (four at once took 14 s each on a host where one takes 4 s). Opening Plugins from the Marketplace
+/// started a second read while the first was out, and each launch started with no list at all.
+@MainActor
+struct PluginListReadTests {
+    @Test(.timeLimit(.minutes(1)))
+    func pagesThatOpenTogetherShareOneRead() async throws {
+        let host = PluginHost()
+        let kept = CapabilitiesKeptCopies()
+        let marketplace = PluginLifecycleManagementModel(client: host.client(), keptCopies: kept)
+        let plugins = PluginLifecycleManagementModel(client: host.client(), keptCopies: kept)
+
+        host.holdCatalog = true
+        let first = Task { await marketplace.loadIfNeeded() }
+        while host.reads["/api/dashboard/plugins/catalog"] != 1 { await Task.yield() }
+        let second = Task { await plugins.loadIfNeeded() }
+        for _ in 0..<50 { await Task.yield() }
+        host.holdCatalog = false
+        await first.value
+        await second.value
+
+        #expect(host.reads["/api/dashboard/plugins/catalog"] == 1)
+        #expect(host.reads["/api/dashboard/plugins/hub"] == 1)
+        #expect(marketplace.snapshot?.catalog.map(\.name) == ["notes"])
+        #expect(plugins.snapshot == marketplace.snapshot)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aNewLaunchOpensOnTheListAnEarlierRunSaved() async throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: "capability-lists-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let saved = CapabilitiesSavedLists(folder: folder)
+        let host = PluginHost()
+        await PluginLifecycleManagementModel(client: host.client(), keptCopies: CapabilitiesKeptCopies(saved: saved)).load()
+        // The copy is written off the main actor.
+        while (try? FileManager.default.contentsOfDirectory(atPath: folder.path()))?.isEmpty != false {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        // The next launch: nothing in memory, and the computer slow to answer.
+        host.holdCatalog = true
+        let next = PluginLifecycleManagementModel(client: host.client(), keptCopies: CapabilitiesKeptCopies(saved: saved))
+        let open = Task { await next.loadIfNeeded() }
+        while next.snapshot == nil { await Task.yield() }
+        #expect(next.snapshot?.catalog.map(\.name) == ["notes"], "The saved list shows before the computer answers")
+        #expect(next.storefront?.hero?.name == "notes")
+        #expect(next.isBusy == false, "No Waiting over the saved list")
+        host.holdCatalog = false
+        await open.value
+        #expect(host.reads["/api/dashboard/plugins/catalog"] == 2, "It still reads the computer again")
+
+        #expect(await saved.read(PluginSnapshot.self, key: "plugins\n\(host.client().owner.cacheScopeID)",
+                                 now: .now.addingTimeInterval(CapabilitiesSavedLists.maximumAge + 1)) == nil,
+                "A copy older than a month is no copy")
+    }
+}
+
 /// One installed, removable plugin and a one-row catalog, answered like Hermes' dashboard.
 /// `holdCatalog` keeps catalog reads waiting until it's cleared.
 @MainActor

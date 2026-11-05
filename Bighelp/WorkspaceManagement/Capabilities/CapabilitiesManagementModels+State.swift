@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Observation
 
@@ -47,18 +48,125 @@ private extension CapabilityOperationState {
     }
 }
 
-/// The last Plugins and Skills Hub lists each computer gave, for this run of the app, so a page
-/// opens on them at once and its read only updates them. Hermes builds the plugin catalog (900
-/// and more plugins, a few megabytes) on every read, and a remote host took 10 s or more.
+/// The last Plugins and Skills Hub lists each computer gave, so a page opens on them at once and its
+/// read only updates them: in memory for this run, and on disk (`CapabilitiesSavedLists`) for the
+/// first page of the next. Hermes builds its plugin lists again on every read (4 s for 108 plugins on
+/// one host), and reads that overlap slow each other down (four at once took 14 s each), so a read a
+/// page asks for while one is out for the same computer waits for that one (`readPlugins`, `readSkills`).
 @MainActor
 final class CapabilitiesKeptCopies {
-    static let shared = CapabilitiesKeptCopies()
+    static let shared = CapabilitiesKeptCopies(saved: CapabilitiesSavedLists.caches)
 
     var plugins: [String: PluginSnapshot] = [:]
     var skills: [String: SkillHubSnapshot] = [:]
 
+    private let saved: CapabilitiesSavedLists?
+    private let pluginReads = SharedReads<PluginSnapshot>()
+    private let skillReads = SharedReads<SkillHubSnapshot>()
+
+    init(saved: CapabilitiesSavedLists? = nil) {
+        self.saved = saved
+    }
+
     static func skillsKey(_ owner: WorkspaceOwner, profileID: String) -> String {
         "\(owner.cacheScopeID)\n\(profileID)"
+    }
+
+    func keepPlugins(_ snapshot: PluginSnapshot, for key: String) {
+        plugins[key] = snapshot
+        saved?.write(snapshot, key: "plugins\n\(key)")
+    }
+
+    func keepSkills(_ snapshot: SkillHubSnapshot, for key: String) {
+        skills[key] = snapshot
+        saved?.write(snapshot, key: "skills\n\(key)")
+    }
+
+    /// The copy saved by an earlier run, now in memory too; nil without one.
+    func savedPlugins(for key: String) async -> PluginSnapshot? {
+        guard let copy = await saved?.read(PluginSnapshot.self, key: "plugins\n\(key)") else { return nil }
+        if plugins[key] == nil { plugins[key] = copy }
+        return plugins[key]
+    }
+
+    func savedSkills(for key: String) async -> SkillHubSnapshot? {
+        guard let copy = await saved?.read(SkillHubSnapshot.self, key: "skills\n\(key)") else { return nil }
+        if skills[key] == nil { skills[key] = copy }
+        return skills[key]
+    }
+
+    /// `read`, unless a read for this computer is already out: then that one's answer.
+    func readPlugins(for key: String, _ read: @escaping @MainActor () async throws -> PluginSnapshot) async throws -> PluginSnapshot {
+        try await pluginReads.run(key, read)
+    }
+
+    func readSkills(for key: String, _ read: @escaping @MainActor () async throws -> SkillHubSnapshot) async throws -> SkillHubSnapshot {
+        try await skillReads.run(key, read)
+    }
+}
+
+/// One read per key at a time: a caller that asks while one is out waits for it. The read runs to the
+/// end even when the caller that started it goes away, so its answer is still kept.
+@MainActor
+final class SharedReads<Value: Sendable> {
+    private var running: [String: Task<Value, any Error>] = [:]
+
+    func run(_ key: String, _ read: @escaping @MainActor () async throws -> Value) async throws -> Value {
+        if let task = running[key] { return try await task.value }
+        let task = Task { @MainActor in try await read() }
+        running[key] = task
+        defer { if running[key] == task { running[key] = nil } }
+        return try await task.value
+    }
+}
+
+/// The kept lists on disk (Caches, which the system may clear), so the first Plugins or Skills Hub page
+/// of a launch opens on the last list too. A copy older than a month, from another format or that
+/// doesn't read is no copy. Demo runs and tests keep none, so made-up lists never outlive their run.
+struct CapabilitiesSavedLists: Sendable {
+    static let format = 1
+    static let maximumAge: TimeInterval = 30 * 24 * 60 * 60
+
+    let folder: URL
+
+    static var caches: CapabilitiesSavedLists? {
+        let process = ProcessInfo.processInfo
+        guard !process.arguments.contains("-use-demo-fixtures"),
+              process.environment["XCTestConfigurationFilePath"] == nil,
+              let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return nil }
+        return CapabilitiesSavedLists(folder: caches.appending(path: "CapabilityLists", directoryHint: .isDirectory))
+    }
+
+    private struct Saved<Value: Codable>: Codable {
+        let format: Int
+        let savedAt: Date
+        let value: Value
+    }
+
+    func read<Value: Codable & Sendable>(_ type: Value.Type, key: String, now: Date = .now) async -> Value? {
+        let file = file(for: key)
+        return await Task.detached(priority: .userInitiated) { () -> Value? in
+            guard let data = try? Data(contentsOf: file),
+                  let saved = try? JSONDecoder().decode(Saved<Value>.self, from: data),
+                  saved.format == Self.format, now.timeIntervalSince(saved.savedAt) < Self.maximumAge else { return nil }
+            return saved.value
+        }.value
+    }
+
+    /// Written off the main actor; a write that fails leaves the last copy.
+    func write<Value: Codable & Sendable>(_ value: Value, key: String) {
+        let file = file(for: key), folder = folder
+        Task.detached(priority: .utility) {
+            guard let data = try? JSONEncoder().encode(Saved(format: Self.format, savedAt: .now, value: value)) else { return }
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try? data.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        }
+    }
+
+    /// The key names the computer's sign-in, so the file is named by its hash.
+    private func file(for key: String) -> URL {
+        let digest = SHA256.hash(data: Data(key.utf8)).map { String(format: "%02x", $0) }.joined()
+        return folder.appending(path: "\(digest).json")
     }
 }
 
@@ -175,9 +283,12 @@ final class SkillsHubManagementModel: CapabilityActionTrackingState {
         snapshot = keptCopies?.skills[CapabilitiesKeptCopies.skillsKey(client.owner, profileID: client.profileID)]
     }
 
-    /// The first read for this page: over the kept copy it updates quietly.
+    /// The first read for this page: over the kept copy (or the one an earlier run saved) it updates quietly.
     func loadIfNeeded() async {
         guard !hasRead else { return }
+        if snapshot == nil, let saved = await keptCopies?.savedSkills(for: keptKey), snapshot == nil {
+            snapshot = saved
+        }
         await load()
     }
 
@@ -188,7 +299,7 @@ final class SkillsHubManagementModel: CapabilityActionTrackingState {
             guard !isBusy, !isRereading else { return }
             isRereading = true
             defer { isRereading = false }
-            do { keep(try await client.load()); support = .available } catch { report(error) }
+            do { keep(try await sharedLoad()); support = .available } catch { report(error) }
             return
         }
         await perform {
@@ -197,13 +308,23 @@ final class SkillsHubManagementModel: CapabilityActionTrackingState {
                     keep(try await client.load())
                 }
             }
-            keep(try await client.load())
+            keep(try await sharedLoad())
         }
+    }
+
+    private var keptKey: String { CapabilitiesKeptCopies.skillsKey(client.owner, profileID: client.profileID) }
+
+    /// A plain read: one for this agent at a time, shared with any other page reading it now. Reads after
+    /// a change go to the client, so they never take an answer from before it.
+    private func sharedLoad() async throws -> SkillHubSnapshot {
+        let client = client
+        guard let keptCopies else { return try await client.load() }
+        return try await keptCopies.readSkills(for: keptKey) { try await client.load() }
     }
 
     private func keep(_ snapshot: SkillHubSnapshot) {
         self.snapshot = snapshot
-        keptCopies?.skills[CapabilitiesKeptCopies.skillsKey(client.owner, profileID: client.profileID)] = snapshot
+        keptCopies?.keepSkills(snapshot, for: keptKey)
     }
 
     func search() async {
@@ -491,16 +612,20 @@ final class PluginLifecycleManagementModel: CapabilityOperationState {
         storefront = snapshot.map { PluginStorefront(catalog: $0.catalog) }
     }
 
-    /// The first read for this page: over the kept copy it updates quietly.
+    /// The first read for this page: over the kept copy (or the one an earlier run saved) it updates quietly.
     func loadIfNeeded() async {
         guard !hasRead else { return }
+        if snapshot == nil, let saved = await keptCopies?.savedPlugins(for: client.owner.cacheScopeID), snapshot == nil {
+            snapshot = saved
+            storefront = PluginStorefront(catalog: saved.catalog)
+        }
         await load()
     }
 
     func load() async {
         hasRead = true
         guard snapshot != nil else {
-            await perform { keep(try await client.load()) }
+            await perform { keep(try await sharedLoad()) }
             return
         }
         // The kept copy stays on screen and in use: no "Waiting", and a change isn't refused.
@@ -511,7 +636,7 @@ final class PluginLifecycleManagementModel: CapabilityOperationState {
         while !Task.isCancelled {
             let generation = changeGeneration
             do {
-                let fresh = try await client.load()
+                let fresh = try await sharedLoad()
                 support = .available
                 guard generation != changeGeneration else { return keep(fresh) }
             } catch {
@@ -622,10 +747,19 @@ final class PluginLifecycleManagementModel: CapabilityOperationState {
                             skippedCatalogRows: current.skippedCatalogRows))
     }
 
+    /// A plain read: one for this computer at a time, shared with any other page reading it now (the
+    /// Marketplace and the Plugins page it opens). Reads after a change go to the client, so they never
+    /// take an answer from before it.
+    private func sharedLoad() async throws -> PluginSnapshot {
+        let client = client
+        guard let keptCopies else { return try await client.load() }
+        return try await keptCopies.readPlugins(for: client.owner.cacheScopeID) { try await client.load() }
+    }
+
     private func keep(_ snapshot: PluginSnapshot) {
         self.snapshot = snapshot
         storefront = PluginStorefront(catalog: snapshot.catalog)
-        keptCopies?.plugins[client.owner.cacheScopeID] = snapshot
+        keptCopies?.keepPlugins(snapshot, for: client.owner.cacheScopeID)
     }
 
     func clearMessages() { errorMessage = nil; successMessage = nil }

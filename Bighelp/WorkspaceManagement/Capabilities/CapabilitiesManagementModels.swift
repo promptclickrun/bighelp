@@ -106,7 +106,7 @@ enum CapabilitiesManagementError: Error, Equatable, LocalizedError, Sendable {
     }
 }
 
-struct SkillHubSource: Identifiable, Equatable, Sendable {
+struct SkillHubSource: Identifiable, Equatable, Sendable, Codable {
     let id: String
     let label: String
     let isAvailable: Bool?
@@ -114,7 +114,7 @@ struct SkillHubSource: Identifiable, Equatable, Sendable {
     let isRateLimited: Bool
 }
 
-struct SkillHubItem: Identifiable, Equatable, Sendable {
+struct SkillHubItem: Identifiable, Equatable, Sendable, Codable {
     let id: String
     let name: String
     let summary: String
@@ -126,7 +126,7 @@ struct SkillHubItem: Identifiable, Equatable, Sendable {
     let isInstalled: Bool
 }
 
-struct InstalledSkill: Identifiable, Equatable, Sendable {
+struct InstalledSkill: Identifiable, Equatable, Sendable, Codable {
     let name: String
     let summary: String
     let category: String
@@ -136,7 +136,7 @@ struct InstalledSkill: Identifiable, Equatable, Sendable {
     var id: String { name }
 }
 
-struct SkillHubSnapshot: Equatable, Sendable {
+struct SkillHubSnapshot: Equatable, Sendable, Codable {
     let sources: [SkillHubSource]
     let featured: [SkillHubItem]
     let official: [SkillHubItem]
@@ -337,14 +337,14 @@ protocol MCPManagementClient: AnyObject, CapabilityActionStatusProviding {
     func cancelOAuth(flowID: String) async throws -> MCPOAuthFlow.Status
 }
 
-struct PluginCapabilitySummary: Equatable, Sendable {
+struct PluginCapabilitySummary: Equatable, Sendable, Codable {
     let tools: [String]
     let hooks: [String]
     let middleware: [String]
     let requiredEnvironment: [String]
 }
 
-struct PluginCatalogEntry: Identifiable, Equatable, Sendable {
+struct PluginCatalogEntry: Identifiable, Equatable, Sendable, Codable {
     let name: String
     let repository: String
     let commitSHA: String
@@ -378,7 +378,7 @@ struct PluginCatalogEntry: Identifiable, Equatable, Sendable {
     var displayName: String { title ?? name }
 }
 
-struct InstalledPlugin: Identifiable, Equatable, Sendable {
+struct InstalledPlugin: Identifiable, Equatable, Sendable, Codable {
     let name: String
     let version: String
     let summary: String
@@ -396,7 +396,7 @@ struct InstalledPlugin: Identifiable, Equatable, Sendable {
 /// What Hermes' marketplace page shows about a catalog plugin and the host's catalog doesn't: GitHub
 /// stars, the curated featured rank, when it was added and last changed, and, from the computer's own
 /// install check, why Hermes won't install it there (the plugin's `marketplace/plugins` route).
-struct PluginMarketplaceFacts: Equatable, Sendable {
+struct PluginMarketplaceFacts: Equatable, Sendable, Codable {
     var stars: Int?
     /// 1-based. The storefront features these in turn, a week each, as the marketplace does.
     var featuredRank: Int?
@@ -412,7 +412,7 @@ protocol PluginMarketplaceReading: AnyObject, Sendable {
     func plugins() async -> [String: PluginMarketplaceFacts]?
 }
 
-struct PluginSnapshot: Equatable, Sendable {
+struct PluginSnapshot: Equatable, Sendable, Codable {
     let installed: [InstalledPlugin]
     let catalog: [PluginCatalogEntry]
     let removedCatalogEntries: [String]

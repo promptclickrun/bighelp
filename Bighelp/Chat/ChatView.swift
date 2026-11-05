@@ -1041,13 +1041,21 @@ struct ChatView: View {
         }
     }
 
-    /// One list: Model & speed, the chat's and its agent's actions, Usage, then File changes and
-    /// Advanced. At accessibility sizes, This chat, Agent and More hold all but Model & speed, so no
-    /// level needs scrolling without reducing the font.
+    /// iOS keeps a menu under about 60% of the screen's height and draws it at the device's text size,
+    /// not bighelp's. The whole list, File changes and all, fits that at the default size
+    /// (`CompactChatMenuUITests`); from XL it folds into This chat, Agent and More.
+    private var foldsChatOptions: Bool {
+        let device = DynamicTypeSize(UIApplication.shared.preferredContentSizeCategory) ?? dynamicTypeSize
+        return device >= .xLarge || dynamicTypeSize.isAccessibilitySize
+    }
+
+    /// One list: a Bot Chat's New Bot Chat (the home chat's Switch agent), then This chat (with File
+    /// changes), Model (Model & speed, Usage) and More (Edit agent, Advanced). Folded, This chat, Agent
+    /// and More hold all but Model & speed, so no level needs scrolling without reducing the font.
     private var chatOptionsMenu: some View {
         Menu {
-            modelAndSpeedMenu
-            if dynamicTypeSize.isAccessibilitySize {
+            if foldsChatOptions {
+                modelAndSpeedMenu
                 Menu {
                     chatItems
                 } label: {
@@ -1056,13 +1064,15 @@ struct ChatView: View {
                 .accessibilityIdentifier("chat.options.this-chat")
                 if onNewBotChat != nil || !model.isBotMode {
                     Menu {
-                        agentItems
+                        newChatItems
+                        editAgentItem
                     } label: {
                         Label("Agent", systemImage: "person.crop.circle")
                     }
                     .accessibilityIdentifier("chat.options.agent")
                 }
                 Menu {
+                    // Here, not in This chat: four rows there need scrolling at the largest sizes.
                     fileChangesMenuItem
                     usageMenu
                     advancedMenu
@@ -1071,13 +1081,19 @@ struct ChatView: View {
                 }
                 .accessibilityIdentifier("chat.options.more")
             } else {
+                // Lines, not titles, between the groups: titles made the list taller than iOS lets a
+                // menu grow, so it scrolled.
+                Section { newChatItems }
                 Section {
                     chatItems
-                    agentItems
-                }
-                Section { usageMenu }
-                Section {
                     fileChangesMenuItem
+                }
+                Section {
+                    modelAndSpeedMenu
+                    usageMenu
+                }
+                Section {
+                    editAgentItem
                     advancedMenu
                 }
             }
@@ -1099,7 +1115,7 @@ struct ChatView: View {
         .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY } action: { optionsButtonBottom = $0 }
         #endif
         .accessibilityLabel("Conversation options")
-        .accessibilityHint("Model and speed, this chat, usage, file changes and advanced options")
+        .accessibilityHint("This chat, file changes, model and speed, usage and advanced options")
         .accessibilityIdentifier("chat.options")
         .modifier(ChatFastModeLoader(controls: model.runtimeControls,
                                     isAllocating: model.isAwaitingAuthoritativeSessionAllocation))
@@ -1176,9 +1192,9 @@ struct ChatView: View {
         }
     }
 
-    /// Edit agent, plus a Bot Chat's New Bot Chat and the home chat's Switch agent.
+    /// A Bot Chat's New Bot Chat and the home chat's Switch agent.
     @ViewBuilder
-    private var agentItems: some View {
+    private var newChatItems: some View {
         if let onNewBotChat {
             Button("New Bot Chat", systemImage: "arrow.trianglehead.counterclockwise") {
                 dismissKeyboard()
@@ -1193,6 +1209,10 @@ struct ChatView: View {
             }
             .accessibilityIdentifier("chat.switch-agent")
         }
+    }
+
+    @ViewBuilder
+    private var editAgentItem: some View {
         if !model.isBotMode {
             Button("Edit agent", systemImage: "person.crop.circle") {
                 presentCurrentAgentEditor()

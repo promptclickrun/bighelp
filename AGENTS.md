@@ -386,7 +386,8 @@ change in both repos.
   (`ImageDraftStore`): it claims the draft on the host, journals the write (`DeviceToolFileJournal`) and reads it back,
   so a second tap or a relaunch never writes twice; without access it opens Apple's own editor, whose Done is the
   Save. In a chat that holds the person's picture the phone answers `contacts.create` and `calendar.create` with
-  `review_required`. Each agent's Photo actions page sits beside its Instructions.
+  `review_required`. Each agent's Photo actions page sits beside its Instructions in Agent Studio, and in What it
+  can use on a bot's profile.
 - **Hermes versions never gate connections or features.** Older, newer, custom and absent version strings are
   metadata, not an allowlist. Check actual host capabilities and route responses instead.
   - Hosts differ, so parse leniently: ignore unknown keys and treat most parts as optional.

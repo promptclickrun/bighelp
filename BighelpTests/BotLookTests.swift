@@ -193,4 +193,63 @@ struct BotLookTests {
         let image = try #require(UIImage(data: data))
         #expect(image.size.width == CGFloat(BotLookRenderer.pixelDimension))
     }
+
+    // MARK: Create New Bot
+
+    /// A body from each set, and the bot's own body even when Surprise me or Bot Studio picked one
+    /// from further in, so the pick always shows.
+    @Test func newBotPicksAlwaysShowTheBotsBody() throws {
+        let catalog = BotBodyCatalog.bundled
+        let firsts = SimpleBotQuickPicks.bodies(in: catalog, keeping: nil)
+        #expect(firsts.map(\.id) == ["shapes.peak", "hermes.round", "bighelp.biggie", "classics.pinch", "bits.bop",
+                                     "pocket-curios.spindle", "bitty-bots.ping"])
+        #expect(SimpleBotQuickPicks.bodies(in: catalog, keeping: firsts[3]).map(\.id) == firsts.map(\.id),
+                "A body on show stays where it is")
+        let hoot = try #require(catalog.body(id: "bitty-bots.hoot"))
+        let kept = SimpleBotQuickPicks.bodies(in: catalog, keeping: hoot)
+        #expect(kept.first == hoot)
+        #expect(kept.count == SimpleBotQuickPicks.bodyCount)
+
+        let colors = SimpleBotQuickPicks.colors(for: hoot)
+        #expect(colors.first?.hex == hoot.colors.main, "Its own color comes first")
+        #expect(colors.count == 8)
+    }
+
+    /// The new bot keeps the look picked on Create New Bot: Hermes gets its picture and the Bot
+    /// Studio look beside it, as Edit avatar saves one.
+    @Test func aNewBotSavesItsBotStudioLook() async throws {
+        let client = CreatedBotRecorder()
+        let store = AgentDirectoryStore(client: client, defaults: isolatedDefaults())
+        try await store.load()
+        let folder = FileManager.default.temporaryDirectory.appending(path: "new-bot-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let model = AgentEditorModel.creating(store: store, processor: AvatarImageProcessor(), avatarDirectory: folder)
+        model.savedUserName = { "" }
+        var look = BotLook(body: try #require(BotBodyCatalog.bundled.body(id: "bitty-bots.hoot")))
+        look.main = "#58C47A"
+
+        SimpleBotCreation.prepare(model, name: "Juniper")
+        try await SimpleBotCreation.use(look, for: model)
+        _ = try await model.save()
+        let draft = try #require(client.created)
+        #expect(draft.look?.studio == look)
+        #expect(draft.avatar != nil, "Other apps show the picture")
+    }
+}
+
+@MainActor
+private final class CreatedBotRecorder: AgentDirectoryClient {
+    private(set) var created: AgentDraft?
+
+    func list() async throws -> [AgentProfile] { [] }
+
+    func create(_ draft: AgentDraft) async throws -> AgentProfile {
+        created = draft
+        return AgentProfile(id: "juniper", name: draft.name, role: draft.role, summary: draft.summary,
+                            instructions: draft.instructions, avatarFileName: draft.avatarFileName,
+                            avatar: draft.avatar, isDefault: false, look: draft.look)
+    }
+
+    func update(id: String, draft: AgentDraft) async throws -> AgentProfile { throw CocoaError(.featureUnsupported) }
 }

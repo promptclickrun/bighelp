@@ -51,9 +51,21 @@ final class SimpleBotsUITests: BighelpUITestCase {
             let name = app.textFields["simple-bots.create.name"]
             XCTAssertTrue(name.waitForExistence(timeout: 5))
             XCTAssertFalse(app.buttons["simple-bots.create.submit"].isEnabled, "Create needs a name")
-            app.buttons["simple-bots.shape.hexagon"].tap()
-            app.buttons["simple-bots.color.orange"].tap()
+            // Bot Studio's bodies and colors, and the rest of Bot Studio a tap away.
+            let round = app.buttons["simple-bots.create.body.hermes.round"]
+            XCTAssertTrue(round.exists, "A body from each of Bot Studio's sets")
+            round.tap()
+            XCTAssertTrue(round.isSelected)
+            let green = app.buttons["simple-bots.create.color.green"]
+            green.tap()
+            XCTAssertTrue(green.isSelected)
             save("simple-create-\(appearance)", app)
+            app.buttons["simple-bots.create.studio"].tap()
+            XCTAssertTrue(app.buttons["bot.studio.tab.eyes"].waitForExistence(timeout: 5), "Bot Studio opens")
+            XCTAssertTrue(app.buttons["bot.studio.tab.eyes"].isSelected, "on Eyes")
+            app.buttons["bot.studio.save"].tap()
+            XCTAssertTrue(round.waitForExistence(timeout: 5), "Done comes back to Create New Bot")
+            XCTAssertTrue(round.isSelected, "with the same body")
             app.buttons["simple-bots.create.close"].tap()
 
             // Search lists every bot.

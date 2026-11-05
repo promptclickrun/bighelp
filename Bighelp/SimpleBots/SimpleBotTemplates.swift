@@ -49,6 +49,16 @@ enum SimpleBotCreation {
             model.draft.summary = helper?.about ?? "Warm, direct, adaptable."
         }
     }
+
+    /// The new bot's Bot Studio look: its picture, and the look saved with it on the computer
+    /// (`ui_meta`), as Edit avatar saves one.
+    static func use(_ look: BotLook, for model: AgentEditorModel) async throws {
+        let face = AgentAvatarLook(style: .photo, studio: look)
+        guard let picture = HermesLookRenderer.png(look: face, name: model.faceName) else {
+            throw AgentCompanionAvatarRenderer.RenderError.emptyImage
+        }
+        try await model.importLookAvatar(data: picture, look: face)
+    }
 }
 
 /// New Bot's Templates button, top right.

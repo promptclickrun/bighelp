@@ -83,18 +83,54 @@ private struct SimpleBotShapeRing: Shape {
     func path(in rect: CGRect) -> Path { shape.path(in: rect) }
 }
 
-/// Create New Bot: a big preview, its name, a shape and a color. The bot
-/// starts with bighelp's everyday helper personality, or a template attached
-/// with Templates, and the default bot's setup, like New agent; its mark
-/// becomes its picture.
+
+/// Create New Bot's short lists from Bot Studio's catalog: a body from each set and eight colors.
+/// Every other body, the eyes, the shape and the moves are in Bot Studio, a tap away.
+enum SimpleBotQuickPicks {
+    struct Swatch: Identifiable, Sendable {
+        let key: String
+        let hex: String
+        let name: LocalizedStringResource
+        var id: String { key }
+    }
+
+    static let bodyCount = 7
+
+    static let palette = [
+        Swatch(key: "red", hex: "#E5484D", name: "Red"), Swatch(key: "orange", hex: "#EF6F2E", name: "Orange"),
+        Swatch(key: "yellow", hex: "#F2C94C", name: "Yellow"), Swatch(key: "green", hex: "#58C47A", name: "Green"),
+        Swatch(key: "blue", hex: "#3B82F6", name: "Blue"), Swatch(key: "purple", hex: "#8B5CF6", name: "Purple"),
+        Swatch(key: "pink", hex: "#E8459A", name: "Pink"),
+    ]
+
+    /// The first body of each set on offer. The bot's own body goes first when it isn't one of them
+    /// (Surprise me and Bot Studio reach every body), so the pick always shows.
+    static func bodies(in catalog: BotBodyCatalog, keeping current: BotBody?, at now: Date = .now) -> [BotBody] {
+        let firsts = Array(catalog.available(at: now).compactMap(\.bodies.first).prefix(bodyCount))
+        guard let current, !firsts.contains(where: { $0.id == current.id }) else { return firsts }
+        return Array(([current] + firsts).prefix(bodyCount))
+    }
+
+    /// The body's own color, then the palette.
+    static func colors(for body: BotBody) -> [Swatch] {
+        let own = Swatch(key: "own", hex: body.colors.main, name: "Its own color")
+        return [own] + palette.filter { $0.hex != own.hex }
+    }
+}
+
+/// Create New Bot: the bot's face with Surprise me, its name, a body from each of Bot Studio's sets
+/// and eight colors. More and Eyes, shape and moves open the full Bot Studio. The bot starts with
+/// bighelp's everyday helper personality, or a template attached with Templates, and the default
+/// bot's setup, like New agent; its look is saved on the computer, as Edit avatar saves one.
 @MainActor
 struct SimpleBotCreateView: View {
     let makeCreator: () -> AgentEditorModel?
     let onCreated: (AgentProfile) -> Void
 
     @State private var name = ""
-    @State private var mark = SimpleBotMark(shape: SimpleBotShape.allCases.randomElement() ?? .hexagon,
-                                            color: [.orange, .pink, .green, .blue, .purple, .teal].randomElement() ?? .orange)
+    @State private var look: BotLook
+    /// Bot Studio, open on this tab.
+    @State private var studioTab: BotStudioView.Tab?
     @State private var isCreating = false
     @State private var errorMessage: String?
     /// Made when the screen opens, so a template can fill it in before Create.
@@ -105,8 +141,16 @@ struct SimpleBotCreateView: View {
     @State private var lastTemplate: AgentSoulTemplate?
     @FocusState private var isNameFocused: Bool
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.companionAgentScope) private var scope
     @BighelpThemeReader private var theme
+    private let library = BotBodyLibrary.shared
+
+    init(makeCreator: @escaping () -> AgentEditorModel?, onCreated: @escaping (AgentProfile) -> Void) {
+        self.makeCreator = makeCreator
+        self.onCreated = onCreated
+        // One of the bodies on show, as it comes.
+        let bodies = SimpleBotQuickPicks.bodies(in: BotBodyLibrary.shared.catalog, keeping: nil)
+        _look = State(initialValue: BotLook(body: bodies.randomElement() ?? BotLook.fallbackBody))
+    }
 
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
@@ -144,10 +188,8 @@ struct SimpleBotCreateView: View {
             }
 
             ScrollView {
-                VStack(spacing: BighelpTokens.space32) {
-                    SimpleBotMarkView(mark: mark, size: 168)
-                        .padding(.top, BighelpTokens.space24)
-                        .animation(.snappy, value: mark)
+                VStack(spacing: BighelpTokens.space24) {
+                    face
                     TextField("Name your Bot", text: $name)
                         .font(.bighelp(.title2, weight: .medium))
                         .multilineTextAlignment(.center)
@@ -167,10 +209,12 @@ struct SimpleBotCreateView: View {
                             .foregroundStyle(theme.secondaryText)
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, -BighelpTokens.space16)
+                            .padding(.top, -BighelpTokens.space12)
                             .accessibilityIdentifier("simple-bots.create.template-note")
                     }
-                    SimpleBotMarkPicker(mark: $mark)
+                    bodies
+                    colors
+                    studioButton
                     if let errorMessage {
                         Text(errorMessage)
                             .font(.bighelp(.subheadline))
@@ -178,7 +222,7 @@ struct SimpleBotCreateView: View {
                             .multilineTextAlignment(.center)
                     }
                 }
-                .padding(.horizontal, BighelpTokens.space20)
+                .padding(.horizontal, BighelpTokens.space16)
                 .padding(.bottom, BighelpTokens.space24)
             }
             .dismissesKeyboardOnScroll(true)
@@ -197,15 +241,140 @@ struct SimpleBotCreateView: View {
         .background(theme.canvas.ignoresSafeArea())
         .interactiveDismissDisabled(isCreating)
         .onAppear { if creator == nil { creator = makeCreator() } }
+        .task { await library.refreshIfNeeded() }
         .bighelpSheet(isPresented: $isPickingTemplate, onDismiss: attachPickedTemplate) {
             AgentTemplateBrowser(title: String(localized: "Templates")) { pickedTemplate = $0 }
                 .bighelpSheetSize(.large)
+        }
+        .bighelpSheet(item: $studioTab) { tab in
+            BotStudioView(start: look, agentName: trimmedName.isEmpty ? String(localized: "Your new bot") : trimmedName,
+                          saveTitle: String(localized: "Done"), tab: tab) { picked in
+                look = picked
+                studioTab = nil
+            }
+            .presentationDragIndicator(.visible)
+            #if os(visionOS)
+            .presentationSizing(.page)
+            #endif
+            .bighelpSheetSize(.large)
         }
         .agentTemplateForm(creator)
         .onChange(of: creator?.appliedTemplateID) { _, applied in
             // A template's form asks for the name too; what was typed there shows here.
             if applied != nil, let typed = creator?.draft.name, !typed.isEmpty { name = typed }
         }
+    }
+
+    private var face: some View {
+        BotLookPlayer(look: look, state: .idle)
+            .frame(width: 170, height: 170)
+            .accessibilityElement()
+            .accessibilityLabel(Text("Your bot's avatar: \(look.body.name)"))
+            .accessibilityIdentifier("simple-bots.create.face")
+            .overlay(alignment: .bottomTrailing) {
+                SimpleBotsCircleButton(systemImage: "dice", label: "Surprise me",
+                                       identifier: "simple-bots.create.surprise") {
+                    let everyBody = library.catalog.available(at: .now).flatMap(\.bodies)
+                    guard var surprise = BotLook.surprise(from: everyBody) else { return }
+                    // A move picked in Bot Studio stays; Surprise me never adds one.
+                    surprise.move = look.move
+                    look = surprise
+                }
+                .offset(x: BighelpTokens.space8)
+            }
+            .padding(.top, BighelpTokens.space16)
+    }
+
+    /// A body from each set, each as it comes (what picking it gives), and More for the rest.
+    private var bodies: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: BighelpTokens.space8), count: 4),
+                  spacing: BighelpTokens.space8) {
+            ForEach(SimpleBotQuickPicks.bodies(in: library.catalog, keeping: look.body)) { option in
+                let isSelected = option.id == look.body.id
+                Button {
+                    if !isSelected { look.use(option) }
+                } label: {
+                    BotLookView(look: isSelected ? look : BotLook(body: option))
+                        .frame(width: 52, height: 52)
+                        .frame(maxWidth: .infinity, minHeight: 72)
+                        .background(theme.surface, in: .rect(cornerRadius: BighelpTokens.radius16, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous)
+                                .strokeBorder(isSelected ? theme.primaryText : .clear, lineWidth: 2)
+                        }
+                        .contentShape(.rect(cornerRadius: BighelpTokens.radius16))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(option.name)
+                .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+                .accessibilityIdentifier("simple-bots.create.body.\(option.id)")
+            }
+            Button { studioTab = .body } label: {
+                Text("More")
+                    .font(.bighelp(.subheadline, weight: .semibold))
+                    .foregroundStyle(theme.primaryText)
+                    .frame(maxWidth: .infinity, minHeight: 72)
+                    .background(theme.surface, in: .rect(cornerRadius: BighelpTokens.radius16, style: .continuous))
+                    .contentShape(.rect(cornerRadius: BighelpTokens.radius16))
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Every body, in Bot Studio")
+            .accessibilityIdentifier("simple-bots.create.more")
+        }
+    }
+
+    /// One row of colors, or two on a narrow screen, so each keeps a full-size target.
+    private var colors: some View {
+        let swatches = SimpleBotQuickPicks.colors(for: look.body)
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 0) { colorButtons(swatches) }
+            VStack(spacing: BighelpTokens.space4) {
+                HStack(spacing: 0) { colorButtons(Array(swatches.prefix(4))) }
+                HStack(spacing: 0) { colorButtons(Array(swatches.dropFirst(4))) }
+            }
+        }
+    }
+
+    private func colorButtons(_ swatches: [SimpleBotQuickPicks.Swatch]) -> some View {
+        ForEach(swatches) { swatch in
+            let isSelected = look.main == swatch.hex
+            Button { look.main = swatch.hex } label: {
+                Circle()
+                    .fill(HermesFaceColor.color(swatch.hex))
+                    .overlay { Circle().strokeBorder(theme.border, lineWidth: 1) }
+                    .padding(4)
+                    .overlay { Circle().strokeBorder(isSelected ? theme.primaryText : .clear, lineWidth: 2.5) }
+                    .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(swatch.name))
+            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+            .accessibilityIdentifier("simple-bots.create.color.\(swatch.key)")
+        }
+    }
+
+    private var studioButton: some View {
+        Button { studioTab = .eyes } label: {
+            HStack(spacing: BighelpTokens.space8) {
+                Text("Eyes, shape and moves")
+                    .font(.bighelp(.body, weight: .semibold))
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.bighelp(.footnote, weight: .semibold))
+                    .foregroundStyle(theme.tertiaryText)
+            }
+            .foregroundStyle(theme.primaryText)
+            .padding(.horizontal, BighelpTokens.space16)
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .background(theme.surface, in: .rect(cornerRadius: BighelpTokens.radius16, style: .continuous))
+            .contentShape(.rect(cornerRadius: BighelpTokens.radius16))
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens Bot Studio")
+        .accessibilityIdentifier("simple-bots.create.studio")
     }
 
     private func attachPickedTemplate() {
@@ -226,11 +395,10 @@ struct SimpleBotCreateView: View {
         errorMessage = nil
         defer { isCreating = false }
         SimpleBotCreation.prepare(model, name: trimmedName)
-        if let picture = SimpleBotMarkView.png(mark) { try? await model.importLookAvatar(data: picture, look: .photo) }
+        // Without its picture the bot is still made, with no avatar.
+        try? await SimpleBotCreation.use(look, for: model)
         do {
-            let profile = try await model.save()
-            SimpleBotMarkStore.shared.set(mark, scope: scope, agentID: profile.id)
-            onCreated(profile)
+            onCreated(try await model.save())
         } catch {
             errorMessage = model.saveError
                 ?? String(localized: "The bot couldn't be made. Check the computer, then try again.")

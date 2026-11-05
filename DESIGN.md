@@ -510,11 +510,14 @@ text is SF Pro, as everywhere.
   Mark Read/Unread (kept on this device), Bot Profile, a divider, and Hide. Actions stay in that order;
   the primary bot has no Pin or Hide. Primary selection stays in Chats settings, and Routines in Bot Profile.
   A group chat's menu has Mark Unread and Rearrange.
-- **Marks**: thirteen shapes in eleven colors with two white eyes (`SimpleBotMark`). Picking one in a
-  bot's profile or in Create New Bot saves it as the bot's picture on its computer, so every screen,
-  device and Hermes Desktop shows it, and drops a character or pet drawn over the picture. A bot that
-  already has a picture, character or pet keeps it until a mark is picked; one with none starts on a
+- **Marks**: thirteen shapes in eleven colors with two white eyes (`SimpleBotMark`), from before Bot Studio.
+  A bot that has one keeps it until another avatar is saved; one with no picture, character or pet shows a
   mark made from its ID.
+- **Create New Bot**: the bot's face with Surprise me on it, its name, a body from each of Bot Studio's sets
+  (each as it comes) and More, eight colors (the body's own first) and Eyes, shape and moves. More and that row
+  open Bot Studio over it, on Body or Eyes; its Done brings the look back. Templates, top right, fills in the
+  role and instructions. Create saves the look as Edit avatar does: the picture on its computer and the Bot
+  Studio look beside it (`SimpleBotCreation.use`).
 - **Chat**: Back, the bot's name (its profile) and ⋯; no New chat button. Voice is a bar over the chat, under
   its header (`SimpleBotVoiceBar`), and the chat stays in use: the bot's face, a visualizer from the real audio
   levels (your voice in the page's ink, the bot's in its color, dots while nobody speaks), voice choices (live

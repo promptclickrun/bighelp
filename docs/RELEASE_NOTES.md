@@ -3,6 +3,12 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.64
+
+### Fixed
+
+- **No crash with Arriving and leaving:** when an agent saved a place to watch, bighelp crashed. After that, bighelp crashed every time it opened. Now bighelp opens again, and the places that your agents saved work.
+
 ## 2.6.63
 
 ### New

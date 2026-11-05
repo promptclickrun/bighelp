@@ -180,14 +180,8 @@ final class ChatModel {
     /// in a branch with the same history, where the message is sent (`continueInBranch`).
     var branchContinuation: ChatBranchContinuation?
     var isHydratingHistory = false
-    /// In-flight reloads from Hermes: returning to the chat, Force Refresh or
-    /// reconnect recovery. The header reads "Updating…" while any is running.
-    private(set) var hostRefreshCount = 0
-    var isRefreshingFromHost: Bool { hostRefreshCount > 0 }
     func requestSessionControls() { sessionControlsRequest += 1 }
 
-    func beginHostRefresh() { hostRefreshCount += 1 }
-    func endHostRefresh() { hostRefreshCount = max(0, hostRefreshCount - 1) }
     /// Invalidates decorative live-only reactions when canonical history arrives.
     var companionHistoryRevision = 0
     var hasPreviousHistory = false

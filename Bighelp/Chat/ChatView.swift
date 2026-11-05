@@ -715,8 +715,6 @@ struct ChatView: View {
             displayName: agentName,
             imageURL: participant?.imageURL,
             activity: model.liveActivityKind,
-            // Coming back reloads the chat from Hermes; say so while it catches up.
-            status: isChatVisible && model.isRefreshingFromHost && !model.isSending ? "Updating…" : nil,
             sessionTitle: shownSessionTitle,
             groupIdentity: model.isBotMode ? AnyView(conversationHeader) : nil,
             options: AnyView(chatOptionsMenu),
@@ -979,14 +977,11 @@ struct ChatView: View {
         return .thinking
     }
 
+    /// Coming back reloads the chat from Hermes behind its saved copy, so only the agent's own work shows here.
     private var headerLiveActivityPresentation: ChatHeaderLiveActivityPresentation? {
         ChatHeaderLiveActivityPresentation.resolve(
             phrase: currentHeaderActivityPhrase,
             isActive: isChatVisible && model.isSending
-        ) ?? ChatHeaderLiveActivityPresentation.resolve(
-            // Coming back reloads the chat from Hermes; say so while it catches up.
-            phrase: "Updating…",
-            isActive: isChatVisible && model.isRefreshingFromHost
         )
     }
 

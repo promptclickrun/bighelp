@@ -124,20 +124,31 @@ struct WorkspaceUnavailableView: View {
 struct WorkspaceReconnectingView: View {
     let destination: WorkspaceDestination
     let hostName: String
+    let hasFailed: Bool
 
     var body: some View {
-        ContentUnavailableView {
-            Label {
-                Text(destination.title)
-            } icon: {
-                BighelpNoodleView(motion: .spring, size: 48, playback: .loop(pause: 0.3))
-            }
-        } description: {
-            Text("Reconnecting to \(hostName)…")
+        HostPageWaitingView(hostName: hostName, hasFailed: hasFailed)
+            .navigationTitle(destination.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .accessibilityIdentifier("workspace.reconnecting.\(destination.rawValue)")
+    }
+}
+
+/// A page that needs its computer while the connection comes back by itself: the
+/// loader without words, and a message only once the quiet tries failed
+/// (`WorkspaceConnectionState.disconnected`).
+struct HostPageWaitingView: View {
+    let hostName: String
+    let hasFailed: Bool
+
+    var body: some View {
+        if hasFailed {
+            ContentUnavailableView("Not connected to \(hostName)", systemImage: "wifi.exclamationmark",
+                                   description: Text("This page opens once \(hostName) answers."))
+        } else {
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .navigationTitle(destination.title)
-        .navigationBarTitleDisplayMode(.inline)
-        .accessibilityIdentifier("workspace.reconnecting.\(destination.rawValue)")
     }
 }
 

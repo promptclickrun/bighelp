@@ -139,7 +139,7 @@ fixed status icon. Chats needing attention come first. Each row opens its own ch
 The expanded Dynamic Island shows three rows, while the compact island keeps a quiet work or attention symbol. Every phone chat uses this big-avatar header and keeps the tab bar under its message box (All
 agents' chats excepted). Every chat has ☰ in the top left, like the other root screens; a chat opened from the
 list, Agents, Feed or a task goes back to it with the edge swipe. A group chat's name opens its Chat Info. The line under
-the name says "Updating…" while a chat reloads from Hermes, the agent's activity while it works, and otherwise the
+the name says the agent's activity while it works, and otherwise the
 chat's title when Settings › Chat › Session title is on (off by default; never "New chat" or "Bot Chat"). iPad works the same way, with no always-open sidebar:
 ☰ slides the menu in from the leading edge, and chats use the width of the screen. The iPhone Duo follows how it's
 held (`BighelpScreenPosture`). Folded, the cover screen is wide and short, with the camera and status in a column on
@@ -646,8 +646,8 @@ Mode and in the background. The loader gallery (`-bighelp-loader-gallery`, Noodl
 | loader | Anything loading: every indeterminate `ProgressView` (`BighelpNoodleProgressStyle`, set at the app's root), `BighelpSpinner`, the chat's active tool folder |
 | thinking | Reasoning: the chat's active thinking row, a folder between calls, voice while the agent works |
 | listening, talking, resting | The voice pill: the microphone is open, the agent speaks, the call is paused or muted |
-| launch | Connecting (host setup, the connection pill, live voice), restoring a session |
-| spring | Reconnecting |
+| launch | Connecting (host setup, live voice), restoring a session |
+| spring | Reconnecting (Hosts, a plugin update waiting for Hermes) |
 | lasso | Searching (models, skills, chats) |
 | infinity | Helper agents running in the chat's active folder |
 | squiggle | Sending from the message box |

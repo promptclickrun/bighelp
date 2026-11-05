@@ -31,8 +31,6 @@ extension HostConnectionStatus {
     init?(island: ConnectionIslandPhase) {
         switch island {
         case .hidden: return nil
-        case .connecting: self.init(.connecting, "Connecting…")
-        case .reconnecting: self.init(.reconnecting, "Reconnecting…")
         case .connected: self.init(.connected, "Connected!")
         case .disconnected: self.init(.disconnected, "Not connected")
         case .noInternet: self.init(.disconnected, "No internet")
@@ -116,9 +114,11 @@ extension HostConnectionStatus {
         }
     }
 
-    /// The home dashboard's status line.
-    init(dashboardIsConnected isConnected: Bool) {
-        self = isConnected ? Self(.connected, "Connected") : Self(.reconnecting, "Reconnecting")
+    /// The home dashboard's connection; it shows only `hasFailed`'s "Not connected".
+    init(dashboardIsConnected isConnected: Bool, hasFailed: Bool = false) {
+        if isConnected { self.init(.connected, "Connected") }
+        else if hasFailed { self.init(.disconnected, "Not connected") }
+        else { self.init(.reconnecting, "Reconnecting") }
     }
 
     /// A plugin update waiting for Hermes to come back after its restart; nil

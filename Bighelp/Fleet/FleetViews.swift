@@ -46,12 +46,12 @@ struct FleetHostFilter: View {
         }
     }
 
-    /// A host still loading or out of reach shows it; a reachable one stays plain.
+    /// A host out of reach shows it; one that's loading or reachable stays plain.
     private func chip(_ title: String, isOn: Bool, status: HostConnectionStatus? = nil, id: String,
                       action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 5) {
-                if let status, status.phase != .connected {
+                if let status, status.phase == .disconnected {
                     BighelpConnectionIndicator(phase: status.phase, tint: isOn ? theme.actionForeground : nil)
                 }
                 Text(title).lineLimit(1)
@@ -451,25 +451,28 @@ struct FleetConnectingView: View {
             .onChange(of: isConnecting, initial: true) { _, connecting in if connecting { hasTried = true } }
             .onChange(of: fleet.selectedHostID) { _, _ in hasTried = isConnecting }
             .safeAreaInset(edge: .top, spacing: 0) {
-                HStack(spacing: BighelpTokens.space8) {
-                    BighelpConnectionIndicator(phase: status.phase)
-                    Text(status.label)
-                        .contentTransition(.opacity)
-                    if requiresAuthentication, let host = registry?.selectedHost {
-                        Button("Sign in again") { registry?.beginAuthentication(for: host) }
-                            .buttonStyle(.borderless)
-                            .accessibilityIdentifier("fleet.sign-in-again")
-                    } else if status.phase == .disconnected {
-                        Button("Try again", action: retry)
-                            .buttonStyle(.borderless)
+                // The list shows what each host had last time; only a failure says anything.
+                if status.phase == .disconnected {
+                    HStack(spacing: BighelpTokens.space8) {
+                        BighelpConnectionIndicator(phase: status.phase)
+                        Text(status.label)
+                            .contentTransition(.opacity)
+                        if requiresAuthentication, let host = registry?.selectedHost {
+                            Button("Sign in again") { registry?.beginAuthentication(for: host) }
+                                .buttonStyle(.borderless)
+                                .accessibilityIdentifier("fleet.sign-in-again")
+                        } else {
+                            Button("Try again", action: retry)
+                                .buttonStyle(.borderless)
+                        }
                     }
+                    .font(.bighelp(.subheadline).weight(.semibold))
+                    .foregroundStyle(theme.primaryText)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(theme.surface)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("fleet.connecting")
                 }
-                .font(.bighelp(.subheadline).weight(.semibold))
-                .foregroundStyle(theme.primaryText)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .background(theme.surface)
-                .accessibilityElement(children: .contain)
-                .accessibilityIdentifier("fleet.connecting")
             }
             .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
             .toolbar { BighelpHostsToolbarLink(registry: registry) }

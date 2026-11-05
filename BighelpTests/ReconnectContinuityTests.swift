@@ -85,67 +85,63 @@ struct WorkspaceScreenAvailabilityTests {
     }
 }
 
-/// The pill under the Dynamic Island says what the connection is doing,
-/// without getting in the way.
+/// The pill under the Dynamic Island: the app connects and reconnects behind
+/// what's on screen, so it shows only a connection that failed, and its return.
 struct ConnectionIslandRulesTests {
     private func next(from phase: ConnectionIslandPhase, _ state: WorkspaceConnectionState,
-                      hasConnected: Bool = true, hasNetwork: Bool = true, isActive: Bool = true,
+                      hasNetwork: Bool = true, isActive: Bool = true,
                       isRecovering: Bool = false) -> (phase: ConnectionIslandPhase, after: Duration?) {
-        ConnectionIslandRules.next(from: phase, state: state, hasConnected: hasConnected, hasNetwork: hasNetwork,
+        ConnectionIslandRules.next(from: phase, state: state, hasNetwork: hasNetwork,
                                    isActive: isActive, isRecovering: isRecovering)
     }
 
-    @Test func theFirstConnectionSaysConnecting() {
-        let first = next(from: .hidden, .reconnecting, hasConnected: false)
-        #expect(first.phase == .connecting)
-        #expect(first.after == ConnectionIslandRules.showDelay)
-        #expect(next(from: .connecting, .connected).phase == .connected)
+    @Test func connectingAndReconnectingShowNothing() {
+        let quiet = next(from: .hidden, .reconnecting)
+        #expect(quiet.phase == .hidden)
+        #expect(quiet.after == nil)
+        #expect(next(from: .hidden, .connected).phase == .hidden, "Connected without a failure says nothing")
     }
 
-    @Test func aDropShowsAfterAMoment() {
-        let drop = next(from: .hidden, .reconnecting)
-        #expect(drop.phase == .reconnecting)
-        #expect(drop.after == ConnectionIslandRules.showDelay)
-        let worse = next(from: .reconnecting, .disconnected)
-        #expect(worse.phase == .disconnected)
+    @Test func aFailureShowsAfterAMoment() {
+        let failed = next(from: .hidden, .disconnected)
+        #expect(failed.phase == .disconnected)
+        #expect(failed.after == ConnectionIslandRules.showDelay)
+        #expect(next(from: .hidden, .disconnected, hasNetwork: false).phase == .noInternet)
+        let worse = next(from: .disconnected, .disconnected, hasNetwork: false)
+        #expect(worse.phase == .noInternet)
         #expect(worse.after == nil)
     }
 
-    @Test func noNetworkAtAllSaysNoInternet() {
-        #expect(next(from: .reconnecting, .disconnected, hasNetwork: false).phase == .noInternet)
+    /// The pill is the only place a chat says the connection is down, so it stays
+    /// until it's back, through each new try; only "Connected!" goes away by itself.
+    @Test func aFailureStaysShownUntilTheConnectionIsBack() {
+        #expect(next(from: .disconnected, .reconnecting).phase == .disconnected)
+        #expect(next(from: .noInternet, .reconnecting).phase == .noInternet)
+        for phase: ConnectionIslandPhase in [.disconnected, .noInternet] {
+            #expect(ConnectionIslandRules.hideDelay(after: phase) == nil, "\(phase)")
+        }
+        #expect(ConnectionIslandRules.hideDelay(after: .connected) == ConnectionIslandRules.connectedHold)
     }
 
-    @Test func comingBackSaysConnected() {
-        #expect(next(from: .reconnecting, .connected).phase == .connected)
+    @Test func comingBackAfterAFailureSaysConnected() {
+        #expect(next(from: .disconnected, .connected).phase == .connected)
         #expect(next(from: .noInternet, .connected).phase == .connected)
-        // A blip too quick to show stays quiet.
-        #expect(next(from: .hidden, .connected).phase == .hidden)
         // Tucked away during a long outage, it still says so when it's back.
         #expect(next(from: .hidden, .connected, isRecovering: true).phase == .connected)
     }
 
-    /// The pill is the only place a chat says the connection is down, so it stays
-    /// until it's back; only "Connected!" goes away by itself.
-    @Test func theConnectionStaysShownUntilItsBack() {
-        for phase: ConnectionIslandPhase in [.connecting, .reconnecting, .disconnected, .noInternet] {
-            #expect(ConnectionIslandRules.hideDelay(after: phase) == nil, "\(phase)")
-        }
-        #expect(ConnectionIslandRules.hideDelay(after: .connected) == ConnectionIslandRules.connectedHold)
-        #expect(next(from: .disconnected, .disconnected).phase == .disconnected)
-    }
-
     @Test func nothingShowsInTheBackground() {
-        let away = next(from: .reconnecting, .reconnecting, isActive: false)
+        let away = next(from: .disconnected, .disconnected, isActive: false)
         #expect(away.phase == .hidden)
         #expect(away.after == nil)
     }
 
     @Test func eachStatusHasItsOwnMarkAndWords() {
-        let shown: [ConnectionIslandPhase] = [.connecting, .reconnecting, .connected, .disconnected, .noInternet]
+        let shown: [ConnectionIslandPhase] = [.connected, .disconnected, .noInternet]
         let statuses = shown.compactMap { HostConnectionStatus(island: $0) }
-        #expect(statuses.map(\.label) == ["Connecting…", "Reconnecting…", "Connected!", "Not connected", "No internet"])
-        // The shared indicator: dots, an arc, a dot that pings once, a still ring.
-        #expect(statuses.map(\.phase) == [.connecting, .reconnecting, .connected, .disconnected, .disconnected])
+        #expect(statuses.map(\.label) == ["Connected!", "Not connected", "No internet"])
+        // The shared indicator: a dot that pings once, a still ring.
+        #expect(statuses.map(\.phase) == [.connected, .disconnected, .disconnected])
         #expect(Set(shown.map(\.spokenStatus)).count == shown.count)
     }
 }

@@ -563,9 +563,7 @@ final class ShellFeatureStore {
             warmSessionRefreshes[id] = nil
         }
         let flightID = UUID()
-        model.beginHostRefresh()
         let task = Task { @MainActor [weak self, weak model] in
-            defer { model?.endHostRefresh() }
             guard let model else { throw CancellationError() }
             defer {
                 if let self, self.warmSessionRefreshes[id]?.id == flightID {
@@ -609,9 +607,7 @@ final class ShellFeatureStore {
         }
 
         let flightID = UUID()
-        model.beginHostRefresh()
         let task = Task { @MainActor [weak self, weak model] in
-            defer { model?.endHostRefresh() }
             guard let self, let model else { throw CancellationError() }
             defer {
                 if self.canonicalSessionReentries[id]?.id == flightID {

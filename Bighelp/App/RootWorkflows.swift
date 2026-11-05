@@ -118,8 +118,7 @@ extension RootShellView {
             }
         } else if currentWorkspaceOwner == nil, workspaceConnections != nil {
             // Back in the app, the connection opens again in a moment.
-            ProgressView("Connecting to your computer…")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            HostPageWaitingView(hostName: workspaceHostName, hasFailed: connectionKeeper.state == .disconnected)
                 .accessibilityIdentifier("workflows.connecting")
         } else {
             ContentUnavailableView("Workflows aren't available", systemImage: "flowchart",

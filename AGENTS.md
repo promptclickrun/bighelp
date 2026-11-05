@@ -780,6 +780,12 @@ sections can crash only on devices ("Thread stack size exceeded").
 - The chat on screen always gets a connection of its own. One opened while the host was away (its saved copy
   shows), or whose open a reconnect cut short, opens again once the runtime reconnects (`openDetachedChat`); the
   reconnect's recovery reattaches only chats that had one, and Send stayed off until you backed out and back in.
+- Opening and coming back never wait for the computer: the workspace opens from what the phone saved for the
+  sign-in (`WorkspaceConnectionStore.savedAuthority`, `NativeWorkspaceSelectionStore`), and the connection comes up
+  behind it, into the same runtime. Nothing says "Connecting" or "Reconnecting" meanwhile: the pill, the dashboard
+  and pages that need the computer (`HostPageWaitingView`) speak only once the keeper's quiet tries fail
+  (`WorkspaceConnectionState.disconnected`). A sign-in that ended before it connected once keeps the opening
+  screen, which has Sign in again.
 - The connection pill at the top (`ConnectionIsland`) has its own pass-through window so it shows over sheets. iOS
   hides an app's own Live Activity while the app is open, so it can't be the real Dynamic Island.
 

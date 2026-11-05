@@ -12,7 +12,10 @@ import UserNotifications
 /// background for an event (with Always allowed) and holds the event until a monitor of this name
 /// is open and listened to, so `DeviceGeofenceTool.live` starts it at every launch.
 actor LiveDeviceGeofenceMonitor: DeviceGeofenceMonitoring {
-    static let name = "bighelp.geofences"
+    /// Letters and digits only: Core Location ends the app with an assertion in `CLMonitor.init` for any
+    /// other name. "bighelp.geofences" (through 2.6.63) crashed at every launch once a place was saved.
+    /// A new name opens a new monitor, and `DeviceGeofenceMonitor.start()` adds the saved places to it.
+    static let name = "bighelpGeofences"
     private var opening: Task<CLMonitor, Never>?
 
     /// One monitor per name: iOS refuses a second one open, so concurrent callers share the first.

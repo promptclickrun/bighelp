@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 import Testing
 @testable import Bighelp
@@ -7,6 +8,23 @@ import Testing
 /// place and coordinate here is made up.
 @MainActor
 struct DeviceGeofenceToolTests {
+    #if !os(visionOS)
+    /// Core Location takes a monitor name of letters and digits only and ends the app for any other:
+    /// "bighelp.geofences" crashed at every launch once a place was saved.
+    @Test func theMonitorNameIsLettersAndDigits() {
+        let name = LiveDeviceGeofenceMonitor.name
+        #expect(!name.isEmpty)
+        #expect(name.unicodeScalars.allSatisfy { ("a"..."z").contains($0) || ("A"..."Z").contains($0) || ("0"..."9").contains($0) },
+                "\(name) has a character Core Location refuses")
+    }
+
+    /// Core Location opens the live monitor by that name, as the app does at launch once a place is saved.
+    @Test func theLiveMonitorOpensUnderItsName() async {
+        let monitor = await CLMonitor(LiveDeviceGeofenceMonitor.name)
+        #expect(await monitor.identifiers.isEmpty)
+    }
+    #endif
+
     private static let arrival = date("2026-10-22T17:42:00Z")
 
     // MARK: Message

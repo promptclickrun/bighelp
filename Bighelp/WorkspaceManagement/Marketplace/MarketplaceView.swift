@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// One of the Marketplace's four ways in.
+/// One of the Marketplace's ways in.
 enum MarketplaceSection: String, CaseIterable, Identifiable, Sendable {
-    case apps, skills, plugins, messaging
+    case apps, skills, plugins, mcp, messaging
 
     var id: String { rawValue }
 
@@ -11,6 +11,7 @@ enum MarketplaceSection: String, CaseIterable, Identifiable, Sendable {
         case .apps: String(localized: "Apps")
         case .skills: String(localized: "Skills")
         case .plugins: String(localized: "Plugins")
+        case .mcp: String(localized: "MCP servers")
         case .messaging: String(localized: "Talk anywhere")
         }
     }
@@ -20,6 +21,7 @@ enum MarketplaceSection: String, CaseIterable, Identifiable, Sendable {
         case .apps: String(localized: "Sign in once and your agents can use them.")
         case .skills: String(localized: "Know-how your agent follows, step by step.")
         case .plugins: String(localized: "New tools for every agent on this computer.")
+        case .mcp: String(localized: "Tools from servers your agent connects to.")
         case .messaging: String(localized: "Reach your agent in Telegram, Discord and more.")
         }
     }
@@ -29,6 +31,7 @@ enum MarketplaceSection: String, CaseIterable, Identifiable, Sendable {
         case .apps: "square.grid.2x2.fill"
         case .skills: "graduationcap.fill"
         case .plugins: "puzzlepiece.extension.fill"
+        case .mcp: "server.rack"
         case .messaging: "bubble.left.and.text.bubble.right.fill"
         }
     }
@@ -47,8 +50,8 @@ struct MarketplaceContext: Identifiable {
     let page: @MainActor (MarketplaceSection) -> AnyView
 }
 
-/// Settings › Marketplace, and a bot's own from its profile: this week's featured plugin, the four
-/// ways in (Apps, Skills, Plugins, Talk anywhere), then the plugins with the most stars. For
+/// Settings › Marketplace, and a bot's own from its profile: this week's featured plugin, the ways in
+/// (Apps, Skills, Plugins, MCP servers, Talk anywhere), then the plugins with the most stars. For
 /// everyone, not Nerd Mode: the pages behind it are the same ones Hermes tools opens.
 @MainActor
 struct MarketplaceView: View {

@@ -24,6 +24,10 @@ struct SimpleBotProfileContext {
     var makeAdvancedOptions: ((String) -> AdvancedOptionsContext?)? = nil
     /// The bot's own Marketplace (its skills, apps and messaging apps, and the computer's plugins).
     var makeMarketplace: ((String) -> MarketplaceContext)? = nil
+    /// The bot's SOUL.md, USER.md, MEMORY.md and its project's AGENTS.md; nil without a computer.
+    var makeCoreFiles: ((String) -> (any CoreFilesSource)?)? = nil
+    /// The bot's Connections page: this device's access and its apps.
+    var makeConnections: ((String) -> AnyView)? = nil
     /// The folder the computer shares (Files); nil without a computer.
     var makeFilesSource: (() -> (any SimpleBotFilesSource)?)? = nil
     /// Photos and videos from the bot's chats (Media); nil while no computer is connected.
@@ -95,6 +99,8 @@ struct SimpleBotProfileView: View {
     @State private var advancedOptions: AdvancedOptionsContext?
     @State private var isAdvancedPresented = false
     @State private var marketplace: MarketplaceContext?
+    @State private var coreFiles: CoreFilesPresentation?
+    @State private var isConnectionsPresented = false
     @State private var vault: CredentialVaultModel?
     @State private var isVaultPresented = false
     @State private var files: SimpleBotFilesModel?
@@ -246,6 +252,36 @@ struct SimpleBotProfileView: View {
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
                     .bighelpSheetSize(.standard)
+            }
+        }
+        .bighelpSheet(item: $coreFiles) { presentation in
+            NavigationStack {
+                CoreFilesView(source: presentation.source, botName: presentation.botName)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(String(localized: "Done")) { coreFiles = nil }
+                                .accessibilityIdentifier("core-files.done")
+                        }
+                    }
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .bighelpSheetSize(.standard)
+        }
+        .bighelpSheet(isPresented: $isConnectionsPresented) {
+            if let makeConnections = context.makeConnections {
+                NavigationStack {
+                    makeConnections(agentID)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button(String(localized: "Done")) { isConnectionsPresented = false }
+                                    .accessibilityIdentifier("bot.connections.done")
+                            }
+                        }
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .bighelpSheetSize(.standard)
             }
         }
         .bighelpSheet(item: $marketplace) { marketplace in
@@ -684,6 +720,17 @@ struct SimpleBotProfileView: View {
                 .disabled(!context.canEdit)
                 .driveTarget("simple-bots.profile.instructions")
                 .accessibilityIdentifier("simple-bots.profile.instructions")
+                if let makeCoreFiles = context.makeCoreFiles {
+                    SimpleBotsDivider()
+                    Button {
+                        coreFiles = makeCoreFiles(profile.id).map { CoreFilesPresentation(source: $0, botName: profile.name) }
+                    } label: {
+                        SimpleBotsRow(title: String(localized: "Core Files"), leading: Image(systemName: "doc.text.magnifyingglass"))
+                    }
+                    .buttonStyle(.plain)
+                    .driveTarget("simple-bots.profile.core-files")
+                    .accessibilityIdentifier("simple-bots.profile.core-files")
+                }
                 SimpleBotsDivider()
                 Button { isPhotoActionsPresented = true } label: {
                     SimpleBotsRow(title: String(localized: "Photo actions"), leading: Image(systemName: "photo.badge.checkmark"))
@@ -711,6 +758,16 @@ struct SimpleBotProfileView: View {
                     .buttonStyle(.plain)
                     .driveTarget("simple-bots.profile.default-voice")
                     .accessibilityIdentifier("simple-bots.profile.default-voice")
+                }
+                if context.makeConnections != nil {
+                    SimpleBotsDivider()
+                    Button { isConnectionsPresented = true } label: {
+                        SimpleBotsRow(title: String(localized: "Connections"),
+                                      leading: Image(systemName: "app.connected.to.app.below.fill"))
+                    }
+                    .buttonStyle(.plain)
+                    .driveTarget("simple-bots.profile.connections")
+                    .accessibilityIdentifier("simple-bots.profile.connections")
                 }
                 if let vault {
                     SimpleBotsDivider()

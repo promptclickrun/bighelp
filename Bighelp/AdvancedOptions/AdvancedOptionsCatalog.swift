@@ -327,6 +327,6 @@ enum AdvancedOptionsCatalog {
     private static let experts = AdvancedGroup(
         id: "experts",
         title: String(localized: "For experts"),
-        rows: [.page(.rawConfiguration), .page(.skillsHub), .page(.toolServers), .page(.plugins),
-               .page(.webhooks), .page(.logs)])
+        // The Skills Hub, MCP servers and Plugins are in the bot's Marketplace.
+        rows: [.page(.rawConfiguration), .page(.webhooks), .page(.logs)])
 }

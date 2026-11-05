@@ -23,7 +23,10 @@ change in both repos.
     token counts. Nerd Mode is `settings.nerdModeEnabled`, also the `nerdModeEnabled` environment value.
   - What agents can add is for everyone: Settings › Marketplace (`MarketplaceView`) opens Apps, Skills, Plugins and
     Talk anywhere (messaging apps) with this week's featured plugin, and each bot's profile has its own for that
-    bot. They're the same pages Hermes tools lists.
+    bot, with MCP servers too. They're the same pages Hermes tools lists; a bot's Advanced Options no longer lists
+    the Skills Hub, Plugins or MCP servers. A bot's profile also has Connections (Device access and its apps) and
+    Core Files: its SOUL.md, USER.md, MEMORY.md and its active project's AGENTS.md, read and saved whole through
+    the plugin's `core-files/*` (`native-core-files-v1`) in the Markdown viewer (`CoreFilesView`).
   - Everyday controls must never live only behind Nerd Mode.
 - **One place for each thing.**
   - There's one ☰ menu (`BighelpMenu`) and one Settings. Settings is a short list of rows that each open one page,

@@ -444,6 +444,7 @@
 		3B7A7FD89CA171ACBC2D9B75 /* HostPluginUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AC0C5C21B939C2BC28A21F4 /* HostPluginUpdate.swift */; };
 		3B80F6C4CC3034E0A30EE01F /* BighelpCardCatalogClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCD72AB088AD85CF46830B9D /* BighelpCardCatalogClientTests.swift */; };
 		3B88C44F95F182BEE1592E30 /* AdvancedOptionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8B9F6C28C72C0F51DAED539 /* AdvancedOptionsTests.swift */; };
+		3C0824DEA0E14A5890C0BB4A /* runs-script-only.json in Resources */ = {isa = PBXBuildFile; fileRef = 4433E549C2FF144608504128 /* runs-script-only.json */; };
 		3C348968573E7F53A7D1F9FD /* ChatTurnFailureUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0297BA21BBDDD1F1BD93679 /* ChatTurnFailureUITests.swift */; };
 		3C348F622E813505DE17112D /* FleetViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6845AF0639C9B3171B2E3DEB /* FleetViews.swift */; };
 		3C7E68E3BBDF6D20A1EB9667 /* UsageExportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F192A98CA05B3B3D3C45AC8 /* UsageExportTests.swift */; };
@@ -791,6 +792,7 @@
 		68B63898B7EF857A586E5EA3 /* WatchRelayProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9C467FC7317A4696048CFF0 /* WatchRelayProjection.swift */; };
 		68C5113F9210FECC31BF8277 /* AvatarChooserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE237713D643E40900063790 /* AvatarChooserView.swift */; };
 		68C71E44D0C5018463169AD8 /* KanbanWidgetPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 939B3D6EB46251894796B1AB /* KanbanWidgetPublisher.swift */; };
+		68D3B097F88EF05663283FD5 /* job-detail.json in Resources */ = {isa = PBXBuildFile; fileRef = A4F0FAF15C0DDB2449C57F89 /* job-detail.json */; };
 		68D6A0D6448B56839C7A9E4A /* PushDisplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C415101BB0D4042CFBE194 /* PushDisplayTests.swift */; };
 		68F420AEEAA55D1DE99A364D /* ChatDestinationAgentResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A0D9E32BA614BB2E014A2C7 /* ChatDestinationAgentResolverTests.swift */; };
 		6915F5A6AD100E5387F0C2EC /* SessionCommandWireModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0039A1FE107A5268FD9E9B /* SessionCommandWireModels.swift */; };
@@ -905,6 +907,7 @@
 		756DE8BED12A998CA830A3FA /* ManagementSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D4BC302EAA32A5632E24C8D /* ManagementSearchTests.swift */; };
 		75C0AE91E97798033204DA52 /* ProjectsLifecycleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6042C0EC3B8B2FA6F5837C4 /* ProjectsLifecycleView.swift */; };
 		75F1D17E0418F160AB22478F /* PushEnrollmentIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 446E3BCC8FC229A69B4D3CBB /* PushEnrollmentIntegrationTests.swift */; };
+		764B6D84403C28132D2ED713 /* runs-agent.json in Resources */ = {isa = PBXBuildFile; fileRef = D5149D050C5E815198C4977A /* runs-agent.json */; };
 		76A46628A6F4FF3679DFD92E /* ChatSessionTitleHeaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C921117448BFD93E2B732354 /* ChatSessionTitleHeaderTests.swift */; };
 		76E347715491113098751F4B /* UsageExportHTML.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294CAADD6C666FC513722844 /* UsageExportHTML.swift */; };
 		76E6EC211AC38F503F1F03C7 /* BighelpShortcutIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D138674A02ECB3B509216ED0 /* BighelpShortcutIntents.swift */; };
@@ -2602,6 +2605,7 @@
 		43C94BD61162D35FD4205BA8 /* BighelpGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpGlyph.swift; sourceTree = "<group>"; };
 		43DC33ACEF48388887235EEE /* OnDeviceVoiceSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceVoiceSettings.swift; sourceTree = "<group>"; };
 		43E999D974BD5735B4179BF6 /* live-earthquakes.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "live-earthquakes.json"; sourceTree = "<group>"; };
+		4433E549C2FF144608504128 /* runs-script-only.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "runs-script-only.json"; sourceTree = "<group>"; };
 		443A7C01587F2C21EA5FAA7E /* DirectHermesProjectLifecycleClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesProjectLifecycleClient.swift; sourceTree = "<group>"; };
 		4440411763E09D8DF72C65A9 /* BighelpCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpCardView.swift; sourceTree = "<group>"; };
 		446E3BCC8FC229A69B4D3CBB /* PushEnrollmentIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushEnrollmentIntegrationTests.swift; sourceTree = "<group>"; };
@@ -3354,6 +3358,7 @@
 		A49088BE1588595A22C2128D /* ChatTurnFailureHostUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTurnFailureHostUITests.swift; sourceTree = "<group>"; };
 		A4B544903C9AB31FA555FE65 /* BighelpShortcutLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpShortcutLinks.swift; sourceTree = "<group>"; };
 		A4C635A2879E0F34F2D33F7D /* BighelpSideMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpSideMenuTests.swift; sourceTree = "<group>"; };
+		A4F0FAF15C0DDB2449C57F89 /* job-detail.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "job-detail.json"; sourceTree = "<group>"; };
 		A55DAB5072E51C8D1AC15B64 /* OnDeviceVoiceInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceVoiceInstaller.swift; sourceTree = "<group>"; };
 		A574AF8E9AC1BDB9730BEF0B /* ChatToolReadableDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatToolReadableDetail.swift; sourceTree = "<group>"; };
 		A598BF0A59557DF48DD3BD96 /* DirectHermesManagementLiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesManagementLiveTests.swift; sourceTree = "<group>"; };
@@ -3703,6 +3708,7 @@
 		D4EE1DC2822C5FC210D90AE0 /* BighelpWindowAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpWindowAppearance.swift; sourceTree = "<group>"; };
 		D4F646E405205B3A5C8D7BED /* WorkspaceManagementLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceManagementLayoutTests.swift; sourceTree = "<group>"; };
 		D50DC8E2C99731C2D773E1E8 /* CompanionSurfacePhysics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionSurfacePhysics.swift; sourceTree = "<group>"; };
+		D5149D050C5E815198C4977A /* runs-agent.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "runs-agent.json"; sourceTree = "<group>"; };
 		D51BF68C15E152807C58243B /* SimpleBotProfileExtras.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleBotProfileExtras.swift; sourceTree = "<group>"; };
 		D51F66A3393E8DF152C00E0D /* GeminiLiveRealServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiLiveRealServiceTests.swift; sourceTree = "<group>"; };
 		D526F4C75CCA7EF12BC76F42 /* OnDeviceSpeechEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceSpeechEngine.swift; sourceTree = "<group>"; };
@@ -5993,6 +5999,7 @@
 				2FA73AFA26F8900D33EE46AF /* telemetry-v1.json */,
 				C0CE1E19E9A636C4F4384691 /* CardExamples */,
 				FEB73B139567EA4146800F9E /* GenerativeUIV2 */,
+				FF3A43DBD2335B64D1B7044B /* HermesCron */,
 				683787982A643F47A7E2874A /* HermesGroups */,
 				5506A4263EE53CACF88CC331 /* OnDeviceVoice */,
 				16F1EA0C90EF4FF985CF9DE8 /* Workflows */,
@@ -6878,6 +6885,16 @@
 			path = GenerativeUIV2;
 			sourceTree = "<group>";
 		};
+		FF3A43DBD2335B64D1B7044B /* HermesCron */ = {
+			isa = PBXGroup;
+			children = (
+				A4F0FAF15C0DDB2449C57F89 /* job-detail.json */,
+				D5149D050C5E815198C4977A /* runs-agent.json */,
+				4433E549C2FF144608504128 /* runs-script-only.json */,
+			);
+			path = HermesCron;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -7212,6 +7229,7 @@
 				B64D060B1FD84DA788BE7BB2 /* inbox-card-workspace.json in Resources */,
 				A24C7032BBA76B53AD05E820 /* incomplete.zip in Resources */,
 				C1B8811FE39B6EA95B8A0E78 /* invalid-private-url.json in Resources */,
+				68D3B097F88EF05663283FD5 /* job-detail.json in Resources */,
 				9A92976A43CA7504E11702A7 /* legacy-path.json in Resources */,
 				516E75BCCFB1BA2F2DEBA372 /* list-v2.json in Resources */,
 				EEEB50E2DBF4AE5BFD0254F5 /* list.json in Resources */,
@@ -7223,6 +7241,7 @@
 				24A40737A11720660FEEA796 /* publish.json in Resources */,
 				E157532EE8C79653F4A880C1 /* rendered-image-drafts.json in Resources */,
 				27D433C0F08016446172D262 /* run-states.json in Resources */,
+				764B6D84403C28132D2ED713 /* runs-agent.json in Resources */,
 				60DFDC0973988F2A9C22B96B /* runs-control.json in Resources */,
 				855970867300E24B7E7B3E77 /* runs-events.json in Resources */,
 				BCFCB6C6E57094F0EFD0A454 /* runs-get-code-command.json in Resources */,
@@ -7232,6 +7251,7 @@
 				9EF3242F11C72B1B8BC6A585 /* runs-get-text-runner.json in Resources */,
 				AB43C53CA037210ACD421590 /* runs-get.json in Resources */,
 				E86F7CC161B08C4625DC420E /* runs-list.json in Resources */,
+				3C0824DEA0E14A5890C0BB4A /* runs-script-only.json in Resources */,
 				E1BD1F0D82A7FD303AB5312A /* runs-signoff-code.json in Resources */,
 				BF4B417384D6C2FB9F81405E /* runs-signoff.json in Resources */,
 				4673B7CC0F30B2287B32517A /* runs-start-code.json in Resources */,

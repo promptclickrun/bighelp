@@ -1,0 +1,25 @@
+{
+  "_note": "Captured from stock Hermes (main, 2026-11-05) on an isolated host with a synthetic model; local paths and the system prompt removed.",
+  "jobID": "150ee8d2a327",
+  "response": {
+    "runs": [
+      {
+        "id": "cron_output:150ee8d2a327:2026-11-04_20-30-37",
+        "title": "COMPLETED \u00b7 # Cron Job: Hello script **Job ID:** 150ee8d2a327 **Run Time:** 2026-11-04 20:30:37 **Mode:** no_agent (script) --- Hello from the script-only job.",
+        "preview": "# Cron Job: Hello script **Job ID:** 150ee8d2a327 **Run Time:** 2026-11-04 20:30:37 **Mode:** no_agent (script) --- Hello from the script-only job.",
+        "source": "cron_output",
+        "started_at": 1793845837.0,
+        "last_active": 1793845837.0,
+        "ended_at": 1793845837.0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "message_count": 0,
+        "tool_call_count": 0,
+        "model": null,
+        "archived": false,
+        "is_active": false
+      }
+    ],
+    "limit": 20
+  }
+}

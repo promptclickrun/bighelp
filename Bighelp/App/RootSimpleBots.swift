@@ -309,6 +309,8 @@ extension RootShellView {
             makeCredentialVault: { makeCredentialVault(for: $0) },
             makeAdvancedOptions: { makeAdvancedOptions(for: $0) },
             makeMarketplace: { makeMarketplace(for: $0) },
+            makeCoreFiles: { makeCoreFiles(for: $0) },
+            makeConnections: { makeBotConnections(for: $0) },
             makeFilesSource: { makeSimpleBotFilesSource() },
             makeMediaClient: { makeSimpleBotMediaClient() },
             showsHiddenFiles: settings.nerdModeEnabled,

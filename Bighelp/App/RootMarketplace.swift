@@ -31,9 +31,33 @@ extension RootShellView {
                 WorkspaceUnavailableView(destination: destination, hostName: workspaceHostName,
                                          reason: String(localized: "Connect to your computer, then open this again."))
             }
+        case .mcp:
+            advancedOptionsPage(.toolServers, agentID: agentID)
         case .messaging:
             advancedOptionsPage(.messaging, agentID: agentID)
         }
+    }
+
+    /// A bot's Core Files (`CoreFilesView`) on the computer in use; made-up files in demo mode.
+    func makeCoreFiles(for agentID: String) -> (any CoreFilesSource)? {
+        #if DEBUG
+        if usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true { return DemoCoreFiles() }
+        #endif
+        guard workspaceConnections?.workspace != nil else { return nil }
+        return DirectHermesCoreFilesClient(agentID: agentID) { [weak workspaceConnections] in workspaceConnections?.workspace }
+    }
+
+    /// A bot's Connections: this device's access and the apps the bot can use, as Settings › Connections
+    /// lists them. Its saved logins have their own row on the profile.
+    func makeBotConnections(for agentID: String) -> AnyView {
+        AnyView(AppsHubView(native: connectorAppsModel(), composio: composioAppsModel(for: agentID)) {
+            NavigationLink {
+                PermissionsSettingsView(center: permissionCenter)
+            } label: {
+                DeviceAccessRowLabel()
+            }
+            .accessibilityIdentifier("bot.connections.device-access")
+        })
     }
 
     /// The Skills Hub and Plugins clients for `agentID` on the computer in use; demo mode's

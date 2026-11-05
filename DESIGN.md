@@ -391,7 +391,9 @@ not when it comes back; a link, widget or notification that opens the app wins, 
 computer can't open them fall back to Last chat (`BighelpLanding`).
 **Marketplace** (Settings › Agents, and a row on each bot's profile for that bot) is for everyone: this week's
 featured plugin (the pick Hermes' marketplace and Desktop show), four ways in (Apps, Skills, Plugins, Talk anywhere
-for messaging apps) and the plugins with the most stars. Host administration — files, MCP, memory, logs,
+for messaging apps) and the plugins with the most stars; a bot's adds MCP servers. A bot's profile also lists
+Connections and **Core Files** (SOUL.md, USER.md, MEMORY.md and its project's AGENTS.md, each opening in the
+Markdown viewer to read or edit). Host administration — files, MCP, memory, logs,
 activity — is hidden until **Nerd Mode** is on, which adds a Hermes section at the bottom: **System** (Update Hermes with how many commits behind,
 Restart Hermes Gateway, the plugin's Update button, then everything else folded away) and **Hermes tools** (the
 searchable list of the host's tools). There's no separate Hermes Tools entry in ☰. Pages lead with the action

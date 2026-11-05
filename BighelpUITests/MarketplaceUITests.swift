@@ -34,6 +34,68 @@ final class MarketplaceUITests: BighelpUITestCase {
     @MainActor
     func testABotsProfileOpensItsOwnMarketplace() {
         let app = launch(appearance: "light", extra: ["-preview-ui-v3", "-bighelp.settings.simple-bots", "YES"])
+        openPrimaryProfileInfo(app)
+
+        let row = app.buttons["simple-bots.profile.marketplace"]
+        for _ in 0..<4 where !row.isHittable { app.swipeUp() }
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "A bot's profile has its own Marketplace")
+        row.tap()
+        XCTAssertTrue(app.buttons["marketplace.featured"].waitForExistence(timeout: 10))
+        evidence("marketplace-bot-light", app)
+        open("skills", expecting: "skills.hero", in: app)
+        open("mcp", expecting: nil, in: app)
+        app.buttons["marketplace.done"].tap()
+        XCTAssertTrue(app.buttons["marketplace.done"].waitForNonExistence(timeout: 5))
+
+        // The Skills Hub, MCP servers and Plugins are in the Marketplace, not in Advanced Options.
+        let advanced = app.buttons["simple-bots.profile.advanced-options"]
+        for _ in 0..<4 where !advanced.isHittable { app.swipeUp() }
+        advanced.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["advanced.options"].waitForExistence(timeout: 10))
+        for _ in 0..<4 { app.swipeUp() }
+        XCTAssertTrue(app.buttons["advanced.page.logs"].exists, "Advanced Options keeps its expert pages")
+        for page in ["skillsHub", "toolServers", "plugins"] {
+            XCTAssertFalse(app.buttons["advanced.page.\(page)"].exists, "\(page) is in the Marketplace")
+        }
+        app.buttons["advanced.done"].tap()
+    }
+
+    /// A bot's profile has its Core Files (SOUL.md and the rest, which open in the editor) and its Connections.
+    @MainActor
+    func testABotsProfileOpensItsCoreFilesAndConnections() {
+        for appearance in ["light", "dark"] {
+            let app = launch(appearance: appearance, extra: ["-preview-ui-v3", "-bighelp.settings.simple-bots", "YES"])
+            openPrimaryProfileInfo(app)
+
+            let coreFiles = app.buttons["simple-bots.profile.core-files"]
+            for _ in 0..<4 where !coreFiles.isHittable { app.swipeUp() }
+            XCTAssertTrue(coreFiles.waitForExistence(timeout: 5), "A bot's profile has Core Files")
+            coreFiles.tap()
+            for kind in ["soul", "user", "memory", "agents"] {
+                XCTAssertTrue(app.buttons["core-files.\(kind)"].waitForExistence(timeout: 10), "Core Files lists \(kind)")
+            }
+            evidence("core-files-\(appearance)", app)
+            app.buttons["core-files.soul"].tap()
+            XCTAssertTrue(app.buttons["markdown-file.done"].waitForExistence(timeout: 10), "SOUL.md opens in the editor")
+            evidence("core-files-soul-\(appearance)", app)
+            app.buttons["markdown-file.done"].tap()
+            app.buttons["core-files.done"].tap()
+            XCTAssertTrue(app.buttons["core-files.done"].waitForNonExistence(timeout: 5))
+
+            let connections = app.buttons["simple-bots.profile.connections"]
+            for _ in 0..<4 where !connections.isHittable { app.swipeUp() }
+            XCTAssertTrue(connections.waitForExistence(timeout: 5), "A bot's profile has Connections")
+            connections.tap()
+            XCTAssertTrue(app.buttons["bot.connections.device-access"].waitForExistence(timeout: 10),
+                          "Connections leads with this device's access")
+            evidence("bot-connections-\(appearance)", app)
+            app.buttons["bot.connections.done"].tap()
+            app.terminate()
+        }
+    }
+
+    @MainActor
+    private func openPrimaryProfileInfo(_ app: XCUIApplication) {
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
         app.buttons["simple-bots.primary"].tap()
         let identity = app.buttons["chat.identity"]
@@ -44,16 +106,6 @@ final class MarketplaceUITests: BighelpUITestCase {
         if !profile.waitForExistence(timeout: 5) { identity.tap() }
         XCTAssertTrue(profile.waitForExistence(timeout: 5))
         app.buttons["simple-bots.profile.tab.info"].tap()
-
-        let row = app.buttons["simple-bots.profile.marketplace"]
-        for _ in 0..<4 where !row.isHittable { app.swipeUp() }
-        XCTAssertTrue(row.waitForExistence(timeout: 5), "A bot's profile has its own Marketplace")
-        row.tap()
-        XCTAssertTrue(app.buttons["marketplace.featured"].waitForExistence(timeout: 10))
-        evidence("marketplace-bot-light", app)
-        open("skills", expecting: "skills.hero", in: app)
-        app.buttons["marketplace.done"].tap()
-        XCTAssertTrue(app.buttons["marketplace.done"].waitForNonExistence(timeout: 5))
     }
 
     /// Opens one way in, checks its page and goes back. `expecting` nil checks only that a page opened.

@@ -190,6 +190,11 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     /// Hermes' marketplace facts for the catalog plugins and the ones this computer won't install
     /// (plugin, `native-marketplace-v1`).
     case marketplacePlugins = "marketplace.plugins"
+    /// A bot's SOUL.md, USER.md, MEMORY.md and its active project's AGENTS.md, read and saved whole
+    /// (plugin, `native-core-files-v1`).
+    case coreFilesList = "core-files.list"
+    case coreFilesRead = "core-files.read"
+    case coreFilesWrite = "core-files.write"
     /// An agent's Bot Chat, made by Hermes itself as its own chat (plugin, `native-bot-chat-v1`). A chat the
     /// app makes over its socket is one Hermes replaces when another agent messages that agent.
     case botChatCreate = "bot-chat.create"

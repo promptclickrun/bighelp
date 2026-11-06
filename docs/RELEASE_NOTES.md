@@ -3,6 +3,12 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.66
+
+### Fixed
+
+- **Group chats open again:** a newer Hermes sends more facts about a group chat. bighelp did not accept them, and no group chat opened. Now group chats open. When Hermes cannot do a group request, bighelp shows the reason of Hermes.
+
 ## 2.6.65
 
 ### New

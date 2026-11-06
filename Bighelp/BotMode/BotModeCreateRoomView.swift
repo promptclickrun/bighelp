@@ -302,6 +302,7 @@ struct BotModeCreateRoomView: View {
                 leadProfileID = nil
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("bot-mode.create.routing")
     }
 

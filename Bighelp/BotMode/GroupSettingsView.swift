@@ -140,6 +140,7 @@ struct GroupSettingsView: View {
                           spacing: BighelpTokens.space12) {
                     ForEach(participants) { participant in face(participant) }
                 }
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("group-settings.members")
             }
             .frame(maxWidth: .infinity)

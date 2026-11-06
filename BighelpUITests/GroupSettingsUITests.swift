@@ -24,10 +24,14 @@ final class GroupSettingsUITests: BighelpUITestCase {
 
     @MainActor
     private func keep(_ app: XCUIApplication, _ name: String) {
-        let shot = XCTAttachment(screenshot: app.screenshot())
-        shot.name = name
-        shot.lifetime = .keepAlways
-        add(shot)
+        let shot = app.screenshot()
+        let attachment = XCTAttachment(screenshot: shot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        guard let folder = ProcessInfo.processInfo.environment["BIGHELP_UI_EVIDENCE"] else { return }
+        try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+        try? shot.pngRepresentation.write(to: URL(fileURLWithPath: folder).appendingPathComponent("\(name).png"))
     }
 
     /// The chat says who took each message, the paused discussion goes on with Continue, and
@@ -104,6 +108,48 @@ final class GroupSettingsUITests: BighelpUITestCase {
         app.buttons["group-settings.discard"].tap()
         XCTAssertTrue(problem.waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.buttons["group-settings.routing.lead"].isSelected)
+        app.terminate()
+    }
+
+    /// New Group Chat asks who answers and the purpose, and the group starts with them.
+    @MainActor
+    func testNewGroupChatStartsWithItsChoice() {
+        XCUIDevice.shared.orientation = .portrait
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-group-create",
+                               "-loopdy.demo.appearance", "light"]
+        app.launch()
+        openAgents(in: app)
+        let create = app.buttons["agents.groups.create"]
+        for _ in 0..<6 where !(create.exists && create.isHittable) { app.swipeUp() }
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        create.tap()
+        let everyone = app.buttons["bot-mode.create.routing.everyone"]
+        XCTAssertTrue(everyone.waitForExistence(timeout: 5))
+        XCTAssertTrue(everyone.isSelected, "Everyone answers unless the person picks otherwise")
+        app.buttons["bot-mode.create.participant.finance"].tap()
+        app.buttons["bot-mode.create.participant.home"].tap()
+        let lead = app.buttons["bot-mode.create.routing.lead"]
+        XCTAssertTrue(lead.waitForExistence(timeout: 5))
+        lead.tap()
+        let jordan = app.buttons["Jordan Lee"]
+        XCTAssertTrue(jordan.waitForExistence(timeout: 5))
+        jordan.tap()
+        XCTAssertEqual(lead.value as? String, "Lead: Jordan Lee")
+        let title = app.textFields["bot-mode.create.title"]
+        title.tap()
+        title.typeText("Supper club\n")
+        let purpose = app.textFields["bot-mode.create.purpose"]
+        purpose.tap()
+        purpose.typeText("Plan Friday supper\n")
+        keep(app, "new-group-chat-routing")
+        app.buttons["bot-mode.create.submit"].tap()
+
+        XCTAssertTrue(app.staticTexts["Lead: Jordan Lee"].waitForExistence(timeout: 10), "The group starts with its lead")
+        app.descendants(matching: .any)["chat.people"].firstMatch.tap()
+        let saved = app.textFields["group-settings.purpose"]
+        XCTAssertTrue(saved.waitForExistence(timeout: 5))
+        XCTAssertEqual(saved.value as? String, "Plan Friday supper")
         app.terminate()
     }
 

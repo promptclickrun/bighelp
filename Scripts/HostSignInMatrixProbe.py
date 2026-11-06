@@ -38,6 +38,10 @@ HOME and HERMES_HOME, then runs the matching HostSignInMatrixUITests:
             access card, Turn on (or Not now) answers it, and the agent says what its
             original call got back (DeviceAccessHostUITests; Reminders is granted to
             the app on the simulator first, so iOS doesn't ask)
+  appstate  no sign-in, with the bighelp plugin (--plugin) and two more agents: Bots
+            mode's top is rearranged and saved, the app is deleted from the
+            simulator and installed again, and the new install shows the same
+            top from the computer (BotsAppStateHostUITests, run twice)
   drafts    no sign-in, with the bighelp plugin (--plugin) and a scripted model:
             a made-up business card sent from the app becomes a contact draft,
             the review's Save writes once and the agent hears it at its next
@@ -753,6 +757,104 @@ def run_fleet(args, repo: Path) -> int:
             model.server_close()
 
 
+def app_state_on_host(home: Path) -> dict:
+    """What the plugin keeps for each person: the keys, their revisions and the home orders, no values."""
+    folder = home / "plugin-data" / "loopdy" / "app-state"
+    people = {}
+    for path in sorted((folder / "people").glob("*.json")) if (folder / "people").exists() else []:
+        keys = json.loads(path.read_text()).get("keys", {})
+        layout = (keys.get("bots.layout") or {}).get("value") or {}
+        people[path.stem] = {"revisions": {key: entry.get("revision") for key, entry in keys.items()},
+                             "home": layout.get("home")}
+    computer = folder / "computer.json"
+    return {"computer": json.loads(computer.read_text()) if computer.exists() else None, "people": people}
+
+
+def run_appstate(args, repo: Path) -> int:
+    """One open host with the plugin and three agents. The app saves a Bots mode order, is deleted
+    from the simulator and installed again, and gets the order back from the host."""
+    if not args.plugin:
+        raise SystemExit("appstate mode needs --plugin <bighelp plugin folder>")
+    with tempfile.TemporaryDirectory(prefix="signin-appstate-", dir="/tmp") as temporary:
+        temp = Path(temporary).resolve()
+        home, project = temp / "home", temp / "project"
+        home.mkdir()
+        project.mkdir()
+        model = ThreadingHTTPServer(("127.0.0.1", 0), SyntheticModel)
+        threading.Thread(target=model.serve_forever, daemon=True).start()
+        port = free_port()
+        origin = f"http://127.0.0.1:{port}"
+        config = {"dashboard": {"public_url": origin},
+                  "model": {"default": "fixture-model", "provider": "custom",
+                            "base_url": f"http://127.0.0.1:{model.server_port}/v1", "api_key": "local-synthetic-no-auth"},
+                  "agent": {"max_turns": 3}, "terminal": {"backend": "local", "cwd": str(project)},
+                  "memory": {"memory_enabled": False, "user_profile_enabled": False},
+                  "plugins": {"enabled": ["loopdy"]}}
+        shutil.copytree(args.plugin, home / "plugins" / "loopdy",
+                        ignore=shutil.ignore_patterns("tests", "__pycache__", ".git"))
+        (home / "config.yaml").write_text(json.dumps(config))
+        session_token = secrets.token_urlsafe(32)
+        env = {k: os.environ[k] for k in ("PATH", "LANG", "TMPDIR") if k in os.environ}
+        env.update(HOME=str(home), HERMES_HOME=str(home), HERMES_DISABLE_LAZY_INSTALLS="1",
+                   HERMES_DASHBOARD_SESSION_TOKEN=session_token, PYTHONUNBUFFERED="1",
+                   NO_PROXY="127.0.0.1,localhost")
+        for name in ("researcher", "writer"):
+            subprocess.run([args.hermes, "profile", "create", name, "--no-alias", "--no-skills"], cwd=project,
+                           env=env, check=True, timeout=120, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        log = (args.results / "hermes-appstate.log").open("w")
+        process = subprocess.Popen([args.hermes, "serve", "--host", "127.0.0.1", "--port", str(port), "--isolated",
+                                    "--skip-build"], cwd=project, env=env, stdout=log, stderr=subprocess.STDOUT)
+        codes = []
+        try:
+            deadline = time.monotonic() + 90
+            while True:
+                if process.poll() is not None:
+                    raise RuntimeError("Hermes exited (appstate); see hermes-appstate.log")
+                try:
+                    if request_status(origin, session_token)[0] == 200:
+                        break
+                except OSError:
+                    pass
+                if time.monotonic() > deadline:
+                    raise TimeoutError("Hermes not ready (appstate)")
+                time.sleep(0.3)
+            for phase in ("save", "restore"):
+                # Deleted before each run: the first starts clean, the second is the reinstall.
+                subprocess.run(["xcrun", "simctl", "uninstall", args.simulator_id, "app.loopdy.mobile"],
+                               check=False, timeout=120)
+                evidence = args.results / "appstate"
+                evidence.mkdir(parents=True, exist_ok=True)
+                client_env = dict(os.environ, TEST_RUNNER_BIGHELP_APP_STATE_HOST=f"{origin.removeprefix('http://')}|{phase}|writer",
+                                  TEST_RUNNER_BIGHELP_SIGNIN_EVIDENCE=str(evidence))
+                command = ["xcodebuild", "test-without-building", "-project", str(repo / "Bighelp.xcodeproj"),
+                           "-scheme", "Bighelp", "-destination", f"platform=iOS Simulator,id={args.simulator_id}",
+                           "-derivedDataPath", str(args.derived_data), "-parallel-testing-enabled", "NO",
+                           "-resultBundlePath", str(args.results / f"appstate-{phase}.xcresult"),
+                           "-only-testing:BighelpUITests/BotsAppStateHostUITests/testBotsOrderComesBackAfterAReinstall"]
+                with (args.results / f"xcodebuild-appstate-{phase}.log").open("w") as output:
+                    result = subprocess.run(command, env=client_env, cwd=repo, stdout=output, stderr=subprocess.STDOUT,
+                                            timeout=1500)
+                codes.append(result.returncode)
+                print(json.dumps({"phase": phase, "exit_code": result.returncode,
+                                  "app_state_on_host": app_state_on_host(home)}), flush=True)
+                if result.returncode:
+                    break
+            print(json.dumps({"session_sources_on_host": session_sources(home)}), flush=True)
+            return max(codes) if codes else 1
+        finally:
+            if (home / "logs").exists():
+                shutil.copytree(home / "logs", args.results / "hermes-appstate-logs", dirs_exist_ok=True)
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+            log.close()
+            model.shutdown()
+            model.server_close()
+
+
 def fixture_png(seed: str, width: int = 240, height: int = 160) -> bytes:
     """A made-up picture of about 100 KB: noise, so it doesn't compress away."""
     import random
@@ -770,6 +872,8 @@ def fixture_png(seed: str, width: int = 240, height: int = 160) -> bytes:
 def run_mode(mode: str, args, repo: Path) -> int:
     if mode == "fleet":
         return run_fleet(args, repo)
+    if mode == "appstate":
+        return run_appstate(args, repo)
     with tempfile.TemporaryDirectory(prefix=f"signin-{mode}-", dir="/tmp") as temporary:
         temp = Path(temporary).resolve()
         home, project = temp / "home", temp / "project"

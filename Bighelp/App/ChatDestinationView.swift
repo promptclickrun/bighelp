@@ -359,6 +359,14 @@ struct ChatDestinationView: View {
             },
             onApprovalTap: onOpenApproval,
             onPeopleTap: { isPeopleAndChatPresented = true },
+            onGroupSettingsTap: model.botModeRoomID == nil ? nil : {
+                // Read at the tap: this body must not read the room, which changes with each message.
+                if let roomID = model.botModeRoom?.nativeRoomID {
+                    appState.open(.groupSettings(roomID: roomID, conversationID: model.conversationID))
+                } else {
+                    isPeopleAndChatPresented = true
+                }
+            },
             onChatFilesTap: { isSessionFilesPresented = true },
             projectMenuItem: projectMenuItem,
             onNewChatTap: onNewChat,

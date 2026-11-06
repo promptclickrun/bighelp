@@ -16,6 +16,8 @@ enum ChatCanvasRow: Identifiable, Equatable {
     case workTrailEnd(String)
     /// Agents messaging each other, back-to-back messages as one rail.
     case agentTalk(ChatAgentTalk)
+    /// A group chat line about who took a message, or a paused discussion with Continue and Stop.
+    case groupNotice(BotModeRoomNoticeRow)
     case earlierMessage(TimelineItem)
     case divider(String)
     case previousHistory(Bool, String?)
@@ -50,6 +52,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case .activityDetail(let event): "activity-detail:\(event.id)"
         case .workTrailEnd(let id): "work-trail-end:\(id)"
         case .agentTalk(let talk): "agent-talk:\(talk.id)"
+        case .groupNotice(let notice): "group-notice:\(notice.id)"
         case .earlierMessage(let item): "earlier:\(item.id)"
         case .divider(let label): "divider:\(label)"
         case .previousHistory: "chat.previous-history"
@@ -86,6 +89,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case (.activityDetail(let a), .activityDetail(let b)): a == b
         case (.workTrailEnd(let a), .workTrailEnd(let b)): a == b
         case (.agentTalk(let a), .agentTalk(let b)): a == b
+        case (.groupNotice(let a), .groupNotice(let b)): a == b
         case (.earlierMessage(let a), .earlierMessage(let b)), (.staged(let a), .staged(let b)): a == b
         case (.divider(let a), .divider(let b)), (.botStatus(let a), .botStatus(let b)), (.failure(let a), .failure(let b)): a == b
         case (.previousHistory(let a, let b), .previousHistory(let c, let d)): a == c && b == d
@@ -161,7 +165,9 @@ enum ChatCanvasTranscriptProjection {
         }
         func append(_ entry: ChatTranscriptEntry, inOpenedTurn: Bool = false) {
             guard case .activity(let turn) = entry else {
-                if case .message(let item) = entry, talk.hides(item) {
+                if case .message(let item) = entry, let notice = item.metadata.groupNotice {
+                    result.append(.groupNotice(notice))
+                } else if case .message(let item) = entry, talk.hides(item) {
                     return
                 } else if case .message(let item) = entry, let piece = talk.piece(for: item) {
                     appendTalk(piece)

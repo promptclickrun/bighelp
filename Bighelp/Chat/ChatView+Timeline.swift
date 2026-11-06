@@ -193,6 +193,19 @@ extension ChatView {
         case .staged(let item):
             TimelineItemView(item: item, onApprovalTap: onApprovalTap, pendingSend: .staged,
                              senderResolver: senderResolver, mentionIdentities: model.messageMentionIdentities)
+        case .groupNotice(let notice):
+            let discussion = notice.pausedDiscussionEventID
+            BotModeRoomNoticeView(
+                notice: notice,
+                isContinuing: discussion.map { model.botModeRoomStore?.nativeContinuesInFlight.contains($0) == true } ?? false,
+                isStopping: model.isBotModeStopInFlight,
+                problem: discussion.flatMap { model.botModeRoomStore?.nativeContinueProblems[$0] },
+                onContinue: {
+                    guard let discussion else { return }
+                    Task { await model.continueBotModeDiscussion(discussion) }
+                },
+                onStop: { Task { await model.stopPausedBotModeDiscussion() } }
+            )
         case .divider(let title): timelineDivider(title)
         case .previousHistory: previousHistoryButton
         case .welcome: emptyTimeline

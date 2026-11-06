@@ -101,6 +101,10 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     /// Hermes' session path: end one member turn it lost track of (a host stopped mid-turn).
     case groupsDiscard = "groups.discard"
     case groupsApprove = "groups.approve"
+    /// A group chat's purpose, shared notes and who answers a message that names nobody.
+    case groupsContext = "groups.context"
+    /// One more budget of rounds and messages for a discussion Hermes paused at its cap.
+    case groupsContinue = "groups.continue"
     /// RoomLink, sent to the computer an agent lives on: a grant for that agent
     /// to join a room whose home is another computer.
     case groupsPeerInvite = "groups.peer.invite"

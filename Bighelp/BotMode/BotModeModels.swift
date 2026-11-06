@@ -131,6 +131,8 @@ struct HermesBotModeRoomState: Codable, Equatable, Sendable {
     let latestSequence: Int?
     let disbandedAt: Double?
     let driverStatus: [String: BighelpJSONValue]?
+    /// The room's settings from `groups.state`, on a room Hermes runs itself. Never saved.
+    var context: HermesBotModeRoomContext? = nil
 
     var persistentMetadata: Self {
         Self(
@@ -546,6 +548,8 @@ struct BotModeRoom: Identifiable, Codable, Equatable, Sendable {
         case nativePendingCancelID
         case nativeFollowUps
         case nativePendingPeerLinks
+        case nativePendingContext
+        case nativeNotices
     }
 
     let id: String
@@ -596,6 +600,11 @@ struct BotModeRoom: Identifiable, Codable, Equatable, Sendable {
     /// Agents on other computers this room still has to link (RoomLink). Kept
     /// until each is registered, so setup can continue after a relaunch.
     private(set) var nativePendingPeerLinks: [HermesBotModePeerLink]
+    /// The room's settings as the person last changed them, until Hermes saves them.
+    private(set) var nativePendingContext: HermesBotModeContextIntent?
+    /// Hermes' lines about who takes a message and a discussion's pauses, beside
+    /// `visibleEvents` under a key of their own: builds before them read the room as before.
+    private(set) var nativeNotices: [BotModeRoomNotice]
 
     init(
         id: String,
@@ -626,7 +635,9 @@ struct BotModeRoom: Identifiable, Codable, Equatable, Sendable {
         nativeRetryJournal: HermesBotModeRetryJournal? = nil,
         nativePendingCancelID: String? = nil,
         nativeFollowUps: [HermesBotModeFollowUp] = [],
-        nativePendingPeerLinks: [HermesBotModePeerLink] = []
+        nativePendingPeerLinks: [HermesBotModePeerLink] = [],
+        nativePendingContext: HermesBotModeContextIntent? = nil,
+        nativeNotices: [BotModeRoomNotice] = []
     ) throws {
         let memberIDs = members.map(\.id)
         guard !id.isEmpty, !memberIDs.isEmpty,
@@ -693,6 +704,8 @@ struct BotModeRoom: Identifiable, Codable, Equatable, Sendable {
         self.nativePendingCancelID = nativePendingCancelID
         self.nativeFollowUps = nativeRoomID == nil ? [] : Array(nativeFollowUps.prefix(HermesBotModeFollowUp.maximumPending))
         self.nativePendingPeerLinks = Array(nativePendingPeerLinks.prefix(Self.maximumMembers))
+        self.nativePendingContext = nativeRoomID == nil ? nil : nativePendingContext
+        self.nativeNotices = nativeRoomID == nil ? [] : Array(nativeNotices.suffix(BotModeRoomNotice.maximumKept))
     }
 
     init(from decoder: any Decoder) throws {
@@ -749,7 +762,11 @@ struct BotModeRoom: Identifiable, Codable, Equatable, Sendable {
             nativeFollowUps: try container.decodeIfPresent([HermesBotModeFollowUp].self, forKey: .nativeFollowUps) ?? [],
             nativePendingPeerLinks: try container.decodeIfPresent(
                 [HermesBotModePeerLink].self, forKey: .nativePendingPeerLinks
-            ) ?? []
+            ) ?? [],
+            nativePendingContext: try container.decodeIfPresent(
+                HermesBotModeContextIntent.self, forKey: .nativePendingContext
+            ),
+            nativeNotices: try container.decodeIfPresent([BotModeRoomNotice].self, forKey: .nativeNotices) ?? []
         )
     }
 
@@ -781,6 +798,19 @@ struct BotModeRoom: Identifiable, Codable, Equatable, Sendable {
 
     mutating func setNativePendingPeerLinks(_ links: [HermesBotModePeerLink]) {
         nativePendingPeerLinks = Array(links.prefix(Self.maximumMembers))
+    }
+
+    mutating func setNativeContextIntent(_ intent: HermesBotModeContextIntent?) {
+        nativePendingContext = intent
+    }
+
+    /// Keeps a Hermes routing or pause event once, in log order, dropping the oldest past the cap.
+    mutating func appendNativeNotice(_ notice: BotModeRoomNotice) {
+        guard !nativeNotices.contains(where: { $0.event.eventID == notice.event.eventID }) else { return }
+        nativeNotices.append(notice)
+        if nativeNotices.count > BotModeRoomNotice.maximumKept {
+            nativeNotices.removeFirst(nativeNotices.count - BotModeRoomNotice.maximumKept)
+        }
     }
 
     mutating func setNativeRetryJournal(_ journal: HermesBotModeRetryJournal?) {

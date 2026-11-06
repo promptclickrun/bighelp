@@ -273,6 +273,11 @@ change in both repos.
   v0.22.4's gateway listener on the session path; features, retry and discard, RoomLink and seatable
   profiles differ. Go by what `groups.capabilities` and each pending action say, never the version
   (docs/HERMES_BOT_MODE.md, vectors in `BighelpTests/Fixtures/HermesGroups`).
+- **Group chats' settings:** where `groups.state` returns `context`, Group Settings (`GroupSettingsView`,
+  `AppRoute.groupSettings`) sets who answers a message that names nobody, the purpose and shared notes through
+  `groups.context`, each edit kept with the room under one `event_id` until Hermes answers. Hermes' picks
+  (`room.assignment`, `room.routed`) and paused discussions (`room.activity` `bounded`, Continue through
+  `groups.continue`) are lines in the chat, kept in `nativeNotices` (docs/HERMES_BOT_MODE.md › Group settings).
 - **Hermes makes every Bot Chat:** Hermes delivers other agents' messages into the chat titled "Bot Chat" and
   takes over only its own native chat (`local-…`); a Bot Chat made over the app's socket (source `bighelp`) got
   renamed `Bot Chat (bighelp <id>)` and replaced, context and all, the first time another agent wrote. So the first

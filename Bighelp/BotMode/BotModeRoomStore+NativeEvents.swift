@@ -59,6 +59,10 @@ extension BotModeRoomStore {
                 room.appendNativeShared(mapped)
                 changed = true
             }
+            if BotModeRoomNotice.keeps(event), !room.nativeNotices.contains(where: { $0.event.eventID == event.eventID }) {
+                room.appendNativeNotice(BotModeRoomNotice(event: event, sourceOrder: takePresentationOrder()))
+                changed = true
+            }
             let retryReceipt = event.taskID.flatMap { expectedRetryReceipts?[$0] }
             // Hermes names the generation on `turn.deferred` only. The retried
             // attempt's terminal event carries none; the attempt before it ended

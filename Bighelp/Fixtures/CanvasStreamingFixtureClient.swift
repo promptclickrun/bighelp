@@ -14,6 +14,43 @@ final class CanvasStreamingFixtureClient: ConversationFixtureClient, StreamingCo
     private let tableReply = ProcessInfo.processInfo.arguments.contains("-test-table-reply")
     private let voiceSteps = ProcessInfo.processInfo.arguments.contains("-test-voice-steps")
     private let musicCardReply = ProcessInfo.processInfo.arguments.contains("-test-music-card-reply")
+    private let firstAnswer = ProcessInfo.processInfo.arguments.contains("-test-first-answer")
+    private var firstAnswerRun = 0
+
+    /// `-test-first-answer`: an answer starting the way it does on Hermes. The agent's work changes every
+    /// 20 ms for a moment (tool after tool, the way a reasoning model's steps arrive), the first words come
+    /// 10 ms after the last change, and the rest a few words every 30 ms. For timing Send to the first
+    /// words on screen (`-test-chat-performance-probe`, its `send_to_answer`).
+    private func runFirstAnswer(onDraft: @escaping (TimelineItem) -> Void) async throws -> ConversationResponse {
+        guard let model else { throw CancellationError() }
+        let sessionID = model.conversationID
+        firstAnswerRun += 1
+        let turnID = "first-answer-\(firstAnswerRun)"
+        for step in 0..<12 {
+            try await Task.sleep(for: .milliseconds(20))
+            let event = ChatActivityEvent(eventID: "\(turnID)-step-\(step)", sessionID: sessionID, turnID: turnID,
+                kind: .tool, lifecycle: .running, title: "Check step \(step + 1)", summary: nil, detail: nil,
+                occurredAt: step * 2, toolCallID: "\(turnID)-call-\(step)", toolName: "read_file",
+                arguments: #"{"path":"notes.md"}"#)
+            _ = model.acceptActivity(event)
+            _ = model.acceptActivity(event.updating(lifecycle: .succeeded, summary: "Checked", detail: nil,
+                                                    occurredAt: step * 2 + 1))
+        }
+        try await Task.sleep(for: .milliseconds(10))
+        let id = "\(turnID)-reply"
+        let words = "The checks are done. Two invoices need a second look before Friday, and the rest match the orders we have on file."
+            .split(separator: " ")
+        func reply(_ count: Int, delivery: String) -> TimelineItem {
+            TimelineItem(id: id, role: .assistant, sender: .agent(id: senderID, snapshot: .init(name: "Canvas fixture")),
+                         content: .message(words.prefix(count).joined(separator: " ")),
+                         metadata: .init(source: "UI fixture", delivery: delivery))
+        }
+        for count in stride(from: 2, through: words.count, by: 2) {
+            onDraft(reply(count, delivery: "Streaming"))
+            try await Task.sleep(for: .milliseconds(30))
+        }
+        return ConversationResponse(items: [reply(words.count, delivery: "Delivered")])
+    }
 
     /// A turn with a few slow steps, the way Hermes reports them: the agent's own
     /// tools, and a helper whose own tool must stay inside its folder.
@@ -275,6 +312,7 @@ final class CanvasStreamingFixtureClient: ConversationFixtureClient, StreamingCo
         if tableReply { return try await runTableReply(onDraft: onDraft) }
         if musicCardReply { return try await runMusicCardReply(onDraft: onDraft) }
         if voiceSteps { return try await runVoiceSteps(onDraft: onDraft) }
+        if firstAnswer { return try await runFirstAnswer(onDraft: onDraft) }
         var text = "CANVAS STREAM START\n"
         var item = TimelineItem(id: "canvas-stream-\(UUID().uuidString)", role: .assistant,
                                 sender: .agent(id: senderID, snapshot: TimelineSenderSnapshot(name: "Canvas fixture")),

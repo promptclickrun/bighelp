@@ -251,6 +251,68 @@ struct SessionContentRepositoryTests {
         #expect(try reader.loadSession(id: second.id) == second)
     }
 
+    @Test func restoredTranscriptCacheIsBoundedByEntriesAndBytes() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = SessionContentRepository(
+            directory: directory,
+            maximumResidentContentEntries: 2,
+            maximumResidentContentBytes: 64 * 1024
+        )
+        let records = (0..<6).map { index in
+            SessionRecord(
+                id: "bounded-\(index)",
+                kind: .direct,
+                agentIDs: ["default"],
+                title: "Bounded \(index)",
+                draft: String(repeating: "x", count: 4 * 1024)
+            )
+        }
+        try repository.save(records)
+        #expect(repository.residentContentCount <= 2)
+        #expect(repository.residentContentByteCount <= 64 * 1024)
+
+        let metadata = try repository.load()
+        for record in records {
+            let saved = try #require(metadata.first { $0.id == record.id })
+            #expect(try repository.restoreContent(in: saved) == record)
+            #expect(repository.residentContentCount <= 2)
+            #expect(repository.residentContentByteCount <= 64 * 1024)
+        }
+        #expect(repository.contentLoadCount >= 4)
+    }
+
+    @Test func compactingAResidentSessionRestoresItExactlyOnTheNextOpen() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = SessionContentRepository(directory: directory)
+        let record = SessionRecord(
+            id: "reopen",
+            kind: .direct,
+            agentIDs: ["default"],
+            title: "Reopen",
+            draft: "Keep this draft",
+            items: [
+                TimelineItem(
+                    id: "answer",
+                    role: .assistant,
+                    sender: .agent(id: "default", snapshot: .init(name: "Hermes")),
+                    content: .message("A long saved answer"),
+                    metadata: .init(delivery: "Saved", sourceOrder: 1)
+                )
+            ]
+        )
+        try repository.save([record])
+        let metadata = try #require(try repository.load().first)
+        let opened = try repository.restoreContent(in: metadata)
+        #expect(opened == record)
+
+        let compacted = try repository.compactContent(in: opened)
+        #expect(!compacted.isContentLoaded)
+        #expect(compacted.draft.isEmpty && compacted.items.isEmpty)
+        #expect(try repository.restoreContent(in: compacted) == record)
+    }
+
     @Test func legacyMigrationPreservesOriginalAndAccountBoundaryRejectsPendingCheckpoint() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

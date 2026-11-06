@@ -31,6 +31,7 @@ enum DemoRepositoryError: Error, Equatable {
 struct DemoRepositoryPreparedEncoding: Sendable {
     fileprivate let data: Data
     fileprivate let schemaVersion: Int
+    var byteCount: Int { data.count }
 }
 
 private struct DemoRepositoryFileIdentity: Equatable, Sendable {
@@ -199,6 +200,10 @@ final class DemoRepository<Value: Codable> {
     /// recovers by replacing an unreadable source. Used for immutable content
     /// and non-destructive adoption of the legacy session repository.
     func loadExistingPreservingSource() throws -> Value? {
+        try loadExistingPreservingSourceWithByteCount()?.value
+    }
+
+    func loadExistingPreservingSourceWithByteCount() throws -> (value: Value, byteCount: Int)? {
         try requireBighelpProtectedData(protectedDataAvailability)
         let fileURL = try resolvedFileURL()
         guard fileManager.fileExists(atPath: fileURL.bighelpFileSystemPath) else { return nil }
@@ -210,7 +215,10 @@ final class DemoRepository<Value: Codable> {
         }
         let decoded = version < currentSchemaVersion
             ? try migratedData(data, fromVersion: version) : data
-        return try JSONDecoder().decode(Envelope<Value>.self, from: decoded).value
+        return (
+            try JSONDecoder().decode(Envelope<Value>.self, from: decoded).value,
+            decoded.count
+        )
     }
 
     /// Only remove an explicitly retired child after its owner's replacement

@@ -25,14 +25,21 @@ extension NativeWorkspaceSessionBridge {
         )
     }
 
+    /// How many turns a re-entry reads again: the newest page, as coming back to the app does.
+    static let reentryTurnLimit = 8
+
     /// Re-enters the exact retained session through fresh canonical history,
     /// replay and activation while keeping the mounted model and socket owner.
+    /// The history read is the newest page (`hydratePage`), which keeps the
+    /// earlier pages the catalog holds when they line up with it; its
+    /// `nextOffset` is where "load earlier" goes on from. Reading the whole
+    /// history here read and laid out every message a long chat ever had.
     /// Same-session callers join one flight. A failed read on the unchanged
     /// socket restores its prior admission state instead of stranding Send.
     func reenterCanonicalSession(
         _ record: SessionRecord,
         model: ChatModel
-    ) async throws -> SessionRecord {
+    ) async throws -> SessionHydrationPage {
         guard retainsCanonicalSession(record, model: model),
               let owner = connections.owner,
               let stream = streams[record.id] else {
@@ -78,7 +85,7 @@ extension NativeWorkspaceSessionBridge {
         owner: WorkspaceOwner,
         client: DirectHermesConversationClient,
         model: ChatModel
-    ) async throws -> SessionRecord {
+    ) async throws -> SessionHydrationPage {
         guard !retired, connections.owner == owner,
               let initial = streams[record.id], initial.owner == owner,
               initial.client === client, initial.boundModel === model,
@@ -95,7 +102,8 @@ extension NativeWorkspaceSessionBridge {
             // This history read does not touch the mounted adapter. If it fails,
             // the existing live stream and composer never leave ready state.
             let catalog = try box.value()
-            let canonical = try await catalog.hydrate(record)
+            let page = try await catalog.hydratePage(record, offset: nil, turnLimit: Self.reentryTurnLimit)
+            let canonical = page.record
             try Task.checkCancellation()
             guard !retired, connections.owner == owner,
                   let beforeProbe = streams[record.id], beforeProbe.owner == owner,
@@ -108,7 +116,8 @@ extension NativeWorkspaceSessionBridge {
                 // A stale/disconnected retained session cannot take the warm
                 // path. Use the existing durable reattach pipeline so Force
                 // Refresh can repair Send instead of rejecting the action.
-                return try await prepare(canonical, catalog: catalog)
+                return SessionHydrationPage(record: try await prepare(canonical, catalog: catalog),
+                                            nextOffset: page.nextOffset)
             }
 
             try await initial.lease.prepareForAdmission()
@@ -121,7 +130,8 @@ extension NativeWorkspaceSessionBridge {
             if probed.requiresResumeAfterTransportReconnect || !client.connected {
                 // The transport really changed while probing. The ordinary
                 // durable reattach path owns that new generation.
-                return try await prepare(canonical, catalog: catalog)
+                return SessionHydrationPage(record: try await prepare(canonical, catalog: catalog),
+                                            nextOffset: page.nextOffset)
             }
 
             try client.seedWorkspaceHistory(canonical)
@@ -162,7 +172,7 @@ extension NativeWorkspaceSessionBridge {
             streamVerificationSequence &+= 1
             current.verificationSequence = streamVerificationSequence
             streams[record.id] = current
-            return refreshed
+            return SessionHydrationPage(record: refreshed, nextOffset: page.nextOffset)
         } catch {
             // Explicit refresh uses a non-destructive recovery policy. Restore
             // only the prior visible snapshot when the exact lease is still

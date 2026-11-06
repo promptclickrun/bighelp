@@ -2,6 +2,25 @@ import Foundation
 
 /// Stream preparation, generation-bound callbacks and live event routing.
 extension NativeWorkspaceSessionBridge {
+    /// Releases an idle native projection when the feature store evicts its
+    /// exact model. Reopening takes the ordinary durable prepare path; no
+    /// transcript or mutation authority is inferred from this cache release.
+    func releaseCachedSession(id: String, modelIdentity: ObjectIdentifier) {
+        guard let stream = streams[id],
+              stream.boundModel.map(ObjectIdentifier.init) == modelIdentity,
+              !stream.client.projection.running,
+              stream.client.journal.unresolved.isEmpty,
+              !stream.client.hasPendingSubmission,
+              !stream.client.needsRecovery,
+              stream.client.attachmentTasks.isEmpty,
+              stream.client.mediaRetryTasks.isEmpty,
+              stream.client.nativeSubagents.isEmpty else { return }
+        streams[id] = nil
+        unbindPromptSession(stream, visibleSessionID: id)
+        stream.client.model = nil
+        stream.client.suspend()
+    }
+
     func bind(_ model: ChatModel, client: any ConversationClient) {
         guard !retired, var stream = streams[model.conversationID], stream.owner == connections.owner,
               (client as? DirectHermesConversationClient) === stream.client else { return }

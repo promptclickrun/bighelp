@@ -40,6 +40,101 @@ enum ChatPerformanceProbe {
         #endif
     }
 
+    // Send to the answer on screen (`ChatSendTimings`), in phases. Each call is one step of a message.
+
+    /// The person tapped Send, before the Live Activity or the message's row.
+    static func sendTapped(_ model: ChatModel) {
+        #if DEBUG
+        guard let recorder = ChatPerformanceRecorder.shared, !model.isBotMode else { return }
+        recorder.sends.tapped(conversationID: model.conversationID, at: CACurrentMediaTime())
+        recorder.signposter.emitEvent("Send tapped")
+        #endif
+    }
+
+    /// The message became a row: waiting in the chat (`staged`) or sent, from the message box or not.
+    static func sendRow(_ id: String, staged: Bool, fromComposer: Bool = true, in model: ChatModel) {
+        #if DEBUG
+        ChatPerformanceRecorder.shared?.sends.row(id, conversationID: model.conversationID, staged: staged,
+                                                  fromComposer: fromComposer, at: CACurrentMediaTime())
+        #endif
+    }
+
+    /// The chat handed the message in row `id` to its conversation client.
+    static func sendHandedOff(_ id: String) {
+        #if DEBUG
+        ChatPerformanceRecorder.shared?.sends.handedOff(rowID: id, at: CACurrentMediaTime())
+        #endif
+    }
+
+    /// The message went into the running turn (a steer): row `id`, or the chat's last tap.
+    static func sendJoinedTurn(_ id: String? = nil, in model: ChatModel) {
+        #if DEBUG
+        ChatPerformanceRecorder.shared?.sends.joinedTurn(conversationID: model.conversationID, rowID: id)
+        #endif
+    }
+
+    /// Hermes' client wrote `prompt.submit` for the chat's message, as `submission`.
+    static func promptDispatched(conversationID: String, submission: UUID) {
+        #if DEBUG
+        guard let recorder = ChatPerformanceRecorder.shared else { return }
+        recorder.sends.dispatched(conversationID: conversationID, submissionID: submission, at: CACurrentMediaTime())
+        recorder.signposter.emitEvent("Prompt dispatched")
+        #endif
+    }
+
+    /// Hermes answered prompt `submission` with the one turn it started for it.
+    static func promptAdmitted(_ submission: UUID) {
+        #if DEBUG
+        ChatPerformanceRecorder.shared?.sends.admitted(submissionID: submission)
+        #endif
+    }
+
+    /// No answer can be tied to prompt `submission`: Hermes queued it or steered it into another turn,
+    /// or more than one turn started with it.
+    static func promptUnattributed(_ submission: UUID) {
+        #if DEBUG
+        ChatPerformanceRecorder.shared?.sends.unattributed(submissionID: submission)
+        #endif
+    }
+
+    /// Words of the live, not replayed, turn Hermes started for prompt `submission`.
+    static func answerReceived(_ id: String, submission: UUID, in model: ChatModel) {
+        #if DEBUG
+        guard let recorder = ChatPerformanceRecorder.shared, model.showsReadableAnswer(id) else { return }
+        recorder.sends.received(answerID: id, submissionID: submission, at: CACurrentMediaTime())
+        recorder.signposter.emitEvent("First words received")
+        #endif
+    }
+
+    /// Words that the send of row `row` got back from its own client call (clients other than Hermes').
+    static func answerReceived(_ id: String, answering row: String?, in model: ChatModel) {
+        #if DEBUG
+        guard let recorder = ChatPerformanceRecorder.shared, let row, model.showsReadableAnswer(id) else { return }
+        recorder.sends.received(answerID: id, rowID: row, at: CACurrentMediaTime())
+        #endif
+    }
+
+    /// The chat's turn ended.
+    static func turnEnded(_ model: ChatModel) {
+        #if DEBUG
+        ChatPerformanceRecorder.shared?.sends.turnEnded(conversationID: model.conversationID)
+        #endif
+    }
+
+    /// The timeline laid out: a waiting answer counts as on screen once its words are
+    /// (`ChatTimelineTableView.showsWords`).
+    static func timelineLaidOut(_ table: ChatTimelineTableView, conversationID: String) {
+        #if DEBUG
+        guard let recorder = ChatPerformanceRecorder.shared else { return }
+        let awaited = recorder.sends.awaitedAnswers(conversationID: conversationID)
+        guard !awaited.isEmpty else { return }
+        let before = recorder.sends.finished.count
+        recorder.sends.laidOut(conversationID: conversationID, showsText: table.showsWords(ofMessage:),
+                               at: CACurrentMediaTime())
+        if recorder.sends.finished.count != before { recorder.signposter.emitEvent("First words on screen") }
+        #endif
+    }
+
     /// Objects alive right now (rows, parsed messages, chat models), for finding
     /// what a long chat keeps after it closes. Safe from `deinit`.
     @inline(__always)
@@ -85,7 +180,9 @@ final class ChatPerformanceRecorder: NSObject {
     private var timer: DispatchSourceTimer?
     private var link: CADisplayLink?
     /// The phase between a reset and a reading, for lining up an Instruments trace.
-    private let signposter = OSSignposter(subsystem: "app.loopdy.mobile.performance", category: .pointsOfInterest)
+    let signposter = OSSignposter(subsystem: "app.loopdy.mobile.performance", category: .pointsOfInterest)
+    /// Each message from Send to its answer on screen (`ChatPerformanceProbe.sendTapped` and the steps after).
+    var sends = ChatSendTimings()
     private var phase: OSSignpostIntervalState?
 
     private override init() {
@@ -199,6 +296,7 @@ final class ChatPerformanceRecorder: NSObject {
         queueGaps.removeAll()
         frameGaps.removeAll()
         busyTurns.removeAll()
+        sends.clearFinished()
         lastTick = nil
         lastFrame = nil
         phaseStart = CACurrentMediaTime()
@@ -227,6 +325,7 @@ final class ChatPerformanceRecorder: NSObject {
                 "over_8ms": busyTurns.filter { $0 > 8.3 }.count, "over_16ms": busyTurns.filter { $0 > 16.7 }.count,
             ],
             "footprint_mib": Double(Self.footprintBytes()) / 1_048_576,
+            "send_to_answer": sends.reading(),
             "live": Self.liveCounts.withLock { $0 },
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]) else { return }
@@ -388,15 +487,20 @@ final class ChatPerformanceAutopilot: NSObject {
         }
     }
 
-    /// Sends the draft (or a short request) and reads once the turn ends.
+    /// Sends the draft (or a short request) and reads once the turn ends. `BIGHELP_PERF_SENDS` sends
+    /// that many, each once the turn before it ended, and reads once after the last: the reading's
+    /// `send_to_answer` has each one from Send to its answer on screen.
     private func send(_ recorder: ChatPerformanceRecorder) {
         guard let model = BighelpVisibleChats.shared.models.first else { return }
-        if model.draft.isEmpty { model.draft = "Run the weekly checks" }
+        let count = max(1, Int(ProcessInfo.processInfo.environment["BIGHELP_PERF_SENDS"] ?? "") ?? 1)
         recorder.reset()
         Task { @MainActor in
-            await model.send()
-            while model.isSending { try? await Task.sleep(for: .milliseconds(100)) }
-            try? await Task.sleep(for: .milliseconds(500))
+            for index in 0..<count {
+                if model.draft.isEmpty { model.draft = count == 1 ? "Run the weekly checks" : "Run check \(index + 1)" }
+                await model.send()
+                while model.isSending { try? await Task.sleep(for: .milliseconds(100)) }
+                try? await Task.sleep(for: .milliseconds(500))
+            }
             recorder.read()
         }
     }

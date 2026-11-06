@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 
 enum SessionCatalogLoadOwnershipError: Error {
     case superseded
@@ -8,6 +9,10 @@ enum SessionCatalogLoadOwnershipError: Error {
 @MainActor
 @Observable
 final class SessionCatalogStore {
+    private static let persistenceLog = Logger(
+        subsystem: "app.loopdy.mobile",
+        category: "SessionCache"
+    )
     // State lives here; responsibility extensions operate on this same MainActor
     // owner. Internal implementation seams are not independent state owners.
     static let fixturePageSize = 50
@@ -244,6 +249,27 @@ final class SessionCatalogStore {
         } catch {
             persistenceDidFail()
             throw error
+        }
+    }
+
+    /// Releases a safely persisted transcript from the catalog's resident
+    /// state. The immutable content remains on disk and is restored on the
+    /// next exact-session open.
+    func compactSessionContent(id: String) {
+        guard let repository, repository.supportsContentCompaction,
+              persistenceErrorMessage == nil, !hasUnsavedChanges,
+              let index = records.firstIndex(where: { $0.id == id }),
+              records[index].isContentLoaded else { return }
+        do {
+            let compacted = try repository.compactContent(in: records[index])
+            guard compacted.id == id, !compacted.isContentLoaded else {
+                throw SessionContentRepositoryError.staleCheckpoint
+            }
+            records[index] = compacted
+        } catch {
+            // A cache-only compaction failure must not evict usable live data or
+            // turn into a persistence/UI error; a later open can still load it.
+            Self.persistenceLog.debug("Resident session content was not compacted")
         }
     }
 

@@ -47,6 +47,15 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
     private var heartbeatTask: Task<Void, Never>?
     private var openingTask: Task<Void, any Error>?
     private var automaticRecoveryTask: Task<Void, Never>?
+    /// When this socket last brought anything from the host: an answer, an event, a request.
+    private var lastHostFrameAt: ContinuousClock.Instant?
+    /// Checks started because the app came back or the network changed (`verifyLiveness`), and the
+    /// newest one a ping sent after it has answered. Until they match, what the socket brings may
+    /// have sat in its buffer from a connection that's already gone, so it vouches for nothing.
+    private var livenessChecks = 0
+    private var answeredLivenessCheck = 0
+    /// How long the host's last frame on this socket vouches for it before a message goes.
+    var admissionFreshness: Duration = .seconds(5)
     private var terminallyClosed = false
     /// Set when `disconnect()` has given a renewal on its way time to finish. Until then the
     /// renewal may still save its new sign-in, even though the connection is closed.
@@ -163,6 +172,17 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
                                         saved: saved, vault: vault)
         client.authenticator.adoptForTesting(saved)
         client.isConnected = true
+        return client
+    }
+
+    /// A client on a real socket to a loopback stand-in, opened the way a restored connection
+    /// opens its socket, for checks of what the connection itself does.
+    static func openedForTesting(_ saved: DirectHermesSavedConnection,
+                                 vault: any DirectHermesCredentialVault) async throws -> DirectHermesClient {
+        let client = DirectHermesClient(authenticator: DirectHermesAuthenticator(endpoint: saved.endpoint),
+                                        saved: saved, vault: vault)
+        client.authenticator.adoptForTesting(saved)
+        try await client.openSocket()
         return client
     }
     #endif
@@ -309,13 +329,22 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
         catch { throw DirectHermesHTTP.safeError(error) }
     }
 
-    /// Proves the current socket immediately before a prompt admission. A failed
+    /// Proves the current socket immediately before a prompt admission: by a frame
+    /// the host sent on it within `admissionFreshness`, or else by a ping. A failed
     /// ping may trigger the bounded automatic reconnect below, but the caller's
     /// mutation is never constructed or sent until the replacement socket is
-    /// ready and the conversation bridge has begun its checkpoint catch-up.
+    /// ready and the conversation bridge has begun its checkpoint catch-up. A
+    /// prompt sent on a socket that dies anyway is journaled as uncertain, never
+    /// sent again by itself.
     func prepareForAdmission() async throws {
         if let automaticRecoveryTask { await automaticRecoveryTask.value }
         guard !terminallyClosed, isConnected else { throw DirectHermesError.notConnected }
+        // The host's own traffic on this socket a moment ago shows it still reaches Hermes, so the
+        // message goes without a ping round trip first. Older traffic, or any from before the app
+        // came back or the network changed (`verifyLiveness`), gets the ping.
+        if answeredLivenessCheck == livenessChecks, let last = lastHostFrameAt,
+           last.duration(to: .now) < admissionFreshness { return }
+        let check = livenessChecks
         do {
             _ = try await request("gateway.ping", params: [:], timeoutNanoseconds: 5_000_000_000)
         } catch {
@@ -323,6 +352,13 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
             guard !terminallyClosed, isConnected else { throw DirectHermesHTTP.safeError(error) }
             _ = try await request("gateway.ping", params: [:], timeoutNanoseconds: 5_000_000_000)
         }
+        hostAnswered(check)
+    }
+
+    /// A ping sent after liveness check `check` began was answered on the current socket.
+    private func hostAnswered(_ check: Int) {
+        answeredLivenessCheck = max(answeredLivenessCheck, check)
+        if answeredLivenessCheck == livenessChecks { lastHostFrameAt = .now }
     }
 
     func disconnect() async {
@@ -706,6 +742,8 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
                 finish(id: id, result: .failure(error))
             }
         }
+        // Whatever the host sent on this ready socket shows it reaches Hermes (`prepareForAdmission`).
+        if generation == epoch, isConnected, answeredLivenessCheck == livenessChecks { lastHostFrameAt = .now }
     }
 
     private func acceptServerRequest(_ request: DirectHermesServerRequest, epoch: UUID) {
@@ -900,16 +938,24 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
 
     /// A quick check that the connection still answers, after the network changed or the app
     /// came back. A silent one is replaced right away (the usual automatic reconnect), so the
-    /// next message doesn't wait out a full timeout on a connection that's already gone.
+    /// next message doesn't wait out a full timeout on a connection that's already gone. Until a
+    /// ping sent from here on is answered, nothing the socket brings lets a message skip its own.
     func verifyLiveness() async {
         guard isConnected, !terminallyClosed, automaticRecoveryTask == nil else { return }
         let epoch = generation
+        livenessChecks += 1
+        let check = livenessChecks
         do {
             _ = try await request("gateway.ping", params: [:],
                                   timeoutNanoseconds: DirectHermesKeepalive.livenessTimeoutNanoseconds)
+            if generation == epoch { hostAnswered(check) }
         } catch {
-            guard generation == epoch, isConnected, DirectHermesKeepalive.outcome(of: error) == .dead else { return }
-            closeConnection(DirectHermesHTTP.safeError(error), notify: true)
+            guard generation == epoch, isConnected else { return }
+            switch DirectHermesKeepalive.outcome(of: error) {
+            case .alive: break
+            case .unsupported: hostAnswered(check)
+            case .dead: closeConnection(DirectHermesHTTP.safeError(error), notify: true)
+            }
         }
     }
 
@@ -951,6 +997,9 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
         let preservesHandlers = shouldRecover || automaticRecoveryTask != nil
         generation = UUID()
         isConnected = false
+        // A replacement socket's own frames, from its ready on, vouch for it.
+        lastHostFrameAt = nil
+        answeredLivenessCheck = livenessChecks
         readyEvent = nil
         socket?.cancel(with: .goingAway, reason: nil)
         socket = nil

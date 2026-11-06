@@ -4,9 +4,11 @@ import Foundation
 /// intact while allowing production to prepare only changed session payloads.
 @MainActor
 protocol SessionCatalogRepository: AnyObject {
+    var supportsContentCompaction: Bool { get }
     func load() throws -> [SessionRecord]
     func loadSession(id: String) throws -> SessionRecord?
     func restoreContent(in record: SessionRecord) throws -> SessionRecord
+    func compactContent(in record: SessionRecord) throws -> SessionRecord
     func save(_ records: [SessionRecord]) throws
     func saveEncoded(_ data: Data) throws
     func encodeSnapshot(_ records: [SessionRecord]) async throws -> Data
@@ -14,11 +16,13 @@ protocol SessionCatalogRepository: AnyObject {
 }
 
 extension SessionCatalogRepository {
+    var supportsContentCompaction: Bool { false }
     func loadSession(id: String) throws -> SessionRecord? {
         try load().first { $0.id == id }
     }
 
     func restoreContent(in record: SessionRecord) throws -> SessionRecord { record }
+    func compactContent(in record: SessionRecord) throws -> SessionRecord { record }
 
     func encodeSnapshot(_ records: [SessionRecord]) async throws -> Data {
         try await Task.detached(priority: .utility) {
@@ -50,6 +54,7 @@ enum SessionContentRepositoryError: Error, Equatable {
 /// account data eraser already removes. Legacy snapshots are never deleted here.
 @MainActor
 final class SessionContentRepository: SessionCatalogRepository {
+    var supportsContentCompaction: Bool { true }
     private struct Manifest: Codable, Sendable {
         var revision: UUID?
         var records: [SessionRecord] = []
@@ -137,6 +142,11 @@ final class SessionContentRepository: SessionCatalogRepository {
         let id: UUID
     }
 
+    private struct ResidentContent {
+        let value: Content
+        let bytes: Int
+    }
+
     private struct PreparedCheckpoint {
         let id: UUID
         let plan: Plan
@@ -152,10 +162,16 @@ final class SessionContentRepository: SessionCatalogRepository {
     private var epoch = UUID()
     private var manifest: Manifest?
     /// Only payloads explicitly loaded or changed in this process are retained.
-    private var contentCache: [UUID: Content] = [:]
+    private var contentCache: [UUID: ResidentContent] = [:]
+    private var contentCacheOrder: [UUID] = []
+    private let maximumResidentContentEntries: Int
+    private let maximumResidentContentBytes: Int
+    private var residentContentBytes = 0
     private var preparedCheckpoint: PreparedCheckpoint?
     private(set) var contentWriteCount = 0
     private(set) var contentLoadCount = 0
+    var residentContentCount: Int { contentCache.count }
+    var residentContentByteCount: Int { residentContentBytes }
 
     init(
         directory: URL,
@@ -166,8 +182,12 @@ final class SessionContentRepository: SessionCatalogRepository {
         protectedDataAvailability: any BighelpProtectedDataAvailabilityProviding = BighelpSystemProtectedDataAvailability(),
         scopeID: (() -> String?)? = nil,
         currentSchemaVersion: Int = 1,
-        migrations: [DemoRepositoryMigration] = []
+        migrations: [DemoRepositoryMigration] = [],
+        maximumResidentContentEntries: Int = 6,
+        maximumResidentContentBytes: Int = 64 * 1024 * 1024
     ) {
+        precondition(maximumResidentContentEntries > 0)
+        precondition(maximumResidentContentBytes > 0)
         let legacy = DemoRepository<[SessionRecord]>(
             directory: directory, name: name, seed: seed, fileManager: fileManager,
             fileProtection: fileProtection, protectedDataAvailability: protectedDataAvailability,
@@ -178,6 +198,8 @@ final class SessionContentRepository: SessionCatalogRepository {
         self.seed = seed
         manifestRepository = legacy.child(name: "\(name)-catalog", seed: Manifest())
         manifestRevisionRepository = legacy.child(name: "\(name)-catalog", seed: ManifestRevision())
+        self.maximumResidentContentEntries = maximumResidentContentEntries
+        self.maximumResidentContentBytes = maximumResidentContentBytes
     }
 
     func resetForAccountBoundary() {
@@ -185,6 +207,8 @@ final class SessionContentRepository: SessionCatalogRepository {
         epoch = UUID()
         manifest = nil
         contentCache.removeAll()
+        contentCacheOrder.removeAll()
+        residentContentBytes = 0
         preparedCheckpoint = nil
     }
 
@@ -195,7 +219,7 @@ final class SessionContentRepository: SessionCatalogRepository {
         manifest = nil
         try ensureManifest()
         let retained = Set((manifest?.records ?? []).compactMap(\.localContentRevision))
-        contentCache = contentCache.filter { retained.contains($0.key) }
+        retainResidentContent(revisions: retained)
         return manifest?.records ?? []
     }
 
@@ -213,17 +237,35 @@ final class SessionContentRepository: SessionCatalogRepository {
             throw SessionContentRepositoryError.staleCheckpoint
         }
         let content: Content
-        if let cached = contentCache[revision] {
+        if let cached = residentContent(revision) {
             content = cached
         } else {
-            guard let loaded = try contentRepository(revision).loadExistingPreservingSource() else {
+            let child = contentRepository(revision)
+            guard let loaded = try child.loadExistingPreservingSourceWithByteCount() else {
                 throw SessionContentRepositoryError.missingContent(metadata.id)
             }
-            content = loaded
-            contentCache[revision] = loaded
+            content = loaded.value
+            rememberResidentContent(content, revision: revision, bytes: loaded.byteCount)
             contentLoadCount += 1
         }
         return content.restoring(metadata)
+    }
+
+    func compactContent(in record: SessionRecord) throws -> SessionRecord {
+        try ensureManifest()
+        guard let metadata = manifest?.records.first(where: { $0.id == record.id }) else {
+            throw SessionContentRepositoryError.missingContent(record.id)
+        }
+        guard metadata.kind == record.kind,
+              metadata.agentIDs == record.agentIDs,
+              metadata.remoteStoredID == record.remoteStoredID,
+              DirectHermesIdentity.sameSessionSource(
+                metadata.remoteSource,
+                record.remoteSource
+              ) else {
+            throw SessionContentRepositoryError.staleCheckpoint
+        }
+        return metadata
     }
 
     func save(_ records: [SessionRecord]) throws {
@@ -300,9 +342,18 @@ final class SessionContentRepository: SessionCatalogRepository {
         // not poison change detection or a retry's original revision guard.
         manifest = candidate
         preparedCheckpoint = nil
-        contentCache.merge(plan.content) { _, new in new }
+        let encodedByteCounts = Dictionary(uniqueKeysWithValues: prepared.writes.map {
+            ($0.revision, $0.data.byteCount)
+        })
+        for (revision, value) in plan.content {
+            rememberResidentContent(
+                value,
+                revision: revision,
+                bytes: encodedByteCounts[revision] ?? 0
+            )
+        }
         let retained = Set(candidate.records.compactMap(\.localContentRevision))
-        contentCache = contentCache.filter { retained.contains($0.key) }
+        retainResidentContent(revisions: retained)
         // Cleanup is post-commit and best effort, never part of send success.
         // Only revisions retired by this exact adoption are eligible; pending
         // writes and the original legacy snapshot are deliberately untouched.
@@ -336,9 +387,13 @@ final class SessionContentRepository: SessionCatalogRepository {
             // Migration is the sole whole-history read; do not keep that
             // temporary decoded corpus alive behind a metadata-only catalog.
             contentCache.removeAll()
+            contentCacheOrder.removeAll()
+            residentContentBytes = 0
         } catch {
             manifest = nil
             contentCache.removeAll()
+            contentCacheOrder.removeAll()
+            residentContentBytes = 0
             throw error
         }
     }
@@ -368,7 +423,7 @@ final class SessionContentRepository: SessionCatalogRepository {
             let payload = Content(record)
             let revision: UUID
             if let old = existing[record.id]?.localContentRevision,
-               let cached = contentCache[old], cached == payload {
+               let cached = residentContent(old), cached == payload {
                 revision = old
             } else {
                 revision = UUID()
@@ -405,4 +460,41 @@ final class SessionContentRepository: SessionCatalogRepository {
             SessionRecord(id: "", kind: .direct, agentIDs: [], title: "")
         ))
     }
+
+    private func residentContent(_ revision: UUID) -> Content? {
+        guard let entry = contentCache[revision] else { return nil }
+        contentCacheOrder.removeAll { $0 == revision }
+        contentCacheOrder.append(revision)
+        return entry.value
+    }
+
+    private func rememberResidentContent(_ content: Content, revision: UUID, bytes: Int) {
+        guard bytes > 0, bytes <= maximumResidentContentBytes else {
+            removeResidentContent(revision)
+            return
+        }
+        removeResidentContent(revision)
+        while contentCache.count >= maximumResidentContentEntries
+            || residentContentBytes + bytes > maximumResidentContentBytes {
+            guard let oldest = contentCacheOrder.first else { break }
+            removeResidentContent(oldest)
+        }
+        contentCache[revision] = ResidentContent(value: content, bytes: bytes)
+        contentCacheOrder.append(revision)
+        residentContentBytes += bytes
+    }
+
+    private func retainResidentContent(revisions: Set<UUID>) {
+        for revision in Array(contentCache.keys) where !revisions.contains(revision) {
+            removeResidentContent(revision)
+        }
+    }
+
+    private func removeResidentContent(_ revision: UUID) {
+        if let removed = contentCache.removeValue(forKey: revision) {
+            residentContentBytes -= removed.bytes
+        }
+        contentCacheOrder.removeAll { $0 == revision }
+    }
+
 }

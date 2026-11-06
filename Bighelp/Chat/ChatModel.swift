@@ -156,6 +156,7 @@ final class ChatModel {
                 hasRestoredPrimaryTurn = false
                 lastSubmittedMessage = nil
                 if oldValue {
+                    ChatPerformanceProbe.turnEnded(self)
                     lastTurnEndedAt = Date()
                     flushPersistence()
                     if let native = nativeConversationClient { forgetAgentFileFailures(from: native, onlyRefused: true) }

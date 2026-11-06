@@ -204,9 +204,12 @@ change in both repos.
 - **Who is sending:** before each new turn, `DirectHermesChatSpeakerNote` posts `people/speaking` (plugin
   `native-people-v1`): the chat's stored session ID, a person ID from iCloud Keychain (`BighelpPersonID`, one per
   Apple ID) and the name the person saved. The plugin puts the name in the chat brief and, once a chat has had two
-  people, a note on each message that only the model sees. It starts alongside the pre-send connection check. A
-  chat's first message waits for it (capped at 1.2 s; the plugin records the brief's person once), and so does the
-  first from each connection; later turns read the note when they reach the model, so they go at once. `UserIdentity.name` is empty until someone saves one; "You" is an on-screen placeholder
+  people, a note on each message that only the model sees. Every new turn and queued message sends its own note,
+  alongside the pre-send connection check, and only at Send: a note makes this person the chat's speaker at once,
+  so opening a chat never sends one. A steer into the running turn sends none. A chat's first message waits for it (capped at 1.2 s; the plugin records the brief's person once), and
+  so does any message until the host has taken a note naming this person, with the name they have now, in this
+  stored session on this connection (`notedSpeaker`); later turns read the note when they reach the model, so they
+  go at once. `UserIdentity.name` is empty until someone saves one; "You" is an on-screen placeholder
   (`displayName`) and must never be sent. Names are at most 40 characters.
 - **A lost create never locks an agent out:** every `session.create` sends the creation record's `intentID` as
   `idempotency_key` (Hermes keeps it 5 minutes and answers a retry with the same session). An unfinished first Bot
@@ -285,9 +288,15 @@ change in both repos.
   just started isn't live yet, Send, the message box and Stop stay on. A message sent then waits at the bottom of
   the chat with "Sending…" under it (`stagedSends`, `ChatCanvasRow.staged`), outside the transcript: a recovery's
   readback would drop a local row as stale. Staged messages go out in order once the chat can take them, each as
-  the row it waited in: a new turn, or a steer once the turn is live. Send goes off only after 25 s without a
-  connection while the app is open (`connectionIsOverdue`, `ChatConnectionGrace`); staged messages then go back in
-  the box. Commands (`/…`) and PDF pages still need the connection and wait in the box.
+  the row it waited in: a new turn, or a steer once the turn is live. The wait (`waitForConnection`) follows the
+  chat's own state through Observation, the app coming and going, and the time left, never a polling timer, so
+  whatever decides `takesMessageNow` must be observed (`pendingID` and `waiter` are). Send goes off only after
+  25 s without a connection while the app is open (`connectionIsOverdue`, `ChatConnectionGrace`); staged messages
+  then go back in the box. Commands (`/…`) and PDF pages still need the connection and wait in the box.
+- **A message's connection check:** before `prompt.submit`, `prepareForAdmission` skips its `gateway.ping` only when
+  the host sent something on that socket in the last 5 s (`admissionFreshness`). Coming back to the app or a
+  network change (`verifyLiveness`) voids that until a ping sent after it is answered: frames from before can sit
+  in a dead socket's buffer. A prompt sent on a socket that dies anyway is journaled as uncertain, never resent.
 - **Who's working:** Bots mode's home and the Agents screen show each agent's Bot Chat working or needing
   you from the plugin's `agents/activity` (`native-agents-activity-v1`): Hermes' turn leases in any process
   (the app, `message_agent`, `chat -q`) and the dashboard's open prompts, for up to 64 agents in one read.
@@ -468,7 +477,9 @@ change in both repos.
   Never walk the ledger once per turn (`ChatLedgerIndex`) or insert into it one event at a time when building
   it (`ChatActivityLedger.init`). XCUITest queries build every row of a long chat (seconds, over 1 GB at
   300 turns), so time one with `ChatLoadSpeedUITests` (`BIGHELP_SPEED`, `BIGHELP_SPEED_TURNS`) or the DEBUG
-  autopilot and probe (`ChatPerformanceAutopilot`, `-test-chat-performance-probe`). `-test-long-chat-heavy`
+  autopilot and probe (`ChatPerformanceAutopilot`, `-test-chat-performance-probe`). The probe's `send_to_answer`
+  times each message from Send to its answer's first words on screen (`ChatSendTimings`, local only); the
+  autopilot's `send` with `BIGHELP_PERF_SENDS` and demo mode's `-test-first-answer` measure it. `-test-long-chat-heavy`
   (`BIGHELP_SPEED_HEAVY`) makes every turn as big as a chat near half a million tokens. Work done for each
   message as it's drawn must not grow with its text beyond the drawing itself: `MarkdownDocument`'s plain
   text is worked out only when read. The probe's `main_busy_ms` counts main run loop turns over 8.3 ms, a
@@ -487,7 +498,8 @@ change in both repos.
 - **Streaming under a drag:** Hermes sends an answer a few words at a time, and each piece lays the whole answer
   out again, so each timeline update waits 50 ms after the last one's layout, and while the reader drags or the chat
   decelerates (`NativeChatTimeline` `applyPendingUpdate`, `isScrolling`); otherwise a drag got a few touch
-  updates a second. Rows resize without UIKit's 0.3 s self-sizing animation, which piled up and bounced a
+  updates a second. Only a turn's first readable words skip the 50 ms, once a turn, while the reader follows
+  the newest message and isn't touching the chat (`takesFirstAnswer`). Rows resize without UIKit's 0.3 s self-sizing animation, which piled up and bounced a
   streaming answer. To reproduce by hand, run demo mode with `-test-tool-stream -test-tool-stream-fast-tail`
   and drag while the answer streams at a model's pace; the other fixtures are slower and pause during
   gestures, so they never showed this.

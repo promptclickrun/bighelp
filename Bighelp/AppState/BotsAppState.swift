@@ -41,7 +41,7 @@ struct BotsPhoneState: Equatable {
 /// {list, top, pinned, unpinned, primary}} for one gateway's home (pins and the primary bot are this
 /// app's own, kept on the phone per sign-in, not on the profiles), `multiGatewayHome` {list, top},
 /// `primary` (Multi-gateway's), and `pinnedGroups` and `hiddenGroups`, kept for a later version. List items are `bot/<computer>/<profile>` and
-/// `group/<computer>/<room>`: never `name:` before a long ID, which the plugin's secret check refuses.
+/// `group/<computer>/<room>`.
 ///
 /// `bots.settings` (v1): `bots` {bot: {voice, mark, pet, character}}.
 @MainActor
@@ -172,7 +172,7 @@ enum BotsAppState {
         }
         faces(phone.marks, "mark") { json($0) }
         faces(phone.pets, "pet") { .string($0) }
-        faces(phone.characters, "character") { character($0) }
+        faces(phone.characters, "character") { json($0) }
         return .object(["bots": .object(bots.mapValues(BighelpJSONValue.object))])
     }
 
@@ -267,7 +267,7 @@ enum BotsAppState {
                 }
                 if let mark = fields["mark"].flatMap({ decode(SimpleBotMark.self, $0) }) { next.marks[face] = mark }
                 if let pet = fields["pet"]?.string, !pet.isEmpty, pet.utf8.count <= 128 { next.pets[face] = pet }
-                if let look = fields["character"].flatMap(character(from:)) { next.characters[face] = look }
+                if let look = fields["character"].flatMap({ decode(CompanionAppearance.self, $0) }) { next.characters[face] = look }
             }
         }
         return next
@@ -379,26 +379,6 @@ enum BotsAppState {
 
     private static func decode<T: Decodable>(_ type: T.Type, _ value: BighelpJSONValue) -> T? {
         (try? JSONEncoder().encode(value)).flatMap { try? JSONDecoder().decode(type, from: $0) }
-    }
-
-    /// A kit character. Its catalog pack's address goes without `https:`: the plugin's secret check
-    /// takes `https://` and a long path with digits for a key.
-    static func character(_ look: CompanionAppearance) -> BighelpJSONValue? {
-        guard var fields = json(look)?.object else { return nil }
-        if var avatar = fields["catalogAvatar"]?.object, let url = avatar["url"]?.string?.stripping("https:") {
-            avatar["url"] = .string(url)
-            fields["catalogAvatar"] = .object(avatar)
-        }
-        return .object(fields)
-    }
-
-    static func character(from value: BighelpJSONValue) -> CompanionAppearance? {
-        guard var fields = value.object else { return nil }
-        if var avatar = fields["catalogAvatar"]?.object, let url = avatar["url"]?.string, url.hasPrefix("//") {
-            avatar["url"] = .string("https:" + url)
-            fields["catalogAvatar"] = .object(avatar)
-        }
-        return decode(CompanionAppearance.self, .object(fields))
     }
 }
 

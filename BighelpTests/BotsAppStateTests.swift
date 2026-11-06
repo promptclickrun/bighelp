@@ -63,7 +63,7 @@ struct BotsAppStateTests {
         #expect(!sent.contains { $0.contains(Self.firstPhoneHost.uuidString) || $0.contains("scope-1") },
                 "Nothing this phone made up for itself goes to the computer")
         #expect(!sent.contains { $0.contains("bot:") || $0.contains("group:") || $0.contains("room:") },
-                "The plugin's secret check refuses a name and a colon before a long ID")
+                "Items go by the computer's names, never the phone's own `bot:` keys")
 
         // Another phone: its own host ID and sign-in for the same computer.
         let second = BotsAppState.Names(hosts: [Self.host(Self.secondPhoneHost, scope: "scope-2")],
@@ -91,15 +91,27 @@ struct BotsAppStateTests {
         #expect(restored.pins == ["scope-2": .init(pinned: ["otto", "juno"], unpinned: ["default"], primary: "mina")])
     }
 
-    @Test func aCatalogCharactersAddressGoesWithoutItsScheme() throws {
+    @Test func aCatalogCharactersFullAddressComesBackOnAnotherPhone() throws {
+        let kitURL = "https://avatars.bighelp.app/v1/kits/\(String(repeating: "ab", count: 32)).json"
         let reference = AvatarCatalogReference(id: "fox", name: "Fox", kitSHA256: String(repeating: "ab", count: 32),
-                                               kitURL: URL(string: "https://avatars.bighelp.app/v1/kits/\(String(repeating: "ab", count: 32)).json")!)
-        let look = CompanionAppearance(character: .lobster, catalogAvatar: reference)
+                                               kitURL: URL(string: kitURL)!)
+        let face = CompanionSurfaceScope.computer(Self.firstPhoneHost.uuidString)
+        let phone = BotsPhoneState(characters: [CompanionStore.agentKey(agentScope: face, agentID: "juno"):
+                                                    CompanionAppearance(character: .lobster, catalogAvatar: reference)])
+        let first = BotsAppState.Names(hosts: [Self.host(Self.firstPhoneHost, scope: "scope-1")],
+                                       computerIDs: [Self.firstPhoneHost.uuidString: Self.computer])
 
-        let sent = try #require(BotsAppState.character(look))
+        let settings = BotsAppState.settings(phone, names: first)
 
-        #expect(!strings(in: sent).contains { $0.hasPrefix("https:") })
-        #expect(BotsAppState.character(from: sent)?.catalogAvatar == reference)
+        #expect(strings(in: settings).contains(kitURL), "The plugin takes links, so the address goes as it is")
+        let second = BotsAppState.Names(hosts: [Self.host(Self.secondPhoneHost, scope: "scope-2")],
+                                        computerIDs: [Self.secondPhoneHost.uuidString: Self.computer])
+        let listed = AppStatePatch(path: ["computers"], value: .array([.string(Self.computer)])).applied(to: settings)
+        let restored = BotsAppState.applying(settings: listed, to: BotsPhoneState(), names: second)
+        let secondFace = CompanionSurfaceScope.computer(Self.secondPhoneHost.uuidString)
+        let look = try #require(restored.characters[CompanionStore.agentKey(agentScope: secondFace, agentID: "juno")])
+        #expect(look.catalogAvatar == reference)
+        #expect(look.catalogAvatar?.kitURL.absoluteString == kitURL)
     }
 
     @Test func orderItemsAnotherPhoneCantNameStayInPlace() {

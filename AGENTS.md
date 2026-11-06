@@ -305,7 +305,7 @@ change in both repos.
   by the computer's own ID (`<computerId>/<profile>`), never by this phone's host ID or sign-in scope. A value
   lists the computers it covers: a computer reached for the first time gets this phone's part, and a value
   already there wins (a fresh install never sends empty choices). Keep JSON fields the app doesn't know. The
-  plugin's secret check refuses `name:` before a long token, so no `bot:<id>` or `https://` strings in values.
+  plugin refuses only values shaped like credentials; links and IDs go as they are.
 - **Who's working:** Bots mode's home and the Agents screen show each agent's Bot Chat working or needing
   you from the plugin's `agents/activity` (`native-agents-activity-v1`): Hermes' turn leases in any process
   (the app, `message_agent`, `chat -q`) and the dashboard's open prompts, for up to 64 agents in one read.

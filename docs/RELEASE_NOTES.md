@@ -3,6 +3,17 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.65
+
+### New
+
+- **All bodies in Bot Studio:** swipe up on the row of bodies to see all of them in a grid, in their sets. Tap a body to use it. Your avatar stays at the top. To see one row again, tap the handle above the bodies.
+
+### Changed
+
+- **The bar keeps your place:** leave a chat for Feed, Ideas or another place. The tab that you left then opens the same chat again. With Sessions in the bar, Sessions opens the chat that you picked from its list. When you change the agent, Chat opens the chat of that agent.
+- **New Bot in Bots mode:** the + button opens New Bot. The gray New Group Chat item is gone. You make group chats in Chat mode.
+
 ## 2.6.64
 
 ### Fixed

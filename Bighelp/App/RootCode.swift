@@ -74,6 +74,7 @@ extension RootShellView {
             status: CodeChatStatusReader(catalog: sessionCatalog, features: featureStore),
             agents: agents.profiles,
             avatarURL: { [agents] in agents.avatarURL(for: $0) },
+            sections: fleet?.sections ?? [],
             onOpenSession: { openCodeSession($0) },
             onOpenChanges: { appState.open(.codeChanges(sessionID: $0.id)) },
             onOpenBatch: { appState.open(.codeBatch(id: $0.id)) },

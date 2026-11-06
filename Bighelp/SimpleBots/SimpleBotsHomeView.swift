@@ -11,13 +11,11 @@ struct SimpleBotsContext {
     /// This computer, for things kept per computer (Mark Unread).
     let scope: String
     let canCreateBots: Bool
-    let canCreateGroups: Bool
     let onOpenBot: (String) -> Void
     let onOpenSession: (SessionSummary) -> Void
     let onOpenSettings: () -> Void
     let onOpenProfile: (String) -> Void
     let onNewChat: (String) -> Void
-    let onCreateGroup: ([String]) -> Void
     /// A model for a new bot, set up the way the shell creates agents; nil when this computer can't.
     let makeCreator: () -> AgentEditorModel?
     /// Multi-gateway: every other gateway's bots too; nil when it's off.
@@ -340,13 +338,12 @@ final class SimpleBotsUnreadStore {
 }
 
 private enum SimpleBotsSheet: Identifiable {
-    case search, create, group
+    case search, create
 
     var id: String {
         switch self {
         case .search: "search"
         case .create: "create"
-        case .group: "group"
         }
     }
 }
@@ -540,7 +537,7 @@ struct SimpleBotsHomeView: View {
                     SimpleBotsPersonButton(name: context.personName, imageURL: context.personImageURL,
                                            action: context.onOpenSettings)
                     Spacer()
-                    newMenu
+                    newButton
                 }
                 BighelpModePill(modeSwitch: modeSwitch)
             }
@@ -582,7 +579,7 @@ struct SimpleBotsHomeView: View {
             }
             SimpleBotsCircleButton(systemImage: "magnifyingglass", label: "Search bots",
                                    identifier: "simple-bots.search") { sheet = .search }
-            newMenu
+            newButton
         }
         .padding(.horizontal, BighelpTokens.space20)
         .padding(.top, BighelpTokens.space4)
@@ -590,14 +587,9 @@ struct SimpleBotsHomeView: View {
         .background { SimpleBotsHeaderFade() }
     }
 
-    /// New Bot and New Group Chat.
-    private var newMenu: some View {
-        Menu {
-            Button("New Bot", systemImage: "plus.circle") { sheet = .create }
-                .disabled(!context.canCreateBots)
-            Button("New Group Chat", systemImage: "person.2") { sheet = .group }
-                .disabled(!context.canCreateGroups)
-        } label: {
+    /// New Bot. Group chats are made in Chat mode, where their list is.
+    private var newButton: some View {
+        Button { sheet = .create } label: {
             Image(systemName: "plus")
                 .font(.bighelp(.title3, weight: .medium))
                 .foregroundStyle(.primary)
@@ -605,10 +597,9 @@ struct SimpleBotsHomeView: View {
                 .contentShape(.circle)
                 .bighelpNavigationGlass(in: Circle(), isInteractive: true)
         }
-        .menuStyle(.button)
         .buttonStyle(.plain)
-        // Its own key: "New" alone is also the unread badge, which another language words differently.
-        .accessibilityLabel(String(localized: "New bot or group chat", defaultValue: "New"))
+        .disabled(!context.canCreateBots)
+        .accessibilityLabel("New Bot")
         .accessibilityIdentifier("simple-bots.new")
     }
 
@@ -992,12 +983,6 @@ struct SimpleBotsHomeView: View {
             SimpleBotCreateView(makeCreator: context.makeCreator, onCreated: { profile in
                 self.sheet = nil
                 context.onOpenBot(profile.id)
-            })
-            .bighelpSheetSize(.large)
-        case .group:
-            SimpleBotsGroupChatView(context: context, onCreate: { ids in
-                self.sheet = nil
-                context.onCreateGroup(ids)
             })
             .bighelpSheetSize(.large)
         }

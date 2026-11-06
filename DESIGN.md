@@ -59,7 +59,9 @@ are historical (`docs/ui-v3-design.md`).
 - Edit avatar opens a choice: **Bot Studio** or **PetDex**, with "Use a photo instead" under them
   (`AvatarChooserView`). Bot Studio (`BotStudioView`) is one editor for every avatar: the avatar fills the top
   and plays its move, with Undo and Surprise me; a drawer below shows one row of choices at a time, picked from
-  the rail (Body, Eyes, Color, Shape, Moves), so no choice pushes the others off screen. Every body is drawn in
+  the rail (Body, Eyes, Color, Shape, Moves), so no choice pushes the others off screen. On Body, a swipe up on
+  the row (or a tap on the drawer's handle) opens every body in a grid, by set, with the avatar small above it;
+  the handle or another tab shows one row again. Every body is drawn in
   one style: one flat main color, tilted, two small slanted eyes up and to the right, and at most a small
   second-color part (`services/avatars/docs/BOT_BODIES.md`). PetDex opens the creator with only pets.
 - The older avatar creator (`AvatarCreatorView`) keeps a pet look simple: pick one of the ten kit
@@ -114,7 +116,9 @@ picked color. New chat is a round button in the middle, in the picked color, on 
 starts a chat with the agent in use, touch and hold (right-click on the Mac) picks agents, one for a 1:1 chat or
 several for a group. The bar holds Chat and three places (Appearance › App layout). In a chat, Chat is the lit tab and tapping it does nothing.
 With Sessions in the bar (App layout), every chat's list and a chat picked from it light Sessions instead, and
-Chat there opens the agent's own chat.
+Chat there opens the agent's own chat. A tab keeps its place: leave a chat for another place and the tab it was
+under (Chat, or Sessions for a chat picked from its list) opens that chat again (`HeldChat`), until another chat
+opens. Once another agent is in use, Chat opens that agent's chat instead.
 Chat opens that agent's canonical Bot Chat (the same conversation as Hermes Desktop's bot entry) with its live avatar big at the top: tap the avatar for its profile (This chat's
 model and reasoning, then Activity, Approvals, Schedules, Identity), tap the name to switch agents or open a group
 chat, and ☰ for everything else. ☰'s first screen fits without
@@ -492,8 +496,8 @@ and no ☰. The page is the light and dark theme picked in Appearance, your bubb
 picked a bubble color in Appearance, and buttons and tinted text are the page's ink (white after dark). The
 text is SF Pro, as everywhere.
 
-- **Home**: your circle top left opens Settings; search and + (New Bot, New Group Chat) top right. The
-  primary bot (no badge) and pinned bots share the top, all the same size: one large, else two or three
+- **Home**: your circle top left opens Settings; search and + (New Bot, no menu: group chats are made in Chat
+  mode) top right. The primary bot (no badge) and pinned bots share the top, all the same size: one large, else two or three
   across, six at most in two rows. Only pins the top shows count toward the six, not the primary bot, hidden bots
   or ones this computer no longer has. Their marks blink now and then (never with Reduce Motion). Under them every
   other bot and each group chat, with the latest message and its time; a bot's role is a small gray label after

@@ -71,6 +71,65 @@ final class BotChatUITests: BighelpUITestCase {
         }
     }
 
+    /// A tab keeps its place: a chat left for Ideas opens again from Chat, not the agent's Bot Chat.
+    /// The chat is another agent's, so Ideas makes that agent the one in use; once the board
+    /// switches back, Chat opens that agent's Bot Chat.
+    @MainActor
+    func testChatOpensTheChatYouLeftForABoard() {
+        let app = launchOnTheAgentsChat()
+        let left = message("Here's the plan for Saturday.", in: app)
+        openListedChat("demo-session-1", in: app)
+        XCTAssertTrue(left.waitForExistence(timeout: 10))
+
+        app.buttons["tab.ideas"].tap()
+        XCTAssertTrue(left.waitForNonExistence(timeout: 5))
+        app.buttons["tab.sessions"].tap()
+        XCTAssertTrue(left.waitForExistence(timeout: 10), "Chat opens the chat you left")
+        XCTAssertFalse(message(botChatText, in: app).exists)
+        save("tab-keeps-chat", app)
+
+        app.buttons["tab.ideas"].tap()
+        let name = app.buttons["agent.hero.name"].firstMatch
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        let finance = app.buttons["agent.switcher.agent.finance"]
+        XCTAssertTrue(finance.waitForExistence(timeout: 5))
+        finance.tap()
+        XCTAssertTrue(finance.waitForNonExistence(timeout: 5))
+        app.buttons["tab.sessions"].tap()
+        XCTAssertTrue(message(botChatText, in: app).waitForExistence(timeout: 10),
+                      "Chat opens the chat of the agent in use")
+        XCTAssertFalse(left.exists)
+    }
+
+    /// With Sessions in the bar, a chat picked from its list is Sessions': Sessions opens it again,
+    /// a second tap shows the list, and Chat opens the agent's own chat.
+    @MainActor
+    func testSessionsOpensTheChatYouLeftFromItsList() {
+        let app = launchOnTheAgentsChat(layout: "{pinned=(sessions,ideas,feed);menu=();}")
+        let sessions = app.buttons["tab.session-list"].firstMatch
+        XCTAssertTrue(sessions.waitForExistence(timeout: 10))
+        sessions.tap()
+        let left = message(listedChatText, in: app)
+        openListedChat(in: app)
+        XCTAssertTrue(left.waitForExistence(timeout: 10))
+
+        app.buttons["tab.ideas"].tap()
+        XCTAssertTrue(left.waitForNonExistence(timeout: 5))
+        sessions.tap()
+        XCTAssertTrue(left.waitForExistence(timeout: 10), "Sessions opens the chat you left")
+        save("sessions-keeps-chat", app)
+        sessions.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["sessions.screen"].waitForExistence(timeout: 5),
+                      "Sessions again shows the list")
+
+        openListedChat(in: app)
+        XCTAssertTrue(left.waitForExistence(timeout: 10))
+        app.buttons["tab.ideas"].tap()
+        app.buttons["tab.sessions"].tap()
+        XCTAssertTrue(message(botChatText, in: app).waitForExistence(timeout: 10), "Chat is the agent's own chat")
+    }
+
     /// With several gateways, All sessions' rows have the long-press menu too.
     @MainActor
     func testAllSessionsRowsHaveALongPressMenu() {
@@ -103,6 +162,44 @@ final class BotChatUITests: BighelpUITestCase {
         if let experience { app.launchArguments += ["-bighelp.chat.bot-chat-experience", experience] }
         app.launch()
         return app
+    }
+
+    /// A finance chat in the list that isn't its Bot Chat.
+    private let listedChatText = "Booked! The details are in your email."
+
+    /// Chat opening the agent's own chat, as people have it, and one computer.
+    @MainActor
+    private func launchOnTheAgentsChat(layout: String? = nil) -> XCUIApplication {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-canonical-agent-chat",
+                               "-loopdy.home.opens-chat", "YES", "-bighelp.hosts.all-hosts", "NO"]
+        if let layout { app.launchArguments += ["-bighelp.app-layout", layout] }
+        app.launch()
+        XCTAssertTrue(chatIdentity(in: app).waitForExistence(timeout: 30))
+        return app
+    }
+
+    /// A chat from the full list: ☰ › Sessions, or the Sessions tab when it's open. `demo-session-3`
+    /// is the finance agent's, `demo-session-1` the travel agent's.
+    @MainActor
+    private func openListedChat(_ id: String = "demo-session-3", in app: XCUIApplication) {
+        let row = app.buttons["session.row.\(id)"].firstMatch
+        let list = app.descendants(matching: .any)["sessions.screen"]
+        if !list.waitForExistence(timeout: 3) {
+            let menu = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["chat.menu", "home.drawer.open"]))
+                .firstMatch
+            XCTAssertTrue(menu.waitForExistence(timeout: 5))
+            menu.tap()
+            app.buttons["menu.sessions"].tap()
+        }
+        XCTAssertTrue(list.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !(row.exists && row.isHittable) { list.swipeUp() }
+        row.tap()
+    }
+
+    @MainActor
+    private func message(_ text: String, in app: XCUIApplication) -> XCUIElement {
+        app.textViews.matching(NSPredicate(format: "value CONTAINS %@", text)).firstMatch
     }
 
     @MainActor

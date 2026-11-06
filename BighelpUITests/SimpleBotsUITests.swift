@@ -45,9 +45,9 @@ final class SimpleBotsUITests: BighelpUITestCase {
             save("simple-settings-\(appearance)", app)
             app.buttons["simple-bots.settings.close"].tap()
 
-            // Create New Bot.
+            // Create New Bot: + opens it, with no menu.
+            XCTAssertEqual(app.buttons["simple-bots.new"].label, "New Bot")
             app.buttons["simple-bots.new"].tap()
-            app.buttons["New Bot"].tap()
             let name = app.textFields["simple-bots.create.name"]
             XCTAssertTrue(name.waitForExistence(timeout: 5))
             XCTAssertFalse(app.buttons["simple-bots.create.submit"].isEnabled, "Create needs a name")
@@ -467,7 +467,6 @@ final class SimpleBotsUITests: BighelpUITestCase {
             let app = launch(appearance: appearance)
             XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
             app.buttons["simple-bots.new"].tap()
-            app.buttons["New Bot"].tap()
             let name = app.textFields["simple-bots.create.name"]
             XCTAssertTrue(name.waitForExistence(timeout: 5))
             let templates = app.buttons["simple-bots.create.templates"]

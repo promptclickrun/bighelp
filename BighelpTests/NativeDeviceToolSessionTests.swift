@@ -301,7 +301,8 @@ struct NativeDeviceToolSessionTests {
     }
 
     /// A shortcut out in the Shortcuts app can outlast the next request in its batch. That one is
-    /// answered as expired, and the channel keeps working instead of closing.
+    /// answered as expired; the host stopped waiting for it at its deadline and refuses the answer
+    /// (`result_replay`), and the channel keeps working instead of closing.
     @Test func aRequestThatExpiresBehindASlowOneIsAnsweredAndTheChannelStays() async throws {
         let fixture = try Fixture()
         let now = Int(Date().timeIntervalSince1970)
@@ -314,10 +315,8 @@ struct NativeDeviceToolSessionTests {
         try await session.connect()
         try await session.pollOnce()
         #expect(fixture.handled == 1)
-        #expect(fixture.http.results.count == 2)
-        #expect(fixture.http.results.last?["requestId"] == .string("tool-call-2"))
-        #expect(fixture.http.results.last?["status"] == .string("failed"))
-        #expect(fixture.http.results.last?["code"] == .string("request_expired"))
+        #expect(fixture.http.results.count == 1)
+        #expect(fixture.http.refusals == ["result_replay"])
         var next = fixture.http.request
         next["requestId"] = .string("tool-call-3")
         fixture.http.batch = [next]
@@ -333,6 +332,28 @@ struct NativeDeviceToolSessionTests {
         try await session.connect()
         await #expect(throws: WorkspaceClientError.self) { try await session.pollOnce() }
         #expect(fixture.handled == 1 && fixture.http.results.isEmpty)
+    }
+
+    /// A tool can run past its call's window: Location's precise-location question, its fix and the
+    /// address can take 40 seconds, and the host waits 30. The host has told the agent by then, so it
+    /// refuses the late answer (`result_replay`). That answer is lost, not the channel: it takes the
+    /// next call (#861).
+    @Test func aLateAnswerTheHostNoLongerTakesKeepsTheChannel() async throws {
+        let fixture = try Fixture()
+        fixture.duringHandle = { fixture.http.giveUpOnDelivered() }
+        let session = fixture.session()
+        try await session.connect()
+        try await session.pollOnce()
+        #expect(fixture.handled == 1 && fixture.http.results.isEmpty)
+        #expect(fixture.http.refusals == ["result_replay"])
+        fixture.duringHandle = nil
+        var next = fixture.http.request
+        next["requestId"] = .string("tool-call-2")
+        fixture.http.batch = [next]
+        try await session.pollOnce()
+        #expect(fixture.handled == 2)
+        #expect(fixture.http.results.map { $0["requestId"] } == [.string("tool-call-2")])
+        #expect(fixture.http.paths.filter { $0 == "device-tools/close" }.isEmpty)
     }
 
     @Test func connectAcceptedAfterForegroundRetiresStillClosesChannel() async throws {
@@ -463,6 +484,8 @@ struct NativeDeviceToolSessionTests {
         var wrongResult = false
         /// The first request handled takes this long, like a run out in Shortcuts.
         var slowFor: Duration?
+        /// Runs while a tool runs, before its answer goes to the host.
+        var duringHandle: (() -> Void)?
         init() throws {
             owner = WorkspaceOwner(authority: try .dashboard(endpointIdentity: "https://host.example:9119"),
                                    authenticationGeneration: UUID(), connectionGeneration: UUID())
@@ -479,6 +502,7 @@ struct NativeDeviceToolSessionTests {
                 isAvailable: { self.available }, isPaused: { self.paused }, handle: { request, _, _ in
                     self.handled += 1
                     if let slowFor = self.slowFor { try? await Task.sleep(for: slowFor) }
+                    self.duringHandle?()
                     var resultRequest = request
                     if self.wrongResult {
                         var raw = self.http.request
@@ -524,6 +548,13 @@ struct NativeDeviceToolSessionTests {
         /// The codes the plugin would answer and log (`bighelp native request rejected: …`).
         var refusals: [String] = []
         var openChannels: Int { purge(); return channels.count }
+        /// Each request a poll handed the phone, by ID, with its deadline (the plugin's `pending`).
+        private var delivered: [String: Int] = [:]
+        /// Requests the host stopped waiting for: it told the agent, and marked them done (`_give_up`).
+        private var givenUp: Set<String> = []
+
+        /// The host's wait for every request the phone has ran out.
+        func giveUpOnDelivered() { givenUp.formUnion(delivered.keys) }
 
         @discardableResult
         func hold(device: String) -> String {
@@ -580,6 +611,9 @@ struct NativeDeviceToolSessionTests {
                 if let id = channel.string { keepAlive(id) }
                 beforePollReply()
                 let rows = batch ?? Array(repeating: self.request, count: duplicateRequest ? 2 : 1)
+                for row in rows {
+                    if let id = row["requestId"]?.string { delivered[id] = row["expiresAt"]?.integer ?? 0 }
+                }
                 // A batch continues after the phone's cursor; the single request always comes as the first.
                 let start = batch == nil ? 0 : Int(request.body?["after"]?.integer ?? 0)
                 value = ["channelId": channel, "next": .integer(start + rows.count),
@@ -587,7 +621,16 @@ struct NativeDeviceToolSessionTests {
                              .object(["sequence": .integer(start + $0.offset + 1), "request": .object($0.element)])
                          })]
             case "device-tools/result":
-                if let result = request.body?["result"]?.object { results.append(result) }
+                // The plugin's `accept_result`: a channel it no longer has refuses first; an answer it
+                // stopped waiting for at the deadline is done (`result_replay`); a taken one renews the lease.
+                if let refused = try gone(channel, request: request, requestGuard: requestGuard) { return refused }
+                let result = request.body?["result"]?.object ?? [:]
+                if let id = result["requestId"]?.string, let deadline = delivered[id],
+                   givenUp.contains(id) || deadline <= Int(Date().timeIntervalSince1970) {
+                    return try refusal("result_replay", status: 409, request: request, requestGuard: requestGuard)
+                }
+                results.append(result)
+                if let id = channel.string { keepAlive(id) }
                 value = ["accepted": .boolean(true)]
             case "device-tools/close":
                 if closeFails { throw URLError(.networkConnectionLost) }

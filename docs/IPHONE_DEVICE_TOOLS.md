@@ -112,6 +112,12 @@ seconds apart (`NativeDeviceToolSession.runReopeningWhileHeld`); any change to
 the chat or connection cancels the wait. While it waits, Device access says it
 connects again in a moment; if another device keeps the chat, it says so.
 
+A tool that runs past its call's window loses only that answer. Location's
+precise-location question, its fix and the address can take 40 seconds, and the
+host waits 30. At the deadline the host tells the agent, and then it refuses the
+late answer (`result_replay`, `result_unknown` or `result_expired`). The channel
+continues with the next call.
+
 ## Transport and ownership
 
 The existing encrypted Link connection carries version-1

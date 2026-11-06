@@ -215,8 +215,14 @@ final class NativeDeviceToolSession {
             let encoded = try JSONEncoder().encode(result)
             guard encoded.count <= 256_000 else { throw WorkspaceClientError.capacityExceeded }
             let payload = try JSONDecoder().decode(BighelpJSONValue.self, from: encoded)
-            let receipt = try await request("result", ["channelId": .string(channelID), "result": payload])
-            guard receipt["accepted"] == .boolean(true) else { throw WorkspaceClientError.outcomeUnknown }
+            do {
+                let receipt = try await request("result", ["channelId": .string(channelID), "result": payload])
+                guard receipt["accepted"] == .boolean(true) else { throw WorkspaceClientError.outcomeUnknown }
+            } catch WorkspaceClientError.rejected(let code?, _) where Self.lateAnswerCodes.contains(code) {
+                // A tool ran past its call's window (Location's precise question, fix and address can take
+                // 40 seconds; the host waits 30): the host told the agent already. Only this answer is lost.
+                Self.log.notice("answer not taken: \(code, privacy: .public)")
+            }
             cursor = sequence
         }
     }
@@ -334,6 +340,10 @@ final class NativeDeviceToolSession {
             }
         }
     }
+
+    /// Refusals of one answer the host stopped waiting for (the call's deadline passed, or its turn
+    /// ended). The channel is fine.
+    private static let lateAnswerCodes: Set<String> = ["result_replay", "result_unknown", "result_expired"]
 
     /// The plugin's code when another channel holds this chat.
     static let chatHeldCode = "channel_ambiguous"

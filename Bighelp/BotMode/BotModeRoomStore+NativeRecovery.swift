@@ -32,6 +32,7 @@ extension BotModeRoomStore {
         }
         try requireNativeBoundary(boundary)
         try validateNativeState(state, previous: initial)
+        recordNativeRoomSettings(roomID: roomID, state: state)
         try refreshNativeApprovals(roomID: roomID, driverStatus: state.driverStatus, boundary: boundary)
         var room = initial
         let metadataChanged = room.nativeRoomID != state.roomID

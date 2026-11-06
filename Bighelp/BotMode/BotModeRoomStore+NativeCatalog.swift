@@ -379,6 +379,9 @@ extension BotModeRoomStore {
         nativeRetryAttemptsByRoom.removeAll()
         nativePendingDiscardsByRoom.removeAll()
         nativeDriverWorkingByRoom.removeAll()
+        nativeRoomSettings.removeAll()
+        nativeRoomSettingsQueued.removeAll()
+        nativeContinueProblems.removeAll()
         nativeBoundaryGeneration += 1
         nativeCapabilities = nil
         catalogRefreshID = nil

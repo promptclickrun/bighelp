@@ -88,6 +88,14 @@ final class BotModeRoomStore {
     var nativeRetryAttemptsByRoom: [String: [String: HermesBotModeRetryAttempt]] = [:]
     var nativePendingDiscardsByRoom: [String: [HermesBotModePendingDiscard]] = [:]
     var nativeDriverWorkingByRoom: [String: Bool] = [:]
+    /// Each room's settings as this connection last read them (`groups.state`'s `context`).
+    var nativeRoomSettings: [String: HermesBotModeRoomSettings] = [:]
+    /// Rooms whose settings are on their way to Hermes, and the newest edit waiting behind one.
+    var nativeRoomSettingsSaving: Set<String> = []
+    var nativeRoomSettingsQueued: [String: HermesBotModeRoomContext] = [:]
+    /// Discussions whose Continue waits for Hermes, and why one didn't go.
+    var nativeContinuesInFlight: Set<String> = []
+    var nativeContinueProblems: [String: String] = [:]
     /// Other saved computers, for group chats with their agents (RoomLink).
     var peerHosts: (any HermesBotModePeerHosts)?
     /// Why an agent on another computer isn't linked to its room yet, by room.

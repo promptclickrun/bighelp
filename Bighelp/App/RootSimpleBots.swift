@@ -103,7 +103,6 @@ extension RootShellView {
             personName: userIdentity.identity.displayName, personImageURL: userIdentity.avatarURL(),
             scope: owner?.cacheScopeID ?? "local",
             canCreateBots: usesWorkspaceFixtures || supports(.profilesCreate),
-            canCreateGroups: supports(.groupsCreate) && botModeRooms.canCreateNativeRoom,
             onOpenBot: { openSimpleBotChat($0) },
             onOpenSession: { summary in
                 appState.chatOpenedFromList = true
@@ -115,7 +114,6 @@ extension RootShellView {
                 appState.chatOpenedFromList = true
                 startNewChat(explicitAgentID: agentID)
             },
-            onCreateGroup: { createGroupChat(with: $0) },
             makeCreator: { makeSimpleBotCreator() },
             gateways: simpleBotsGateways,
             activity: botChatActivity,

@@ -494,8 +494,8 @@ and no ☰. The page is the light and dark theme picked in Appearance, your bubb
 picked a bubble color in Appearance, and buttons and tinted text are the page's ink (white after dark). The
 text is SF Pro, as everywhere.
 
-- **Home**: your circle top left opens Settings; search and + (New Bot, New Group Chat) top right. The
-  primary bot (no badge) and pinned bots share the top, all the same size: one large, else two or three
+- **Home**: your circle top left opens Settings; search and + (New Bot, no menu: group chats are made in Chat
+  mode) top right. The primary bot (no badge) and pinned bots share the top, all the same size: one large, else two or three
   across, six at most in two rows. Only pins the top shows count toward the six, not the primary bot, hidden bots
   or ones this computer no longer has. Their marks blink now and then (never with Reduce Motion). Under them every
   other bot and each group chat, with the latest message and its time; a bot's role is a small gray label after

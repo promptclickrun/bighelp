@@ -15,6 +15,13 @@ struct SuspendedChat: Equatable {
     let text: String
 }
 
+/// The chat a board covered: Feed, Ideas, Goals and Apps take the Chat tab's chat off
+/// screen, and Chat brings that chat back instead of the agent's own Bot Chat.
+struct CoveredChat: Equatable {
+    let conversationID: String
+    let openedFromList: Bool
+}
+
 @MainActor
 @Observable
 final class AppState {
@@ -26,6 +33,9 @@ final class AppState {
     private(set) var pendingVoiceConversationID: String?
     /// Text a board "Ask" or "Discuss" leaves in the next new chat's composer.
     var pendingComposerText: String?
+    /// The chat Feed, Ideas, Goals or Apps covered when the person left the Chat tab for
+    /// them: Chat goes back to it, not to the agent's own Bot Chat.
+    private(set) var chatBehindBoard: CoveredChat?
     /// The open chat's agent and text when the app left, while that chat had sent nothing.
     /// Hermes saves a chat only on its first message, so it can be gone on return.
     var suspendedChat: SuspendedChat?
@@ -57,6 +67,11 @@ final class AppState {
     }
 
     func select(_ tab: AppTab) {
+        // Feed, Ideas, Goals and Apps replace the chat on screen. Chat brings that chat back
+        // rather than the agent's own Bot Chat; a chat opened on purpose replaces it first.
+        if tab.isAgentBoard, case .chat(let id)? = path.last {
+            chatBehindBoard = CoveredChat(conversationID: id, openedFromList: chatOpenedFromList)
+        }
         switch tab {
         case .home, .inbox:
             selectedTab = .workspace
@@ -132,6 +147,8 @@ final class AppState {
     }
 
     func activateConversation(id: String, source: ConversationActivationSource) {
+        // Opening a chat on purpose replaces the one a board was covering.
+        chatBehindBoard = nil
         let route = AppRoute.chat(conversationID: id)
         // Already open (a notification, widget or link about it): go back to that copy. A second
         // copy would share its model, both would redraw every change, and Back would show it again.
@@ -182,6 +199,8 @@ final class AppState {
         pendingVoiceConversationID = nil
         clearComposerText()
         chatOpenedFromList = false
+        // Its chat is the other computer's.
+        chatBehindBoard = nil
     }
 
     func resetForAccountBoundary() {
@@ -191,6 +210,7 @@ final class AppState {
         pendingVoiceConversationID = nil
         clearComposerText()
         chatOpenedFromList = false
+        chatBehindBoard = nil
     }
 
     /// When `pendingComposerText` was left. A chat that opens much later (its open failed, or the

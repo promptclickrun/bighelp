@@ -114,7 +114,8 @@ picked color. New chat is a round button in the middle, in the picked color, on 
 starts a chat with the agent in use, touch and hold (right-click on the Mac) picks agents, one for a 1:1 chat or
 several for a group. The bar holds Chat and three places (Appearance › App layout). In a chat, Chat is the lit tab and tapping it does nothing.
 With Sessions in the bar (App layout), every chat's list and a chat picked from it light Sessions instead, and
-Chat there opens the agent's own chat.
+Chat there opens the agent's own chat. Feed, Ideas, Goals and Apps cover the chat you were in, and Chat goes back
+to that chat rather than the agent's own, so the bar switches between a chat and its boards.
 Chat opens that agent's canonical Bot Chat (the same conversation as Hermes Desktop's bot entry) with its live avatar big at the top: tap the avatar for its profile (This chat's
 model and reasoning, then Activity, Approvals, Schedules, Identity), tap the name to switch agents or open a group
 chat, and ☰ for everything else. ☰'s first screen fits without

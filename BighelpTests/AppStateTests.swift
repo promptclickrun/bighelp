@@ -185,4 +185,67 @@ struct AppStateTests {
         #expect(state.selectedTab == .scheduledTasks)
         #expect(state.path.isEmpty)
     }
+
+    /// Feed, Ideas, Goals and Apps take the chat off screen. Chat brings the same chat back,
+    /// not the agent's own Bot Chat, so the bottom bar is a switch between a chat and its boards.
+    @Test func aBoardRemembersTheChatItCoveredForChatToBringBack() {
+        let state = AppState()
+        state.select(.sessions)
+        state.chatOpenedFromList = true
+        state.activateConversation(id: "session-1", source: .sessions)
+        #expect(state.chatBehindBoard == nil)
+
+        state.select(.feed)
+
+        #expect(state.selectedTab == .feed)
+        #expect(state.path.isEmpty)
+        #expect(state.chatBehindBoard == CoveredChat(conversationID: "session-1", openedFromList: true))
+    }
+
+    /// A chat opened on purpose is the one Chat goes back to from now on.
+    @Test func openingAnotherChatForgetsTheBoardCoveredOne() {
+        let state = AppState()
+        state.select(.sessions)
+        state.activateConversation(id: "covered", source: .sessions)
+        state.select(.ideas)
+        #expect(state.chatBehindBoard?.conversationID == "covered")
+
+        state.activateConversation(id: "opened", source: .sessions)
+
+        #expect(state.chatBehindBoard == nil)
+    }
+
+    /// Only the boards cover the chat. Leaving it for Agents, Sessions or Settings leaves
+    /// Chat opening the agent's own chat, as it always has.
+    @Test func leavingAChatForAnywhereElseDoesNotCoverIt() {
+        let state = AppState()
+        state.select(.sessions)
+        state.activateConversation(id: "session-1", source: .sessions)
+
+        for tab in [AppTab.agents, .scheduledTasks, .projects, .sessions] {
+            state.activateConversation(id: "session-1", source: .sessions)
+            state.select(tab)
+            #expect(state.chatBehindBoard == nil, "\(tab) doesn't cover the chat")
+        }
+    }
+
+    /// The covered chat belongs to this computer and this account.
+    @Test func hostAndAccountBoundariesForgetTheBoardCoveredChat() {
+        let state = AppState()
+        state.select(.sessions)
+        state.activateConversation(id: "session-1", source: .sessions)
+        state.select(.goals)
+        #expect(state.chatBehindBoard != nil)
+
+        state.resetForHostBoundary()
+        #expect(state.chatBehindBoard == nil)
+
+        state.select(.sessions)
+        state.activateConversation(id: "session-1", source: .sessions)
+        state.select(.apps)
+        #expect(state.chatBehindBoard != nil)
+
+        state.resetForAccountBoundary()
+        #expect(state.chatBehindBoard == nil)
+    }
 }

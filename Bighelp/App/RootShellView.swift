@@ -1061,7 +1061,9 @@ struct RootShellView: View {
             return
         }
         if tab == .sessions, opensHomeChat {
-            // Chat is the agent's own chat; ☰ and swipe-back reach the full list.
+            // The chat a board covered comes back; otherwise Chat is the agent's own chat.
+            // ☰ and swipe-back reach the full list either way.
+            if openChatBehindBoard() { return }
             openHomeChat()
         } else if tab == .sessions {
             openSessions(filteredTo: nil)
@@ -1072,6 +1074,18 @@ struct RootShellView: View {
         } else {
             appState.select(tab)
         }
+    }
+
+    /// Back to the chat Feed, Ideas, Goals or Apps covered, while this computer still lists it.
+    /// False when there is none (or it is gone), and Chat opens the agent's own chat.
+    private func openChatBehindBoard() -> Bool {
+        guard let covered = appState.chatBehindBoard,
+              let record = sessionCatalog.session(id: covered.conversationID) else { return false }
+        appState.select(.sessions)
+        appState.chatOpenedFromList = covered.openedFromList
+        // A group chat opens its room, as it did from the list.
+        openSessionSelection(record.summary)
+        return true
     }
 
     /// Projects, Kanban, Workflows or Usage from the bottom bar: opened the way ☰ opens

@@ -314,6 +314,15 @@ change in both repos.
   the host sent something on that socket in the last 5 s (`admissionFreshness`). Coming back to the app or a
   network change (`verifyLiveness`) voids that until a ping sent after it is answered: frames from before can sit
   in a dead socket's buffer. A prompt sent on a socket that dies anyway is journaled as uncertain, never resent.
+- **App state on the computer:** Bots mode's order, the sections, each group chat's section, Multi-gateway's
+  primary bot and each bot's voice, mark, pet and character are also kept for each person on their computers
+  (plugin `native-app-state-v1`, keys `bots.layout` and `bots.settings`; `Bighelp/AppState/`), so a reinstall
+  or another device gets them back. The stores stay where screens read them; `BotsAppStateSync` turns their
+  changes into patches and puts the newest revision from every computer reached back in them. Items are named
+  by the computer's own ID (`<computerId>/<profile>`), never by this phone's host ID or sign-in scope. A value
+  lists the computers it covers: a computer reached for the first time gets this phone's part, and a value
+  already there wins (a fresh install never sends empty choices). Keep JSON fields the app doesn't know. The
+  plugin refuses only values shaped like credentials; links and IDs go as they are.
 - **Who's working:** Bots mode's home and the Agents screen show each agent's Bot Chat working or needing
   you from the plugin's `agents/activity` (`native-agents-activity-v1`): Hermes' turn leases in any process
   (the app, `message_agent`, `chat -q`) and the dashboard's open prompts, for up to 64 agents in one read.

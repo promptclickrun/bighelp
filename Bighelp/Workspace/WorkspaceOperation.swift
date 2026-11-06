@@ -216,6 +216,10 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case myTemplatesList = "my-templates.list"
     case myTemplatesSave = "my-templates.save"
     case myTemplatesDelete = "my-templates.delete"
+    /// The app's own layout and bot settings for one person, kept on the computer so a reinstall or
+    /// another device gets them back (plugin, `native-app-state-v1`).
+    case appStateRead = "app-state.read"
+    case appStateWrite = "app-state.write"
     /// Copies saved cards and addresses to more websites in an agent's vault, on the computer, so
     /// their numbers never come to the phone (plugin, `native-vault-link-v1`).
     case vaultLink = "vault.link"

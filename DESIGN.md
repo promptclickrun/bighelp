@@ -518,8 +518,10 @@ text is SF Pro, as everywhere.
   other bot and each group chat, with the latest message and its time; a bot's role is a small gray label after
   its name. Rearrange (in each menu) turns the home into an arranging mode: Cancel and Save in the header, no
   menus, chats or blinking, and every bot and group chat drags into place, on top (the primary bot too) or in
-  the list. Save keeps the order per computer (`SimpleBotsOrderStore`); a bot or group chat not placed yet leads
-  the list, by its latest message. Hidden bots stay off the home; search's filter shows them.
+  the list. Save keeps the order per computer (`SimpleBotsOrderStore`), and on the computer too, so a reinstall or
+  another device gets it back (`BotsAppStateSync`; on a computer whose plugin can't keep it, on this device only,
+  and the Rearrange hint says to update the plugin); a bot or group chat not placed yet leads the list, by its
+  latest message. Hidden bots stay off the home; search's filter shows them.
 - **Working and Needs you**: a bot whose Bot Chat is on a turn acts the work out on its face: a mark or kit
   character plays the mood for it (`AgentActivityKind.moodID`: scanning for code, looking around while it
   browses), a Hermes face or shape the designer's state for it (`hermesPlayState`), a pet its move. In the list,

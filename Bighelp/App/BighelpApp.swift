@@ -169,6 +169,16 @@ struct BighelpApp: App {
             }
         }
         PhotoActionsSettingsStore.shared.connection = { imageDraftsConnection().map { ($0.scope, $0.api) } }
+        let demoAgents = composition.agentDirectory
+        Self.startBotsAppState(registry: hostRegistry, connections: connections, fleet: fleet,
+                               settings: composition.settings, companions: composition.companion,
+                               demo: usesDemoWorkspace ? demoHosts : nil, liveAgents: {
+            if let runtime = nativeWorkspaces.current { return (runtime.authority.cacheScopeID, runtime.agents) }
+            guard usesDemoWorkspace, !connections.isDirectSelected,
+                  let scope = (try? WorkspaceAuthority.fixture(id: demoHosts.selectedHostID ?? "demo"))?.cacheScopeID
+            else { return nil }
+            return (scope, demoAgents)
+        })
         let nativeWorkspaceKey: @MainActor () -> BighelpShortcutWorkspaceKey? = {
             if usesDemoWorkspace, !connections.isDirectSelected { return nil }
             guard hostRegistry.connectionMode == .independent || connections.isDirectSelected else { return nil }
@@ -683,6 +693,12 @@ struct BighelpApp: App {
             .environment(\.bighelpNotificationContext, notificationContext)
             .task(id: nativeWorkspaces.synchronizationKey) {
                 await nativeWorkspaces.synchronize()
+            }
+            // Bots mode's order, sections and bot settings from the person's computers.
+            .task(id: Self.botsAppStateKey(connections: workspaceConnections, registry: hostRegistry,
+                                           isActive: scenePhase == .active)) {
+                guard scenePhase == .active else { return }
+                await BotsAppStateSync.shared.sync()
             }
             .environment(\.managedNotificationService, notificationComposition.service)
             .task(id: notificationComposition.revision.description + ":" + hostRegistry.generation.uuidString + ":" + String(scenePhase == .active)) {

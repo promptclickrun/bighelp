@@ -128,6 +128,10 @@ final class PetAvatarStore {
 
     func slug(for agentKey: String) -> String? { assignments[agentKey] }
 
+    /// Pets chosen on another device whose moves are still on their way (or couldn't come): they
+    /// count as the agent's pet for app state, so a slow download never takes them off elsewhere.
+    @ObservationIgnored private(set) var wanted: [String: String] = [:]
+
     /// The frames for this agent's move, or nil when it wears no pet (or the
     /// pet's moves are gone): then its still picture shows.
     func frames(for agentKey: String, move: PetdexMove) -> [CGImage]? {
@@ -139,6 +143,7 @@ final class PetAvatarStore {
     /// Fetches the pet's sheet (unless its moves are already here), cuts it into
     /// moves and then puts it on the agent. Until then the still picture shows.
     func assign(_ pet: PetdexPet, to agentKey: String, loadSheet: @escaping @MainActor () async throws -> Data) {
+        wanted[agentKey] = nil
         loads[agentKey]?.cancel()
         let folder = folder(for: pet.slug)
         loads[agentKey] = Task { @MainActor [weak self] in
@@ -163,12 +168,29 @@ final class PetAvatarStore {
             guard !Task.isCancelled else { return }
             if self.assignments[agentKey] == nil, self.assignments.count >= Self.maximumAgents { return }
             self.assignments[agentKey] = pet.slug
+            if self.wanted[agentKey] == pet.slug { self.wanted[agentKey] = nil }
             self.persist()
+        }
+    }
+
+    /// A pet chosen on another device (`BotsAppState`): found by its slug, then put on the agent the
+    /// way `assign` does. Nothing when it's on already or on its way.
+    func restore(_ slug: String, to agentKey: String, find: @escaping @MainActor (String) async -> PetdexPet?,
+                 loadSheet: @escaping @MainActor (PetdexPet) async throws -> Data) {
+        guard assignments[agentKey] != slug, wanted[agentKey] != slug else { return }
+        guard assignments[agentKey] != nil || assignments.count < Self.maximumAgents else { return }
+        loads[agentKey]?.cancel()
+        wanted[agentKey] = slug
+        loads[agentKey] = Task { @MainActor [weak self] in
+            guard let pet = await find(slug), !Task.isCancelled, let self, self.wanted[agentKey] == slug else { return }
+            self.assign(pet, to: agentKey) { try await loadSheet(pet) }
+            self.wanted[agentKey] = slug
         }
     }
 
     /// The agent wears something else now.
     func remove(_ agentKey: String) {
+        wanted[agentKey] = nil
         loads[agentKey]?.cancel()
         loads[agentKey] = nil
         guard let slug = assignments.removeValue(forKey: agentKey) else { return }

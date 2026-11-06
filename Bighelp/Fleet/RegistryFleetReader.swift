@@ -142,6 +142,25 @@ final class RegistryFleetReader: FleetHostReading {
         return try await body(workspace, owner, current, client)
     }
 
+    /// A host the all-hosts view keeps connected, for its plugin routes (app state). It never
+    /// connects one, and it's nil once the host is selected or its connection goes.
+    func connectedPluginWorkspace(_ hostID: UUID) -> DirectHermesWorkspaceClient? {
+        guard registry.keepsOtherHostsConnected, registry.selectedHostID != hostID, registry.isWorkspaceReady,
+              let host = registry.hosts.first(where: { $0.id == hostID }) else { return nil }
+        let store = registry.workspace(for: host)
+        guard store.isConnected, !store.isConnecting,
+              let verified = try? store.verifiedConnection(for: host, generation: registry.generation) else { return nil }
+        let client = verified.client, owner = verified.owner
+        let generation = owner.connectionGeneration
+        let current: @MainActor () -> WorkspaceOwner? = { [weak registry, weak store] in
+            guard let registry, let store, registry.selectedHostID != hostID, store.isConnected,
+                  store.connectionGeneration == generation else { return nil }
+            return owner
+        }
+        return DirectHermesWorkspaceClient(rpc: client, http: client, owner: owner,
+                                           capabilities: .init(owner: owner), currentOwner: current)
+    }
+
     /// Another host's connection kept open until `release`: for a group chat
     /// with its agents on screen, or a Team Call they speak in.
     func holdWorkspace(_ hostID: UUID) async throws -> HeldWorkspace {

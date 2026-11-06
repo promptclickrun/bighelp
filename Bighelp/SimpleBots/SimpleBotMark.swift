@@ -368,6 +368,14 @@ final class SimpleBotMarkStore {
         while marks.count > Self.maximumMarks, let first = marks.keys.sorted().first { marks[first] = nil }
         if let data = try? JSONEncoder().encode(marks) { defaults.set(data, forKey: Self.defaultsKey) }
     }
+
+    /// Every mark at once, from app state on the computers (`BotsAppState`).
+    func replaceAll(_ next: [String: SimpleBotMark]) {
+        guard marks != next else { return }
+        marks = next
+        while marks.count > Self.maximumMarks, let first = marks.keys.sorted().first { marks[first] = nil }
+        if let data = try? JSONEncoder().encode(marks) { defaults.set(data, forKey: Self.defaultsKey) }
+    }
 }
 
 /// A bot's face in Bots mode, in `AgentFace`'s order: its character, pet, Hermes face or mark,

@@ -4241,6 +4241,23 @@
         }
       }
     },
+    "Drag your bots and group chats into the order you want, then tap Save. To keep this order on your other devices too, update the bighelp plugin on this computer.": {
+      "comment": "Rearrange in Bots mode when this computer's plugin can't keep the order (#857); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag your bots and group chats into the order you want, then tap Save. To keep this order on your other devices too, update the bighelp plugin on this computer."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "将机器人和群聊拖到你想要的顺序，然后轻点“保存”。要在你的其他设备上也保留这个顺序，请更新这台电脑上的 bighelp 插件。"
+          }
+        }
+      }
+    },
     "Drop": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {

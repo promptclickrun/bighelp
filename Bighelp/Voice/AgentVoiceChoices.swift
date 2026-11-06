@@ -85,7 +85,33 @@ final class AgentVoiceChoices {
     }
 
     private static func entry(_ computer: String, _ agentID: String) -> String {
+        entryKey(computer: computer, agentID: agentID)
+    }
+
+    // MARK: Every choice at once, for app state on the computers (`BotsAppState`)
+
+    var all: [String: Choice] { saved }
+
+    func replaceAll(_ choices: [String: Choice]) {
+        let next = choices.filter { !$0.value.isEmpty }
+        guard saved != next else { return }
+        saved = next
+        defaults.set(try? JSONEncoder().encode(saved), forKey: Self.key)
+    }
+
+    static func entryKey(computer: String, agentID: String) -> String {
         "\(computer.utf8.count):\(computer)\(agentID)"
+    }
+
+    /// The computer (`cacheScopeID`) and agent of an entry key.
+    static func entryParts(_ entry: String) -> (computer: String, agentID: String)? {
+        let bytes = Array(entry.utf8)[...]
+        guard let colon = bytes.firstIndex(of: UInt8(ascii: ":")),
+              let count = Int(String(decoding: bytes[..<colon], as: UTF8.self)), count > 0,
+              bytes.endIndex - colon - 1 > count,
+              let computer = String(bytes: bytes[(colon + 1)..<(colon + 1 + count)], encoding: .utf8),
+              let agentID = String(bytes: bytes[(colon + 1 + count)...], encoding: .utf8) else { return nil }
+        return (computer, agentID)
     }
 }
 

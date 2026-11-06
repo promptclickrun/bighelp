@@ -66,7 +66,8 @@ extension DirectHermesConversationClient {
             retainVisibleState()
         }
         let previousSequence = projection.lastSequence
-        let change = projection.accept(event)
+        // A replayed reply ended earlier, at a time the phone doesn't know: only a reread gives it one.
+        let change = projection.accept(event, arrivedAt: isReplayingActivity ? nil : Date())
         var observedDurationItem: TimelineItem?
         if let sequence = event.sequence, sequence <= previousSequence { return }
         if let result = change.sideTaskResult, result.kind == .background {

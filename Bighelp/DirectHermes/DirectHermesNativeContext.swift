@@ -453,6 +453,11 @@ final class DirectHermesNativePluginClient {
         case .myTemplatesDelete:
             return Route(path: "my-templates/delete", feature: MyTemplatesWire.feature, isMutation: true,
                          maximumResponseBytes: 16_384)
+        case .appStateRead, .appStateWrite:
+            // Two keys of at most 64 KB each; a person's whole file is at most 512 KB.
+            return Route(path: operation.rawValue.replacingOccurrences(of: ".", with: "/"),
+                         feature: AppStateWire.feature, isMutation: operation == .appStateWrite,
+                         maximumResponseBytes: 589_824, timeout: 20)
         case .vaultLink:
             return Route(path: "vault/link", feature: CredentialVault.linkFeature, isMutation: true,
                          maximumResponseBytes: 65_536)

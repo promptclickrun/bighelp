@@ -606,6 +606,79 @@ struct DirectHermesAgentAdapterTests {
         #expect(workspace.calls.filter { $0.operation == .modelOptions }.count == 2)
     }
 
+    /// Callers sharing one catalog read each check, once it answers, that the connection they asked on is
+    /// still the one in use, as `service.request` does for its own caller. A connection that changed after
+    /// the read answered but before they resumed gets nothing from it, and nothing is kept.
+    @Test func everyCallerOfASharedCatalogReadChecksTheConnectionAgain() async throws {
+        let workspace = try AgentNativeWorkspace()
+        let client = DirectHermesAgentRuntimeDefaultsClient(workspace: workspace, owner: workspace.initialOwner,
+                                                            currentOwner: { workspace.owner })
+        workspace.holdsModelOptions = true
+        let first = Task { try await client.loadModelProviders(agentID: "studio") }
+        while workspace.heldModelOptionsCount == 0 { await Task.yield() }
+        let second = Task { try await client.loadModelProviders(agentID: "studio") }
+        for _ in 0..<20 { await Task.yield() }
+        // Queued as the read answers: it runs after the read's own owner check and before its callers resume.
+        workspace.onModelOptionsAnswer = {
+            Task { @MainActor in
+                workspace.owner = WorkspaceOwner(authority: workspace.initialOwner.authority,
+                                                 authenticationGeneration: workspace.initialOwner.authenticationGeneration,
+                                                 connectionGeneration: UUID())
+            }
+        }
+        workspace.releaseModelOptions()
+        await #expect(throws: WorkspaceClientError.ownerChanged) { try await first.value }
+        await #expect(throws: WorkspaceClientError.ownerChanged) { try await second.value }
+        #expect(workspace.calls.filter { $0.operation == .modelOptions }.count == 1)
+
+        workspace.onModelOptionsAnswer = nil
+        workspace.owner = workspace.initialOwner
+        _ = try await client.loadModelProviders(agentID: "studio")
+        #expect(workspace.calls.filter { $0.operation == .modelOptions }.count == 2, "Nothing was kept from the overtaken read")
+    }
+
+    /// A caller that was cancelled while it shared a read doesn't get the answer; the others do.
+    @Test func aCancelledCallerOfASharedCatalogReadGetsNothing() async throws {
+        let workspace = try AgentNativeWorkspace()
+        let client = DirectHermesAgentRuntimeDefaultsClient(workspace: workspace, owner: workspace.initialOwner,
+                                                            currentOwner: { workspace.owner })
+        workspace.holdsModelOptions = true
+        let first = Task { try await client.loadModelProviders(agentID: "studio") }
+        while workspace.heldModelOptionsCount == 0 { await Task.yield() }
+        let second = Task { try await client.loadModelProviders(agentID: "studio") }
+        for _ in 0..<20 { await Task.yield() }
+        second.cancel()
+        workspace.releaseModelOptions()
+        #expect(try await !first.value.isEmpty)
+        await #expect(throws: CancellationError.self) { try await second.value }
+    }
+
+    /// A save retires the read in flight. The read started after it is the one that counts: the retired
+    /// read, finishing late, neither drops it (a caller then would start a third read) nor fills the cache.
+    @Test func aRetiredCatalogReadLeavesTheReadThatReplacedItAlone() async throws {
+        let workspace = try AgentNativeWorkspace()
+        let client = DirectHermesAgentRuntimeDefaultsClient(workspace: workspace, owner: workspace.initialOwner,
+                                                            currentOwner: { workspace.owner })
+        func reads() -> Int { workspace.calls.filter { $0.operation == .modelOptions }.count }
+        workspace.holdsModelOptions = true
+        let retired = Task { try await client.loadModelProviders(agentID: "studio") }
+        while workspace.heldModelOptionsCount == 0 { await Task.yield() }
+        client.invalidateProviderCache(agentID: "studio")
+        let replacement = Task { try await client.loadModelProviders(agentID: "studio") }
+        while workspace.heldModelOptionsCount < 2 { await Task.yield() }
+
+        workspace.releaseModelOptions(1)
+        await #expect(throws: CancellationError.self) { try await retired.value }
+        let joining = Task { try await client.loadModelProviders(agentID: "studio") }
+        for _ in 0..<20 { await Task.yield() }
+        #expect(reads() == 2, "A caller after the retired read ends joins its replacement")
+        workspace.releaseModelOptions()
+        _ = try await replacement.value
+        _ = try await joining.value
+        _ = try await client.loadModelProviders(agentID: "studio")
+        #expect(reads() == 2, "The replacement's answer is the one kept")
+    }
+
     @Test func ignoredCronReasoningKeyIsRejectedWithoutMutation() async throws {
         let workspace = try AgentNativeWorkspace()
         let client = runtime(workspace)
@@ -817,6 +890,18 @@ private final class AgentNativeWorkspace: WorkspaceOperationPerforming {
     var mainProvider = "native-provider"
     var availableModels = ["one", "two", "unavailable"]
     var loseFastReceipt = false
+    /// `model.options` answers wait for `releaseModelOptions()`, oldest first.
+    var holdsModelOptions = false
+    private var heldModelOptions: [CheckedContinuation<Void, Never>] = []
+    var heldModelOptionsCount: Int { heldModelOptions.count }
+    /// Runs as `model.options` answers, before the caller's own owner check.
+    var onModelOptionsAnswer: (() -> Void)?
+    func releaseModelOptions(_ count: Int = .max) {
+        let released = heldModelOptions.prefix(count)
+        heldModelOptions.removeFirst(released.count)
+        if heldModelOptions.isEmpty { holdsModelOptions = false }
+        released.forEach { $0.resume() }
+    }
     var config: [String: BighelpJSONValue] = [
         "agent": .object(["reasoning_effort": .string("medium")]),
         "delegation": .object(["reasoning_effort": .boolean(false), "has_base_url_override": .boolean(false)]),
@@ -943,6 +1028,8 @@ private final class AgentNativeWorkspace: WorkspaceOperationPerforming {
         case .profilesDescribe:
             return ["name": .string(id), "model": .object(["provider": .string(mainProvider), "default": .string(mainModel)])]
         case .modelOptions:
+            if holdsModelOptions { await withCheckedContinuation { heldModelOptions.append($0) } }
+            onModelOptionsAnswer?()
             return ["providers": .array([.object([
                 "slug": .string(mainProvider), "name": .string("Native Provider"),
                 "is_current": .boolean(true), "is_user_defined": .boolean(false),

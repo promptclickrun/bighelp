@@ -12,7 +12,8 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
     private var baselines: [String: Snapshot] = [:]
     private var providerCache: [String: [BighelpLinkModelProvider]] = [:]
     private var providerCacheFetchedAt: [String: Date] = [:]
-    private var providerLoads: [String: Task<[BighelpLinkModelProvider], any Error>] = [:]
+    /// The catalog read in flight for each agent, by its own ID: only that read fills the cache or clears this.
+    private var providerLoads: [String: (id: UUID, task: Task<[BighelpLinkModelProvider], any Error>)] = [:]
     static let providerCacheLifetime: TimeInterval = 60
     private var confirmation: AgentRuntimeDefaultsSaveConfirmation?
     private var confirmationExpiresAt: Date?
@@ -43,7 +44,15 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
     func loadModelProviders(agentID: String) async throws -> [BighelpLinkModelProvider] {
         _ = try DirectHermesAgentProfileService.profileIdentifier(agentID)
         if let cached = cachedModelProviders(agentID: agentID) { return cached }
-        if let existing = providerLoads[agentID] { return try await existing.value }
+        // Callers at the same time share one read. Each checks the owner again once it has the answer,
+        // as `service.request` does for its own caller: the connection, or the caller, may have gone
+        // while it waited.
+        if let flight = providerLoads[agentID] {
+            let providers = try await flight.task.value
+            try service.requireOwner()
+            return providers
+        }
+        let id = UUID()
         let task = Task { @MainActor [service] in
             let response = try await service.request(
                 .modelOptions,
@@ -53,17 +62,16 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
             )
             return try Self.decodeModelProviders(response)
         }
-        providerLoads[agentID] = task
-        do {
-            let providers = try await task.value
+        providerLoads[agentID] = (id, task)
+        defer { if providerLoads[agentID]?.id == id { providerLoads[agentID] = nil } }
+        let providers = try await task.value
+        try service.requireOwner()
+        // A save since it started (`invalidateProviderCache`) retired this read: its answer isn't kept.
+        if providerLoads[agentID]?.id == id {
             providerCache[agentID] = providers
             providerCacheFetchedAt[agentID] = now()
-            providerLoads[agentID] = nil
-            return providers
-        } catch {
-            providerLoads[agentID] = nil
-            throw error
         }
+        return providers
     }
 
     /// Hermes' model catalog (`model.options`), read so the picker always has it: a provider
@@ -220,8 +228,9 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
         }
     }
 
-    private func invalidateProviderCache(agentID: String) {
-        providerLoads[agentID]?.cancel()
+    /// A save changed what the catalog marks current: the cached copy and the read in flight are retired.
+    func invalidateProviderCache(agentID: String) {
+        providerLoads[agentID]?.task.cancel()
         providerLoads[agentID] = nil
         providerCache[agentID] = nil
         providerCacheFetchedAt[agentID] = nil

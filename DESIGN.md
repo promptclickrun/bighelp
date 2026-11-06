@@ -59,7 +59,9 @@ are historical (`docs/ui-v3-design.md`).
 - Edit avatar opens a choice: **Bot Studio** or **PetDex**, with "Use a photo instead" under them
   (`AvatarChooserView`). Bot Studio (`BotStudioView`) is one editor for every avatar: the avatar fills the top
   and plays its move, with Undo and Surprise me; a drawer below shows one row of choices at a time, picked from
-  the rail (Body, Eyes, Color, Shape, Moves), so no choice pushes the others off screen. Every body is drawn in
+  the rail (Body, Eyes, Color, Shape, Moves), so no choice pushes the others off screen. On Body, a swipe up on
+  the row (or a tap on the drawer's handle) opens every body in a grid, by set, with the avatar small above it;
+  the handle or another tab shows one row again. Every body is drawn in
   one style: one flat main color, tilted, two small slanted eyes up and to the right, and at most a small
   second-color part (`services/avatars/docs/BOT_BODIES.md`). PetDex opens the creator with only pets.
 - The older avatar creator (`AvatarCreatorView`) keeps a pet look simple: pick one of the ten kit

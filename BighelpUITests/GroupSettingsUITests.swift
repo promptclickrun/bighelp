@@ -78,9 +78,8 @@ final class GroupSettingsUITests: BighelpUITestCase {
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Lead: Avery Park"].waitForNonExistence(timeout: 5),
                       "Nobody leads once a quick check picks")
-        app.buttons["chat.options"].tap()
-        let menuItem = app.buttons["chat.group-settings"]
-        XCTAssertTrue(menuItem.waitForExistence(timeout: 5), "⋯ opens Group Settings too")
+        let menuItem = chatMenuItem("chat.group-settings", in: app)
+        XCTAssertTrue(menuItem.exists && menuItem.isHittable, "⋯ opens Group Settings too")
         menuItem.tap()
         let saved = app.textFields["group-settings.purpose"]
         XCTAssertTrue(saved.waitForExistence(timeout: 5))
@@ -115,13 +114,10 @@ final class GroupSettingsUITests: BighelpUITestCase {
                             extra: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL"])
         keep(app, "group-routing-lines-large-text")
         // Folded at this size, This chat holds Group Settings without scrolling.
-        app.buttons["chat.options"].tap()
-        let thisChat = app.buttons["chat.options.this-chat"]
-        XCTAssertTrue(thisChat.waitForExistence(timeout: 5))
-        thisChat.tap()
-        let menuItem = app.buttons["chat.group-settings"]
-        XCTAssertTrue(menuItem.waitForExistence(timeout: 5))
+        let menuItem = chatMenuItem("chat.group-settings", in: app)
+        XCTAssertTrue(menuItem.exists)
         XCTAssertTrue(menuItem.isHittable)
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(menuItem.frame), "Group Settings fits on screen")
         keep(app, "group-chat-menu-large-text")
         menuItem.tap()
         XCTAssertTrue(app.descendants(matching: .any)["group-settings"].firstMatch.waitForExistence(timeout: 5))

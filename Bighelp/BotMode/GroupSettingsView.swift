@@ -389,8 +389,9 @@ struct GroupSettingsView: View {
     }
 
     private func avatar(_ participant: HermesBotModeParticipant, size: CGFloat) -> some View {
+        // The member's ID, as the chat's header and messages draw it.
         AvatarView(
-            stableID: participant.profileID, displayName: participant.displayName,
+            stableID: participant.memberID, displayName: participant.displayName,
             imageURL: participant.peerImageURL ?? participant.profile.flatMap { agents.avatarURL(for: $0) },
             size: size
         )

@@ -129,7 +129,10 @@ bottom; the Secure credential vault is in Settings › Connections, with the app
 Keep it that short: a new destination goes where people already look, not on the first screen. Headers keep their
 own New chat only where there's no bar to hold it: Code mode, the iPhone Duo's side strip, Vision Pro's tab
 ornament, and a board opened with Back. The chat list (and the all-hosts view's All sessions) searches from the system
-glass search bar along the bottom, like All agents; it matches titles and previews, and a scroll puts the keyboard away. Feed, Ideas, Goals and Apps keep the Chat tab's header: ☰ and ⋯ (the agent's profile,
+glass search bar along the bottom, like All agents; it matches titles and previews, and a scroll puts the keyboard away.
+A chat with something new since it was last read has a bold title and Bots mode's dot after its time, and a chat
+whose message box holds an unsent message shows Draft before its preview. Where the computer keeps read state, the
+row's menu and leading swipe have Mark Read and Mark Unread. Feed, Ideas, Goals and Apps keep the Chat tab's header: ☰ and ⋯ (the agent's profile,
 then Files, Memory, Skills & tools and Scheduled tasks). The root's edge-swipe zones
 start below that row, so its corner buttons always get the tap. The avatar reacts to what the agent is doing (thinking, writing code, browsing, making
 images…), driven by the running tool (`AgentActivityKind`, shared with the island as `BighelpActivityPose`). On
@@ -514,7 +517,8 @@ text is SF Pro, as everywhere.
   in ember and "Needs you", which wins over working. It's only what the computer says (`BotChatActivityStore`):
   unknown or out of date shows nothing, and it clears when the turn ends.
 - **Touch and hold** a bot: its latest message, then New Chat, Pin (Unpin when pinned), Rearrange,
-  Mark Read/Unread (kept on this device), Bot Profile, a divider, and Hide. Actions stay in that order;
+  Mark Read/Unread (its Bot Chat's, on the computer; kept on this device where the computer keeps no read state),
+  Bot Profile, a divider, and Hide. Actions stay in that order;
   the primary bot has no Pin or Hide. Primary selection stays in Chats settings, and Routines in Bot Profile.
   A group chat's menu has Mark Unread and Rearrange.
 - **Marks**: thirteen shapes in eleven colors with two white eyes (`SimpleBotMark`), from before Bot Studio.

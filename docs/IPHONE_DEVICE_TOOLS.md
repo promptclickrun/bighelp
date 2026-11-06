@@ -112,6 +112,23 @@ seconds apart (`NativeDeviceToolSession.runReopeningWhileHeld`); any change to
 the chat or connection cancels the wait. While it waits, Device access says it
 connects again in a moment; if another device keeps the chat, it says so.
 
+A channel that the host ended opens again by itself while the chat stays open and
+its tools stay on. The host ends a channel that the phone still uses when its
+30-second lease runs out while a slow tool runs (the phone does not poll while a
+tool runs), when the same phone opens another channel for the chat, when Hermes
+unloads the agent's plugin, or when the plugin starts again. The next poll or
+answer then gets `phone_unavailable` or `channel_not_found`. A lost connection, a
+time-out, a changed context (`context_changed`) and a plugin that is not ready
+(`device_tools_unavailable`) also end a channel. The phone opens a new channel
+after 1, 2, 4, 8, 16 and 32 seconds (`NativeDeviceToolSession.reopenWaits`). Then
+it stops, and Device access says that it is not connected. The first try comes
+quickly: for two minutes, the plugin keeps a call that finds no channel waiting
+for the phone that had one, and the new channel takes the call. A channel that
+stayed open for a minute starts the waits again. A refusal that a new channel
+can't fix (`profile_not_served`, `profile_not_found`, `session_not_found`,
+`channel_capacity`) stops at once. A change to the chat or connection, or the end
+of the background grace, cancels the wait.
+
 A tool that runs past its call's window loses only that answer. Location's
 precise-location question, its fix and the address can take 40 seconds, and the
 host waits 30. At the deadline the host tells the agent, and then it refuses the

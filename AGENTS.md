@@ -383,6 +383,10 @@ change in both repos.
   that carried the call, and the call goes on. Apple Health is read only and asks once about sharing first. The
   channel runs while bighelp is active, inactive or in the background grace, and in any agent's chat on a plugin with
   `native-device-tools-agents-v1`; after the grace it closes as `paused` so the host waits for the phone.
+  A channel the host ended (its 30 s lease ran out while a slow tool ran, the plugin unloaded or started again, a
+  lost connection) opens again by itself while the chat keeps its tools, with longer waits each time and a limit
+  (`runReopeningWhileHeld`, `reopenWaits`); a late answer the host no longer takes loses only that answer, never
+  the channel. Before, any of these left the chat without phone tools until the person left it (#861).
   Two reach past the open chat: Arriving and leaving sends its message from the background (`DeviceGeofenceMonitor`),
   and a Shortcuts run keeps the call alive while Shortcuts is in front (`DeviceToolHandoff`).
 - **Agents show the way** (`iphone_navigation`, `Bighelp/Driving/`): a place in `DriveCatalog` is only one the

@@ -314,30 +314,76 @@ final class NativeDeviceToolSession {
         return try response.object()
     }
 
-    /// Runs the chat's channel, and opens a new one when the plugin says another channel holds the chat.
-    /// That channel is this phone's own when its app closed before the close arrived (killed, relaunched,
-    /// or the close was lost on a reconnect): an older plugin keeps it until its 30-second lease ends,
-    /// so the next try waits a little longer than that. A newer plugin lets the same phone replace its
-    /// own channel at once. Another device keeps the chat, so this stops after a few tries; any change
-    /// to the chat or connection cancels the wait.
+    /// Runs the chat's channel, and opens a new one when the old one ends for a reason a new one fixes.
+    ///
+    /// The plugin says another channel holds the chat. That channel is this phone's own when its app
+    /// closed before the close arrived (killed, relaunched, or the close was lost on a reconnect): an
+    /// older plugin keeps it until its 30-second lease ends, so the next try waits a little longer than
+    /// that. A newer plugin lets the same phone replace its own channel at once. Another device keeps
+    /// the chat, so this stops after a few tries.
+    ///
+    /// The host no longer has the channel, or a request never reached it (`reopens(after:)`). While the
+    /// chat still owns its tools, a new channel opens after each of `reopenWaits`, then the tries stop.
+    /// A channel that stayed open for `steadyAfter` worked, so when it ends the waits start again.
+    ///
+    /// Any change to the chat or connection cancels a wait.
     static func runReopeningWhileHeld(
         attempts: Int = 4, wait: Duration = .seconds(32),
+        reopenWaits: [Duration] = NativeDeviceToolSession.reopenWaits, steadyAfter: Duration = .seconds(60),
+        now: @MainActor () -> ContinuousClock.Instant = { .now },
         sleep: @MainActor (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
         makeSession: @MainActor () -> NativeDeviceToolSession,
         onConnected: @MainActor (NativeDeviceToolSession) -> Void = { _ in },
         onWaiting: @MainActor () -> Void = {}
     ) async throws {
         var attempt = 1
+        var reopened = 0
         while true {
             let session = makeSession()
+            var openedAt: ContinuousClock.Instant?
             do {
-                try await session.run(onConnected: { onConnected(session) })
+                try await session.run(onConnected: { openedAt = now(); onConnected(session) })
                 return
             } catch where isChatHeld(error) && attempt < attempts {
                 onWaiting()
                 try await sleep(wait)
                 attempt += 1
+            } catch where reopens(after: error) && session.owns() {
+                if let openedAt, now() - openedAt >= steadyAfter { reopened = 0 }
+                guard reopened < reopenWaits.count else { throw error }
+                let pause = reopenWaits[reopened]
+                reopened += 1
+                log.notice("channel opens again in \(pause.components.seconds) s")
+                onWaiting()
+                try await sleep(pause)
+                guard session.owns() else { throw error }
             }
+        }
+    }
+
+    /// The waits before each new channel after the host ended one. The first is short: for two minutes
+    /// the plugin keeps a call that finds no channel waiting for the phone that had one
+    /// (`LAPSE_MEMORY_SECONDS`), and a call waits 30 seconds at most. The last ends about a minute
+    /// later, well inside those two, and a host that is down gets six requests, never a stream.
+    static let reopenWaits: [Duration] = [1, 2, 4, 8, 16, 32].map { .seconds($0) }
+
+    /// Refusals that say the plugin no longer has this channel, or its context moved on. `phone_unavailable`
+    /// is one it retired: its lease ran out while a slow tool ran, the same phone replaced it, or Hermes
+    /// unloaded the agent's plugin. `channel_not_found` is one it never had: it started again.
+    static let reopenCodes: Set<String> = [
+        "phone_unavailable", "channel_not_found", "channel_owner_changed", "context_changed", "feed_gap",
+        "device_tools_unavailable",
+    ]
+
+    /// Whether a new channel can fix why this one ended: the host no longer has it, or a request never
+    /// got there (a lost connection, a time-out).
+    static func reopens(after error: any Error) -> Bool {
+        switch error {
+        case WorkspaceClientError.rejected(let code?, _): reopenCodes.contains(code)
+        case WorkspaceClientError.transportUnavailable: true
+        case DirectHermesError.connectionFailed, DirectHermesError.notConnected,
+             DirectHermesError.timedOut(_), DirectHermesError.disconnected(_): true
+        default: false
         }
     }
 
@@ -369,7 +415,8 @@ final class NativeDeviceToolSession {
         return code
     }
 
-    private func owns() -> Bool { currentOwner() == owner && isAvailable() && !Task.isCancelled }
+    /// Whether the chat still owns this channel's tools: the same owner, still available, not cancelled.
+    func owns() -> Bool { currentOwner() == owner && isAvailable() && !Task.isCancelled }
     private func check() throws { guard owns() else { throw WorkspaceClientError.ownerChanged } }
 }
 
@@ -387,7 +434,8 @@ enum DeviceToolChannelNote {
             ? "Open a chat with \(servingAgentName) to use this iPhone’s shared data." : nil
     }
 
-    /// The chat's channel waits for an earlier one to end (`NativeDeviceToolSession.runReopeningWhileHeld`).
+    /// The chat's channel waits for an earlier one to end, or for a new one after the host ended the last
+    /// (`NativeDeviceToolSession.runReopeningWhileHeld`).
     static func reconnecting(enabled: Set<DeviceToolCapability>) -> String? {
         enabled.contains(where: \.sharesPersonalData) ? "Device access connects again in a moment." : nil
     }

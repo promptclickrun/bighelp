@@ -22,13 +22,6 @@ struct SessionRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: BighelpTokens.space8) {
-                    if session.isUnread {
-                        Circle()
-                            .fill(theme.information)
-                            .frame(width: 8, height: 8)
-                            .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + titleSize * 0.32 }
-                            .accessibilityHidden(true)
-                    }
                     Text(session.title)
                         .font(.system(size: titleSize, weight: session.isUnread ? .bold : .semibold))
                         .foregroundStyle(theme.primaryText)
@@ -46,6 +39,14 @@ struct SessionRow: View {
                         .foregroundStyle(theme.secondaryText)
                         .lineLimit(1)
                         .layoutPriority(1)
+                    // Bots mode's dot, in the same place: after the time, clear of the live dot below.
+                    if session.isUnread {
+                        Circle()
+                            .fill(theme.information)
+                            .frame(width: 9, height: 9)
+                            .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + timeSize * 0.32 }
+                            .accessibilityHidden(true)
+                    }
                 }
 
                 HStack(spacing: 6) {

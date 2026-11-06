@@ -772,11 +772,17 @@ struct SessionsView: View {
                 } label: {
                     VStack(spacing: 5) {
                         SessionIdentityView(session: session, agents: agents, size: 64, state: state)
-                        Text(session.title)
-                            .font(.system(size: pinnedTitleSize, weight: .semibold))
-                            .foregroundStyle(theme.primaryText)
-                            .lineLimit(1)
-                            .frame(maxWidth: .infinity)
+                        // As Bots mode's top bots: the dot after the name.
+                        HStack(spacing: BighelpTokens.space4) {
+                            Text(session.title)
+                                .font(.system(size: pinnedTitleSize, weight: session.isUnread ? .bold : .semibold))
+                                .foregroundStyle(theme.primaryText)
+                                .lineLimit(1)
+                            if session.isUnread {
+                                Circle().fill(theme.information).frame(width: 9, height: 9)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
                         if state != .idle {
                             AgentLiveStateLabel(state: state, font: .system(size: sectionCaptionSize))
                         }
@@ -796,7 +802,8 @@ struct SessionsView: View {
                 #endif
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Pinned chat, \(session.title)")
-                .accessibilityValue(state == .idle ? "" : state.label)
+                .accessibilityValue([session.isUnread ? "Unread" : nil, state == .idle ? nil : state.label]
+                    .compactMap { $0 }.joined(separator: ", "))
                 .accessibilityIdentifier("session.pin.\(session.id)")
             }
         }
@@ -962,19 +969,25 @@ struct SessionsView: View {
                 projectMoveTarget = session
             })
         }
-        items += [
-            MacTileMenu.Item(title: session.isPinned ? "Unpin" : "Pin",
-                             systemImage: session.isPinned ? "pin.slash" : "pin") {
+        items.append(MacTileMenu.Item(title: session.isPinned ? "Unpin" : "Pin",
+                                      systemImage: session.isPinned ? "pin.slash" : "pin") {
+            performMutation(sessionID: session.id) {
+                try await model.setSessionPinned(id: session.id, pinned: !session.isPinned)
+            }
+        })
+        if session.tracksUnread {
+            items.append(MacTileMenu.Item(title: session.isUnread ? "Mark Read" : "Mark Unread",
+                                          systemImage: session.isUnread ? "message" : "message.badge") {
                 performMutation(sessionID: session.id) {
-                    try await model.setSessionPinned(id: session.id, pinned: !session.isPinned)
+                    try await model.setSessionUnread(id: session.id, unread: !session.isUnread)
                 }
-            },
-            MacTileMenu.Item(title: "Archive", systemImage: "archivebox") {
-                performMutation(sessionID: session.id) {
-                    try await model.archiveSession(id: session.id)
-                }
-            },
-        ]
+            })
+        }
+        items.append(MacTileMenu.Item(title: "Archive", systemImage: "archivebox") {
+            performMutation(sessionID: session.id) {
+                try await model.archiveSession(id: session.id)
+            }
+        })
         if model.canDeleteConversation {
             items.append(MacTileMenu.Item(title: "Delete", systemImage: "trash", isDestructive: true, startsGroup: true) {
                 actionDialog = .delete(session)

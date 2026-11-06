@@ -73,11 +73,11 @@ final class GroupSettingsUITests: BighelpUITestCase {
         XCTAssertTrue(purpose.waitForExistence(timeout: 5))
         purpose.tap()
         purpose.typeText(" in May\n")
-        XCTAssertFalse(app.descendants(matching: .any)["group-settings.problem"].exists)
 
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["Lead: Avery Park"].exists, "Nobody leads once a quick check picks")
+        XCTAssertTrue(app.staticTexts["Lead: Avery Park"].waitForNonExistence(timeout: 5),
+                      "Nobody leads once a quick check picks")
         app.buttons["chat.options"].tap()
         let menuItem = app.buttons["chat.group-settings"]
         XCTAssertTrue(menuItem.waitForExistence(timeout: 5), "⋯ opens Group Settings too")

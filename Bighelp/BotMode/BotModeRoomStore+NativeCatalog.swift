@@ -380,6 +380,7 @@ extension BotModeRoomStore {
         nativePendingDiscardsByRoom.removeAll()
         nativeDriverWorkingByRoom.removeAll()
         nativeRoomSettings.removeAll()
+        nativeRoomSettingsStamps.removeAll()
         nativeRoomSettingsQueued.removeAll()
         nativeContinueProblems.removeAll()
         nativeBoundaryGeneration += 1

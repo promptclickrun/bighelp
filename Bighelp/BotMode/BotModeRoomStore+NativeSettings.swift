@@ -2,7 +2,13 @@ import Foundation
 
 extension BotModeRoomStore {
     /// Keeps the settings a `groups.state` read returned. A room without `context` has none.
-    func recordNativeRoomSettings(roomID: String, state: HermesBotModeRoomState) {
+    /// Moves on with each save Hermes confirms, so a read that started before one is dropped.
+    func nativeRoomSettingsStamp(roomID: String) -> Int { nativeRoomSettingsStamps[roomID, default: 0] }
+
+    /// `stamp` is `nativeRoomSettingsStamp` from before the read: a read that started before a
+    /// save Hermes confirmed would put the old settings back.
+    func recordNativeRoomSettings(roomID: String, state: HermesBotModeRoomState, readSince stamp: Int? = nil) {
+        if let stamp, stamp != nativeRoomSettingsStamp(roomID: roomID) { return }
         guard state.roomID == roomID, let context = state.context else {
             if nativeRoomSettings[roomID] != nil { nativeRoomSettings[roomID] = nil }
             return
@@ -15,6 +21,7 @@ extension BotModeRoomStore {
     func refreshNativeRoomSettings(roomID: String) async -> String? {
         guard let nativeClient, let room = room(id: roomID), room.hasNativeRoom else { return nil }
         let boundary = nativeBoundaryGeneration
+        let stamp = nativeRoomSettingsStamp(roomID: roomID)
         do {
             let capabilities = try await negotiatedNativeCapabilities(using: nativeClient, boundary: boundary)
             guard capabilities.supports("groups.state") else { return nil }
@@ -22,7 +29,7 @@ extension BotModeRoomStore {
             try requireNativeBoundary(boundary)
             guard let current = self.room(id: roomID) else { return nil }
             try validateNativeState(state, previous: current)
-            recordNativeRoomSettings(roomID: roomID, state: state)
+            recordNativeRoomSettings(roomID: roomID, state: state, readSince: stamp)
             return nil
         } catch is CancellationError {
             return nil
@@ -109,6 +116,7 @@ extension BotModeRoomStore {
                 room.setNativeContextIntent(nil)
                 return true
             }
+            nativeRoomSettingsStamps[roomID, default: 0] += 1
             nativeRoomSettings[roomID] = HermesBotModeRoomSettings(
                 context: saved, support: nativeRoomSettings[roomID]?.support ?? .init())
         } catch is CancellationError {
@@ -116,17 +124,17 @@ extension BotModeRoomStore {
         } catch {
             guard boundary == nativeBoundaryGeneration else { return }
             intent.problem = Self.contextProblem(error)
-            try? keepNativeContextIntent(intent, roomID: roomID)
+            try? keepNativeContextIntent(intent, roomID: roomID, onlyOverItself: true)
         }
     }
 
-    /// Saves this edit with the room, unless a newer one took its place.
-    private func keepNativeContextIntent(_ intent: HermesBotModeContextIntent, roomID: String) throws {
+    /// Saves this edit with the room. `onlyOverItself` keeps a failure only on the edit it
+    /// belongs to: a newer edit, or a discard while it was on its way, wins.
+    private func keepNativeContextIntent(_ intent: HermesBotModeContextIntent, roomID: String,
+                                         onlyOverItself: Bool = false) throws {
         try updateNativeRoom(roomID) { room in
             guard room.nativePendingContext != intent else { return false }
-            if let pending = room.nativePendingContext, pending.eventID != intent.eventID, intent.problem != nil {
-                return false
-            }
+            if onlyOverItself, room.nativePendingContext?.eventID != intent.eventID { return false }
             room.setNativeContextIntent(intent)
             return true
         }

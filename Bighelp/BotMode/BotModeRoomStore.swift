@@ -90,6 +90,7 @@ final class BotModeRoomStore {
     var nativeDriverWorkingByRoom: [String: Bool] = [:]
     /// Each room's settings as this connection last read them (`groups.state`'s `context`).
     var nativeRoomSettings: [String: HermesBotModeRoomSettings] = [:]
+    var nativeRoomSettingsStamps: [String: Int] = [:]
     /// Rooms whose settings are on their way to Hermes, and the newest edit waiting behind one.
     var nativeRoomSettingsSaving: Set<String> = []
     var nativeRoomSettingsQueued: [String: HermesBotModeRoomContext] = [:]
@@ -387,7 +388,9 @@ final class BotModeRoomStore {
     }
 
     private static func presentationOrder(after rooms: [BotModeRoom]) -> Int {
-        (rooms.flatMap(\.visibleEvents).compactMap(\.sourceOrder).max() ?? 0) + 1
+        let messages = rooms.flatMap(\.visibleEvents).compactMap(\.sourceOrder).max() ?? 0
+        let notices = rooms.flatMap(\.nativeNotices).map(\.sourceOrder).max() ?? 0
+        return max(messages, notices) + 1
     }
 
     func replaceStored(_ room: BotModeRoom) {

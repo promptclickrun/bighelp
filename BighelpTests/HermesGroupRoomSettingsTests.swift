@@ -196,6 +196,48 @@ struct HermesGroupRoomSettingsTests {
         #expect(store.nativeRoomSettings[host.roomID] == nil, "A room without context shows no settings")
     }
 
+    @Test
+    func aReadThatStartedBeforeASaveNeverUndoesIt() async throws {
+        let host = try RoomSettingsHost()
+        let store = try await host.openRoom()
+        let stale = try await host.client.groupsState(roomID: host.roomID, includeDisbanded: false)
+        let stamp = store.nativeRoomSettingsStamp(roomID: host.roomID)
+
+        await store.saveNativeRoomContext(roomID: host.roomID, .init(purpose: "Plan", routing: .auto))
+        store.recordNativeRoomSettings(roomID: host.roomID, state: stale, readSince: stamp)
+
+        #expect(store.nativeRoomSettings[host.roomID]?.context.routing == .auto, "The older read is dropped")
+        store.recordNativeRoomSettings(roomID: host.roomID, state: stale,
+                                       readSince: store.nativeRoomSettingsStamp(roomID: host.roomID))
+        #expect(store.nativeRoomSettings[host.roomID]?.context.routing == .lead, "A read after the save counts")
+    }
+
+    @Test
+    func anEditDiscardedWhileItWasOnItsWayStaysDiscarded() async throws {
+        let host = try RoomSettingsHost()
+        let store = try await host.openRoom()
+        host.contextFailures = [WorkspaceClientError.transportUnavailable]
+        host.beforeContextAnswer = { try? store.discardNativeRoomContextEdit(roomID: host.roomID) }
+
+        await store.saveNativeRoomContext(roomID: host.roomID, .init(purpose: "Plan", routing: .auto))
+
+        #expect(store.room(id: host.roomID)?.nativePendingContext == nil)
+    }
+
+    @Test
+    func routingLinesCountTowardTheOrderAfterARelaunch() throws {
+        let host = try RoomSettingsHost()
+        let assignment = try host.events("routing_events")[0]
+        let room = try BotModeRoom(
+            id: host.roomID, members: [BotModeMember(profileID: "pixel", handle: "pixel", sessionID: "",
+                                                     nativeMemberID: "pixel")],
+            visibleEvents: [.human(text: "Hello", id: "user:1", sourceOrder: 10)], nativeRoomID: host.roomID,
+            nativeNotices: [BotModeRoomNotice(event: assignment, sourceOrder: 50)])
+        let store = BotModeRoomStore(client: BotModeFixtureClient(), rooms: [room])
+
+        #expect(store.takePresentationOrder() == 51, "A message after the line lands after it")
+    }
+
     // MARK: Continue
 
     @Test
@@ -400,6 +442,8 @@ private final class RoomSettingsHost: WorkspaceOperationPerforming {
     var state: [String: BighelpJSONValue]
     var log: [HermesBotModeEvent] = []
     var contextFailures: [any Error] = []
+    /// Runs while a save waits for its answer.
+    var beforeContextAnswer: (() -> Void)?
     /// Answers a save with another save's event, as a confused host might.
     var contextReplyEventID: String?
     var continueFailure: (any Error)?
@@ -472,6 +516,7 @@ private final class RoomSettingsHost: WorkspaceOperationPerforming {
                 "authority": .object(["gateway_id": .string(Self.gatewayID), "epoch": .integer(1)]),
             ]
         case .groupsContext:
+            beforeContextAnswer?()
             if !contextFailures.isEmpty { throw contextFailures.removeFirst() }
             var reply = try object("context_reply")
             var event = try #require(reply["event"]?.object)

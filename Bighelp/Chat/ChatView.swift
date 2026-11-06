@@ -1019,8 +1019,13 @@ struct ChatView: View {
         .buttonStyle(.plain)
         .accessibilityLabel("\(model.botModeRoomTitle), \(groupParticipantSummary)")
         .accessibilityValue(model.botModeLeadName.map { "Lead: \($0)" } ?? "")
-        .accessibilityHint(onGroupSettingsTap == nil ? "Opens People and Chat details" : "Opens Group Settings")
+        .accessibilityHint(opensGroupSettings ? "Opens Group Settings" : "Opens People and Chat details")
         .accessibilityIdentifier("chat.people")
+    }
+
+    /// A group Hermes runs has Group Settings; any other group's name opens its people.
+    private var opensGroupSettings: Bool {
+        onGroupSettingsTap != nil && model.botModeRoom?.hasNativeRoom == true
     }
 
     private var groupParticipantSummary: String {
@@ -1166,7 +1171,7 @@ struct ChatView: View {
     /// Rename, Move to Project and Files, and a group's Group Settings and Chat info (its members).
     @ViewBuilder
     private var chatItems: some View {
-        if model.isBotMode, let onGroupSettingsTap {
+        if opensGroupSettings, let onGroupSettingsTap {
             Button("Group Settings", systemImage: "person.2") {
                 dismissKeyboard()
                 onGroupSettingsTap()

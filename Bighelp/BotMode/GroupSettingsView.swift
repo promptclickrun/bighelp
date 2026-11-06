@@ -12,7 +12,7 @@ struct GroupSettingsView: View {
     let rooms: BotModeRoomStore
     let agents: AgentDirectoryStore
     /// The group's open chat, for what it shows on this device (tool calls); nil leaves that out.
-    var chat: ChatModel? = nil
+    let chat: ChatModel?
 
     @State private var draft = HermesBotModeRoomContext()
     /// The settings the draft started from; the draft follows Hermes while it's untouched.
@@ -28,6 +28,19 @@ struct GroupSettingsView: View {
     @BighelpThemeReader private var theme
 
     private enum Field: Hashable { case purpose, notes }
+
+    init(roomID: String, rooms: BotModeRoomStore, agents: AgentDirectoryStore, chat: ChatModel? = nil) {
+        self.roomID = roomID
+        self.rooms = rooms
+        self.agents = agents
+        self.chat = chat
+        // What this connection already read, so the first frame isn't empty; an edit Hermes
+        // didn't save comes back as it was.
+        let saved = rooms.nativeRoomSettings[roomID]?.context
+        _draft = State(initialValue: rooms.room(id: roomID)?.nativePendingContext?.context
+            ?? saved ?? HermesBotModeRoomContext())
+        _basis = State(initialValue: saved)
+    }
 
     var body: some View {
         List {
@@ -57,7 +70,7 @@ struct GroupSettingsView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
-        .scrollDismissesKeyboard(.interactively)
+        .dismissesKeyboardOnScroll(true)
         .background(theme.canvas.ignoresSafeArea())
         .tint(theme.action)
         .navigationTitle("Group Settings")
@@ -83,6 +96,7 @@ struct GroupSettingsView: View {
             Button("Cancel", role: .cancel) {}
             Button("Save") { Task { await rename() } }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("group-settings")
     }
 
@@ -250,6 +264,7 @@ struct GroupSettingsView: View {
                                 .accessibilityHidden(true)
                         }
                     }
+                    .bighelpMacFieldArea()
                     .accessibilityLabel("Shared notes")
                     .accessibilityIdentifier("group-settings.notes")
                 HStack(alignment: .firstTextBaseline) {
@@ -399,17 +414,14 @@ struct GroupSettingsView: View {
     private var notesBytes: Int { HermesBotModeRoomContext.notesBytes(draft.notes) }
     private var notesTooLong: Bool { notesBytes > HermesBotModeRoomContext.maximumNotesBytes }
 
+    /// Reads the settings again each time the page shows (also back from the lead list). The
+    /// draft stays: it follows Hermes only while untouched (`follow`).
     private func load() async {
-        if let pendingEdit {
-            draft = pendingEdit.context
-        } else if let settings {
-            draft = settings.context
-        }
-        basis = settings?.context
         isLoading = true
         let problem = await rooms.refreshNativeRoomSettings(roomID: roomID)
         isLoading = false
         loadProblem = problem
+        // The first read of a room this connection hadn't read yet.
         if basis == nil, let settings {
             basis = settings.context
             if pendingEdit == nil { draft = settings.context }

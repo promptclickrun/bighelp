@@ -408,14 +408,33 @@ struct SimpleBotsHomeView: View {
         context.gateways == nil ? (bot.profileID, context.scope) : (bot.id, "multi-gateway")
     }
 
+    /// Its Bot Chat, when Hermes keeps that chat's read state (`SimpleBotsReadState`); on the gateway in use only.
+    private func hermesBotChat(_ bot: SimpleBotsBot) -> SessionRecord? {
+        guard bot.fleetAgent == nil || bot.isOnGatewayInUse else { return nil }
+        return SimpleBotsReadState.botChat(bot.profileID, in: context.catalog.records)
+    }
+
     private func isUnread(_ bot: SimpleBotsBot) -> Bool {
+        if let chat = hermesBotChat(bot) { return chat.isUnread == true }
         let key = unreadKey(bot)
         return unread.isUnread(key.id, scope: key.scope)
     }
 
     private func setUnread(_ bot: SimpleBotsBot, _ value: Bool) {
+        if let chat = hermesBotChat(bot) {
+            markOnHermes(chat.id, value)
+            return
+        }
         let key = unreadKey(bot)
         unread.set(value, id: key.id, scope: key.scope)
+    }
+
+    private func isUnread(_ group: SessionSummary) -> Bool {
+        group.tracksUnread ? group.isUnread : unread.isUnread(group.id, scope: context.scope)
+    }
+
+    private func markOnHermes(_ id: String, _ value: Bool) {
+        Task { @MainActor in try? await context.catalog.setSessionUnread(id: id, unread: value) }
     }
 
     /// On its own gateway: `local` with one gateway, else the gateway comes into use (if it isn't) first.
@@ -424,7 +443,9 @@ struct SimpleBotsHomeView: View {
     }
 
     private func openBot(_ bot: SimpleBotsBot) {
-        setUnread(bot, false)
+        // This device's mark; Hermes' clears once the chat shows (`BighelpVisibleChats`).
+        let key = unreadKey(bot)
+        unread.set(false, id: key.id, scope: key.scope)
         act(bot, .agent(profileID: bot.profileID)) { context.onOpenBot(bot.profileID) }
     }
 
@@ -753,11 +774,11 @@ struct SimpleBotsHomeView: View {
             } label: {
                 SimpleBotsRowLabel(face: AnyView(groupFaces(summary)), title: summary.title,
                                    preview: item.preview, date: item.date,
-                                   isUnread: unread.isUnread(summary.id, scope: context.scope), isPinned: item.isPinned)
+                                   isUnread: isUnread(summary), isPinned: item.isPinned)
             }
             .buttonStyle(.plain)
             .contextMenu {
-                unreadButton(summary.id)
+                unreadButton(summary)
                 rearrangeButton
             }
             .accessibilityIdentifier("simple-bots.group.\(summary.id)")
@@ -947,10 +968,14 @@ struct SimpleBotsHomeView: View {
         }
     }
 
-    private func unreadButton(_ id: String) -> some View {
-        let isUnread = unread.isUnread(id, scope: context.scope)
-        return Button(isUnread ? "Mark Read" : "Mark Unread", systemImage: isUnread ? "message" : "message.badge") {
-            unread.set(!isUnread, id: id, scope: context.scope)
+    private func unreadButton(_ group: SessionSummary) -> some View {
+        let unreadNow = isUnread(group)
+        return Button(unreadNow ? "Mark Read" : "Mark Unread", systemImage: unreadNow ? "message" : "message.badge") {
+            if group.tracksUnread {
+                markOnHermes(group.id, !unreadNow)
+            } else {
+                unread.set(!unreadNow, id: group.id, scope: context.scope)
+            }
         }
     }
 

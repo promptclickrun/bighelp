@@ -202,4 +202,27 @@ struct ChatReadStateTests {
         read.isUnread = false
         #expect(SessionCatalogReconciliation.merged(local: listed, incoming: read).isUnread == false)
     }
+
+    // MARK: Bots mode
+
+    @Test func botsModeShowsHermesReadStateAndFallsBackToThisDevice() {
+        var travel = SessionRecord(id: "travel-bot-chat", kind: .direct, agentIDs: ["travel"], title: "Bot Chat",
+                                   isUnread: true)
+        let home = SessionRecord(id: "home-bot-chat", kind: .direct, agentIDs: ["home"], title: "Bot Chat")
+        let older = SessionRecord(id: "travel-older", kind: .direct, agentIDs: ["travel"], title: "Packing list",
+                                  isUnread: false)
+        #expect(SimpleBotsReadState.botChat("travel", in: [older, travel, home])?.id == "travel-bot-chat")
+        #expect(SimpleBotsReadState.botChat("travel", in: [travel])?.isUnread == true)
+        travel.isUnread = false
+        #expect(SimpleBotsReadState.botChat("travel", in: [travel])?.isUnread == false)
+        // No read state on Hermes: this device's own mark stands in.
+        #expect(SimpleBotsReadState.botChat("home", in: [home]) == nil)
+        #expect(SimpleBotsReadState.botChat("finance", in: [travel, home]) == nil)
+
+        let group = SessionRecord(id: "group", kind: .botMode, agentIDs: ["travel", "home"], title: "Weekend trip",
+                                  isUnread: true)
+        #expect(group.summary.tracksUnread && group.summary.isUnread)
+        let room = SessionRecord(id: "room", kind: .botMode, agentIDs: ["travel", "home"], title: "Dinner plans")
+        #expect(!room.summary.tracksUnread)
+    }
 }

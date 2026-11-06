@@ -437,6 +437,7 @@
 		3AB6DDD20A75CEB013581D39 /* NativeWorkspaceSessionBridge+Prompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5467FAB05B10A607ED9DBE3C /* NativeWorkspaceSessionBridge+Prompts.swift */; };
 		3AC380D2C6ED5E6C41E85C5A /* BighelpV3MessageStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7281B7E7971EE34A73716B /* BighelpV3MessageStyle.swift */; };
 		3AEF9711748131D3F4D17B44 /* BighelpActivityRowsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D0756F28F8D83DCD99820C5 /* BighelpActivityRowsView.swift */; };
+		3B1B256184670D6206650FE1 /* SimpleBotsReadState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC2618030B874F836A2CD709 /* SimpleBotsReadState.swift */; };
 		3B26D057C95D7D70F4D15F81 /* BighelpCardValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2007B746E9AB0E6276E8303F /* BighelpCardValidatorTests.swift */; };
 		3B31977C0095185737081B6B /* AvatarCreatorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027157CAB5BF115163393990 /* AvatarCreatorUITests.swift */; };
 		3B48C4603DD14FC2D8934D66 /* DirectHermesFileAttachmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96C74BDF98AAE3E3E3A18027 /* DirectHermesFileAttachmentTests.swift */; };
@@ -3545,6 +3546,7 @@
 		BB65AD325A6BC9301CF2010A /* UsageExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageExport.swift; sourceTree = "<group>"; };
 		BB90671104D35742A479E374 /* WorkspaceInventoryDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceInventoryDecoder.swift; sourceTree = "<group>"; };
 		BBD533A9FF9B1BB710AF3F81 /* TemplateCatalogUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateCatalogUITests.swift; sourceTree = "<group>"; };
+		BC2618030B874F836A2CD709 /* SimpleBotsReadState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleBotsReadState.swift; sourceTree = "<group>"; };
 		BC27A35B9A6557BD1E426506 /* BighelpPhysicalActivityTokenRegistrarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpPhysicalActivityTokenRegistrarTests.swift; sourceTree = "<group>"; };
 		BC406E40BA9D2F66AE2CEDA4 /* WorkspaceManagementDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceManagementDecoder.swift; sourceTree = "<group>"; };
 		BC59500AEED985EECAA4D71F /* ModelNameCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelNameCatalog.swift; sourceTree = "<group>"; };
@@ -4584,6 +4586,7 @@
 				F1CCD48AB707E4FB6E740F7B /* SimpleBotsChatOpening.swift */,
 				E2251A03C44FEE34DE17B789 /* SimpleBotsHomeView.swift */,
 				61AAED8CD39E8D3EBB6D9B8A /* SimpleBotsOpeningOverlay.swift */,
+				BC2618030B874F836A2CD709 /* SimpleBotsReadState.swift */,
 				E870F072CBA0B66AC95493FB /* SimpleBotsSearchView.swift */,
 				89F6727324898A0915DEB6F3 /* SimpleBotsSettingsView.swift */,
 				6F4DD82DEE8EB5910B718623 /* SimpleBotsStyle.swift */,
@@ -8399,6 +8402,7 @@
 				5AABDC9FB87A5F78228292E0 /* SimpleBotsChatOpening.swift in Sources */,
 				9439485E2A2FA9EC2B7ED47F /* SimpleBotsHomeView.swift in Sources */,
 				5A7F5B7A17576449765C4124 /* SimpleBotsOpeningOverlay.swift in Sources */,
+				3B1B256184670D6206650FE1 /* SimpleBotsReadState.swift in Sources */,
 				78269EBC10C58BA4BFDAB67B /* SimpleBotsSearchView.swift in Sources */,
 				BC9C0771242CAEFB1F8A3E25 /* SimpleBotsSettingsView.swift in Sources */,
 				49EAE1D0BBCF8F61BB406C65 /* SimpleBotsStyle.swift in Sources */,

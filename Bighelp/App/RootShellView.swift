@@ -1890,7 +1890,6 @@ struct RootShellView: View {
     }
 
     func openSession(_ session: SessionSummary) {
-        markSessionReadOnOpen(session)
         let route = AppRoute.chat(conversationID: session.id)
         let simpleBotsOpening = beginSimpleBotsChatOpening(session)
         defer { if let simpleBotsOpening { noteSimpleBotsChatOpened(simpleBotsOpening, route: route) } }
@@ -1977,15 +1976,6 @@ struct RootShellView: View {
         appState.activateConversation(id: id, source: .sessions)
         connectionKeeper.retry()
         return true
-    }
-
-    /// Opening a chat is reading it: Hermes' read watermark moves to now, so the list's
-    /// dot clears and only later activity marks the chat unread again.
-    private func markSessionReadOnOpen(_ session: SessionSummary) {
-        guard session.isUnread else { return }
-        Task { @MainActor in
-            try? await sessionCatalog.setSessionUnread(id: session.id, unread: false)
-        }
     }
 
     func openSessionSelection(_ session: SessionSummary) {

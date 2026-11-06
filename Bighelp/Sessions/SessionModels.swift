@@ -135,6 +135,8 @@ struct SessionSummary: Identifiable, Equatable, Sendable {
     let isPinned: Bool
     /// Hermes' read watermark: a reply or answer arrived after the chat was last opened.
     let isUnread: Bool
+    /// Hermes keeps this chat's read state (its row says `unread`), so Mark Read and Mark Unread work.
+    let tracksUnread: Bool
     /// Text saved in this chat's message box that hasn't been sent.
     let hasDraft: Bool
     let isCronSession: Bool
@@ -155,6 +157,7 @@ struct SessionSummary: Identifiable, Equatable, Sendable {
         isActive: Bool = false,
         isPinned: Bool = false,
         isUnread: Bool = false,
+        tracksUnread: Bool = false,
         hasDraft: Bool = false,
         isCronSession: Bool = false,
         workspaceID: String? = nil,
@@ -172,6 +175,7 @@ struct SessionSummary: Identifiable, Equatable, Sendable {
         self.isActive = isActive
         self.isPinned = isPinned
         self.isUnread = isUnread
+        self.tracksUnread = tracksUnread
         self.hasDraft = hasDraft
         self.isCronSession = isCronSession
         self.workspaceID = workspaceID
@@ -222,9 +226,10 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
     /// the first user message has been committed.
     var isActive: Bool
     var isPinned: Bool
-    /// Hermes' read watermark (`sessions.last_read_at`): true when the host has activity
-    /// after this chat was last opened. Local records keep the host's value as read.
-    var isUnread: Bool
+    /// Hermes' read watermark (`sessions.last_read_at`): true when the host has activity after
+    /// the chat was last read. Nil when the host's row didn't say: a host that keeps no read state,
+    /// or a chat it hasn't listed yet.
+    var isUnread: Bool?
     let createdAt: Date
     var updatedAt: Date
     var hasAcceptedMessage: Bool
@@ -308,7 +313,7 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
         activityVisibility: ChatActivityVisibility? = nil,
         isActive: Bool = false,
         isPinned: Bool = false,
-        isUnread: Bool = false,
+        isUnread: Bool? = nil,
         createdAt: Date = .now,
         updatedAt: Date? = nil,
         hasAcceptedMessage: Bool = false,
@@ -362,7 +367,8 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
             updatedAt: updatedAt,
             isActive: hasActiveWork,
             isPinned: isPinned,
-            isUnread: isUnread,
+            isUnread: isUnread == true,
+            tracksUnread: isUnread != nil,
             hasDraft: !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             isCronSession: isCronSession,
             workspaceID: workspaceID,
@@ -442,7 +448,7 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
         )
         isActive = try container.decodeIfPresent(Bool.self, forKey: .isActive) ?? false
         isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
-        isUnread = try container.decodeIfPresent(Bool.self, forKey: .isUnread) ?? false
+        isUnread = try container.decodeIfPresent(Bool.self, forKey: .isUnread)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
         hasAcceptedMessage = try container.decodeIfPresent(
@@ -482,7 +488,7 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
         try container.encodeIfPresent(activityVisibility, forKey: .activityVisibility)
         try container.encode(isActive, forKey: .isActive)
         try container.encode(isPinned, forKey: .isPinned)
-        try container.encode(isUnread, forKey: .isUnread)
+        try container.encodeIfPresent(isUnread, forKey: .isUnread)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
         try container.encode(hasAcceptedMessage, forKey: .hasAcceptedMessage)

@@ -1398,9 +1398,12 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
               fields.allSatisfy({ response[$0.key] == $0.value }) else {
             throw WorkspaceClientError.invalidResponse
         }
+        // A row's `unread` follows new activity as well as the mark (a reply can land in between), so
+        // it can't confirm one: a read mark, sent each time a chat is read, needs no second request.
+        let checked = fields.filter { $0.key != "unread" }
+        guard !checked.isEmpty else { return }
         let current = try await detail(profileID: binding.coordinate.profileID, storedID: targetID)
-        for (field, expected) in fields {
-            if field == "unread" { continue }
+        for (field, expected) in checked {
             guard try DirectHermesSessionValidation.flag(current[field]) == expected.boolean else {
                 throw WorkspaceClientError.conflict
             }
@@ -1733,7 +1736,8 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         var record = SessionRecord(
             id: appID, kind: .direct, agentIDs: [profile.id], title: shownTitle,
             remoteStoredID: id, remoteSource: source, isPinned: try DirectHermesSessionValidation.flag(value["pinned"]) ?? false,
-            isUnread: try DirectHermesSessionValidation.flag(value["unread"]) ?? false,
+            // A host whose rows don't say keeps no read state; one that says it oddly is read as not saying.
+            isUnread: try? DirectHermesSessionValidation.flag(value["unread"]),
             createdAt: started, updatedAt: updated, hasAcceptedMessage: count > 0
         )
         record.catalogPreview = preview

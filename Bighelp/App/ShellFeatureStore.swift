@@ -1475,6 +1475,12 @@ final class ShellFeatureStore {
             onDraftJournal: journalDraft
         )
         referenceModel = model
+        // Reading the chat marks it read on Hermes (#862).
+        model.onRead = { [weak self, weak catalog] activity, reading in
+            guard let self, let catalog, self.accountGeneration == referenceGeneration,
+                  let referenceModel, self.chatModels[session.id] === referenceModel else { return }
+            catalog.noteRead(id: session.id, activity: activity, reading: reading)
+        }
         // A draft from the journal isn't in the chat yet: its next save writes it there.
         if !openingDraft.utf8.elementsEqual(session.draft.utf8) { model.persistSession(draftOnly: true) }
         // Turns Hermes runs on its own (a background process finished, another agent wrote in) never stream

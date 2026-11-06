@@ -76,6 +76,8 @@ final class SessionCatalogStore {
     var previousHistoryOffsetByID: [String: Int] = [:]
     private var acceptedStopAtByID: [String: Date] = [:]
     private var subagentParentBySessionID: [String: String] = [:]
+    /// Hermes' read marks for the chats being read (`noteRead`).
+    @ObservationIgnored var readStamps = SessionReadStamps()
 
     init(
         client: any SessionCatalogClient,
@@ -148,6 +150,7 @@ final class SessionCatalogStore {
         previousHistoryOffsetByID.removeAll()
         acceptedStopAtByID.removeAll()
         subagentParentBySessionID.removeAll()
+        readStamps = SessionReadStamps()
     }
 
     static func erasePersistedUserPreferences(defaults: UserDefaults = .standard) {
@@ -409,6 +412,13 @@ final class SessionCatalogStore {
         guard let index = records.firstIndex(where: { $0.id == id }) else { return }
         records[index].isUnread = unread
         persistChangesIfNeeded()
+    }
+
+    /// Hermes took a read mark (`noteRead`): the chat shows read here too.
+    func showRead(id: String) {
+        guard let index = records.firstIndex(where: { $0.id == id }), records[index].isUnread != false else { return }
+        records[index].isUnread = false
+        schedulePersistenceCheckpoint()
     }
 
     /// Chats someone archived on this computer (Archived Chats).

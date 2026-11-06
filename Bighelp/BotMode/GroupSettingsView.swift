@@ -25,6 +25,7 @@ struct GroupSettingsView: View {
     @State private var renameProblem: String?
     @FocusState private var focus: Field?
     @ScaledMetric(relativeTo: .body) private var faceColumn: CGFloat = 80
+    @ScaledMetric(relativeTo: .body) private var notesHeight: CGFloat = 120
     @BighelpThemeReader private var theme
 
     private enum Field: Hashable { case purpose, notes }
@@ -228,9 +229,11 @@ struct GroupSettingsView: View {
                 Text("Purpose")
                     .font(.bighelp(.subheadline).weight(.semibold))
                     .foregroundStyle(theme.primaryText)
+                // One line to Hermes, wrapped here so a long purpose never cuts off.
                 TextField("Purpose", text: $draft.purpose,
-                          prompt: Text("What this group is for").bighelpFieldHint(theme))
+                          prompt: Text("What this group is for").bighelpFieldHint(theme), axis: .vertical)
                     .font(.bighelp(.body))
+                    .lineLimit(1...6)
                     .submitLabel(.done)
                     .focused($focus, equals: .purpose)
                     .onSubmit { focus = nil }
@@ -239,7 +242,8 @@ struct GroupSettingsView: View {
                     .accessibilityIdentifier("group-settings.purpose")
             }
             .onChange(of: draft.purpose) { _, purpose in
-                // One line, as Hermes keeps it; longer ones stop at its limit.
+                // One line, as Hermes keeps it, so Return ends the edit; longer ones stop at its limit.
+                if purpose.contains("\n") { focus = nil }
                 let line = purpose.replacingOccurrences(of: "\n", with: " ")
                 let limited = String(String.UnicodeScalarView(
                     line.unicodeScalars.prefix(HermesBotModeRoomContext.maximumPurposeCharacters)))
@@ -251,7 +255,7 @@ struct GroupSettingsView: View {
                     .foregroundStyle(theme.primaryText)
                 TextEditor(text: $draft.notes)
                     .font(.bighelp(.body))
-                    .frame(minHeight: 120)
+                    .frame(minHeight: notesHeight)
                     .scrollContentBackground(.hidden)
                     .focused($focus, equals: .notes)
                     .overlay(alignment: .topLeading) {

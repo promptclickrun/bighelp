@@ -35,6 +35,7 @@ struct BotModeCreateRoomView: View {
     @State private var routing: HermesBotModeRoomContext.Routing = .everyone
     @State private var leadProfileID: String?
     @State private var purpose = ""
+    @FocusState private var isPurposeFocused: Bool
 
     private var hasPendingCreation: Bool { rooms.room(id: roomID)?.nativePendingCreation != nil }
     private var ownerChanged: Bool { rooms.nativePresentationOwnerID != presentationOwnerID }
@@ -275,11 +276,13 @@ struct BotModeCreateRoomView: View {
                 .bighelpFont(.metadata)
                 .foregroundStyle(theme.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
-            TextField("Purpose (optional)", text: $purpose)
+            TextField("Purpose (optional)", text: $purpose, axis: .vertical)
                 .bighelpFont(.body)
                 .foregroundStyle(theme.primaryText)
+                .lineLimit(1...6)
                 .submitLabel(.done)
                 .padding(.horizontal, BighelpTokens.space16)
+                .padding(.vertical, BighelpTokens.space12)
                 .frame(minHeight: 52)
                 .background(theme.surface, in: .rect(cornerRadius: 14))
                 .overlay {
@@ -287,8 +290,11 @@ struct BotModeCreateRoomView: View {
                         .stroke(theme.border, lineWidth: BighelpTokens.hairline)
                 }
                 .disabled(isSubmitting || hasPendingCreation || ownerChanged)
+                .focused($isPurposeFocused)
                 .accessibilityIdentifier("bot-mode.create.purpose")
                 .onChange(of: purpose) { _, value in
+                    // One line, as Hermes keeps it, so Return ends the edit.
+                    if value.contains("\n") { isPurposeFocused = false }
                     let line = value.replacingOccurrences(of: "\n", with: " ")
                     let limited = String(String.UnicodeScalarView(
                         line.unicodeScalars.prefix(HermesBotModeRoomContext.maximumPurposeCharacters)))

@@ -22,6 +22,12 @@ final class GroupSettingsUITests: BighelpUITestCase {
         return app
     }
 
+    /// Purpose wraps (a vertical text field), which XCUITest may list as a text view.
+    @MainActor
+    private func field(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
     @MainActor
     private func keep(_ app: XCUIApplication, _ name: String) {
         let shot = app.screenshot()
@@ -73,7 +79,7 @@ final class GroupSettingsUITests: BighelpUITestCase {
 
         app.buttons["group-settings.routing.auto"].tap()
         XCTAssertTrue(app.buttons["group-settings.routing.auto"].isSelected)
-        let purpose = app.textFields["group-settings.purpose"]
+        let purpose = field("group-settings.purpose", in: app)
         XCTAssertTrue(purpose.waitForExistence(timeout: 5))
         purpose.tap()
         purpose.typeText(" in May\n")
@@ -85,7 +91,7 @@ final class GroupSettingsUITests: BighelpUITestCase {
         let menuItem = chatMenuItem("chat.group-settings", in: app)
         XCTAssertTrue(menuItem.exists && menuItem.isHittable, "⋯ opens Group Settings too")
         menuItem.tap()
-        let saved = app.textFields["group-settings.purpose"]
+        let saved = field("group-settings.purpose", in: app)
         XCTAssertTrue(saved.waitForExistence(timeout: 5))
         XCTAssertTrue((saved.value as? String)?.contains("in May") == true, "The purpose was saved")
         XCTAssertTrue(app.buttons["group-settings.routing.auto"].isSelected)
@@ -139,7 +145,7 @@ final class GroupSettingsUITests: BighelpUITestCase {
         let title = app.textFields["bot-mode.create.title"]
         title.tap()
         title.typeText("Supper club\n")
-        let purpose = app.textFields["bot-mode.create.purpose"]
+        let purpose = field("bot-mode.create.purpose", in: app)
         purpose.tap()
         purpose.typeText("Plan Friday supper\n")
         keep(app, "new-group-chat-routing")
@@ -147,7 +153,7 @@ final class GroupSettingsUITests: BighelpUITestCase {
 
         XCTAssertTrue(app.staticTexts["Lead: Jordan Lee"].waitForExistence(timeout: 10), "The group starts with its lead")
         app.descendants(matching: .any)["chat.people"].firstMatch.tap()
-        let saved = app.textFields["group-settings.purpose"]
+        let saved = field("group-settings.purpose", in: app)
         XCTAssertTrue(saved.waitForExistence(timeout: 5))
         XCTAssertEqual(saved.value as? String, "Plan Friday supper")
         app.terminate()

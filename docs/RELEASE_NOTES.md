@@ -3,6 +3,19 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.67
+
+### Changed
+
+- **Answers show sooner:** after you send a message, the first words of the answer show on the screen sooner.
+- **Waiting messages go at once:** a message that waits for the connection goes as soon as bighelp can send it.
+- **Faster return to long chats:** when you go back to a long chat, bighelp reads only its newest messages again. The older messages that you loaded stay.
+
+### Fixed
+
+- **The agent knows who writes:** on a computer that several people share, the agent knows again who sends each message.
+- **Waiting messages stay:** a message that waits for the connection stays when you open many other chats.
+
 ## 2.6.66
 
 ### Fixed

@@ -20,6 +20,7 @@ struct BotsAppStateStores {
 
     func read(scopes: [String]) -> BotsPhoneState {
         BotsPhoneState(orders: order.orders, sections: fleet?.sections ?? [], groupSections: fleet?.groupSectionIDs ?? [:],
+                       pinnedGroups: fleet?.pinnedGroupIDs ?? [], hiddenGroups: fleet?.hiddenGroupIDs ?? [],
                        primary: primary(), voices: voices.all, marks: marks.marks,
                        pets: pets.assignments.merging(pets.wanted) { _, wanted in wanted },
                        characters: companions.agentOverrides,
@@ -33,9 +34,12 @@ struct BotsAppStateStores {
                 order.set(next.orders[scope] ?? [], scope: scope)
             }
         }
-        if let fleet, next.sections != old.sections || next.groupSections != old.groupSections {
+        if let fleet, next.sections != old.sections || next.groupSections != old.groupSections
+            || next.pinnedGroups != old.pinnedGroups || next.hiddenGroups != old.hiddenGroups {
             fleet.sections = next.sections
             fleet.groupSectionIDs = next.groupSections
+            fleet.pinnedGroupIDs = next.pinnedGroups
+            fleet.hiddenGroupIDs = next.hiddenGroups
             fleet.saveSections()
         }
         if next.primary != old.primary { setPrimary(next.primary) }
@@ -227,16 +231,31 @@ final class BotsAppStateSync {
             ? (BotsAppState.layoutShape, BotsAppState.layout(phone, names: names))
             : (BotsAppState.settingsShape, BotsAppState.settings(phone, names: names))
         let patches = shape.patches(from: nil, to: whole)
-        guard value != nil else {
+        guard let value else {
             var seed = [AppStatePatch(path: ["v"], value: .integer(BotsAppState.version))] + patches
             if key == BotsAppState.layoutKey {
-                seed += [AppStatePatch(path: ["pinnedGroups"], value: .array([])),
-                         AppStatePatch(path: ["hiddenGroups"], value: .array([]))]
+                for field in BotsAppState.groupListFields where !patches.contains(where: { $0.path == [field] }) {
+                    seed.append(AppStatePatch(path: [field], value: .array([])))
+                }
             }
             return seed
         }
         let joining = Set(computers)
-        return patches.filter { BotsAppState.computer(of: $0.path).map(joining.contains) == true }
+        var joined = patches.filter { BotsAppState.computer(of: $0.path).map(joining.contains) == true }
+        if key == BotsAppState.layoutKey {
+            // Pinned and hidden group chats are one list for every computer: the joining ones' are added to it.
+            for field in BotsAppState.groupListFields {
+                let listed = (value.object?[field]?.array ?? []).compactMap(\.string)
+                let adding = (whole.object?[field]?.array ?? []).compactMap(\.string).filter { group in
+                    group.split(separator: "/", maxSplits: 1).first.map { joining.contains(String($0)) } == true
+                        && !listed.contains(group)
+                }
+                if !adding.isEmpty {
+                    joined.append(AppStatePatch(path: [field], value: .array((listed + adding).map(BighelpJSONValue.string))))
+                }
+            }
+        }
+        return joined
     }
 
     private func scopes() -> [String] { hosts().flatMap(\.scopes) }
@@ -247,6 +266,9 @@ final class BotsAppStateSync {
 }
 
 extension BotsAppState {
+    /// `bots.layout`'s lists of group chats, one for every computer.
+    static let groupListFields = ["pinnedGroups", "hiddenGroups"]
+
     /// The computer a part of a value belongs to; nil for parts every computer shares.
     static func computer(of path: [String]) -> String? {
         guard path.count >= 2 else { return nil }

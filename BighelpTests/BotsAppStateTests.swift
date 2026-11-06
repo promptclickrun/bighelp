@@ -114,6 +114,42 @@ struct BotsAppStateTests {
         #expect(look.catalogAvatar?.kitURL.absoluteString == kitURL)
     }
 
+    /// Pinned and hidden group chats, group chats on top and in Multi-gateway's order go by the
+    /// computer, and come back on another phone by its own host ID.
+    @Test func groupChatsPinsHidesAndPlacesComeBackOnAnotherPhone() throws {
+        let host = Self.firstPhoneHost.uuidString, computer = Self.computer
+        let first = BotsAppState.Names(hosts: [Self.host(Self.firstPhoneHost, scope: "scope-1")],
+                                       computerIDs: [host: computer])
+        let crew = FleetID.make(Self.firstPhoneHost, "group/crew-1611de2eb694")
+        let phone = BotsPhoneState(
+            orders: ["top|scope-1": ["group:hermes-room:crew-1611de2eb694", "otto"],
+                     "multi-gateway": ["group:\(crew)", "bot:\(host)/otto"],
+                     "top|multi-gateway": ["group:\(crew)", "\(host)/otto"]],
+            pinnedGroups: [crew], hiddenGroups: [FleetID.make(Self.firstPhoneHost, "group/quiet")])
+
+        let layout = BotsAppState.layout(phone, names: first)
+
+        let both = BighelpJSONValue.array(["group/\(computer)/crew-1611de2eb694", "bot/\(computer)/otto"]
+            .map(BighelpJSONValue.string))
+        #expect(layout.object?["pinnedGroups"] == .array([.string("\(computer)/crew-1611de2eb694")]))
+        #expect(layout.object?["hiddenGroups"] == .array([.string("\(computer)/quiet")]))
+        #expect(layout.object?["home"]?.object?[computer]?.object?["top"] == both, "A pinned group chat on top")
+        #expect(layout.object?["multiGatewayHome"]?.object?["list"] == both)
+        #expect(layout.object?["multiGatewayHome"]?.object?["top"] == both)
+
+        let other = Self.secondPhoneHost.uuidString
+        let second = BotsAppState.Names(hosts: [Self.host(Self.secondPhoneHost, scope: "scope-2")],
+                                        computerIDs: [other: computer])
+        let listed = AppStatePatch(path: ["computers"], value: .array([.string(computer)])).applied(to: layout)
+        let restored = BotsAppState.applying(layout: listed, to: BotsPhoneState(), names: second)
+        let crewThere = FleetID.make(Self.secondPhoneHost, "group/crew-1611de2eb694")
+        #expect(restored.pinnedGroups == [crewThere])
+        #expect(restored.hiddenGroups == [FleetID.make(Self.secondPhoneHost, "group/quiet")])
+        #expect(restored.orders["top|scope-2"] == ["group:hermes-room:crew-1611de2eb694", "otto"])
+        #expect(restored.orders["multi-gateway"] == ["group:\(crewThere)", "bot:\(other)/otto"])
+        #expect(restored.orders["top|multi-gateway"] == ["group:\(crewThere)", "\(other)/otto"])
+    }
+
     @Test func orderItemsAnotherPhoneCantNameStayInPlace() {
         let merged = BotsAppState.keepingUnnamed(["bot:a", "x:1", "bot:b", "x:2"], placed: ["bot:b", "bot:a", "bot:c"]) {
             $0.hasPrefix("x:")
@@ -140,12 +176,17 @@ struct BotsAppStateTests {
         var pins: [String: AgentDirectoryStore.SavedPins] = [:]
 
         func sync(host: UUID, scope: String, client: any AppStateClient) -> BotsAppStateSync {
+            sync(hosts: [BotsAppStateTests.host(host, scope: scope)],
+                 computers: { [AppStateComputer(hostKey: host.uuidString, client: client)] })
+        }
+
+        func sync(hosts: [BotsAppStateHost], computers: @escaping @MainActor () -> [AppStateComputer]) -> BotsAppStateSync {
             let bridge = BotsAppStateSync(
                 engine: AppStateSync(keys: BotsAppState.keys, device: UUID().uuidString.lowercased(), file: nil,
                                      person: { AppStateSyncTests.person }),
                 settle: .seconds(3_600))
-            bridge.hosts = { [BotsAppStateTests.host(host, scope: scope)] }
-            bridge.computers = { [AppStateComputer(hostKey: host.uuidString, client: client)] }
+            bridge.hosts = { hosts }
+            bridge.computers = computers
             bridge.start(BotsAppStateStores(
                 order: order, fleet: fleet, primary: { [unowned self] in self.primary },
                 setPrimary: { [unowned self] in self.primary = $0 }, voices: voices, marks: marks, pets: pets,
@@ -153,6 +194,35 @@ struct BotsAppStateTests {
                 pins: { [unowned self] in self.pins[$0] ?? .init() }, setPins: { [unowned self] in self.pins[$1] = $0 }))
             return bridge
         }
+    }
+
+    /// A computer reached for the first time gets this phone's pinned group chats on it, added to the
+    /// list the other computers keep.
+    @Test func aComputerReachedForTheFirstTimeGetsThisPhonesPinnedGroupChats() async throws {
+        let studioComputer = "1e2d3c4b-5a69-4788-97a6-b5c4d3e2f1a0"
+        let home = DemoAppStateClient(computerID: Self.computer), studio = DemoAppStateClient(computerID: studioComputer)
+        let studioHost = UUID(uuidString: "C3C3C3C3-0000-4000-8000-000000000003")!
+        let phone = Phone()
+        var reached = [AppStateComputer(hostKey: Self.firstPhoneHost.uuidString, client: home)]
+        let bridge = phone.sync(hosts: [Self.host(Self.firstPhoneHost, scope: "scope-1"),
+                                        BotsAppStateHost(hostKey: studioHost.uuidString, scopes: ["scope-3"],
+                                                         faceScope: CompanionSurfaceScope.computer(studioHost.uuidString),
+                                                         isSelected: false)],
+                                computers: { reached })
+        phone.fleet.setPinned(groupKey: FleetID.make(Self.firstPhoneHost, "group/crew"), true)
+        phone.fleet.setPinned(groupKey: FleetID.make(studioHost, "group/launch"), true)
+        await bridge.sync()
+        #expect(home.stored(AppStateSyncTests.person)[BotsAppState.layoutKey]?.value?.object?["pinnedGroups"]
+                == .array([.string("\(Self.computer)/crew")]), "The studio isn't reached yet")
+
+        reached.append(AppStateComputer(hostKey: studioHost.uuidString, client: studio))
+        await bridge.sync()
+
+        let pinned = BighelpJSONValue.array([.string("\(Self.computer)/crew"), .string("\(studioComputer)/launch")])
+        #expect(studio.stored(AppStateSyncTests.person)[BotsAppState.layoutKey]?.value?.object?["pinnedGroups"] == pinned)
+        #expect(home.stored(AppStateSyncTests.person)[BotsAppState.layoutKey]?.value?.object?["pinnedGroups"] == pinned)
+        #expect(phone.fleet.pinnedGroupIDs == [FleetID.make(Self.firstPhoneHost, "group/crew"),
+                                               FleetID.make(studioHost, "group/launch")])
     }
 
     @Test func aFreshInstallGetsTheOrderBackFromTheComputer() async {

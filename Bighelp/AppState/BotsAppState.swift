@@ -18,6 +18,9 @@ struct BotsPhoneState: Equatable {
     var sections: [FleetSection] = []
     /// A group chat's section, by `FleetGroup.id`.
     var groupSections: [String: String] = [:]
+    /// Group chats pinned on Bots mode's home and ones hidden from it, by `FleetGroup.id`.
+    var pinnedGroups: [String] = []
+    var hiddenGroups: [String] = []
     /// Multi-gateway's primary bot (`FleetID`).
     var primary: String?
     /// `AgentVoiceChoices`, by its entry keys.
@@ -40,8 +43,8 @@ struct BotsPhoneState: Equatable {
 /// `bots.layout` (v1): `sections` [{id, name}], `groupSections` {group: section}, `home` {computer:
 /// {list, top, pinned, unpinned, primary}} for one gateway's home (pins and the primary bot are this
 /// app's own, kept on the phone per sign-in, not on the profiles), `multiGatewayHome` {list, top},
-/// `primary` (Multi-gateway's), and `pinnedGroups` and `hiddenGroups`, kept for a later version. List items are `bot/<computer>/<profile>` and
-/// `group/<computer>/<room>`.
+/// `primary` (Multi-gateway's), and `pinnedGroups` and `hiddenGroups` [`<computer>/<room>`]. List and top items
+/// are `bot/<computer>/<profile>` and `group/<computer>/<room>`.
 ///
 /// `bots.settings` (v1): `bots` {bot: {voice, mark, pet, character}}.
 @MainActor
@@ -58,6 +61,8 @@ enum BotsAppState {
                               "primary": .leaf()])),
         "multiGatewayHome": .object(["list": .leaf(), "top": .leaf()]),
         "primary": .leaf(),
+        "pinnedGroups": .leaf(),
+        "hiddenGroups": .leaf(),
     ])
 
     static let settingsShape = AppStateShape.object([
@@ -119,6 +124,12 @@ enum BotsAppState {
             groups[computer + "/" + parsed.room] = .string(section)
         }
         if !groups.isEmpty { value["groupSections"] = .object(groups) }
+        for (field, keys) in [("pinnedGroups", phone.pinnedGroups), ("hiddenGroups", phone.hiddenGroups)] {
+            let portable = keys.compactMap { key in
+                fleetGroup(key).flatMap { group in names.computer(hostKey: group.host).map { $0 + "/" + group.room } }
+            }
+            if !portable.isEmpty { value[field] = list(portable) }
+        }
         var home: [String: BighelpJSONValue] = [:]
         for computer in names.computers {
             let scopes = names.hosts(of: computer).flatMap(\.scopes)
@@ -202,6 +213,19 @@ enum BotsAppState {
                 next.groupSections[FleetID.make(hostID, "group/" + pair.rest)] = section
             }
         }
+        for (field, path) in [("pinnedGroups", \BotsPhoneState.pinnedGroups), ("hiddenGroups", \BotsPhoneState.hiddenGroups)] {
+            // Ones on hosts this phone can't name stay; the value has the rest.
+            var keys = phone[keyPath: path].filter { key in fleetGroup(key).map { names.computer(hostKey: $0.host) == nil } ?? true }
+            for group in strings(value[field]) {
+                guard let pair = split(group) else { continue }
+                for host in names.hosts(of: pair.first) {
+                    guard let hostID = UUID(uuidString: host.hostKey) else { continue }
+                    let key = FleetID.make(hostID, "group/" + pair.rest)
+                    if !keys.contains(key) { keys.append(key) }
+                }
+            }
+            next[keyPath: path] = keys
+        }
         let home = value["home"]?.object ?? [:]
         for computer in names.computers {
             let parts = home[computer]?.object ?? [:]
@@ -276,34 +300,39 @@ enum BotsAppState {
     // MARK: Names
 
     /// A one-gateway home's item (`bot:<profile>`, `group:hermes-room:<room>`; on top, bots' bare
-    /// profile IDs) by the computer.
+    /// profile IDs and pinned group chats' items) by the computer.
     static func portableItem(_ item: String, computer: String, top: Bool = false) -> String? {
-        if top { return isName(item) && !item.contains("/") ? "bot/\(computer)/\(item)" : nil }
-        if let profile = item.stripping("bot:"), isName(profile) { return "bot/\(computer)/\(profile)" }
         if let room = item.stripping("group:")?.stripping(roomPrefix), isName(room) { return "group/\(computer)/\(room)" }
+        if top { return isName(item) && !item.contains("/") && !item.hasPrefix("group:") ? "bot/\(computer)/\(item)" : nil }
+        if let profile = item.stripping("bot:"), isName(profile) { return "bot/\(computer)/\(profile)" }
         return nil
     }
 
     static func phoneItem(_ item: String, computer: String, top: Bool = false) -> String? {
         let parts = item.split(separator: "/", maxSplits: 2).map(String.init)
         guard parts.count == 3, parts[1] == computer, isName(parts[2]) else { return nil }
-        if top { return parts[0] == "bot" ? parts[2] : nil }
         switch parts[0] {
-        case "bot": return "bot:" + parts[2]
+        case "bot": return (top ? "" : "bot:") + parts[2]
         case "group": return "group:" + roomPrefix + parts[2]
         default: return nil
         }
     }
 
-    /// A Multi-gateway home's item (`bot:<host>/<profile>`, `group:hermes-room:<room>` on the
-    /// gateway in use; on top, bots' bare `FleetID`s) by the computer.
+    /// A Multi-gateway home's item (`bot:<host>/<profile>`, `group:<host>/group/<room>`; on top, bots'
+    /// bare `FleetID`s and pinned group chats' items) by the computer. Orders saved before group chats
+    /// were named by their gateway have `group:hermes-room:<room>` for the gateway in use.
     static func portableMultiItem(_ item: String, names: Names, top: Bool = false) -> String? {
+        if let group = item.stripping("group:") {
+            if let room = group.stripping(roomPrefix), isName(room), let computer = names.selectedComputer {
+                return "group/\(computer)/\(room)"
+            }
+            return fleetGroup(group).flatMap { group in
+                names.computer(hostKey: group.host).map { "group/\($0)/\(group.room)" }
+            }
+        }
         if top { return portableBot(fleetID: item, names: names).map { "bot/" + $0 } }
         if let bot = item.stripping("bot:") {
             return portableBot(fleetID: bot, names: names).map { "bot/" + $0 }
-        }
-        if let room = item.stripping("group:")?.stripping(roomPrefix), isName(room), let computer = names.selectedComputer {
-            return "group/\(computer)/\(room)"
         }
         return nil
     }
@@ -315,8 +344,9 @@ enum BotsAppState {
         case "bot":
             guard let host = names.hosts(of: parts[1]).first, let hostID = UUID(uuidString: host.hostKey) else { return nil }
             return (top ? "" : "bot:") + FleetID.make(hostID, parts[2])
-        case "group" where !top:
-            return "group:" + roomPrefix + parts[2]
+        case "group":
+            guard let host = names.hosts(of: parts[1]).first, let hostID = UUID(uuidString: host.hostKey) else { return nil }
+            return "group:" + FleetID.make(hostID, "group/" + parts[2])
         default:
             return nil
         }

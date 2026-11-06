@@ -1300,6 +1300,10 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         try await setFlags(record, flags: .init(pinned: pinned))
     }
 
+    func setUnread(_ record: SessionRecord, unread: Bool) async throws {
+        try await setFlags(record, flags: .init(unread: unread))
+    }
+
     func archive(_ record: SessionRecord) async throws {
         let target = try candidate(for: record)
         let botChat = target.canonicalRegistryID != nil
@@ -1729,6 +1733,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         var record = SessionRecord(
             id: appID, kind: .direct, agentIDs: [profile.id], title: shownTitle,
             remoteStoredID: id, remoteSource: source, isPinned: try DirectHermesSessionValidation.flag(value["pinned"]) ?? false,
+            isUnread: try DirectHermesSessionValidation.flag(value["unread"]) ?? false,
             createdAt: started, updatedAt: updated, hasAcceptedMessage: count > 0
         )
         record.catalogPreview = preview
@@ -1773,6 +1778,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         record.title = incoming.record.title
         record.catalogPreview = incoming.record.catalogPreview
         record.isPinned = incoming.record.isPinned
+        record.isUnread = incoming.record.isUnread
         record.isActive = hasOwnership(current) && current.record.isActive
         // The host's saved last activity, unless a reply is still coming in here.
         record.updatedAt = record.isActive ? max(current.record.updatedAt, incoming.record.updatedAt)

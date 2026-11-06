@@ -820,6 +820,16 @@ struct SessionsView: View {
             if model.canManageConversation(session) {
                 Button {
                     performMutation(sessionID: session.id) {
+                        try await model.setSessionUnread(id: session.id, unread: !session.isUnread)
+                    }
+                } label: {
+                    Label(session.isUnread ? "Read" : "Unread",
+                          systemImage: session.isUnread ? "message" : "message.badge")
+                }
+                .tint(theme.information)
+                .accessibilityIdentifier("session.swipe.unread.\(session.id)")
+                Button {
+                    performMutation(sessionID: session.id) {
                         try await model.setSessionPinned(id: session.id, pinned: !session.isPinned)
                     }
                 } label: {
@@ -900,6 +910,16 @@ struct SessionsView: View {
                 Label(session.isPinned ? "Unpin" : "Pin", systemImage: session.isPinned ? "pin.slash" : "pin")
             }
             .accessibilityIdentifier("session.action.pin.\(session.id)")
+
+            Button {
+                performMutation(sessionID: session.id) {
+                    try await model.setSessionUnread(id: session.id, unread: !session.isUnread)
+                }
+            } label: {
+                Label(session.isUnread ? "Mark Read" : "Mark Unread",
+                      systemImage: session.isUnread ? "message" : "message.badge")
+            }
+            .accessibilityIdentifier("session.action.unread.\(session.id)")
 
             Button {
                 performMutation(sessionID: session.id) {
@@ -1148,6 +1168,21 @@ struct SessionsView: View {
                                                 )
                                             }
                                             .accessibilityIdentifier("session.action.pin.\(session.id)")
+
+                                            Button {
+                                                performMutation(sessionID: session.id) {
+                                                    try await model.setSessionUnread(
+                                                        id: session.id,
+                                                        unread: !session.isUnread
+                                                    )
+                                                }
+                                            } label: {
+                                                Label(
+                                                    session.isUnread ? "Mark Read" : "Mark Unread",
+                                                    systemImage: session.isUnread ? "message" : "message.badge"
+                                                )
+                                            }
+                                            .accessibilityIdentifier("session.action.unread.\(session.id)")
 
                                             Button {
                                                 performMutation(sessionID: session.id) {

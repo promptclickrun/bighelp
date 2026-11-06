@@ -22,8 +22,15 @@ struct SessionRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: BighelpTokens.space8) {
+                    if session.isUnread {
+                        Circle()
+                            .fill(theme.information)
+                            .frame(width: 8, height: 8)
+                            .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + titleSize * 0.32 }
+                            .accessibilityHidden(true)
+                    }
                     Text(session.title)
-                        .font(.system(size: titleSize, weight: .semibold))
+                        .font(.system(size: titleSize, weight: session.isUnread ? .bold : .semibold))
                         .foregroundStyle(theme.primaryText)
                         .lineLimit(1)
                     if session.isPinned {
@@ -49,6 +56,15 @@ struct SessionRow: View {
                             .accessibilityHidden(true)
                     }
                     SessionOriginTag(source: session.origin, size: timeSize * 0.85)
+                    if session.hasDraft {
+                        HStack(spacing: 2) {
+                            Image(systemName: "pencil")
+                            Text("Draft")
+                        }
+                        .font(.system(size: timeSize * 0.85, weight: .semibold))
+                        .foregroundStyle(theme.secondaryText)
+                        .accessibilityHidden(true)
+                    }
                     Text(previewLine)
                         .font(.system(size: previewSize))
                         .foregroundStyle(theme.secondaryText)
@@ -107,6 +123,8 @@ struct SessionRow: View {
         let kind = session.kind == .botMode ? "Group chat" : "Chat"
         let preview = plainPreview.isEmpty ? "No preview" : plainPreview
         let state = [
+            session.isUnread ? "Unread" : nil,
+            session.hasDraft ? "Draft" : nil,
             session.isActive ? "Active" : nil,
             session.isPinned ? "Pinned" : nil,
         ].compactMap { $0 }.joined(separator: ", ")

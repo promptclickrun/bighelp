@@ -400,6 +400,17 @@ final class SessionCatalogStore {
         persistChangesIfNeeded()
     }
 
+    /// Marks a chat read or unread on Hermes' own read watermark, then shows it here.
+    /// The host has to take it: a reload lists the same flag, so a local-only change
+    /// would last until the next load.
+    func setSessionUnread(id: String, unread: Bool) async throws {
+        guard let record = session(id: id) else { throw SessionCatalogError.invalidSession }
+        try await client.setUnread(record, unread: unread)
+        guard let index = records.firstIndex(where: { $0.id == id }) else { return }
+        records[index].isUnread = unread
+        persistChangesIfNeeded()
+    }
+
     /// Chats someone archived on this computer (Archived Chats).
     func archivedChats() async throws -> [SessionArchivedChat] {
         try await client.archivedChats()

@@ -405,6 +405,14 @@ final class SessionsModel {
         try await catalog.setSessionPinned(id: id, pinned: pinned)
     }
 
+    /// Marks a chat read or unread again, on the host's read watermark.
+    func setSessionUnread(id: String, unread: Bool) async throws {
+        guard let catalog, canManageConversation(id: id) else {
+            throw SessionCatalogError.invalidSession
+        }
+        try await catalog.setSessionUnread(id: id, unread: unread)
+    }
+
     func archiveSession(id: String) async throws {
         guard let catalog, canManageConversation(id: id) else {
             throw SessionCatalogError.invalidSession

@@ -297,6 +297,12 @@ extension NativeWorkspaceSessionBridge {
         stream.record.isPinned = pinned
         streams[record.id] = stream
     }
+    func setUnread(_ record: SessionRecord, unread: Bool) async throws {
+        try await box.value().setUnread(record, unread: unread)
+        guard var stream = streams[record.id] else { return }
+        stream.record.isUnread = unread
+        streams[record.id] = stream
+    }
     func archive(_ record: SessionRecord) async throws {
         try await box.value().archive(record)
         guard var stream = streams[record.id] else { return }

@@ -18,6 +18,8 @@ struct AgentsShellView: View {
     var createRequest: Binding<Bool> = .constant(false)
     var botChatActivity: BotChatActivityStore? = nil
     var botChatActivitySource: BotChatActivitySource? = nil
+    /// Bots mode's section cards, between Pinned and the rest.
+    var sectionCards: AnyView? = nil
 
     var body: some View {
         AgentsView(
@@ -36,7 +38,8 @@ struct AgentsShellView: View {
             groupFilterRequest: groupFilterRequest,
             createRequest: createRequest,
             botChatActivity: botChatActivity,
-            botChatActivitySource: botChatActivitySource
+            botChatActivitySource: botChatActivitySource,
+            sectionCards: sectionCards
         )
     }
 }

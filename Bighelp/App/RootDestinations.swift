@@ -35,6 +35,8 @@ extension RootShellView {
             devFactoryDestination(route)
         case (.simpleBotProfile(let agentID, let opening), _):
             SimpleBotProfileView(agentID: agentID, context: simpleBotProfileContext(for: agentID), opening: opening)
+        case (.simpleBotsSection(let id), _):
+            SimpleBotsHomeView(context: simpleBotsContext, sectionID: id)
         case (.board(let tab), _):
             agentBoardPage(tab)
         case (.allHostsChats, _):

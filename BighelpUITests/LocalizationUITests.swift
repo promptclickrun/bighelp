@@ -154,8 +154,11 @@ final class LocalizationUITests: BighelpUITestCase {
             capture("simple-search", language, appearance)
             close.tap()
 
-            let newBot = app.buttons["simple-bots.new"]
-            XCTAssertEqual(newBot.label, say("New Bot", "新建机器人"))
+            let new = app.buttons["simple-bots.new"]
+            XCTAssertEqual(new.label, say("Add", "添加"))
+            new.tap()
+            let newBot = app.buttons[say("New Bot", "新建机器人")]
+            XCTAssertTrue(newBot.waitForExistence(timeout: 5))
             newBot.tap()
             XCTAssertTrue(app.textFields["simple-bots.create.name"].waitForExistence(timeout: 5))
             XCTAssertEqual(app.buttons["simple-bots.create.submit"].label, say("Create", "创建"))

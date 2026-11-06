@@ -141,6 +141,12 @@ struct BighelpAppComposition {
             do { try agentRepository.save(initialAgentProfiles) }
             catch { preconditionFailure("The synthetic Agents fixture could not be saved.") }
         }
+        if usesFixtures, SimpleBotsDemoSections.isOn {
+            for index in initialAgentProfiles.indices {
+                initialAgentProfiles[index].placement = SimpleBotsDemoSections.placement(for: initialAgentProfiles[index].id)
+            }
+            try? agentRepository.save(initialAgentProfiles)
+        }
         // "-test-agent-look travel:face" (or "travel:shape"): one demo agent wears a Hermes look, as
         // Hermes Desktop or the avatar designer saves it.
         if usesFixtures, let index = arguments.firstIndex(of: "-test-agent-look"), arguments.indices.contains(index + 1) {

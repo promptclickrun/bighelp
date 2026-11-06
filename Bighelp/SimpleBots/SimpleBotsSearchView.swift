@@ -1,10 +1,13 @@
 import SwiftUI
 
 /// Search in Bots mode: every bot by name or what it's for. The filter
-/// shows hidden bots too, so a hidden one can come back.
+/// shows hidden bots and group chats too, so a hidden one can come back, and
+/// leads to Edit Sections.
 @MainActor
 struct SimpleBotsSearchView: View {
     let context: SimpleBotsContext
+    var hiddenGroups: [SimpleBotsGroup] = []
+    var sections: SimpleBotsSectionsModel? = nil
     let onOpen: (String) -> Void
 
     private enum Filter: String, CaseIterable, Identifiable {
@@ -21,6 +24,7 @@ struct SimpleBotsSearchView: View {
 
     @State private var query = ""
     @State private var filter: Filter = .all
+    @State private var sectionPrompt: SimpleBotsSectionPrompt?
     @FocusState private var isSearchFocused: Bool
     @Environment(\.dismiss) private var dismiss
     @BighelpThemeReader private var theme
@@ -37,6 +41,12 @@ struct SimpleBotsSearchView: View {
             guard !words.isEmpty else { return true }
             return [profile.name, profile.role, profile.summary].contains { $0.localizedCaseInsensitiveContains(words) }
         }
+    }
+
+    private var groups: [SimpleBotsGroup] {
+        guard filter == .hidden else { return [] }
+        let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return hiddenGroups.filter { words.isEmpty || $0.title.localizedCaseInsensitiveContains(words) }
     }
 
     var body: some View {
@@ -60,6 +70,11 @@ struct SimpleBotsSearchView: View {
                     Picker("Show", selection: $filter) {
                         ForEach(Filter.allCases) { Text($0.title).tag($0) }
                     }
+                    if sections != nil {
+                        Divider()
+                        Button("Edit Sections…", systemImage: "folder") { sectionPrompt = .editSections }
+                            .accessibilityIdentifier("simple-bots.search.edit-sections")
+                    }
                 } label: {
                     Image(systemName: "line.3.horizontal.decrease")
                         .font(.bighelp(.title3, weight: .medium))
@@ -75,7 +90,8 @@ struct SimpleBotsSearchView: View {
             .padding(.horizontal, BighelpTokens.space16)
             .padding(.vertical, BighelpTokens.space12)
 
-            List(bots) { profile in
+            List {
+              ForEach(bots) { profile in
                 Button { onOpen(profile.id) } label: {
                     HStack(spacing: BighelpTokens.space16) {
                         SimpleBotLiveFace(bot: SimpleBotsBot(profile, imageURL: context.agents.avatarURL(for: profile)),
@@ -116,18 +132,48 @@ struct SimpleBotsSearchView: View {
                 }
                 .modifier(SimpleBotActivityValue(key: BotChatActivityStore.liveKey(profile.id), activity: context.activity))
                 .accessibilityIdentifier("simple-bots.search.bot.\(profile.id)")
+              }
+              ForEach(groups) { group in
+                  HStack(spacing: BighelpTokens.space16) {
+                      SimpleBotsGroupFace(members: group.members, size: 56)
+                      HStack {
+                          Text(group.title)
+                              .font(.bighelp(.title3, weight: .medium))
+                              .foregroundStyle(theme.primaryText)
+                          Spacer()
+                          Text("Group chat")
+                              .font(.bighelp(.subheadline))
+                              .foregroundStyle(theme.tertiaryText)
+                      }
+                  }
+                  .frame(minHeight: 64)
+                  .contentShape(.rect)
+                  .listRowBackground(Color.clear)
+                  .listRowSeparator(.hidden)
+                  .contextMenu {
+                      Button("Show on Home", systemImage: "eye") { unhide(group) }
+                  }
+                  .accessibilityElement(children: .combine)
+                  .accessibilityAction(named: "Show on Home") { unhide(group) }
+                  .accessibilityIdentifier("simple-bots.search.group.\(group.id)")
+              }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .overlay {
-                if bots.isEmpty {
-                    ContentUnavailableView(filter == .hidden ? "No hidden bots" : "No bots found",
+                if bots.isEmpty && groups.isEmpty {
+                    ContentUnavailableView(filter == .hidden ? "Nothing hidden" : "No bots found",
                                            systemImage: "magnifyingglass")
                 }
             }
         }
         .background(theme.canvas.ignoresSafeArea())
         .onAppear { isSearchFocused = false }
+        .modifier(SimpleBotsSectionPrompts(prompt: $sectionPrompt, model: sections))
+    }
+
+    private func unhide(_ group: SimpleBotsGroup) {
+        if let key = group.key { context.fleet?.setHidden(groupKey: key, false) }
     }
 
     private func unhide(_ profile: AgentProfile) {

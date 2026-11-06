@@ -1,5 +1,12 @@
 import SwiftUI
 
+/// Bots mode's New Group Chat: a section to put the new group chat in.
+struct BotModeCreateSectionChoice {
+    let sections: [FleetSection]
+    /// Files the made group chat (its room ID) in the picked section.
+    let file: @MainActor (_ roomID: String, _ sectionID: String) -> Void
+}
+
 @MainActor
 struct BotModeCreateRoomView: View {
     let rooms: BotModeRoomStore
@@ -8,14 +15,18 @@ struct BotModeCreateRoomView: View {
     let onCreated: (String) -> Void
     /// New chat mode: one agent starts a 1:1 chat, two or more a group.
     let onStartDirect: ((String) -> Void)?
+    /// Bots mode: an optional Section row.
+    let sectionChoice: BotModeCreateSectionChoice?
     @State private var presentationOwnerID: String
 
     init(rooms: BotModeRoomStore, agents: AgentDirectoryStore, seedProfileID: String?,
+         sectionChoice: BotModeCreateSectionChoice? = nil,
          onStartDirect: ((String) -> Void)? = nil,
          onCreated: @escaping (String) -> Void) {
         self.rooms = rooms
         self.agents = agents
         self.seedProfileID = seedProfileID
+        self.sectionChoice = sectionChoice
         self.onStartDirect = onStartDirect
         self.onCreated = onCreated
         _presentationOwnerID = State(initialValue: rooms.nativePresentationOwnerID)
@@ -32,6 +43,7 @@ struct BotModeCreateRoomView: View {
     @State private var isSubmitting = false
     @State private var errorMessage: String?
     @State private var isAdvancedExpanded = false
+    @State private var sectionID: String?
 
     private var hasPendingCreation: Bool { rooms.room(id: roomID)?.nativePendingCreation != nil }
     private var ownerChanged: Bool { rooms.nativePresentationOwnerID != presentationOwnerID }
@@ -87,6 +99,9 @@ struct BotModeCreateRoomView: View {
                 Text("Participants")
             } footer: {
                 Text("Choose two to six agents on this host. Hermes fixes the participants when the room is created.")
+            }
+            if let sectionChoice {
+                Section { sectionPicker(sectionChoice) }
             }
             if let unseatableNote {
                 Section { Text(unseatableNote).accessibilityIdentifier("bot-mode.create.unseatable") }
@@ -161,6 +176,17 @@ struct BotModeCreateRoomView: View {
                         .bighelpFont(.metadata)
                         .foregroundStyle(theme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let sectionChoice, onStartDirect == nil {
+                    sectionPicker(sectionChoice)
+                        .padding(.horizontal, BighelpTokens.space16)
+                        .frame(minHeight: 52)
+                        .background(theme.surface, in: .rect(cornerRadius: 14))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(theme.border, lineWidth: BighelpTokens.hairline)
+                        }
                 }
 
                 if !rooms.canCreateNativeRoom, onStartDirect == nil || isGroupSelection {
@@ -282,6 +308,23 @@ struct BotModeCreateRoomView: View {
                 .stroke(theme.border, lineWidth: BighelpTokens.hairline)
         }
         .accessibilityIdentifier("bot-mode.create.advanced")
+    }
+
+    /// Section: none, or one of the person's sections.
+    private func sectionPicker(_ choice: BotModeCreateSectionChoice) -> some View {
+        Picker(selection: $sectionID) {
+            Text("None").tag(String?.none)
+            ForEach(choice.sections) { section in
+                Text(section.name).tag(Optional(section.id))
+            }
+        } label: {
+            Text("Section")
+                .bighelpFont(.body)
+                .foregroundStyle(theme.primaryText)
+        }
+        .pickerStyle(.menu)
+        .disabled(isSubmitting || hasPendingCreation || ownerChanged)
+        .accessibilityIdentifier("bot-mode.create.section")
     }
 
     /// The same handle assignment `createNativeRoom` sends to Hermes.
@@ -422,6 +465,7 @@ struct BotModeCreateRoomView: View {
             )
             guard !ownerChanged, !Task.isCancelled else { throw WorkspaceClientError.ownerChanged }
             errorMessage = nil
+            if let sectionChoice, let sectionID { sectionChoice.file(room.id, sectionID) }
             onCreated(room.id)
             dismiss()
         } catch is CancellationError {

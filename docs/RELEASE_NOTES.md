@@ -3,6 +3,24 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.68
+
+### New
+
+- **Sections in Bots mode:** put bots and group chats in sections, like folders on the Home Screen. Tap + and then New Section. Each section shows as a card with the faces of its members. Tap a card to open the section. A section can hold bots from more than one computer. Chat mode's Agents and Code mode's agent list show the same sections.
+- **Group chats in Bots mode:** tap + and then New Group Chat. You can pin, hide, arrange and move a group chat, as you do with a bot.
+- **Who answers in a group chat:** in Group Settings, pick who answers a message that names nobody. The choices are every bot, a lead bot that gives the message to the right bots, or an automatic pick. Each group chat also has a purpose and shared notes that every bot keeps in mind. A long discussion stops after 10 messages, and you can tap Continue.
+- **Unread chats:** a chat with a new answer that you did not read shows a dot, and its title is bold. A chat that holds a message that you did not send shows "Draft".
+
+### Changed
+
+- **Your order on every device:** bighelp keeps your bot order, your sections, your pins and each bot's settings on your computer. Another phone, an iPad or a new install of bighelp gets them again. This needs bighelp plugin 3.45.0.
+
+### Fixed
+
+- **Phone tools stay on:** when a phone tool ran a long time (for example Location), the chat lost its phone tools until you left it. Now bighelp connects them again by itself. With plugin 3.45.0, Location also gets more time.
+- **The time of an answer:** an answer from an agent shows its time as soon as it ends. Before, the time showed only after you opened the chat again.
+
 ## 2.6.67
 
 ### Changed

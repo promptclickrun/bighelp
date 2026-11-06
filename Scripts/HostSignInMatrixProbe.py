@@ -819,9 +819,17 @@ def run_appstate(args, repo: Path) -> int:
                     raise TimeoutError("Hermes not ready (appstate)")
                 time.sleep(0.3)
             for phase in ("save", "restore"):
-                # Deleted before each run: the first starts clean, the second is the reinstall.
+                # Deleted before each run: the first starts clean, the second is the reinstall. simctl can
+                # only delete an app from a booted simulator, and the test run leaves it shut down.
+                subprocess.run(["xcrun", "simctl", "bootstatus", args.simulator_id, "-b"], check=False, timeout=300,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 subprocess.run(["xcrun", "simctl", "uninstall", args.simulator_id, "app.loopdy.mobile"],
-                               check=False, timeout=120)
+                               check=True, timeout=120)
+                container = subprocess.run(["xcrun", "simctl", "get_app_container", args.simulator_id,
+                                            "app.loopdy.mobile", "data"], capture_output=True, timeout=60)
+                if container.returncode == 0:
+                    raise RuntimeError("bighelp is still installed after simctl uninstall")
+                print(json.dumps({"phase": phase, "app_deleted_before_run": True}), flush=True)
                 evidence = args.results / "appstate"
                 evidence.mkdir(parents=True, exist_ok=True)
                 client_env = dict(os.environ, TEST_RUNNER_BIGHELP_APP_STATE_HOST=f"{origin.removeprefix('http://')}|{phase}|writer",

@@ -185,4 +185,71 @@ struct AppStateTests {
         #expect(state.selectedTab == .scheduledTasks)
         #expect(state.path.isEmpty)
     }
+
+    /// Leaving a chat for any other place holds it, as it was opened, for the tab it was under.
+    @Test func leavingAChatForAnotherPlaceHoldsIt() {
+        for tab in [AppTab.ideas, .feed, .apps, .agents, .kanban, .projects] {
+            let state = AppState()
+            state.chatOpenedFromList = true
+            state.activateConversation(id: "chat-1", source: .sessions)
+            #expect(state.heldChat == nil)
+
+            state.select(tab)
+
+            #expect(state.path.isEmpty)
+            #expect(state.heldChat == HeldChat(conversationID: "chat-1", openedFromList: true), "\(tab)")
+        }
+    }
+
+    /// Chat and Sessions share a root: moving between them, or opening a chat, holds nothing.
+    @Test func chatAndSessionsAndOpeningAChatHoldNothing() {
+        let state = AppState()
+        state.activateConversation(id: "chat-1", source: .sessions)
+        state.select(.sessionList)
+        #expect(state.heldChat == nil)
+
+        state.activateConversation(id: "chat-1", source: .sessions)
+        state.select(.ideas)
+        #expect(state.heldChat != nil)
+        state.select(.feed)
+        #expect(state.heldChat?.conversationID == "chat-1", "Board to board keeps it")
+        state.select(.sessions)
+        state.activateConversation(id: "chat-2", source: .sessions)
+        #expect(state.heldChat == nil, "The chat on screen is the one held next")
+    }
+
+    /// The held chat belongs to this computer and this account.
+    @Test func hostAndAccountBoundariesForgetTheHeldChat() {
+        let state = AppState()
+        state.activateConversation(id: "chat-1", source: .sessions)
+        state.select(.goals)
+        state.resetForHostBoundary()
+        #expect(state.heldChat == nil)
+
+        state.select(.sessions)
+        state.activateConversation(id: "chat-1", source: .sessions)
+        state.select(.goals)
+        state.resetForAccountBoundary()
+        #expect(state.heldChat == nil)
+    }
+
+    /// Chat opens its own chat and, without Sessions in the bar, a chat from the list too. With
+    /// Sessions in the bar, a chat from the list is Sessions'.
+    @Test func theTabAChatWasUnderOpensItAgain() {
+        let own = HeldChat(conversationID: "own", openedFromList: false)
+        let listed = HeldChat(conversationID: "listed", openedFromList: true)
+        #expect(own.tab(sessionsInBar: false) == .sessions)
+        #expect(own.tab(sessionsInBar: true) == .sessions)
+        #expect(listed.tab(sessionsInBar: false) == .sessions)
+        #expect(listed.tab(sessionsInBar: true) == .sessionList)
+    }
+
+    /// Chat opens a 1:1 chat again only while its agent is the one in use; a group chat always.
+    @Test func chatHoldsAOneToOneChatOnlyForItsAgent() {
+        #expect(HeldChat.fitsChat(members: ["finance"], agentInUse: "finance"),
+                "A board from a 1:1 chat makes its agent the one in use")
+        #expect(!HeldChat.fitsChat(members: ["finance"], agentInUse: "travel"))
+        #expect(!HeldChat.fitsChat(members: ["finance"], agentInUse: nil))
+        #expect(HeldChat.fitsChat(members: ["finance", "travel"], agentInUse: "home"))
+    }
 }

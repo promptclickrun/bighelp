@@ -1050,6 +1050,7 @@ struct RootShellView: View {
 
     private func selectTab(_ tab: AppTab) {
         if tab == .sessionList {
+            if openHeldChat(under: tab) { return }
             openAllSessions()
             return
         }
@@ -1061,7 +1062,9 @@ struct RootShellView: View {
             return
         }
         if tab == .sessions, opensHomeChat {
-            // Chat is the agent's own chat; ☰ and swipe-back reach the full list.
+            // The chat you left under Chat opens again; otherwise Chat is the agent's own chat.
+            // ☰ and swipe-back reach the full list either way.
+            if openHeldChat(under: tab) { return }
             openHomeChat()
         } else if tab == .sessions {
             openSessions(filteredTo: nil)
@@ -1072,6 +1075,23 @@ struct RootShellView: View {
         } else {
             appState.select(tab)
         }
+    }
+
+    /// The chat the person left under `tab` (Chat or Sessions) for another place, while this
+    /// computer still lists it. False when there's none, and the tab opens as it always has. Chat
+    /// skips a 1:1 chat whose agent is no longer the one in use: it opens that agent's chat instead.
+    private func openHeldChat(under tab: AppTab) -> Bool {
+        guard !fleetModeOn, let held = appState.heldChat,
+              held.tab(sessionsInBar: barTabs.contains(.sessionList)) == tab,
+              let record = sessionCatalog.session(id: held.conversationID),
+              tab == .sessionList || HeldChat.fitsChat(members: record.agentIDs, agentInUse: homeAgent?.id)
+        else { return false }
+        appState.select(.sessions)
+        // A chat from the list keeps Back to the list.
+        appState.chatOpenedFromList = held.openedFromList
+        // A group chat opens its room, as it did from the list.
+        openSessionSelection(record.summary)
+        return true
     }
 
     /// Projects, Kanban, Workflows or Usage from the bottom bar: opened the way ☰ opens

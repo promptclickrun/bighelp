@@ -311,7 +311,8 @@ extension RootShellView {
             }
             return
         }
-        agents.select(agent.id)
+        // Over the primary agent too: a board opened from a chat makes that chat's agent primary.
+        agents.makeHomeAgent(agent.id)
         if appState.selectedTab == .sessions { openHomeChat(replacing: true) }
     }
 

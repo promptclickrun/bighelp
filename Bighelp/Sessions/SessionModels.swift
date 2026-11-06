@@ -137,8 +137,8 @@ struct SessionSummary: Identifiable, Equatable, Sendable {
     let isUnread: Bool
     /// Hermes keeps this chat's read state (its row says `unread`), so Mark Read and Mark Unread work.
     let tracksUnread: Bool
-    /// Text saved in this chat's message box that hasn't been sent.
-    let hasDraft: Bool
+    /// The chat's message box holds something that hasn't been sent.
+    var hasDraft: Bool
     let isCronSession: Bool
     let workspaceID: String?
     let workspaceName: String?
@@ -239,6 +239,8 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
     var localContentRevision: UUID? = nil
     var localContentScope: String? = nil
     var catalogPreview: String? = nil
+    /// Whether the saved draft held text, for a projection whose draft isn't loaded (the Chats list's Draft).
+    var catalogHasDraft: Bool = false
     var hasDeferredReferenceState: Bool = false
     var isContentLoaded: Bool { localContentRevision == nil }
 
@@ -287,6 +289,7 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
         case localContentRevision
         case localContentScope
         case catalogPreview
+        case catalogHasDraft
         case hasDeferredReferenceState
     }
 
@@ -369,7 +372,7 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
             isPinned: isPinned,
             isUnread: isUnread == true,
             tracksUnread: isUnread != nil,
-            hasDraft: !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            hasDraft: isContentLoaded ? Self.holdsDraft(draft) : catalogHasDraft,
             isCronSession: isCronSession,
             workspaceID: workspaceID,
             workspaceName: workspaceName,
@@ -381,6 +384,11 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
 
     var isSubagentSession: Bool {
         parentSessionID != nil
+    }
+
+    /// Whether a saved draft is something to send: whitespace alone isn't.
+    static func holdsDraft(_ draft: String) -> Bool {
+        draft.contains { !$0.isWhitespace }
     }
 
     var isCronSession: Bool {
@@ -458,6 +466,7 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
         localContentRevision = try container.decodeIfPresent(UUID.self, forKey: .localContentRevision)
         localContentScope = try container.decodeIfPresent(String.self, forKey: .localContentScope)
         catalogPreview = try container.decodeIfPresent(String.self, forKey: .catalogPreview)
+        catalogHasDraft = try container.decodeIfPresent(Bool.self, forKey: .catalogHasDraft) ?? false
         hasDeferredReferenceState = try container.decodeIfPresent(Bool.self, forKey: .hasDeferredReferenceState) ?? false
     }
 
@@ -495,6 +504,9 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
         try container.encodeIfPresent(localContentRevision, forKey: .localContentRevision)
         try container.encodeIfPresent(localContentScope, forKey: .localContentScope)
         try container.encodeIfPresent(catalogPreview, forKey: .catalogPreview)
+        if catalogHasDraft {
+            try container.encode(true, forKey: .catalogHasDraft)
+        }
         if hasDeferredReferenceState {
             try container.encode(true, forKey: .hasDeferredReferenceState)
         }

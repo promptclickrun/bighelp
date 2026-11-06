@@ -451,6 +451,7 @@ final class ShellFeatureStore {
                 agents: agents,
                 hostedRooms: botModeRooms
             )
+            sessionsModel?.unsentDraft = { [weak self] id in self?.unsentDraft(id) }
             return true
         case .scheduledTasks:
             return scheduledTasks != nil
@@ -983,6 +984,14 @@ final class ShellFeatureStore {
         unresolvedSubagentSnapshots.removeAll()
         hasDeferredDashboardRefresh = false
         dashboardModel.resetForAccountBoundary()
+    }
+
+    /// Whether a chat's message box holds something its saved draft doesn't show yet: files only the
+    /// open chat holds (they're never saved), or typing still in the draft journal. Nil when the
+    /// saved draft is the latest, as it is once the person leaves the chat (it saves then).
+    func unsentDraft(_ id: String) -> Bool? {
+        if chatModels[id]?.orderedDraftAttachments.isEmpty == false { return true }
+        return draftJournal?.pendingDraft(for: id).map(SessionRecord.holdsDraft)
     }
 
     func flushChatPersistence() {

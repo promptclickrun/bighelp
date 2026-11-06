@@ -55,6 +55,13 @@ final class ChatDraftJournal {
         return entry.draft
     }
 
+    /// What was typed in the chat since it last saved, if anything: the Chats list's Draft mark reads
+    /// it, without a redraw for each key, since the journal tells no one it changed.
+    func pendingDraft(for sessionID: String) -> String? {
+        loadIfNeeded()
+        return entries[sessionID]?.draft
+    }
+
     /// Keeps `draft` for the chat whose saved draft is `savedDraft` right now.
     func write(_ draft: String, over savedDraft: String, for sessionID: String) {
         loadIfNeeded()

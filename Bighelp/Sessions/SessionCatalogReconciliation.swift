@@ -333,6 +333,7 @@ enum SessionCatalogReconciliation {
                 merged.localContentScope = local.localContentScope
                 merged.catalogPreview = incoming.catalogPreview
                     ?? (incoming.items.isEmpty ? local.catalogPreview : String(incoming.summary.preview.prefix(512)))
+                merged.catalogHasDraft = local.catalogHasDraft
                 merged.hasDeferredReferenceState = local.hasDeferredReferenceState
                 merged.draft = ""
                 merged.referenceState = nil
@@ -345,6 +346,7 @@ enum SessionCatalogReconciliation {
                 merged.localContentRevision = nil
                 merged.localContentScope = nil
                 merged.catalogPreview = nil
+                merged.catalogHasDraft = false
                 merged.hasDeferredReferenceState = false
                 merged.draft = local.draft
                 merged.referenceState = local.referenceState

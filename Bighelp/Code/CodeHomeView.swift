@@ -7,6 +7,8 @@ struct CodeHomeContext {
     let status: any CodeSessionStatusReading
     let agents: [AgentProfile]
     var avatarURL: (AgentProfile) -> URL? = { _ in nil }
+    /// The person's sections, which the agent picker lists agents by.
+    var sections: [FleetSection] = []
     let onOpenSession: (CodeSessionRecord) -> Void
     let onOpenChanges: (CodeSessionRecord) -> Void
     var onOpenBatch: (CodeBatch) -> Void = { _ in }
@@ -63,7 +65,8 @@ struct CodeHomeView: View {
         .simultaneousGesture(TapGesture().onEnded { BighelpKeyboard.dismiss() })
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            CodeComposer(store: store, agents: context.agents, avatarURL: context.avatarURL, onWorktrees: context.onWorktrees)
+            CodeComposer(store: store, agents: context.agents, avatarURL: context.avatarURL, sections: context.sections,
+                         onWorktrees: context.onWorktrees)
                 .frame(maxWidth: 720)
                 .frame(maxWidth: .infinity)
         }

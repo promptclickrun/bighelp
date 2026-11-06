@@ -38,6 +38,8 @@ extension RootShellView {
         case (.groupSettings(let roomID, let conversationID), _):
             GroupSettingsView(roomID: roomID, rooms: botModeRooms, agents: agents,
                               chat: conversationID.flatMap(featureStore.preparedChatModel(id:)))
+        case (.simpleBotsSection(let id), _):
+            SimpleBotsHomeView(context: simpleBotsContext, sectionID: id)
         case (.board(let tab), _):
             agentBoardPage(tab)
         case (.allHostsChats, _):

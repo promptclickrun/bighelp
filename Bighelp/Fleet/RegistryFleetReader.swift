@@ -261,8 +261,28 @@ final class RegistryFleetReader: FleetHostReading {
             reconcileClosedRuntime: { _ in throw HermesSessionMaintenanceError.invalidRequest }
         ).foreignSessions(profileID: defaultProfile, source: nil, offset: 0, limit: 10)
         return FleetSnapshot(agents: agents, chats: chats,
-                             tasks: tasks.map { FleetTask(hostID: hostID, scheduledTask: $0) }, refreshedAt: Date(),
+                             tasks: tasks.map { FleetTask(hostID: hostID, scheduledTask: $0) },
+                             groups: await groups(hostID, workspace: workspace, owner: owner, profiles: profiles),
+                             refreshedAt: Date(),
                              otherAppChats: otherApps.map { $0.sessions.map { FleetOtherAppChat(hostID: hostID, item: $0) } })
+    }
+
+    /// Its group chats, for Bots mode's Multi-gateway: the first page, to list and open. A host
+    /// that can't list them has none here.
+    private static func groups(_ hostID: UUID, workspace: DirectHermesWorkspaceClient, owner: WorkspaceOwner,
+                               profiles: [AgentProfile]) async -> [FleetGroup] {
+        guard let payload = try? await workspace.perform(.groupsList, payload: [
+            "offset": .integer(0), "limit": .integer(50), "include_disbanded": .boolean(false),
+        ], owner: owner),
+            let data = try? JSONEncoder().encode(BighelpJSONValue.object(payload)),
+            let page = try? JSONDecoder().decode(HermesBotModeRoomListPage.self, from: data) else { return [] }
+        let names = Dictionary(profiles.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        return page.rooms.filter { $0.disbandedAt == nil }.map { room in
+            FleetGroup(hostID: hostID, roomID: room.roomID, name: room.name,
+                       memberNames: room.members.map { names[$0.profile] ?? $0.handle },
+                       updatedAt: Date(timeIntervalSince1970: room.updatedAt), isWorking: false,
+                       canRename: false, canDelete: false, memberIDs: room.members.map(\.profile))
+        }
     }
 
     static let workingStatuses: Set<String> = ["starting", "working", "streaming", "resuming"]

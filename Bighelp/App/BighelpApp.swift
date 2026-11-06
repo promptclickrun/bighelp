@@ -122,6 +122,7 @@ struct BighelpApp: App {
         if arguments.contains("-use-demo-fixtures"), !arguments.contains("-test-no-configured-hosts") {
             fleet = FleetStore(reader: FleetFixtureReader(), directory: FileManager.default.temporaryDirectory
                 .appending(path: "bighelp-fleet-demo-\(ProcessInfo.processInfo.processIdentifier)"))
+            if SimpleBotsDemoSections.isOn { SimpleBotsDemoSections.seed(fleet) }
             peerHosts = DemoRoomPeerHosts(fleet: fleet)
         }
         #endif

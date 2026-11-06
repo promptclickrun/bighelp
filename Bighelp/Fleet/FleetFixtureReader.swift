@@ -28,7 +28,8 @@ final class FleetFixtureReader: FleetHostReading {
 
     /// Sections and hidden agents saved on the demo host, like a real one's
     /// profiles. None until the person files or hides one.
-    private var placements: [String: AgentListPlacement] = [:]
+    private var placements: [String: AgentListPlacement] = SimpleBotsDemoSections.isOn
+        ? ["reviewer": SimpleBotsDemoSections.placement(for: "reviewer")!] : [:]
 
     func setPlacement(_ placement: AgentListPlacement, hostID: UUID, profileID: String) async throws {
         guard hostID == Self.studioID else { throw WorkspaceClientError.unavailable(.unsupportedHost) }
@@ -88,7 +89,7 @@ final class FleetFixtureReader: FleetHostReading {
             groups: [
                 FleetGroup(hostID: id, roomID: "studio-launch", name: "Launch crew",
                            memberNames: ["Rio Tanaka", "Sage Ortiz"], updatedAt: now.addingTimeInterval(-50 * 60),
-                           isWorking: false, canRename: false, canDelete: false),
+                           isWorking: false, canRename: false, canDelete: false, memberIDs: ["research", "reviewer"]),
             ],
             refreshedAt: now,
             otherAppChats: [

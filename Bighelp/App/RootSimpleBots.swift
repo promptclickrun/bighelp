@@ -118,8 +118,34 @@ extension RootShellView {
             gateways: simpleBotsGateways,
             activity: botChatActivity,
             activitySource: botChatActivitySource,
-            modeSwitch: modeSwitch
+            modeSwitch: modeSwitch,
+            fleet: fleet,
+            onNewGroupChat: newGroupChatAction.map { action in { appState.chatOpenedFromList = true; action() } },
+            onGroupSettings: { roomID in
+                guard let owner else { return }
+                handleAgentWorkspaceAction(.init(owner: owner, action: .openGroupSettings(roomID: roomID)))
+            },
+            onDeleteGroup: owner.flatMap { owner in
+                botModeRooms.nativeCapabilities?.supports("groups.disband") == true ? { roomID in
+                    handleAgentWorkspaceAction(.init(owner: owner, action: .deleteGroup(roomID: roomID)))
+                } : nil
+            },
+            onOpenSection: { appState.open(.simpleBotsSection(id: $0)) },
+            rooms: botModeRooms.catalogRooms,
+            onOpenGroup: { roomID in
+                guard let owner else { return }
+                appState.chatOpenedFromList = true
+                handleAgentWorkspaceAction(.init(owner: owner, action: .openGroup(roomID: roomID)))
+            }
         )
+    }
+
+    /// New Group Chat's Section row in Bots mode: the group chat goes in the picked section once it's made.
+    var groupSectionChoice: BotModeCreateSectionChoice? {
+        guard simpleBotsOn, let fleet, let hostID = fleet.selectedHostID, !fleet.sections.isEmpty else { return nil }
+        return BotModeCreateSectionChoice(sections: fleet.sections) { roomID, sectionID in
+            fleet.file(groupKey: FleetID.make(hostID, "group/" + roomID), in: sectionID)
+        }
     }
 
     /// Where the bots' working states come from: the gateway in use's plugin route, else what stock
@@ -170,23 +196,33 @@ extension RootShellView {
         let selected = fleet.selectedHostID
         let liveKnown = nativeRuntime != nil && agents.knowsProfiles
         var bots: [SimpleBotsBot] = [], latest: [String: SimpleBotsLatest] = [:], pinned: [String] = []
+        var groups: [SimpleBotsGroup] = []
         for host in fleet.hosts {
             if host.id == selected, liveKnown {
                 let live = agents.profiles.map { SimpleBotsBot($0, hostID: host.id, imageURL: agents.avatarURL(for: $0)) }
                 bots += live
-                latest.merge(SimpleBotsHomeProjection.latestChats(
-                    sessionCatalog.recentSummaries(includeCronSessions: false), bots: live.map { ($0.id, $0.profileID) }
+                let summaries = sessionCatalog.recentSummaries(includeCronSessions: false)
+                latest.merge(SimpleBotsHomeProjection.latestChats(summaries, bots: live.map { ($0.id, $0.profileID) }
                 )) { _, new in new }
                 pinned += agents.pinnedAgentIDs.map { FleetID.make(host.id, $0) }
+                groups += SimpleBotsHomeProjection.groups(summaries, rooms: botModeRooms.catalogRooms, hostID: host.id,
+                                                          bots: live, listsByKey: true)
             } else {
+                var hostBots: [SimpleBotsBot] = []
                 for agent in fleet.agents(on: host.id) {
                     var bot = SimpleBotsBot(agent, imageURL: fleet.avatars.url(for: agent.avatarFile))
                     bot.isOnGatewayInUse = host.id == selected
-                    bots.append(bot)
+                    hostBots.append(bot)
                     if let chat = fleet.latestChat(for: agent) {
                         latest[agent.id] = SimpleBotsLatest(preview: chat.preview, date: chat.updatedAt)
                     }
                     if agent.isPinned { pinned.append(agent.id) }
+                }
+                bots += hostBots
+                groups += fleet.groups(on: host.id).map { group in
+                    SimpleBotsGroup(group, members: (group.memberIDs ?? []).compactMap { id in
+                        hostBots.first { $0.profileID == id }
+                    })
                 }
             }
         }
@@ -225,7 +261,8 @@ extension RootShellView {
                 // Keep the primary bot put from now on, whichever gateway comes into use.
                 if settings.simpleBotsMultiPrimary == nil, let primaryID { settings.simpleBotsMultiPrimary = primaryID }
                 fleet.refresh()
-            })
+            },
+            groups: groups)
     }
 
     /// The edge swipes in Bots mode (`effectiveLeftEdgeSwipeAction`): from the left back to your

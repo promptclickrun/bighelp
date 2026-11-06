@@ -471,6 +471,9 @@ extension RootShellView {
         case .group(let roomID):
             guard let owner = currentWorkspaceOwner else { return }
             handleAgentWorkspaceAction(.init(owner: owner, action: .openGroup(roomID: roomID)))
+        case .groupSettings(let roomID):
+            guard let owner = currentWorkspaceOwner else { return }
+            handleAgentWorkspaceAction(.init(owner: owner, action: .openGroupSettings(roomID: roomID)))
         case .newGroup(let profileIDs, let peers):
             createGroupChat(with: profileIDs, peers: peers)
         case .routines(let profileID):
@@ -555,7 +558,7 @@ extension RootShellView {
             FleetGroup(hostID: key.hostID, roomID: room.roomID, name: room.name,
                        memberNames: room.members.map { names[$0.profile] ?? $0.handle },
                        updatedAt: room.updatedAt, isWorking: botModeRooms.room(id: room.roomID)?.isNativeWorking == true,
-                       canRename: room.canRename, canDelete: canDelete)
+                       canRename: room.canRename, canDelete: canDelete, memberIDs: room.members.map(\.profile))
         }
         fleet.selectedHostPlacementWriter = { [agents] placement, profileID in
             try await agents.setPlacement(placement, profileID: profileID)
@@ -682,5 +685,17 @@ struct FleetHooks: ViewModifier {
                 if phase == .active, keepsConnected { setKeepsConnected(true) }
             }
             .onChange(of: keepsConnected, initial: true) { _, keep in setKeepsConnected(keep) }
+    }
+}
+
+/// Sections made on another device (or in Hermes Desktop) that the gateway in use's own agents are
+/// in, for Bots mode and the Agents screen, which read those agents live rather than from every
+/// host's copies.
+struct FleetSectionAdoption: ViewModifier {
+    let placements: [AgentListPlacement]
+    let adopt: ([AgentListPlacement]) -> Void
+
+    func body(content: Content) -> some View {
+        content.onChange(of: placements, initial: true) { _, placements in adopt(placements) }
     }
 }

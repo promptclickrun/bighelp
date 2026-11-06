@@ -511,17 +511,22 @@ and no ☰. The page is the light and dark theme picked in Appearance, your bubb
 picked a bubble color in Appearance, and buttons and tinted text are the page's ink (white after dark). The
 text is SF Pro, as everywhere.
 
-- **Home**: your circle top left opens Settings; search and + (New Bot, no menu: group chats are made in Chat
-  mode) top right. The primary bot (no badge) and pinned bots share the top, all the same size: one large, else two or three
-  across, six at most in two rows. Only pins the top shows count toward the six, not the primary bot, hidden bots
-  or ones this computer no longer has. Their marks blink now and then (never with Reduce Motion). Under them every
-  other bot and each group chat, with the latest message and its time; a bot's role is a small gray label after
-  its name. Rearrange (in each menu) turns the home into an arranging mode: Cancel and Save in the header, no
+- **Home**: your circle top left opens Settings; search and + top right. + is a short menu: New Bot, New Group
+  Chat and New Section, each only where it can work (a computer that can't make group chats leaves New Group Chat
+  out). The primary bot (no badge), pinned bots and pinned group chats (up to three of their members' faces) share
+  the top, all the same size: one large, else two or three across, six at most in two rows. Only pins the top
+  shows count toward the six, not the primary bot, hidden bots or ones this computer no longer has. Their marks
+  blink now and then (never with Reduce Motion). Under them, only once a section exists, a SECTIONS caption and a
+  card for each section, two across (one at the largest text sizes): a 2 × 2 folder of its members' faces (a
+  group chat as its members' faces together, all still), its name and how many are in it, and a dot while one
+  is unread. Then every other bot and group chat in no section, with the latest message and its time; a bot's
+  role is a small gray label after its name. Rearrange (in each menu) turns the home into an arranging mode: Cancel and Save in the header, no
   menus, chats or blinking, and every bot and group chat drags into place, on top (the primary bot too) or in
   the list. Save keeps the order per computer (`SimpleBotsOrderStore`), and on the computer too, so a reinstall or
   another device gets it back (`BotsAppStateSync`; on a computer whose plugin can't keep it, on this device only,
   and the Rearrange hint says to update the plugin); a bot or group chat not placed yet leads the list, by its
-  latest message. Hidden bots stay off the home; search's filter shows them.
+  latest message. Hidden bots and group chats stay off the home; search's filter shows them, with Show on
+  Home.
 - **Working and Needs you**: a bot whose Bot Chat is on a turn acts the work out on its face: a mark or kit
   character plays the mood for it (`AgentActivityKind.moodID`: scanning for code, looking around while it
   browses), a Hermes face or shape the designer's state for it (`hermesPlayState`), a pet its move. In the list,
@@ -530,11 +535,23 @@ text is SF Pro, as everywhere.
   (a globe while it browses, in the page's ink). One waiting on you (an approval, a question) gets a raised hand
   in ember and "Needs you", which wins over working. It's only what the computer says (`BotChatActivityStore`):
   unknown or out of date shows nothing, and it clears when the turn ends.
-- **Touch and hold** a bot: its latest message, then New Chat, Pin (Unpin when pinned), Rearrange,
-  Mark Read/Unread (its Bot Chat's, on the computer; kept on this device where the computer keeps no read state),
-  Bot Profile, a divider, and Hide. Actions stay in that order;
-  the primary bot has no Pin or Hide. Primary selection stays in Chats settings, and Routines in Bot Profile.
-  A group chat's menu has Mark Unread and Rearrange.
+- **Touch and hold** a bot: its latest message, then New Chat, Pin (Unpin when pinned), Rearrange, Move to
+  Section (each section, No section, New Section…), Mark Read/Unread (its Bot Chat's, on the computer; kept on this device where the
+  computer keeps no read state), Bot Profile, a divider, and Hide. Actions stay in that order; the primary bot has no Pin or Hide. Primary selection stays in
+  Chats settings, and Routines in Bot Profile. A group chat: its latest message, then Pin, Rearrange, Move to
+  Section, Mark Read/Unread, Group Settings, a divider, Hide and Delete Group Chat (it asks first). A section's
+  card: Open, Rename, Edit Members, Edit Sections, a divider, Delete Section.
+- **Sections** are folders, like Home Screen folders. A card opens the section's page: Back, its name (and
+  "On Home Mac and Studio Mac" when its members are on more than one computer), ⋯ (Rename, Edit Members, Delete
+  Section), a big folder of faces, its members as home rows (their role line names the computer when the section
+  spans several), then Add Bots or Group Chats. New Section and Edit Members are one sheet: the name, then every
+  bot and group chat with a check (by computer with Multi-gateway; "In Work", or "Moves from Work" once picked).
+  A bot is in one section at a time. Edit Sections (a card's menu, search's filter) renames, drags into order
+  and deletes; Done keeps it all, and Delete asks first and keeps every member, in No section. With Multi-gateway
+  a section holds any computer's bots and group chats; with it off (or one gateway filtered) a section shows only
+  that computer's members, and one with all its members elsewhere doesn't show. Bots' sections are Hermes
+  Desktop's own field, so Desktop shows them too; Chat mode's Agents screen shows the same cards under Pinned, and
+  Code mode's agent picker lists agents under their sections.
 - **Marks**: thirteen shapes in eleven colors with two white eyes (`SimpleBotMark`), from before Bot Studio.
   A bot that has one keeps it until another avatar is saved; one with no picture, character or pet shows a
   mark made from its ID.

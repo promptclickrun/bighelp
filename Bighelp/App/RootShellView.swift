@@ -234,6 +234,8 @@ struct RootShellView: View {
             recordLive: recordLiveFleet, openPending: openPendingFleetIfReady,
             syncHosts: syncFleetHosts, cancelReads: { fleet?.cancelReads() },
             setKeepsConnected: setKeepsFleetHostsConnected))
+        .modifier(FleetSectionAdoption(placements: agents.profiles.compactMap(\.placement),
+                                       adopt: { fleet?.adoptSections(adding: $0) }))
         .environment(\.agentDeletion, agentDeletionAction)
         .focusedSceneValue(\.bighelpShellActions, menuCommandActions)
         .bighelpThemePresentation(theme)
@@ -260,7 +262,8 @@ struct RootShellView: View {
                 .environment(\.agentDeletion, agentDeletionAction)
         }
         .bighelpSheet(isPresented: $isGroupCreationPresented) {
-            BotModeCreateRoomView(rooms: botModeRooms, agents: agents, seedProfileID: groupCreationSeed) { roomID in
+            BotModeCreateRoomView(rooms: botModeRooms, agents: agents, seedProfileID: groupCreationSeed,
+                                  sectionChoice: groupSectionChoice) { roomID in
                 // A reconnect while the sheet was open is still this computer.
                 guard let owner = groupCreationOwner, isCurrentSignIn(owner),
                       let current = currentWorkspaceOwner else { return }
@@ -608,7 +611,8 @@ struct RootShellView: View {
                 groupFilterRequest: $agentGroupFilterRequest,
                 createRequest: $agentCreateRequest,
                 botChatActivity: botChatActivity,
-                botChatActivitySource: botChatActivitySource
+                botChatActivitySource: botChatActivitySource,
+                sectionCards: AnyView(SimpleBotsSectionsArea(context: simpleBotsContext))
             )
             // The one main action, where a thumb rests, as on All agents.
             .overlay(alignment: .bottomTrailing) {

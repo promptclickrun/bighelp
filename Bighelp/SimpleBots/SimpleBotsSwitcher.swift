@@ -23,7 +23,7 @@ struct SimpleBotsSwitcher: View {
             if case .bot(let bot) = item.kind { return bot }
             return nil
         }
-        return Array((home.top + listed).prefix(BighelpChatSwitcher.limit))
+        return Array((home.top.compactMap(\.bot) + listed).prefix(BighelpChatSwitcher.limit))
     }
 
     private static func home(_ context: SimpleBotsContext) -> SimpleBotsHomeProjection.Home {

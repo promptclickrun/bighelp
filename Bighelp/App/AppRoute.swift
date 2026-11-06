@@ -74,6 +74,8 @@ enum AppRoute: Hashable {
     /// A group chat's Group Settings, from its name, its ⋯ menu or a list of chats.
     /// `conversationID` is its open chat, for what that chat shows (tool calls).
     case groupSettings(roomID: String, conversationID: String? = nil)
+    /// A section's page (Bots mode's home or the Agents screen): its bots and group chats.
+    case simpleBotsSection(id: String)
 
     /// Screens about every computer, which stay put when the working computer changes.
     var isAllHosts: Bool { self == .allHostsChats }

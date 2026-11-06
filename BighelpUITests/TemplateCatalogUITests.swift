@@ -126,6 +126,7 @@ final class TemplateCatalogUITests: BighelpUITestCase {
             let any = app.descendants(matching: .any)
             XCTAssertTrue(any["simple-bots.home"].waitForExistence(timeout: 15))
             app.buttons["simple-bots.new"].tap()
+            app.buttons["New Bot"].tap()
             let templates = app.buttons["simple-bots.create.templates"]
             XCTAssertTrue(templates.waitForExistence(timeout: 5))
             templates.tap()

@@ -70,6 +70,8 @@ struct FleetGroup: Codable, Equatable, Sendable, Identifiable {
     var isWorking: Bool
     var canRename: Bool
     var canDelete: Bool
+    /// Its members' profile IDs on that host, for their faces; nil in snapshots saved before.
+    var memberIDs: [String]? = nil
 
     var id: String { FleetID.make(hostID, "group/" + roomID) }
 }
@@ -168,6 +170,8 @@ enum FleetOpen: Equatable, Sendable {
     case task(jobID: String, profileID: String)
     case newChat(profileID: String)
     case group(roomID: String)
+    /// A group chat's settings (Bots mode's Group Settings).
+    case groupSettings(roomID: String)
     /// A new group chat with these agents, from New chat's Group chat. `peers`
     /// are agents on other computers; this host is the group's home.
     case newGroup(profileIDs: [String], peers: [HermesBotModePeerCandidate] = [])
@@ -210,7 +214,7 @@ struct FleetPendingOpen: Equatable, Sendable {
         switch open {
         case .agent(let id), .newChat(let id), .routines(let id), .botProfile(let id): id
         case .chat(let id, _, _), .task(_, let id): id
-        case .group, .newGroup, .destination: nil
+        case .group, .groupSettings, .newGroup, .destination: nil
         }
     }
 }

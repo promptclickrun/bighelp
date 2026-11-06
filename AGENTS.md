@@ -78,6 +78,15 @@ change in both repos.
     gateway's bot goes through `openFleet`; the home stays under the Noodle loader (`SimpleBotsOpeningOverlay`,
     with Cancel) until the bot opens. A computer that doesn't answer gives the selection back to the one the tap
     came from (`FleetSwitchFallback`), so neither the app nor its next launch is left on it.
+  - Sections are folders of bots and group chats (`Bighelp/SimpleBots/SimpleBotsSections.swift`): cards on
+    Bots mode's home and the Agents screen, a page of their own (`AppRoute.simpleBotsSection`, the home view
+    with a `sectionID`), and Code mode's agent picker lists agents by them. A bot's section is its profile's
+    `AgentListPlacement` (Hermes Desktop's field, saved on its own computer through `SimpleBotsSectionEditor`);
+    the sections list and each group chat's section, pin and hide are `FleetStore`'s, kept on the computers too
+    (`bots.layout`). Same-named sections on two computers are one (`FleetSectioning`). With one gateway shown, a
+    section whose members are all elsewhere stays off (`SimpleBotsSectioning.elsewhere`). + in Bots mode is
+    New Bot, New Group Chat and New Section, each only where it can work (`SimpleBotsNewItem`); the bot and
+    group chat menus come from `SimpleBotsMenuAction`.
   - First run (`FirstRunOnboardingView`) is Welcome, Connect, the optional plugin, notifications (only once the
     plugin is in), then Choose your mode (`FirstRunMode`: Bots, Sessions, Code). Optional steps have a small Skip;
     Connect and the mode don't. `FirstRunOnboarding.afterConnectKey` keeps it on screen after host setup's own
@@ -297,7 +306,7 @@ change in both repos.
   the host sent something on that socket in the last 5 s (`admissionFreshness`). Coming back to the app or a
   network change (`verifyLiveness`) voids that until a ping sent after it is answered: frames from before can sit
   in a dead socket's buffer. A prompt sent on a socket that dies anyway is journaled as uncertain, never resent.
-- **App state on the computer:** Bots mode's order, the sections, each group chat's section, Multi-gateway's
+- **App state on the computer:** Bots mode's order, the sections, each group chat's section, pin and hide, Multi-gateway's
   primary bot and each bot's voice, mark, pet and character are also kept for each person on their computers
   (plugin `native-app-state-v1`, keys `bots.layout` and `bots.settings`; `Bighelp/AppState/`), so a reinstall
   or another device gets them back. The stores stay where screens read them; `BotsAppStateSync` turns their

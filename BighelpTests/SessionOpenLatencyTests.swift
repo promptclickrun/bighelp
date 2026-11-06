@@ -184,6 +184,48 @@ struct SessionOpenLatencyTests {
         #expect(records.allSatisfy { features.preparedModel(for: .chat(conversationID: $0.id)) == nil })
     }
 
+    /// A message waiting in a chat for its connection ("Sending…") owns that chat: going through more chats
+    /// than are kept warm doesn't drop it or its stream, and it goes out once, when the chat can take it.
+    /// After that the chat is an ordinary warm chat again.
+    @Test func aChatWithAWaitingMessageIsKeptUntilTheMessageGoes() async throws {
+        let owner = WorkspaceOwner(authority: try .fixture(id: "warm-staged"),
+                                   authenticationGeneration: UUID(), connectionGeneration: UUID())
+        let records = (0..<7).map { SessionRecord(id: "staged-\($0)", kind: .direct, agentIDs: ["default"], title: "Saved") }
+        let catalog = SessionCatalogStore(client: SessionCatalogFixtureClient(), records: records)
+        var evicted: [String] = []
+        let features = ShellFeatureStore(timing: .immediate, catalog: catalog, navigationWorkspaceOwner: { owner },
+                                         nativeModelEvicted: { id, _ in evicted.append(id) })
+        let first = AppRoute.chat(conversationID: "staged-0")
+        #expect(try features.prepareCachedForUserNavigation(first))
+        guard case .chat(let model)? = features.preparedModel(for: first) else { Issue.record("No chat"); return }
+        model.client = NativeWorkspaceUnavailableClient()
+        model.draft = "Hello there"
+        await model.send()
+        #expect(model.stagedSends.count == 1 && !model.isSending)
+
+        for record in records {
+            if record.id != "staged-0" { #expect(try features.prepareCachedForUserNavigation(.chat(conversationID: record.id))) }
+            features.retainModels(ownedBy: [])
+        }
+        guard case .chat(let kept)? = features.preparedModel(for: first) else { Issue.record("The waiting chat was dropped"); return }
+        #expect(kept === model)
+        #expect(!evicted.contains("staged-0"))
+
+        let sender = CountingConversationClient()
+        model.client = sender
+        for _ in 0..<500 where !model.stagedSends.isEmpty || model.stagedSendDrain != nil {
+            try await Task.sleep(for: .milliseconds(2))
+        }
+        #expect(sender.messages == ["Hello there"])
+        for _ in 0..<2 {
+            #expect(try features.prepareCachedForUserNavigation(.chat(conversationID: "staged-6")))
+            features.retainModels(ownedBy: [])
+        }
+        #expect(sender.messages == ["Hello there"], "It went out once")
+        features.retainModels(ownedBy: [])
+        #expect(evicted.contains("staged-0"), "Once its message went, it's a warm chat like the others")
+    }
+
     @Test func leavingHydratingChatKeepsItsExactModelAndDraft() throws {
         let client = HeldSessionPageClient()
         let catalog = SessionCatalogStore(client: client, records: [client.record])
@@ -325,3 +367,18 @@ private final class HeldSessionPageClient: SessionCatalogClient {
 }
 
 private struct HeldPageFailure: Error {}
+
+/// Sends nothing anywhere: records what the chat handed it.
+@MainActor
+private final class CountingConversationClient: ConversationClient {
+    private(set) var messages: [String] = []
+
+    func send(message: String, conversationID: String) async throws -> ConversationResponse {
+        messages.append(message)
+        return ConversationResponse(items: [])
+    }
+
+    func perform(action: QuickAction, conversationID: String) async throws -> ConversationResponse {
+        ConversationResponse(items: [])
+    }
+}

@@ -912,7 +912,9 @@ final class ShellFeatureStore {
         var protected = navigationOwnedConversationIDs
         var idleNativeIDs: [String] = []
         for (id, model) in chatModels {
+            // A message waiting in the chat for its connection ("Sending…") isn't sent yet: the chat owns it.
             if model.isSending || model.hasPendingIndependentMessageSubmission
+                || !model.stagedSends.isEmpty || model.stagedSendDrain != nil
                 || model.isHydratingHistory || model.isLoadingPreviousHistory
                 || navigationHydrations[id] != nil || canonicalSessionReentries[id] != nil {
                 protected.insert(id)

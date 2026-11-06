@@ -86,9 +86,9 @@ extension DirectHermesConversationClient {
     /// message anyway and the agent just doesn't get the name.
     static let speakerNoteWait: Duration = .milliseconds(1_200)
 
-    /// Says who's sending, for every message: the plugin names each message's writer from the
-    /// latest note. Nothing is noted before Send, since a note makes this person the chat's speaker
-    /// at once. A chat's first message waits for it (the plugin records the brief's person once),
+    /// Says who's sending, for every new turn and queued message (a steer sends none): the plugin
+    /// names each message's writer from the latest note. Nothing is noted before Send, since a note
+    /// makes this person the chat's speaker at once. A chat's first message waits for it (the plugin records the brief's person once),
     /// and so does any message until the host has taken a note naming this person, as they are
     /// now, in this stored session on this connection: the host may still have someone else as
     /// the speaker. Later turns read the note when they reach the model, well after the message
@@ -101,9 +101,11 @@ extension DirectHermesConversationClient {
             // connection or stored session, doesn't count: the next message waits for its own.
             guard let noted = await speakerNote.note(agentID: agentID, storedSessionID: storedID),
                   let self, self.generation == generation, self.storedID == storedID else { return }
-            self.notedSpeaker = (storedID, noted)
+            self.notedSpeaker = (storedID, generation, noted)
         }
-        let known = notedSpeaker.map { $0.storedID == storedID && $0.speaker == speaker } ?? false
+        let known = notedSpeaker.map {
+            $0.storedID == storedID && $0.generation == generation && $0.speaker == speaker
+        } ?? false
         guard projection.items.isEmpty || !known else { return }
         let wait = Self.speakerNoteWait
         // Whichever ends first lets the message go: the note, or the wait. A note

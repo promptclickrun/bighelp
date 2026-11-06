@@ -3270,6 +3270,36 @@ struct NativeMidSessionTests {
         #expect(log.events.count == 2)
     }
 
+    /// A note taken on an earlier connection doesn't vouch for a new one: after a reconnect the next message
+    /// waits for its own note, and the messages after it on that connection go at once again.
+    @Test func aNewConnectionWaitsForItsOwnNote() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let (client, rpc) = try await savedChatClient(root: root)
+        defer { client.suspend() }
+        let log = SpeakerLog()
+        let note = RecordingSpeakerNote(log: log)
+        client.speakerNote = note
+        await client.noteSpeaker()
+        #expect(client.notedSpeaker != nil)
+
+        client.suspend()
+        client.rebind(rpc)
+        try await client.recover(epoch: "epoch")
+        note.holds = true
+        let next = SpeakerWait(client)
+        await SpeakerWait.settle()
+        #expect(!next.isDone, "The new connection hasn't said who's sending yet")
+        note.release()
+        await next.task.value
+
+        note.delay = .seconds(30)
+        let later = SpeakerWait(client)
+        await SpeakerWait.settle()
+        #expect(later.isDone, "Once it has, later messages go at once")
+        #expect(log.events.count == 2)
+    }
+
     /// A chat with saved messages, recovered on its connection.
     private func savedChatClient(root: URL) async throws -> (DirectHermesConversationClient, DirectTestRPC) {
         let rpc = DirectTestRPC()

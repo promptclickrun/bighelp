@@ -163,9 +163,9 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
     @ObservationIgnored var onSubmissionAdmitted: (@MainActor () -> Void)?
     /// Says who is sending before each new turn (hosts several people share).
     @ObservationIgnored var speakerNote: (any ChatSpeakerNoting)?
-    /// Who the host last took a note for, in which stored session. While that's still who's sending
-    /// here, a message goes without waiting for its own note.
-    @ObservationIgnored var notedSpeaker: (storedID: String, speaker: ChatSpeaker)?
+    /// Who the host last took a note for, in which stored session, on which connection (`generation`).
+    /// While that's still who's sending here, a message goes without waiting for its own note.
+    @ObservationIgnored var notedSpeaker: (storedID: String, generation: UUID, speaker: ChatSpeaker)?
     /// Other agents this chat's agent talks to (`ChatAgentTalkRail`).
     @ObservationIgnored var agentTalk: (any AgentTalkReading)?
     /// What the host supports for this chat's profile (helper Stop and Steer).

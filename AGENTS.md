@@ -204,9 +204,9 @@ change in both repos.
 - **Who is sending:** before each new turn, `DirectHermesChatSpeakerNote` posts `people/speaking` (plugin
   `native-people-v1`): the chat's stored session ID, a person ID from iCloud Keychain (`BighelpPersonID`, one per
   Apple ID) and the name the person saved. The plugin puts the name in the chat brief and, once a chat has had two
-  people, a note on each message that only the model sees. Every message sends its own note, alongside the pre-send
-  connection check, and only at Send: a note makes this person the chat's speaker at once, so opening a chat never
-  sends one. A chat's first message waits for it (capped at 1.2 s; the plugin records the brief's person once), and
+  people, a note on each message that only the model sees. Every new turn and queued message sends its own note,
+  alongside the pre-send connection check, and only at Send: a note makes this person the chat's speaker at once,
+  so opening a chat never sends one. A steer into the running turn sends none. A chat's first message waits for it (capped at 1.2 s; the plugin records the brief's person once), and
   so does any message until the host has taken a note naming this person, with the name they have now, in this
   stored session on this connection (`notedSpeaker`); later turns read the note when they reach the model, so they
   go at once. `UserIdentity.name` is empty until someone saves one; "You" is an on-screen placeholder

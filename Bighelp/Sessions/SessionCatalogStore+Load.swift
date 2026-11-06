@@ -94,9 +94,9 @@ extension SessionCatalogStore {
             guard loadGeneration == latestLoadGeneration else {
                 throw SessionCatalogLoadOwnershipError.superseded
             }
-            let protectedIncoming = applyingPinPreferences(
+            let protectedIncoming = applyingReadState(to: applyingPinPreferences(
                 to: incomingRecords.map(protectAcceptedStop)
-            )
+            ))
             changed = adopt((!requireAuthoritativeRefresh && (repository != nil || hasUnsavedChanges))
                 ? SessionCatalogReconciliation.merged(local: records, incoming: protectedIncoming)
                 : SessionCatalogReconciliation.reconciled(local: records, authoritativeIncoming: protectedIncoming)) || changed

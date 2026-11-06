@@ -290,6 +290,14 @@ change in both repos.
   (`canonical_session`, `canonicalBotChat`) so a refresh can't drop it. Hermes names it only when
   `profiles.list` asks for the agents' sessions (`include_sessions`, its default), so the catalog asks; without
   them every refresh dropped the saved Bot Chat, and the first tap on a bot waited on a full lookup.
+- **Read state** (#862): Hermes' `last_read_at` is a watermark. A chat is unread once anything happens in it after
+  that, the person's own messages too, and a chat no client ever marked counts as read. So the app marks a chat read
+  each time it's read (`BighelpVisibleChats` → `ChatModel.noteRead` → `SessionCatalogStore.noteRead`): as it shows,
+  2 s after a turn ends on screen, and as it stops showing or the app leaves the front. A chat that isn't on screen
+  is never marked, and one read again with nothing new isn't marked twice. Rows without `unread` mean the host
+  keeps none: Mark Read and Mark Unread hide (`SessionSummary.tracksUnread`). Bots mode shows Hermes' state where
+  there is one, else the marks kept on the device (`SimpleBotsReadState`). The Chats list's Draft reads the draft
+  journal without observing it (`ChatDraftJournal.pendingDraft`).
 - **Archived:** the catalog lists `archived=include` and keeps rows Hermes' idle sweep archived
   (`auto_archived`); deliberately archived chats live in Archived Chats (`archivedChats`, Restore).
 - **Send never waits for the connection:** while a chat has no working connection (back from the background, a

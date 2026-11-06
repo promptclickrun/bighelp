@@ -133,6 +133,12 @@ struct SessionSummary: Identifiable, Equatable, Sendable {
     let updatedAt: Date
     let isActive: Bool
     let isPinned: Bool
+    /// Hermes' read watermark: a reply or answer arrived after the chat was last opened.
+    let isUnread: Bool
+    /// Hermes keeps this chat's read state (its row says `unread`), so Mark Read and Mark Unread work.
+    let tracksUnread: Bool
+    /// The chat's message box holds something that hasn't been sent.
+    var hasDraft: Bool
     let isCronSession: Bool
     let workspaceID: String?
     let workspaceName: String?
@@ -150,6 +156,9 @@ struct SessionSummary: Identifiable, Equatable, Sendable {
         updatedAt: Date,
         isActive: Bool = false,
         isPinned: Bool = false,
+        isUnread: Bool = false,
+        tracksUnread: Bool = false,
+        hasDraft: Bool = false,
         isCronSession: Bool = false,
         workspaceID: String? = nil,
         workspaceName: String? = nil,
@@ -165,6 +174,9 @@ struct SessionSummary: Identifiable, Equatable, Sendable {
         self.updatedAt = updatedAt
         self.isActive = isActive
         self.isPinned = isPinned
+        self.isUnread = isUnread
+        self.tracksUnread = tracksUnread
+        self.hasDraft = hasDraft
         self.isCronSession = isCronSession
         self.workspaceID = workspaceID
         self.workspaceName = workspaceName
@@ -214,6 +226,10 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
     /// the first user message has been committed.
     var isActive: Bool
     var isPinned: Bool
+    /// Hermes' read watermark (`sessions.last_read_at`): true when the host has activity after
+    /// the chat was last read. Nil when the host's row didn't say: a host that keeps no read state,
+    /// or a chat it hasn't listed yet.
+    var isUnread: Bool?
     let createdAt: Date
     var updatedAt: Date
     var hasAcceptedMessage: Bool
@@ -223,6 +239,8 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
     var localContentRevision: UUID? = nil
     var localContentScope: String? = nil
     var catalogPreview: String? = nil
+    /// Whether the saved draft held text, for a projection whose draft isn't loaded (the Chats list's Draft).
+    var catalogHasDraft: Bool = false
     var hasDeferredReferenceState: Bool = false
     var isContentLoaded: Bool { localContentRevision == nil }
 
@@ -264,12 +282,14 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
         case activityVisibility = "chosenActivityVisibility"
         case isActive
         case isPinned
+        case isUnread
         case createdAt
         case updatedAt
         case hasAcceptedMessage
         case localContentRevision
         case localContentScope
         case catalogPreview
+        case catalogHasDraft
         case hasDeferredReferenceState
     }
 
@@ -296,6 +316,7 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
         activityVisibility: ChatActivityVisibility? = nil,
         isActive: Bool = false,
         isPinned: Bool = false,
+        isUnread: Bool? = nil,
         createdAt: Date = .now,
         updatedAt: Date? = nil,
         hasAcceptedMessage: Bool = false,
@@ -328,6 +349,7 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
         self.activityVisibility = activityVisibility
         self.isActive = isActive
         self.isPinned = isPinned
+        self.isUnread = isUnread
         self.createdAt = createdAt
         self.updatedAt = updatedAt ?? createdAt
         self.hasAcceptedMessage = hasAcceptedMessage
@@ -348,6 +370,9 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
             updatedAt: updatedAt,
             isActive: hasActiveWork,
             isPinned: isPinned,
+            isUnread: isUnread == true,
+            tracksUnread: isUnread != nil,
+            hasDraft: isContentLoaded ? Self.holdsDraft(draft) : catalogHasDraft,
             isCronSession: isCronSession,
             workspaceID: workspaceID,
             workspaceName: workspaceName,
@@ -359,6 +384,11 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
 
     var isSubagentSession: Bool {
         parentSessionID != nil
+    }
+
+    /// Whether a saved draft is something to send: whitespace alone isn't.
+    static func holdsDraft(_ draft: String) -> Bool {
+        draft.contains { !$0.isWhitespace }
     }
 
     var isCronSession: Bool {
@@ -426,6 +456,7 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
         )
         isActive = try container.decodeIfPresent(Bool.self, forKey: .isActive) ?? false
         isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
+        isUnread = try container.decodeIfPresent(Bool.self, forKey: .isUnread)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
         hasAcceptedMessage = try container.decodeIfPresent(
@@ -435,6 +466,7 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
         localContentRevision = try container.decodeIfPresent(UUID.self, forKey: .localContentRevision)
         localContentScope = try container.decodeIfPresent(String.self, forKey: .localContentScope)
         catalogPreview = try container.decodeIfPresent(String.self, forKey: .catalogPreview)
+        catalogHasDraft = try container.decodeIfPresent(Bool.self, forKey: .catalogHasDraft) ?? false
         hasDeferredReferenceState = try container.decodeIfPresent(Bool.self, forKey: .hasDeferredReferenceState) ?? false
     }
 
@@ -465,12 +497,16 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
         try container.encodeIfPresent(activityVisibility, forKey: .activityVisibility)
         try container.encode(isActive, forKey: .isActive)
         try container.encode(isPinned, forKey: .isPinned)
+        try container.encodeIfPresent(isUnread, forKey: .isUnread)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
         try container.encode(hasAcceptedMessage, forKey: .hasAcceptedMessage)
         try container.encodeIfPresent(localContentRevision, forKey: .localContentRevision)
         try container.encodeIfPresent(localContentScope, forKey: .localContentScope)
         try container.encodeIfPresent(catalogPreview, forKey: .catalogPreview)
+        if catalogHasDraft {
+            try container.encode(true, forKey: .catalogHasDraft)
+        }
         if hasDeferredReferenceState {
             try container.encode(true, forKey: .hasDeferredReferenceState)
         }
@@ -591,6 +627,9 @@ protocol SessionCatalogClient {
     ) async throws -> SessionHydrationPage
     func rename(_ record: SessionRecord, title: String) async throws
     func setPinned(_ record: SessionRecord, pinned: Bool) async throws
+    /// Sets Hermes' read watermark for a chat: `true` marks it unread again, `false`
+    /// marks it read now. Only a host with session flags carries it.
+    func setUnread(_ record: SessionRecord, unread: Bool) async throws
     func archive(_ record: SessionRecord) async throws
     func delete(_ record: SessionRecord) async throws
     func resetForAccountBoundary()
@@ -627,6 +666,10 @@ extension SessionCatalogClient {
     }
 
     func setPinned(_ record: SessionRecord, pinned: Bool) async throws {
+        throw SessionCatalogError.invalidSession
+    }
+
+    func setUnread(_ record: SessionRecord, unread: Bool) async throws {
         throw SessionCatalogError.invalidSession
     }
 

@@ -218,6 +218,10 @@ change in both repos.
 - **A turn stays pending while it streams:** after `prompt.submit` returns `streaming`, the chat isn't "ready for a
   new turn" until the turn ends. A mid-turn Send must go through the steer/queue path (`sendMidSession`). Steer is
   the default.
+- **A reply's time comes from the phone until a reread:** Hermes' live events carry no time, and nothing reads
+  the saved history after this device's own turn. A reply segment Hermes completes live takes the time it
+  arrived (`DirectHermesProjection.accept(_:arrivedAt:)`); a replay takes none, since it ended at a time the
+  phone doesn't know. A reread puts the host's saved time on the same row (#856).
 - **Live voice is Full Duplex, and it is the agent:** each agent picks its provider (GPT-Live on the Codex
   subscription or an API key, or Gemini Live) and voice (`AgentVoiceChoices`). The plugin's brief names the
   agent, so the voice model speaks as it, never about "your agent". Gemini's media and events stay between the

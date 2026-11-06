@@ -94,7 +94,8 @@ class ConversationFixtureClient: AttachmentConversationClient, CompactingConvers
             role: .assistant,
             sender: .agent(id: canonicalAgentID, snapshot: agentSnapshot),
             content: content,
-            metadata: TimelineMetadata(source: "bighelp demo data", freshness: "Updated just now")
+            // As a live Hermes reply: the time it arrived (#856).
+            metadata: TimelineMetadata(source: "bighelp demo data", freshness: "Updated just now", timestamp: Date())
         )
     }
 }

@@ -2460,6 +2460,104 @@ struct DirectHermesConversationTests {
         #expect(model.activityLedger.allEvents.filter { $0.kind == .reasoning }.map(\.detail) == ["Provider-recorded reasoning"])
     }
 
+    /// A reply shows its time as soon as Hermes completes it (#856). Hermes' live events carry no
+    /// time, and nothing reads the saved history after this device's own turn, so the time showed
+    /// only after Refresh chat or opening the chat again.
+    @Test func ownTurnReplyShowsItsTimeWhenHermesCompletesIt() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let rpc = DirectTestRPC()
+        rpc.handler = { method, _ in
+            .object(["status": .string(method == "prompt.submit" ? "streaming" : "queued")])
+        }
+        let client = try DirectHermesConversationClient(rpc: rpc, hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "stored", title: "Native", epoch: "epoch", drafts: .init(root: root))
+        defer { client.suspend() }
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        model.draft = "What's on my list today?"
+        let turn = Task { await model.send() }
+        for _ in 0..<200 where !rpc.requests.contains(where: { $0.method == "prompt.submit" }) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        client.receive(.init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 1))
+        client.receive(.init(type: "message.delta", sessionID: "runtime",
+                             payload: ["text": .string("Two things")], sequence: 2))
+        let streaming = try #require(model.items.last { $0.role == .assistant })
+        #expect(streaming.metadata.timestamp == nil)
+        let before = Date()
+        client.receive(.init(type: "message.complete", sessionID: "runtime",
+                             payload: ["text": .string("Two things: the dentist and the report.")], sequence: 3))
+        let after = Date()
+        client.receive(.init(type: "session.info", sessionID: "runtime",
+                             payload: ["running": .boolean(false)], sequence: 4))
+        let replies = model.items.filter { $0.role == .assistant }
+        #expect(replies.count == 1)
+        let reply = try #require(replies.first)
+        #expect(reply.id == streaming.id)
+        #expect(reply.metadata.sourceOrder == streaming.metadata.sourceOrder)
+        let time = try #require(reply.metadata.timestamp)
+        // Within a millisecond: the time is kept as seconds since 1970.
+        #expect(time.timeIntervalSince(before) > -0.001 && after.timeIntervalSince(time) > -0.001)
+        #expect(TimelineMetadataPresentation.timestampLabel(for: reply.metadata) != nil)
+        turn.cancel()
+    }
+
+    /// A reread puts the host's saved time on the reply in place of the phone's: the same row, in the
+    /// same place, never a second copy.
+    @Test func rereadPutsTheHostsSavedTimeOnTheLiveReplyInPlace() throws {
+        let sent = Date(timeIntervalSince1970: 1_000)
+        let arrived = Date(timeIntervalSince1970: 1_021)
+        var projection = DirectHermesProjection(conversationID: "chat", profile: "default", storedID: "saved", epoch: "epoch")
+        projection.retainVisible(items: [TimelineItem(
+            id: "chat-human", role: .human, sender: .user(snapshot: .init(name: "You")), content: .message("Work"),
+            metadata: .init(delivery: "Sent", timestamp: sent, sourceOrder: 1))], activities: [])
+        _ = projection.accept(.init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 1),
+                              arrivedAt: arrived)
+        let streaming = try #require(projection.accept(.init(type: "message.delta", sessionID: "runtime",
+            payload: ["text": .string("Do")], sequence: 2), arrivedAt: arrived).items.first)
+        #expect(streaming.metadata.timestamp == nil)
+        let live = try #require(projection.accept(.init(type: "message.complete", sessionID: "runtime",
+            payload: ["text": .string("Done")], sequence: 3), arrivedAt: arrived).items.first)
+        #expect(live.id == streaming.id)
+        #expect(live.metadata.timestamp == arrived)
+
+        projection.reconcileHistory([
+            .object(["row_id": .integer(1), "session_id": .string("saved"), "role": .string("user"),
+                     "text": .string("Work"), "timestamp": .number(1_000)]),
+            .object(["row_id": .integer(2), "session_id": .string("saved"), "role": .string("assistant"),
+                     "text": .string("Done"), "timestamp": .number(1_020)]),
+        ])
+
+        #expect(projection.items.map(\.id) == ["chat-human", live.id])
+        let reply = try #require(projection.items.last)
+        #expect(reply.metadata.timestamp == Date(timeIntervalSince1970: 1_020))
+        #expect(reply.metadata.sourceOrder == live.metadata.sourceOrder)
+        #expect(reply.content == .message("Done"))
+    }
+
+    /// A reply caught up from Hermes' event log ended earlier, at a time the phone doesn't know:
+    /// it takes its time only from the saved history, never the time it was caught up.
+    @Test func caughtUpReplyTakesNoTimeFromThePhone() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let client = try DirectHermesConversationClient(rpc: DirectTestRPC(), hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "stored", title: "Native", epoch: "epoch", drafts: .init(root: root))
+        defer { client.suspend() }
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        client.replayReceived([
+            .init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 1),
+            .init(type: "message.delta", sessionID: "runtime", payload: ["text": .string("Done")], sequence: 2),
+            .init(type: "message.complete", sessionID: "runtime", payload: ["text": .string("Done.")], sequence: 3),
+            .init(type: "session.info", sessionID: "runtime", payload: ["running": .boolean(false)], sequence: 4),
+        ])
+        let reply = try #require(model.items.last { $0.role == .assistant })
+        #expect(reply.content == .message("Done."))
+        #expect(reply.metadata.timestamp == nil)
+    }
+
     @Test func projectionKeepsDeltaOrderAndDoesNotFinishOnSegmentFinal() {
         var projection = DirectHermesProjection(conversationID: "a", profile: "default", storedID: "saved", epoch: "epoch")
         _ = projection.accept(DirectHermesEvent(type: "message.start", sessionID: "a", payload: [:], sequence: 1))
@@ -2503,8 +2601,8 @@ struct DirectHermesConversationTests {
         )
 
         // The final history row is the host's persisted completion timestamp.
-        // A live event has no end timestamp of its own, so this is the only
-        // source that may enable the legacy timestamp-difference fallback.
+        // A live event has no end timestamp of its own (a reply completed live
+        // takes the time it arrived), so the host's saved time wins here.
         projection.reconcileHistory([
             .object([
                 "row_id": .integer(1), "session_id": .string("saved"), "role": .string("user"),

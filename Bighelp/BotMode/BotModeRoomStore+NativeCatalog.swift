@@ -318,7 +318,9 @@ extension BotModeRoomStore {
         } catch {
             guard boundary == nativeBoundaryGeneration, catalogRefreshID == refreshID else { return }
             nativeCapabilities = nil
-            catalogState = .failed("Rooms could not be refreshed. Check the connection and try again.")
+            // When Hermes answered with a reason, that says more than a hint about the connection.
+            catalogState = .failed("Rooms could not be refreshed. "
+                + (HermesRefusalMessage.sentence(in: error) ?? "Check the connection and try again."))
             isCatalogStale = !catalogRooms.isEmpty
         }
     }

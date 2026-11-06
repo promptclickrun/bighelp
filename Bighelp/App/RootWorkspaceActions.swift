@@ -514,7 +514,8 @@ extension RootShellView {
                 else { appState.activateConversation(id: record.id, source: .sessions) }
             } catch {
                 guard currentWorkspaceOwner == owner else { return }
-                actionErrorMessage = "Hermes could not open this group. Check the host and try again."
+                actionErrorMessage = "Hermes could not open this group. "
+                    + (HermesRefusalMessage.sentence(in: error) ?? "Check the host and try again.")
             }
         }
     }

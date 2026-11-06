@@ -159,7 +159,7 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBo
                 "event_id": .string(eventID),
                 "name": .string(name),
             ])
-            let room = try decodeRoom(from: payload, allowedKeys: ["room"])
+            let room = try decodeRoom(from: payload)
             guard room.roomID == roomID,
                   let eventValue = payload["room"]?.object?["event"] else {
                 throw BighelpLinkWorkspaceClientError.invalidResponse
@@ -195,7 +195,7 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBo
                 "name": .string(name),
                 "members": .array(memberValues),
             ])
-            let room = try decodeRoom(from: payload, allowedKeys: ["room"])
+            let room = try decodeRoom(from: payload)
             guard room.roomID == roomID, room.name == name, room.members == members else {
                 throw BighelpLinkWorkspaceClientError.invalidResponse
             }
@@ -210,7 +210,7 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBo
                 "room_id": .string(roomID),
                 "include_disbanded": .boolean(includeDisbanded),
             ])
-            let room = try decodeRoom(from: payload, allowedKeys: ["room", "driver_status"])
+            let room = try decodeRoom(from: payload)
             guard room.roomID == roomID else {
                 throw BighelpLinkWorkspaceClientError.invalidResponse
             }
@@ -483,12 +483,11 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBo
         }
     }
 
-    private func decodeRoom(
-        from payload: [String: BighelpJSONValue],
-        allowedKeys: Set<String>
-    ) throws -> HermesBotModeRoomState {
-        guard Set(payload.keys).isSubset(of: allowedKeys),
-              let roomValue = payload["room"] else {
+    /// The room in a `groups.*` answer, with `driver_status` when Hermes sends it. Hermes adds
+    /// fields to these answers (`groups.state` gained `context`); the ones the app doesn't use
+    /// are ignored, and the room itself is still checked in full.
+    private func decodeRoom(from payload: [String: BighelpJSONValue]) throws -> HermesBotModeRoomState {
+        guard let roomValue = payload["room"] else {
             throw BighelpLinkWorkspaceClientError.invalidResponse
         }
         do {

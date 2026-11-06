@@ -77,7 +77,6 @@ struct RootShellView: View {
     @State var groupCreationOwner: WorkspaceOwner?
     /// The chat header's New chat: one agent starts a 1:1 chat, several a group.
     @State var newChatPicker: NewChatPickerRequest?
-    @State var groupSettingsModel: ChatModel?
     @State private var isStartingNewChat = false
     @State private var newChatStartID: UUID?
     @State private var fixtureCanonicalSessions: [String: String] = [:]
@@ -272,14 +271,6 @@ struct RootShellView: View {
             }
             .bighelpSheetSize(.standard)
         }
-        .bighelpSheet(isPresented: Binding(
-            get: { groupSettingsModel != nil }, set: { if !$0 { groupSettingsModel = nil } }
-        )) {
-            if let model = groupSettingsModel {
-                PeopleAndChatView(model: model, agents: agents)
-                    .bighelpSheetSize(.standard)
-            }
-        }
         // With Settings open (Settings › System › Add Host), Settings presents it: one view shows one sheet.
         .modifier(HostSetupSheet(registry: hostRegistry, isActive: !isUnifiedSettingsPresented))
         .onChange(of: hostRegistry?.selectedHostID) { _, _ in
@@ -465,7 +456,6 @@ struct RootShellView: View {
         lifecycleProfileID = nil
         lifecyclePresentationID = nil
         isGroupCreationPresented = false
-        groupSettingsModel = nil
         fixtureCanonicalSessions = [:]
     }
 

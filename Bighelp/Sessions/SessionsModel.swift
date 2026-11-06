@@ -220,6 +220,9 @@ final class SessionsModel {
     private let fixtureAgentNamesByID: [String: String]
     private let calendar: Calendar
     private let now: () -> Date
+    /// Whether a chat's message box holds something its saved draft doesn't show yet (typing still in
+    /// the draft journal, files only the open chat holds); nil when the saved draft is the latest.
+    @ObservationIgnored var unsentDraft: ((String) -> Bool?)?
     private var liveHostedRoomProjectionEnabled = true
     private var accountGeneration: UInt64 = 0
     private var latestLoadGeneration: UInt64 = 0
@@ -323,13 +326,19 @@ final class SessionsModel {
             .sorted(by: activitySort)
             .prefix(SessionCatalogStore.summaryRetentionLimit)
             .filter(matches)
-            .map(\.summary)
+            .map(summary)
 
         return SessionSectionOrganizer.sections(
             from: matching,
             organizeByProjects: organizeByProjects,
             projectOrder: projectOrder
         )
+    }
+
+    private func summary(_ record: SessionRecord) -> SessionSummary {
+        var summary = record.summary
+        if let unsent = unsentDraft?(record.id) { summary.hasDraft = unsent }
+        return summary
     }
 
     var hasLoadedSessions: Bool {
@@ -403,6 +412,14 @@ final class SessionsModel {
             throw SessionCatalogError.invalidSession
         }
         try await catalog.setSessionPinned(id: id, pinned: pinned)
+    }
+
+    /// Marks a chat read or unread again, on the host's read watermark.
+    func setSessionUnread(id: String, unread: Bool) async throws {
+        guard let catalog, canManageConversation(id: id), catalog.session(id: id)?.isUnread != nil else {
+            throw SessionCatalogError.invalidSession
+        }
+        try await catalog.setSessionUnread(id: id, unread: unread)
     }
 
     func archiveSession(id: String) async throws {

@@ -2,11 +2,14 @@
 import Foundation
 
 @MainActor
-class BotModeCatalogFixtureClient: HermesBotModeCatalogClient, HermesBotModePeerRegistering {
+class BotModeCatalogFixtureClient: HermesBotModeCatalogClient, HermesBotModePeerRegistering,
+                                   HermesBotModeRoomSettingsClient {
     /// Demo group chats can be created (and then sit quiet, with no replies).
     static let createsGroupsArgument = "-preview-group-create"
 
     private var states: [HermesBotModeRoomState]
+    /// Settings of the groups made here, as `groups.context` saved them.
+    private var contexts: [String: HermesBotModeRoomContext] = [:]
     private let showsStoreScreenshots: Bool
     private let createsGroups: Bool
 
@@ -27,7 +30,8 @@ class BotModeCatalogFixtureClient: HermesBotModeCatalogClient, HermesBotModePeer
                 protocolVersion: 2, driver: true, persistentProcess: true,
                 authorityGatewayID: "fixture-gateway", roomLink: [:],
                 features: HermesBotModeCapabilities.requiredFeatures,
-                methods: HermesBotModeCapabilities.requiredOperations + ["groups.list", "groups.rename", "groups.disband"],
+                methods: HermesBotModeCapabilities.requiredOperations + ["groups.list", "groups.rename", "groups.disband"]
+                    + (createsGroups ? ["groups.context"] : []),
                 maxLogLimit: 500
             )
         }
@@ -46,10 +50,27 @@ class BotModeCatalogFixtureClient: HermesBotModeCatalogClient, HermesBotModePeer
     }
 
     func groupsState(roomID: String, includeDisbanded: Bool) async throws -> HermesBotModeRoomState {
-        guard let state = states.first(where: { $0.roomID == roomID }) else {
+        guard var state = states.first(where: { $0.roomID == roomID }) else {
             throw BotModeRoomError.roomNotFound
         }
+        // A group made here keeps its settings, as a Hermes that runs its rooms does.
+        if createsGroups { state.context = contexts[roomID] ?? HermesBotModeRoomContext() }
         return state
+    }
+
+    func groupsContext(roomID: String, intent: HermesBotModeContextIntent) async throws -> HermesBotModeRoomContext {
+        guard createsGroups, states.contains(where: { $0.roomID == roomID }) else {
+            throw BotModeRoomError.executionUnavailable
+        }
+        var context = intent.context
+        if context.routing == nil { context.routing = contexts[roomID]?.routing ?? .everyone }
+        if context.routing == .lead, context.leadMemberID == nil { context.leadMemberID = contexts[roomID]?.leadMemberID }
+        contexts[roomID] = context
+        return context
+    }
+
+    func groupsContinue(roomID: String, discussionEventID: String) async throws -> HermesBotModeEvent {
+        throw BotModeRoomError.executionUnavailable
     }
 
     func groupsLog(roomID: String, sinceSequence: Int, limit: Int, includeDisbanded: Bool) async throws -> HermesBotModeLogPage {

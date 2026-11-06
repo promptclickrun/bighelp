@@ -271,18 +271,26 @@ extension SimpleBotsHomeView {
         return (group.id, "multi-gateway")
     }
 
+    /// Hermes' read state when its catalog row carries one (`tracksUnread`), else this device's mark.
     func isUnread(_ group: SimpleBotsGroup) -> Bool {
+        if let summary = group.summary, summary.tracksUnread { return summary.isUnread }
         let key = unreadKey(group)
         return unread.isUnread(key.id, scope: key.scope)
     }
 
     func setUnread(_ group: SimpleBotsGroup, _ value: Bool) {
+        if let summary = group.summary, summary.tracksUnread {
+            markOnHermes(summary.id, value)
+            return
+        }
         let key = unreadKey(group)
         unread.set(value, id: key.id, scope: key.scope)
     }
 
     func openGroup(_ group: SimpleBotsGroup) {
-        setUnread(group, false)
+        // This device's mark; Hermes' clears once the chat shows (`BighelpVisibleChats`).
+        let key = unreadKey(group)
+        unread.set(false, id: key.id, scope: key.scope)
         if let summary = group.summary {
             context.onOpenSession(summary)
         } else if group.isOnGatewayInUse {
@@ -446,12 +454,18 @@ struct SimpleBotsSectionsArea: View {
         }
     }
 
+    /// Hermes' read state where its rows carry one (a bot's Bot Chat, a group chat's row), else this device's mark.
     private func isUnread(_ card: SimpleBotsSectionCard) -> Bool {
         card.members.contains { item in
             switch item.kind {
-            case .bot(let bot): unread.isUnread(bot.profileID, scope: context.scope)
+            case .bot(let bot):
+                if let chat = SimpleBotsReadState.botChat(bot.profileID, in: context.catalog.records) {
+                    return chat.isUnread == true
+                }
+                return unread.isUnread(bot.profileID, scope: context.scope)
             case .group(let group):
-                unread.isUnread(group.summary?.id ?? SimpleBotsGroup.catalogID(group.roomID), scope: context.scope)
+                if let summary = group.summary, summary.tracksUnread { return summary.isUnread }
+                return unread.isUnread(group.summary?.id ?? SimpleBotsGroup.catalogID(group.roomID), scope: context.scope)
             }
         }
     }

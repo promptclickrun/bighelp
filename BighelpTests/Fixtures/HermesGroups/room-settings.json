@@ -1,0 +1,123 @@
+{
+  "about": "Room settings, routing and Continue as Hermes v0.23.0 writes them. Not a recording: the shapes come from its source (gateway/hosted_room_context.py set_room_context and room_context, gateway/hosted_room_lead.py assignment_effect, gateway/hosted_room_router.py routed_payload and continue, gateway/hosted_room_discussion.py room.activity, tui_gateway/hosted_room_service.py status and continue_room, tui_gateway/methods_groups.py groups.state). Names and IDs are made up.",
+  "state": {
+    "room": {
+      "authority_epoch": 1,
+      "authority_gateway_id": "install:5e551011f00dfeed5e551011f00dfeed",
+      "created_at": 1792631092.4788601,
+      "idempotent": false,
+      "latest_seq": 3,
+      "members": [
+        {"handle": "pixel", "member_id": "pixel", "profile": "pixel", "display_name": "Pixel", "target": {"kind": "local", "profile": "pixel"}},
+        {"handle": "scout", "member_id": "scout", "profile": "scout", "display_name": "Scout", "target": {"kind": "local", "profile": "scout"}},
+        {"handle": "echo", "member_id": "echo", "profile": "echo", "display_name": "Echo", "target": {"kind": "local", "profile": "echo"}}
+      ],
+      "name": "Launch crew",
+      "revision": 2,
+      "room_id": "settings-room",
+      "updated_at": 1792631100.25
+    },
+    "context": {
+      "purpose": "Ship the spring launch on time",
+      "notes": "The launch date is April 14.\nKeep replies short.",
+      "routing": "lead",
+      "lead_member_id": "pixel"
+    },
+    "driver_status": {
+      "blocked": false,
+      "counts": {},
+      "last_error": null,
+      "max_continues": 5,
+      "max_rounds": 3,
+      "member_activity": [],
+      "peer_routes": [],
+      "pending_actions": [],
+      "routing_modes": ["everyone", "lead", "auto"],
+      "running": true,
+      "working": false
+    }
+  },
+  "context_params": {
+    "room_id": "settings-room",
+    "event_id": "context-2f7f3c1e-8f7a-4f0e-9d55-6a1f9f1b7a10",
+    "purpose": "Ship the spring launch on time",
+    "notes": "The launch date is April 14.",
+    "routing": "auto"
+  },
+  "context_reply": {
+    "context": {"purpose": "Ship the spring launch on time", "notes": "The launch date is April 14.", "routing": "auto", "lead_member_id": ""},
+    "event": {
+      "actor": {"id": "room-control", "kind": "system"},
+      "authority_epoch": 1,
+      "created_at": 1792631200.5,
+      "event_id": "context-2f7f3c1e-8f7a-4f0e-9d55-6a1f9f1b7a10",
+      "idempotent": false,
+      "kind": "room.context_set",
+      "payload": {"purpose": "Ship the spring launch on time", "notes": "The launch date is April 14.", "routing": "auto", "lead_member_id": ""},
+      "room_id": "settings-room",
+      "seq": 4
+    }
+  },
+  "authority_refusal": "This Group Chat is managed by another gateway.",
+  "continue_params": {
+    "room_id": "settings-room",
+    "discussion_event_id": "user:7d1c2a"
+  },
+  "continue_reply": {
+    "continued": true,
+    "event": {
+      "actor": {"id": "install:5e551011f00dfeed5e551011f00dfeed", "kind": "gateway"},
+      "authority_epoch": 1,
+      "created_at": 1792631300.75,
+      "event_id": "dcontinue:user:7d1c2a:1",
+      "idempotent": false,
+      "kind": "room.continued",
+      "payload": {"discussion_event_id": "user:7d1c2a", "thread_id": "loopdy-settings-room", "grant": 1},
+      "room_id": "settings-room",
+      "seq": 9
+    }
+  },
+  "continue_refusal": "This discussion already used every Continue.",
+  "routing_events": [
+    {
+      "actor": {"id": "install:5e551011f00dfeed5e551011f00dfeed", "kind": "gateway"},
+      "authority_epoch": 1, "created_at": 1792631110.0, "event_id": "dassign:9a1b", "idempotent": false,
+      "kind": "room.assignment",
+      "payload": {"discussion_event_id": "user:11aa", "thread_id": "loopdy-settings-room", "task_id": "dtask:9a1b",
+                  "lead_member_id": "pixel", "member_ids": ["scout"], "fallback": false},
+      "room_id": "settings-room", "seq": 2
+    },
+    {
+      "actor": {"id": "install:5e551011f00dfeed5e551011f00dfeed", "kind": "gateway"},
+      "authority_epoch": 1, "created_at": 1792631120.0, "event_id": "dassign:9a1c", "idempotent": false,
+      "kind": "room.assignment",
+      "payload": {"discussion_event_id": "user:22bb", "thread_id": "loopdy-settings-room", "task_id": "dtask:9a1c",
+                  "lead_member_id": "pixel", "member_ids": ["pixel"], "fallback": true},
+      "room_id": "settings-room", "seq": 5
+    },
+    {
+      "actor": {"id": "install:5e551011f00dfeed5e551011f00dfeed", "kind": "gateway"},
+      "authority_epoch": 1, "created_at": 1792631130.0, "event_id": "droute:user:33cc", "idempotent": false,
+      "kind": "room.routed",
+      "payload": {"discussion_event_id": "user:33cc", "thread_id": "loopdy-settings-room",
+                  "member_ids": ["scout", "echo"], "everyone": false, "fallback": false},
+      "room_id": "settings-room", "seq": 7
+    },
+    {
+      "actor": {"id": "install:5e551011f00dfeed5e551011f00dfeed", "kind": "gateway"},
+      "authority_epoch": 1, "created_at": 1792631140.0, "event_id": "droute:user:44dd", "idempotent": false,
+      "kind": "room.routed",
+      "payload": {"discussion_event_id": "user:44dd", "thread_id": "loopdy-settings-room",
+                  "member_ids": [], "everyone": true, "fallback": false},
+      "room_id": "settings-room", "seq": 9
+    },
+    {
+      "actor": {"id": "install:5e551011f00dfeed5e551011f00dfeed", "kind": "gateway"},
+      "authority_epoch": 1, "created_at": 1792631150.0, "event_id": "droute:user:55ee", "idempotent": false,
+      "kind": "room.routed",
+      "payload": {"discussion_event_id": "user:55ee", "thread_id": "loopdy-settings-room",
+                  "member_ids": [], "everyone": true, "fallback": true},
+      "room_id": "settings-room", "seq": 11
+    }
+  ]
+}

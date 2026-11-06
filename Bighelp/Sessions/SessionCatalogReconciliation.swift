@@ -315,6 +315,9 @@ enum SessionCatalogReconciliation {
         // carry a legacy or default false value, so an existing local record
         // remains authoritative for its pin state across every refresh.
         merged.isPinned = local.isPinned
+        // Hermes' read state comes only from its own rows; a record that doesn't carry it (a live-only
+        // chat, a history page) keeps what the last row said.
+        merged.isUnread = incoming.isUnread ?? local.isUnread
         // The host's saved last activity wins once nothing is in progress here. Keeping the newer
         // of the two kept times Hermes had stamped on merely reopened chats forever.
         merged.updatedAt = local.isActive ? max(local.updatedAt, incoming.updatedAt) : incoming.updatedAt
@@ -330,6 +333,7 @@ enum SessionCatalogReconciliation {
                 merged.localContentScope = local.localContentScope
                 merged.catalogPreview = incoming.catalogPreview
                     ?? (incoming.items.isEmpty ? local.catalogPreview : String(incoming.summary.preview.prefix(512)))
+                merged.catalogHasDraft = local.catalogHasDraft
                 merged.hasDeferredReferenceState = local.hasDeferredReferenceState
                 merged.draft = ""
                 merged.referenceState = nil
@@ -342,6 +346,7 @@ enum SessionCatalogReconciliation {
                 merged.localContentRevision = nil
                 merged.localContentScope = nil
                 merged.catalogPreview = nil
+                merged.catalogHasDraft = false
                 merged.hasDeferredReferenceState = false
                 merged.draft = local.draft
                 merged.referenceState = local.referenceState

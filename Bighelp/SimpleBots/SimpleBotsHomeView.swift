@@ -524,14 +524,29 @@ struct SimpleBotsHomeView: View {
         context.gateways == nil ? (bot.profileID, context.scope) : (bot.id, "multi-gateway")
     }
 
+    /// Its Bot Chat, when Hermes keeps that chat's read state (`SimpleBotsReadState`); on the gateway in use only.
+    private func hermesBotChat(_ bot: SimpleBotsBot) -> SessionRecord? {
+        guard bot.fleetAgent == nil || bot.isOnGatewayInUse else { return nil }
+        return SimpleBotsReadState.botChat(bot.profileID, in: context.catalog.records)
+    }
+
     func isUnread(_ bot: SimpleBotsBot) -> Bool {
+        if let chat = hermesBotChat(bot) { return chat.isUnread == true }
         let key = unreadKey(bot)
         return unread.isUnread(key.id, scope: key.scope)
     }
 
     private func setUnread(_ bot: SimpleBotsBot, _ value: Bool) {
+        if let chat = hermesBotChat(bot) {
+            markOnHermes(chat.id, value)
+            return
+        }
         let key = unreadKey(bot)
         unread.set(value, id: key.id, scope: key.scope)
+    }
+
+    func markOnHermes(_ id: String, _ value: Bool) {
+        Task { @MainActor in try? await context.catalog.setSessionUnread(id: id, unread: value) }
     }
 
     /// On its own gateway: `local` with one gateway, else the gateway comes into use (if it isn't) first.
@@ -540,7 +555,9 @@ struct SimpleBotsHomeView: View {
     }
 
     func openBot(_ bot: SimpleBotsBot) {
-        setUnread(bot, false)
+        // This device's mark; Hermes' clears once the chat shows (`BighelpVisibleChats`).
+        let key = unreadKey(bot)
+        unread.set(false, id: key.id, scope: key.scope)
         act(bot, .agent(profileID: bot.profileID)) { context.onOpenBot(bot.profileID) }
     }
 

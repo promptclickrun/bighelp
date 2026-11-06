@@ -315,8 +315,9 @@ enum ChatCompletedTurnProjection {
             .compactMap(\.durationMilliseconds).max() {
             return TimeInterval(duration) / 1_000
         }
-        // Older hosts have no measured duration. Use only persisted human/final
-        // message timestamps, never synthetic activity order or the render clock.
+        // Older hosts have no measured duration. Use only human/final message
+        // timestamps (saved, or when a live final arrived; a replay has none),
+        // never synthetic activity order or the render clock.
         guard let start = startedAt,
               let final = messages.last(where: { $0.role == .assistant && $0.metadata.delivery != "Streaming" }),
               let end = final.metadata.timestamp, end >= start else { return nil }

@@ -104,6 +104,7 @@ extension ChatModel {
     /// device wrote in. Only its answer streams here, so the chat reads what Hermes saved.
     func hostTurnEnded(from owner: DirectHermesConversationClient) {
         guard (client as? DirectHermesConversationClient) === owner, !isBotMode else { return }
+        readTurnEnded()
         refreshFromHostSoon()
     }
 

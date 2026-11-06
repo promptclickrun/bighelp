@@ -510,7 +510,7 @@ extension RootShellView {
                       case .chat(let model)? = featureStore.preparedModel(for: route) else {
                     throw WorkspaceClientError.unavailable(.unsupportedOperation)
                 }
-                if settings { groupSettingsModel = model }
+                if settings { appState.open(.groupSettings(roomID: room.id, conversationID: model.conversationID)) }
                 else { appState.activateConversation(id: record.id, source: .sessions) }
             } catch {
                 guard currentWorkspaceOwner == owner else { return }

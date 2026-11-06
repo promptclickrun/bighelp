@@ -91,6 +91,7 @@ final class SessionContentRepository: SessionCatalogRepository {
             record.localContentRevision = nil
             record.localContentScope = nil
             record.catalogPreview = nil
+            record.catalogHasDraft = false
             record.hasDeferredReferenceState = false
             return record
         }
@@ -433,6 +434,7 @@ final class SessionContentRepository: SessionCatalogRepository {
             row.localContentRevision = revision
             row.localContentScope = scope
             row.catalogPreview = String(record.summary.preview.prefix(512))
+            row.catalogHasDraft = SessionRecord.holdsDraft(record.draft)
             row.hasDeferredReferenceState = record.referenceState != nil
                 || ReferenceCodec.decode(record.draft).hasValidAppendix
             row.draft = ""

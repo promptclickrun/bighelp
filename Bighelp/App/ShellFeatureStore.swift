@@ -391,7 +391,7 @@ final class ShellFeatureStore {
              .workspaceActivity, .workspaceSettings, .workspaceManagement, .workspaceConnections, .workspaceHub,
              .projects, .project, .kanban, .usage, .allHostsChats, .board,
              .workflows, .workflow, .workflowRun, .workflowSignoff, .workflowRuns, .codeChanges, .codeBatch,
-             .devFactory, .devFactoryRecipe, .devFactoryGroup, .devFactoryChanges, .simpleBotProfile, .simpleBotsSection:
+             .devFactory, .devFactoryRecipe, .devFactoryGroup, .devFactoryChanges, .simpleBotProfile, .groupSettings, .simpleBotsSection:
             nil
         }
     }
@@ -451,6 +451,7 @@ final class ShellFeatureStore {
                 agents: agents,
                 hostedRooms: botModeRooms
             )
+            sessionsModel?.unsentDraft = { [weak self] id in self?.unsentDraft(id) }
             return true
         case .scheduledTasks:
             return scheduledTasks != nil
@@ -469,7 +470,7 @@ final class ShellFeatureStore {
              .workspaceActivity, .workspaceSettings, .workspaceManagement, .workspaceConnections, .workspaceHub,
              .projects, .project, .kanban, .usage, .allHostsChats, .board,
              .workflows, .workflow, .workflowRun, .workflowSignoff, .workflowRuns, .codeChanges, .codeBatch,
-             .devFactory, .devFactoryRecipe, .devFactoryGroup, .devFactoryChanges, .simpleBotProfile, .simpleBotsSection:
+             .devFactory, .devFactoryRecipe, .devFactoryGroup, .devFactoryChanges, .simpleBotProfile, .groupSettings, .simpleBotsSection:
             return true
         }
     }
@@ -985,6 +986,14 @@ final class ShellFeatureStore {
         dashboardModel.resetForAccountBoundary()
     }
 
+    /// Whether a chat's message box holds something its saved draft doesn't show yet: files only the
+    /// open chat holds (they're never saved), or typing still in the draft journal. Nil when the
+    /// saved draft is the latest, as it is once the person leaves the chat (it saves then).
+    func unsentDraft(_ id: String) -> Bool? {
+        if chatModels[id]?.orderedDraftAttachments.isEmpty == false { return true }
+        return draftJournal?.pendingDraft(for: id).map(SessionRecord.holdsDraft)
+    }
+
     func flushChatPersistence() {
         chatModels.values.forEach { $0.flushPersistence() }
         catalog.flushPersistence()
@@ -1475,6 +1484,12 @@ final class ShellFeatureStore {
             onDraftJournal: journalDraft
         )
         referenceModel = model
+        // Reading the chat marks it read on Hermes (#862).
+        model.onRead = { [weak self, weak catalog] activity, reading in
+            guard let self, let catalog, self.accountGeneration == referenceGeneration,
+                  let referenceModel, self.chatModels[session.id] === referenceModel else { return }
+            catalog.noteRead(id: session.id, activity: activity, reading: reading)
+        }
         // A draft from the journal isn't in the chat yet: its next save writes it there.
         if !openingDraft.utf8.elementsEqual(session.draft.utf8) { model.persistSession(draftOnly: true) }
         // Turns Hermes runs on its own (a background process finished, another agent wrote in) never stream

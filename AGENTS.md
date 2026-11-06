@@ -227,6 +227,10 @@ change in both repos.
 - **A turn stays pending while it streams:** after `prompt.submit` returns `streaming`, the chat isn't "ready for a
   new turn" until the turn ends. A mid-turn Send must go through the steer/queue path (`sendMidSession`). Steer is
   the default.
+- **A reply's time comes from the phone until a reread:** Hermes' live events carry no time, and nothing reads
+  the saved history after this device's own turn. A reply segment Hermes completes live takes the time it
+  arrived (`DirectHermesProjection.accept(_:arrivedAt:)`); a replay takes none, since it ended at a time the
+  phone doesn't know. A reread puts the host's saved time on the same row (#856).
 - **Live voice is Full Duplex, and it is the agent:** each agent picks its provider (GPT-Live on the Codex
   subscription or an API key, or Gemini Live) and voice (`AgentVoiceChoices`). The plugin's brief names the
   agent, so the voice model speaks as it, never about "your agent". Gemini's media and events stay between the
@@ -278,6 +282,11 @@ change in both repos.
   v0.22.4's gateway listener on the session path; features, retry and discard, RoomLink and seatable
   profiles differ. Go by what `groups.capabilities` and each pending action say, never the version
   (docs/HERMES_BOT_MODE.md, vectors in `BighelpTests/Fixtures/HermesGroups`).
+- **Group chats' settings:** where `groups.state` returns `context`, Group Settings (`GroupSettingsView`,
+  `AppRoute.groupSettings`) sets who answers a message that names nobody, the purpose and shared notes through
+  `groups.context`, each edit kept with the room under one `event_id` until Hermes answers. Hermes' picks
+  (`room.assignment`, `room.routed`) and paused discussions (`room.activity` `bounded`, Continue through
+  `groups.continue`) are lines in the chat, kept in `nativeNotices` (docs/HERMES_BOT_MODE.md › Group settings).
 - **Hermes makes every Bot Chat:** Hermes delivers other agents' messages into the chat titled "Bot Chat" and
   takes over only its own native chat (`local-…`); a Bot Chat made over the app's socket (source `bighelp`) got
   renamed `Bot Chat (bighelp <id>)` and replaced, context and all, the first time another agent wrote. So the first
@@ -290,6 +299,14 @@ change in both repos.
   (`canonical_session`, `canonicalBotChat`) so a refresh can't drop it. Hermes names it only when
   `profiles.list` asks for the agents' sessions (`include_sessions`, its default), so the catalog asks; without
   them every refresh dropped the saved Bot Chat, and the first tap on a bot waited on a full lookup.
+- **Read state** (#862): Hermes' `last_read_at` is a watermark. A chat is unread once anything happens in it after
+  that, the person's own messages too, and a chat no client ever marked counts as read. So the app marks a chat read
+  each time it's read (`BighelpVisibleChats` → `ChatModel.noteRead` → `SessionCatalogStore.noteRead`): as it shows,
+  2 s after a turn ends on screen, and as it stops showing or the app leaves the front. A chat that isn't on screen
+  is never marked, and one read again with nothing new isn't marked twice. Rows without `unread` mean the host
+  keeps none: Mark Read and Mark Unread hide (`SessionSummary.tracksUnread`). Bots mode shows Hermes' state where
+  there is one, else the marks kept on the device (`SimpleBotsReadState`). The Chats list's Draft reads the draft
+  journal without observing it (`ChatDraftJournal.pendingDraft`).
 - **Archived:** the catalog lists `archived=include` and keeps rows Hermes' idle sweep archived
   (`auto_archived`); deliberately archived chats live in Archived Chats (`archivedChats`, Restore).
 - **Send never waits for the connection:** while a chat has no working connection (back from the background, a
@@ -401,6 +418,10 @@ change in both repos.
   that carried the call, and the call goes on. Apple Health is read only and asks once about sharing first. The
   channel runs while bighelp is active, inactive or in the background grace, and in any agent's chat on a plugin with
   `native-device-tools-agents-v1`; after the grace it closes as `paused` so the host waits for the phone.
+  A channel the host ended (its 30 s lease ran out while a slow tool ran, the plugin unloaded or started again, a
+  lost connection) opens again by itself while the chat keeps its tools, with longer waits each time and a limit
+  (`runReopeningWhileHeld`, `reopenWaits`); a late answer the host no longer takes loses only that answer, never
+  the channel. Before, any of these left the chat without phone tools until the person left it (#861).
   Two reach past the open chat: Arriving and leaving sends its message from the background (`DeviceGeofenceMonitor`),
   and a Shortcuts run keeps the call alive while Shortcuts is in front (`DeviceToolHandoff`).
 - **Agents show the way** (`iphone_navigation`, `Bighelp/Driving/`): a place in `DriveCatalog` is only one the

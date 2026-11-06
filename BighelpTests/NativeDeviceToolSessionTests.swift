@@ -301,7 +301,8 @@ struct NativeDeviceToolSessionTests {
     }
 
     /// A shortcut out in the Shortcuts app can outlast the next request in its batch. That one is
-    /// answered as expired, and the channel keeps working instead of closing.
+    /// answered as expired; the host stopped waiting for it at its deadline and refuses the answer
+    /// (`result_replay`), and the channel keeps working instead of closing.
     @Test func aRequestThatExpiresBehindASlowOneIsAnsweredAndTheChannelStays() async throws {
         let fixture = try Fixture()
         let now = Int(Date().timeIntervalSince1970)
@@ -314,10 +315,8 @@ struct NativeDeviceToolSessionTests {
         try await session.connect()
         try await session.pollOnce()
         #expect(fixture.handled == 1)
-        #expect(fixture.http.results.count == 2)
-        #expect(fixture.http.results.last?["requestId"] == .string("tool-call-2"))
-        #expect(fixture.http.results.last?["status"] == .string("failed"))
-        #expect(fixture.http.results.last?["code"] == .string("request_expired"))
+        #expect(fixture.http.results.count == 1)
+        #expect(fixture.http.refusals == ["result_replay"])
         var next = fixture.http.request
         next["requestId"] = .string("tool-call-3")
         fixture.http.batch = [next]
@@ -333,6 +332,181 @@ struct NativeDeviceToolSessionTests {
         try await session.connect()
         await #expect(throws: WorkspaceClientError.self) { try await session.pollOnce() }
         #expect(fixture.handled == 1 && fixture.http.results.isEmpty)
+    }
+
+    /// A tool can run past its call's window: Location's precise-location question, its fix and the
+    /// address can take 40 seconds, and the host waits 30. The host has told the agent by then, so it
+    /// refuses the late answer (`result_replay`). That answer is lost, not the channel: it takes the
+    /// next call (#861).
+    @Test func aLateAnswerTheHostNoLongerTakesKeepsTheChannel() async throws {
+        let fixture = try Fixture()
+        fixture.duringHandle = { fixture.http.giveUpOnDelivered() }
+        let session = fixture.session()
+        try await session.connect()
+        try await session.pollOnce()
+        #expect(fixture.handled == 1 && fixture.http.results.isEmpty)
+        #expect(fixture.http.refusals == ["result_replay"])
+        fixture.duringHandle = nil
+        var next = fixture.http.request
+        next["requestId"] = .string("tool-call-2")
+        fixture.http.batch = [next]
+        try await session.pollOnce()
+        #expect(fixture.handled == 2)
+        #expect(fixture.http.results.map { $0["requestId"] } == [.string("tool-call-2")])
+        #expect(fixture.http.paths.filter { $0 == "device-tools/close" }.isEmpty)
+    }
+
+    // MARK: A channel the host ended opens again (#861)
+
+    /// What can end a channel the phone still uses while the chat stays open.
+    enum ChannelEnd: String, CaseIterable, Sendable {
+        /// The plugin retired it: it unloaded the agent, or the same phone opened another (`phone_unavailable`).
+        case retired
+        /// Its 30-second lease ran out while a slow tool ran, so the answer is refused (`phone_unavailable`).
+        case outlastedLease
+        /// The plugin started again and never had it (`channel_not_found`).
+        case forgotten
+        /// The connection dropped under the poll.
+        case connectionLost
+        /// The poll got no answer in time.
+        case timedOut
+    }
+
+    /// Before, the chat had no phone tools after any of these until the person left it or quit bighelp:
+    /// every later call failed at once with `phone_unavailable`.
+    @Test(arguments: ChannelEnd.allCases)
+    func aChannelThatEndsWhileTheChatStaysOpenOpensAgain(_ end: ChannelEnd) async throws {
+        let fixture = try Fixture()
+        var waits: [Duration] = []
+        var waiting = 0
+        var connected = 0
+        try await NativeDeviceToolSession.runReopeningWhileHeld(
+            sleep: { waits.append($0); fixture.http.advance($0) },
+            makeSession: { fixture.session() },
+            onConnected: { _ in
+                connected += 1
+                // The new channel is open: the person leaves the chat, which ends it for good.
+                guard connected == 1 else { fixture.available = false; return }
+                switch end {
+                case .retired: fixture.http.retireAll()
+                case .outlastedLease:
+                    fixture.duringHandle = { fixture.http.advance(.seconds(31)); fixture.duringHandle = nil }
+                case .forgotten: fixture.http.forgetAll()
+                case .connectionLost: fixture.http.pollFailure = { throw DirectHermesError.connectionFailed }
+                case .timedOut: fixture.http.pollFailure = { throw DirectHermesError.timedOut(outcomeUnknown: false) }
+                }
+            },
+            onWaiting: { waiting += 1 })
+        #expect(connected == 2, "A new channel opens for the chat")
+        #expect(waiting == 1, "Device access says it connects again in a moment")
+        #expect(waits == [.seconds(1)])
+        #expect(fixture.http.connects == 2)
+    }
+
+    /// A host that ends every channel at once gets a few tries that wait longer each time, never a
+    /// tight loop. The last one fails as before, and Device access says so.
+    @Test func theTriesWaitLongerEachTimeAndThenStop() async throws {
+        let fixture = try Fixture()
+        var waits: [Duration] = []
+        var waiting = 0
+        await #expect(throws: WorkspaceClientError.rejected(code: "phone_unavailable")) {
+            try await NativeDeviceToolSession.runReopeningWhileHeld(
+                sleep: { waits.append($0); fixture.http.advance($0) },
+                makeSession: { fixture.session() },
+                onConnected: { _ in fixture.http.retireAll() },
+                onWaiting: { waiting += 1 })
+        }
+        #expect(waits == NativeDeviceToolSession.reopenWaits)
+        #expect(zip(waits, waits.dropFirst()).allSatisfy { $0 < $1 })
+        #expect(waiting == waits.count)
+        #expect(fixture.http.connects == waits.count + 1)
+    }
+
+    /// A channel that worked for a while before it ended starts the waits again: a chat open all
+    /// day isn't left without its tools after a few lost connections.
+    @Test func aChannelThatWorkedForAWhileStartsTheWaitsAgain() async throws {
+        let fixture = try Fixture()
+        let start = ContinuousClock.now
+        var elapsed = Duration.zero
+        var waits: [Duration] = []
+        var connected = 0
+        try await NativeDeviceToolSession.runReopeningWhileHeld(
+            now: { start + elapsed },
+            sleep: { waits.append($0); elapsed += $0 },
+            makeSession: { fixture.session() },
+            onConnected: { _ in
+                connected += 1
+                guard connected < 4 else { fixture.available = false; return }
+                elapsed += .seconds(90)
+                fixture.http.retireAll()
+            })
+        #expect(connected == 4)
+        #expect(waits == Array(repeating: .seconds(1), count: 3))
+    }
+
+    /// Refusals a new channel can't fix stop at once, as before.
+    @Test(arguments: ["profile_not_served", "profile_not_found", "session_not_found", "channel_capacity"])
+    func aRefusalANewChannelCannotFixStillStops(_ code: String) async throws {
+        let fixture = try Fixture()
+        fixture.http.refusesConnect = code
+        var waits = 0
+        await #expect(throws: WorkspaceClientError.rejected(code: code)) {
+            try await NativeDeviceToolSession.runReopeningWhileHeld(
+                sleep: { _ in waits += 1 }, makeSession: { fixture.session() })
+        }
+        #expect(waits == 0)
+        #expect(fixture.http.connects == 1)
+        #expect(fixture.http.closeBodies.isEmpty)
+    }
+
+    /// Another agent's chat on an older plugin never opens a channel, so nothing tries again.
+    @Test func anotherAgentsChatOnAnOlderPluginNeverTriesAgain() async throws {
+        let fixture = try Fixture()
+        var waits = 0
+        await #expect(throws: WorkspaceClientError.unavailable(.unsupportedOperation)) {
+            try await NativeDeviceToolSession.runReopeningWhileHeld(
+                sleep: { _ in waits += 1 }, makeSession: { fixture.session(agentID: "researcher") })
+        }
+        #expect(waits == 0 && fixture.http.connects == 0)
+    }
+
+    /// The chat stops owning its tools as the channel ends (the person left the chat, the host
+    /// changed, or the background grace ran out): nothing opens again.
+    @Test(arguments: [false, true])
+    func aChannelThatEndsAsTheChatLetsGoIsNotOpenedAgain(_ hostChanged: Bool) async throws {
+        let fixture = try Fixture()
+        var waits = 0
+        fixture.http.pollFailure = {
+            if hostChanged { fixture.current = false } else { fixture.available = false }
+            throw DirectHermesError.connectionFailed
+        }
+        await #expect(throws: DirectHermesError.connectionFailed) {
+            try await NativeDeviceToolSession.runReopeningWhileHeld(
+                sleep: { _ in waits += 1 }, makeSession: { fixture.session() })
+        }
+        #expect(waits == 0 && fixture.http.connects == 1)
+    }
+
+    /// Leaving the chat while the phone waits to open the channel again ends the wait: nothing opens.
+    @Test func leavingTheChatDuringTheWaitOpensNothing() async throws {
+        let fixture = try Fixture()
+        await #expect(throws: WorkspaceClientError.rejected(code: "phone_unavailable")) {
+            try await NativeDeviceToolSession.runReopeningWhileHeld(
+                sleep: { _ in fixture.available = false },
+                makeSession: { fixture.session() },
+                onConnected: { _ in fixture.http.retireAll() })
+        }
+        #expect(fixture.http.connects == 1)
+
+        let cancelled = try Fixture()
+        let task = Task { @MainActor in
+            try await NativeDeviceToolSession.runReopeningWhileHeld(
+                makeSession: { cancelled.session() }, onConnected: { _ in cancelled.http.retireAll() })
+        }
+        for _ in 0..<1_000 where cancelled.http.refusals.count < 2 { await Task.yield() }
+        task.cancel()
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(cancelled.http.connects == 1)
     }
 
     @Test func connectAcceptedAfterForegroundRetiresStillClosesChannel() async throws {
@@ -463,6 +637,8 @@ struct NativeDeviceToolSessionTests {
         var wrongResult = false
         /// The first request handled takes this long, like a run out in Shortcuts.
         var slowFor: Duration?
+        /// Runs while a tool runs, before its answer goes to the host.
+        var duringHandle: (() -> Void)?
         init() throws {
             owner = WorkspaceOwner(authority: try .dashboard(endpointIdentity: "https://host.example:9119"),
                                    authenticationGeneration: UUID(), connectionGeneration: UUID())
@@ -479,6 +655,7 @@ struct NativeDeviceToolSessionTests {
                 isAvailable: { self.available }, isPaused: { self.paused }, handle: { request, _, _ in
                     self.handled += 1
                     if let slowFor = self.slowFor { try? await Task.sleep(for: slowFor) }
+                    self.duringHandle?()
                     var resultRequest = request
                     if self.wrongResult {
                         var raw = self.http.request
@@ -524,6 +701,22 @@ struct NativeDeviceToolSessionTests {
         /// The codes the plugin would answer and log (`bighelp native request rejected: …`).
         var refusals: [String] = []
         var openChannels: Int { purge(); return channels.count }
+        var connects: Int { paths.filter { $0 == "device-tools/connect" }.count }
+        /// A connect refusal that opens nothing (`profile_not_found`, `session_not_found`, …).
+        var refusesConnect: String?
+        /// Runs in place of the next poll's answer, once: a lost connection or a time-out.
+        var pollFailure: (() throws -> Void)?
+        /// Each request a poll handed the phone, by ID, with its deadline (the plugin's `pending`).
+        private var delivered: [String: Int] = [:]
+        /// Requests the host stopped waiting for: it told the agent, and marked them done (`_give_up`).
+        private var givenUp: Set<String> = []
+
+        /// The plugin retires every channel: it unloaded the agent (`close_profile`).
+        func retireAll() { for id in channels.keys { channels[id] = nil; retired.insert(id) } }
+        /// The plugin started again: it never had these channels.
+        func forgetAll() { channels.removeAll() }
+        /// The host's wait for every request the phone has ran out.
+        func giveUpOnDelivered() { givenUp.formUnion(delivered.keys) }
 
         @discardableResult
         func hold(device: String) -> String {
@@ -556,6 +749,10 @@ struct NativeDeviceToolSessionTests {
                 if missingProfiles.contains(agent) {
                     return try refusal("profile_not_found", status: 404, request: request, requestGuard: requestGuard)
                 }
+                if let code = refusesConnect {
+                    return try refusal(code, status: code == "channel_capacity" ? 503 : 404, request: request,
+                                       requestGuard: requestGuard)
+                }
                 guard let id = channel.string, let device = request.body?["deviceId"]?.string,
                       let session = request.body?["sessionId"]?.string else { throw WorkspaceClientError.invalidRequest }
                 connectedAgents.append(agent)
@@ -576,10 +773,17 @@ struct NativeDeviceToolSessionTests {
                 channels[id] = Held(device: device, agent: agent, session: session, expires: now + 30)
                 value = ["channelId": channel, "connected": .boolean(true)]
             case "device-tools/poll":
+                if let failure = pollFailure {
+                    pollFailure = nil
+                    try failure()
+                }
                 if let refused = try gone(channel, request: request, requestGuard: requestGuard) { return refused }
                 if let id = channel.string { keepAlive(id) }
                 beforePollReply()
                 let rows = batch ?? Array(repeating: self.request, count: duplicateRequest ? 2 : 1)
+                for row in rows {
+                    if let id = row["requestId"]?.string { delivered[id] = row["expiresAt"]?.integer ?? 0 }
+                }
                 // A batch continues after the phone's cursor; the single request always comes as the first.
                 let start = batch == nil ? 0 : Int(request.body?["after"]?.integer ?? 0)
                 value = ["channelId": channel, "next": .integer(start + rows.count),
@@ -587,7 +791,16 @@ struct NativeDeviceToolSessionTests {
                              .object(["sequence": .integer(start + $0.offset + 1), "request": .object($0.element)])
                          })]
             case "device-tools/result":
-                if let result = request.body?["result"]?.object { results.append(result) }
+                // The plugin's `accept_result`: a channel it no longer has refuses first; an answer it
+                // stopped waiting for at the deadline is done (`result_replay`); a taken one renews the lease.
+                if let refused = try gone(channel, request: request, requestGuard: requestGuard) { return refused }
+                let result = request.body?["result"]?.object ?? [:]
+                if let id = result["requestId"]?.string, let deadline = delivered[id],
+                   givenUp.contains(id) || deadline <= Int(Date().timeIntervalSince1970) {
+                    return try refusal("result_replay", status: 409, request: request, requestGuard: requestGuard)
+                }
+                results.append(result)
+                if let id = channel.string { keepAlive(id) }
                 value = ["accepted": .boolean(true)]
             case "device-tools/close":
                 if closeFails { throw URLError(.networkConnectionLost) }

@@ -9,7 +9,8 @@ extension BighelpApp {
                                   liveAgents: @escaping @MainActor () -> (scope: String, agents: AgentDirectoryStore)?) {
         let sync = BotsAppStateSync.shared
         let others = RegistryFleetReader(registry: registry)
-        let usesDemo = { demo != nil && !connections.isDirectSelected }
+        let usesDemo: @MainActor () -> Bool = { demo != nil && !connections.isDirectSelected }
+        sync.usesDemo = usesDemo
         sync.hosts = {
             if usesDemo() {
                 let scope = (try? WorkspaceAuthority.fixture(id: demo?.selectedHostID ?? "demo"))?.cacheScopeID ?? "demo"

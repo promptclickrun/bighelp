@@ -167,6 +167,42 @@ struct BotsAppStateTests {
         #expect(computer.writes == writes, "The empty phone took the computer's choices and sent nothing")
     }
 
+    @Test func theDemosComputerNeverReachesARealOne() async throws {
+        let demo = DemoAppStateClient(computerID: "11111111-2222-4333-8444-555555555555")
+        let real = DemoAppStateClient(computerID: Self.computer)
+        let phone = Phone()
+        var inDemo = true
+        let engine = { AppStateSync(keys: BotsAppState.keys, device: UUID().uuidString.lowercased(), file: nil,
+                                    person: { AppStateSyncTests.person }) }
+        let bridge = BotsAppStateSync(engine: engine(), demoEngine: engine(), settle: .seconds(3_600))
+        bridge.usesDemo = { inDemo }
+        bridge.hosts = {
+            [inDemo ? BotsAppStateHost(hostKey: "demo", scopes: ["demo-scope"], faceScope: "fixture-account:fixture-host",
+                                       isSelected: true)
+                    : Self.host(Self.firstPhoneHost, scope: "scope-1")]
+        }
+        bridge.computers = {
+            [inDemo ? AppStateComputer(hostKey: "demo", client: demo)
+                    : AppStateComputer(hostKey: Self.firstPhoneHost.uuidString, client: real)]
+        }
+        bridge.start(BotsAppStateStores(
+            order: phone.order, fleet: phone.fleet, primary: { nil }, setPrimary: { _ in }, voices: phone.voices,
+            marks: phone.marks, pets: phone.pets, companions: phone.companions, restorePet: { _, _ in },
+            pins: { _ in .init() }, setPins: { _, _ in }))
+        phone.order.set(["bot:demo-bot"], scope: "demo-scope")
+        await bridge.sync()
+        #expect(demo.stored(AppStateSyncTests.person)[BotsAppState.layoutKey] != nil)
+
+        // A real computer added in the same run.
+        inDemo = false
+        phone.order.set(["bot:mina"], scope: "scope-1")
+        await bridge.sync()
+
+        let home = try #require(real.stored(AppStateSyncTests.person)[BotsAppState.layoutKey]?.value?.object?["home"]?.object)
+        #expect(Array(home.keys) == [Self.computer], "Only the real computer's bots, never the demo's")
+        #expect(bridge.engine.computerID(forHost: "demo") == nil)
+    }
+
     @Test func aHostWithoutTheFeatureKeepsItsChoicesOnThePhone() async {
         let phone = Phone()
         phone.order.set(["bot:otto", "bot:mina"], scope: "scope-1")

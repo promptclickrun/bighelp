@@ -73,6 +73,11 @@ final class BotsAppStateSync {
     @ObservationIgnored var computers: @MainActor () -> [AppStateComputer] = { [] }
 
     let engine: AppStateSync
+    /// Demo mode's computer has a store of its own, kept for the run only, so its made-up bots never
+    /// reach a real computer's values (real-host tests add a real computer to the demo).
+    let demoEngine: AppStateSync
+    @ObservationIgnored var usesDemo: @MainActor () -> Bool = { false }
+    private var current: AppStateSync { usesDemo() ? demoEngine : engine }
     @ObservationIgnored private var stores: BotsAppStateStores?
     /// What the stores held after the last change or sync. Changes are found by naming both it and
     /// the stores now the same way, so learning a computer's ID is never taken for a change.
@@ -82,8 +87,11 @@ final class BotsAppStateSync {
     @ObservationIgnored private var debounce: Task<Void, Never>?
     private let settle: Duration
 
-    init(engine: AppStateSync = BotsAppStateSync.makeEngine(), settle: Duration = .milliseconds(600)) {
+    init(engine: AppStateSync = BotsAppStateSync.makeEngine(), demoEngine: AppStateSync? = nil,
+         settle: Duration = .milliseconds(600)) {
         self.engine = engine
+        self.demoEngine = demoEngine
+            ?? AppStateSync(keys: engine.keys, device: engine.device, file: nil, person: { BighelpPersonID.current() })
         self.settle = settle
     }
 
@@ -125,7 +133,7 @@ final class BotsAppStateSync {
                 record()
                 let computers = computers()
                 if !computers.isEmpty {
-                    let outcome = await engine.sync(computers) { [weak self] key, value, ids in
+                    let outcome = await current.sync(computers) { [weak self] key, value, ids in
                         self?.join(key, value: value, computers: ids) ?? []
                     }
                     note(outcome)
@@ -180,10 +188,10 @@ final class BotsAppStateSync {
         let names = self.names()
         let layout = BotsAppState.layoutShape.patches(from: BotsAppState.layout(last, names: names),
                                                       to: BotsAppState.layout(phone, names: names))
-        if !layout.isEmpty { engine.change(BotsAppState.layoutKey, layout) }
+        if !layout.isEmpty { current.change(BotsAppState.layoutKey, layout) }
         let settings = BotsAppState.settingsShape.patches(from: BotsAppState.settings(last, names: names),
                                                           to: BotsAppState.settings(phone, names: names))
-        if !settings.isEmpty { engine.change(BotsAppState.settingsKey, settings) }
+        if !settings.isEmpty { current.change(BotsAppState.settingsKey, settings) }
         last = phone
         return !layout.isEmpty || !settings.isEmpty
     }
@@ -198,10 +206,10 @@ final class BotsAppStateSync {
         let names = self.names()
         let old = stores.read(scopes: scopes())
         var next = old
-        if let layout = engine.value(BotsAppState.layoutKey) {
+        if let layout = current.value(BotsAppState.layoutKey) {
             next = BotsAppState.applying(layout: layout, to: next, names: names.joined(in: layout))
         }
-        if let settings = engine.value(BotsAppState.settingsKey) {
+        if let settings = current.value(BotsAppState.settingsKey) {
             next = BotsAppState.applying(settings: settings, to: next, names: names.joined(in: settings))
         }
         if next != old { stores.write(next, over: old) }
@@ -234,7 +242,7 @@ final class BotsAppStateSync {
     private func scopes() -> [String] { hosts().flatMap(\.scopes) }
 
     private func names() -> BotsAppState.Names {
-        BotsAppState.Names(hosts: hosts(), computerIDs: engine.saved.computers)
+        BotsAppState.Names(hosts: hosts(), computerIDs: current.saved.computers)
     }
 }
 

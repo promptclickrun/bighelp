@@ -9,9 +9,6 @@ struct PeopleAndChatView: View {
 
     @Environment(\.bighelpUIV3Enabled) private var uiV3Enabled
     @State private var errorMessage: String?
-    @State private var titleDraft = ""
-    @State private var loadedTitle = ""
-    @State private var isSavingTitle = false
 
     init(
         model: ChatModel,
@@ -42,10 +39,12 @@ struct PeopleAndChatView: View {
         if model.botModeRoom?.hasNativeRoom == true {
             return ChatSessionSettingsDestination(
                 title: "Group Settings",
-                subtitle: "Name, members, permissions, and routing",
+                subtitle: model.botModeRoomSettings == nil ? "Name and members" : "Who answers, purpose and shared notes",
                 systemImage: "person.2"
             ) {
-                nativeSettings
+                if let roomID = model.botModeRoom?.nativeRoomID, let rooms = model.botModeRoomStore {
+                    GroupSettingsView(roomID: roomID, rooms: rooms, agents: agents, chat: model)
+                }
             }
         }
         return ChatSessionSettingsDestination(
@@ -54,109 +53,6 @@ struct PeopleAndChatView: View {
             systemImage: "person.2"
         ) {
             uiV3Enabled ? AnyView(nativeEditableList) : AnyView(legacyList)
-        }
-    }
-
-    private var nativeSettings: some View {
-        @Bindable var model = model
-        return Form {
-            Section {
-                ForEach(model.nativeRoomParticipants) { participant in
-                    HStack(spacing: BighelpTokens.space12) {
-                        AvatarView(
-                            stableID: participant.profileID, displayName: participant.displayName,
-                            imageURL: participant.peerImageURL ?? participant.profile.flatMap { agents.avatarURL(for: $0) }, size: 44
-                        )
-                        .opacity(participant.availability == .available ? 1 : 0.5)
-                        .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(participant.displayName)
-                                .bighelpFont(.body, weight: .semibold)
-                                .foregroundStyle(theme.primaryText)
-                            Text(participant.availability == .available
-                                 ? "@\(participant.handle)"
-                                 : "@\(participant.handle) · Unavailable on this host")
-                                .bighelpFont(.label)
-                                .foregroundStyle(theme.secondaryText)
-                        }
-                    }
-                    .frame(minHeight: BighelpTokens.hitTarget)
-                    .accessibilityElement(children: .combine)
-                }
-            } header: {
-                HStack {
-                    Text("People")
-                    Spacer()
-                    Text("\(model.nativeRoomParticipants.count) agents")
-                }
-            } footer: {
-                Text("Mention @handle for one agent or @all for everyone.")
-            }
-            Section("Group name") {
-                TextField("Title", text: $titleDraft)
-                    .disabled(isSavingTitle)
-                    .accessibilityIdentifier("bot-mode.settings.title")
-                Button("Save title") { Task { await saveTitle() } }
-                    .disabled(isSavingTitle
-                        || (titleDraft == model.botModeRoomTitle && model.botModeRoom?.nativePendingRename == nil)
-                        || titleDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        || titleDraft.count > 200
-                        || model.botModeRoomStore?.nativeCapabilities?.supports("groups.rename") != true)
-                    .frame(minHeight: BighelpTokens.hitTarget)
-                if isSavingTitle { ProgressView("Saving title") }
-            }
-            if !model.botModeExecutionEnabled {
-                Section {
-                    Label("This group is readable, but the host is not ready to run it.", systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(theme.warning)
-                }
-            }
-            if let errorMessage {
-                Section { Text(errorMessage).foregroundStyle(theme.danger) }
-            }
-            Section {
-                DisclosureGroup("Advanced") {
-                    Toggle("Show tool calls", isOn: $model.activityVisibility.showToolCalls)
-                        .accessibilityIdentifier("bot-mode.settings.tools")
-                    Text("This changes what this device shows. Hermes must provide tool activity for details to appear.")
-                        .bighelpFont(.metadata)
-                        .foregroundStyle(theme.secondaryText)
-                    Label {
-                        Text("Hermes owns this group on the selected host. Membership is fixed after creation, and earlier direct chats stay private.")
-                    } icon: {
-                        Image(systemName: "lock.shield")
-                    }
-                    Label {
-                        Text("Unrecognized mentions address everyone; each agent chooses whether to reply.")
-                    } icon: {
-                        Image(systemName: "at")
-                    }
-                }
-                .accessibilityIdentifier("bot-mode.settings.advanced")
-            }
-        }
-        .scrollContentBackground(.hidden)
-        .onAppear {
-            loadedTitle = model.botModeRoomTitle
-            titleDraft = model.botModeRoom?.nativePendingRename?.name ?? loadedTitle
-        }
-        .onChange(of: model.botModeRoomTitle) { _, title in
-            if titleDraft == loadedTitle { titleDraft = title }
-            loadedTitle = title
-        }
-    }
-
-    private func saveTitle() async {
-        guard !isSavingTitle else { return }
-        isSavingTitle = true
-        defer { isSavingTitle = false }
-        do {
-            try await model.renameBotModeRoom(titleDraft)
-            errorMessage = nil
-        } catch is CancellationError {
-            return
-        } catch {
-            errorMessage = "The title change could not be confirmed. Check the connection, then retry the same title."
         }
     }
 

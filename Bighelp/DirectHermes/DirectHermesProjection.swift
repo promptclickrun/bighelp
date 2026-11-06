@@ -602,7 +602,9 @@ struct DirectHermesProjection {
         return change
     }
 
-    mutating func accept(_ event: DirectHermesEvent) -> Change {
+    /// `arrivedAt` is when a live event reached the phone, nil for a replay. Hermes' events carry no
+    /// time, so a reply segment Hermes completes live takes this one until a reread gives the host's.
+    mutating func accept(_ event: DirectHermesEvent, arrivedAt: Date? = nil) -> Change {
         if let sequence = event.sequence {
             guard sequence > lastSequence else { return Change() }
             lastSequence = sequence
@@ -651,7 +653,7 @@ struct DirectHermesProjection {
             change.activities += finishReasoning()
             let interim = p["text"]?.string ?? ""
             if !interim.isEmpty {
-                change.items = [publishText(interim, eventKey: eventKey, complete: true)]
+                change.items = [publishText(interim, eventKey: eventKey, complete: true, at: arrivedAt)]
                 sealedSegmentID = segmentID
             }
             text = ""
@@ -688,7 +690,7 @@ struct DirectHermesProjection {
             if !final.isEmpty, reused, segmentID == nil, let settled = settleSealedAnswer(final) {
                 change.settledAnswer = settled
             } else if !final.isEmpty {
-                change.items = [publishText(final, eventKey: eventKey, complete: true, endsTurn: true)]
+                change.items = [publishText(final, eventKey: eventKey, complete: true, endsTurn: true, at: arrivedAt)]
             }
             // A bare message.complete also comes from child mirrors. It is a
             // segment final, not a turn final. session.info.running=false is the
@@ -938,7 +940,7 @@ struct DirectHermesProjection {
     }
 
     private mutating func publishText(_ value: String, eventKey: String, complete: Bool,
-                                      endsTurn: Bool = false) -> TimelineItem {
+                                      endsTurn: Bool = false, at time: Date? = nil) -> TimelineItem {
         if segmentID == nil { segmentID = "\(storedID):live:\(turnID):\(segment):\(eventKey)" }
         let id = segmentID!
         lastTextLookupWorkCount = 1
@@ -954,7 +956,8 @@ struct DirectHermesProjection {
         let old = index.map { items[$0] }
         if old == nil { arrival += 1 }
         let row = item(id: id, text: value, human: false, delivery: complete ? "Received" : "Streaming",
-            order: old?.metadata.sourceOrder ?? arrival, endsTurn: endsTurn)
+            order: old?.metadata.sourceOrder ?? arrival,
+            timestamp: (old?.metadata.timestamp ?? time)?.timeIntervalSince1970, endsTurn: endsTurn)
         if let index { items[index] = row; segmentIndex = index }
         else { segmentIndex = items.count; items.append(row) }
         return row

@@ -20,6 +20,14 @@ final class ChatModel {
     @ObservationIgnored var hostHistoryRefresh: (@MainActor () async throws -> Void)?
     @ObservationIgnored var hostRefreshTask: Task<Void, Never>?
     @ObservationIgnored var hostRefreshRequested = false
+    /// Tells this chat's catalog the person read it, or stopped (`SessionCatalogStore.noteRead`; set by the shell).
+    @ObservationIgnored var onRead: (@MainActor (SessionReadActivity, Bool) -> Void)?
+    /// Turns that ended here, for `readActivity`.
+    @ObservationIgnored var turnsEnded = 0
+    @ObservationIgnored var readSettleTask: Task<Void, Never>?
+    /// How long after a turn ends the chat on screen is marked read: Hermes saves the turn's last
+    /// rows just after it says the turn is over, and a mark sent before them would count them unread.
+    @ObservationIgnored var readSettleDelay: Duration = .seconds(2)
 
     @ObservationIgnored let responseTextGrowthSubject = PassthroughSubject<ResponseTextGrowth, Never>()
     var responseTextGrowth: AnyPublisher<ResponseTextGrowth, Never> {
@@ -158,6 +166,7 @@ final class ChatModel {
                 if oldValue {
                     ChatPerformanceProbe.turnEnded(self)
                     lastTurnEndedAt = Date()
+                    readTurnEnded()
                     flushPersistence()
                     if let native = nativeConversationClient { forgetAgentFileFailures(from: native, onlyRefused: true) }
                 }

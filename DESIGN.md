@@ -129,7 +129,10 @@ bottom; the Secure credential vault is in Settings › Connections, with the app
 Keep it that short: a new destination goes where people already look, not on the first screen. Headers keep their
 own New chat only where there's no bar to hold it: Code mode, the iPhone Duo's side strip, Vision Pro's tab
 ornament, and a board opened with Back. The chat list (and the all-hosts view's All sessions) searches from the system
-glass search bar along the bottom, like All agents; it matches titles and previews, and a scroll puts the keyboard away. Feed, Ideas, Goals and Apps keep the Chat tab's header: ☰ and ⋯ (the agent's profile,
+glass search bar along the bottom, like All agents; it matches titles and previews, and a scroll puts the keyboard away.
+A chat with something new since it was last read has a bold title and Bots mode's dot after its time, and a chat
+whose message box holds an unsent message shows Draft before its preview. Where the computer keeps read state, the
+row's menu and leading swipe have Mark Read and Mark Unread. Feed, Ideas, Goals and Apps keep the Chat tab's header: ☰ and ⋯ (the agent's profile,
 then Files, Memory, Skills & tools and Scheduled tasks). The root's edge-swipe zones
 start below that row, so its corner buttons always get the tap. The avatar reacts to what the agent is doing (thinking, writing code, browsing, making
 images…), driven by the running tool (`AgentActivityKind`, shared with the island as `BighelpActivityPose`). On
@@ -142,7 +145,7 @@ turns it off. Outside the app, one Live Activity holds the active chats as compa
 fixed status icon. Chats needing attention come first. Each row opens its own chat; extra chats show as a count.
 The expanded Dynamic Island shows three rows, while the compact island keeps a quiet work or attention symbol. Every phone chat uses this big-avatar header and keeps the tab bar under its message box (All
 agents' chats excepted). Every chat has ☰ in the top left, like the other root screens; a chat opened from the
-list, Agents, Feed or a task goes back to it with the edge swipe. A group chat's name opens its Chat Info. The line under
+list, Agents, Feed or a task goes back to it with the edge swipe. A group chat's name opens its Group Settings (Chat Info for a group Hermes doesn't run). The line under
 the name says the agent's activity while it works, and otherwise the
 chat's title when Settings › Chat › Session title is on (off by default; never "New chat" or "Bot Chat"). iPad works the same way, with no always-open sidebar:
 ☰ slides the menu in from the leading edge, and chats use the width of the screen. The iPhone Duo follows how it's
@@ -378,7 +381,19 @@ that can't be reached says so and keeps showing what it had last time. While it'
 host stays connected, so a switch opens the agent's chat at once from the copy saved on the phone while that
 host's details finish loading.
 
-Group chats (Hermes hosted rooms / Bot Mode) live in the switcher, ☰ and Agents. Agents opens on the
+Group chats (Hermes hosted rooms / Bot Mode) live in the switcher, ☰ and Agents. A group's **Group Settings**
+(`GroupSettingsView`, a pushed page any screen can open: `AppRoute.groupSettings`) shows its name and "3 bots",
+its members' faces with a small Lead badge on the lead, then, where Hermes keeps settings for the room
+(`groups.state` has `context`): WHEN A MESSAGE NAMES NOBODY, three radio rows with a hint each (Everyone answers;
+Pick who answers, only where the room's runtime runs it; A lead passes it on, with the lead's name and a chevron to
+the member list) and the note that @mentions and @everyone go straight to the bots you name; and WHAT EVERY BOT
+KEEPS IN MIND, a one-line Purpose and Shared notes with a counter ("212 of 4,096"). Changes save as they're made
+and when the page closes; an edit Hermes doesn't save stays with the reason, Try again and Discard changes. A
+group Hermes doesn't run shows only its name and members. New Group Chat offers the same choice and a Purpose.
+In the chat, Hermes' picks are one quiet centered line ("Pixel gave this to Scout", "Assigned to Scout and
+Echo", "Couldn’t choose who answers, so everyone will"), the header says "Lead: Pixel" under the name, and a
+discussion Hermes paused at its cap is a small card ("Paused after 10 messages.") with Continue and Stop until
+something moves it on or it has used every Continue. Agents opens on the
 **Pinned** agents: each shows its role under the name (one line, trailing off), or what it's doing when it's busy.
 Touch and hold lifts an agent: drag it to reorder (the order is kept per host), or let go to see its actions.
 
@@ -412,7 +427,7 @@ Skills/Session rows in the + sheet, Agent Studio's Advanced page and templates, 
 Settings › Chat. Everyday controls must never live only behind it.
 
 The chat's ⋯ menu is one list, the same with Nerd Mode on or off: New Bot Chat in an agent's Bot Chat (Switch agent
-in the home chat); then This chat (a group chat's Chat info, where its members are, Rename…, Move to Project… with
+in the home chat); then This chat (a group chat's Group Settings and Chat info, where its members are, Rename…, Move to Project… with
 the chat's project, Files, and File changes when available); then Model (Model & speed, Usage); then More (Edit
 agent, Advanced). Model & speed contains Model & reasoning and Fast Mode. Usage contains provider usage, Context
 window and Compact. Existing technical controls stay in Advanced. The groups have lines between them, not titles:
@@ -516,7 +531,8 @@ text is SF Pro, as everywhere.
   in ember and "Needs you", which wins over working. It's only what the computer says (`BotChatActivityStore`):
   unknown or out of date shows nothing, and it clears when the turn ends.
 - **Touch and hold** a bot: its latest message, then New Chat, Pin (Unpin when pinned), Rearrange,
-  Mark Read/Unread (kept on this device), Bot Profile, a divider, and Hide. Actions stay in that order;
+  Mark Read/Unread (its Bot Chat's, on the computer; kept on this device where the computer keeps no read state),
+  Bot Profile, a divider, and Hide. Actions stay in that order;
   the primary bot has no Pin or Hide. Primary selection stays in Chats settings, and Routines in Bot Profile.
   A group chat's menu has Mark Unread and Rearrange.
 - **Marks**: thirteen shapes in eleven colors with two white eyes (`SimpleBotMark`), from before Bot Studio.

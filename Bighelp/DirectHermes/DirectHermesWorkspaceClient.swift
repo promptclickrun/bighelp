@@ -222,6 +222,14 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
         case .groupsDiscard:
             return try rpc(operation, payload, allowed: ["room_id", "member_id", "task_id", "execution_generation"],
                            required: ["room_id", "member_id", "task_id", "execution_generation"])
+        case .groupsContext:
+            // Routing and the lead are left out to keep what Hermes has.
+            return try rpc(operation, payload,
+                           allowed: ["room_id", "event_id", "purpose", "notes", "routing", "lead_member_id"],
+                           required: ["room_id", "event_id", "purpose", "notes"])
+        case .groupsContinue:
+            return try rpc(operation, payload, allowed: ["room_id", "discussion_event_id"],
+                           required: ["room_id", "discussion_event_id"])
         case .groupsApprove:
             return try rpc(operation, payload,
                            allowed: ["room_id", "member_id", "task_id", "execution_generation", "request_id", "choice"],

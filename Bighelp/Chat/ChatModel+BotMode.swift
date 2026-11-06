@@ -389,7 +389,68 @@ extension ChatModel {
         return suggestions
     }
 
+    /// The room's messages, with Hermes' lines about who took each message and its paused
+    /// discussions between them. Both carry the room log's order.
     var botModeTimelineItems: [TimelineItem] {
+        let messages = botModeMessageItems
+        guard let room = botModeRoom, !room.nativeNotices.isEmpty else { return messages }
+        let rows = BotModeRoomNoticePresentation.rows(
+            notices: room.nativeNotices, messages: room.visibleEvents.compactMap(\.nativeEvent),
+            names: botModeMemberNames, maximumContinues: botModeRoomSettings?.support.maximumContinues,
+            allowsContinue: botModeRoomStore?.nativeCapabilities?.supports("groups.continue") == true)
+        guard !rows.isEmpty else { return messages }
+        let notices = rows.map { TimelineItem.groupNotice($0.row, sourceOrder: $0.notice.sourceOrder,
+                                                          createdAt: $0.notice.event.createdAt) }
+        return (messages + notices).enumerated().sorted { left, right in
+            let leftOrder = left.element.metadata.sourceOrder ?? .max
+            let rightOrder = right.element.metadata.sourceOrder ?? .max
+            return leftOrder == rightOrder ? left.offset < right.offset : leftOrder < rightOrder
+        }.map(\.element)
+    }
+
+    /// Each member's name as the room shows it, for the lines about who took a message.
+    private var botModeMemberNames: [String: String] {
+        Dictionary(nativeRoomParticipants.map { ($0.memberID, $0.displayName) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    /// The room's settings as this connection last read them; nil where Hermes keeps none.
+    var botModeRoomSettings: HermesBotModeRoomSettings? {
+        guard !referenceOwnerRetired, let botModeRoomID else { return nil }
+        return botModeRoomStore?.nativeRoomSettings[botModeRoomID]
+    }
+
+    /// The lead's name while a lead passes on messages that name nobody ("Lead: Pixel").
+    var botModeLeadName: String? {
+        guard let context = botModeRoomSettings?.context, context.routing == .lead,
+              let lead = context.leadMemberID else { return nil }
+        return nativeRoomParticipants.first { $0.memberID == lead }?.displayName
+    }
+
+    func continueBotModeDiscussion(_ discussionEventID: String) async {
+        guard !referenceOwnerRetired, let botModeRoomID, let botModeRoomStore else { return }
+        await botModeRoomStore.continueNativeDiscussion(roomID: botModeRoomID, discussionEventID: discussionEventID)
+    }
+
+    /// Stop on a paused discussion's card: Hermes ends it for good, as the chat's Stop does.
+    func stopPausedBotModeDiscussion() async {
+        guard !referenceOwnerRetired, !isBotModeStopInFlight, let botModeRoomID, let botModeRoomStore else { return }
+        let generation = ownerGeneration
+        isStopping = true
+        defer { isStopping = false }
+        do {
+            try await botModeRoomStore.stopNativeRoom(roomID: botModeRoomID)
+        } catch is CancellationError {
+            return
+        } catch {
+            guard isCurrentOwner(generation) else { return }
+            // A saved cancel ID shows its own row with Stop again.
+            if botModeRoom?.nativePendingCancelID == nil {
+                failureMessage = "The discussion could not be stopped. Try again."
+            }
+        }
+    }
+
+    private var botModeMessageItems: [TimelineItem] {
         timelineEvents.compactMap { event -> TimelineItem? in
             guard let text = event.text else { return nil }
             switch event.kind {

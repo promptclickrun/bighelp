@@ -222,6 +222,27 @@ struct BighelpLinkHermesBotModeClientTests {
         #expect(messaging.requests.count == 1)
     }
 
+    /// Hermes adds fields to its answers (`groups.state` gained `context`), and a room it
+    /// answers for still opens: the client reads `room` and `driver_status` and ignores the rest.
+    @Test
+    func roomStateAcceptsFieldsTheClientDoesNotUse() async throws {
+        let owner = BighelpLinkHermesBotModeOwner(accountID: "account-1", hostID: "host-1", connectionID: "connection-1")
+        let messaging = HermesBotModeMessagingStub { request in
+            #expect(request.operation == .groupsState)
+            return try Self.result(for: request, payload: [
+                "room": Self.room(roomID: "room-1"),
+                "driver_status": .object(["working": .boolean(false)]),
+                "context": .object(["summary": .string("Planning the week")]),
+            ])
+        }
+        let client = BighelpLinkHermesBotModeClient(workspace: BighelpLinkWorkspaceClient(messaging: messaging),
+                                                  owner: owner, currentOwner: { owner })
+
+        let room = try await client.groupsState(roomID: "room-1", includeDisbanded: true)
+
+        #expect(room.roomID == "room-1")
+    }
+
     @Test
     func groupsClientDiscardsResultWhenAccountHostOrConnectionChangesDuringRequest() async throws {
         let owner = BighelpLinkHermesBotModeOwner(

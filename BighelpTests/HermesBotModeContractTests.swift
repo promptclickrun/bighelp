@@ -200,6 +200,16 @@ struct HermesBotModeContractTests {
         #expect(store.catalogRooms.isEmpty)
     }
 
+    /// A catalog Hermes refuses with a reason shows that reason, not a hint to check the
+    /// connection, which answered.
+    @Test func refusedCatalogShowsHermesReason() async throws {
+        let store = BotModeRoomStore(client: BotModeFixtureClient(), executionEnabled: false,
+                                     nativeClient: RefusingGroupCatalogClient())
+        await store.refreshNativeRoomCatalog()
+        #expect(store.catalogState
+            == .failed("Rooms could not be refreshed. Hermes said: the gateway that owns it did not answer"))
+    }
+
     @Test func readOnlyCatalogFixtureKeepsAllParticipantsAndRetiresOnHostChange() async throws {
         let store = BotModeRoomStore(client: BotModeFixtureClient(), executionEnabled: false,
                                      nativeClient: BotModeCatalogFixtureClient())
@@ -270,5 +280,12 @@ private final class DeferredGroupCatalogClient: BotModeCatalogFixtureClient {
             await withCheckedContinuation { pendingList = $0 }
         }
         return snapshot
+    }
+}
+
+private final class RefusingGroupCatalogClient: BotModeCatalogFixtureClient {
+    override func groupsCapabilities() async throws -> HermesBotModeCapabilities {
+        throw DirectHermesError.rpcRejected(code: 5114,
+                                            message: HermesRefusalMessage("the gateway that owns it did not answer"))
     }
 }

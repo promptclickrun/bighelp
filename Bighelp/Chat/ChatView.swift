@@ -140,6 +140,9 @@ struct ChatView: View {
     let onVoiceTap: () -> Void
     let onApprovalTap: (ApprovalRequest) -> Void
     let onPeopleTap: () -> Void
+    /// A group chat Hermes runs: its name and ⋯ › Group Settings open Group Settings. Nil
+    /// leaves the item out, and the name opens the chat's info.
+    let onGroupSettingsTap: (() -> Void)?
     /// This chat's files, from ⋯ › Files. Nil leaves the item out.
     let onChatFilesTap: (() -> Void)?
     /// ⋯ › Move to Project…. Nil leaves the item out.
@@ -228,6 +231,7 @@ struct ChatView: View {
         onVoiceTap: @escaping () -> Void = {},
         onApprovalTap: @escaping (ApprovalRequest) -> Void = { _ in },
         onPeopleTap: @escaping () -> Void = {},
+        onGroupSettingsTap: (() -> Void)? = nil,
         onChatFilesTap: (() -> Void)? = nil,
         projectMenuItem: ChatProjectMenuItem? = nil,
         onNewChatTap: @escaping () -> Void = {},
@@ -273,6 +277,7 @@ struct ChatView: View {
         self.onVoiceTap = onVoiceTap
         self.onApprovalTap = onApprovalTap
         self.onPeopleTap = onPeopleTap
+        self.onGroupSettingsTap = onGroupSettingsTap
         self.onChatFilesTap = onChatFilesTap
         self.projectMenuItem = projectMenuItem
         self.onNewChatTap = onNewChatTap
@@ -1000,11 +1005,11 @@ struct ChatView: View {
     private var groupConversationIdentityButton: some View {
         Button {
             dismissKeyboard()
-            onPeopleTap()
+            if let onGroupSettingsTap { onGroupSettingsTap() } else { onPeopleTap() }
         } label: {
             ChatConversationIdentityLabel(
                 title: model.botModeRoomTitle,
-                subtitle: nil,
+                subtitle: model.botModeLeadName.map { "Lead: \($0)" },
                 participants: resolvedIdentityParticipants,
                 theme: theme,
                 showsCaption: true,
@@ -1013,7 +1018,8 @@ struct ChatView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(model.botModeRoomTitle), \(groupParticipantSummary)")
-        .accessibilityHint("Opens People and Chat details")
+        .accessibilityValue(model.botModeLeadName.map { "Lead: \($0)" } ?? "")
+        .accessibilityHint(onGroupSettingsTap == nil ? "Opens People and Chat details" : "Opens Group Settings")
         .accessibilityIdentifier("chat.people")
     }
 
@@ -1157,9 +1163,16 @@ struct ChatView: View {
         }
     }
 
-    /// Rename, Move to Project and Files, and a group's Chat info (its members).
+    /// Rename, Move to Project and Files, and a group's Group Settings and Chat info (its members).
     @ViewBuilder
     private var chatItems: some View {
+        if model.isBotMode, let onGroupSettingsTap {
+            Button("Group Settings", systemImage: "person.2") {
+                dismissKeyboard()
+                onGroupSettingsTap()
+            }
+            .accessibilityIdentifier("chat.group-settings")
+        }
         if model.isBotMode {
             Button("Chat info", systemImage: "info.circle") {
                 dismissKeyboard()

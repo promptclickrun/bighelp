@@ -359,6 +359,9 @@ struct ChatDestinationView: View {
             },
             onApprovalTap: onOpenApproval,
             onPeopleTap: { isPeopleAndChatPresented = true },
+            onGroupSettingsTap: model.botModeRoom?.nativeRoomID.map { roomID in
+                { appState.open(.groupSettings(roomID: roomID, conversationID: model.conversationID)) }
+            },
             onChatFilesTap: { isSessionFilesPresented = true },
             projectMenuItem: projectMenuItem,
             onNewChatTap: onNewChat,

@@ -740,6 +740,77 @@ struct ChatTimelineRenderPartitionTests {
         #expect(textView.text.contains("Written while the reader drags."), "The newest rows show once the scroll settles.")
     }
 
+    /// The first words of an answer show at once instead of waiting out the wait after the rows before them
+    /// (the agent's work, a spinner), while the reader follows the chat. The words after them, and a first
+    /// answer that arrives while the reader drags, still wait.
+    @Test func theFirstWordsOfAnAnswerSkipTheWaitAfterTheWorkBeforeThem() async throws {
+        let owner = NSObject()
+        let timeline = ChatTimelineController()
+        func question(_ id: String) -> ChatCanvasRow {
+            .transcript(.entry(.message(TimelineItem(id: id, role: .human, sender: .user(snapshot: .init(name: "You")),
+                                                     content: .message("What's next?"), metadata: .init()))))
+        }
+        func answer(_ id: String, _ text: String) -> ChatCanvasRow {
+            .transcript(.entry(.message(TimelineItem(id: id, role: .assistant,
+                sender: .agent(id: "default", snapshot: .init(name: "Juno")),
+                content: .message(text), metadata: .init(delivery: "Streaming")))))
+        }
+        func view(_ rows: [ChatCanvasRow]) -> some View {
+            NativeChatTimeline(conversationID: "first-answer", ownerID: ObjectIdentifier(owner), rows: rows + [.bottom],
+                               controller: timeline, entryCount: rows.count) { row in
+                if case .transcript(.entry(.message(let message))) = row {
+                    TimelineItemView(item: message, onApprovalTap: { _ in })
+                } else {
+                    Text(row.id).frame(maxWidth: .infinity, minHeight: 40)
+                }
+            }
+            .environment(\.bighelpUIV3Enabled, true)
+        }
+        let host = UIHostingController(rootView: view([question("q1"), .pending("Thinking", true)]))
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        try await Task.sleep(for: .milliseconds(300))
+        let table = try #require(descendants(host.view, of: ChatTimelineTableView.self).first)
+        func shows(_ text: String) -> Bool { descendants(table, of: UITextView.self).contains { $0.text.contains(text) } }
+        /// Shows `rows` and waits until their update is laid out, which starts the next update's wait.
+        func layOut(_ rows: [ChatCanvasRow]) async throws {
+            let before = table.updateLaidOutAt
+            host.rootView = view(rows)
+            for _ in 0..<500 where table.updateLaidOutAt == before { try await Task.sleep(for: .milliseconds(1)) }
+            #expect(table.updateLaidOutAt > before)
+        }
+        // The cooldown after a laid-out update (`NativeChatTimeline` `updateInterval`).
+        let wait: CFTimeInterval = 0.05
+
+        try await layOut([question("q1"), .divider("Checked the notes")])
+        host.rootView = view([question("q1"), .divider("Checked the notes"), answer("a1", "The first words")])
+        try await Task.sleep(for: .milliseconds(15))
+        #expect(CACurrentMediaTime() - table.updateLaidOutAt < wait, "Checked inside the wait after the work")
+        #expect(shows("The first words"), "The first words show at once")
+
+        host.rootView = view([question("q1"), .divider("Checked the notes"), answer("a1", "The first words and more")])
+        try await Task.sleep(for: .milliseconds(15))
+        #expect(CACurrentMediaTime() - table.updateLaidOutAt < wait)
+        #expect(!shows("and more"), "The words after them wait as before")
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(shows("and more"))
+
+        // The next turn's first answer, while the reader drags.
+        try await layOut([question("q1"), answer("a1", "The first words and more"), question("q2"), .divider("Working")])
+        table.interactionStateOverride = true
+        host.rootView = view([question("q1"), answer("a1", "The first words and more"), question("q2"),
+                              .divider("Working"), answer("a2", "Written under the drag")])
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(!shows("Written under the drag"), "Reader interaction owns the chat")
+        table.interactionStateOverride = nil
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(shows("Written under the drag"))
+    }
+
     @Test func nativeContentInsetsPreserveReviewAndTailAnchors() async throws {
         let owner = NSObject()
         let timeline = ChatTimelineController()

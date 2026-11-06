@@ -162,7 +162,13 @@ struct SessionOpenLatencyTests {
                                    authenticationGeneration: UUID(), connectionGeneration: UUID())
         let records = (0..<7).map { SessionRecord(id: "warm-\($0)", kind: .direct, agentIDs: ["default"], title: "Saved") }
         let catalog = SessionCatalogStore(client: SessionCatalogFixtureClient(), records: records)
-        let features = ShellFeatureStore(timing: .immediate, catalog: catalog, navigationWorkspaceOwner: { owner })
+        var evicted: [String] = []
+        let features = ShellFeatureStore(
+            timing: .immediate,
+            catalog: catalog,
+            navigationWorkspaceOwner: { owner },
+            nativeModelEvicted: { id, _ in evicted.append(id) }
+        )
         for record in records {
             let route = AppRoute.chat(conversationID: record.id)
             #expect(try features.prepareCachedForUserNavigation(route))
@@ -173,6 +179,7 @@ struct SessionOpenLatencyTests {
         }
         let retained = records.filter { features.preparedModel(for: .chat(conversationID: $0.id)) != nil }.map(\.id)
         #expect(retained == ["warm-0", "warm-3", "warm-4", "warm-5", "warm-6"])
+        #expect(evicted == ["warm-1", "warm-2"] || evicted == ["warm-2", "warm-1"])
         features.resetForAccountBoundary()
         #expect(records.allSatisfy { features.preparedModel(for: .chat(conversationID: $0.id)) == nil })
     }

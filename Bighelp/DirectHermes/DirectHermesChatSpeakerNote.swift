@@ -1,10 +1,20 @@
 import Foundation
 
+/// Who a speaker note names: this person's ID and the name they saved (empty until they save one).
+struct ChatSpeaker: Equatable, Sendable {
+    let personID: String
+    let name: String
+}
+
 /// Tells the host who is about to send in a chat, so the agent knows who it's
 /// talking with when several people share one host.
 @MainActor
 protocol ChatSpeakerNoting: AnyObject, Sendable {
-    func note(agentID: String, storedSessionID: String) async
+    /// Who a note sent now would name; nil while there's no one to name (no person ID yet).
+    var speaker: ChatSpeaker? { get }
+    /// Says who's about to send. Returns who the host took the note for, or nil when it didn't.
+    @discardableResult
+    func note(agentID: String, storedSessionID: String) async -> ChatSpeaker?
 }
 
 /// The bighelp plugin's `native-people-v1` route. Sends the name you saved
@@ -34,17 +44,25 @@ final class DirectHermesChatSpeakerNote: ChatSpeakerNoting {
         self.pluginFeatures = pluginFeatures
     }
 
-    func note(agentID: String, storedSessionID: String) async {
-        guard let person = personID(), BighelpPersonID.isValid(person),
-              let workspace = currentWorkspace(), let owner = workspace.owner else { return }
+    var speaker: ChatSpeaker? {
+        guard let person = personID(), BighelpPersonID.isValid(person) else { return nil }
+        return ChatSpeaker(personID: person, name: UserIdentity.savedName(name()))
+    }
+
+    @discardableResult
+    func note(agentID: String, storedSessionID: String) async -> ChatSpeaker? {
+        guard let speaker, let workspace = currentWorkspace(), let owner = workspace.owner else { return nil }
         let payload = Self.payload(agentID: agentID, storedSessionID: storedSessionID,
-                                   personID: person, name: name(), pluginFeatures: pluginFeatures())
+                                   personID: speaker.personID, name: speaker.name, pluginFeatures: pluginFeatures())
         do {
             _ = try await workspace.perform(.peopleSpeaking, payload: payload, owner: owner)
         } catch WorkspaceClientError.conflict {
             // The plugin's context changed (412): the next call loads it again. Once.
-            _ = try? await workspace.perform(.peopleSpeaking, payload: payload, owner: owner)
-        } catch {}
+            guard (try? await workspace.perform(.peopleSpeaking, payload: payload, owner: owner)) != nil else { return nil }
+        } catch {
+            return nil
+        }
+        return speaker
     }
 
     static func payload(agentID: String, storedSessionID: String, personID: String, name: String,
@@ -68,18 +86,25 @@ extension DirectHermesConversationClient {
     /// message anyway and the agent just doesn't get the name.
     static let speakerNoteWait: Duration = .milliseconds(1_200)
 
-    /// Says who's sending. A chat's first message waits for it (the plugin records the brief's
-    /// person once), and so does the first one from this connection, when the host may still
-    /// have someone else as the speaker. Later turns read the note when they reach the model,
-    /// well after the message lands, so they go at once (a far host added round trips to each).
+    /// Says who's sending, for every message: the plugin names each message's writer from the
+    /// latest note. Nothing is noted before Send, since a note makes this person the chat's speaker
+    /// at once. A chat's first message waits for it (the plugin records the brief's person once),
+    /// and so does any message until the host has taken a note naming this person, as they are
+    /// now, in this stored session on this connection: the host may still have someone else as
+    /// the speaker. Later turns read the note when they reach the model, well after the message
+    /// lands, so they go at once (a far host added round trips to each).
     func noteSpeaker() async {
-        guard let speakerNote else { return }
-        let agentID = profile, storedID = storedID
+        guard let speakerNote, let speaker = speakerNote.speaker else { return }
+        let agentID = profile, storedID = storedID, generation = generation
         let note = Task { @MainActor [weak self] in
-            await speakerNote.note(agentID: agentID, storedSessionID: storedID)
-            self?.speakerNoted = true
+            // A failed or refused note, or one that lands after the chat moved to another
+            // connection or stored session, doesn't count: the next message waits for its own.
+            guard let noted = await speakerNote.note(agentID: agentID, storedSessionID: storedID),
+                  let self, self.generation == generation, self.storedID == storedID else { return }
+            self.notedSpeaker = (storedID, noted)
         }
-        guard projection.items.isEmpty || !speakerNoted else { return }
+        let known = notedSpeaker.map { $0.storedID == storedID && $0.speaker == speaker } ?? false
+        guard projection.items.isEmpty || !known else { return }
         let wait = Self.speakerNoteWait
         // Whichever ends first lets the message go: the note, or the wait. A note
         // still running after that finishes on its own.

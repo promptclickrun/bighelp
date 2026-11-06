@@ -447,6 +447,59 @@ struct DirectHermesHistoryProjectionTests {
         #expect(client.historyProjections[record.id]?.rows.map(\.id) == Array(61...140))
     }
 
+    /// Re-entering an open chat (Force Refresh, a warm return to it) reads its newest page once, the way
+    /// `NativeWorkspaceSessionBridge.reenterCanonicalSession` does. It read the whole history before: one
+    /// request per 200 rows of a long chat, every message laid out again. The earlier pages the chat
+    /// loaded stay, and "load earlier" goes on from them.
+    @Test func reenteringALongChatReadsOnlyItsNewestPage() async throws {
+        @MainActor final class FixtureState {
+            var newest = 3_000
+        }
+        let workspace = try SessionWorkspaceStub()
+        let state = FixtureState()
+        workspace.handler = { operation, payload in
+            switch operation {
+            case .profilesList: return DirectHermesSessionCatalogClientTests.profiles()
+            case .sessionsList:
+                return ["sessions": .array([DirectHermesSessionCatalogClientTests.session(id: "tip")]),
+                        "total": .integer(1), "offset": .integer(0), "limit": .integer(100)]
+            case .sessionHistory:
+                // Rows are numbered oldest first. "latest" counts the offset back from the newest.
+                let offset = try #require(payload["offset"]?.integer)
+                let limit = try #require(payload["limit"]?.integer)
+                let order = try #require(payload["order"]?.string)
+                let ids = order == "latest"
+                    ? Array(max(1, state.newest - offset - limit + 1)...(state.newest - offset))
+                    : Array((offset + 1)...min(state.newest, offset + limit))
+                return Self.page(ids.map { Self.row(id: $0, role: "user", content: .string("Row \($0)")) },
+                                 offset: offset, limit: limit, order: order)
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let client = DirectHermesSessionCatalogClientTests.client(workspace)
+        let record = try #require(try await client.list().first)
+        let turns = NativeWorkspaceSessionBridge.reentryTurnLimit
+        let opened = try await client.hydratePage(record, offset: nil, turnLimit: turns)
+        let earlier = try await client.hydratePage(opened.record, offset: try #require(opened.nextOffset), turnLimit: turns)
+        #expect(earlier.record.items.count == 640)
+
+        state.newest = 3_004
+        func historyReads() -> [SessionWorkspaceStub.Call] { workspace.calls.filter { $0.operation == .sessionHistory } }
+        let before = historyReads().count
+        let reentered = try await client.hydratePage(earlier.record, offset: nil, turnLimit: turns)
+        let reads = historyReads().dropFirst(before)
+        #expect(reads.count == 1)
+        #expect(reads.allSatisfy { ($0.payload["limit"]?.integer ?? .max) <= 400 })
+        #expect(client.historyProjections[record.id]?.rows.map(\.id) == Array(2_361...3_004))
+        #expect(reentered.record.items.count == 644)
+        #expect(reentered.nextOffset == 644)
+
+        // The whole history, as re-entry read it before.
+        let whole = try await client.hydrate(reentered.record)
+        #expect(whole.items.count == 3_004)
+        #expect(historyReads().count - before - 1 == 16)
+    }
+
     @Test func readingTheNewestPageAgainKeepsTheEarlierPagesTheChatHolds() async throws {
         @MainActor final class FixtureState {
             var newest = 140

@@ -49,6 +49,13 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
     var hasPendingSubmission: Bool {
         preparingAttachmentID != nil || pendingID != nil || waiter != nil
     }
+    /// The prompt whose own turn plays out live right now: Hermes started one turn for it, and what
+    /// arrives isn't a replay. Nil while catching up, in another turn, or once the prompt settled.
+    var liveTurnSubmission: UUID? {
+        guard !isReplayingActivity, !admissionOverlapped, let pendingID, let pendingTurnID,
+              pendingTurnID == projection.turnID else { return nil }
+        return pendingID
+    }
     // Read-only views of readiness gates, for explaining a disabled Send.
     var isHydratingForReason: Bool { isHydrating }
     var needsRecoveryForReason: Bool { needsRecovery }
@@ -156,8 +163,9 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
     @ObservationIgnored var onSubmissionAdmitted: (@MainActor () -> Void)?
     /// Says who is sending before each new turn (hosts several people share).
     @ObservationIgnored var speakerNote: (any ChatSpeakerNoting)?
-    /// A note from this connection has reached the host, so the plugin knows who's on this device.
-    @ObservationIgnored var speakerNoted = false
+    /// Who the host last took a note for, in which stored session. While that's still who's sending
+    /// here, a message goes without waiting for its own note.
+    @ObservationIgnored var notedSpeaker: (storedID: String, speaker: ChatSpeaker)?
     /// Other agents this chat's agent talks to (`ChatAgentTalkRail`).
     @ObservationIgnored var agentTalk: (any AgentTalkReading)?
     /// What the host supports for this chat's profile (helper Stop and Steer).
@@ -172,8 +180,10 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
     @ObservationIgnored var mediaFailures: [String: Int] = [:]
     var retainedMessageReactions: [Int: DirectHermesMessageReaction] = [:]
     @ObservationIgnored var generation = UUID()
-    @ObservationIgnored var waiter: CheckedContinuation<ConversationResponse, Error>?
-    @ObservationIgnored var pendingID: UUID?
+    // Observed: they decide `isReadyForSubmission`, and a message waiting in the chat goes the
+    // moment that changes (`ChatModel.waitForConnection`).
+    var waiter: CheckedContinuation<ConversationResponse, Error>?
+    var pendingID: UUID?
     @ObservationIgnored var pendingTurnID: String?
     @ObservationIgnored var admissionOverlapped = false
     @ObservationIgnored var submissionTurns: [String] = []

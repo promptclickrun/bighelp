@@ -680,6 +680,8 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
         /// long answer kept the main thread from the reader's drag. After an update is laid out, the
         /// next waits this long.
         static var updateInterval: CFTimeInterval { 0.05 }
+        /// The turn whose first readable answer last skipped that wait (`answeredTurn`): once a turn.
+        private var firstAnswerTurn: String?
 
         func install(on table: ChatTimelineTableView) {
             dataSource = UITableViewDiffableDataSource(tableView: table) { [weak self] table, indexPath, id in
@@ -699,6 +701,9 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             table.onLayout = { [weak self, weak table] in
                 guard let self, let table else { return }
                 self.publishPosition(of: table)
+                if let id = self.conversationID {
+                    ChatPerformanceProbe.timelineLaidOut(table, conversationID: id)
+                }
             }
         }
 
@@ -721,7 +726,12 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             }
             let sameChat = update.parent.conversationID == conversationID && update.parent.ownerID == ownerID
             let wait = table.updateLaidOutAt + Self.updateInterval - CACurrentMediaTime()
-            if sameChat, wait > 0 || table.isScrolling {
+            // The first words of an answer show at once instead of waiting out the wait after the
+            // update before them (the agent's work, a spinner), while the reader follows the newest
+            // message and isn't touching or scrolling the chat. Words after them wait as before.
+            let firstAnswer = sameChat && wait > 0 && table.followsTail && !table.isUserInteracting
+                && !table.isScrolling && !table.isAnimatingReturn && takesFirstAnswer(update.parent.rows)
+            if sameChat, (wait > 0 && !firstAnswer) || table.isScrolling {
                 table.applyCustomContentInsets(update.parent.contentInsets)
                 let delay = table.isScrolling ? Self.updateInterval / 2 : max(wait, 0.005)
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak table] in
@@ -731,8 +741,15 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             }
             updateScheduled = false
             pendingUpdate = nil
-            ChatPerformanceProbe.measure("timeline.update") {
-                self.update(update.parent, environment: update.environment, table: table)
+            if firstAnswer {
+                // Kept apart from `timeline.update`: this is the answer row's first build and sizing.
+                ChatPerformanceProbe.measure("timeline.first_answer_update") {
+                    self.update(update.parent, environment: update.environment, table: table)
+                }
+            } else {
+                ChatPerformanceProbe.measure("timeline.update") {
+                    self.update(update.parent, environment: update.environment, table: table)
+                }
             }
             table.applyCustomContentInsets(update.parent.contentInsets)
             table.accessibilityValue = "\(update.parent.entryCount) conversation entries"
@@ -742,6 +759,34 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
         func cancelPendingUpdate() {
             pendingUpdate = nil
             prewarm?.cancel()
+        }
+
+        /// Whether `next` brings the current turn's first readable answer, which the rows on screen don't
+        /// show yet, and this turn hasn't had its answer shown at once already.
+        private func takesFirstAnswer(_ next: [ChatCanvasRow]) -> Bool {
+            guard let turn = Self.answeredTurn(in: next), turn != firstAnswerTurn,
+                  Self.answeredTurn(in: rows) != turn else { return false }
+            firstAnswerTurn = turn
+            return true
+        }
+
+        /// The turn an answer with words in it ends the rows with: the ID of the person's message it
+        /// answers (empty before any), or nil while the rows since that message have no such answer.
+        /// Looks back only as far as that message.
+        static func answeredTurn(in rows: [ChatCanvasRow]) -> String? {
+            var answered = false
+            for row in rows.reversed() {
+                switch row {
+                case .staged(let item):
+                    return answered ? item.id : nil
+                case .transcript(.entry(.message(let item))) where item.role == .human:
+                    return answered ? item.id : nil
+                case .transcript(.entry(.message(let item))) where item.role == .assistant:
+                    if case .message(let text) = item.content, text.contains(where: { !$0.isWhitespace }) { answered = true }
+                default: break
+                }
+            }
+            return answered ? "" : nil
         }
 
         func releaseBuiltRows() {
@@ -887,6 +932,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             if reset {
                 table.followsTail = true
                 table.isAnimatingReturn = false
+                firstAnswerTurn = nil
                 heights.removeAll()
                 estimates.removeAll()
                 built.removeAll()

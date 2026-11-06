@@ -556,6 +556,22 @@ Selected-checkpoint branching remains unavailable on the native stock-host
 contract until Hermes exposes the required visible-row/digest/CAS boundary.
 Retained fork value types do not authorize an alternate transport.
 
+The on-device catalog is split into a metadata manifest and immutable,
+session-specific content revisions. Opening a session restores only its exact
+content revision; decoded resident content is an LRU-bounded cache. Leaving an
+idle chat evicts its feature model and native projection, then replaces the
+catalog's full payload with the persisted metadata pointer. The next open
+restores the same immutable bytes. Drafts, uncertain sends, active turns and
+mounted routes remain owners and are never evicted as cache.
+
+Transport and discovery caches remain presentation-only. A frame the host sent
+on the current socket within the last few seconds can stand in for the pre-send
+ping, but never after the app came back or the network changed until a newer
+ping is answered, and never authorizes a mutation from a replaced owner or
+socket. Model-provider
+catalogs use a short owner-scoped TTL and coalesced reads; mutations invalidate
+their current-selection evidence and retain Hermes readback as authority.
+
 Readable session content is not stored by bighelp's notification services. It may
 exist in the app's local cache and on the authorized Hermes host.
 

@@ -187,7 +187,13 @@ extension DirectHermesConversationClient {
                     voiceReplyUnavailable = true
                 }
             }
-            if let model { model.acceptExternal([item], isLiveAssistantText: change.sideTaskResult == nil) }
+            if let model {
+                model.acceptExternal([item], isLiveAssistantText: change.sideTaskResult == nil)
+                // Timed only from this prompt's own live turn: not a replay, a side task or another turn.
+                if item.role == .assistant, change.sideTaskResult == nil, let submission = liveTurnSubmission {
+                    ChatPerformanceProbe.answerReceived(item.id, submission: submission, in: model)
+                }
+            }
             else if let draftSink, pendingTurnID == projection.turnID, !terminalSeen { draftSink(item) }
         }
         if let settled = change.settledAnswer { model?.updateNativeMetadata(settled, from: self) }

@@ -584,6 +584,28 @@ struct DirectHermesAgentAdapterTests {
         ]))
     }
 
+    @Test func modelProviderDiscoveryReusesFreshAndConcurrentReads() async throws {
+        let workspace = try AgentNativeWorkspace()
+        var now = Date(timeIntervalSince1970: 1_800_000_000)
+        let client = DirectHermesAgentRuntimeDefaultsClient(
+            workspace: workspace,
+            owner: workspace.initialOwner,
+            currentOwner: { workspace.owner },
+            now: { now }
+        )
+        async let first = client.loadModelProviders(agentID: "studio")
+        async let second = client.loadModelProviders(agentID: "studio")
+        _ = try await (first, second)
+        #expect(workspace.calls.filter { $0.operation == .modelOptions }.count == 1)
+
+        _ = try await client.loadModelProviders(agentID: "studio")
+        #expect(workspace.calls.filter { $0.operation == .modelOptions }.count == 1)
+
+        now.addTimeInterval(DirectHermesAgentRuntimeDefaultsClient.providerCacheLifetime)
+        _ = try await client.loadModelProviders(agentID: "studio")
+        #expect(workspace.calls.filter { $0.operation == .modelOptions }.count == 2)
+    }
+
     @Test func ignoredCronReasoningKeyIsRejectedWithoutMutation() async throws {
         let workspace = try AgentNativeWorkspace()
         let client = runtime(workspace)

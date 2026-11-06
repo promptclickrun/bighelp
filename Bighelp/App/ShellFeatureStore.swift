@@ -52,6 +52,7 @@ final class ShellFeatureStore {
     private let sessionControlMessaging: (any BighelpLinkSessionControlMessaging)?
     private let slashCommandCatalogClient: (any SlashCommandCatalogClient)?
     private let generatedMediaResolver: (any GeneratedMediaResolving)?
+    private let nativeModelEvicted: @MainActor (String, ObjectIdentifier) -> Void
     private let voiceClientFactory: ((SessionRecord, AgentProfile?) -> any VoiceSessionClient)?
     private let voiceInputLevelSource: () -> any VoiceInputLevelSource
     private let voiceHoldMusic: @MainActor () -> (any VoiceHoldMusicPlaying)?
@@ -305,6 +306,7 @@ final class ShellFeatureStore {
         sessionControlMessaging: (any BighelpLinkSessionControlMessaging)? = nil,
         slashCommandCatalogClient: (any SlashCommandCatalogClient)? = nil,
         generatedMediaResolver: (any GeneratedMediaResolving)? = nil,
+        nativeModelEvicted: @escaping @MainActor (String, ObjectIdentifier) -> Void = { _, _ in },
         recentModelHistory: RecentModelHistoryStore = RecentModelHistoryStore(),
         midSessionBehavior: @escaping @MainActor () -> MidSessionChatBehavior = { .steer }
     ) {
@@ -338,6 +340,7 @@ final class ShellFeatureStore {
         self.sessionControlMessaging = sessionControlMessaging
         self.slashCommandCatalogClient = slashCommandCatalogClient
         self.generatedMediaResolver = generatedMediaResolver
+        self.nativeModelEvicted = nativeModelEvicted
         self.recentModelHistory = recentModelHistory
         self.midSessionBehavior = midSessionBehavior
         conversationClientFactory = conversationClient ?? { session, agent in
@@ -946,6 +949,8 @@ final class ShellFeatureStore {
             chatModels[id] = nil
             nativeModelUse[id] = nil
             hydratedNavigationModels[id] = nil
+            nativeModelEvicted(id, ObjectIdentifier(model))
+            catalog.compactSessionContent(id: id)
         }
     }
 

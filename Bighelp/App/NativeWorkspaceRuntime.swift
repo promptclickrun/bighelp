@@ -391,6 +391,9 @@ final class NativeWorkspaceRuntime {
             sessionControlMessaging: sessionControls,
             slashCommandCatalogClient: WorkspaceSlashCommandCatalogProxy(box: slashCommandsBox),
             generatedMediaResolver: mediaResolver,
+            nativeModelEvicted: { [weak bridge] id, model in
+                bridge?.releaseCachedSession(id: id, modelIdentity: model)
+            },
             recentModelHistory: RecentModelHistoryStore(defaults: preferences, scopeID: { scope }),
             midSessionBehavior: { settings.midSessionChatBehavior }
         )
@@ -570,13 +573,10 @@ final class NativeWorkspaceRuntime {
         }
         let refreshed = try await bridge.reenterCanonicalSession(record, model: model)
         try require(owner)
-        _ = try features.installSessionStateSnapshot(
-            SessionHydrationPage(record: refreshed, nextOffset: nil),
-            source: record
-        )
+        _ = try features.installSessionStateSnapshot(refreshed, source: record)
         try require(owner)
         guard bridge.isWarmSession(
-            sessions.session(id: record.id) ?? refreshed,
+            sessions.session(id: record.id) ?? refreshed.record,
             model: model
         ) else {
             throw WorkspaceClientError.ownerChanged
@@ -798,6 +798,26 @@ final class NativeWorkspaceRuntime {
             try agentRepository.save(agents.profiles)
             supported.formUnion(DirectHermesReleaseContract.profileOperations)
             try publishCapabilities()
+            connections.cloneClient = DirectHermesAgentProfileCloneClient(
+                workspace: workspace, owner: owner, currentOwner: { [weak connections] in connections?.owner }
+            )
+            connections.openCanonicalSession = { [weak self] profile, expectedOwner in
+                guard let self else { throw WorkspaceClientError.ownerChanged }
+                try self.require(expectedOwner)
+                let record = try await self.bridge.canonicalChat(profileID: profile)
+                try self.require(expectedOwner)
+                _ = try self.sessions.installWorkspaceRecord(record, ownerIsCurrent: { [weak self] in
+                    self?.connections.owner == expectedOwner && self?.retired == false
+                })
+                return record.id
+            }
+            isReady = true
+            try await refreshSessionsForBootstrap(owner: owner, request: request)
+            try require(owner, request: request)
+            isSuspended = false
+            // Core chat is now mounted and authoritative. Scheduled tasks,
+            // project association and room discovery are presentation
+            // features; publishing them must not delay the first send.
             await refreshScheduledTasks(expectedOwner: owner)
             try require(owner, request: request)
             if scheduledTasks.loadState == .loaded { supported.formUnion([.schedulesEdit, .schedulesRun]) }
@@ -822,23 +842,6 @@ final class NativeWorkspaceRuntime {
                                      .groupsRetry, .groupsApprove, .groupsDisband])
             }
             try publishCapabilities()
-            connections.cloneClient = DirectHermesAgentProfileCloneClient(
-                workspace: workspace, owner: owner, currentOwner: { [weak connections] in connections?.owner }
-            )
-            connections.openCanonicalSession = { [weak self] profile, expectedOwner in
-                guard let self else { throw WorkspaceClientError.ownerChanged }
-                try self.require(expectedOwner)
-                let record = try await self.bridge.canonicalChat(profileID: profile)
-                try self.require(expectedOwner)
-                _ = try self.sessions.installWorkspaceRecord(record, ownerIsCurrent: { [weak self] in
-                    self?.connections.owner == expectedOwner && self?.retired == false
-                })
-                return record.id
-            }
-            isReady = true
-            try await refreshSessionsForBootstrap(owner: owner, request: request)
-            try require(owner, request: request)
-            isSuspended = false
 
         } catch {
             guard !retired, refreshID == request else { return }

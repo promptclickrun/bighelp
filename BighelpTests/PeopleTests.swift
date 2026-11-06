@@ -100,6 +100,21 @@ struct PeopleTests {
         #expect(performer.payloads.count == 1)
     }
 
+    /// A chat counts the host as knowing who's sending only from a note it took, so the route says
+    /// whom it named only when the host answered.
+    @Test func theNoteSaysWhoTheHostTookItFor() async throws {
+        let performer = try SpeakingPerformer()
+        let note = DirectHermesChatSpeakerNote(currentWorkspace: { performer }, name: { " Colt " },
+                                               personID: { Self.person })
+        #expect(note.speaker == ChatSpeaker(personID: Self.person, name: "Colt"))
+        #expect(await note.note(agentID: "default", storedSessionID: "s1") == note.speaker)
+        performer.failure = WorkspaceClientError.unavailable(.unsupportedOperation)
+        #expect(await note.note(agentID: "default", storedSessionID: "s1") == nil)
+        let nobody = DirectHermesChatSpeakerNote(currentWorkspace: { performer }, name: { "Colt" }, personID: { nil })
+        #expect(nobody.speaker == nil)
+        #expect(await nobody.note(agentID: "default", storedSessionID: "s1") == nil)
+    }
+
     /// Older plugins refuse fields they don't know, so without
     /// `native-card-objects-v1` the note is exactly what it always was.
     @Test func withoutTheObjectCardsFeatureTheNoteIsUnchanged() async throws {

@@ -8,20 +8,28 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
     }
 
     private let service: DirectHermesAgentProfileService
+    private let now: @MainActor () -> Date
     private var baselines: [String: Snapshot] = [:]
     private var providerCache: [String: [BighelpLinkModelProvider]] = [:]
+    private var providerCacheFetchedAt: [String: Date] = [:]
+    private var providerLoads: [String: Task<[BighelpLinkModelProvider], any Error>] = [:]
+    static let providerCacheLifetime: TimeInterval = 60
     private var confirmation: AgentRuntimeDefaultsSaveConfirmation?
     private var confirmationExpiresAt: Date?
     private var isSaving = false
 
     init(workspace: any WorkspaceOperationPerforming, owner: WorkspaceOwner,
-         currentOwner: @escaping @MainActor () -> WorkspaceOwner?) {
+         currentOwner: @escaping @MainActor () -> WorkspaceOwner?,
+         now: @escaping @MainActor () -> Date = Date.init) {
         service = DirectHermesAgentProfileService(workspace: workspace, owner: owner, currentOwner: currentOwner)
+        self.now = now
     }
 
     func loadCatalog(agentID: String) async throws -> AgentRuntimeDefaultsCatalog {
-        let snapshot = try await readSnapshot(agentID: agentID)
-        let providers = try await loadModelProviders(agentID: agentID)
+        async let snapshotTask = readSnapshot(agentID: agentID)
+        async let providersTask = loadModelProviders(agentID: agentID)
+        let snapshot = try await snapshotTask
+        let providers = try await providersTask
         baselines[agentID] = snapshot
         return AgentRuntimeDefaultsCatalog(defaults: snapshot.defaults, providers: providers, support: snapshot.support)
     }
@@ -34,11 +42,28 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
 
     func loadModelProviders(agentID: String) async throws -> [BighelpLinkModelProvider] {
         _ = try DirectHermesAgentProfileService.profileIdentifier(agentID)
-        let response = try await service.request(.modelOptions, ["profile": .string(agentID)],
-                                                 capability: .modelsRead, profileID: agentID)
-        let providers = try Self.decodeModelProviders(response)
-        providerCache[agentID] = providers
-        return providers
+        if let cached = cachedModelProviders(agentID: agentID) { return cached }
+        if let existing = providerLoads[agentID] { return try await existing.value }
+        let task = Task { @MainActor [service] in
+            let response = try await service.request(
+                .modelOptions,
+                ["profile": .string(agentID)],
+                capability: .modelsRead,
+                profileID: agentID
+            )
+            return try Self.decodeModelProviders(response)
+        }
+        providerLoads[agentID] = task
+        do {
+            let providers = try await task.value
+            providerCache[agentID] = providers
+            providerCacheFetchedAt[agentID] = now()
+            providerLoads[agentID] = nil
+            return providers
+        } catch {
+            providerLoads[agentID] = nil
+            throw error
+        }
     }
 
     /// Hermes' model catalog (`model.options`), read so the picker always has it: a provider
@@ -75,7 +100,10 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
     }
 
     func cachedModelProviders(agentID: String) -> [BighelpLinkModelProvider]? {
-        guard service.currentOwner() == service.owner, service.workspace.owner == service.owner else { return nil }
+        guard service.currentOwner() == service.owner, service.workspace.owner == service.owner,
+              let fetchedAt = providerCacheFetchedAt[agentID],
+              now().timeIntervalSince(fetchedAt) >= 0,
+              now().timeIntervalSince(fetchedAt) < Self.providerCacheLifetime else { return nil }
         return providerCache[agentID]
     }
 
@@ -172,6 +200,7 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
             }
             let verified = try await readSnapshot(agentID: agentID)
             baselines[agentID] = verified
+            invalidateProviderCache(agentID: agentID)
             guard verified.defaults == desired else {
                 throw AgentRuntimeDefaultsPartialSaveError(committed: verified.defaults)
             }
@@ -182,12 +211,20 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
         } catch {
             try service.requireOwner()
             guard didSubmitMutation else { throw error }
+            invalidateProviderCache(agentID: agentID)
             let verified: Snapshot
             do { verified = try await readSnapshot(agentID: agentID) }
             catch { try service.requireOwner(); throw WorkspaceClientError.outcomeUnknown }
             baselines[agentID] = verified
             throw AgentRuntimeDefaultsPartialSaveError(committed: verified.defaults)
         }
+    }
+
+    private func invalidateProviderCache(agentID: String) {
+        providerLoads[agentID]?.cancel()
+        providerLoads[agentID] = nil
+        providerCache[agentID] = nil
+        providerCacheFetchedAt[agentID] = nil
     }
 
     private func readSnapshot(agentID: String) async throws -> Snapshot {

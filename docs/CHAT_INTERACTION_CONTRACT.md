@@ -61,7 +61,11 @@ A self-sizing row takes its new height at once, except inside a keyboard or
 rotation animation: UIKit's 0.3 s resize animation piled up on a streamed answer,
 which resizes many times a second, and bounced it. Each row update waits 50 ms
 after the previous one is laid out, which leaves the main thread room for touches
-while an answer streams.
+while an answer streams. The one exception is a turn's first readable answer:
+while the reader follows the newest message and isn't touching, dragging or
+decelerating the chat, the update that brings its first words applies at once,
+once per turn. The words after them, tool bursts and reading older history keep
+the wait.
 Speculative row prefetching is disabled for this canvas because growing, rich
 rows multiplied hosting/layout work. Re-enabling it or replacing the container
 requires comparative evidence for expanded tools, growing text, and user drag.
@@ -97,6 +101,7 @@ cover these boundaries:
 | View identity and selection | `appendingTextPreservesThePreviousNativeMessageAndItsSelection` |
 | Bounded cells and reading position | `nativeRowsRecycleAndPrependingHistoryKeepsTheVisibleMessageInPlace`, `oneExpandedWorkTrailRecyclesIndividualToolRows` |
 | Streaming under the reader's drag | `growingAnswerResizesWithoutAnimation`, `aDragHoldsTheGrowingAnswerUntilTheScrollSettles` |
+| First readable answer without the wait | `theFirstWordsOfAnAnswerSkipTheWaitAfterTheWorkBeforeThem` |
 | Correct reuse, observation, and owner replacement | `recycledRowsStartWithTheirOwnLocalState`, `livePresentationChangesUpdateAnOtherwiseUnchangedRow`, `replacingTheModelWithMatchingRowIDsRetiresItsVisibleActions` |
 | Exact incremental text | `incrementalNativeTextPreservesExactCharactersAndFormatting`, `streamingTextEditsOnlyTheChangedSuffix` |
 | Native input continuity | `typingDuringLongHistoryStreamingKeepsTheNativeComposerAndCaret` |

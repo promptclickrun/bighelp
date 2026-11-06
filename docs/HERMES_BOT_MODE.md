@@ -183,6 +183,46 @@ so a local and a peer `default` never share a voice).
   tool calls or claim token streaming when the hosted-room log only provides
   completed member messages.
 
+## Group settings, routing and Continue
+
+Hermes 0.23 keeps settings for the rooms it runs itself (`gateway/hosted_room_context.py`),
+in one `room.context_set` event: `purpose` (one line, at most 500 characters; Hermes
+collapses whitespace), `notes` (at most 4,096 bytes, trimmed), `routing` (`everyone`, the
+default; `lead`; or `auto`) and `lead_member_id` (only with `lead`, a seated member). The app
+goes by what each room returns, never by version:
+
+- `groups.state` returns them as `context`. A room without it has none of these settings,
+  and Group Settings shows only its name and members. A context without `routing`, or with a
+  routing the app doesn't know, hides that choice, and a save leaves `routing` out so Hermes
+  keeps it. `driver_status.routing_modes` says what the room's runtime runs: "Pick who
+  answers" shows only where it lists `auto` (or the room already uses it).
+  `driver_status.max_continues` is how many times one discussion may continue.
+- `groups.context` `{room_id, event_id, purpose, notes, routing?, lead_member_id?}` answers
+  `{context, event}`. An omitted routing field keeps Hermes' value. The edit is saved with the
+  room first (`nativePendingContext`) and keeps its `event_id` until Hermes answers, so a
+  retry after a lost answer gets the first save back. A refusal keeps the edit and says why
+  (another computer runs the room: "This Group Chat is managed by another gateway."). New
+  Group Chat saves its choice the same way once the room exists.
+- A lead's pick is `room.assignment` `{lead_member_id, member_ids, fallback}` (`fallback`: the
+  lead's answer named nobody, so the lead takes it); the automatic pick is `room.routed`
+  `{member_ids, everyone, fallback}` (`fallback`: the pick failed, so everyone answers).
+  @mentions, @all/@everyone, scheduled posts and replies in a thread skip both. Hermes
+  writes them as the room's gateway; the app keeps them, a pause (`room.activity` with
+  `bounded`), `room.continued` and `room.stop_requested` beside the messages
+  (`nativeNotices`, a key older builds don't read) and shows each as one centered line. A
+  line names only members still in the room, and one naming nobody is left out. Which bots an
+  @mention reached isn't in the log, so the app doesn't say it.
+- A discussion pauses after 10 member messages or 3 rounds. `groups.continue`
+  `{room_id, discussion_event_id}` answers `{continued, event}` with a `room.continued` and
+  grants one more budget, at most `max_continues` times. The pause's card offers Continue and
+  Stop (`groups.stop`) until a later Continue or pause for that discussion, a Stop after its
+  message, a newer message in its thread, or the last Continue moves it on (Hermes'
+  `paused_discussion`).
+
+Vectors: `BighelpTests/Fixtures/HermesGroups/room-settings.json`, from the Hermes 0.23.0
+source, not a recording. Tests: `HermesGroupRoomSettingsTests`. Demo: `-preview-group-settings`
+(`GroupSettingsDemoClient`; `-preview-group-settings-refused` refuses every save).
+
 ## Mentions, authors and optional live activity
 
 The hosted driver, not the local fixture parser, chooses recipients. It matches
@@ -244,7 +284,7 @@ an unconfirmed close relies on the host's bounded inactivity lease.
 
 ## Verification and release
 
-Run `HermesBotModeContractTests`, `HermesGroupsHostPathTests` (both paths' recorded replies), `BighelpLinkHermesBotModeClientTests`,
+Run `HermesBotModeContractTests`, `HermesGroupsHostPathTests` (both paths' recorded replies), `HermesGroupRoomSettingsTests`, `BighelpLinkHermesBotModeClientTests`,
 `BighelpLinkHermesBotModeApprovalTests`, `BotModeRoomStoreTests` and
 `ChatBotModeIntegrationTests` along with the chat interaction regression gate.
 The Link client tests cover request shapes, cancelled/stale results, idempotency,

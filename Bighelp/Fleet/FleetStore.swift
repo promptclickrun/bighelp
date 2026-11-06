@@ -95,6 +95,10 @@ final class FleetStore {
     var sections: [FleetSection] = []
     /// Which section each group chat is in, by its list ID. Kept on this device.
     var groupSectionIDs: [String: String] = [:]
+    /// Group chats pinned on Bots mode's home, and ones hidden from it, by list ID. Hermes keeps
+    /// neither for group chats, so the app does (and the computers, `bots.layout`).
+    var pinnedGroupIDs: [String] = []
+    var hiddenGroupIDs: [String] = []
     /// Why the last section or hide change couldn't be saved.
     var placementError: String?
 
@@ -105,6 +109,7 @@ final class FleetStore {
     @ObservationIgnored var selectedHostPlacementWriter: ((AgentListPlacement, String) async throws -> Void)?
     /// Sections deleted here whose members are still being unfiled.
     @ObservationIgnored var pendingSectionDeletes: [String: UUID] = [:]
+    @ObservationIgnored var sectionUnfiling: [String: Task<Void, Never>] = [:]
     /// When each agent's placement was last saved from here.
     @ObservationIgnored var placementWrites: [String: Date] = [:]
     @ObservationIgnored private var reads: [UUID: Task<Void, Never>] = [:]

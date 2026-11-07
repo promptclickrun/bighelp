@@ -124,6 +124,7 @@ final class NativeWorkspaceRuntime {
             avatarDirectoryProvider: { [agentRepository] in try? agentRepository.scopedAvatarsDirectory() },
             currentHostID: { scope }
         )
+        agents.savesProfiles = { [agentRepository] in try? agentRepository.save($0) }
         self.agents = agents
         let defaultsBox = WorkspaceOwnedClientBox<any AgentRuntimeDefaultsClient>(
             connections: connections, authority: authority

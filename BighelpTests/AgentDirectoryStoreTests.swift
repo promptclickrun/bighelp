@@ -210,6 +210,25 @@ struct AgentDirectoryStoreTests {
         #expect(restored.pinnedAgentIDs == ["finance", "default"])
     }
 
+    /// A section changed here is in the list the next launch opens with. Saved only at each load,
+    /// a deleted section came back from it before the computer answered, and was kept from then on.
+    @Test func aPlacementChangeIsInTheListTheNextLaunchOpensWith() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "agent-placement-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let host = DemoRepository<[AgentProfile]>(directory: directory, name: "host", seed: [.defaultFixture])
+        let saved = DemoRepository<[AgentProfile]>(directory: directory, name: "saved", seed: [.defaultFixture])
+        let store = AgentDirectoryStore(client: DemoAgentDirectoryClient(repository: host), defaults: isolatedDefaults(),
+                                        profiles: try saved.load())
+        store.savesProfiles = { try? saved.save($0) }
+
+        let work = AgentListPlacement(sectionID: "sec-work", sectionName: "Work")
+        try await store.setPlacement(work, profileID: AgentProfile.defaultFixture.id)
+
+        #expect(try saved.load().first?.placement == work)
+        #expect(try host.load().first?.placement == work)
+    }
+
     @Test func pinnedIntentSurvivesPartialCatalogAndRelaunch() async throws {
         let defaults = isolatedDefaults()
         let client = AgentDirectoryFixtureClient(profiles: [.defaultFixture, .financeFixture])

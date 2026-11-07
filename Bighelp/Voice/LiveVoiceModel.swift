@@ -174,6 +174,7 @@ final class LiveVoiceModel {
         phase = .preparing
         errorMessage = nil
         cleanupMessage = nil
+        endedCallReport = nil
         providerStarted = false
         nativeConnected = false
         answerApplied = false
@@ -265,9 +266,11 @@ final class LiveVoiceModel {
         peer?.setMuted(muted)
     }
 
-    /// The report of where this call's sound goes on the device (Settings › Voice › Debug); nil for a call
+    /// The report of where this call's sound goes on the device (Settings › Voice › Debug), or the last
+    /// call's once it ended, so Copy report still has a call Gemini refused at once; nil for a call
     /// without one (GPT-Live).
-    func audioReport() -> String? { (peer as? LiveVoiceAudioReporting)?.audioReport() }
+    func audioReport() -> String? { (peer as? LiveVoiceAudioReporting)?.audioReport() ?? endedCallReport }
+    @ObservationIgnored private var endedCallReport: String?
 
     /// Cheap to ask on every redraw, unlike the report itself.
     var keepsAudioReport: Bool { peer is LiveVoiceAudioReporting }
@@ -403,10 +406,16 @@ final class LiveVoiceModel {
                 fail(LiveVoiceControlError.unavailable, generation: generation)
             }
         case "transport_closed", "closed":
+            let geminiClose = provider == .gemini ? GeminiLiveClose(event: event) : nil
+            // Gemini refused the call before it was set up: a failure, in Gemini's own words (#888).
+            if let geminiClose, !geminiClose.ready {
+                fail(geminiClose, generation: generation)
+                return
+            }
             stopLocal()
             phase = .ended
             cleanupMessage = provider == .gemini
-                ? "Gemini ended the call. Work you started keeps going."
+                ? geminiClose?.message ?? "Gemini ended the call. Work you started keeps going."
                 : "The host closed live voice. Accepted tasks were not cancelled."
         default: break // Unknown events cannot execute/control tasks.
         }
@@ -532,6 +541,7 @@ final class LiveVoiceModel {
         peer?.onConnectionState = nil
         peer?.onAudioRoute = nil
         peer?.onInterruption = nil
+        if let reporting = peer as? LiveVoiceAudioReporting { endedCallReport = reporting.audioReport() }
         peer?.close()
         peer = nil
         nativeConnected = false
@@ -573,6 +583,8 @@ final class LiveVoiceModel {
     static func safeMessage(_ error: any Error, provider: LiveVoiceProvider = .codexSubscription) -> String {
         if let error = error as? BighelpRealtimeAudioPeer.Failure { return error.localizedDescription }
         if let error = error as? LiveVoiceControlError { return error.localizedDescription }
+        // Gemini's own close reason is the one provider text shown: cleaned, one line, bounded (#888).
+        if let close = error as? GeminiLiveClose { return close.message }
         if provider == .gemini { return geminiMessage(error) }
         // Plain words for host answers. Never surface arbitrary provider or
         // transport text, SDP or headers.

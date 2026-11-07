@@ -680,7 +680,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
         private var prewarm: DispatchWorkItem?
         private var memoryWarning: NSObjectProtocol?
         private var lastScrolledAt: CFTimeInterval = 0
-        private var pendingUpdate: (parent: NativeChatTimeline, environment: EnvironmentValues)?
+        private var pendingUpdate: (parent: NativeChatTimeline, environment: EnvironmentValues, style: Style)?
         private var updateScheduled = false
         /// A streamed answer can arrive far faster than it can be laid out again, and each layout of a
         /// long answer kept the main thread from the reader's drag. After an update is laid out, the
@@ -714,7 +714,10 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
         }
 
         func scheduleUpdate(_ parent: NativeChatTimeline, environment: EnvironmentValues, table: ChatTimelineTableView) {
-            pendingUpdate = (parent, environment)
+            // The rows' look is read now, while SwiftUI runs updateUIView: SwiftUI calls it again only
+            // for the environment values read during it. Read in the update below, a change from Light
+            // to Dark with the chat open never reached the rows (#855).
+            pendingUpdate = (parent, environment, Style(environment))
             guard !updateScheduled else { return }
             updateScheduled = true
             // Diffable self-sizing measures hosting views synchronously. Do
@@ -750,11 +753,11 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             if firstAnswer {
                 // Kept apart from `timeline.update`: this is the answer row's first build and sizing.
                 ChatPerformanceProbe.measure("timeline.first_answer_update") {
-                    self.update(update.parent, environment: update.environment, table: table)
+                    self.update(update.parent, environment: update.environment, style: update.style, table: table)
                 }
             } else {
                 ChatPerformanceProbe.measure("timeline.update") {
-                    self.update(update.parent, environment: update.environment, table: table)
+                    self.update(update.parent, environment: update.environment, style: update.style, table: table)
                 }
             }
             table.applyCustomContentInsets(update.parent.contentInsets)
@@ -912,7 +915,8 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             return (start, end)
         }
 
-        func update(_ parent: NativeChatTimeline, environment: EnvironmentValues, table: ChatTimelineTableView) {
+        private func update(_ parent: NativeChatTimeline, environment: EnvironmentValues, style nextStyle: Style,
+                            table: ChatTimelineTableView) {
             // Preserve known visible heights before a structural update makes
             // UIKit estimate the old viewport again. Changed rows are still
             // invalidated below and always receive native self-sizing.
@@ -925,7 +929,6 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             rowContent = parent.rowContent
             defer { schedulePrewarm(table) }
             live.take(environment)
-            let nextStyle = Style(environment)
             let previousContext = rowContext
             rowContext = parent.rowContext
             let styleChanged = style != nextStyle || previousContext.density != rowContext.density

@@ -3,6 +3,12 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.70
+
+### New
+
+- **Apps from your agents:** ask an agent for a small app, for example a budget planner or a dashboard. The agent makes the app, and the chat shows a card for it. Tap **Open App** to use the app on the full screen. An app can show live data, which changes while the app is open. When the agent allows it, the app can send your answer back: bighelp shows you the message first, and sends it only when you tap **Send**. Update the bighelp plugin on your computer to 3.46.0 to use apps.
+
 ## 2.6.69
 
 ### Fixed

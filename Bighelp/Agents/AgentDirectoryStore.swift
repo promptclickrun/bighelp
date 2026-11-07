@@ -64,6 +64,9 @@ final class AgentDirectoryStore {
     var avatarDirectory: URL? { avatarDirectoryProvider() }
 
     private let client: any AgentDirectoryClient
+    /// Keeps the list on this device after a change made here, as each load does, so the next
+    /// launch opens with it. Set by the workspace that owns the saved list.
+    @ObservationIgnored var savesProfiles: (([AgentProfile]) -> Void)?
     private let defaults: UserDefaults
     private let currentHostID: () -> String?
     private let avatarDirectoryProvider: () -> URL?
@@ -325,6 +328,7 @@ final class AgentDirectoryStore {
             if let index = profiles.firstIndex(where: { $0.id == profileID }) { profiles[index].placement = previous }
             throw error
         }
+        savesProfiles?(profiles)
     }
 
     @discardableResult

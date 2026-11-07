@@ -107,9 +107,13 @@ final class FleetStore {
     @ObservationIgnored let directory: URL
     /// Saves the selected host's placements through its own agent list.
     @ObservationIgnored var selectedHostPlacementWriter: ((AgentListPlacement, String) async throws -> Void)?
-    /// Sections deleted here whose members are still being unfiled.
-    @ObservationIgnored var pendingSectionDeletes: [String: UUID] = [:]
+    /// Sections renamed or deleted here whose members are still changing, with the change's token:
+    /// `adoptSections` neither brings them back nor gives them back an old name meanwhile. With
+    /// each, the IDs other computers gave it (same-named sections show as one).
+    @ObservationIgnored var retiringSectionIDs: [String: UUID] = [:]
     @ObservationIgnored var sectionUnfiling: [String: Task<Void, Never>] = [:]
+    /// A section change's second pass, over bots the copies it went by didn't have yet.
+    @ObservationIgnored var sectionCatchUps: [String: Task<Void, Never>] = [:]
     /// When each agent's placement was last saved from here.
     @ObservationIgnored var placementWrites: [String: Date] = [:]
     @ObservationIgnored private var reads: [UUID: Task<Void, Never>] = [:]

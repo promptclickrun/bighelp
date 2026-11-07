@@ -67,8 +67,10 @@ enum FleetSectioning {
     /// agree (a rename elsewhere, fully saved). A section whose name is
     /// already listed joins it, so same-named sections on different hosts
     /// show as one. Mirrors Hermes Desktop's `adoptBotSectionsFromMeta`.
+    /// `held` (sections changed here whose members are still changing) are
+    /// neither added nor renamed.
     static func adopt(_ local: [FleetSection], placements: [AgentListPlacement],
-                      ignoring pendingDeletes: Set<String>) -> [FleetSection] {
+                      ignoring held: Set<String>) -> [FleetSection] {
         var order: [String] = []
         var names: [String: Set<String>] = [:]
         for placement in placements {
@@ -78,11 +80,12 @@ enum FleetSectioning {
         }
         let known = Set(local.map(\.id))
         var result = local.map { section -> FleetSection in
-            guard let agreed = names[section.id], agreed.count == 1, let name = agreed.first else { return section }
+            guard !held.contains(section.id), let agreed = names[section.id], agreed.count == 1,
+                  let name = agreed.first else { return section }
             return FleetSection(id: section.id, name: name)
         }
         var listedNames = Set(result.map { FleetSection.nameKey($0.name) })
-        for id in order where !known.contains(id) && !pendingDeletes.contains(id) {
+        for id in order where !known.contains(id) && !held.contains(id) {
             guard let name = names[id]?.sorted().first, listedNames.insert(FleetSection.nameKey(name)).inserted
             else { continue }
             result.append(FleetSection(id: id, name: name))
@@ -205,11 +208,22 @@ extension FleetStore {
               sections[index].name != clean else { return }
         sections[index].name = clean
         saveSections()
+        // Until every member has the new name, the old one can't come back: from members filed under
+        // another computer's ID for it (which no listed section is named now), nor from members that
+        // still agree on it.
+        let token = UUID()
+        let others = Self.sectionIDs(of: members).subtracting([id])
+        let held = others.union([id])
+        for heldID in held { retiringSectionIDs[heldID] = token }
         for member in members where self.section(id: id) != nil {
             var placement = member.placement ?? AgentListPlacement()
             placement.sectionID = id
             placement.sectionName = clean
             try? await member.save(placement)
+        }
+        catchUp(id, holding: held, token: token, carrying: held) { [weak self] agent in
+            guard let self, section(id: id)?.name == clean, agent.placement?.sectionName != clean else { return }
+            try? await file(agent, in: id)
         }
     }
 
@@ -227,21 +241,52 @@ extension FleetStore {
         let groups = groupSectionIDs.filter { $0.value == id }.map(\.key)
         let deletion = FleetSectionDeletion(section: section, index: index, agentIDs: members.map(\.id), groupIDs: groups)
         let token = UUID()
-        pendingSectionDeletes[id] = token
+        // With it, the IDs its members on other computers carry for it, or the first member out lets
+        // another's bring it back.
+        let retiring = Self.sectionIDs(of: members).union([id])
+        for retired in retiring { retiringSectionIDs[retired] = token }
         for group in groups { groupSectionIDs[group] = nil }
         saveSections()
         sectionUnfiling[id] = Task { @MainActor [weak self] in
             for member in members {
-                guard let self, pendingSectionDeletes[id] == token else { return }
+                guard let self, retiringSectionIDs[id] == token else { return }
                 var placement = member.placement ?? AgentListPlacement()
                 placement.sectionID = nil
                 placement.sectionName = nil
                 try? await member.save(placement)
             }
-            if self?.pendingSectionDeletes[id] == token { self?.pendingSectionDeletes[id] = nil }
-            self?.sectionUnfiling[id] = nil
+            guard let self else { return }
+            sectionUnfiling[id] = nil
+            catchUp(id, holding: retiring, token: token, carrying: retiring) { [weak self] agent in
+                guard let self, retiringSectionIDs[id] == token else { return }
+                try? await file(agent, in: nil)
+            }
         }
         return deletion
+    }
+
+    /// A section change's second pass. A bot filed in the section on another device can be missing
+    /// from the copies the change went by, and would bring the old section back when next read: the
+    /// other computers are read again, `late` gets each agent still filed under one of `ids`, and
+    /// only then can `adoptSections` take in `held` again.
+    private func catchUp(_ id: String, holding held: Set<String>, token: UUID, carrying ids: Set<String>,
+                         late: @escaping @MainActor (FleetAgent) async -> Void) {
+        sectionCatchUps[id] = Task { @MainActor [weak self] in
+            guard let self else { return }
+            refresh(force: true)
+            await waitForReads()
+            for agent in agents() where agent.placement?.sectionID.map(ids.contains) == true { await late(agent) }
+            release(held, token: token)
+        }
+    }
+
+    private static func sectionIDs(of members: [FleetSectionMember]) -> Set<String> {
+        Set(members.compactMap { $0.placement?.sectionID })
+    }
+
+    /// Lets `adoptSections` take these IDs in again, unless a later change holds them.
+    private func release(_ ids: Set<String>, token: UUID) {
+        for id in ids where retiringSectionIDs[id] == token { retiringSectionIDs[id] = nil }
     }
 
     /// Waits until a deleted section's members are out of it (Bots mode's sheets, tests).
@@ -249,8 +294,15 @@ extension FleetStore {
         await sectionUnfiling[id]?.value
     }
 
+    /// Waits until a section change has reached the bots the copies didn't have (tests).
+    func waitForSectionCatchUp(_ id: String) async {
+        await sectionCatchUps[id]?.value
+    }
+
     func undoDeleteSection(_ deletion: FleetSectionDeletion) {
-        pendingSectionDeletes[deletion.section.id] = nil
+        if let token = retiringSectionIDs[deletion.section.id] {
+            release(Set(retiringSectionIDs.keys), token: token)
+        }
         guard !sections.contains(where: { $0.id == deletion.section.id }) else { return }
         sections.insert(deletion.section, at: min(deletion.index, sections.count))
         for group in deletion.groupIDs { groupSectionIDs[group] = deletion.section.id }
@@ -387,7 +439,7 @@ extension FleetStore {
     func adoptSections(adding live: [AgentListPlacement] = []) {
         let placements = hosts.flatMap { snapshots[$0.id]?.agents ?? [] }.compactMap(\.placement) + live
         let adopted = FleetSectioning.adopt(sections, placements: placements,
-                                            ignoring: Set(pendingSectionDeletes.keys))
+                                            ignoring: Set(retiringSectionIDs.keys))
         guard adopted != sections else { return }
         sections = adopted
         saveSections()

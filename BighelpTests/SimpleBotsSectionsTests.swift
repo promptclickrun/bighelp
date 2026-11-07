@@ -23,7 +23,11 @@ struct SimpleBotsSectionsTests {
         func select(_ hostID: UUID) {}
         func canOpen(_ hostID: UUID) -> Bool { true }
         func setPinned(_ pinned: Bool, hostID: UUID, profileID: String) -> Bool { true }
-        func setPlacement(_ placement: AgentListPlacement, hostID: UUID, profileID: String) async throws {}
+        /// Keeps it, as the computer would.
+        func setPlacement(_ placement: AgentListPlacement, hostID: UUID, profileID: String) async throws {
+            guard let index = snapshots[hostID]?.agents.firstIndex(where: { $0.profileID == profileID }) else { return }
+            snapshots[hostID]?.agents[index].placement = placement
+        }
         func updateChat(_ change: FleetChatChange, chat: FleetChat) async throws {}
     }
 
@@ -218,6 +222,87 @@ struct SimpleBotsSectionsTests {
                 "The studio's bot leaves the section too")
         fleet.adoptSections()
         #expect(fleet.sections.isEmpty, "So the section doesn't come back")
+    }
+
+    /// A section made on each computer under one name (Hermes Desktop makes its own IDs) shows as
+    /// one. Renaming or deleting it changes its members one at a time, and the home takes in
+    /// sections from members after each change: the other computer's ID must not bring the old
+    /// section back meanwhile.
+    @Test func renamingOrDeletingSameNamedSectionsLeavesNoneBehind() async throws {
+        let work = self.work
+        /// Mina on this computer in `work`, Rio on the studio in its own "Work".
+        func setUp() async -> (FleetStore, SimpleBotsSectionEditor, Phone) {
+            let reader = Reader()
+            reader.snapshots[Self.studio] = FleetSnapshot(agents: [
+                FleetAgent(hostID: Self.studio, profileID: "rio", name: "Rio", role: "", isPinned: false,
+                           isDefault: false, placement: AgentListPlacement(sectionID: "sec-desktop", sectionName: "Work")),
+            ], refreshedAt: Date())
+            let fleet = FleetStore(reader: reader, directory: folder(), saveDelay: .zero)
+            fleet.refresh()
+            await fleet.waitForReads()
+            fleet.sections = [work]
+            let phone = Phone()
+            phone.placements["mina"] = AgentListPlacement(sectionID: work.id, sectionName: work.name)
+            var mina = bot("mina")
+            mina.placement = phone.placements["mina"]
+            let editor = SimpleBotsSectionEditor(fleet: fleet, bots: [mina], groups: []) { bot, placement in
+                phone.placements[bot.profileID] = placement
+                // What `FleetSectionAdoption` does when the gateway in use's bots change.
+                fleet.adoptSections(adding: Array(phone.placements.values))
+            }
+            return (fleet, editor, phone)
+        }
+
+        let (renamed, renaming, _) = await setUp()
+        await renaming.rename(work.id, to: "Projects")
+        #expect(renamed.sections == [FleetSection(id: work.id, name: "Projects")], "No “Work” is left over")
+        #expect(renamed.agent(hostID: Self.studio, profileID: "rio")?.placement
+                == AgentListPlacement(sectionID: work.id, sectionName: "Projects"))
+
+        let (deleted, deleting, phone) = await setUp()
+        await deleting.delete(work.id)
+        #expect(phone.placements["mina"]?.sectionID == nil)
+        #expect(deleted.agent(hostID: Self.studio, profileID: "rio")?.placement?.sectionID == nil)
+        #expect(deleted.sections.isEmpty, "The studio's own ID for it doesn't bring it back")
+    }
+
+    /// Another device filed a bot on another computer into the section, and this phone's copy of
+    /// that computer hasn't read it yet. Once Rename or Delete has changed the members it knew, the
+    /// other computers are read again and that bot takes the change too: left as it was, it brought
+    /// the deleted section back at the next read.
+    @Test func aSectionChangeReachesBotsTheCopiesMissed() async throws {
+        let work = self.work
+        /// Mina on this computer in `work`; Rio on the studio filed in it only after the copy was read.
+        func setUp() async -> (FleetStore, Reader, SimpleBotsSectionEditor) {
+            let reader = Reader()
+            reader.snapshots[Self.studio] = FleetSnapshot(agents: [
+                FleetAgent(hostID: Self.studio, profileID: "rio", name: "Rio", role: "", isPinned: false,
+                           isDefault: false),
+            ], refreshedAt: Date())
+            let fleet = FleetStore(reader: reader, directory: folder(), saveDelay: .zero)
+            fleet.refresh()
+            await fleet.waitForReads()
+            fleet.sections = [work]
+            reader.snapshots[Self.studio]?.agents[0].placement = AgentListPlacement(sectionID: work.id,
+                                                                                   sectionName: work.name)
+            let phone = Phone()
+            phone.placements["mina"] = AgentListPlacement(sectionID: work.id, sectionName: work.name)
+            return (fleet, reader, editor(fleet, phone, bots: ["mina"], groups: []))
+        }
+
+        let (renamed, studio, renaming) = await setUp()
+        await renaming.rename(work.id, to: "Projects")
+        await renamed.waitForSectionCatchUp(work.id)
+        #expect(studio.snapshots[Self.studio]?.agents.first?.placement
+                == AgentListPlacement(sectionID: work.id, sectionName: "Projects"), "Rio takes the new name")
+
+        let (deleted, reader, deleting) = await setUp()
+        await deleting.delete(work.id)
+        await deleted.waitForSectionCatchUp(work.id)
+        #expect(reader.snapshots[Self.studio]?.agents.first?.placement?.sectionID == nil, "Rio leaves it")
+        deleted.refresh(force: true)
+        await deleted.waitForReads()
+        #expect(deleted.sections.isEmpty, "So the section doesn't come back at the next read")
     }
 
     // MARK: Group chats

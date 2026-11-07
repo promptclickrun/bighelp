@@ -50,6 +50,22 @@ private final class NativeWorkspaceRefreshErrorBox {
     var error: (any Error)?
 }
 
+/// The bighelp plugin's state as the last refresh found it, kept with the connection it was read on.
+/// The voice screen reads it to say why live voice can't start.
+@MainActor
+final class NativePluginStateRecord {
+    private var reading: (owner: WorkspaceOwner, state: NativeWorkspaceRuntime.PluginState)?
+
+    func record(_ state: NativeWorkspaceRuntime.PluginState, owner: WorkspaceOwner) {
+        reading = (owner, state)
+    }
+
+    /// `.unknown` until a refresh on `owner`'s connection read the plugin.
+    func state(for owner: WorkspaceOwner) -> NativeWorkspaceRuntime.PluginState {
+        reading.flatMap { $0.owner == owner ? $0.state : nil } ?? .unknown
+    }
+}
+
 @MainActor
 @Observable
 final class NativeWorkspaceRuntime {
@@ -77,6 +93,7 @@ final class NativeWorkspaceRuntime {
     private(set) var errorMessage: String?
     private(set) var optionalFeatureMessage: String?
     @ObservationIgnored private let connections: WorkspaceConnectionStore
+    @ObservationIgnored private let pluginStates: NativePluginStateRecord
     @ObservationIgnored private let stockGitBox: WorkspaceOwnedClientBox<any ProjectGitClient>
     @ObservationIgnored private let agentRepository: DemoRepository<[AgentProfile]>
     @ObservationIgnored private let resetClients: [@MainActor () -> Void]
@@ -100,6 +117,8 @@ final class NativeWorkspaceRuntime {
         guard authority.kind == .direct else { throw WorkspaceClientError.ownerChanged }
         self.connections = connections
         self.authority = authority
+        let pluginStates = NativePluginStateRecord()
+        self.pluginStates = pluginStates
         let scope = authority.cacheScopeID
         let root = directory.appending(path: scope, directoryHint: .isDirectory)
         guard let preferences = UserDefaults(suiteName: "app.loopdy.native-workspace." + scope) else {
@@ -413,11 +432,16 @@ final class NativeWorkspaceRuntime {
         // mounting the shell; ShellFeatureStore is not an observable store.
         _ = features.prepareSessions()
         features.configureLiveVoiceFactory { [weak connections, weak bridge] session, agent, chat in
-            guard let connections, let owner = connections.owner, owner.authority == authority,
-                  let workspace = connections.workspace,
-                  workspace.nativeContext?.features.contains("native-voice-v1") == true,
-                  let coordinate = bridge?.currentCoordinate(for: session.id), coordinate.owner == owner,
-                  let stored = coordinate.storedSessionID, session.kind == .direct else { return nil }
+            let owner = connections?.owner.flatMap { $0.authority == authority ? $0 : nil }
+            let workspace = owner == nil ? nil : connections?.workspace
+            let coordinate = bridge?.currentCoordinate(for: session.id).flatMap { $0.owner == owner ? $0 : nil }
+            if let reason = LiveVoiceUnavailable.reason(
+                connected: workspace != nil, features: workspace?.nativeContext?.features,
+                plugin: owner.map { pluginStates.state(for: $0) } ?? .unknown,
+                isDirectChat: session.kind == .direct, chatReady: coordinate?.storedSessionID != nil
+            ) { return .failure(reason) }
+            guard let connections, let owner, let workspace, let coordinate,
+                  let stored = coordinate.storedSessionID else { return .failure(.connecting) }
             let voiceOwner = LiveVoiceOwner(hostID: authority.cacheScopeID,
                 authorizationID: owner.authenticationGeneration.uuidString + ":" + owner.connectionGeneration.uuidString,
                 agentID: coordinate.profileID, sessionID: stored)
@@ -436,7 +460,7 @@ final class NativeWorkspaceRuntime {
                 guard let chat else { throw LiveVoiceControlError.wrongOwner }
                 return try await chat.runNativeVoiceRequest(text)
             }, context: context)
-            return voice.makeModel(agentName: agent?.name ?? "Hermes")
+            return .success(voice.makeModel(agentName: agent?.name ?? "Hermes"))
         }
         // Native creation already captures the verified selected cwd before
         // mutation; do not perform a second post-create workspace move.
@@ -525,6 +549,39 @@ final class NativeWorkspaceRuntime {
             await self?.performRefresh()
         }
         await retryUnrecoveredActiveChat()
+    }
+
+    /// Something on the computer changed what it serves (the bighelp plugin installed or turned on,
+    /// its dashboard or gateway restarted). Reads it all again once a refresh under way ends, since
+    /// that one may have read the computer from before the change, so new features and modes show.
+    func reloadAfterHostChange() async {
+        guard !retired, connections.owner?.authority == authority else { return }
+        resetClients.forEach { $0() }
+        await refreshFlight.runAfterCurrent { [weak self] in
+            await self?.performRefresh()
+        }
+    }
+
+    /// What the computer's dashboard does with the bighelp plugin, as a refresh found it.
+    enum PluginState: Equatable, Sendable {
+        /// Not read on this connection yet.
+        case unknown
+        case running
+        /// Not installed, or installed and turned off.
+        case notInstalled
+        /// Installed and turned on, but the dashboard serving this app hasn't loaded it.
+        case notLoaded
+        /// The plugin's list didn't come for another reason (a dropped answer, a refused sign-in).
+        case unreachable
+    }
+
+    /// Only a missing route says the dashboard hasn't loaded the plugin; Hermes' own plugin list
+    /// then says whether it's there at all.
+    private static func pluginState(after error: any Error, store: DirectHermesWorkspaceStore) async -> PluginState {
+        guard case WorkspaceClientError.unavailable(.pluginRequired) = error else { return .unreachable }
+        guard let list = try? await store.managePlugins(["action": .string("list")]),
+              let rows = try? HostInstalledPlugin.decodeList(list) else { return .unreachable }
+        return rows.contains(where: \.configuredEnabled) ? .notLoaded : .notInstalled
     }
 
     /// Coming back must leave the open chat current. When the bulk recovery
@@ -758,9 +815,13 @@ final class NativeWorkspaceRuntime {
             do {
                 _ = try await workspace.perform(.nativeContext, payload: [:], owner: owner)
                 optionalFeatureMessage = nil
+                pluginStates.record(.running, owner: owner)
             } catch {
                 try require(owner, request: request)
                 optionalFeatureMessage = "Optional host integrations are unavailable. Core workspace access does not require them."
+                let state = await Self.pluginState(after: error, store: directStore)
+                try require(owner, request: request)
+                pluginStates.record(state, owner: owner)
             }
             if let context = workspace.nativeContext {
                 if context.features.contains("native-voice-v1") { supported.insert(.liveVoice) }

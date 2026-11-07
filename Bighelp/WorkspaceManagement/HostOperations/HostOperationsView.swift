@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Settings › System, laid out like Fleet settings for the computer in use: its computers,
-/// then update Hermes, the bighelp plugin and restart the gateway; everything else waits in
-/// Additional settings, folded away.
+/// then update Hermes, the bighelp plugin and restart the gateway or the dashboard; everything
+/// else waits in Additional settings, folded away.
 @MainActor
 struct HostOperationsView<MoreLinks: View>: View {
     @Bindable var store: HostOperationsStore
@@ -15,13 +15,17 @@ struct HostOperationsView<MoreLinks: View>: View {
     @State private var drainTarget: Bool?
     @State private var confirmsMigration = false
     @State private var confirmsUpdate = false
+    @State private var confirmsDashboardRestart = false
     @State private var showsAdditional = false
     @State private var pluginUpdate: HostPluginUpdateModel?
     @Environment(\.bighelpHostRegistry) private var hostRegistry
 
-    init(store: HostOperationsStore, leading: AnyView? = nil, @ViewBuilder moreLinks: () -> MoreLinks) {
+    /// `pluginUpdate` is for fixtures; otherwise the page reads the selected host's own.
+    init(store: HostOperationsStore, leading: AnyView? = nil, pluginUpdate: HostPluginUpdateModel? = nil,
+         @ViewBuilder moreLinks: () -> MoreLinks) {
         _store = Bindable(wrappedValue: store)
         self.leading = leading
+        _pluginUpdate = State(initialValue: pluginUpdate)
         self.moreLinks = moreLinks()
     }
 
@@ -40,6 +44,9 @@ struct HostOperationsView<MoreLinks: View>: View {
                 gatewaySection(overview)
             } else if store.isLoading {
                 Section { ProgressView("Loading…") }
+            }
+            if let pluginUpdate, pluginUpdate.state != .notInstalled {
+                dashboardSection(pluginUpdate)
             }
             additionalSettings
         }
@@ -103,6 +110,17 @@ struct HostOperationsView<MoreLinks: View>: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Hermes checks the plan again, then runs one gateway for every eligible profile.")
+        }
+        .confirmationDialog(
+            "Restart the Hermes dashboard?",
+            isPresented: $confirmsDashboardRestart,
+            titleVisibility: .visible
+        ) {
+            Button("Restart") { Task { await pluginUpdate?.restartDashboard() } }
+                .accessibilityIdentifier("system.dashboard.restart.confirm")
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("bighelp disconnects for a moment and reconnects. Replies in progress on your computer stop.")
         }
         .confirmationDialog(
             "Update Hermes?",
@@ -213,6 +231,46 @@ struct HostOperationsView<MoreLinks: View>: View {
 
         } header: {
             Text("Messaging gateway")
+        }
+    }
+
+    // MARK: Dashboard
+
+    /// The Hermes dashboard (`hermes dashboard` or `hermes serve`) serves this app's connection and
+    /// the bighelp plugin's routes. Hermes can't restart it for an app, so the plugin running in it
+    /// does, in place; before the dashboard has loaded the plugin, only the computer can.
+    @ViewBuilder
+    private func dashboardSection(_ plugin: HostPluginUpdateModel) -> some View {
+        // Until the plugin was read, there's no telling whether it can restart the dashboard.
+        if plugin.canRestartHost || ![.idle, .checking].contains(plugin.state) {
+            Section {
+                if plugin.canRestartHost {
+                    BighelpActionRow(title: "Restart Hermes Dashboard",
+                                     detail: plugin.state == .restarting ? "Restarting…" : "bighelp reconnects after a moment",
+                                     systemImage: "arrow.clockwise") { confirmsDashboardRestart = true }
+                        .disabled(plugin.isWorking || !store.canAct)
+                        .accessibilityIdentifier("system.dashboard.restart")
+                } else {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Restart it on your computer")
+                            Text(plugin.isLoaded
+                                 ? "This dashboard can't restart from bighelp."
+                                 : "The dashboard hasn't loaded the bighelp plugin yet, so only your computer can restart it.")
+                                .font(.bighelp(.footnote))
+                                .foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: "desktopcomputer")
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("system.dashboard.restart-on-computer")
+                }
+            } header: {
+                Text("Dashboard")
+            } footer: {
+                Text("The dashboard serves bighelp's connection and the bighelp plugin. A new or updated plugin takes effect after the dashboard and the messaging gateway restart.")
+            }
         }
     }
 
@@ -435,7 +493,7 @@ struct HostOperationsView<MoreLinks: View>: View {
 }
 
 extension HostOperationsView where MoreLinks == EmptyView {
-    init(store: HostOperationsStore) {
-        self.init(store: store) { EmptyView() }
+    init(store: HostOperationsStore, pluginUpdate: HostPluginUpdateModel? = nil) {
+        self.init(store: store, pluginUpdate: pluginUpdate) { EmptyView() }
     }
 }

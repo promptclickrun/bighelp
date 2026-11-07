@@ -553,15 +553,21 @@ struct BighelpAppComposition {
                 let owner = LiveVoiceOwner(hostID: "fixture-host", authorizationID: "inert-ui-fixture",
                     agentID: session.agentIDs.first ?? "fixture-agent", sessionID: session.id)
                 if keepsReport {
-                    return DemoLiveVoiceReportCall.model(owner: owner, agentName: agent?.name ?? "bighelp")
+                    return .success(DemoLiveVoiceReportCall.model(owner: owner, agentName: agent?.name ?? "bighelp"))
                 }
                 let control = LiveVoiceControlClient(owner: owner, operation: { _, _ in
                     // Never reaches the peer, microphone, network or provider.
                     throw LiveVoiceControlError.unavailable
                 }, isOwnerCurrent: { $0 == owner })
-                return LiveVoiceModel(agentName: agent?.name ?? "bighelp", client: control,
-                    makePeer: { BighelpRealtimeAudioPeer(captureEnabled: false) })
+                return .success(LiveVoiceModel(agentName: agent?.name ?? "bighelp", client: control,
+                    makePeer: { BighelpRealtimeAudioPeer(captureEnabled: false) }))
             }
+        }
+        // `-test-live-voice-unavailable <reason>`: live voice can't start, for that reason (`pluginNotLoaded`).
+        if usesFixtures, let index = arguments.firstIndex(of: "-test-live-voice-unavailable") {
+            let reason = arguments.indices.contains(index + 1)
+                ? LiveVoiceUnavailable(rawValue: arguments[index + 1]) : nil
+            featureStore.configureLiveVoiceFactory { _, _, _ in .failure(reason ?? .pluginNotLoaded) }
         }
         #endif
         if usesOverflowStatusRailFixture {

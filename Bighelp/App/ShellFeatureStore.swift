@@ -24,6 +24,8 @@ struct VoicePresentation: Identifiable {
     let model: VoiceModel
     let conversationMode: VoiceConversationMode
     var liveModel: LiveVoiceModel? = nil
+    /// Why live voice couldn't start, when it was asked for and `liveModel` is nil.
+    var liveUnavailable: LiveVoiceUnavailable? = nil
 }
 
 enum PreparedRouteModel {
@@ -222,10 +224,13 @@ final class ShellFeatureStore {
     private var sessionsModel: SessionsModel?
     private var approvalModels: [String: ApprovalModel] = [:]
     private var voiceSessionSequences: [String: Int] = [:]
-    private var liveVoiceFactory: ((SessionRecord, AgentProfile?, ChatModel) -> LiveVoiceModel?)?
+    /// Makes a chat's live voice call, or says why it can't start there.
+    private var liveVoiceFactory: ((SessionRecord, AgentProfile?, ChatModel) -> Result<LiveVoiceModel, LiveVoiceUnavailable>)?
     private weak var activeLiveVoice: LiveVoiceModel?
 
-    func configureLiveVoiceFactory(_ factory: @escaping (SessionRecord, AgentProfile?, ChatModel) -> LiveVoiceModel?) {
+    func configureLiveVoiceFactory(
+        _ factory: @escaping (SessionRecord, AgentProfile?, ChatModel) -> Result<LiveVoiceModel, LiveVoiceUnavailable>
+    ) {
         liveVoiceFactory = factory
     }
 
@@ -1698,9 +1703,16 @@ final class ShellFeatureStore {
             : Self.voiceTranscript(from: session?.items ?? [])
 
         activeLiveVoice?.invalidateOwner()
-        let liveModel = conversationMode == .codexLive
-            ? session.flatMap { liveVoiceFactory?($0, agent, chatModel(for: $0)) }
-            : nil
+        let live: Result<LiveVoiceModel, LiveVoiceUnavailable>? = if conversationMode != .codexLive {
+            nil
+        } else if let liveVoiceFactory {
+            session.map { liveVoiceFactory($0, agent, chatModel(for: $0)) } ?? .failure(.chatOpening)
+        } else {
+            // Only demo mode runs without a computer to make the call.
+            .failure(.demo)
+        }
+        let liveModel = try? live?.get()
+        let liveUnavailable: LiveVoiceUnavailable? = if case .failure(let reason)? = live { reason } else { nil }
         liveModel?.configure(provider: liveProvider, voice: liveVoice)
         activeLiveVoice = liveModel
         return VoicePresentation(
@@ -1745,7 +1757,8 @@ final class ShellFeatureStore {
                 holdMusic: conversationMode == .codexLive || !voiceHoldMusicEnabled() ? nil : voiceHoldMusic()
             ),
             conversationMode: conversationMode,
-            liveModel: liveModel
+            liveModel: liveModel,
+            liveUnavailable: liveUnavailable
         )
     }
 

@@ -313,6 +313,11 @@ struct ChatDestinationView: View {
         voicePresentation = makeVoice(.turnBased)
     }
 
+    /// Live voice couldn't start yet (still connecting, or a step on the computer): try it again.
+    private func tryLiveVoiceAgain() {
+        voicePresentation = makeVoice(agentVoice.mode)
+    }
+
     private var forceRefreshAction: (@MainActor () async throws -> Void)? {
         guard model.nativeConversationClient != nil, !model.isBotMode else { return nil }
         return {
@@ -566,6 +571,7 @@ struct ChatDestinationView: View {
                 onEnded: { voicePresentation = nil },
                 onWorkspaceTap: openMenuFromVoice,
                 onUseTurnBased: useTurnBasedVoice,
+                onTryAgain: tryLiveVoiceAgain,
                 chatActivity: { [model] in model.liveActivityKind },
                 chatStep: { [model] in model.liveStepPhrase }
             )

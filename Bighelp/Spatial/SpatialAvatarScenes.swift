@@ -354,6 +354,7 @@ struct SpatialAvatarVolume: View {
                 onEnded: { model.endVoice() },
                 onWorkspaceTap: openChat,
                 onUseTurnBased: useTurnBasedVoice,
+                onTryAgain: tryLiveVoiceAgain,
                 chatActivity: { model.activity }
             )
             .id(voice.id)
@@ -364,6 +365,11 @@ struct SpatialAvatarVolume: View {
 
     private func useTurnBasedVoice() {
         settings.useTurnBasedVoice(computer: model.voiceComputer, agentID: model.agent?.id)
+        model.endVoice()
+        Task { _ = await model.startVoice(settings) }
+    }
+
+    private func tryLiveVoiceAgain() {
         model.endVoice()
         Task { _ = await model.startVoice(settings) }
     }

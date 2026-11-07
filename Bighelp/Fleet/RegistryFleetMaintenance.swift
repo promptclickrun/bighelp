@@ -39,6 +39,7 @@ final class RegistryFleetMaintenance: FleetMaintenanceConnecting {
         let profile = workspace.selectedProfile.isEmpty ? "default" : workspace.selectedProfile
         let operations = HostOperationsStore(hostName: host.name, profileID: profile, client: client,
                                              isCurrent: { current() == owner })
+        operations.onServicesChanged = { [weak registry] in registry?.noteServicesChanged(hostID: hostID) }
         return .ready(operations: operations, plugin: HostPluginUpdateModel.model(for: hostID, registry: registry))
     }
 }

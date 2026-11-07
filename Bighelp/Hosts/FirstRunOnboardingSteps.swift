@@ -116,11 +116,15 @@ struct FirstRunPluginStep: View {
     @State private var outcome: String?
     @State private var needsRestart = false
     @State private var alreadyInstalled = false
+    /// After an install: the plugin takes effect once the dashboard and the gateway restart.
+    @State private var restarts: HostPluginUpdateModel?
+    @State private var restartPrompt: HostPluginUpdateModel?
     @BighelpThemeReader private var theme
 
     private var primaryTitle: String {
         if needsRestart { return String(localized: "Continue") }
         if alreadyInstalled { return String(localized: "Continue") }
+        if restarts?.isWorking == true { return String(localized: "Restarting…") }
         guard setup?.isWorking == true else { return String(localized: "Install Plugin") }
         return setup?.state == .checking ? String(localized: "Checking…") : String(localized: "Installing…")
     }
@@ -134,7 +138,7 @@ struct FirstRunPluginStep: View {
                 : "Optional. It adds extras to Hermes on your computer. You can add it later in Settings.",
             primaryTitle: primaryTitle,
             primaryIdentifier: "onboarding.plugin.install",
-            isWorking: setup?.isWorking == true && !alreadyInstalled,
+            isWorking: (setup?.isWorking == true || restarts?.isWorking == true) && !alreadyInstalled,
             primary: {
                 if needsRestart { onSkip() } else if alreadyInstalled { onInstalled() } else { install() }
             }
@@ -169,6 +173,7 @@ struct FirstRunPluginStep: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("onboarding.plugin")
         .task { await checkInstalled() }
+        .pluginRestartPrompt($restartPrompt) { _ in onInstalled() }
     }
 
     /// A computer that already has the plugin only needs Continue. Checking reads; it never installs.
@@ -191,6 +196,10 @@ struct FirstRunPluginStep: View {
         Task {
             await model.enable()
             switch model.state {
+            case .installed where model.pluginChanged, .enabled where model.pluginChanged:
+                let restarts = await HostPluginUpdateModel.afterPluginChange(hostID: host.id, registry: registry)
+                self.restarts = restarts
+                restartPrompt = restarts
             case .installed, .enabled:
                 onInstalled()
             case .backendRestartRequired:

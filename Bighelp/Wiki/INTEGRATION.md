@@ -1,5 +1,20 @@
 # Native Wiki integration API
 
+> **Historical.** This page describes a Wiki provider for the retired Link transport. Link is gone. Chat and
+> plugin features use native Hermes now (see [docs/NATIVE_TRANSPORT.md](../../docs/NATIVE_TRANSPORT.md)). Wiki
+> is no longer a feature.
+>
+> - The bighelp plugin removed the wiki routes and no longer lists `native-wiki-v1` (bighelp-plugin README ›
+>   Legacy code). Files that the routes saved stay on hosts, but nothing reads them.
+> - The app has no Wiki screen. `WikiBrowserView`, `WikiConnectionView`, `WikiDocumentView` and
+>   `WikiSaveControls` are not in it.
+> - Hermes tools leaves Wiki out (`WorkspaceDestination.appMenuCases`).
+> - If someone sends a Wiki or GitHub reference in chat, the app says that these references are no longer
+>   available (`ReferenceChatComposition`).
+> - What is left is inactive code: the models, store, drafts and persistence in `Bighelp/Wiki/`, the request
+>   codec (`WikiLinkClient`), `DirectHermesWikiClient` (the `wiki/*` plugin routes, behind `native-wiki-v1`) and
+>   the reference adapter in `Bighelp/References/`.
+
 This is an optional, source-only native provider candidate. The parent owns composition, tests, review, project membership and execution. It has no fixture provider and no direct HTTP/dashboard-token path.
 
 ## Construction and ownership

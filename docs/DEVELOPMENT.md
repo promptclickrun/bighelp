@@ -1,10 +1,13 @@
 # Development guide
 
-Production transport contract: **native Hermes only for chat**. Cloud services
-are used only for optional notifications and Live Activities, which bighelp's own notification service sends. The current composition,
+Production transport contract: **native Hermes only for chat**. Chat never goes
+through bighelp's cloud services. They send optional notifications and Live
+Activities (bighelp's own notification service), take usage and diagnostics
+([Telemetry](TELEMETRY.md)) and serve public artwork and catalogs. The current composition,
 voice boundary, enrollment isolation and verification requirements are defined
-in [Native transport](NATIVE_TRANSPORT.md). Retained Link/paired-Direct protocol
-sections below describe legacy compatibility code, not a selectable chat path.
+in [Native transport](NATIVE_TRANSPORT.md). The bighelp account and its Link
+transport are retired. The app only removes their leftover keys and settings at
+launch (`BighelpLinkAccountRetirement`).
 
 ## Requirements
 
@@ -40,9 +43,9 @@ locking or corrupting shared incremental state.
 
 ## iPhone tools and input regressions
 
-Run the native permission, Apple service, mutation journal/coordinator and directed
-socket suites listed in [the device-tools contract](IPHONE_DEVICE_TOOLS.md).
-`DeviceToolPermissionsUITests` must show three independent controls off without
+Run the native permission, Apple service, mutation journal/coordinator and
+device-tool channel suites listed in [the device-tools contract](IPHONE_DEVICE_TOOLS.md).
+`DeviceToolPermissionsUITests` must show every phone tool's switch off without
 requesting real OS access. `ComposerInteractionUITests` must focus from visible
 padding and align microphone/Send on iPhone and iPad. Native grants must stay
 separate from system permission status, and delayed callbacks cannot restore
@@ -58,7 +61,7 @@ plugin updates; apply the feature diff rather than replacing those modules.
 
 The Hermes `ToolExecutionContext` extension is a required host dependency. A
 plugin doctor/import check cannot establish running gateway activation. Verify
-the loaded plugin revision and a fresh connected Link state after one restart.
+the loaded plugin revision and a fresh native connection after one restart.
 Record physical Health/EventKit acceptance separately from injected-boundary
 and simulator checks.
 
@@ -307,7 +310,6 @@ values. Never commit:
 - APNs keys or certificates
 - Signing certificates or provisioning profiles
 - Private host credentials
-- Account content keys
 - Device private keys
 - Production database or namespace identifiers
 
@@ -345,7 +347,8 @@ Local JSON repositories are schema-versioned. When changing a persisted model:
 
 ## Protocol changes
 
-Multiple independently deployed components implement bighelp Link.
+The app, the bighelp Hermes plugin and the notification service are deployed
+independently and share the plugin routes and the notification protocol.
 Protocol changes require compatibility tests for:
 
 - Strict payload validation and bounds
@@ -363,7 +366,7 @@ Do not document or log live protocol coordinates in public issues.
 Before merging a feature:
 
 - Does it add durable local or cloud data?
-- Can the routing plane decrypt any new payload?
+- Can the notification service read any new payload?
 - Does it add a required-reason API or collected-data category?
 - Does it place sensitive text on the Lock Screen?
 - Does it add a permission usage description?
@@ -371,7 +374,7 @@ Before merging a feature:
 - Are all external strings, identifiers, counts, and byte sizes bounded?
 - Are callbacks and continuations identity-checked and settled exactly once?
 - Is cancellation safe?
-- Does sign-out, unpair, or revocation remove access?
+- Does removing a host, or revoking a notification grant, remove access?
 - Are logs redacted?
 - Are production and fixture paths both tested?
 
@@ -383,9 +386,9 @@ Feature folders own their views, domain models, observable state, and adapters.
 Cross-target code belongs only in the explicit shared folders. Avoid moving
 secrets or production configuration into fixtures.
 
-The `Hermes` folder contains a direct HTTPS client retained for compatibility
-and testing. Production selects `NativeWorkspaceRuntime` and `DirectHermesWorkspaceClient`.
-The older `HermesClient` is not the selected transport.
+The `Hermes` folder holds the session catalog client
+(`DirectHermesSessionCatalogClient`) and its helpers. Production selects
+`NativeWorkspaceRuntime` and `DirectHermesWorkspaceClient`.
 
 ## Documentation safety
 
@@ -458,13 +461,10 @@ explicit manual confirmation. It installs the supplied identity in a temporary k
 and deletes temporary signing files when finished. It uses the committed
 Fastlane bundle and needs no preconfigured `asc` login on the runner.
 
-Wiki folder registration also requires deploying the updated bighelp Hermes
-plugin that advertises `wiki.connect`. The iOS workflow does not update or restart
-an unrelated host. Deploy the committed plugin on the authorized host with the
-existing plugin release procedure, then verify `hermes plugins doctor loopdy
---ci`, gateway health, and Wiki folder Save from the paired device. Existing
-Wiki connections remain available on compatible older hosts; a missing new
-operation produces an explicit host-update message.
+Wiki folder registration works only on an older host whose plugin still
+advertises `wiki.connect`: current plugin releases no longer have the Wiki routes.
+The iOS workflow does not update or restart an unrelated host. A host without
+the operation produces an explicit host-update message.
 
 Implementation references: [Fastlane TestFlight action](https://docs.fastlane.tools/actions/upload_to_testflight/),
 [Fastlane Xcode signing](https://docs.fastlane.tools/codesigning/xcode-project/).
@@ -472,14 +472,13 @@ Implementation references: [Fastlane TestFlight action](https://docs.fastlane.to
 ## Hermes Bot Mode and instance regression checks
 
 Use [Hermes Bot Mode](HERMES_BOT_MODE.md) as the current runtime contract. Keep
-its Link client, room-store and ChatModel integration suites green. Include
+its native client, room-store and ChatModel integration suites green. Include
 pending-send recovery, canonical event IDs, cursor/authority checks, explicit
 Stop, failed-task retry and task-specific approvals. A direct-chat fixture is not
 proof of native Hermes room execution or of the bighelp Native harness.
 
 The UI gate includes default/AX XXXL suggested prompts, root content clearance
-in portrait/landscape/accessibility sizes, Wiki navigation, Hosts/Connected
-Devices and long-press instance switching. Keep primary-host preference separate
+in portrait/landscape/accessibility sizes, Hosts and long-press instance switching. Keep primary-host preference separate
 from immediate selection. Preserve the chat performance gate alongside this work.
 
 
@@ -498,14 +497,13 @@ Host selection must disable the old composer before any `await`. Account tests
 must distinguish protected-data recovery and partial-store failure from missing
 credentials or a lost/replaced verified connection.
 
-Link catalog changes and Worker rollbacks must also run the signed HTTP catalog
-regressions in `services/link/test/http.test.ts`, the full Link suite, type check
-and deployment dry run. The regression fixture must include a forward-migrated
+The retired account catalog still lives in the notification service Worker
+(`services/link`). Changes to it and Worker rollbacks must also run the signed
+HTTP catalog regressions in `services/link/test/http.test.ts`, the full
+`services/link` suite, type check and deployment dry run. The regression fixture must include a forward-migrated
 Native row alongside an existing phone and Hermes host. Verify that v1 returns
 its supported kinds and that all persisted rows, grants and schema are unchanged.
 Do not fix this by revoking devices, changing keys or coercing Native to Hermes.
-After deployment, verify the live signed account profile and device list; source
-tests alone do not establish successful iPhone sign-in.
 
 For drawer changes, run `BighelpMenuUITests` and look at the drawer on screen, light and
 dark, checking hit targets as well as layout. Keep navigation before the bounded pinned-agent preview and sessions;

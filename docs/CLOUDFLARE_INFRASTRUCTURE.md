@@ -1,242 +1,182 @@
 # Cloudflare infrastructure
 
-This document describes the deployed bighelp services based on read-only
-verification performed on August 29, 2026. It omits non-public production
-identifiers, private routes, database and namespace identifiers, schema
-definitions, anti-abuse thresholds, exact retention intervals, and secrets.
-The public client service origin and public app identifiers necessarily remain
-visible in the application bundle.
+This page describes bighelp's Cloudflare services as their source and Wrangler configs in `services/` define them.
+It omits non-public production identifiers, private routes, database and namespace identifiers, anti-abuse
+thresholds, exact retention intervals and secrets. The public service hostnames and app identifiers are already
+visible in the app and in this repo.
 
-Cloudflare account, Link and notification services are optional to an
-independently authenticated native Hermes connection. They retain their own
-authorization and erasure boundaries; a cloud outage or sign-out does not select
-another transport for an active Direct session. This does not establish
-cloud-independent closed-app APNs delivery.
+Chat never goes through Cloudflare. The app talks straight to the person's Hermes host over native Hermes (REST
+sign-in, the WebSocket JSON-RPC gateway and the plugin's routes under `/api/plugins/loopdy/native/…`; see
+[Native transport](NATIVE_TRANSPORT.md)). The Cloudflare services are optional extras: notifications and Live
+Activities, the template catalog, avatars, provider logos and usage numbers. If they are down, chat still works.
+Agents, sessions, projects, scheduled tasks and workspace management use the host's own interfaces and add no
+cloud service.
 
-An independent native workspace does not use the Link workspace account-refresh
-loop to connect or recover. Native Agents, Sessions, Projects,
-Scheduled Tasks and supported hosted rooms use that host's authenticated public
-interfaces and isolated device caches. This composition change adds no Worker,
-relay registration, cloud schema or deployment.
+The retired bighelp account and its Link transport (pairing, and encrypted frames relayed between the phone and
+a paired host) are gone from the app. See [Retired services](#retired-services).
 
-The Cloudflare deployment has two bighelp Workers, two D1 databases, one Durable
-Object namespace, an asynchronous delivery queue with dead-letter handling, and
-an internal service binding. The bighelp Workers do not currently bind KV or R2.
+## 1. The Workers
 
-The native Workspace management layer introduces no Cloudflare service, schema,
-retention or deployment change. Its bounded read models use the selected
-owner's operation transport and remain in device memory; this feature does not
-upload credentials, file previews or diagnostic logs to a new cloud endpoint.
-See [Workspace management](WORKSPACE_MANAGEMENT.md) for its scope boundaries.
+`services/` holds five Workers with a production config, plus the recovered source of an older relay:
 
-## 1. Logical topology
+| Folder | Worker | Hostname | What it binds |
+|---|---|---|---|
+| `services/link` | `loopdy-link` | `link.loopdy.app` | D1 `ACCOUNTS` and `MARKETPLACE_RETIREMENT`, Durable Object `USER_LINKS`, queue `APNS_RETRY`, service `TELEMETRY` |
+| `services/telemetry` | `bighelp-telemetry` | `telemetry.bighelp.app` | two Rate Limiting bindings, no storage |
+| `services/catalog` | `bighelp-catalog` | `catalog.bighelp.app` | D1 `DB`, static assets `REVIEWER_ASSETS`, a daily cron |
+| `services/avatars` | `bighelp-avatars` | `avatars.bighelp.app` | static assets `ASSETS` (the Worker runs first) |
+| `services/provider-logos` | `loopdy-provider-logos` | `logos.loopdy.app` | static assets only, no script |
+| `services/relay` | (recovery only) | none | none: `wrangler.recovery.jsonc` is a local check that must never be deployed |
+
+None of them binds KV or R2. Every Worker has `workers_dev` and preview URLs turned off. `services/link`,
+`services/catalog` and `services/telemetry` also have a `wrangler.test.jsonc` for local tests, which must never be
+deployed.
+
+## 2. Logical topology
 
 ```mermaid
 flowchart TB
-    IOS["iOS device"]
-    Host["Authorized Hermes host"]
-    Identity["Account and link Worker"]
-    DO["Per-account Durable Object"]
-    Accounts["Account metadata D1"]
-    Relay["Notification relay Worker"]
-    RelayDB["Delivery metadata D1"]
-    Queue["Asynchronous delivery queue"]
+    IOS["iPhone, iPad, Mac or Vision Pro app"]
+    Host["Hermes host with the bighelp plugin"]
+    Link["Notification service Worker (loopdy-link)"]
+    DO["Per-owner Durable Object (UserLink)"]
+    Accounts["Notification D1 (ACCOUNTS)"]
+    Retry["APNs retry queue + dead-letter queue"]
+    BuzzKit["BuzzKit"]
     APNS["APNs"]
+    Telemetry["Telemetry Worker"]
+    Static["Catalog, avatars and logo Workers"]
 
-    IOS -->|"passkey and signed device operations"| Identity
-    Identity --> Accounts
-    IOS <-->|"authenticated encrypted frames"| DO
-    Host <-->|"authenticated encrypted frames"| DO
-    Identity --> DO
-    Identity -->|"internal service call"| Relay
-    Relay --> RelayDB
-    Relay --> Queue
-    Queue --> APNS
+    IOS -->|"signed installation requests, push targets"| Link
+    Host -->|"grant-signed alerts and Live Activity updates"| Link
+    Link --> Accounts
+    Link --> DO
+    Link -->|"direct send"| APNS
+    Link --> Retry
+    Retry --> APNS
+    Link -->|"fallback and older builds"| BuzzKit
+    BuzzKit --> APNS
     APNS --> IOS
+    Link -->|"service binding (RPC)"| Telemetry
+    IOS --> Telemetry
+    IOS --> Static
 ```
 
-## 2. Account and link Worker
+## 3. Notification service Worker (`services/link`)
 
-The account/link Worker is responsible for:
+The Worker kept its first name, `loopdy-link`, and its hostname, `link.loopdy.app`: installed phones and plugins
+already use them. Today it is the notification service. It is responsible for:
 
-- Passkey registration and assertion challenges
-- Verification of WebAuthn responses
-- Short-lived access authorization
-- Device public-key registration and revocation
-- Encrypted device-label storage
-- Pairing challenge coordination
-- Signed device-management operations
-- WebSocket admission
-- Routing a connection to the correct per-account Durable Object
-- Passing push and Live Activity enrollment to the relay through an internal
-  service binding
+- Notification installations: each phone registers its own signing key (`/v1/notifications/bootstrap`,
+  `/v1/notifications/installations/current`), and can revoke it.
+- Host grants: a Hermes host enrolls for one agent and sends alerts and Live Activity updates under that grant
+  (`/v1/notifications/host-grants/…`).
+- Push targets: the phone's APNs token for alerts and its Live Activity tokens (`/v1/notifications/push-target`,
+  `/v1/notifications/live-activity-target`). The Worker encrypts the tokens at rest with
+  `PUSH_TOKEN_KEY`.
+- Agent avatars for alerts (`/v1/notifications/buzzkit/assets`).
+- Delivery to APNs, directly or through BuzzKit (below).
 
-It is not responsible for running agents or storing readable chat sessions.
+It does not run agents or store readable chats.
 
-### Durable account metadata
+### Bindings
 
-The account database holds the minimum durable material needed for identity and
-authorization:
+- **D1 `ACCOUNTS`** (`loopdy-link-accounts`, `migrations/`): notification installations, grants, revocation
+  records and push targets. Migrations `0001` to `0004` are the retired account and pairing tables.
+- **D1 `MARKETPLACE_RETIREMENT`** (`loopdy-marketplace`, `marketplace-migrations/`): the old marketplace's
+  tables are dropped. Only a receipt is left, which the Worker checks before it deletes an old account.
+- **Durable Object `USER_LINKS`** (class `UserLink`, SQLite storage): one instance per owner. It holds that
+  owner's notification state, such as Live Activity rows and alert avatars, and the retired Link frame queue.
+- **Queue `APNS_RETRY`** (`loopdy-link-apns-retry`, dead-letter queue `loopdy-link-apns-retry-dlq`): the Worker
+  produces to it and consumes it. Pushes APNs could not take at once wait there.
+- **Service `TELEMETRY`**: the telemetry Worker's `TelemetryIngest` entrypoint. Without it the Worker still works
+  and sends no events.
 
-- Opaque account coordinates
-- Passkey public credential material
-- Expiring authentication challenges
-- Hashed access-session tokens
-- Device public keys and authorization state
-- Pairing challenges and replay-prevention metadata
-- An encrypted account-key envelope
+Workers Logs are on and sampled. Invocation logs are off, because a request URL can carry a grant ID. The code logs
+fixed codes only.
 
-The passkey biometric or device-unlock secret never leaves the Apple
-authentication system. The client creates the account content key; the service
-stores only its encrypted envelope.
+### Direct APNs and BuzzKit
 
-## 3. Per-account Durable Object
+The Worker can send a push straight to APNs for installations whose app registered a push target with it.
+Transient APNs failures go to the retry queue. A push that cannot be sent directly falls back to BuzzKit, which is
+also the route for older app builds. `DIRECT_APNS` (`off`, `shadow` or `on`) controls direct sends, and
+`APNS_ENVIRONMENTS` says which APNs environments get them. The APNs secrets are `APNS_KEY_P8`, `APNS_KEY_ID`,
+`APNS_TEAM_ID` and `PUSH_TOKEN_KEY`. BuzzKit has its own secrets. See [Direct APNs relay](DIRECT_APNS_RELAY.md) for
+the routes, payloads and rollout.
 
-The account/link Worker maps each account to one Durable Object instance that
-coordinates authorized endpoints. The object stores only:
+### Alert content and Live Activities
 
-- Authorized-host routing grants
-- Frame identifiers and sequencing metadata
-- A count-bounded queue of encrypted frames awaiting delivery
+Current plugins seal each alert's title, text and avatar for the one enrolled phone (alert version 3). The Worker
+and BuzzKit see only a neutral placeholder, and the phone opens the sealed content. For older plugins, the Worker
+still accepts the earlier alert format, which carries readable title and text.
 
-The queued frame body is ciphertext created by an endpoint holding the account
-key. The deployed Worker has no frame-decryption path. Frames are removed after
-an authenticated recipient acknowledgement or when the affected endpoint is
-revoked. We found no independent time-based expiration for offline Link frames.
-Do not describe this storage as automatically short-lived.
+Live Activity updates carry a reduced, generic progress state for the Lock Screen: a phase, a time, a count of
+helpers and the latest tool. They must not contain prompts, tool inputs, unrestricted model output, credentials or
+private attachments. Chat titles and agent names stay on the phone. See
+[Live Activity groups](LIVE_ACTIVITY_GROUPS.md).
 
-This Durable Object is a coordination mechanism, not a conversation database.
-
-## 4. Notification relay Worker
-
-The notification relay is isolated from the account/link Worker. It receives
-authorized internal requests and manages:
-
-- Device push registrations
-- Recipient public-key coordinates
-- APNs token ciphertext
-- Encrypted alert payloads
-- Delivery attempts and status
-- Live Activity registrations and revocations
-- Bounded Live Activity delivery state
-- Nonces, idempotency receipts, tombstones, and aggregate usage counters
-- Asynchronous APNs delivery through a queue
-
-The relay encrypts push tokens and alert payloads at rest. The authorized source
-encrypts human-readable notification content for the destination device before
-APNs delivery.
-
-Live Activity updates are different from alert notifications: they contain a
-deliberately reduced, generic progress projection suitable for a Lock Screen
-surface. They must not contain prompts, tool inputs, unrestricted model output,
-credentials, or private attachments.
-
-### Direct APNs delivery from the Link Worker
-
-The Link Worker (`loopdy-link`) can also send a push straight to APNs for installations whose app registered a push
-token with it. The token is stored encrypted in the `loopdy-link-accounts` database. Transient APNs failures wait in a
-retry queue with a dead-letter queue, and a message that cannot be sent directly falls back to BuzzKit. The Worker has
-Workers Logs on (sampled), an optional service binding to the telemetry Worker, and these secrets: `APNS_KEY_P8`,
-`APNS_KEY_ID`, `APNS_TEAM_ID` and `PUSH_TOKEN_KEY`. `DIRECT_APNS` (`off`, `shadow` or `on`) turns it on and `off` is the
-way back. See [Direct APNs relay](DIRECT_APNS_RELAY.md) for the routes, payloads and rollout.
-
-## 5. What Cloudflare can and cannot see
+## 4. What Cloudflare can and cannot see
 
 ### Cloudflare can process
 
-- Source network metadata inherent to an HTTPS/WebSocket service
-- Connection timing and duration
-- Ciphertext sizes
-- Opaque account, device, frame, and delivery coordinates
+- Network metadata that comes with any HTTPS service, and connection timing
+- Opaque installation, grant, delivery and activity identifiers
 - Public keys and authorization epochs
-- Encrypted device labels
-- Encrypted APNs tokens and encrypted alert payloads
+- Encrypted push tokens and sealed alert payloads, and their sizes
+- Readable alert title and text from older plugins that do not seal alerts
 - Generic Live Activity progress state
-- Delivery status, coarse presence, and aggregate usage counters
+- Delivery status and aggregate counters
 
-### Not available to the deployed frame-routing path
+### Cannot see
 
-- Chat prompts or replies carried inside bighelp Link frames
-- Attachment bytes carried inside bighelp Link frames
-- Voice transcripts or synthesized audio carried inside bighelp Link frames
-- Agent instructions and workspace operations carried inside bighelp Link frames
-- Private account content keys
-- Device signing private keys
-- Notification recipient private keys
-- Passkey biometric or device-unlock secrets
+- Chats, prompts, replies, attachments or voice: these go straight between the app and the host
+- The content of sealed alerts
+- Device signing private keys and notification recipient private keys
 
-This does not make the system anonymous. Infrastructure providers can still
-observe network and routing metadata, and the authorized Hermes host receives
-plaintext because it must perform the requested work. Pairing keys are bound to
-a host-generated commitment carried in the QR code or compared as a separate
-16-character manual verification code.
+This does not make the system anonymous. Infrastructure providers can still see network and routing metadata, and
+the Hermes host receives plaintext because it does the work.
 
-## 6. Session storage statement
+## 5. Storage statement
 
-bighelp's Cloudflare deployment does **not** contain a database of readable
-sessions, messages, or transcripts.
+bighelp's Cloudflare deployment does **not** contain a database of readable sessions, messages or transcripts.
+The app may cache readable session state on the device. The Hermes host keeps sessions according to its own
+configuration.
 
-Encrypted frames may be held while an authorized endpoint is offline. That
-ciphertext is deleted after recipient acknowledgement or endpoint revocation.
-The iOS app may cache readable session state. The authorized Hermes host may
-maintain it according to its configuration.
+A phone can revoke its notification installation. The Worker then revokes that installation's grants and deletes
+its push targets and its BuzzKit subscriber. Infrastructure backups and provider recovery systems can still outlive logical deletion according to
+their configured policies.
 
-The current service exposes device revocation and passkey-authorized account
-deletion. Account deletion revokes push and Live Activity routes, deletes the
-account/device directory rows, closes sockets, and purges the per-account
-Durable Object twice around the directory deletion to close authenticated-request
-races. Infrastructure backups and provider recovery systems can still outlive
-logical deletion according to their configured policies.
-
-## 7. Operational safety
+## 6. Operational safety
 
 Production operations should preserve these invariants:
 
-- Never log plaintext frame bodies, credentials, push tokens, or decrypted alert
-  content.
+- Never log plaintext alert content, credentials, push tokens or grant IDs.
 - Keep all public traffic on TLS.
-- Restrict internal service bindings to the minimum required services.
-- Keep secrets in Cloudflare secret bindings, not source or plain-text
-  variables.
-- Preserve replay protection, bounded parsing, and authorization-epoch checks.
-- Add and verify time-based cleanup for offline frame ciphertext in addition to
-  acknowledgement and revocation cleanup.
-- Treat D1 migrations and Durable Object migrations as security-sensitive
-  changes.
-- Treat host-key enrollment and rotation for sealed alerts as part of the
-  notification service trust boundary; pairing-key commitment does not provide
-  notification sender-key transparency.
-- Test revocation from both active and offline endpoint states.
-- Review privacy disclosures whenever a new durable field or storage product is
-  introduced.
+- Restrict service bindings to the minimum required services.
+- Keep secrets in Cloudflare secret bindings, not in source or plain-text variables.
+- Preserve replay protection, bounded parsing and authorization-epoch checks.
+- Treat D1 migrations and Durable Object migrations as security-sensitive changes. `wrangler deploy` does not
+  apply D1 migrations: apply and verify them first (see `services/link/SOURCE.md`).
+- Treat host-key enrollment and rotation for sealed alerts as part of the notification service trust boundary.
+- Test revocation from both active and offline states.
+- Review privacy disclosures whenever a new durable field or storage product is introduced.
 
-## 8. Reproducibility status
+## 7. Reproducibility
 
-The iOS repository does not currently include the Worker source, D1 migrations,
-queue configuration, or infrastructure-as-code used by the deployed services.
-This document describes and verifies the deployment but cannot reproduce it.
+This repo includes each Worker's source, its D1 migrations, its queue and Durable Object configuration, and its
+tests (run from the Worker's folder). The
+production `wrangler.jsonc` files are checked in. Secrets are set with `wrangler secret put` and stay out of
+source. Some deploys also need a private config kept outside the repo, for example the catalog's reviewer
+hostname (see `services/catalog/README.md`). Only the maintainer deploys these services.
 
-For fully reproducible open-source infrastructure, publish a separate server
-repository containing:
-
-- Worker source
-- Durable Object classes and migrations
-- D1 migrations
-- Queue consumers
-- Development-only configuration templates
-- Local test harnesses
-- Deployment instructions that use placeholder identifiers
-- A threat model and protocol compatibility tests
-
-Do not publish production account identifiers, resource identifiers, API
-tokens, APNs credentials, signing keys, production hostnames not already meant
-to be public, or live operational thresholds.
+Do not publish API tokens, APNs credentials, signing keys, production hostnames not already meant to be public,
+or live operational thresholds.
 
 ## Telemetry Worker
 
 The `bighelp-telemetry` Worker (`services/telemetry`) is a separate Worker at `telemetry.bighelp.app`. It accepts
-batches from the app, the notification extension and the Hermes plugin. The Link relay reaches it over a service
-binding that calls the `TelemetryIngest` entrypoint.
+batches from the app, the notification extension and the Hermes plugin. The notification service reaches it over a
+service binding that calls the `TelemetryIngest` entrypoint.
 
 - **It holds no storage.** There is no D1, KV, R2, queue or Durable Object. It checks each batch against an
   allowlist (`contracts/telemetry-v1.json`), applies two Workers Rate Limiting bindings (per ID, and per network by a
@@ -249,6 +189,15 @@ binding that calls the `TelemetryIngest` entrypoint.
 
 See [Telemetry](TELEMETRY.md) for what is collected and how to turn it off.
 
-## Wiki folder setup transport
+## Retired services
 
-The optional Wiki family includes explicitly negotiated `wiki.connect` on the existing encrypted workspace transport. It carries an existing folder coordinate and selected profile; the authenticated envelope supplies device/host ownership. New registrations are host-persisted, read-only, and owner-scoped. Root responses may include a source folder path, which remains encrypted like Wiki content. This adds no relay-readable source storage, endpoint, routing authority, or recipient-only encryption.
+- **Link transport and the bighelp account.** The notification service's source still has the old passkey account,
+  pairing, device and `/v1/socket` routes and the Link frame queue in its Durable Object, but no current app build
+  uses them. The app removes old Link keys and settings at launch (`BighelpLinkAccountRetirement`). See
+  [Legacy Link recipient overflow policy](LINK_RETENTION.md) for the old frame limits.
+- **Notification relay.** `services/relay` is a byte-exact recovery of an older notification relay Worker, kept
+  for reference and checks (`services/relay/README.md`). It has no production config or live bindings in this repo.
+  The notification service has no binding to it, and the plugin no longer sends to a relay.
+- **Wiki.** The Wiki family (`wiki.connect` and the other `wiki.*` operations) ran over the Link transport and
+  later the plugin's routes. The plugin no longer serves them. See [contracts/wiki-v1.md](../contracts/wiki-v1.md).
+- **Marketplace.** Its D1 tables are dropped (see the `MARKETPLACE_RETIREMENT` binding above).

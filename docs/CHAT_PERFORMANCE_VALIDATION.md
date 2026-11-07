@@ -33,7 +33,7 @@ follow-up. Reader preparation has a separate cancellation regression.
 | 100 consecutive expanded tools + second active chat | 9 s | 63 ms | 35 ms | 66 ms | 117 ms |
 
 This removes the reproduced fixture hang; 66 ms display p95 does not establish
-60 FPS. Real-device performance, relay backlog behavior, direct Tailscale routing,
+60 FPS. Real-device performance, host backlog behavior, direct Tailscale routing,
 and long Shortcut execution remain separate acceptance checks.
 
 ## Diagnosis

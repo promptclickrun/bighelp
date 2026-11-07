@@ -146,6 +146,17 @@ Each board request has `agentId`. The board is per agent; Feed, Ideas and Goals 
 | `agents/plugins/share` | M / `native-agent-plugin-links-v1` | `{agentId}` | `{linked,kept:[{name,reason}]}` / 32,768; 30 s |
 | `host/restart` | M / `native-host-restart-v1` | `{confirm:true}` | `{restarting:true,runtimeId,...}`; connection drops |
 | `telemetry` (PUT) | M / `native-host-telemetry-v1` | `{enabled:boolean}` | host telemetry state / 16,384; 10 s |
+| `bot-chat/create` | M / `native-bot-chat-v1` | `{profile,idempotencyKey}` | the agent's new Bot Chat / 16,384; 60 s |
+| `marketplace/plugins` | R / `native-marketplace-v1` | `{}` | marketplace plugins with stars, featured picks and install checks / 1 MiB; 30 s |
+| `voice-catalog` | R / `native-voice-catalog-v1` | `{profile,provider}` | the provider's voices / 131,072; 20 s |
+| `vault/link` | M / `native-vault-link-v1` | `{profile,item_ids,origins}` | `{copies,...}` / 65,536 |
+| `skills/import` | M / `native-skills-import-v1` | `{agentId,fileName,kind:"zip",data,category?}` (base64 zip, up to about 3 MB) | import receipt / 65,536; 60 s |
+| `html-apps/get` | R / `native-html-apps-v1` | `{agentId,appId,knownSha256?}`, then `{agentId,appId,offset,htmlSha256}` | `{app,html?,offset,nextOffset}`, pieces of up to 2 MiB; 60 s |
+| `html-apps/data` | R / same | `{agentId,appId}` | `{appId,data,updatedAt,problem?}` / 2 MiB + 128 KiB; 10 s |
+| `uploads/start`, `uploads/status`, `uploads/discard` | M (status R) / `native-uploads-v1` | `{agentId,fileName,mimeType,byteCount,sha256}` for start, `{uploadId}` otherwise | upload receipt / 16,384; 30 s |
+| `uploads/finish` | M / same | `{uploadId}` | the finished file's place / 16,384; 60 s |
+
+Big files (over 8 MiB) send their bytes to `uploads/chunk` as raw 4 MiB pieces outside this JSON route table (`DirectHermesBigFileChunk`); the full contract is the plugin's docs/BIG_FILES.md. [HTML apps](../HTML_APPS.md) describes `html-apps/*`.
 
 A board item has `id,kind,title,body,icon,section,status,note,links:[{url,title}],images:[{url? ,index?}],files,source,liked,rating?,reason?,read?,dismissed,category?,createdAt,updatedAt`. A file entry has `index,fileName,mimeType,byteCount,addedAt?`; never derive its fetch path from its display name. Identity documents are `{text,updatedAt,truncated}`. Activity rows carry `id,sessionId,title,request,summary,category,outcome,createdAt`; approval history carries `id,sessionTitle,description,command,choice,createdAt` (Unix seconds).
 

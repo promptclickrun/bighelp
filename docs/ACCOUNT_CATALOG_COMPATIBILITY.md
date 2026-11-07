@@ -1,5 +1,11 @@
 # Account catalog compatibility
 
+> **Historical.** This page records a 2026 incident in the retired bighelp account's device catalog (Link
+> transport, passkey sign-in, paired hosts). The app no longer has the account or Link: chat and plugin features
+> run over native Hermes ([NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md)), and at launch the app removes the old Link
+> keychain items and settings once (`BighelpLinkAccountRetirement`). The catalog code (`/v1/devices`) still lives
+> in the notification service Worker (`services/link`, `link.loopdy.app`), but no current app build reads it.
+
 ## September 10, 2026 incident
 
 After the build 13 Link deployment, an account with a persisted `native_host`

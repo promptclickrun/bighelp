@@ -35,8 +35,9 @@ Treat these as app investigation evidence, not an iOS-version explanation.
   They must not start a dashboard request per historical answer. An account
   boundary discards a pending refresh from the previous owner.
 - Keep live turn completion and strict reference-send durability boundaries.
-  Preserve encrypted sequence validation, event identities, ordered receipt
-  commit and acknowledgements. No transport data is dropped to improve timing.
+  Preserve event identities. No transport data is dropped to improve timing.
+  (At build 14 this also covered the Link transport's encrypted sequence
+  validation, ordered receipts and acknowledgements; Link is now retired.)
 
 ## Reproduction and evidence limits
 

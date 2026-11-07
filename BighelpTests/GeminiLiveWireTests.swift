@@ -20,6 +20,29 @@ struct GeminiLiveWireTests {
         #expect(GeminiLiveWire.decode(frame("not json")).isEmpty)
     }
 
+    /// Close reasons recorded from Gemini Live (2026-11-07), and what the call screen makes of them (#888).
+    @Test func aCloseSaysWhatGeminiSaidAndKeepsNothingSecret() throws {
+        let refused = GeminiLiveClose(ready: false, code: 1008,
+            reason: "models/gemini-0.0-live is not found for API version v1main, or is not supported for bidiGenerateContent.")
+        #expect(refused.message == "Gemini didn't start the call. Gemini said: “models/gemini-0.0-live is not found for API version v1main, or is not supported for bidiGenerateContent.”")
+        #expect(GeminiLiveClose(event: refused.event) == refused)
+        #expect(GeminiLiveClose(ready: false, code: 1011).message == "Gemini didn't start the call (code 1011).")
+        #expect(GeminiLiveClose(ready: false, httpStatus: 403).message == "Gemini refused the call (HTTP 403).")
+        #expect(GeminiLiveClose(ready: false, networkError: URLError.notConnectedToInternet.rawValue).message
+            .hasPrefix("This \(BighelpPlatform.isMac ? "Mac" : "device") couldn't reach Gemini."))
+        #expect(GeminiLiveClose(ready: true, code: 1000).message == "Gemini ended the call. Work you started keeps going.")
+        #expect(GeminiLiveClose(ready: true, networkError: URLError.networkConnectionLost.rawValue).message
+            == "The connection to Gemini dropped. Work you started keeps going.")
+        #expect(GeminiLiveClose(event: ["kind": .string("closed")]) == nil, "A close without Gemini's details")
+
+        let cleaned = try #require(GeminiLiveClose.sanitized(
+            "Bad\u{0}auth  auth_tokens/abc.DEF-123 or key AIzaSyA-1234567890abcdef\n" + String(repeating: "x", count: 300)))
+        #expect(cleaned.hasPrefix("Bad auth … or key …"))
+        #expect(!cleaned.contains("abc.DEF") && !cleaned.contains("AIza"))
+        #expect(cleaned.count <= GeminiLiveClose.maximumReasonLength)
+        #expect(GeminiLiveClose.sanitized(" \n ") == nil)
+    }
+
     @Test func functionCallsKeepTheirIDsAndArguments() {
         let messages = GeminiLiveWire.decode(frame("""
         {"toolCall":{"functionCalls":[{"id":"call_594282","name":"start_work","args":{"request":"tidy Downloads"}},

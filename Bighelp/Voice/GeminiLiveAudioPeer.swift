@@ -39,6 +39,8 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
     private var speakerOutputPolicy: BighelpSpeakerOutputPolicy = .none
     private let diagnostics = GeminiLiveAudioDiagnostics()
     private var reportLog: Task<Void, Never>?
+    /// Gemini set the session up (`setupComplete`).
+    private var ready = false
     private var closed = false
 
     init(sessionCoordinator: VoiceAudioSessionCoordinator = .shared) {
@@ -73,12 +75,18 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
         task.maximumMessageSize = GeminiLiveWire.maximumFrameBytes
         socket = task
         publish(.connecting)
+        diagnostics.event("connecting to Gemini for \(model)")
         task.resume()
         do {
             try await task.send(.string(String(decoding: GeminiLiveWire.setup(model: model), as: UTF8.self)))
         } catch {
-            throw BighelpRealtimeAudioPeer.Failure.negotiation
+            // The socket never opened: Gemini refused it, or the network failed on the way.
+            let close = GeminiLiveClose(task: task, error: error, ready: false)
+            // Ended here while it connected: nothing failed.
+            if !closed { record(close) }
+            throw close
         }
+        diagnostics.event("setup sent")
         receiver = Task { [weak self] in await self?.receive(from: task) }
         // The device's own record of the call, in the log as well as on screen.
         reportLog = Task { [weak self] in
@@ -334,7 +342,8 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
         for observer in observers { NotificationCenter.default.removeObserver(observer) }
         observers = []
         diagnostics.playerStopping()
-        player.stop()
+        // Never attached when the call ended before its audio started: stop() would raise an exception.
+        if player.engine != nil { player.stop() }
         engine.inputNode.removeTap(onBus: 0)
         engine.mainMixerNode.removeTap(onBus: 0)
         engine.stop()
@@ -351,19 +360,24 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
                 @unknown default: continue
                 }
             } catch {
-                // Gemini ended the session (it sends goAway first), or the network went away: the
-                // call is over, and work it started keeps going in the chat.
-                if socket === task, !closed { onEvent?(["kind": .string("closed")]) }
+                // Gemini ended the session (it sends goAway first) or refused it, with a code and its
+                // reason, or the network went away: the call is over, and work it started keeps going.
+                guard socket === task, !closed else { return }
+                let close = GeminiLiveClose(task: task, error: error, ready: ready)
+                record(close)
+                onEvent?(close.event)
                 return
             }
             guard socket === task, !closed else { return }
             for message in GeminiLiveWire.decode(frame) {
                 if message == .setupComplete {
                     // Audio before the session is set up is not Gemini's order.
+                    ready = true
                     uplink.attach(task)
                     publish(.connected)
                     diagnostics.event("Gemini ready")
                 }
+                if message == .goAway { diagnostics.event("Gemini said the session ends soon (goAway)") }
                 switch message {
                 case .audio, .assistantText: lastOutputAt = Date()
                 default: break
@@ -429,6 +443,12 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
             diagnostics.event("player started for new audio")
             player.play()
         }
+    }
+
+    /// In the report and the log at once: a call Gemini refused ended before the log's first 10 seconds.
+    private func record(_ close: GeminiLiveClose) {
+        diagnostics.event(close.summary)
+        GeminiLiveAudioDiagnostics.log.error("\(close.summary, privacy: .public)")
     }
 
     private func send(_ frame: Data) {

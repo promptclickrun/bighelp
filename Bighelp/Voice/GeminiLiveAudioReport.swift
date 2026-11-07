@@ -14,7 +14,8 @@ protocol LiveVoiceAudioReporting: AnyObject {
 /// What happened to a Gemini call's sound on this device: what Gemini sent, what the player took and
 /// finished, what the main mixer put out, and every change to the engine, route and session, with
 /// times. Gemini's voice played in the simulator and on the Mac but not on an iPhone, and only the
-/// device can say where it stops. Numbers, enums and port types only: never device names or words.
+/// device can say where it stops. Numbers, enums and port types only: never device names or anyone's
+/// words. Gemini's own reason for closing the socket (`GeminiLiveClose`) is the one text it keeps.
 final class GeminiLiveAudioDiagnostics: @unchecked Sendable {
     static let log = Logger(subsystem: "app.loopdy.mobile", category: "LiveVoiceAudio")
     static let maximumEvents = 40
@@ -197,7 +198,9 @@ struct GeminiLiveAudioState: Sendable {
     init(engine: AVAudioEngine, player: AVAudioPlayerNode, session: AVAudioSession = .sharedInstance()) {
         engineRunning = engine.isRunning
         playerPlaying = player.isPlaying
-        if let render = player.lastRenderTime, let time = player.playerTime(forNodeTime: render) {
+        // A player the engine never took (a call that ended before its audio started) raises an exception
+        // Swift can't catch when asked its time.
+        if player.engine != nil, let render = player.lastRenderTime, let time = player.playerTime(forNodeTime: render) {
             playerPosition = time.sampleTime
         }
         playerVolume = player.volume

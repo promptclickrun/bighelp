@@ -61,6 +61,15 @@ GPT-Live gets from `poll`, so `NativeLiveVoiceSession` routes work the same way:
   the translator ignores it.
 
 A Gemini session lasts up to 30 minutes from its token; the call ends when Gemini closes the socket.
+Gemini refuses a call the same way: it closes the socket with a code and its reason, for example
+`1011 "Token has been used too many times"`, `1011 "new_session_expire_time deadline exceeded"` (the token's
+60 seconds to start had passed) or `1008 "models/… is not found"`. The peer keeps them (`GeminiLiveClose`):
+Gemini's code and reason, the HTTP status if it refused the socket's opening request, or the network error
+if nothing came from Gemini. A call Gemini closed before it set the session up fails, and the call screen
+shows Gemini's words; a working call that Gemini ends says why, when Gemini gave a reason. Each step (connecting,
+setup sent, Gemini ready, goAway, the close) goes in the call's report, and the close goes in the
+`LiveVoiceAudio` log at once. The call screen keeps the last call's report, so Copy report works after a
+call that ended at once.
 
 Voice processing makes a configuration change right after the engine starts, on iPhone and in the simulator. The
 engine stops, and the peer starts it again (`GeminiLiveAudioPeer.restart`). The player stops first: started

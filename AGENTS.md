@@ -242,7 +242,9 @@ change in both repos.
   (`GeminiLiveAudioPeer.restart`), or it takes Gemini's voice and plays none. A test that only counts bytes
   received can't see that; check what finished playing. The call audio report (`GeminiLiveAudioDiagnostics`,
   log category `LiveVoiceAudio`) shows where the sound stops on a device; Settings › Voice › Debug (Nerd Mode)
-  shows it on the call screen and has Restart sound.
+  shows it on the call screen and has Restart sound. Gemini refuses a call by closing the socket with a code
+  and its reason; the call screen shows Gemini's words (`GeminiLiveClose`), never a bare "Gemini ended the
+  call" (#888).
   With plugin `native-voice-context-v1`, the offer also says who is talking and where
   (`LiveVoiceCallContext`): the agent's shown name, the person's saved name (never "You"), the time zone and,
   only while Device access › Location is usable, a coarse place (`LiveVoicePlace`: city, region, country from

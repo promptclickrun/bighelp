@@ -19,14 +19,14 @@ struct GeminiLiveRealServiceTests {
         }
     }
 
-    /// `gemini_live.mint` in the plugin, in Swift.
-    private static func mint(_ key: String) async throws -> String {
+    /// `gemini_live.mint` in the plugin, in Swift. The phone has `startWithin` seconds to connect.
+    private static func mint(_ key: String, startWithin: TimeInterval = 60) async throws -> String {
         let iso = ISO8601DateFormatter()
         let now = Date()
         let body: [String: Any] = [
             "uses": 1,
             "expireTime": iso.string(from: now.addingTimeInterval(1_800)),
-            "newSessionExpireTime": iso.string(from: now.addingTimeInterval(60)),
+            "newSessionExpireTime": iso.string(from: now.addingTimeInterval(startWithin)),
             "bidiGenerateContentSetup": [
                 "model": "models/gemini-3.8-live",
                 "generationConfig": ["responseModalities": ["AUDIO"],
@@ -73,6 +73,28 @@ struct GeminiLiveRealServiceTests {
         #expect(stats.bytesReceived > 0, "Gemini's voice reached the phone")
         #expect(stats.audioDeviceRunning)
         #expect(stats.bytesSent > 0, "The microphone reached Gemini")
+    }
+
+    /// Gemini refuses a call by closing the socket with a code and its reason, and the peer keeps both (#888).
+    /// A token whose start window has passed is one refusal Gemini makes every time.
+    @Test(.enabled(if: key != nil), .timeLimit(.minutes(1)))
+    func aRefusedCallKeepsGeminisCloseCodeAndReason() async throws {
+        let log = Log()
+        let peer = GeminiLiveAudioPeer()
+        peer.onEvent = { log.events.append($0) }
+        defer { peer.close() }
+        let token = try await Self.mint(Self.key!, startWithin: 2)
+        try await Task.sleep(for: .seconds(4))
+
+        try await peer.apply(.gemini(url: Self.socket, token: token, model: "models/gemini-3.8-live"))
+        for _ in 0..<100 where !log.has("closed") { try await Task.sleep(for: .milliseconds(100)) }
+        let closed = try #require(log.events.first { $0["kind"] == .string("closed") })
+        print("GEMINI-CLOSE \(closed)")
+        let close = try #require(GeminiLiveClose(event: closed))
+        #expect(close.ready == false)
+        #expect(close.code == 1011)
+        #expect(close.reason?.contains("new_session_expire_time") == true)
+        #expect(peer.audioReport().contains("new_session_expire_time"), "The report has Gemini's reason")
     }
 
     @Test(.enabled(if: key != nil && speech != nil))

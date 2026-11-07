@@ -320,7 +320,7 @@ enum BighelpNotificationErrorCode: String, CaseIterable, Codable, Sendable {
             "This computer didn't confirm the plugin install. Try again. If it still happens, use Set Up Again."
         case .pluginNotTurnedOn: "The bighelp plugin didn't turn on. Turn it on in Hermes, then try again."
         case .restartHermes:
-            "Restart Hermes on this computer (the hermes serve process, not only the messaging gateway), then try again."
+            "Restart the Hermes dashboard and the messaging gateway on this computer, then try again."
         case .pluginTooOld: "The bighelp plugin on this computer is too old for notifications. Update the plugin, then try again."
         case .computerCannotReachService:
             "This computer can't reach bighelp's notification service. Check the computer's internet connection and that no firewall blocks it, then try again."

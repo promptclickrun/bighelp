@@ -166,6 +166,12 @@ final class NativeWorkspaceSelectionStore {
         current?.receive(event)
     }
 
+    /// The computer in use serves something new (`BighelpHostRegistry.noteServicesChanged`).
+    func reloadAfterHostChange(hostID changed: UUID) async {
+        guard changed == hostID, let runtime = current else { return }
+        await runtime.reloadAfterHostChange()
+    }
+
     /// Opens the workspace if it isn't open, for the same connection. Its usual trigger is a new owner,
     /// but a wake while the phone was locked leaves its connection up: nothing new comes when the
     /// person unlocks and returns, so foreground entry, unlocking and Reconnect call this (#628).

@@ -830,6 +830,9 @@ struct HostNotificationSetupSection: View {
     var hostEndpoint: String? = nil
     var onCompletion: @MainActor () async -> Void = {}
     @State private var showsReview = false
+    /// After setup installed the plugin: it takes effect once the dashboard and the gateway restart.
+    @State private var restartPrompt: HostPluginUpdateModel?
+    @Environment(\.bighelpHostRegistry) private var registry
 
     var body: some View {
         Section {
@@ -866,7 +869,12 @@ struct HostNotificationSetupSection: View {
                     Button(actionTitle) {
                         Task {
                             await model.enable()
-                            await onCompletion()
+                            if model.pluginChanged, let registry {
+                                restartPrompt = await HostPluginUpdateModel.afterPluginChange(
+                                    hostID: model.hostID, registry: registry)
+                            } else {
+                                await onCompletion()
+                            }
                         }
                     }
                     .accessibilityIdentifier("host-setup.install-plugin")
@@ -893,6 +901,11 @@ struct HostNotificationSetupSection: View {
             if offersSetUpAgain {
                 Text("Set Up Again clears this computer's notification setup, on the computer and on this device, and sets it up fresh.")
             }
+        }
+        .pluginRestartPrompt($restartPrompt) { restarted in
+            // Alerts need the plugin running: a setup that stopped for the restart goes on after it.
+            if restarted, model.state != .enabled { await model.enable() }
+            await onCompletion()
         }
     }
 

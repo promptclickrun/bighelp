@@ -11,7 +11,7 @@ struct ShellFeatureStoreTests {
         let owner = LiveVoiceOwner(hostID: "host", authorizationID: "owner", agentID: "default", sessionID: session.id)
         let client = LiveVoiceControlClient(owner: owner, operation: { _, _ in [:] }, isOwnerCurrent: { _ in true })
         let live = LiveVoiceModel(agentName: "Fixture", client: client)
-        harness.store.configureLiveVoiceFactory { record, _, _ in record.id == session.id ? live : nil }
+        harness.store.configureLiveVoiceFactory { record, _, _ in record.id == session.id ? .success(live) : .failure(.chatOpening) }
         let presentation = harness.store.makeVoicePresentation(
             for: session.id,
             conversationMode: .codexLive,
@@ -2118,7 +2118,7 @@ struct ShellFeatureStoreTests {
         let music = HoldMusicSpy()
         let (store, catalog) = makeStore(records: [session], holdMusic: music)
         let live = liveVoice(for: session)
-        store.configureLiveVoiceFactory { _, _, _ in live }
+        store.configureLiveVoiceFactory { _, _, _ in .success(live) }
 
         let presentation = store.makeVoicePresentation(for: session.id, conversationMode: .codexLive)
         #expect(presentation.liveModel === live)
@@ -2167,13 +2167,24 @@ struct ShellFeatureStoreTests {
         #expect(music.starts == 0, "Hold music played with Hold music turned off")
     }
 
+    /// Live voice that can't start says why, so the voice screen names the real step.
+    @Test func liveVoiceThatCannotStartSaysWhy() {
+        let session = record(id: "no-live")
+        let (store, _) = makeStore(records: [session])
+        store.configureLiveVoiceFactory { _, _, _ in .failure(.pluginNotLoaded) }
+        let presentation = store.makeVoicePresentation(for: session.id, conversationMode: .codexLive)
+        #expect(presentation.liveModel == nil)
+        #expect(presentation.liveUnavailable == .pluginNotLoaded)
+        #expect(store.makeVoicePresentation(for: session.id, conversationMode: .turnBased).liveUnavailable == nil)
+    }
+
     /// "Use TTS voice mode" opens a new turn-based presentation over the failed live one.
     @Test func switchingFromLiveToTurnBasedVoiceBringsTheHoldMusicBack() async {
         let session = record(id: "switch-hold")
         let music = HoldMusicSpy()
         let (store, _) = makeStore(records: [session], holdMusic: music)
         let live = liveVoice(for: session)
-        store.configureLiveVoiceFactory { _, _, _ in live }
+        store.configureLiveVoiceFactory { _, _, _ in .success(live) }
 
         let first = store.makeVoicePresentation(for: session.id, conversationMode: .codexLive)
         first.model.reconcileAgentRun(isActive: true)

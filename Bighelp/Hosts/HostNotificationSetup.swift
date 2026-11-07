@@ -240,7 +240,7 @@ enum HostNotificationState: String, Codable, Sendable {
         case .installed: "Plugin installed. Finishing setup…"
         case .enabled: "Notifications enabled."
         case .verificationRequired: "Check your saved setup to continue."
-        case .backendRestartRequired: "Restart the hermes serve process on the host (not just the messaging gateway), then check again."
+        case .backendRestartRequired: "Restart the Hermes dashboard and the messaging gateway on your computer, then check again."
         case .prerequisitesRequired: "This computer needs notification support."
         case .permissionDenied: "This computer doesn't allow plugin installation."
         case .managementRejected: "This computer rejected installation. Check Hermes for details."
@@ -348,6 +348,9 @@ final class HostNotificationSetupModel {
     private(set) var failure: BighelpNotificationSetupFailure?
     /// The failure is from an earlier run: whatever stopped it may be fixed now.
     private(set) var failureIsFromEarlierRun = false
+    /// The last setup installed, updated or turned on the plugin. It takes effect only after the
+    /// Hermes dashboard and the messaging gateway restart (`PluginRestartPrompt`).
+    private(set) var pluginChanged = false
     /// The commit an install uses: the newest release, looked up only when one is needed.
     private(set) var pin: HostPluginPin?
     private(set) var release: PluginRelease?
@@ -563,11 +566,14 @@ final class HostNotificationSetupModel {
         isWorking = true
         failure = nil
         failureIsFromEarlierRun = false
+        pluginChanged = false
         defer { if operation == operationID { isWorking = false } }
         @MainActor func owns() -> Bool {
             registry.generation == owner && registry.accountScope == scope && operation == operationID
                 && registry.hosts.contains(where: { $0.id == hostID }) && !Task.isCancelled
         }
+        // A newer Hermes serves a new plugin's routes as soon as they're asked for: read it again.
+        defer { if pluginChanged { registry.noteServicesChanged(hostID: hostID) } }
         var host = original
         let workspace = management
         // Where setup is, so an error says which step it stopped.
@@ -626,6 +632,7 @@ final class HostNotificationSetupModel {
                         identifier: pin.identifier, revision: pin.revision,
                         profile: nil, phase: .verified
                     )
+                    pluginChanged = true
                     try finish(.installed, host: &host)
                     return
                 }
@@ -654,6 +661,7 @@ final class HostNotificationSetupModel {
                         }
                         return
                     }
+                    pluginChanged = true
                 }
                 // The pin controls an installation we initiate, not compatibility
                 // of an operator's existing plugin. Enrollment verifies the live
@@ -780,6 +788,7 @@ final class HostNotificationSetupModel {
                 }
             }
             host.pluginIntent = HostPluginIntent(identifier: pin.identifier, revision: pin.revision, profile: nil, phase: .verified)
+            pluginChanged = true
             try finish(.installed, host: &host)
             step = .startingSetup
             try await enrollInstalled(host: &host, connection: workspace.savedConnection, isCurrent: { owns() })

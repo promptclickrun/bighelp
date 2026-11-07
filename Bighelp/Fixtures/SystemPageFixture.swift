@@ -4,10 +4,12 @@ import SwiftUI
 
 /// `-test-system-page`: Settings › System against a synthetic host that is 12
 /// commits behind, for UI tests and screenshots. Add `-test-system-page-current`
-/// for a host that's up to date. Every number here is made up.
+/// for a host that's up to date, and `-test-system-page-plugin-not-loaded` for a
+/// plugin its dashboard hasn't loaded yet. Every number here is made up.
 enum SystemPageFixture {
     static let launchArgument = "-test-system-page"
     static let upToDateArgument = "-test-system-page-current"
+    static let pluginNotLoadedArgument = "-test-system-page-plugin-not-loaded"
 
     @MainActor
     static func rootView() -> some View {
@@ -18,6 +20,7 @@ enum SystemPageFixture {
     /// `rootView()` each time would be replaced before it finished loading.
     private struct Root: View {
         @State private var store = SystemPageFixture.makeStore()
+        @State private var plugin = SystemPageFixture.makePlugin()
 
         var body: some View {
             let arguments = ProcessInfo.processInfo.arguments
@@ -25,11 +28,23 @@ enum SystemPageFixture {
                 arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil
             }
             NavigationStack {
-                HostOperationsView(store: store)
+                HostOperationsView(store: store, pluginUpdate: plugin)
             }
             .environment(\.bighelpUIV3Enabled, true)
             .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
         }
+    }
+
+    /// The plugin as it runs: restartable from here, or not loaded by its dashboard yet.
+    @MainActor
+    private static func makePlugin() -> HostPluginUpdateModel {
+        guard ProcessInfo.processInfo.arguments.contains(pluginNotLoadedArgument) else {
+            return HostPluginUpdateFixture.model(.upToDate, installed: "2.17.0", running: "2.17.0",
+                                                 message: "bighelp plugin 2.17.0 is running.", canRestartHost: true)
+        }
+        return HostPluginUpdateFixture.model(.restartNeeded, installed: "2.17.0", running: nil,
+                                             message: HostPluginUpdateModel.notLoadedMessage(installed: "2.17.0"),
+                                             canRestartHost: false, loaded: false)
     }
 
     @MainActor

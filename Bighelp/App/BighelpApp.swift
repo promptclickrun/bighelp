@@ -312,6 +312,11 @@ struct BighelpApp: App {
                 await notificationComposition?.receiveNativeEvent(host, event)
             }
         }
+        hostRegistry.onServicesChanged = { [weak nativeWorkspaces] hostID in
+            Task { @MainActor [weak nativeWorkspaces] in
+                await nativeWorkspaces?.reloadAfterHostChange(hostID: hostID)
+            }
+        }
         _demoHosts = State(initialValue: composition.demoHosts)
         _permissionCenter = State(initialValue: composition.permissionCenter)
         _sessionCatalog = State(initialValue: composition.sessionCatalog)

@@ -356,6 +356,15 @@ change in both repos.
   - It looks up the release's exact commit, installs it, reads it back, and never replaces a newer or equal
     plugin. An install that may still be running on the host is finished with the commit it asked for.
   - When the app needs a newer plugin feature, gate it on `/native/context` and say "update the plugin".
+  - A plugin installed, turned on or updated takes effect only after two restarts: the Hermes dashboard
+    (`hermes dashboard` or `hermes serve`, which serves the app's connection and the plugin's routes) and the
+    messaging gateway (its own copy: reply alerts, other agents' messages). "Installed and enabled" reads the
+    plugin list on disk, not what runs. Every place that installs it asks to restart both
+    (`PluginRestartPrompt`), and Settings › System has Restart Hermes Dashboard beside the gateway's. Hermes
+    can't restart the dashboard for an app, so the plugin running in it does (`native-host-restart-v1`);
+    before the dashboard has loaded the plugin, only the computer can. After an install or a restart,
+    `BighelpHostRegistry.noteServicesChanged` has the runtime read the computer again (`reloadAfterHostChange`).
+    Live voice that can't start says why (`LiveVoiceUnavailable`), never only "not supported".
   - Test the app against the plugin's `main` on the Mac, not through a CI workflow.
 - **Agents talking to each other:** the app reads them from the tool calls Hermes recorded (`AgentTalkCall`:
   `hermes -p <agent> chat -q`, `hermes peer dm`, `message_agent`) and from the messages other agents send in

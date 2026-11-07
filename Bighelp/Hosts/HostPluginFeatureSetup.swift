@@ -29,9 +29,9 @@ struct HostPluginFeatureSection: View {
     @State private var action: String?
     @State private var checking = false
     @State private var ready = false
-    @State private var offerGatewayRestart = false
-    @State private var restartingGateway = false
-    @State private var confirmsGatewayRestart = false
+    /// Set after this section installed or turned on the plugin, until a restart finishes it.
+    @State private var restarts: HostPluginUpdateModel?
+    @State private var restartPrompt: HostPluginUpdateModel?
     @State private var requestID = UUID()
 
     private var identity: String {
@@ -48,30 +48,19 @@ struct HostPluginFeatureSection: View {
             Label(status, systemImage: ready ? "checkmark.circle" : "puzzlepiece.extension")
                 .bighelpFont(.metadata).foregroundStyle(.secondary)
                 .accessibilityIdentifier("settings.plugin-status.\(feature.rawValue)")
-            if checking || setup?.isWorking == true {
+            if let restarts, restarts.isWorking {
+                ProgressView(restarts.message ?? "Restarting Hermes…")
+            } else if checking || setup?.isWorking == true {
                 ProgressView(setup?.isWorking == true ? "Setting up the plugin…" : "Checking plugin…")
             } else if let action, let setup {
-                Button(action) {
-                    Task {
-                        await setup.enable()
-                        guard !Task.isCancelled else { return }
-                        if setup.state == .installed {
-                            offerGatewayRestart = true
-                            status = "Plugin files and configured enablement are verified. Restart the messaging gateway to try loading agent tools, or restart the hermes serve process on the host itself to load native APIs. bighelp cannot restart hermes serve for you."
-                        } else { status = setup.message }
-                    }
-                }
-                .accessibilityIdentifier(feature.installIdentifier)
+                Button(action) { Task { await install(setup) } }
+                    .accessibilityIdentifier(feature.installIdentifier)
+            } else if let restarts {
+                Button("Restart Hermes to Finish") { restartPrompt = restarts }
+                    .accessibilityIdentifier("settings.plugin-restart.\(feature.rawValue)")
             } else if !ready, registry?.selectedHost != nil {
                 Button("Check again") { Task { await check() } }
                     .accessibilityIdentifier("settings.plugin-check.\(feature.rawValue)")
-            }
-            if offerGatewayRestart && !ready {
-                Button(restartingGateway ? "Restarting Messaging Gateway…" : "Restart Messaging Gateway") {
-                    confirmsGatewayRestart = true
-                }
-                .disabled(restartingGateway)
-                .accessibilityIdentifier("settings.plugin-restart-gateway.\(feature.rawValue)")
             }
         } header: {
             Text(feature.title)
@@ -89,16 +78,28 @@ struct HostPluginFeatureSection: View {
             requestID = UUID()
             setup?.cancel()
         }
-        .confirmationDialog(
-            "Restart the messaging gateway?",
-            isPresented: $confirmsGatewayRestart,
-            titleVisibility: .visible
-        ) {
-            Button("Restart Messaging Gateway") { Task { await restartMessagingGateway() } }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("This restarts only the selected profile's messaging gateway. It does not restart the hermes serve process carrying this connection and native plugin APIs. To restart that process, restart hermes serve on the host itself, then return here and check again.")
+        .pluginRestartPrompt($restartPrompt) { restarted in
+            if restarted { restarts = nil }
+            await check()
         }
+    }
+
+    /// Installs or turns on the plugin, then asks to restart the dashboard and the gateway: it
+    /// takes effect only after both.
+    private func install(_ setup: HostNotificationSetupModel) async {
+        await setup.enable()
+        guard !Task.isCancelled else { return }
+        guard setup.state == .installed, setup.pluginChanged, let registry else {
+            status = setup.message
+            return
+        }
+        status = "Plugin installed. It takes effect after the Hermes dashboard and the messaging gateway restart."
+        // Its install button is done; the restart button takes its place.
+        action = nil
+        let model = await HostPluginUpdateModel.afterPluginChange(hostID: setup.hostID, registry: registry)
+        guard !Task.isCancelled else { return }
+        restarts = model
+        restartPrompt = model
     }
 
     private func check() async {
@@ -181,7 +182,7 @@ struct HostPluginFeatureSection: View {
                     action = "Update bighelp Plugin"
                 } else if installed.configuredEnabled {
                     status = nativeResponded
-                        ? "The plugin is installed and its native API answered, but it did not advertise this feature. Check the hermes serve log on the host for why the native middleware was skipped, restart the hermes serve process on the host itself, then check again."
+                        ? "The plugin is installed and answers, but it doesn't offer this feature on this computer. The Hermes dashboard's log on your computer says why. Restart the dashboard on your computer, then check again."
                         : Self.unreachableMessage(nativeFailure)
                 } else {
                     status = "The bighelp plugin is installed but disabled."
@@ -196,13 +197,13 @@ struct HostPluginFeatureSection: View {
         }
     }
 
-    /// Only a missing route means hermes serve hasn't loaded the plugin. A
+    /// Only a missing route means the Hermes dashboard hasn't loaded the plugin. A
     /// turned-away sign-in or a host that didn't answer needs a different step,
     /// and a restart wouldn't help.
     static func unreachableMessage(_ failure: (any Error)?) -> String {
         switch failure {
         case WorkspaceClientError.unavailable(.pluginRequired)?:
-            "The plugin is installed, but bighelp could not reach its native API on this host. Restarting the messaging gateway only loads agent tools; restart the hermes serve process on the host itself, then reconnect and check again."
+            "The plugin is installed, but the Hermes dashboard on your computer hasn't loaded it yet. Restart the dashboard and the messaging gateway on your computer, then check again."
         case WorkspaceClientError.authenticationRequired?:
             "The plugin is installed, but this host turned down bighelp's sign-in. Sign in to the host again, then check again."
         default:
@@ -219,60 +220,6 @@ struct HostPluginFeatureSection: View {
             false
         }
     }
-
-    /// Deliberately gateway-only: this connection is carried by the very
-    /// `hermes serve` process a dual restart would have to kill, so the app
-    /// cannot restart it and poll the result. The confirmation copy states
-    /// exactly what restarts and gives the host-side manual step.
-    private func restartMessagingGateway() async {
-        guard !restartingGateway, let registry, let host = registry.selectedHost,
-              let workspace = registry.selectedWorkspace, workspace.isConnected,
-              let direct = workspace.nativeClient,
-              let authority = workspace.savedConnection?.workspaceAuthority else { return }
-        let generation = registry.generation
-        let connection = workspace.connectionGeneration
-        let owner = WorkspaceOwner(
-            authority: authority,
-            authenticationGeneration: generation,
-            connectionGeneration: connection
-        )
-        func owns() -> Bool {
-            registry.generation == generation && registry.selectedHostID == host.id
-                && workspace.connectionGeneration == connection && !Task.isCancelled
-        }
-        restartingGateway = true
-        defer { restartingGateway = false }
-        do {
-            let operations = DirectHermesHostOperationsClient(
-                rpc: direct, http: direct, owner: owner,
-                currentOwner: { owns() ? owner : nil }
-            )
-            let receipt = try await operations.launchMessagingGateway(
-                .restart, profileID: workspace.selectedProfile
-            )
-            let result = try await operations.poll(
-                receipt, attempts: 30, intervalNanoseconds: 1_000_000_000
-            )
-            guard owns() else { return }
-            guard result.phase == .succeeded else {
-                status = "The messaging-gateway restart could not be confirmed. bighelp cannot restart the hermes serve process from this connection; restart it on the host itself, then reconnect and check again."
-                return
-            }
-            await workspace.reconnect()
-            guard owns(), workspace.isConnected else {
-                status = "The gateway restarted, but bighelp could not reconnect. Restart the hermes serve process on the host itself if the plugin still does not activate."
-                return
-            }
-            offerGatewayRestart = false
-            await check()
-            if !ready {
-                status = "The messaging gateway restarted, but the plugin feature is still unavailable. bighelp cannot restart the hermes serve process from here; restart it on the host itself, then reconnect and check again."
-            }
-        } catch {
-            guard owns() else { return }
-            status = "The messaging-gateway restart failed or could not be verified. Restart the hermes serve process on the host itself, then reconnect and check again."
-        }
-    }
 }
 
 /// Explicit host-detail installation. It reuses the stock plugin coordinator
@@ -281,10 +228,11 @@ struct HostPluginFeatureSection: View {
 struct HostPluginInstallationSection: View {
     let model: HostNotificationSetupModel
     @State private var showsReview = false
-    @State private var restartOffered = false
-    @State private var confirmsRestart = false
-    @State private var restarting = false
-    @State private var restartStatus: String?
+    /// Set after this section installed or turned on the plugin, until a restart finishes it.
+    @State private var restarts: HostPluginUpdateModel?
+    @State private var restartPrompt: HostPluginUpdateModel?
+    /// What the restart that finished the install said, once its button is gone.
+    @State private var finishedRestartMessage: String?
     @Environment(\.bighelpHostRegistry) private var registry
 
     var body: some View {
@@ -316,18 +264,10 @@ struct HostPluginInstallationSection: View {
                 }
                 Text("Hermes' own security scanner checks the plugin before it's installed, and bighelp confirms the exact version landed.")
                     .fixedSize(horizontal: false, vertical: true)
-                Text("Installing doesn't turn on notifications. If the plugin's features don't appear afterwards, restart Hermes on this computer.")
+                Text("Installing doesn't turn on notifications. The plugin takes effect after the Hermes dashboard and the messaging gateway restart, and bighelp asks to restart them once it's in.")
                     .fixedSize(horizontal: false, vertical: true)
                 if let actionTitle = model.actionTitle {
-                    Button(actionTitle) {
-                        Task {
-                            await model.enable()
-                            if model.state == .installed || model.state == .enabled {
-                                restartOffered = true
-                                restartStatus = "Plugin files are installed and enabled. Runtime activation is not yet verified."
-                            }
-                        }
-                    }
+                    Button(actionTitle) { Task { await install() } }
                         .accessibilityIdentifier("hosts.install-loopdy-plugin.confirm")
                 }
                 Button("Not Now", role: .cancel) { showsReview = false }
@@ -339,15 +279,17 @@ struct HostPluginInstallationSection: View {
                 }
                     .accessibilityIdentifier("hosts.install-loopdy-plugin")
             }
-            if restartOffered {
-                Button(restarting ? "Restarting Messaging Gateway…" : "Restart Messaging Gateway") {
-                    confirmsRestart = true
+            if let restarts {
+                if restarts.isWorking {
+                    ProgressView(restarts.message ?? "Restarting Hermes…")
+                        .accessibilityIdentifier("hosts.plugin-install.restarting")
+                } else {
+                    Button("Restart Hermes to Finish") { restartPrompt = restarts }
+                        .accessibilityIdentifier("hosts.plugin-install.restart")
                 }
-                .disabled(restarting)
-                .accessibilityIdentifier("hosts.plugin-install.restart-gateway")
             }
-            if let restartStatus {
-                Text(restartStatus).fixedSize(horizontal: false, vertical: true)
+            if let message = restarts?.message ?? finishedRestartMessage, restarts?.isWorking != true {
+                Text(message).fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("hosts.plugin-install.restart-status")
             }
         } header: {
@@ -355,15 +297,10 @@ struct HostPluginInstallationSection: View {
         } footer: {
             Text("Plugin installation is separate from notification enrollment. Basic chat and Artifacts remain available without it.")
         }
-        .confirmationDialog(
-            "Restart the messaging gateway?",
-            isPresented: $confirmsRestart,
-            titleVisibility: .visible
-        ) {
-            Button("Restart Messaging Gateway") { Task { await restartAndVerify() } }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("This restarts only the selected profile's messaging gateway. It does not restart hermes serve, which carries this native connection and plugin API. To restart that process, restart hermes serve on the host itself, then return here and check again.")
+        .pluginRestartPrompt($restartPrompt) { restarted in
+            guard restarted, let restarts else { return }
+            finishedRestartMessage = restarts.message
+            self.restarts = nil
         }
     }
 
@@ -375,57 +312,13 @@ struct HostPluginInstallationSection: View {
         }
     }
 
-    /// Gateway-only by design (see restartMessagingGateway): the host operator
-    /// restarts `hermes serve` on the host itself when native APIs stay dark.
-    private func restartAndVerify() async {
-        guard !restarting, let registry,
-              let host = registry.hosts.first(where: { $0.id == model.hostID }) else { return }
-        let workspace = registry.workspace(for: host)
-        if !workspace.isConnected { await workspace.reconnect() }
-        guard workspace.isConnected, let direct = workspace.nativeClient,
-              let authority = workspace.savedConnection?.workspaceAuthority else {
-            restartStatus = "bighelp could not reconnect to request a gateway restart. Restart the hermes serve process on the host itself, then check again."
-            return
-        }
-        let generation = registry.generation
-        let connection = workspace.connectionGeneration
-        let owner = WorkspaceOwner(authority: authority, authenticationGeneration: generation,
-                                   connectionGeneration: connection)
-        func owns() -> Bool {
-            registry.generation == generation && registry.hosts.contains(where: { $0.id == host.id })
-                && workspace.connectionGeneration == connection && !Task.isCancelled
-        }
-        restarting = true
-        defer { restarting = false }
-        do {
-            let operations = DirectHermesHostOperationsClient(
-                rpc: direct, http: direct, owner: owner,
-                currentOwner: { owns() ? owner : nil }
-            )
-            let receipt = try await operations.launchMessagingGateway(
-                .restart, profileID: workspace.selectedProfile
-            )
-            let result = try await operations.poll(receipt, attempts: 30,
-                                                   intervalNanoseconds: 1_000_000_000)
-            guard owns(), result.phase == .succeeded else {
-                restartStatus = "The gateway restart could not be verified. Restart the hermes serve process on the host itself, then check again."
-                return
-            }
-            await workspace.reconnect()
-            guard owns(), workspace.isConnected, let refreshed = workspace.nativeClient else {
-                restartStatus = "The gateway restarted, but bighelp could not reconnect. Restart the hermes serve process on the host itself if the plugin remains unavailable."
-                return
-            }
-            let verifier = DirectHermesNativePluginClient(
-                http: refreshed, owner: owner, currentOwner: { owns() ? owner : nil }
-            )
-            _ = try await verifier.loadContext(force: true)
-            guard owns() else { return }
-            restartOffered = false
-            restartStatus = "Messaging gateway restarted and the bighelp plugin context was verified after reconnect."
-        } catch {
-            guard owns() else { return }
-            restartStatus = "The messaging gateway failed or did not activate the native plugin context. Restart the hermes serve process on the host itself, then reconnect and check again."
-        }
+    /// Installs or turns on the plugin, then asks to restart the dashboard and the gateway: it
+    /// takes effect only after both.
+    private func install() async {
+        await model.enable()
+        guard model.state == .installed || model.state == .enabled, model.pluginChanged, let registry else { return }
+        let restarts = await HostPluginUpdateModel.afterPluginChange(hostID: model.hostID, registry: registry)
+        self.restarts = restarts
+        restartPrompt = restarts
     }
 }

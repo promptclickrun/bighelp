@@ -38,6 +38,9 @@ struct BighelpCardView: View {
         if let draft = ImageDraftCard.draft(in: card) {
             ImageDraftCardView(draft: draft, cardHash: card.document["content_hash"]?.string,
                                isIntact: card.isDraftContentIntact)
+        } else if let app = HTMLAppCard.app(in: card) {
+            // An agent's app: the card opens it; its page never draws in the chat.
+            HTMLAppCardView(app: app, cardID: card.id)
         } else {
             displayCard
         }

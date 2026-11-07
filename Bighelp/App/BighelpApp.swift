@@ -170,6 +170,15 @@ struct BighelpApp: App {
             }
         }
         PhotoActionsSettingsStore.shared.connection = { imageDraftsConnection().map { ($0.scope, $0.api) } }
+        // Agents' apps: the computer in use, or the demo's sample apps.
+        HTMLAppHost.connection = {
+            if usesDemoWorkspace, !connections.isDirectSelected {
+                let scope = (try? WorkspaceAuthority.fixture(id: demoHosts.selectedHostID ?? "demo"))?.cacheScopeID ?? "demo"
+                return (scope, HTMLAppsAPI(client: DemoHTMLAppsClient.shared))
+            }
+            guard let owner = connections.owner else { return nil }
+            return (owner.cacheScopeID, HTMLAppsAPI(client: DirectHermesHTMLAppsClient(workspace: { connections.workspace })))
+        }
         let demoAgents = composition.agentDirectory
         Self.startBotsAppState(registry: hostRegistry, connections: connections, fleet: fleet,
                                settings: composition.settings, companions: composition.companion,

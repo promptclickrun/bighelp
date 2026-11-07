@@ -411,6 +411,9 @@ final class BighelpHostRegistry {
         Task { await AgentAttachmentCache.shared.removeAll() }
         // Photo drafts' edits and pending Saves hold a person's details; same one-way names, same rule.
         ImageDraftStore.shared.eraseLocalData()
+        // Agents' apps: their pages kept on the phone and what each page stored for itself.
+        HTMLAppCache().eraseAll()
+        Task { await HTMLAppWebView.eraseStorage() }
         vault.invalidate(); draftStores[host.id]?.invalidate()
         hosts = remaining; selectedHostID = selection
         selectedWorkspace = selectedHost.map { workspace(for: $0) }

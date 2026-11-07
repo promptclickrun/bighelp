@@ -102,17 +102,26 @@ Both routes are reads, `POST /api/plugins/loopdy/native/html-apps/{operation}`:
 
 - `html-apps/get` with `{"agentId", "appId", "knownSha256"?}` answers
   `{"app": {"appId", "title", "description", "sendsAnswers", "live", "revision", "updatedAt",
-  "htmlSha256", "htmlBytes"}, "html"?}`. `html` is base64 and is left out when `knownSha256` is the
-  same as `htmlSha256`. The app checks the size and the hash of the HTML.
+  "htmlSha256", "htmlBytes"}, "offset", "html", "nextOffset"}`. The page (up to 16 MB) comes in base64
+  pieces of up to 2 MiB, so every answer fits the app's usual 4 MiB cap on one answer, whatever the page's
+  size: a route that asked for more would be refused by the app before it was sent
+  (`everyAppRoutesAnswerFitsTheHTTPSizeFence`). The app asks for each later piece with its `offset` and the
+  page's `htmlSha256`, asks again for a piece that didn't come, and starts again on `409 app_changed` (the
+  page changed while it loaded). It checks the size and the hash of the whole page. The page is left out
+  when `knownSha256` is the same as `htmlSha256`.
 - `html-apps/data` with `{"agentId", "appId"}` answers
   `{"appId", "data", "updatedAt", "dataSha256", "problem"}`. `problem` is `missing`, `invalid` or
-  `too_large` when the data file cannot be read.
+  `too_large` when the data file cannot be read. Data is up to 1 MB.
 
 `app_not_found` means the app is not this agent's, or is gone. A host without the feature makes the
 app say to update the plugin.
 
 ## Demo and tests
 
-Demo mode's computer (`DemoHTMLAppsClient`) has two sample apps: Trip budget, which sends answers,
+Demo mode's computer (`DemoHTMLAppsClient`) answers in pieces of 1 KB, so demo mode loads every page
+in several pieces, as a big page does. It has two sample apps: Trip budget, which sends answers,
 and Garden watch, whose data changes every few seconds. `-test-html-apps` opens a chat with a card
-for each. `HTMLAppTests` covers the card, the answer text, the routes and the speaker note.
+for each. `HTMLAppTests` covers the card, the answer text, the routes, the pieces and the speaker note.
+`HTMLAppsHostUITests` runs on a real, isolated Hermes with the plugin
+(`Scripts/HostSignInMatrixProbe.py --modes apps --plugin <plugin checkout>`): the agent shows a page of
+about 5 MB, the app loads it in pieces over HTTP, and the page's answer reaches the agent.

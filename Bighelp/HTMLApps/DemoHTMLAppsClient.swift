@@ -26,12 +26,34 @@ final class DemoHTMLAppsClient: HTMLAppsClient {
                            description: "Soil, temperature and the last watering, from the sensors.",
                            sendsAnswers: false, html: DemoHTMLApps.gardenWatch, data: DemoHTMLApps.gardenData),
     ]
+    /// Small, so demo mode and its UI tests load every page in several pieces, as a big page does.
+    var pieceBytes = 1_024
     private let clock: () -> Date
     /// Every call, for tests.
     private(set) var calls: [(operation: HTMLAppsOperation, payload: [String: BighelpJSONValue])] = []
 
     init(clock: @escaping () -> Date = { Date() }) {
         self.clock = clock
+    }
+
+    /// `html-apps/get` as the plugin answers it: the app, then one piece of its page from `offset`
+    /// (nothing when the phone has this page), and a later piece of a page that changed is refused.
+    static func pageReply(info: [String: BighelpJSONValue], page: Data, payload: [String: BighelpJSONValue],
+                          pieceBytes: Int) throws -> [String: BighelpJSONValue] {
+        let hash = HTMLAppHash.sha256(page)
+        if let revision = payload["htmlSha256"]?.string, revision != hash {
+            throw WorkspaceClientError.rejected(code: "app_changed")
+        }
+        var app = info
+        app["htmlSha256"] = .string(hash)
+        app["htmlBytes"] = .integer(page.count)
+        let offset = payload["offset"]?.integer ?? 0
+        if offset == 0, payload["knownSha256"]?.string == hash { return ["app": .object(app)] }
+        guard offset >= 0, offset < page.count else { throw WorkspaceClientError.rejected(code: "invalid_request") }
+        let end = min(offset + pieceBytes, page.count)
+        return ["app": .object(app), "offset": .integer(offset),
+                "html": .string(page.subdata(in: offset..<end).base64EncodedString()),
+                "nextOffset": end < page.count ? .integer(end) : .null]
     }
 
     func perform(_ operation: HTMLAppsOperation,
@@ -44,15 +66,12 @@ final class DemoHTMLAppsClient: HTMLAppsClient {
         let now = clock()
         switch operation {
         case .get:
-            let bytes = Data(app.html.utf8)
-            let hash = HTMLAppHash.sha256(bytes)
-            var reply: [String: BighelpJSONValue] = ["app": .object([
+            let info: [String: BighelpJSONValue] = [
                 "appId": .string(appID), "title": .string(app.title), "description": .string(app.description),
                 "sendsAnswers": .boolean(app.sendsAnswers), "live": .boolean(app.data != nil), "revision": .integer(1),
-                "updatedAt": .string("2026-11-07T12:00:00Z"), "htmlSha256": .string(hash), "htmlBytes": .integer(bytes.count),
-            ])]
-            if payload["knownSha256"]?.string != hash { reply["html"] = .string(bytes.base64EncodedString()) }
-            return reply
+                "updatedAt": .string("2026-11-07T12:00:00Z"),
+            ]
+            return try Self.pageReply(info: info, page: Data(app.html.utf8), payload: payload, pieceBytes: pieceBytes)
         case .data:
             let data = app.data?(now)
             return ["appId": .string(appID), "data": data ?? .null,

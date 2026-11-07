@@ -176,6 +176,47 @@ struct HTMLAppTests {
         #expect(broken.problem == .invalid)
     }
 
+    @Test func aPageComesInPiecesAndIsPutTogether() async throws {
+        let page = String(repeating: "<p>Trip budget é</p>\n", count: 600)
+        let server = HTMLAppPieceServer(page: page, pieceBytes: 4_096)
+        let result = try await HTMLAppsAPI(client: server, retryDelays: [.zero])
+            .app(agentID: "default", appID: Self.appID, knownSHA256: nil)
+        #expect(result.html == page)
+        let pieces = (Data(page.utf8).count + 4_095) / 4_096
+        #expect(server.calls.count == pieces)
+        let later = server.calls.dropFirst().map(\.payload)
+        #expect(later.allSatisfy { $0["htmlSha256"]?.string == HTMLAppHash.sha256(Data(page.utf8)) && $0["knownSha256"] == nil })
+        #expect(later.compactMap { $0["offset"]?.integer } == (1..<pieces).map { $0 * 4_096 })
+    }
+
+    @Test func aDroppedPieceIsAskedForAgainFromItsOffset() async throws {
+        let page = String(repeating: "x", count: 10_000)
+        let server = HTMLAppPieceServer(page: page, pieceBytes: 4_096)
+        server.dropOnce = [4_096]
+        let result = try await HTMLAppsAPI(client: server, retryDelays: [.zero])
+            .app(agentID: "default", appID: Self.appID, knownSHA256: nil)
+        #expect(result.html == page)
+        #expect(server.calls.compactMap { $0.payload["offset"]?.integer } == [4_096, 4_096, 8_192])
+    }
+
+    @Test func aPageThatChangesWhileItLoadsStartsAgain() async throws {
+        let server = HTMLAppPieceServer(page: String(repeating: "a", count: 10_000), pieceBytes: 4_096)
+        server.replaceAfterFirstPiece = String(repeating: "b", count: 5_000)
+        let result = try await HTMLAppsAPI(client: server, retryDelays: [.zero])
+            .app(agentID: "default", appID: Self.appID, knownSHA256: nil)
+        #expect(result.html == String(repeating: "b", count: 5_000))
+    }
+
+    /// Demo mode skips HTTP, so only this catches a route whose answer the transport would refuse
+    /// before sending (on a real host, every app said "The app didn't open").
+    @Test func everyAppRoutesAnswerFitsTheHTTPSizeFence() throws {
+        for operation in HTMLAppsOperation.allCases {
+            let budget = try #require(DirectHermesNativePluginClient.responseBudget(operation.workspaceOperation))
+            #expect(budget.maximumResponseBytes <= DirectHermesHTTP.responseLimit(route: budget.path, method: "POST", query: []),
+                    "\(budget.path)")
+        }
+    }
+
     @Test func refusalsBecomePlainErrors() async {
         let client = HTMLAppsFakeClient()
         client.error = WorkspaceClientError.unavailable(.unsupportedOperation)
@@ -212,6 +253,40 @@ struct HTMLAppTests {
             ]),
             "html": .string(bytes.base64EncodedString()),
         ]
+    }
+}
+
+/// Serves one app's page the way the plugin does (`DemoHTMLAppsClient.pageReply`), and can drop a
+/// piece once or replace the page after the first piece.
+@MainActor
+final class HTMLAppPieceServer: HTMLAppsClient {
+    var page: Data
+    let pieceBytes: Int
+    var dropOnce: Set<Int> = []
+    var replaceAfterFirstPiece: String?
+    private(set) var calls: [(operation: HTMLAppsOperation, payload: [String: BighelpJSONValue])] = []
+
+    init(page: String, pieceBytes: Int) {
+        self.page = Data(page.utf8)
+        self.pieceBytes = pieceBytes
+    }
+
+    func perform(_ operation: HTMLAppsOperation,
+                 payload: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] {
+        calls.append((operation, payload))
+        if let offset = payload["offset"]?.integer, dropOnce.remove(offset) != nil {
+            throw WorkspaceClientError.transportUnavailable
+        }
+        let info: [String: BighelpJSONValue] = [
+            "appId": .string(HTMLAppTests.appID), "title": .string("Trip budget"), "description": .string("D"),
+            "sendsAnswers": .boolean(true), "live": .boolean(false), "revision": .integer(1),
+        ]
+        let reply = try DemoHTMLAppsClient.pageReply(info: info, page: page, payload: payload, pieceBytes: pieceBytes)
+        if let replacement = replaceAfterFirstPiece {
+            page = Data(replacement.utf8)
+            replaceAfterFirstPiece = nil
+        }
+        return reply
     }
 }
 

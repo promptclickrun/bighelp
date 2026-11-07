@@ -1,5 +1,20 @@
 # Wiki v1 Link contract
 
+> **Historical.** This contract is for the retired Link transport (`targetHostId`, `senderEpoch`, the `wiki.v1`
+> capability). Link is gone. Chat and plugin features use native Hermes now (see
+> [docs/NATIVE_TRANSPORT.md](../docs/NATIVE_TRANSPORT.md)). Wiki is no longer a feature.
+>
+> - The bighelp plugin removed the wiki routes and no longer lists `native-wiki-v1` (bighelp-plugin README ›
+>   Legacy code). Files that the routes saved stay on hosts, but nothing reads them.
+> - The app has no Wiki screen. `WikiBrowserView`, `WikiConnectionView`, `WikiDocumentView` and
+>   `WikiSaveControls` are not in it.
+> - Hermes tools leaves Wiki out (`WorkspaceDestination.appMenuCases`).
+> - If someone sends a Wiki or GitHub reference in chat, the app says that these references are no longer
+>   available (`ReferenceChatComposition`).
+> - What is left is inactive code: the models, store, drafts and persistence in `Bighelp/Wiki/`, the request
+>   codec (`WikiLinkClient`), `DirectHermesWikiClient` (the `wiki/*` plugin routes, behind `native-wiki-v1`) and
+>   the reference adapter in `Bighelp/References/`.
+
 Implementation contract for issue #135. User-approved Wiki/reference spec governs privacy, optionality and source fidelity. All operations are optional and advertised using existing negotiated capability string arrays (`wiki.v1`); no new unsolicited top-level response fields. Old hosts are unavailable for Wiki, not broken for chat.
 
 ## Authentication

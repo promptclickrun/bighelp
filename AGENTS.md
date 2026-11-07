@@ -87,9 +87,10 @@ change in both repos.
     section whose members are all elsewhere stays off (`SimpleBotsSectioning.elsewhere`). + in Bots mode is
     New Bot, New Group Chat and New Section, each only where it can work (`SimpleBotsNewItem`); the bot and
     group chat menus come from `SimpleBotsMenuAction`.
-  - First run (`FirstRunOnboardingView`) is Welcome, Connect, the optional plugin, notifications (only once the
-    plugin is in), then Choose your mode (`FirstRunMode`: Bots, Sessions, Code). Optional steps have a small Skip;
-    Connect and the mode don't. `FirstRunOnboarding.afterConnectKey` keeps it on screen after host setup's own
+  - First run (`FirstRunOnboardingView`) is Welcome (with an optional Appearance step behind Appearance options),
+    the AI data agreement if not given yet, Connect, the optional plugin, notifications (only once the plugin is
+    in), then Choose your mode (`FirstRunMode`: Bots, Chat for `.sessions`, Code). Optional steps have a small
+    Skip; Connect and the mode don't. `FirstRunOnboarding.afterConnectKey` keeps it on screen after host setup's own
     finish. The mode cards show screenshots (`OnboardingMode*` assets); retake them when those homes change.
   - While every host's data shows (all-hosts view or Multi-gateway), the other hosts stay connected
     (`keepsFleetHostsConnected`), through the background grace too, so opening on one is instant.

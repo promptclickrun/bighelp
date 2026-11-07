@@ -20,8 +20,9 @@ the file is dropped at the edge.
   the plugin and Hermes versions. Tool names are sent only for built-in Hermes tools and `bighelp_*` tools. Other
   tools report `mcp` or `custom`. The Worker adds the host's country and, in the United States, its state (see
   [Host location](#host-location)).
-- **The Link relay** reports `push.sent`, `push.token_invalid`, `push.retry`, `push.dlq`, `push.fallback_buzzkit` and
-  `push.shadow`: the event type, a result code, timings and counts.
+- **The notification service** (`services/link`, the `loopdy-link` Worker behind `link.loopdy.app`) reports
+  `push.sent`, `push.token_invalid`, `push.retry`, `push.dlq`, `push.fallback_buzzkit` and `push.shadow`: the event type, a result
+  code, timings and counts.
 
 Each batch also names a random ID: an install ID the app keeps in the Keychain, or a telemetry ID the host keeps in
 its own plugin data. Neither is derived from an account, an Apple ID or the host's notification key.
@@ -53,7 +54,8 @@ Cloudflare's edge assigns to the connection (for example `DE`), and `usState`, t
 United States (for example `TX`, or `DC`). The Worker reads them from the request's Cloudflare properties after the
 batch passes validation, so a host can't set or change them. Nothing finer is kept: no city, postal code or
 coordinates, and not the address. Unknown and Tor connections get neither value, and a US region that is not one of
-the 50 states or DC keeps only the country. App, notification-extension and relay reports carry no location.
+the 50 states or DC keeps only the country. App, notification-extension and notification-service reports carry no
+location.
 
 This is where the connection comes from, not where a person lives. A host on a cloud server reports its data
 center's country, and a host behind a VPN reports the VPN's.
@@ -64,7 +66,7 @@ center's country, and a host behind a VPN reports the VPN's.
 flowchart LR
   App["bighelp app"] --> Worker["telemetry.bighelp.app (Cloudflare Worker)"]
   Host["Hermes host plugin"] --> Worker
-  Relay["Link relay Worker"] -->|"service binding"| Worker
+  Relay["Notification service Worker (services/link)"] -->|"service binding"| Worker
   Worker -->|"track API"| AI["Application Insights"] --> LA["Log Analytics"]
 ```
 
@@ -105,8 +107,9 @@ The maintainer runs these steps. The Azure side is in
 2. Deploy the Worker: `cd services/telemetry && npx wrangler deploy`.
 3. Set the secrets `APPINSIGHTS_CONNECTION_STRING` and `IP_HASH_KEY` with `wrangler secret put`.
 4. Send the test batch from the Azure README and look for it in Application Insights.
-5. Bind the Worker to the Link relay (`TELEMETRY` service binding to `bighelp-telemetry`, entrypoint
-   `TelemetryIngest`).
+5. Deploy the notification service (`services/link`). Its `wrangler.jsonc` binds it to this Worker (`TELEMETRY`
+   service binding to `bighelp-telemetry`, entrypoint `TelemetryIngest`). Without the binding it still delivers
+   pushes and sends no events.
 
 **If ingestion stops**
 - `curl` the test batch. A 202 means the Worker is fine and the problem is after it.
@@ -115,7 +118,7 @@ The maintainer runs these steps. The Azure side is in
 - Many `429` answers: the rate limits are 60 batches a minute for one ID and 600 for one network. Change them in
   `services/telemetry/wrangler.jsonc`.
 - The budget alert fired: if the monthly credit runs out, Azure disables the resources until the next cycle. The
-  relay is not affected.
+  notification service is not affected.
 
 **Stop telemetry quickly**
 - Turn off ingestion for everyone: `npx wrangler secret delete APPINSIGHTS_CONNECTION_STRING`. The Worker still

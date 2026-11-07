@@ -203,21 +203,24 @@ webapp deletions. `scripts/catalog-sync.py sync --apply` remains an explicit rep
 `POST /review/templates` takes an optional `id` (lowercase letters, digits and dashes) so the repo and the catalog
 keep the same ids; a taken id answers 409.
 
-## App integration (not built yet)
+## App integration
 
-What the app needs, in the same style as `ProviderLogoStore`:
+The app reads the catalog through `TemplateCatalogStore` (`Bighelp/Board/TemplateCatalogStore.swift`):
 
-1. A store that fetches `/v1/board-blueprints.json` and `/v1/agent-templates.json` on foreground at
-   most every few hours, with `If-None-Match`, a size cap (say 1 MB), https and host checks, and no
-   cookies. It keeps the last good copy in Caches and uses the bundled JSON when there is none.
-2. `BoardBlueprintCatalog.shared` becomes "remote snapshot if present, else bundled". The parser
-   already ignores unknown keys (`credit`, `schemaVersion`, `revision`).
-3. The agent picker's Templates rail reads remote agents. `AgentSoulTemplate.soul` reads from the
-   bundle today; remote templates carry `instructions` inline. Fall back to
-   `person.crop.square` when `symbol` is missing, and show `credit` on community cards.
-4. Demo fixtures keep the bundled data; `-use-demo-fixtures` must not hit the network.
-5. Optional: a "Share a template" link in the Blueprints sheet and agent picker to
-   `https://bighelp.app/templates#submit`.
+- It fetches `https://catalog.bighelp.app/v1/catalog.json` when the app comes to the front, at most once every
+  6 hours. A failed request doesn't count toward the 6 hours.
+- The request uses https to `catalog.bighelp.app` only, an ephemeral session with no cookies and no URL cache,
+  a 20-second timeout and a 1 MB (1,048,576 bytes) cap. It sends the saved `ETag` as `If-None-Match`, without
+  Cloudflare's `W/` prefix, and a 304 keeps the saved copy.
+- The last good copy and its ETag stay in Caches (`TemplateCatalog/catalog.json`). Until there is one, the app
+  uses its bundled blueprints and agent templates. The app takes each half of a download (blueprints or agents)
+  only if it has at least one good item. So a failed or empty download never replaces a good copy.
+- `BoardBlueprintCatalog.shared` and `AgentSoulTemplate.all` read from the store. Agent rows are parsed
+  leniently: a bad row is dropped, never the file. A missing or unknown `symbol` falls back to
+  `person.crop.square`, and community templates show their `credit`.
+- Demo fixtures (`-use-demo-fixtures`) and tests keep the bundled data and never use the network.
+- The Blueprints sheet, the template browser and the agent start picker link to
+  `https://bighelp.app/templates#submit`. There is no in-app submit form.
 
 Community text is untrusted: render it as plain text, never Markdown links or HTML.
 

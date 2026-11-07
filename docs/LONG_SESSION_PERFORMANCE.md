@@ -54,7 +54,7 @@ This is removal of a specific history-scaled UI cost, not an end-to-end app spee
 - The actual ChatView in a UIHostingController follows growing same-row content and idle incoming messages.
 - Earlier focused runs also passed live-tail projection, activity insertion/group append and background catch-up preservation checks.
 
-Use the repository's explicit `xcodebuild test` command and select `BighelpAppReadinessTests`, the named recovery tests in `BighelpLinkLiveSocketTests`, and the scroll/visible-canvas tests in `ChatModelTests`. Performance reproduction: `-only-testing:'BighelpTests/ChatModelTests/timelineScrollObservationCostDoesNotGrowWithSettledHistory()'`. Use one explicit project, simulator and reusable DerivedData root. A shared runner switched to an unrelated checkout during one attempted retry reproduction; that zero-selection result was excluded and the correct checkout was exercised directly.
+Use the repository's explicit `xcodebuild test` command and select `BighelpAppReadinessTests`, the named recovery tests in `BighelpLinkLiveSocketTests`, and the scroll/visible-canvas tests in `ChatModelTests`. Performance reproduction: `-only-testing:'BighelpTests/ChatModelTests/timelineScrollObservationCostDoesNotGrowWithSettledHistory()'`. Use one explicit project, simulator and reusable DerivedData root. A shared runner switched to an unrelated checkout during one attempted retry reproduction; that zero-selection result was excluded and the correct checkout was exercised directly. Neither `BighelpAppReadinessTests` nor `BighelpLinkLiveSocketTests` is in the repository today. The Link transport is retired.
 
 ## Remaining opportunities, not claimed fixes
 

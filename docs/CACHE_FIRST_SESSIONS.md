@@ -5,8 +5,10 @@
 Existing chat navigation mounts the retained ChatModel or the host/account-scoped
 local transcript before awaiting network work. Mounting an existing model does
 not reconcile an older catalog over live text. The canonical recent-history
-refresh still owns remote identities and live-state recovery. The composer can
-be edited immediately, while Send waits for a ready native client.
+refresh still owns remote identities and live-state recovery. The composer and
+Send work at once: a message sent before the native client is ready waits at the
+bottom of the chat with "Sending…" (`stagedSends`) and goes out once the chat can
+take it. Commands (`/…`) and PDF pages still wait in the box for the connection.
 
 ```text
 open saved chat
@@ -45,7 +47,8 @@ host approvals and clarification requests, not old steered text.
 ## Reopen identity and group readiness
 
 Hosted groups use their own verified group client. Their unused direct-chat
-placeholder does not gate Send; direct chats still wait for their own transport.
+placeholder does not gate Send. Direct chats stage a message until their own
+transport is ready.
 Programmatic direct sends preserve the draft while that transport is unavailable.
 
 Authoritative history may refine a stored result's tool-call linkage at a page

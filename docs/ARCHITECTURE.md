@@ -3,25 +3,27 @@
 Production transport contract: **native Hermes only for chat**. Cloud services
 are used only for optional notifications and Live Activities, which BuzzKit delivers. The current composition,
 voice boundary, enrollment isolation and verification requirements are defined
-in [Native transport](NATIVE_TRANSPORT.md). Historical Link/paired-Direct protocol
-names remain in shared value types and migration boundaries. Their names do not
-imply a selectable chat transport; the disabled iOS transport graph is removed.
+in [Native transport](NATIVE_TRANSPORT.md). The retired Link transport (a bighelp
+account, pairing and an encrypted relay) is gone. Some of its names remain in
+shared value types and cleanup code (`Bighelp/Link/`, `BighelpLink…`). These
+names do not select a chat transport.
 
 This document describes the current iOS codebase and its end-to-end interaction
 with an authorized Hermes host and bighelp's notification services. This document
 follows the implementation rather than older design proposals.
 
-The [iPhone device-tools contract](IPHONE_DEVICE_TOOLS.md) describes the native
-HealthKit (read only), EventKit and location service, the connect cards for tools that are off,
-host-scoped permissions, authenticated Hermes tool
-context, and negotiated directed Link frames.
+The [iPhone device-tools contract](IPHONE_DEVICE_TOOLS.md) describes the phone's
+tools (Apple Health read only, Calendar, Reminders, Location and the rest), the
+connect cards for tools that are off, the one permission list for every host and
+agent, and the plugin's `device-tools/{connect,poll,result,close}` routes that
+carry the calls over the native connection.
 
 ## 1. System boundaries
 
 Native workspaces connect directly to an independently authenticated Hermes
-host through its public interfaces. A bighelp account, Link pairing and the
-notification relay are not required for that connection. The optional
-Link and notification paths have their own authorization and trust boundaries.
+host through its public interfaces. No bighelp account and no notification
+service are needed for that connection. Notifications are optional and have
+their own authorization and trust boundaries.
 
 bighelp has five important trust boundaries:
 
@@ -34,8 +36,9 @@ bighelp has five important trust boundaries:
 3. **The authorized Hermes host** authenticates native workspace access and
    owns agent execution and session state. Native host authority is independent
    of optional cloud account credentials and account deletion.
-4. **The notification relay** manages APNs delivery material and sends encrypted
-   alert envelopes or bounded Live Activity state.
+4. **The notification service's delivery path** (the same `services/link`
+   Worker) keeps the APNs delivery material and sends sealed alert envelopes or
+   bounded Live Activity state, straight to APNs or through BuzzKit.
 5. **External AI and tool providers** may receive plaintext needed to perform a
    request. The Hermes host selects and controls these providers.
 
@@ -64,15 +67,14 @@ Start at the owner of a behavior, then follow its typed boundary:
 | Rail, goal, tasks and subagent sheets | `Bighelp/Chat/SessionStatusRailView.swift`, `SessionGoalSheet.swift`, `SessionTasksSheet.swift`, `SessionSubagentRosterSheet.swift` | Presentation does not invent execution or session authority. |
 | Local appearance | `Bighelp/DesignSystem/BighelpThemeReader.swift` | Resolve the consuming view's traits, including sheet and hosted-row overrides. |
 | Shared Swift wire values | Domain-named `*WireModels.swift` files in `Bighelp/Link/`; `SharedWireValidation.swift` | A historical Link name does not select a transport. Distinct field and byte policies remain distinct. |
-| Plugin HTTP mechanics | `bighelp-plugin/loopdy_plugin/http_contracts.py` | Route families keep their own errors, caps, authentication and context rechecks. |
-| Python wire contracts | `bighelp-plugin/loopdy_plugin/link_contracts.py` and its explicit domain imports | The facade preserves imports; domain modules validate values without owning transport state. |
-| Plugin adapter lifecycle | `bighelp-plugin/loopdy_plugin/adapter.py` and `adapter_*.py` | One adapter owns state and lifecycle. Helpers operate on that instance, not parallel controllers. |
+| Hermes socket and dashboard client | `Bighelp/DirectHermes/DirectHermesNetworking.swift`, `DirectHermesConversationClient.swift` | Every socket sends `client.capabilities {server_requests: true}`; sessions carry `source: "bighelp"`. |
+| Plugin routes in the app | `Bighelp/DirectHermes/DirectHermesNativeContext.swift`, `Bighelp/Workspace/WorkspaceOperation.swift` | Each route is a `WorkspaceOperation` case plus a `Route` gated by a `/native/context` feature. |
+| Plugin route families | `bighelp-plugin/loopdy_plugin/native_api.py`, `native_context.py` | Route families keep their own errors, caps, authentication and context rechecks. |
+| Plugin registration and lifecycle | `bighelp-plugin/loopdy_plugin/registration.py`, `adapter.py`, `store.py` | One registration owns tools, hooks and the platform adapter. Feature modules don't add listeners or a second chat route. |
 
-The plugin adapter's operation modules separate delivery, presentation, sessions,
-pickers, requests, transport and voice. They do not add listeners or a fallback
-chat route. Native default construction remains separate from explicitly injected
-compatibility transports. The HTTP helper similarly shares byte and JSON
-mechanics, not authorization decisions or a generic endpoint dispatcher.
+The plugin runs inside Hermes' own processes (the dashboard and the messaging
+gateway). Its routes share Hermes' authentication. It adds no listener and no
+fallback chat route.
 
 ## 2. Apple-platform target structure
 
@@ -104,9 +106,9 @@ and Live Activity extension compile the same validated state representation.
 Notification cryptography and trust code is likewise shared between the app
 and notification service extension.
 
-The project uses Swift 6 strict concurrency, an iOS 17 deployment target, and a
-macOS 15 deployment target. Passkey account flows use APIs available on iOS 18
-and fail as unavailable on older systems.
+The project uses Swift 6 strict concurrency, an iOS 17 deployment target, a
+visionOS 26 deployment target, and a macOS 15 deployment target for the
+`BighelpMac` prototype.
 
 ### Paired Watch companion
 
@@ -168,18 +170,18 @@ refreshes native history, and replaces only exact-generation transport leases.
 Changing authority retires those consumers without migrating a live session.
 There is no Link alternative or cloud recovery transport.
 
-The compatibility map currently covers the tested stock `0.21.2` release
-contract, not an attestation of a server commit or its current write permissions.
-Feature reads, owner checks and mutation receipts remain necessary. Unknown
-versions, optional plugin features, and missing room drivers are not inferred
-from liveness. Native selected-checkpoint branching is unavailable because stock
+There is no Hermes version map. Hermes versions never gate a connection or a
+feature: the app reads `gateway.capabilities`, the plugin's `/native/context`
+feature list and each route's answer. Feature reads, owner checks and mutation
+receipts remain necessary. Unknown versions, optional plugin features, and
+missing room drivers are not inferred from liveness. Native selected-checkpoint branching is unavailable because stock
 Hermes does not expose the matching visible-row/digest/CAS boundary. Optional
 surfaces without a native adapter fail explicitly rather than using Link or
 fixture implementations.
 
 `Bighelp/Workspace` defines transport-neutral, owner-bound operations and
 capability snapshots for the Direct workspace integration. Its authority
-coordinates distinguish a native host principal from a paired Link device;
+coordinates distinguish a native host principal from a legacy Link device record;
 connection generations invalidate callbacks without changing the stable cache
 scope. These types do not themselves authenticate, select, or enable a runtime.
 Feature clients remain responsible for typed payloads and authoritative readback.
@@ -187,15 +189,15 @@ Feature clients remain responsible for typed payloads and authoritative readback
 Native plugin features use the same authenticated Hermes HTTP session, not a
 second listener. The client verifies the context principal against its native
 connection, retains only the bounded safe context projection, and attaches the
-exact context ETag and a fresh request ID to fixed Wiki, template and room
-observation operations. Success must echo both coordinates. A context conflict
+exact context ETag (`If-Match`) and a fresh lowercase request ID
+(`X-Loopdy-Request-ID`) to every plugin route. Success must echo both coordinates. A context conflict
 retires discovery without replaying a mutation; a lost mutation response remains
 unconfirmed. These request IDs are correlation, not a new exactly-once contract.
 Feature advertisement and the feature's own grant/revision checks remain
 independent requirements.
 
-The existing host registry distinguishes independent native connections from
-optional Link-owned connections. Independent hosts use a separate protected
+The host registry distinguishes independent native connections from legacy
+Link-era records (`BighelpHostConnectionMode.link`), which no longer connect. Independent hosts use a separate protected
 registry root and device-only Keychain service; their records have no bighelp
 account identity. Cloud credential changes do not retarget or erase that
 selection. Legacy account-keyed Direct records stay private in their original
@@ -244,11 +246,7 @@ catalog, before the runtime's refresh finishes (the same point the home chat
 opens at launch); host-only screens ask which host first. Removing a host
 deletes its snapshot.
 
-The optional account device list retains separate selected/primary preferences
-for account management and fixtures. Those paired-device preferences cannot
-choose, reset or gate the production native workspace.
-
-Signing out of or deleting the optional notification account clears its scoped
+Resetting the optional notification installation clears its scoped
 delivery state and retires its enrollment. It does not replace the native shell,
 retarget a host, or erase independent native credentials and journals. Changing
 native authority retires the old workspace consumers before replacement. Fixture
@@ -273,7 +271,7 @@ optical geometry remain authoritative. Remote artwork cannot add provider
 capabilities or bypass those rules.
 
 Artwork is published independently through the static-only service documented in
-`services/provider-logos/README.md`. No Link/relay or Hermes deployment is required
+`services/provider-logos/README.md`. No notification service or Hermes deployment is required
 for a logo update. Shipping the first app version containing this loader remains
 an ordinary, separately authorized app release.
 
@@ -374,7 +372,7 @@ for main chats, subagents, and scheduled tasks. Session-level picker changes are
 separate from agent-level defaults.
 
 Personality controls use the selected native host's supported operations;
-unsupported surfaces stay unavailable rather than falling back to Link.
+unsupported surfaces stay unavailable; there is no fallback path.
 
 ### Chat
 
@@ -476,7 +474,9 @@ versioned storage rather than writing the value into a legacy v1 cache.
 
 The app validates attachments locally and enforces size and integrity limits.
 Native ordinary-file uploads use the public session-bound `file.attach` call,
-never a host-path upload or Link fallback. They retain the 8 MiB per-file and 24 MiB per-message limits, validate
+never a host-path upload. They retain the 8 MiB per-file and 24 MiB per-message limits
+(`ChatAttachment.maximumBytes`, `DirectHermesFileAttachments.maximumBatchBytes`). Bigger files, up to 256 MiB, go
+to the plugin's `uploads/*` routes instead (`BigFileUploader`, plugin `native-uploads-v1`). Small files validate
 the whole batch first, and serialize staging. Only acknowledged `ref_text`
 values are appended to `prompt.submit`; the original local caption and selected
 attachment disclosure are preserved. Photos use Hermes' `image.attach_bytes`
@@ -485,8 +485,8 @@ takes the staged pictures with the message. Unknown or cancelled upload attempts
 remain reviewable without automatic replay. A contact or event made from a
 picture is a reviewed draft, never a write ([Image drafts](IMAGE_DRAFTS.md)).
 
-The app processes and stores avatar images locally; avatar
-image bytes are not part of the cloud account directory.
+The app processes avatar images on the device before it saves them to the
+agent's profile on the host (`profiles.set_asset`), and caches them locally.
 
 The app renders a streaming assistant draft only when its session and agent
 coordinates match the active request. It validates the final response before
@@ -494,8 +494,10 @@ adding it to the canonical timeline.
 
 ### Local customization
 
-bighelp has no Marketplace, public catalog, publishing workflow, install gateway,
-or Marketplace service. Card templates remain a local feature. Themes are gone:
+Card templates remain a local feature. There is no card template catalog,
+publishing workflow or install gateway. (Settings › Marketplace is Hermes' own
+catalog of apps, skills and plugins, and agent templates come from the Template
+Catalog; see AGENTS.md.) Themes are gone:
 the look is one bubble color and a light and dark page, kept on the device, and
 old saved themes and their logo files are removed at launch.
 
@@ -504,12 +506,15 @@ old saved themes and their logo files are removed at launch.
 `loopdy.card` version 1 adds a display-only declarative document alongside the
 existing `loopdy.generative_ui` version 1 and 2 envelopes. The Hermes plugin
 validates and canonicalizes the agent's document, adds the content hash, card
-ID, creation time, and origin. Native chat renders bounded `loopdy-card` fenced
-payloads through `ChatCardMessageProjection`, then validates the envelope and
-finite element tree before mapping it to native SwiftUI views. Retained card
-DTOs also support cached timelines and optional notification payloads.
+ID, creation time, and origin. The agent puts the result, a fenced `loopdy-card`
+block, in its reply, so the card travels as reply text over the native chat
+connection. Native chat renders bounded `loopdy-card` fenced payloads through
+`ChatCardMessageProjection`, then validates the envelope and finite element tree
+before mapping it to native SwiftUI views. Object cards (places, contacts,
+events) go only to chats whose app listed them in `renders`, which the app sends
+with `people/speaking`. Retained card DTOs also support cached timelines.
 
-Build 3 supports static Cards only. All displayed values are embedded in the
+Cards are static only. All displayed values are embedded in the
 document, `data_sources` must be empty, and the production data client fails
 closed. No Card network request or refresh occurs.
 
@@ -528,14 +533,13 @@ sequenceDiagram
 ```
 
 Live source bindings, refresh requests, and freshness states remain reserved for
-a later release and are not production-reachable in build 3.
+a later release and are not production-reachable.
 
 Installed templates are data bundles rather than executable extensions. The app
 verifies metadata, hashes, embedded card documents, versions, and parameter
-slots before atomic account-scoped storage. Plugin template operations remain
-part of the owner-bound native workspace contract; the app does not construct
-the retired Link template-sync client. No production catalog URL is configured
-until a separately governed and licensed catalog is approved.
+slots before atomic storage. No production card catalog URL is configured
+(`BighelpCardCatalogClient.productionIndexURL` is nil) until a separately
+governed and licensed catalog is approved.
 
 See [bighelp Cards](BIGHELP_CARDS.md) for the complete wire contract, component
 catalog, static-data policy, privacy disclosures, template lifecycle, and legacy
@@ -801,8 +805,7 @@ camera frames for presentation without recording or storing them.
 
 The Keychain stores:
 
-- The device signing private key
-- The account content-encryption key
+- The notification installation's signing private key
 - Optional direct Hermes gateway credentials
 - The notification recipient private key
 - Host notification public keys pinned per grant
@@ -841,15 +844,14 @@ and pinned agents, pinned sessions, user-facing identity, and gesture choices.
 Those explicit preferences survive sign-out and app updates until the user
 changes them. Project-section order and collapse state are device-local too,
 shared by the Sessions screen and Quick Workspace. Their versioned settings
-payload is keyed by the signed-in device credential ID and selected host ID,
-so fresh device enrollment starts a new layout scope. Layout is not synced to
+payload is keyed by the sign-in scope and selected host ID, so a fresh sign-in
+starts a new layout scope. Layout is not synced to
 other devices. Project names are display labels; stable project IDs own the
 saved layout, and reordering a filtered subset preserves absent project slots.
-Deleting the bighelp account removes account-derived host and session preference
-identifiers and retired Link outbox artifacts. Native host credentials, journals
-and repositories remain outside that cloud-account erasure boundary. The app no
-longer creates a Link chat outbox. UserDefaults does not store account private
-keys or access tokens.
+Phones that once used the retired bighelp account lose its keys and Link
+settings once, at launch (`BighelpLinkAccountRetirement`). The app no longer
+creates a Link chat outbox. UserDefaults does not store private keys or access
+tokens.
 
 ## 7. Production and fixture modes
 
@@ -890,9 +892,10 @@ from physical-device or release claims.
 
 ## Wiki folder connections
 
-This section records the retained native service, source and migration contracts.
-It does not advertise a current Wiki browser or References entry point in the
-app's navigation; those provider screens are retired.
+This section is history. Current plugins no longer serve the Wiki routes
+(`native-wiki-v1`), and the app has no Wiki browser or References entry point.
+The app still holds the Wiki client and its stores (`Bighelp/Wiki/`); see
+[Wiki integration](../Bighelp/Wiki/INTEGRATION.md).
 
 Wiki uses a plugin-owned registration store distinct from Hermes Projects and Files grants. Add Wiki browses existing host folder suggestions, then explicitly saves through the negotiated `wiki.connect` workspace operation. Suggestions and `wiki.resolve` never register folders. The host creates a new read-only registration pinned to the verified initiating device, selected profile, pairing authority, directory identity and generation. Existing grants are never overwritten by this operation; overlapping registrations belonging to another authority, profile or device fail closed. Only host administration can change write policy.
 
@@ -903,7 +906,8 @@ References opens with a bounded recursive file catalog for connected Wikis, even
 
 ### Account recovery and host-switch ownership
 
-The signed `/v1/devices` catalog exposes only `phone`, `tablet`, `computer` and
+The notification service (`services/link`) still serves the retired account's
+signed `/v1/devices` catalog to older app builds. It exposes only `phone`, `tablet`, `computer` and
 `hermes_host`. Persisted Native or future-runtime records must not enter that
 projection: shipping clients decode the finite v1 kind set strictly, so one
 unknown kind can reject the entire list and block account readiness after login.

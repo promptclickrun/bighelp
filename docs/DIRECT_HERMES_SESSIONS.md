@@ -1,11 +1,17 @@
 # Direct Hermes sessions
 
-> Current transport contract: [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md). Session creation, fork support and recovery have evolved since this narrative. Where transport details differ, use the versioned native contract and its source links.
+> Transport: [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md). The app reaches Hermes in two ways: WebSocket JSON-RPC on
+> the dashboard's `/api/ws` (singular method names such as `session.create`, `session.delete`) and the dashboard's REST
+> routes (`/api/sessions…`). Where this page and that contract differ, the contract and the code win.
 
 `DirectHermesSessionCatalogClient` is a feature adapter over the shared,
 owner-bound `WorkspaceOperationPerforming`. It owns no connection, credential,
-agent loop, session database, ChatModel or canvas. The physical Direct adapter
-maps its finite operations to native REST and TUI RPC.
+agent loop, session database, ChatModel or canvas. `DirectHermesWorkspaceClient`
+maps each `WorkspaceOperation` to either a dashboard REST request or a
+WebSocket JSON-RPC call. Some operation names don't match the Hermes method:
+for example `WorkspaceOperation.sessionDelete` (raw value `sessions.delete`) is
+the dashboard's `DELETE /api/sessions/{id}`, while
+`WorkspaceOperation.nativeSessionDelete` is the socket's `session.delete`.
 
 ## Identity and opening
 
@@ -38,14 +44,20 @@ durable identifiers. A selected folder comes only from the explicitly injected
 host-folder provider; an active Project alone never supplies CWD. A returned CWD
 that disagrees with that request is unconfirmed, not a successful selection.
 
-First canonical birth is a separate, explicitly authorized action. It checks the
-exact `Bot Chat` registry, creates only when no prior positive identity exists,
-persists the title through `session.title`, requires `pending:false`, and reads
-the registry back. A title-conflict winner is adopted from that registry.
+First canonical birth (`createFirstCanonicalChat`) is a separate, explicitly
+authorized action. It checks the exact `Bot Chat` registry and creates only when
+no prior positive identity exists. On a plugin with `native-bot-chat-v1` the
+plugin makes the chat (see "Bot Chats are Hermes' own" below). Otherwise the app
+uses `session.create`, persists the title through `session.title`, requires
+`pending:false`, and reads the registry back. A title-conflict winner is adopted from that registry.
 No introductory prompt or other model call is submitted.
 
-Native creation is neither atomic nor idempotent. An unknown create/title
-outcome remains guarded; the client does not blindly retry it. A vanished
+Native creation is not atomic. Every `session.create` sends the creation
+record's `intentID` as `idempotency_key` (#440). Hermes keeps that key for about
+5 minutes and answers a retry with the same session; a Hermes without the key
+ignores it. So an unfinished first Bot Chat creates again under the same key, or
+resumes the session Hermes made and asks for its title again. It never blocks
+New Chat. An unknown title outcome stays guarded and is not blindly retried. A vanished
 unpersisted draft may remain unresolvable without a separate human decision.
 Creation receipts and the eventual canonical winner are retained as different
 facts, rather than relabeling a losing draft.
@@ -79,7 +91,8 @@ turned into guessed attachment IDs or paths. Tool calls/results join only on
 exact unambiguous native call IDs. Their original content remains in activity
 detail, never assistant final text. Unknown outcomes use the app-only
 `recorded` lifecycle, which is neither running nor success and cannot drive
-Live Activities. Legacy Link wire rejects that lifecycle.
+Live Activities. The older activity wire model kept from the retired Link
+transport (`Bighelp/Link/ActivityEventWireModels.swift`) refuses that lifecycle.
 
 In-memory history windows are bounded and disposable. Evicted or stale paging
 coordinates require a fresh read. This is not a competing transcript authority.
@@ -145,9 +158,21 @@ route, which sends a fresh lowercase-UUID `request_id` and `expected_revision` (
 when the row's detail has an integer `runtime_revision`, tries once more on `revision_conflict` or `stale_generation`,
 and sends the plain body when the detail has no revision.
 
-Generic conversation deletion is disabled. The explicit internal
-`deleteNativeRow` operation refreshes the catalog target and returns a row-only
-receipt that warns other history may remain. Hermes deletes that row and
+How a delete is sent: `DirectHermesSessionEditor.delete` first calls the socket's
+`session.delete` (JSON-RPC). Hermes refuses it while the chat is open, and that
+message reaches the person. A `4007` answer means the row is already gone and
+counts as deleted. Only when the socket doesn't know the method does it fall
+back to the dashboard's `DELETE /api/sessions/{id}`, fenced as above.
+
+Generic conversation deletion is disabled: the Direct catalog reports
+`canDeleteConversation == false`, so the chat list offers no Delete, and
+`delete(_:)` throws `nativeRowDeletionOnly`. The explicit internal
+`deleteNativeRow` operation refreshes the catalog target, deletes through the
+editor and returns a row-only receipt that warns other history may remain. The
+app itself uses the editor's delete only to remove the empty chat a failed Bot
+Chat title claim left behind. Bulk clean-up in Session Maintenance (Nerd Mode)
+uses separate dashboard routes (`/api/sessions/bulk-delete`, `/api/sessions/empty`,
+`/api/sessions/prune`) through `DirectHermesSessionMaintenanceClient`. Hermes deletes that row and
 delegate children but orphans branch/compression descendants; neither root nor
 tip deletion proves conversation-wide erasure. Root must obtain explicit
 row-semantic confirmation before exposing that narrower action.

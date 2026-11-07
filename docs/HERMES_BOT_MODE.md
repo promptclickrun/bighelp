@@ -1,30 +1,36 @@
 # Hermes Bot Mode
 
-> Current transport contract: [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md). Its legacy Link transport discussion is historical; the current native groups path uses core JSON-RPC. Where transport details differ, use the versioned native contract and its source links.
+> Transport: [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md). Group chats use Hermes' own `groups.*` JSON-RPC methods over
+> the app's native WebSocket connection to the dashboard. The retired bighelp Link relay plays no part. Some type
+> names still say `Link` (for example `BighelpLinkHermesBotModeClient`, aliased as `HermesHostedRoomClient`); they
+> are legacy names only.
 
 ## Product boundary
 
-bighelp supports Hermes and is building its own bighelp Native harness. Neither
-path replaces the other. The Goose-based iOS/Companion runtime remains under
-development; the local Bot Mode fixture runner is not that production engine.
+Group chats run on Hermes. The local Bot Mode fixture runner
+(`BotModeFixtureClient`) only drives fixtures and tests; it is not a production
+engine.
 
-For Hermes hosts, Hermes owns room membership, routing, task execution,
-idempotency, fencing and the durable event log. The iOS app presents that state through one typed `groups.*` client. It can use
-native authenticated Direct workspace operations or explicitly selected,
-authenticated encrypted Link. Direct does not require a bighelp account.
-The plugin forwards these fixed operations through Hermes' existing
-`tui_gateway.server.handle_request` dispatcher. No second daemon, private
-database adapter or synthesized member-turn prompt is needed.
+Hermes owns room membership, routing, task execution, idempotency, fencing and
+the durable event log. The iOS app presents that state through one typed
+`groups.*` client (`HermesHostedRoomClient`, made in `NativeWorkspaceRuntime`).
+It sends each operation as a `WorkspaceOperation` that
+`DirectHermesWorkspaceClient` maps to a core Hermes JSON-RPC call on the
+signed-in socket, with a fixed list of allowed fields per method. No bighelp
+account, second daemon, private database adapter or synthesized member-turn
+prompt is needed. The plugin is needed only for the optional room activity and
+typing feed (see below), which reads Hermes' own room state through its
+`tui_gateway.server.handle_request` dispatcher.
 
 ## Readiness and ownership
 
-The client is bound to the selected transport's verified authority, selected host
-and authentication/connection generations. Only that host's rooms are listed;
+The client is bound to the current `WorkspaceOwner`: the selected host, its
+sign-in and its connection generation. Only that host's rooms are listed;
 switching hosts retires old catalog results, observers and actions before the
 replacement context is exposed.
 Check ownership and cancellation around every await. A stale completion must
-never update a newly selected instance. Negotiate `groups.capabilities` after
-Link verification. Execution requires protocol 2, a running driver, an authority
+never update a newly selected instance. Negotiate `groups.capabilities` once the
+connection is signed in. Execution requires protocol 2, a running driver, an authority
 identifier, the necessary methods and the `room_identity` and `monotonic_log`
 features. Advertising methods alone does not prove that the driver runs. Peer
 room-link enablement is not required for local hosted rooms.
@@ -75,11 +81,9 @@ verified same-owner data; no automatic cross-owner or cross-transport pending
 intent import is authorized. Hermes history is normally recovered through its
 room catalog and log.
 
-Link advertises `groups-results-v1` for a separately bounded groups-result
-envelope. Only an opted-in request receives the corresponding result marker.
-Legacy envelopes and limits remain unchanged. Native log authority is validated
-at its exact schema path; this never permits gateway or secret-bearing keys in
-arbitrary workspace payloads. Event bytes are never truncated to fit transport.
+Native log authority is validated at its exact schema path; this never permits
+gateway or secret-bearing keys in arbitrary workspace payloads. Event bytes are
+never truncated to fit transport.
 
 ## Agents on other computers
 
@@ -285,20 +289,18 @@ an unconfirmed close relies on the host's bounded inactivity lease.
 ## Verification and release
 
 Run `HermesBotModeContractTests`, `HermesGroupsHostPathTests` (both paths' recorded replies), `HermesGroupRoomSettingsTests`, `BighelpLinkHermesBotModeClientTests`,
-`BighelpLinkHermesBotModeApprovalTests`, `BotModeRoomStoreTests` and
+`BighelpLinkHermesBotModeApprovalTests`, `NativeHermesGroupFlowTests`, `BotModeRoomStoreTests` and
 `ChatBotModeIntegrationTests` along with the chat interaction regression gate.
-The Link client tests cover request shapes, cancelled/stale results, idempotency,
+The `BighelpLinkHermesBotModeClient` tests (a legacy name) cover request shapes, cancelled/stale results, idempotency,
 cursor validation and driver status. Store checks cover persistence, replay,
 capability gating and room execution. Preserve the separate local fixture tests.
 
-Run the plugin contract and workspace-control suites with the official Hermes
-source on `PYTHONPATH`. Publish the matching plugin separately from the iOS
+Run the plugin's room activity tests (`tests/test_room_activity.py`) with the
+official Hermes source on `PYTHONPATH`. Publish the matching plugin separately from the iOS
 archive, then activate it using Hermes' supported installer/updater. An app
 upload does not activate a plugin on a user's host. Record source, simulator,
 live host and TestFlight evidence separately; none substitutes for the others.
-Include `test_hosted_room_contract` and the portable
-`bighelp-plugin/tests/fixtures/groups-result-v1.json` vector for negotiated
-envelope and encryption coverage.
+`Scripts/RoomLinkProbe.py` checks a room across two isolated real hosts.
 
 Room discovery on the Hermes host must exclude invalid profile directories and
 deleted-profile tombstones. In the September 10 host version, enumerating every

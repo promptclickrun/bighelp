@@ -270,10 +270,10 @@ final class LiveVoiceModel {
     /// call's once it ended, so Copy report still has a call Gemini refused at once; nil for a call
     /// without one (GPT-Live).
     func audioReport() -> String? { (peer as? LiveVoiceAudioReporting)?.audioReport() ?? endedCallReport }
-    @ObservationIgnored private var endedCallReport: String?
+    private var endedCallReport: String?
 
     /// Cheap to ask on every redraw, unlike the report itself.
-    var keepsAudioReport: Bool { peer is LiveVoiceAudioReporting }
+    var keepsAudioReport: Bool { peer is LiveVoiceAudioReporting || endedCallReport != nil }
 
     /// Settings › Voice › Debug's Restart sound: stops and starts the call's player only.
     func restartPlayback() { (peer as? LiveVoiceAudioReporting)?.restartPlayback() }

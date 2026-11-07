@@ -214,7 +214,8 @@ struct GeminiLiveClose: Error, Equatable, Sendable {
     var reason: String?
     /// Gemini answered the socket's opening request with this HTTP status instead.
     var httpStatus: Int?
-    /// Nothing came from Gemini: the network failed with this `URLError` code.
+    /// Nothing came from Gemini: the network failed with this error code (a `URLError` code, else the
+    /// underlying one, often POSIX).
     var networkError: Int?
 
     /// WebSocket close reasons are at most 123 bytes; anything longer isn't Gemini's.

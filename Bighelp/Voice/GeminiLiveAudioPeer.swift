@@ -82,7 +82,8 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
         } catch {
             // The socket never opened: Gemini refused it, or the network failed on the way.
             let close = GeminiLiveClose(task: task, error: error, ready: false)
-            record(close)
+            // Ended here while it connected: nothing failed.
+            if !closed { record(close) }
             throw close
         }
         diagnostics.event("setup sent")

@@ -363,6 +363,8 @@ struct NativeLiveVoiceTests {
         #expect(message.contains("Gemini didn't start the call"))
         #expect(message.contains("Token has been used too many times"))
         #expect(model.audioReport() == "the call's report", "The report outlives a call Gemini refused at once")
+        #expect(model.keepsAudioReport, "Bots mode's Copy report still offers it")
+        #expect(!model.canRestartPlayback)
     }
 
     @Test func geminiEndingAWorkingCallSaysWhyAndKeepsTheWork() async throws {

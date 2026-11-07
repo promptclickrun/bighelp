@@ -601,7 +601,8 @@ change in both repos.
 - **Each gateway has its own objects:** `AppState`, the stores and the chats belong to one gateway
   (`NativeWorkspaceRuntime`), and a gateway switch keeps `RootShellView` and hands it the new ones. Anything handed
   over once in `.onAppear` keeps the first gateway's: an agent's drive moved a navigation that wasn't on screen
-  (#666). Hand it over again when they change (`DriveShellHooks`).
+  (#666), and an unsent chat let go on another gateway said "This chat isn't available". Hand it over again
+  when they change (`DriveShellHooks`, `watchForLostChats`).
 
 ### Crashes that only happen on a real iPhone
 

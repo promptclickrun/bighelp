@@ -210,9 +210,11 @@ extension RootShellView {
             routeWithWorkspaceMenu {
                 ApprovalDestinationView(model: model)
             }
-        case (.chat(let conversationID), nil) where appState.suspendedChat?.chatID == conversationID:
-            // The unsent chat that was open when the app left lost its session (Hermes dropped
-            // it): open a fresh chat in its place with its text, rather than a dead end.
+        case (.chat(let conversationID), nil) where appState.suspendedChat?.chatID == conversationID
+            || featureStore.hasRetiredUnsentChat(id: conversationID):
+            // An unsent chat on screen lost its session (Hermes dropped it while the app was away
+            // or the computer restarted): open a fresh chat in its place with its text, rather
+            // than a dead end.
             ReopeningChatView {
                 replaceLostChat(id: conversationID, agentID: nil, text: "")
             }

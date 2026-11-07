@@ -73,6 +73,9 @@ final class ShellFeatureStore {
     /// A new chat that never sent anything was retired (Hermes dropped its unsaved session):
     /// its ID, agent and draft, so the screen showing it can open a fresh chat in its place.
     var onUnsentChatRetired: (@MainActor (String, String, String) -> Void)?
+    /// The same, kept until the screen takes it: a chat screen whose model is gone opens a fresh
+    /// chat from it rather than "This chat isn't available" (`takeRetiredUnsentChat`).
+    private var retiredUnsentChats: [String: (agentID: String, text: String)] = [:]
     private var chatModels: [String: ChatModel] = [:]
     private let navigationWorkspaceOwner: (@MainActor () -> WorkspaceOwner?)?
     private let nativeWarmSessionIsCurrent: @MainActor (SessionRecord, ChatModel) -> Bool
@@ -411,6 +414,14 @@ final class ShellFeatureStore {
               model.memberIDs.count == 1, let agentID = model.memberIDs.first else { return nil }
         return (agentID, model.draft)
     }
+
+    /// An unsent chat this store let go, once: what a fresh chat in its place starts from.
+    func takeRetiredUnsentChat(id: String) -> (agentID: String, text: String)? {
+        retiredUnsentChats.removeValue(forKey: id)
+    }
+
+    /// Whether `id` is an unsent chat this store let go that no fresh chat has replaced yet.
+    func hasRetiredUnsentChat(id: String) -> Bool { retiredUnsentChats[id] != nil }
 
     @discardableResult
     func prepare(_ route: AppRoute) -> Bool {
@@ -757,6 +768,7 @@ final class ShellFeatureStore {
         // A new chat that never sent anything: the screen showing it opens a fresh one in its place.
         if !model.isBotMode, model.transcriptEntries.isEmpty, model.memberIDs.count == 1,
            let agentID = model.memberIDs.first {
+            retiredUnsentChats[id] = (agentID, model.draft)
             onUnsentChatRetired?(id, agentID, model.draft)
         }
         // Removing the exact sink first prevents its final flush from writing
@@ -981,6 +993,7 @@ final class ShellFeatureStore {
         retentionTask = nil
         backgroundActivityProjections.removeAll()
         chatModels.removeAll()
+        retiredUnsentChats.removeAll()
         sessionsModel = nil
         approvalModels.removeAll()
         voiceSessionSequences.removeAll()

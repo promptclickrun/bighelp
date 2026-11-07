@@ -629,6 +629,27 @@ import Testing
         #expect(setup.calls == 1)
     }
 
+    /// An install the app confirmed finished, then the plugin removed on the computer: nothing of
+    /// that install can still be running, so the app installs again. It once said "the plugin
+    /// install may still be running" for good.
+    @Test func aConfirmedInstallRemovedOnTheComputerCanBeInstalledAgain() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        var host = fixture.host
+        host.pluginIntent = .init(identifier: fixture.pin.identifier, revision: String(repeating: "b", count: 40),
+                                  profile: nil, phase: .verified)
+        try fixture.registry.update(host)
+        let management = Manager(saved: fixture.saved)
+        management.onInstall = { management.rows = [fixture.row(sha: String(repeating: "c", count: 40), version: "3.0.0")] }
+        let model = HostNotificationSetupModel(host: host, registry: fixture.registry,
+                                               releases: try FixedPluginReleases.release("3.0.0", "c"),
+                                               management: management, enrollNotifications: false)
+        await model.enable()
+        #expect(model.state == .installed)
+        #expect(management.actions.filter { $0 == "install" }.count == 1)
+        #expect(model.pluginChanged)
+    }
+
     @Test func unknownAbsentInstallNeverRetriesAndObservedPluginIsReused() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }

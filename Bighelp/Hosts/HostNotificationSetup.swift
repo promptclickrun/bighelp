@@ -699,7 +699,9 @@ final class HostNotificationSetupModel {
             if matches.isEmpty {
                 // A lost reply may still be executing on the backend. Absence is
                 // not proof of rejection and never authorizes duplicate install.
-                if let intent = host.pluginIntent, intent.phase != .consented {
+                // An install this app confirmed can't still be running: the plugin
+                // was removed on the computer since, so it installs again.
+                if let intent = host.pluginIntent, Self.isUnfinished(intent) {
                     try fail(.pluginInstallMayBeRunning, step, "install_pending", state: .outcomeUnknown, host: &host)
                     return
                 }

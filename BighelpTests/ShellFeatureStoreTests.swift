@@ -517,6 +517,29 @@ struct ShellFeatureStoreTests {
         #expect(harness.store.unsentChat(id: session.id) == nil)
     }
 
+    /// A computer switch keeps the shell but hands it a new store, which once never got the
+    /// screen's hook: an unsent chat let go there fell through to "This chat isn't available right
+    /// now". The store keeps what it needs, so the screen showing it opens a fresh chat anyway.
+    @Test func aRetiredChatThatNeverSentIsRememberedWithoutTheScreensHook() {
+        let session = record(id: "session_unsent_draft_0002")
+        let harness = makeStore(records: [session])
+        let route = AppRoute.chat(conversationID: session.id)
+        #expect(harness.store.prepare(route))
+        guard case .chat(let model) = harness.store.preparedModel(for: route) else {
+            Issue.record("Expected prepared Chat model")
+            return
+        }
+        model.draft = "Book the dentist"
+
+        harness.store.retireNavigationSession(id: session.id)
+
+        let retired = harness.store.takeRetiredUnsentChat(id: session.id)
+        #expect(retired?.agentID == "finance")
+        #expect(retired?.text == "Book the dentist")
+        // Taken once: the fresh chat that replaces it is the only one.
+        #expect(harness.store.takeRetiredUnsentChat(id: session.id) == nil)
+    }
+
     @Test func aRetiredChatWithMessagesIsNotReplacedByAFreshOne() async throws {
         let catalog = SessionCatalogStore(client: DemoSessionCatalogClient())
         let store = ShellFeatureStore(timing: .immediate, catalog: catalog)
@@ -540,6 +563,7 @@ struct ShellFeatureStoreTests {
         store.retireNavigationSession(id: session.id)
 
         #expect(retired == 0)
+        #expect(store.takeRetiredUnsentChat(id: session.id) == nil)
     }
 
     @Test func savedSessionNavigationRefreshesBeforePresentingRouteOwnedHydration() {

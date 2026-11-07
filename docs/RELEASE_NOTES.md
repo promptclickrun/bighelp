@@ -3,6 +3,13 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.69
+
+### Fixed
+
+- **Dark mode in an open chat:** when your iPhone changes from Light to Dark while a chat is open, the agent's messages change too. Before, they kept their Light colors and were almost invisible until you opened the chat again.
+- **Sections on more than one computer:** when you rename or delete a section that holds bots from more than one computer, the change gets to every bot. Before, the old section could stay or come back, and you had to do the action again.
+
 ## 2.6.68
 
 ### New

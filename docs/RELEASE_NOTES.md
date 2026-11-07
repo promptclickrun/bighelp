@@ -3,6 +3,12 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.71
+
+### Fixed
+
+- **Apps open:** in 2.6.70, an agent's app showed its card, but **Open App** said "The app didn't open." Now the app opens. An app's page can be up to 16 MB. Update the bighelp plugin on your computer to 3.46.1.
+
 ## 2.6.70
 
 ### New

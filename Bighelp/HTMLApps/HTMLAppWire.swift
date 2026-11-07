@@ -9,7 +9,7 @@ enum HTMLAppWire {
     static let type = "html_app"
     /// What the speaker note adds to `renders` when the plugin lists the feature.
     static let renders = [type]
-    static let maximumHTMLBytes = 2_097_152
+    static let maximumHTMLBytes = 16_777_216
     static let maximumDescriptionLength = 240
     static let maximumTitleLength = 60
 }

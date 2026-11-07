@@ -8,6 +8,8 @@ enum HTMLAppsError: Error, Equatable {
     /// Not this agent's app, or gone.
     case notFound
     case noConnection
+    /// The page changed while its pieces loaded; loading again gets the new one.
+    case changed
     case failed
 
     init(_ error: any Error) {
@@ -15,6 +17,7 @@ enum HTMLAppsError: Error, Equatable {
         switch error as? WorkspaceClientError {
         case .unavailable(.unsupportedOperation)?, .unavailable(.pluginRequired)?: self = .needsPluginUpdate
         case .rejected(let code, _)? where code == "app_not_found": self = .notFound
+        case .rejected(let code, _)? where code == "app_changed": self = .changed
         case .transportUnavailable?, .ownerChanged?, .authenticationRequired?, .unavailable?: self = .noConnection
         default: self = .failed
         }
@@ -25,7 +28,7 @@ enum HTMLAppsError: Error, Equatable {
         case .needsPluginUpdate: "Update the bighelp plugin on this computer to open apps."
         case .notFound: "This app isn't on the computer anymore."
         case .noConnection: "bighelp can't reach the computer right now."
-        case .failed: "The app didn't open."
+        case .changed, .failed: "The app didn't open."
         }
     }
 }
@@ -110,11 +113,14 @@ final class DirectHermesHTMLAppsClient: HTMLAppsClient {
 @MainActor
 struct HTMLAppsAPI {
     static let log = Logger(subsystem: "app.loopdy.mobile", category: "HTMLApps")
+    static let pieceRetryDelays: [Duration] = [.seconds(1), .seconds(3)]
 
     let client: any HTMLAppsClient
+    let retryDelays: [Duration]
 
-    init(client: any HTMLAppsClient) {
+    init(client: any HTMLAppsClient, retryDelays: [Duration] = Self.pieceRetryDelays) {
         self.client = client
+        self.retryDelays = retryDelays
     }
 
     private func call(_ operation: HTMLAppsOperation,
@@ -126,19 +132,64 @@ struct HTMLAppsAPI {
         }
     }
 
+    /// The app and its page, which comes in pieces of up to 2 MiB so a page of any size fits one
+    /// answer. A page that changes while it loads starts again.
     func app(agentID: String, appID: String, knownSHA256: String?) async throws(HTMLAppsError) -> HTMLAppPage {
-        var payload: [String: BighelpJSONValue] = ["agentId": .string(agentID), "appId": .string(appID)]
-        if let knownSHA256 { payload["knownSha256"] = .string(knownSHA256) }
-        let reply = try await call(.get, payload)
+        var restarts = 0
+        while true {
+            do throws(HTMLAppsError) {
+                return try await page(agentID: agentID, appID: appID, knownSHA256: knownSHA256)
+            } catch .changed where restarts < 2 {
+                restarts += 1
+            }
+        }
+    }
+
+    private func page(agentID: String, appID: String, knownSHA256: String?) async throws(HTMLAppsError) -> HTMLAppPage {
+        let base: [String: BighelpJSONValue] = ["agentId": .string(agentID), "appId": .string(appID)]
+        var first = base
+        if let knownSHA256 { first["knownSha256"] = .string(knownSHA256) }
+        var reply = try await piece(first)
         guard let info = reply["app"]?.object.flatMap(Self.info), info.appID == appID else { throw .failed }
-        guard let encoded = reply["html"]?.string else {
+        guard reply["html"] != nil else {
             guard knownSHA256 == info.htmlSHA256 else { throw .failed }
             return HTMLAppPage(info: info, html: nil)
         }
-        guard let bytes = Data(base64Encoded: encoded), bytes.count == info.htmlBytes,
-              HTMLAppHash.sha256(bytes) == info.htmlSHA256,
-              let html = String(data: bytes, encoding: .utf8) else { throw .failed }
-        return HTMLAppPage(info: info, html: html)
+        var bytes = Data()
+        while true {
+            // A plugin from before pieces sends the whole page with no offset.
+            guard (reply["offset"]?.integer ?? 0) == bytes.count,
+                  reply["app"]?.object?["htmlSha256"]?.string == info.htmlSHA256,
+                  let encoded = reply["html"]?.string, let chunk = Data(base64Encoded: encoded), !chunk.isEmpty,
+                  bytes.count + chunk.count <= info.htmlBytes else { throw .failed }
+            bytes.append(chunk)
+            switch reply["nextOffset"] {
+            case nil, .null?:
+                guard bytes.count == info.htmlBytes, HTMLAppHash.sha256(bytes) == info.htmlSHA256,
+                      let html = String(data: bytes, encoding: .utf8) else { throw .failed }
+                return HTMLAppPage(info: info, html: html)
+            case .integer(let next)? where next == bytes.count && next < info.htmlBytes:
+                var payload = base
+                payload["offset"] = .integer(next)
+                payload["htmlSha256"] = .string(info.htmlSHA256)
+                reply = try await piece(payload)
+            default:
+                throw .failed
+            }
+        }
+    }
+
+    /// One `html-apps/get`. A dropped request is asked again, from the same offset.
+    private func piece(_ payload: [String: BighelpJSONValue]) async throws(HTMLAppsError) -> [String: BighelpJSONValue] {
+        var retries = retryDelays[...]
+        while true {
+            do throws(HTMLAppsError) {
+                return try await call(.get, payload)
+            } catch {
+                guard error == .noConnection || error == .failed, !retries.isEmpty else { throw error }
+                do { try await Task.sleep(for: retries.removeFirst()) } catch { throw .noConnection }
+            }
+        }
     }
 
     func data(agentID: String, appID: String) async throws(HTMLAppsError) -> HTMLAppData {

@@ -140,7 +140,7 @@ struct HTMLAppScreen: View {
                     .font(.bighelp(.body))
                     .foregroundStyle(theme.primaryText)
                     .multilineTextAlignment(.center)
-                if error == .noConnection || error == .failed {
+                if error != .notFound, error != .needsPluginUpdate {
                     Button("Try again") { Task { await model.reload() } }
                         .font(.bighelp(.body, weight: .semibold))
                         .foregroundStyle(theme.action)

@@ -47,6 +47,10 @@ HOME and HERMES_HOME, then runs the matching HostSignInMatrixUITests:
             the review's Save writes once and the agent hears it at its next
             turn; a photo alone gets the offer, and the host refuses the agent's
             own contact create in that chat (ImageDraftsHostUITests)
+  apps      no sign-in, with the bighelp plugin (--plugin) and the same scripted model:
+            the agent shows an app from a page of about 5 MB that it wrote, the app
+            loads it in pieces, and the page's answer reaches the agent after Send
+            (HTMLAppsHostUITests)
 
 HERMES_DISABLE_LAZY_INSTALLS=1 keeps Hermes from "finishing a source update"
 into its checkout on first launch. Use a separate Hermes checkout anyway: never
@@ -100,6 +104,7 @@ TESTS = {
               "ShortcutGatewaySwitchHostUITests/testAskAnAgentSwitchesToItsGatewayAndGetsTheAnswer"],
     "drafts": ["ImageDraftsHostUITests/testAContactDraftFromAPhotoSavesOnceAndTheAgentHearsIt",
                "ImageDraftsHostUITests/testAPhotoAloneGetsTheOfferAndTheAgentCantAddTheContactItself"],
+    "apps": ["HTMLAppsHostUITests/testABigAppFromTheAgentOpensAndItsAnswerReachesTheAgent"],
     "bigfiles": ["BigFileHostUITests/testAnEightyMegabyteVideoReachesTheAgentAfterADrop"],
     "device": ["DeviceAccessHostUITests/testAToolThatIsOffAsksWithACardAndTheCallGoesOn",
                "DeviceAccessHostUITests/testNotNowGivesTheAgentAPlainRefusal",
@@ -317,7 +322,8 @@ class PhotoDraftModel(BaseHTTPRequestHandler):
     made-up business card with bighelp_draft_contact; a picture with no words gets the offer
     (bighelp_offer_photo_action); "direct contact test" calls iphone_contacts create itself,
     which the host must refuse in a chat with a picture; "outcome test" says which draft note
-    the plugin added to its turn."""
+    the plugin added to its turn. "app test" shows the probe's app (probe-app.html, about 5 MB, in the
+    working folder) with bighelp_show_app, and its answer gets "I got your answers"."""
 
     CONTACT = {"fields": {"given_name": "Riley", "organization": "Sample Studio", "job_title": "Designer",
                           "phones": [{"label": "work", "value": "+1 555 0142"}],
@@ -355,7 +361,10 @@ class PhotoDraftModel(BaseHTTPRequestHandler):
                        asked.split("[bighelp]")[0]).strip()
         call = None
         if not results:
-            if "contact draft test" in asked or "Make a contact from this card" in asked:
+            if "app test" in asked:
+                call = ("bighelp_show_app", {"title": "Probe app", "description": "A big page that checks apps open.",
+                                             "path": "probe-app.html", "sends_answers": True})
+            elif "contact draft test" in asked or "Make a contact from this card" in asked:
                 call = ("bighelp_draft_contact", self.CONTACT)
             elif "direct contact test" in asked:
                 call = ("iphone_contacts", {"operation": "create", "givenName": "Riley", "organization": "Sample Studio"})
@@ -374,8 +383,12 @@ class PhotoDraftModel(BaseHTTPRequestHandler):
                 note = asked.lower()
                 text = "Outcome note: " + ("saved" if "saved the contact draft" in note else
                                            "discarded" if "discarded the contact draft" in note else "none") + "."
+            elif "display_markdown" in outcome and "app_id" in outcome:
+                text = "Here is your app.\n\n" + outcome["display_markdown"]
             elif "display_markdown" in outcome:
                 text = "Here it is. Check it before you save.\n\n" + outcome["display_markdown"]
+            elif words.startswith("My answers to"):
+                text = "I got your answers: " + " ".join(words.splitlines()[1:])
             elif results:
                 text = "Tool said: " + str(outcome.get("error") or outcome.get("code") or results[-1][:200])
             else:
@@ -887,7 +900,7 @@ def run_mode(mode: str, args, repo: Path) -> int:
         home, project = temp / "home", temp / "project"
         home.mkdir()
         project.mkdir()
-        model = ThreadingHTTPServer(("127.0.0.1", 0), PhotoDraftModel if mode == "drafts"
+        model = ThreadingHTTPServer(("127.0.0.1", 0), PhotoDraftModel if mode in ("drafts", "apps")
                                     else ToolTurnModel if mode in ("tools", "media", "bigfiles", "device") else SyntheticModel)
         model.sent_files, model.gone_files = [], []
         if mode == "media":
@@ -916,15 +929,15 @@ def run_mode(mode: str, args, repo: Path) -> int:
         # still resolves to this Mac, so gated hosts use it; single sign-on needs the
         # app on that same name, since the sign-in cookie belongs to it.
         public = f"http://127.0.0.1:{proxy.port}" if proxy \
-            else origin if mode in ("open", "tools", "widgets", "features", "update", "media", "drafts", "bigfiles",
-                                    "device") \
+            else origin if mode in ("open", "tools", "widgets", "features", "update", "media", "drafts", "apps",
+                                    "bigfiles", "device") \
             else f"http://hermes.localhost:{port}"
         config = {"dashboard": {"public_url": public},
                   "model": {"default": "fixture-model", "provider": "custom",
                             "base_url": f"http://127.0.0.1:{model.server_port}/v1", "api_key": "local-synthetic-no-auth"},
                   "agent": {"max_turns": 3}, "terminal": {"backend": "local", "cwd": str(project)},
                   "memory": {"memory_enabled": False, "user_profile_enabled": False}}
-        if mode in ("tools", "features", "media", "drafts", "bigfiles", "device"):
+        if mode in ("tools", "features", "media", "drafts", "apps", "bigfiles", "device"):
             if not args.plugin:
                 raise SystemExit(f"{mode} mode needs --plugin <bighelp plugin folder>")
             shutil.copytree(args.plugin, home / "plugins" / "loopdy",
@@ -936,6 +949,16 @@ def run_mode(mode: str, args, repo: Path) -> int:
                             ignore=shutil.ignore_patterns("__pycache__"))
             config["plugins"]["enabled"].append("bighelp-probe")
             config["image_gen"] = {"provider": "bighelp-probe"}
+        if mode == "apps":
+            # A page the agent wrote, big enough to come to the app in three pieces.
+            (project / "probe-app.html").write_text(
+                '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">'
+                '<title>Probe app</title></head><body><h1>Probe app</h1>'
+                '<button id="send">Send my pick</button><p id="note"></p><script>'
+                'document.getElementById("send").onclick = async () => {'
+                ' const sent = await window.bighelp.sendAnswer({Pick: "Blue", Size: 3});'
+                ' document.getElementById("note").textContent = sent ? "Sent." : "Not sent."; };'
+                '</script><!-- ' + "padding " * 640_000 + '--></body></html>')
         if mode == "features":
             seed_board(home, args.plugin)
             (project / "garden").mkdir()

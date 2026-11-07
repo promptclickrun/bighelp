@@ -872,7 +872,9 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
 - An alert with a picture shows as a message from its agent (a communication notification,
   `BighelpPushDisplay.communication`): the agent's picture stands where bighelp's icon would. The buttons and
   picture go on the held content first, so a timeout still shows them, and the message keeps the alert's
-  interruption level. Alerts the app posts itself while open keep the icon.
+  interruption level. Alerts the app posts itself while open keep the icon. Apple asks for the Communication
+  Notifications entitlement on the app: the iPhone and iPad app (`BighelpCarPlay.entitlements`) and the
+  notification service both carry it, and both App IDs need the capability.
 - A newer reply for a chat removes that chat's earlier replies; questions and approvals stay until dealt with.
 - Helper (subagent) results arrive passive: Notification Center only, no banner or sound.
 - A scheduled task's alert opens the chat where its job was made, else the job in Scheduled tasks

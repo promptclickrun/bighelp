@@ -767,8 +767,8 @@ then 6 hours. Registration never changes what setup, BuzzKit or the alerts do.
 The notification service extension no longer builds on BuzzKit's extension product. The extension class
 is a thin shell around `BighelpNotificationProcessor`, which opens sealed alerts, stacks them, and hands the
 system exactly one notification before time runs out (tests run it with fakes). It shows every
-alert itself (`BighelpPushDisplay`): it registers the push's `bk.category` and `bk.actions` as a
-category, attaches `bk.image` (HTTPS, status 200, at most 10 MB, written to a file in pieces; a picture that says it is bigger is refused before its body is read, and one that turns out bigger is cut off) and finishes before the system's
+alert itself (`BighelpPushDisplay.show`): it registers the push's `bk.category` and `bk.actions` as a
+category, attaches the alert's picture (a sealed alert's avatar, or `bk.image`: HTTPS, status 200, at most 10 MB, written to a file in pieces; a picture that says it is bigger is refused before its body is read, and one that turns out bigger is cut off), and names the agent the alert is from as the sender of a communication notification (`INSendMessageIntent`). The sender is the name the alert already shows and its agent stack, which becomes the conversation; the sender image is the alert's picture, so iOS puts the agent's own picture where it would otherwise put bighelp's icon, the way Telegram shows the sender. Building that returns a different content, so the extension shows what `show` returns rather than the content it passed in; with no sender, no picture, or no Communication Notifications entitlement, `show` hands back the alert untouched and it looks exactly as before. The interaction donation feeds Siri's suggestions only, so it never holds an alert back. Everything finishes before the system's
 time limit. Pushes through BuzzKit and pushes sent straight to Apple carry the same `bk` object and
 look the same. For this release the extension still sends BuzzKit's delivered receipt
 (`BuzzKitExtensionSupport.trackDelivered`, app group `group.app.loopdy.mobile.buzzkit`) for a push that

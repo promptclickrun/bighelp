@@ -349,6 +349,58 @@ import UserNotifications
         #expect(content.attachments.isEmpty)
     }
 
+    // MARK: The sender
+
+    /// The alert's agent, as a communication notification needs it: the name it already shows and the
+    /// stack it is grouped in, which becomes the conversation.
+    @Test func theAgentInTheTitleIsTheSender() {
+        let content = UNMutableNotificationContent()
+        content.title = " Tandy "
+        content.threadIdentifier = "bighelp.agent.2f0a3c1d4b5e6f70"
+        let sender = BighelpPushDisplay.Sender.of(content)
+        #expect(sender?.name == "Tandy")
+        #expect(sender?.conversation == "bighelp.agent.2f0a3c1d4b5e6f70")
+    }
+
+    @Test func thePushedAgentNameBeatsTheAlertTitle() {
+        let content = UNMutableNotificationContent()
+        content.title = "bighelp"
+        content.threadIdentifier = "bighelp"
+        content.userInfo = ["loopdy": ["agent": ["id": "nova", "name": "Nova"] as [String: Any]] as [String: Any]]
+        #expect(BighelpPushDisplay.Sender.of(content)?.name == "Nova")
+    }
+
+    @Test func anAlertWithNoAgentNameOrStackHasNoSender() {
+        let content = UNMutableNotificationContent()
+        content.title = "  "
+        content.threadIdentifier = ""
+        #expect(BighelpPushDisplay.Sender.of(content) == nil)
+    }
+
+    /// No picture, no communication notification: the alert shows as it always has.
+    @Test func aSenderWithoutAPictureLeavesTheContentAsItIs() {
+        let content = UNMutableNotificationContent()
+        content.title = "Tandy"
+        content.threadIdentifier = "bighelp.agent.2f0a3c1d4b5e6f70"
+        let shown = BighelpPushDisplay.communication(content, sender: BighelpPushDisplay.Sender.of(content),
+                                                     picture: nil)
+        #expect((shown as AnyObject) === (content as AnyObject))
+    }
+
+    /// The one call the notification service makes: buttons, picture, and the content to show.
+    @Test(arguments: Path.allCases)
+    func showCarriesTheCategoryAndThePictureThrough(path: Path) async throws {
+        let display = try #require(BighelpPushDisplay(userInfo: Self.alert(path)))
+        #expect(display.imageURL?.absoluteString == "https://example.com/avatar.png")
+        let content = UNMutableNotificationContent()
+        content.title = "Nova"
+        content.threadIdentifier = "bighelp.agent.2f0a3c1d4b5e6f70"
+        let shown = await BighelpPushDisplay.show(content, categories: Categories(), download: Self.download())
+        #expect(shown.categoryIdentifier == "BIGHELP_APPROVAL")
+        #expect(shown.threadIdentifier == "bighelp.agent.2f0a3c1d4b5e6f70")
+        #expect(shown.attachments.first?.identifier == "bk.image")
+    }
+
     // MARK: Finishing in time
 
     @Test func theNotificationShowsOnceWhicheverEndsFirst() {

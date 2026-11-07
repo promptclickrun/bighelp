@@ -1,4 +1,5 @@
 import Foundation
+import Intents
 import UserNotifications
 
 /// The categories the notification service extension registers. A seam for tests;
@@ -48,6 +49,25 @@ struct BighelpPushDisplay: Equatable, Sendable {
     let actions: [Action]
     let imageURL: URL?
 
+    /// The agent an alert is from, as a communication notification names it: the name the alert shows
+    /// and the stack it is grouped in, which the system also takes as the conversation, so every alert
+    /// from one agent is the same sender.
+    struct Sender: Equatable, Sendable {
+        let name: String
+        let conversation: String
+
+        /// Nil without both a name and a stack: the alert then shows as it always has, with bighelp's
+        /// icon.
+        static func of(_ content: UNNotificationContent) -> Sender? {
+            let pushed = (content.userInfo["loopdy"] as? [String: Any])
+                .flatMap { ($0["agent"] as? [String: Any])?["name"] as? String }
+            let name = (pushed ?? content.title).trimmingCharacters(in: .whitespacesAndNewlines)
+            let conversation = content.threadIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty, !conversation.isEmpty else { return nil }
+            return Sender(name: name, conversation: conversation)
+        }
+    }
+
     /// Nil for a push with neither a `bk` object nor a top-level `messageId`: it has nothing to add.
     /// Other top-level keys, such as `bighelp_meta`, are ignored.
     init?(userInfo: [AnyHashable: Any]) {
@@ -96,6 +116,57 @@ struct BighelpPushDisplay: Equatable, Sendable {
         await attachImage(to: content, download: download)
     }
 
+    /// Everything a push asks for, done in one go, and the content to show.
+    ///
+    /// It is one call because a communication notification is a different content, not a change to
+    /// this one: iOS shows the intent's sender image as the alert's avatar, and the sender can only be
+    /// built once the picture is on the phone. `picture` is a picture that came with the alert (a
+    /// sealed alert's avatar); otherwise the push's own `bk.image` is downloaded. Anything that fails
+    /// leaves the alert exactly as it would have shown without this.
+    static func show(_ content: UNMutableNotificationContent, picture: URL? = nil,
+                     categories: any BighelpNotificationCategoryStore = UNUserNotificationCenter.current(),
+                     download: Download = BighelpPushDisplay.download) async -> UNNotificationContent {
+        var file = picture
+        if let display = BighelpPushDisplay(userInfo: content.userInfo) {
+            await display.registerActions(on: content, categories: categories)
+            if let downloaded = await display.pictureFile(download: download) { file = downloaded }
+        }
+        if content.attachments.isEmpty, let file,
+           let attachment = try? UNNotificationAttachment(identifier: imageIdentifier, url: file) {
+            content.attachments = [attachment]
+        }
+        return communication(content, sender: Sender.of(content), picture: file)
+    }
+
+    /// The alert as a communication notification, so an agent's own picture stands where iOS shows
+    /// bighelp's icon, the way Telegram shows the sender. Without a sender or a picture it returns
+    /// `content` untouched.
+    static func communication(_ content: UNMutableNotificationContent, sender: Sender?,
+                              picture: URL?) -> UNNotificationContent {
+        guard let sender, let picture, let image = INImage(url: picture) else { return content }
+        let person = INPerson(personHandle: INPersonHandle(value: sender.conversation, type: .unknown),
+                              nameComponents: nil, displayName: sender.name, image: image,
+                              contactIdentifier: nil, customIdentifier: sender.conversation)
+        let intent = INSendMessageIntent(recipients: nil,
+                                         outgoingMessageType: .outgoingMessageText,
+                                         content: content.body,
+                                         speakableGroupName: nil,
+                                         conversationIdentifier: sender.conversation,
+                                         serviceName: "bighelp",
+                                         sender: person,
+                                         attachments: nil)
+        // Apple asks for the donation before the update. It feeds Siri's suggestions only, so an alert
+        // whose donation fails still shows and the failure is dropped.
+        let interaction = INInteraction(intent: intent, response: nil)
+        interaction.direction = .incoming
+        interaction.donate { _ in }
+        guard let updated = try? content.updating(from: intent),
+              let copy = updated.mutableCopy() as? UNMutableNotificationContent else { return content }
+        // The update hands back a new content, so everything this one carried comes along by hand.
+        copy.attachments = content.attachments
+        return copy
+    }
+
     func registerActions(on content: UNMutableNotificationContent,
                          categories store: any BighelpNotificationCategoryStore) async {
         guard !actions.isEmpty, let categoryID else { return }
@@ -118,8 +189,9 @@ struct BighelpPushDisplay: Equatable, Sendable {
         store.setCategories(existing.union([category]))
     }
 
-    func attachImage(to content: UNMutableNotificationContent, download: Download) async {
-        guard let url = imageURL, url.scheme?.lowercased() == "https" else { return }
+    /// The push's picture as a file on the phone: nil when the push has none or it can't be used.
+    func pictureFile(download: Download) async -> URL? {
+        guard let url = imageURL, url.scheme?.lowercased() == "https" else { return nil }
         do {
             let (location, response) = try await download(url)
             guard (response as? HTTPURLResponse)?.statusCode == 200,
@@ -127,20 +199,25 @@ struct BighelpPushDisplay: Equatable, Sendable {
                   let size = try? location.resourceValues(forKeys: [.fileSizeKey]).fileSize,
                   size <= Self.maximumImageBytes else {
                 try? FileManager.default.removeItem(at: location)
-                return
+                return nil
             }
             let destination = FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString)
                 .appendingPathExtension(url.pathExtension.isEmpty ? "png" : url.pathExtension)
             try FileManager.default.moveItem(at: location, to: destination)
-            do {
-                content.attachments = [try UNNotificationAttachment(identifier: Self.imageIdentifier, url: destination)]
-            } catch {
-                try? FileManager.default.removeItem(at: destination)
-            }
+            return destination
         } catch {
+            return nil
+        }
+    }
+
+    func attachImage(to content: UNMutableNotificationContent, download: Download) async {
+        guard let file = await pictureFile(download: download) else { return }
+        guard let attachment = try? UNNotificationAttachment(identifier: Self.imageIdentifier, url: file) else {
+            try? FileManager.default.removeItem(at: file)
             return
         }
+        content.attachments = [attachment]
     }
 }
 

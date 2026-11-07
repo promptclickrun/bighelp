@@ -90,14 +90,16 @@ final class BighelpNotificationProcessor: @unchecked Sendable {
         Task {
             // This chat's earlier replies are old news now.
             await services.clearOlder(box.value.content, eventType, eventID, identifier)
-            if let file = await Self.value(of: avatar, within: services.avatarWait),
-               let attachment = try? UNNotificationAttachment(identifier: BighelpPushDisplay.imageIdentifier, url: file) {
-                box.value.content.attachments = [attachment]
-            }
+            let picture = await Self.value(of: avatar, within: services.avatarWait)
+            // The buttons and the picture the sealed alert brought, shown with the agent as the sender
+            // so iOS puts its picture where it would put bighelp's icon.
+            let shown = await BighelpPushDisplay.show(box.value.content, picture: picture,
+                                                      categories: services.categories,
+                                                      download: services.download)
             // The same hold carries on into the display stage, so there is no moment when time running
             // out could find nothing to show.
-            guard self.delivery.replace(content: box.value.content) else { return }
-            await self.addButtonsAndPicture(box.value.content)
+            guard self.delivery.replace(content: shown) else { return }
+            self.delivery.finish()
         }
     }
 
@@ -123,22 +125,19 @@ final class BighelpNotificationProcessor: @unchecked Sendable {
         return UNNotificationRequest(identifier: request.identifier, content: content, trigger: nil)
     }
 
-    /// Holds `request`'s content, adds the push's action buttons and picture, then shows it.
+    /// Holds `request`'s content, adds the push's action buttons, picture and sender, then shows it.
     private func display(_ request: UNNotificationRequest, _ handler: @escaping (UNNotificationContent) -> Void) {
         guard let content = request.content.mutableCopy() as? UNMutableNotificationContent else {
             handler(request.content)
             return
         }
         delivery.hold(handler, content)
-        let box = UncheckedBox(content)
-        Task { await self.addButtonsAndPicture(box.value) }
-    }
-
-    private func addButtonsAndPicture(_ content: UNMutableNotificationContent) async {
-        if let display = BighelpPushDisplay(userInfo: content.userInfo) {
-            await display.apply(to: content, categories: services.categories, download: services.download)
+        Task {
+            let shown = await BighelpPushDisplay.show(content, categories: services.categories,
+                                                      download: services.download)
+            self.delivery.replace(content: shown)
+            self.delivery.finish()
         }
-        delivery.finish()
     }
 
     /// The task's value, or nil once `limit` passes (the task keeps running).

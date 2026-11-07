@@ -12,7 +12,7 @@ enum BighelpCardValidator {
     static let supportedElementTypes: Set<String> = [
         "card", "vstack", "hstack", "grid", "text", "metric", "badge",
         "progress", "chart", "table", "list", "divider", "spacer", "image",
-        "contact", "place", "music", "contact_draft", "event_draft",
+        "contact", "place", "music", "contact_draft", "event_draft", HTMLAppWire.type,
     ]
     private static let supportedOperations: Set<String> = [
         "coalesce", "add", "subtract", "multiply", "divide", "percent_change",
@@ -104,6 +104,7 @@ enum BighelpCardValidator {
         }
         // A card holds one photo draft and nothing else to act on beside it (docs/IMAGE_DRAFTS.md).
         try ImageDraftCard.validateComposition(card.elements)
+        try HTMLAppCard.validateComposition(card.elements)
         return card
     }
 

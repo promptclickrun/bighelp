@@ -1,0 +1,20 @@
+{
+  "schema": "loopdy.card",
+  "version": 1,
+  "title": "Trip planner",
+  "spoken_summary": "An app to open in bighelp: Trip planner.",
+  "data_sources": [],
+  "root": "app",
+  "elements": {
+    "app": {
+      "type": "html_app",
+      "props": {
+        "app_id": "a_0123456789abcdef0123456789abcdef",
+        "description": "Plan the stops of a road trip.",
+        "sends_answers": true,
+        "live": false
+      },
+      "children": []
+    }
+  }
+}

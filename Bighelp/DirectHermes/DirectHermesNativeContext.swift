@@ -488,6 +488,14 @@ final class DirectHermesNativePluginClient {
             // image-drafts.claim -> image-drafts/claim
             return Route(path: operation.rawValue.replacingOccurrences(of: ".", with: "/"),
                          feature: ImageDraftWire.feature, isMutation: true, maximumResponseBytes: 16_384)
+        case .htmlAppsGet:
+            // Up to 2 MB of HTML, base64 in JSON.
+            return Route(path: "html-apps/get", feature: HTMLAppWire.feature, isMutation: false,
+                         maximumResponseBytes: 4 * 1_024 * 1_024 + 65_536, timeout: 60)
+        case .htmlAppsData:
+            // Read every few seconds while a live app is open; at most 256 KB of data.
+            return Route(path: "html-apps/data", feature: HTMLAppWire.feature, isMutation: false,
+                         maximumResponseBytes: 512 * 1_024 + 16_384, timeout: 10)
         case .peopleSpeaking:
             // Sent before each message; a slow host never holds a message for long.
             return Route(path: "people/speaking", feature: "native-people-v1", isMutation: true,

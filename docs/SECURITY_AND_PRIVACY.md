@@ -517,6 +517,19 @@ and both the Hermes plugin and iOS app reject nonempty `data_sources`. Opening a
 Card therefore does not disclose the device IP, timing, URL, or query to a Card
 source host. See [bighelp Cards](BIGHELP_CARDS.md) for the static release contract.
 
+### Agents' apps
+
+An agent's HTML app is not a Card. Its page is the agent's own code, and bighelp
+renders it as made: when the person opens the app, the page can load and send
+anything it asks for, so the sites it uses see the device's IP address, as in
+a browser. Nothing loads until the person taps Open App. Each app has its own
+origin and storage, apart from bighelp's own data and other apps. The page
+gets no host address, credential or chat text from bighelp: only the data the
+agent gave the app, through the plugin. Links open outside bighelp, and the
+camera and microphone are refused. An answer from the app goes to the agent
+only after the person sees the exact message and taps Send. See
+[Agents' HTML apps](HTML_APPS.md).
+
 ## 8. Privacy manifest
 
 The app declares:

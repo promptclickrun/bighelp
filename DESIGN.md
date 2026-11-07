@@ -102,6 +102,11 @@ are historical (`docs/ui-v3-design.md`).
   its quote. After a decision the same card says what happened. Each agent's Photo actions page (beside its
   Instructions in Agent Studio, in What it can use on a bot's profile) sets the offer, how to read each kind, the question for unclear pictures and the review messages,
   with Preview and Reset to defaults ([Image drafts](docs/IMAGE_DRAFTS.md)).
+- Agents' apps: an app an agent made is a card in the chat, never its page: an icon tile in the action color, the
+  title, the agent's description, small "Sends answers" and "Live data" tags, and a full-width Open App. Open App
+  covers the screen: Done, the title with "Live, updated 2:14 PM" under it for an app with data, a ••• menu with
+  Reload, and the page. When the page sends an answer, a panel rises from the bottom with the exact message, Cancel
+  and Send; nothing goes until Send ([Agents' HTML apps](docs/HTML_APPS.md)).
 - Attachments in a draft are one small glass tag above the message box, lined up with the field
   (`DraftAttachmentRail`): the count first, then the kinds ("4 attached · 3 photos, 1 PDF"), with photos leading a
   stack of up to three thumbnails. One photo says "1 photo"; one file shows its name and size. While photos or files

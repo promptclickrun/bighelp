@@ -235,6 +235,9 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case imageDraftsFinish = "image-drafts.finish"
     case imageDraftsDiscard = "image-drafts.discard"
     case imageDraftsReopen = "image-drafts.reopen"
+    /// Agents' HTML apps: an app's page and its latest data (plugin `native-html-apps-v1`, docs/HTML_APPS.md).
+    case htmlAppsGet = "html-apps.get"
+    case htmlAppsData = "html-apps.data"
     /// Composio Connect in Hermes, for Settings › Connections › Composio Apps (plugin `native-composio-v1`).
     case composioStatus = "composio.status"
     case composioInstall = "composio.install"

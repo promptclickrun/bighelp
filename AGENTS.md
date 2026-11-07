@@ -128,6 +128,7 @@ change in both repos.
 | `Bighelp/Kanban/` | Kanban on Hermes' Kanban plugin: board model, lanes, cards, Vision Pro window and pinch-drag |
 | `Bighelp/Code/` | Code mode (Settings › Modes › Code mode): its home (`CodeHomeView`), the message box's chips (project, new worktree or local, branch), `CodeLauncher`, Changes and Ship |
 | `Bighelp/Connectors/` | Settings › Connections (`AppsHubView`): Hermes' connectors as Native App Connections (the inline connect cards in chat, `connection.request`, `ConnectorCardStore`; `ConnectorAppsModel`) and Composio Apps (`Composio/`, [docs/COMPOSIO_APPS.md](docs/COMPOSIO_APPS.md)) |
+| `Bighelp/HTMLApps/` | Agents' HTML apps: the `html_app` card, the full-screen page and its `window.bighelp` bridge, the plugin's `html-apps` routes, the demo's sample apps |
 | `Bighelp/BotScreen/` | Bot Screen: an agent's Linux screen (Hermes `display.*`) in its profile's Screen tab, a native RFB client (`RFB/`) and the full-screen viewer with take control and hand back |
 | `Bighelp/Driving/` | An agent showing the person a place (`iphone_navigation`, #662): the place catalog and its playbooks (`DriveCatalog`), the navigator that plays one (`DriveNavigator`), and the overlay (island bar, chat dock) in its own window |
 | `Bighelp/Usage/` | The Usage page (☰ › Usage): plans and limits (`ProviderUsageStore`), Hermes' own analytics per agent and computer (`UsageStore`, `HostUsageLoader`), charts |
@@ -436,6 +437,12 @@ change in both repos.
   Save. In a chat that holds the person's picture the phone answers `contacts.create` and `calendar.create` with
   `review_required`. Each agent's Photo actions page sits beside its Instructions in Agent Studio, and in What it
   can use on a bot's profile.
+- **Agents' apps** ([docs/HTML_APPS.md](docs/HTML_APPS.md), plugin `native-html-apps-v1`): an agent's HTML app is an
+  `html_app` card (title, description, Open App); the chat never draws the HTML. Open App loads the page from its own
+  `bighelp-app://<app id>/` origin in a full-screen web view (`HTMLAppWebView`) and renders it as made: any site or
+  library loads, while links and new windows open outside and the camera and microphone are refused. Its only way to
+  the app is `window.bighelp` (`HTMLAppBridge`): data the plugin serves (read every 5 s while a live app is open) and
+  `sendAnswer`, which shows the exact message and sends only on the person's Send, as their next message.
 - **Hermes versions never gate connections or features.** Older, newer, custom and absent version strings are
   metadata, not an allowlist. Check actual host capabilities and route responses instead.
   - Hosts differ, so parse leniently: ignore unknown keys and treat most parts as optional.

@@ -91,15 +91,14 @@ final class BighelpNotificationProcessor: @unchecked Sendable {
             // This chat's earlier replies are old news now.
             await services.clearOlder(box.value.content, eventType, eventID, identifier)
             let picture = await Self.value(of: avatar, within: services.avatarWait)
-            // The buttons and the picture the sealed alert brought, shown with the agent as the sender
-            // so iOS puts its picture where it would put bighelp's icon.
-            let shown = await BighelpPushDisplay.show(box.value.content, picture: picture,
-                                                      categories: services.categories,
-                                                      download: services.download)
+            if let picture,
+               let attachment = try? UNNotificationAttachment(identifier: BighelpPushDisplay.imageIdentifier, url: picture) {
+                box.value.content.attachments = [attachment]
+            }
             // The same hold carries on into the display stage, so there is no moment when time running
             // out could find nothing to show.
-            guard self.delivery.replace(content: shown) else { return }
-            self.delivery.finish()
+            guard self.delivery.replace(content: box.value.content) else { return }
+            await self.addButtonsPictureAndSender(box.value.content, picture: picture)
         }
     }
 
@@ -132,12 +131,24 @@ final class BighelpNotificationProcessor: @unchecked Sendable {
             return
         }
         delivery.hold(handler, content)
-        Task {
-            let shown = await BighelpPushDisplay.show(content, categories: services.categories,
-                                                      download: services.download)
-            self.delivery.replace(content: shown)
-            self.delivery.finish()
+        let box = UncheckedBox(content)
+        Task { await self.addButtonsPictureAndSender(box.value, picture: nil) }
+    }
+
+    /// Adds the push's action buttons and picture to the held `content`, so time running out still shows
+    /// them, then shows it as a message from its agent: iOS puts the agent's picture where it would put
+    /// bighelp's icon. `picture` is the one the alert already brought (a sealed alert's avatar).
+    private func addButtonsPictureAndSender(_ content: UNMutableNotificationContent, picture: URL?) async {
+        var picture = picture
+        if let display = BighelpPushDisplay(userInfo: content.userInfo),
+           let attached = await display.apply(to: content, categories: services.categories, download: services.download) {
+            picture = attached
         }
+        // A different content: until it is built, the held one stays ready to show.
+        if let message = BighelpPushDisplay.communication(content, picture: picture) {
+            delivery.replace(content: message)
+        }
+        delivery.finish()
     }
 
     /// The task's value, or nil once `limit` passes (the task keeps running).

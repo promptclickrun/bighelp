@@ -8,8 +8,8 @@ import UserNotifications
 /// Apple (CONTRACTS §2): the same action buttons, picture, tap and quiet-chat rules. The only
 /// difference is that a direct push has no `bk.messageId`, so bighelp sends no receipt for it.
 @MainActor @Suite(.serialized) struct PushDisplayTests {
-    private static let grantID = "0b3f1c2e-4d5a-4b6c-8d7e-9f0a1b2c3d4e"
-    private static let eventID = grantID + ":" + String(repeating: "ab", count: 32)
+    nonisolated private static let grantID = "0b3f1c2e-4d5a-4b6c-8d7e-9f0a1b2c3d4e"
+    nonisolated private static let eventID = grantID + ":" + String(repeating: "ab", count: 32)
     /// A 1 by 1 PNG.
     nonisolated private static let png = Data(base64Encoded:
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")!
@@ -17,7 +17,7 @@ import UserNotifications
     enum Path: String, CaseIterable { case buzzkit, direct }
 
     /// A sealed or rich alert as the Worker builds it for each path.
-    private static func alert(_ path: Path, image: String? = "https://example.com/avatar.png") -> [AnyHashable: Any] {
+    nonisolated private static func alert(_ path: Path, image: String? = "https://example.com/avatar.png") -> [AnyHashable: Any] {
         var bk: [String: Any] = [
             "deepLink": "loopdy:///dashboard?eventId=\(eventID)",
             "action": ["name": "open_loopdy_managed_event", "data": ["eventId": eventID]],
@@ -81,6 +81,13 @@ import UserNotifications
             if let size { try FileHandle(forWritingTo: file).truncate(atOffset: UInt64(size)) }
             return (file, HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)!)
         }
+    }
+
+    /// A picture on disk, as a download or a sealed alert's avatar leaves it.
+    private static func pictureFile() throws -> URL {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".png")
+        try png.write(to: file)
+        return file
     }
 
     final class Requested: @unchecked Sendable {
@@ -378,27 +385,56 @@ import UserNotifications
     }
 
     /// No picture, no communication notification: the alert shows as it always has.
-    @Test func aSenderWithoutAPictureLeavesTheContentAsItIs() {
+    @Test func aSenderWithoutAPictureIsNoMessage() {
         let content = UNMutableNotificationContent()
         content.title = "Tandy"
         content.threadIdentifier = "bighelp.agent.2f0a3c1d4b5e6f70"
-        let shown = BighelpPushDisplay.communication(content, sender: BighelpPushDisplay.Sender.of(content),
-                                                     picture: nil)
-        #expect((shown as AnyObject) === (content as AnyObject))
+        #expect(BighelpPushDisplay.messageIntent(for: content, picture: nil) == nil)
+        #expect(BighelpPushDisplay.communication(content, picture: nil) == nil)
     }
 
-    /// The one call the notification service makes: buttons, picture, and the content to show.
-    @Test(arguments: Path.allCases)
-    func showCarriesTheCategoryAndThePictureThrough(path: Path) async throws {
-        let display = try #require(BighelpPushDisplay(userInfo: Self.alert(path)))
-        #expect(display.imageURL?.absoluteString == "https://example.com/avatar.png")
+    /// The message iOS draws: the agent as the sender, with its picture, in the conversation that is its
+    /// stack. The picture's bytes go in the intent, so the file being moved on delivery can't lose them.
+    @Test func theMessageIsFromTheAgentWithItsPicture() throws {
+        let file = try Self.pictureFile()
         let content = UNMutableNotificationContent()
         content.title = "Nova"
+        content.body = "Your build finished"
         content.threadIdentifier = "bighelp.agent.2f0a3c1d4b5e6f70"
-        let shown = await BighelpPushDisplay.show(content, categories: Categories(), download: Self.download())
-        #expect(shown.categoryIdentifier == "BIGHELP_APPROVAL")
-        #expect(shown.threadIdentifier == "bighelp.agent.2f0a3c1d4b5e6f70")
-        #expect(shown.attachments.first?.identifier == "bk.image")
+        // Attaching the file leaves it there until the alert is delivered.
+        content.attachments = [try UNNotificationAttachment(identifier: BighelpPushDisplay.imageIdentifier, url: file)]
+        let intent = try #require(BighelpPushDisplay.messageIntent(for: content, picture: file))
+        #expect(intent.sender?.displayName == "Nova")
+        #expect(intent.sender?.customIdentifier == "bighelp.agent.2f0a3c1d4b5e6f70")
+        #expect(intent.sender?.image != nil)
+        #expect(intent.conversationIdentifier == "bighelp.agent.2f0a3c1d4b5e6f70")
+        #expect(intent.content == "Your build finished")
+    }
+
+    /// The push's buttons and picture, then the message built from them: what the notification service
+    /// shows. A quiet alert stays quiet as a message.
+    @Test(arguments: Path.allCases)
+    func theMessageKeepsTheButtonsPictureStackAndQuiet(path: Path) async throws {
+        let content = UNMutableNotificationContent()
+        content.userInfo = Self.alert(path)
+        content.title = "Nova"
+        content.body = "Something needs you"
+        content.threadIdentifier = "bighelp.agent.2f0a3c1d4b5e6f70"
+        content.interruptionLevel = .passive
+        let display = try #require(BighelpPushDisplay(userInfo: Self.alert(path)))
+        let attached = await display.apply(to: content, categories: Categories(), download: Self.download())
+        let picture = try #require(attached)
+        #expect(content.categoryIdentifier == "BIGHELP_APPROVAL")
+        #expect(content.attachments.map(\.identifier) == ["bk.image"])
+
+        let message = try #require(BighelpPushDisplay.communication(content, picture: picture),
+                                   "The alert became a message from its agent")
+        #expect(message.categoryIdentifier == "BIGHELP_APPROVAL")
+        #expect(message.threadIdentifier == "bighelp.agent.2f0a3c1d4b5e6f70")
+        #expect(message.attachments.map(\.identifier) == ["bk.image"])
+        #expect(message.interruptionLevel == .passive)
+        #expect(message.body == "Something needs you")
+        #expect(message.userInfo["bk"] != nil, "The tap still finds the push's data")
     }
 
     // MARK: Finishing in time

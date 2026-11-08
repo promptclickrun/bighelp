@@ -16,12 +16,13 @@ struct SessionSubagentRosterSheet: View {
 
     var body: some View {
         let totalSubagents = subagents.count + nativeSubagents.count
-        let summary = ChatBackgroundSummary(subagents: totalSubagents, commands: commands.count)
+        let summary = ChatBackgroundSummary(subagents: totalSubagents, commands: commands.count(where: \.isRunning))
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: BighelpTokens.space12) {
                     VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                        Label(summary.detail, systemImage: "square.stack.3d.up")
+                        Label(summary.isEmpty ? String(localized: "Nothing running now") : summary.detail,
+                              systemImage: "square.stack.3d.up")
                             .font(.bighelp(.headline))
                             .foregroundStyle(theme.primaryText)
                         Text(totalSubagents > 0 ? "Tap a subagent to watch it work." : "Work the agent left running in this chat.")

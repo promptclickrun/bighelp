@@ -206,7 +206,7 @@ struct ChatComposer: View, Equatable {
         // open to show how they ended, and closes once Hermes lists nothing.
         .onChange(of: model.sessionSubagents) { _, _ in closeEmptyBackgroundSheet() }
         .onChange(of: model.nativeSubagents) { _, _ in closeEmptyBackgroundSheet() }
-        .onChange(of: model.backgroundCommands) { _, _ in closeEmptyBackgroundSheet() }
+        .onChange(of: model.hasBackgroundCommands) { _, _ in closeEmptyBackgroundSheet() }
         .onChange(of: model.goalRailState) { _, goal in
             if goal == nil, presentedStatus == .goal {
                 presentedStatus = nil
@@ -702,7 +702,7 @@ struct ChatComposer: View, Equatable {
 
     private func closeEmptyBackgroundSheet() {
         guard presentedStatus == .background, model.sessionSubagents.isEmpty, model.nativeSubagents.isEmpty,
-              model.subagentCanvases.isEmpty, model.backgroundCommands.isEmpty else { return }
+              model.subagentCanvases.isEmpty, !model.hasBackgroundCommands else { return }
         presentedStatus = nil
     }
 

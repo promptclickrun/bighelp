@@ -96,14 +96,20 @@ final class AgentTodayModel {
     /// Bumps with each new connection, so the section's reads start over on it.
     private(set) var connection = 0
     @ObservationIgnored private var client: (any AgentBoardClient)?
+    @ObservationIgnored private var scope: String?
 
     /// The board's connection, which the Dashboard follows. While it reconnects there is none, and
-    /// what the section shows stays until the next one answers.
-    func use(_ client: (any AgentBoardClient)?) {
+    /// what the section shows stays until the next one answers; another computer starts over.
+    func use(_ client: (any AgentBoardClient)?, scope: String) {
         guard let client, client !== self.client else { return }
         self.client = client
         connection &+= 1
-        if !client.supportsToday { phase = .unsupported } else if phase == .unsupported { phase = .loading }
+        if !client.supportsToday {
+            phase = .unsupported
+        } else if phase == .unsupported || scope != self.scope {
+            phase = .loading
+        }
+        self.scope = scope
     }
 
     var items: [AgentTodayItem] {

@@ -134,7 +134,7 @@ final class NativeSubagentProductionUITests: BighelpUITestCase {
             thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98))
         )
         let closed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            !app.navigationBars["Subagents"].exists && !app.navigationBars["Session agents"].exists
+            !app.navigationBars["In the background"].exists && !app.navigationBars["Session agents"].exists
         }, object: app)
         XCTAssertEqual(
             XCTWaiter.wait(for: [closed], timeout: 10),

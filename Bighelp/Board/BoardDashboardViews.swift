@@ -81,7 +81,7 @@ final class BoardDashboardModel {
             scope = connection.scope
             refreshSnoozes()
             await store.connect(client: connection.client, scope: connection.scope)
-            today.use(connection.client)
+            today.use(connection.client, scope: connection.scope)
             if store.agentID != agentID || store.state == .idle { await store.load(agentID: agentID) }
         } else if shell.isWaitingForConnection {
             store.waitForConnection()
@@ -251,7 +251,7 @@ struct BoardDashboardOverlays: ViewModifier {
 }
 
 /// The Dashboard tab: Today (closed until the person opens it), then the Feed, Ideas and Goals piles.
-/// Templates open from an empty pile and from each page.
+/// Templates open from an empty pile, and from the Templates button on each pile's See all page.
 struct BoardDashboardView: View {
     @Bindable var model: BoardDashboardModel
     /// The bot's board, with its chat for Ask and blueprints.

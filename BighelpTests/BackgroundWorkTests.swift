@@ -23,7 +23,9 @@ struct BackgroundWorkTests {
                  "status": .string("exited"), "exit_code": .integer(1), "completion_reason": .string("exited")]),
         .object(["session_id": .string("proc_stopped"), "command": .string("tail -f log"), "uptime_seconds": .integer(60),
                  "status": .string("exited"), "exit_code": .integer(-15), "completion_reason": .string("killed")]),
-        // No ID or no command: left out, not the whole list.
+        // A subagent's own command is its work, not the chat's. No ID or no command: left out, not the whole list.
+        .object(["session_id": .string("proc_helper"), "command": .string("pytest"), "owner_task_id": .string("sa-3f2a"),
+                 "uptime_seconds": .integer(30), "status": .string("running")]),
         .object(["command": .string("orphan")]),
         .object(["session_id": .string("proc_blank"), "command": .string("   ")]),
     ])])
@@ -147,7 +149,7 @@ struct BackgroundWorkTests {
         let today = AgentTodayModel()
         #expect(AgentTodayModel.summary(today.phase) == "Loading…")
         #expect(!today.isExpanded, "Closed until the person opens it")
-        today.use(client)
+        today.use(client, scope: "home-mac")
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "America/Chicago")!
         let now = Date(timeIntervalSince1970: 1_794_092_000)
@@ -164,7 +166,7 @@ struct BackgroundWorkTests {
         let older = TodayClient()
         older.supportsToday = false
         let other = AgentTodayModel()
-        other.use(older)
+        other.use(older, scope: "home-mac")
         #expect(other.phase == .unsupported)
         #expect(AgentTodayModel.summary(other.phase) == "Update the plugin to see it")
         #expect(AgentTodayModel.summary(.loaded([])) == "Nothing in the background yet")

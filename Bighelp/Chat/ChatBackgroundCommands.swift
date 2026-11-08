@@ -47,11 +47,15 @@ struct ChatBackgroundCommand: Identifiable, Equatable, Sendable {
                   output: String(output.suffix(Self.maximumOutputLength)))
     }
 
-    /// The `process.list` answer: running first, then the newest. Nil when it isn't one.
+    /// The `process.list` answer: running first, then the newest. Nil when it isn't one. A
+    /// subagent's own commands (`sa-…` tasks) are left out: they're part of that subagent's work,
+    /// which the chip already counts.
     static func list(_ response: BighelpJSONValue, now: Date = .now) -> [ChatBackgroundCommand]? {
         guard let rows = response.object?["processes"]?.array else { return nil }
         var seen: Set<String> = []
-        let commands = rows.prefix(maximumCommands).compactMap { ChatBackgroundCommand(json: $0, now: now) }
+        let commands = rows.prefix(maximumCommands)
+            .filter { $0.object?["owner_task_id"]?.string?.hasPrefix("sa-") != true }
+            .compactMap { ChatBackgroundCommand(json: $0, now: now) }
             .filter { seen.insert($0.id).inserted }
         return commands.sorted { lhs, rhs in
             if lhs.isRunning != rhs.isRunning { return lhs.isRunning }

@@ -3,8 +3,6 @@ import SwiftUI
 /// The chat's background commands: what the "In the background" chip counts beside its subagents,
 /// and what its sheet lists and stops.
 extension ChatModel {
-    var runningBackgroundCommands: Int { backgroundCommands.count(where: \.isRunning) }
-
     /// One read of `process.list`. False when this chat can't be asked (no live connection, a
     /// group chat, or a Hermes without the method), so its reader stops until the next connection.
     @discardableResult
@@ -15,15 +13,22 @@ extension ChatModel {
         do {
             let commands = try await native.backgroundCommands(now: now)
             guard nativeConversationClient === native else { return true }
-            if commands != backgroundCommands { backgroundCommands = commands }
+            show(commands)
         } catch DirectHermesError.rpcRejected(let code, _) where code == -32601 {
             backgroundCommandsUnsupported = connection
-            if !backgroundCommands.isEmpty { backgroundCommands = [] }
+            show([])
             return false
         } catch {
             // A passing failure (reconnecting, a slow answer) keeps what the chat shows.
         }
         return true
+    }
+
+    private func show(_ commands: [ChatBackgroundCommand]) {
+        if commands != backgroundCommands { backgroundCommands = commands }
+        let running = commands.count(where: \.isRunning)
+        if running != runningBackgroundCommands { runningBackgroundCommands = running }
+        if commands.isEmpty == hasBackgroundCommands { hasBackgroundCommands = !commands.isEmpty }
     }
 
     /// Stops one, then reads the list again. False when it had already ended or Hermes didn't stop it.

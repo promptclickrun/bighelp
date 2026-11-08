@@ -136,7 +136,11 @@ own New chat only where there's no bar to hold it: Code mode, the iPhone Duo's s
 ornament, and a board opened with Back. The chat list (and the all-hosts view's All sessions) searches from the system
 glass search bar along the bottom, like All agents; it matches titles and previews, and a scroll puts the keyboard away.
 A chat with something new since it was last read has a bold title and Bots mode's dot after its time, and a chat
-whose message box holds an unsent message shows Draft before its preview. Where the computer keeps read state, the
+whose message box holds an unsent message shows Draft before its preview. With Settings › Chat › Projects in the chat
+list on (on by default, saved on each device), a chat in a project shows the project's name on a line of its own
+under the preview, never beside it, so the preview stays whole at large text; a list grouped by project leaves it out.
+The row's menu shows the chat's project beside Move to Project…, and the move sheet lists that project first, then
+the rest by name. Projects sorts by Recently used or Name, saved on the device. Where the computer keeps read state, the
 row's menu and leading swipe have Mark Read and Mark Unread. Feed, Ideas, Goals and Apps keep the Chat tab's header: ☰ and ⋯ (the agent's profile,
 then Files, Memory, Skills & tools and Scheduled tasks). The root's edge-swipe zones
 start below that row, so its corner buttons always get the tap. The avatar reacts to what the agent is doing (thinking, writing code, browsing, making

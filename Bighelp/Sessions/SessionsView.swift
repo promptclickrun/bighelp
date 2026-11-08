@@ -26,6 +26,9 @@ struct SessionsView: View {
     @Environment(\.bighelpUIV2Enabled) private var uiV2Enabled
     @Environment(\.bighelpUIV3Enabled) private var uiV3Enabled
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    /// Settings › Chat › Projects in the chat list, saved on this device only.
+    @AppStorage(ChatLayoutPreferences.showsChatProjectKey)
+    private var showsChatProject = ChatLayoutPreferences.showsChatProjectByDefault
     private enum ActionDialog {
         case rename(SessionSummary)
         case delete(SessionSummary)
@@ -814,7 +817,7 @@ struct SessionsView: View {
 
     private func nativeSessionButton(_ session: SessionSummary, model: SessionsModel) -> some View {
         Button { onSelect(session) } label: {
-            SessionRow(session: session, agents: agents)
+            SessionRow(session: session, agents: agents, showsProject: showsChatProject && !organizeByProjects)
         }
         .buttonStyle(.plain)
         .disabled(mutatingSessionIDs.contains(session.id))
@@ -887,14 +890,23 @@ struct SessionsView: View {
         projectMove != nil && session.kind == .direct && session.agentIDs.count == 1
     }
 
+    /// Move to Project…, showing the project the chat is in now, as the chat's ⋯ menu does,
+    /// so nobody has to open the sheet to find out where the chat lives.
     @ViewBuilder
     private func moveToProjectButton(_ session: SessionSummary) -> some View {
         if canMoveToProject(session) {
             Button {
                 projectMoveTarget = session
             } label: {
-                Label("Move to Project…", systemImage: "folder")
+                Text(dynamicTypeSize.isAccessibilitySize ? "Move…" : "Move to Project…")
+                if !dynamicTypeSize.isAccessibilitySize,
+                   let name = session.workspaceName, !name.isEmpty {
+                    Text(name)
+                }
+                Image(systemName: "folder")
             }
+            .accessibilityLabel(session.workspaceName.map { "Move to Project…, now in \($0)" }
+                ?? "Move to Project…")
             .accessibilityIdentifier("session.action.move-project.\(session.id)")
         }
     }
@@ -1156,7 +1168,7 @@ struct SessionsView: View {
                                     Button {
                                         onSelect(session)
                                     } label: {
-                                        SessionRow(session: session, agents: agents)
+                                        SessionRow(session: session, agents: agents, showsProject: showsChatProject && !organizeByProjects)
                                     }
                                     .buttonStyle(.plain)
                                     .disabled(mutatingSessionIDs.contains(session.id))

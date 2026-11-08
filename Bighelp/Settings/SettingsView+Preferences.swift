@@ -294,6 +294,12 @@ extension SettingsView {
             }
             .accessibilityIdentifier("settings.chat.session-title")
 
+            ChatProjectToggle {
+                settingLabel(String(localized: "Projects in the chat list"),
+                             detail: String(localized: "Show which project each chat is in."))
+            }
+            .accessibilityIdentifier("settings.chat.chat-projects")
+
             ReturnSendsToggle {
                 settingLabel(String(localized: "Return sends"), detail: Self.returnSendsDetail)
             }
@@ -438,6 +444,17 @@ private struct SessionTitleToggle<Label: View>: View {
 
     var body: some View {
         Toggle(isOn: $showsSessionTitle) { label }
+    }
+}
+
+/// Saved on this device only (`@AppStorage`), like the chat look; Chats reads it directly.
+private struct ChatProjectToggle<Label: View>: View {
+    @AppStorage(ChatLayoutPreferences.showsChatProjectKey)
+    private var showsChatProject = ChatLayoutPreferences.showsChatProjectByDefault
+    @ViewBuilder let label: Label
+
+    var body: some View {
+        Toggle(isOn: $showsChatProject) { label }
     }
 }
 

@@ -101,7 +101,7 @@ final class DirectHermesClient: DirectHermesRPC, DirectHermesAuthenticatedHTTP,
         "session.status", "session.usage", "session.events.since", "commands.catalog",
         "config.get", "delegation.status", "spawn_tree.list",
         "profiles.list", "profiles.describe", "profiles.get_asset", "model.options",
-        "projects.list", "projects.get", "subagent.list", "subagent.tail", "client.capabilities",
+        "projects.list", "projects.get", "subagent.list", "subagent.tail", "process.list", "client.capabilities",
         "groups.capabilities", "groups.list", "groups.state", "groups.log", "pet.gallery", "pet.thumb"
     ]
 

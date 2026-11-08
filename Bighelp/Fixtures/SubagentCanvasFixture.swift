@@ -7,7 +7,9 @@ import SwiftUI
 /// client and projection a host's would, and each helper's saved session is
 /// served as Hermes' `/api/sessions/{id}/messages` would. Made-up content
 /// only. Opening the ryokan helper's canvas (its first saved-record read) lets
-/// the rest of its work arrive, so a test can watch the canvas change.
+/// the rest of its work arrive, so a test can watch the canvas change. The agent also left a
+/// preview server running (Hermes-shaped `process.list` rows), so the "In the background" chip and
+/// its sheet show subagents and commands together.
 @MainActor
 struct SubagentCanvasFixtureView: View {
     static let launchArgument = "-test-subagent-canvas"
@@ -174,10 +176,45 @@ private final class SubagentCanvasFixtureRPC: DirectHermesRPC, DirectHermesAuthe
     /// What the person told each helper.
     private(set) var steered: [String: [String]] = [:]
     var onInterrupt: ((String) -> Void)?
+    /// Whether the person stopped the preview server.
+    private(set) var previewStopped = false
+
+    /// The chat's background commands as Hermes' `process.list` rows: a preview server the agent
+    /// left running, and a script that already finished.
+    private var processes: [BighelpJSONValue] {
+        [
+            .object(["session_id": .string("proc_preview"),
+                     "command": .string("python3 -m http.server 8000 --directory kyoto-trip"),
+                     "cwd": .string("/home/demo/kyoto-trip"), "uptime_seconds": .integer(380),
+                     "status": .string(previewStopped ? "exited" : "running"),
+                     "output_tail": .string("""
+                         Serving HTTP on :: port 8000 (http://[::]:8000/) ...
+                         ::1 - - "GET / HTTP/1.1" 200 -
+                         ::1 - - "GET /itinerary.html HTTP/1.1" 200 -
+                         ::1 - - "GET /map.png HTTP/1.1" 200 -
+                         ::1 - - "GET /ryokan-pick.html HTTP/1.1" 200 -
+                         """),
+                     "exit_code": previewStopped ? .integer(-15) : .null,
+                     "completion_reason": previewStopped ? .string("killed") : .null]),
+            .object(["session_id": .string("proc_trains"), "command": .string("./fetch_rail_times.sh kyoto arashiyama"),
+                     "cwd": .string("/home/demo/kyoto-trip"), "uptime_seconds": .integer(900),
+                     "status": .string("exited"), "output_tail": .string("Saved 14 departures to trains.json"),
+                     "exit_code": .integer(0), "completion_reason": .string("exited")]),
+        ]
+    }
 
     func request(_ method: String, params: [String: BighelpJSONValue]) async throws -> BighelpJSONValue {
         guard params["session_id"]?.string == "fixture-runtime" else { throw DirectHermesError.identityChanged }
         switch method {
+        case "process.list":
+            return .object(["processes": .array(processes)])
+        case "process.kill":
+            guard params["process_id"]?.string == "proc_preview" else {
+                return .object(["status": .string("not_found")])
+            }
+            guard !previewStopped else { return .object(["status": .string("already_exited")]) }
+            previewStopped = true
+            return .object(["status": .string("killed"), "exit_code": .integer(-15)])
         case "session.events.since":
             return .object(["epoch": .string("fixture-epoch"), "latest_seq": .integer(0),
                             "truncated": .boolean(false), "events": .array([]), "count": .integer(0)])

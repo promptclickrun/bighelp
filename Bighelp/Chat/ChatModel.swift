@@ -269,6 +269,10 @@ final class ChatModel {
     /// is guaranteed to exist. Keep that live status separate from the
     /// persisted Link roster so missing child navigation never invents a route.
     var nativeSubagents: [NativeSubagentRailItem] = []
+    /// Commands the agent runs in the background in this chat (`process.list`), running first.
+    var backgroundCommands: [ChatBackgroundCommand] = []
+    /// The connection whose Hermes has no `process.list`: it isn't asked again.
+    @ObservationIgnored var backgroundCommandsUnsupported: ObjectIdentifier?
     /// What each helper did, kept after it finishes so its canvas can show the end.
     var subagentCanvases = SubagentCanvasLedger()
     /// The chat's own ⋯ choice (`setReasoningVisible`, `setToolCallsVisible`); nil while it

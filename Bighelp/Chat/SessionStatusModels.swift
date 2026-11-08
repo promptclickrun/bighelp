@@ -461,7 +461,8 @@ enum ProjectChangesRailPresentation {
 
 enum SessionStatusRailKind: String, Equatable, Sendable {
     case goal
-    case subagents
+    /// Subagents and background commands: what the agent runs beside, or after, its turn.
+    case background
     case tasks
 }
 
@@ -477,14 +478,15 @@ enum SessionStatusRailPresentation {
         goal: ChatGoalRailState?,
         subagents: [SessionSubagentSnapshot],
         nativeSubagents: [NativeSubagentRailItem] = [],
+        runningCommands: Int = 0,
         tasks: ChatTaskDrawerState?
     ) -> [SessionStatusRailItem] {
         var result: [SessionStatusRailItem] = []
         if goal != nil {
             result.append(SessionStatusRailItem(kind: .goal))
         }
-        if !subagents.isEmpty || !nativeSubagents.isEmpty {
-            result.append(SessionStatusRailItem(kind: .subagents))
+        if !subagents.isEmpty || !nativeSubagents.isEmpty || runningCommands > 0 {
+            result.append(SessionStatusRailItem(kind: .background))
         }
         if tasks != nil {
             result.append(SessionStatusRailItem(kind: .tasks))

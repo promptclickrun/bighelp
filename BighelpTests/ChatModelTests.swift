@@ -537,7 +537,7 @@ struct ChatModelTests {
             goal: goal,
             subagents: [subagent],
             tasks: tasks
-        ).map(\.kind) == [.goal, .subagents, .tasks])
+        ).map(\.kind) == [.goal, .background, .tasks])
     }
 
     @Test func sessionContextSnapshotDecodesThePluginEnvelope() throws {

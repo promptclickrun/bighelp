@@ -11,20 +11,20 @@ struct SessionSubagentRosterSheet: View {
     /// Every helper this chat has seen, running or finished, so a finished
     /// helper stays open to the end of its story.
     private var nativeSubagents: [SubagentCanvasState] { model.subagentCanvases.ordered }
+    /// Running first, then the ones that ended lately, as Hermes lists them.
+    private var commands: [ChatBackgroundCommand] { model.backgroundCommands }
 
     var body: some View {
         let totalSubagents = subagents.count + nativeSubagents.count
+        let summary = ChatBackgroundSummary(subagents: totalSubagents, commands: commands.count)
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: BighelpTokens.space12) {
                     VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                        Label(
-                            totalSubagents == 1 ? "1 subagent" : "\(totalSubagents) subagents",
-                            systemImage: "cpu"
-                        )
-                        .font(.bighelp(.headline))
-                        .foregroundStyle(theme.primaryText)
-                        Text("Tap one to watch it work.")
+                        Label(summary.detail, systemImage: "square.stack.3d.up")
+                            .font(.bighelp(.headline))
+                            .foregroundStyle(theme.primaryText)
+                        Text(totalSubagents > 0 ? "Tap a subagent to watch it work." : "Work the agent left running in this chat.")
                             .font(.bighelp(.subheadline))
                             .foregroundStyle(theme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
@@ -70,13 +70,16 @@ struct SessionSubagentRosterSheet: View {
                     ForEach(nativeSubagents) { subagent in
                         nativeSubagentRow(subagent)
                     }
+                    ForEach(commands) { command in
+                        BackgroundCommandRow(command: command, model: model)
+                    }
                 }
                 .frame(maxWidth: 680)
                 .padding(BighelpTokens.space20)
                 .frame(maxWidth: .infinity)
             }
             .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
-            .navigationTitle("Subagents")
+            .navigationTitle("In the background")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
@@ -137,6 +140,112 @@ struct SessionSubagentRosterSheet: View {
 
     @BighelpThemeReader private var theme
 
+}
+
+/// A command the agent left running: what it runs, for how long, and Stop. Its latest output shows
+/// with Nerd Mode on.
+private struct BackgroundCommandRow: View {
+    let command: ChatBackgroundCommand
+    let model: ChatModel
+    @Environment(\.nerdModeEnabled) private var nerdModeEnabled
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var isStopping = false
+    @State private var stopMissed = false
+    @State private var showsAllOutput = false
+    @BighelpThemeReader private var theme
+
+    static let previewLines = 4
+
+    var body: some View {
+        let showsOutput = nerdModeEnabled && !command.output.isEmpty
+        let hasMoreOutput = showsOutput && Self.lastLines(command.output, Self.previewLines) != command.output
+        VStack(alignment: .leading, spacing: BighelpTokens.space12) {
+            HStack(alignment: .top, spacing: BighelpTokens.space12) {
+                Image(systemName: command.isRunning ? "terminal.fill" : "terminal")
+                    .font(.bighelp(.subheadline, weight: .semibold))
+                    .foregroundStyle(command.isRunning ? theme.action : theme.secondaryText)
+                    .frame(width: 22, height: 22)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                    Text(command.command)
+                        .font(.bighelp(.subheadline, weight: .semibold).monospaced())
+                        .foregroundStyle(theme.primaryText)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                        .truncationMode(.middle)
+                    // Once a minute, so the run time keeps up without redrawing all the time.
+                    TimelineView(.periodic(from: .now, by: 60)) { context in
+                        Text(Self.status(command, now: context.date))
+                            .bighelpFont(.body)
+                            .foregroundStyle(theme.secondaryText)
+                            .monospacedDigit()
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if showsOutput {
+                Text(showsAllOutput ? command.output : Self.lastLines(command.output, Self.previewLines))
+                    .font(.bighelp(.caption).monospaced())
+                    .foregroundStyle(theme.primaryText)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(BighelpTokens.space12)
+                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(theme.secondaryText.opacity(0.1)))
+                    .accessibilityIdentifier("background.command.output.\(command.id)")
+            }
+            if command.isRunning || hasMoreOutput {
+                HStack(spacing: BighelpTokens.space8) {
+                    if command.isRunning {
+                        Button(role: .destructive, action: stop) {
+                            Label("Stop", systemImage: "stop.fill")
+                        }
+                        .buttonStyle(BighelpV2ButtonStyle(emphasis: .secondary))
+                        .disabled(isStopping)
+                        .accessibilityLabel("Stop \(command.command)")
+                        .accessibilityIdentifier("background.command.stop.\(command.id)")
+                    }
+                    if hasMoreOutput {
+                        Button(showsAllOutput ? "Less output" : "All output") { showsAllOutput.toggle() }
+                            .buttonStyle(BighelpV2ButtonStyle(emphasis: .secondary))
+                    }
+                }
+            }
+            if stopMissed {
+                Text("It had already finished.")
+                    .font(.bighelp(.subheadline))
+                    .foregroundStyle(theme.secondaryText)
+            }
+        }
+        .padding(BighelpTokens.space16)
+        .bighelpSurface(.card)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("background.command.\(command.id)")
+    }
+
+    private func stop() {
+        guard !isStopping else { return }
+        isStopping = true
+        Task {
+            stopMissed = !(await model.stopBackgroundCommand(command.id))
+            isStopping = false
+        }
+    }
+
+    /// "Running · 6 min", or how it ended.
+    static func status(_ command: ChatBackgroundCommand, now: Date) -> String {
+        guard command.isRunning else { return command.outcome }
+        guard let started = command.startedAt else { return command.outcome }
+        let seconds = max(0, now.timeIntervalSince(started))
+        guard seconds >= 60 else { return String(localized: "Running · just started") }
+        let length = Duration.seconds(seconds).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
+        return String(localized: "Running · \(length)")
+    }
+
+    static func lastLines(_ text: String, _ count: Int) -> String {
+        let lines = text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+        let trimmed = lines.reversed().drop { $0.allSatisfy(\.isWhitespace) }.reversed()
+        return trimmed.suffix(count).joined(separator: "\n")
+    }
 }
 
 private struct SessionSubagentDetailView: View {

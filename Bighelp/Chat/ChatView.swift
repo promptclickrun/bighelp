@@ -321,6 +321,7 @@ struct ChatView: View {
         .environment(\.bighelpUIV2Enabled, true)
         .environment(\.chatActivityDisclosureStore, model.activityDisclosures)
         .modifier(ChatScheduledRetryLifecycle(model: model))
+        .modifier(ChatBackgroundCommandsWatch(model: model))
         .onAppear {
             isChatVisible = true
             registerChatDissolve()

@@ -62,7 +62,6 @@ struct ChatComposerHost: View {
 struct ChatComposer: View, Equatable {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.verticalSizeClass) private var verticalSizeClass
-    @Environment(\.nerdModeEnabled) private var nerdModeEnabled
     @Environment(\.providerUsage) private var providerUsage
     @ScaledMetric(relativeTo: .body) private var compactDraftLineHeight: CGFloat = 22
     let model: ChatModel
@@ -192,6 +191,7 @@ struct ChatComposer: View, Equatable {
         .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.taskDrawer)
         .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.sessionSubagents)
         .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.nativeSubagents)
+        .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.runningBackgroundCommands)
         .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.goalRailState)
         .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.sessionContext)
         .animation(reduceMotion ? nil : .snappy(duration: BighelpTokens.stateDuration), value: model.compaction)
@@ -202,19 +202,11 @@ struct ChatComposer: View, Equatable {
                 presentedStatus = nil
             }
         }
-        .onChange(of: model.sessionSubagents) { _, subagents in
-            if subagents.isEmpty, model.nativeSubagents.isEmpty, model.subagentCanvases.isEmpty,
-               presentedStatus == .subagents {
-                presentedStatus = nil
-            }
-        }
-        .onChange(of: model.nativeSubagents) { _, nativeSubagents in
-            // A finished helper keeps its canvas; the sheet stays open to show how it ended.
-            if nativeSubagents.isEmpty, model.sessionSubagents.isEmpty, model.subagentCanvases.isEmpty,
-               presentedStatus == .subagents {
-                presentedStatus = nil
-            }
-        }
+        // A finished helper keeps its canvas, and a finished command stays listed: the sheet stays
+        // open to show how they ended, and closes once Hermes lists nothing.
+        .onChange(of: model.sessionSubagents) { _, _ in closeEmptyBackgroundSheet() }
+        .onChange(of: model.nativeSubagents) { _, _ in closeEmptyBackgroundSheet() }
+        .onChange(of: model.backgroundCommands) { _, _ in closeEmptyBackgroundSheet() }
         .onChange(of: model.goalRailState) { _, goal in
             if goal == nil, presentedStatus == .goal {
                 presentedStatus = nil
@@ -255,7 +247,7 @@ struct ChatComposer: View, Equatable {
                             }
                         )
                     }
-                case .subagents:
+                case .background:
                     SessionSubagentRosterSheet(model: model, sessionCatalog: sessionCatalog)
                 case .tasks:
                     if let tasks = model.taskDrawer {
@@ -300,8 +292,9 @@ struct ChatComposer: View, Equatable {
         } else {
             SessionStatusRailView(
                 goal: model.goalRailState,
-                subagents: nerdModeEnabled ? model.sessionSubagents : [],
-                nativeSubagents: nerdModeEnabled ? model.nativeSubagents : [],
+                subagents: model.sessionSubagents,
+                nativeSubagents: model.nativeSubagents,
+                runningCommands: model.runningBackgroundCommands,
                 tasks: model.taskDrawer,
                 onSelect: presentStatus,
                 onFittingVerticalDrag: { [actions] in actions.fittingRailVerticalDrag($0) }
@@ -317,8 +310,9 @@ struct ChatComposer: View, Equatable {
     private var compactSessionActions: some View {
         let items = SessionStatusRailPresentation.items(
             goal: model.goalRailState,
-            subagents: nerdModeEnabled ? model.sessionSubagents : [],
-            nativeSubagents: nerdModeEnabled ? model.nativeSubagents : [],
+            subagents: model.sessionSubagents,
+            nativeSubagents: model.nativeSubagents,
+            runningCommands: model.runningBackgroundCommands,
             tasks: model.taskDrawer
         )
         if !items.isEmpty || model.runtimeControls != nil {
@@ -329,7 +323,7 @@ struct ChatComposer: View, Equatable {
                     } label: {
                         switch item.kind {
                         case .goal: Label("Goal", systemImage: "target")
-                        case .subagents: Label("Subagents", systemImage: "person.2")
+                        case .background: Label("In the background", systemImage: "square.stack.3d.up")
                         case .tasks: Label("Tasks", systemImage: "checklist")
                         }
                     }
@@ -706,14 +700,20 @@ struct ChatComposer: View, Equatable {
         BighelpKeyboard.dismiss()
     }
 
+    private func closeEmptyBackgroundSheet() {
+        guard presentedStatus == .background, model.sessionSubagents.isEmpty, model.nativeSubagents.isEmpty,
+              model.subagentCanvases.isEmpty, model.backgroundCommands.isEmpty else { return }
+        presentedStatus = nil
+    }
+
     private func presentStatus(_ kind: SessionStatusRailKind) {
         draftFocus.wrappedValue = false
         BighelpKeyboard.dismiss()
         switch kind {
         case .goal:
             presentedStatus = .goal
-        case .subagents:
-            presentedStatus = .subagents
+        case .background:
+            presentedStatus = .background
         case .tasks:
             presentedStatus = .tasks
         }

@@ -579,7 +579,11 @@ text is SF Pro, as everywhere.
   and Goals stay where they were. Open, it lists the bot's subagents and background commands of the last seven days
   by day (Today, Yesterday, then weekdays), running first, each with how it went and when (`DashboardTodaySection`,
   plugin `native-agents-today-v1`). Routines (scheduled task runs) show only with ⋯ › Show routines, which the ⋯
-  menu offers on the Dashboard tab and which is off by default. Templates open from an empty pile and from each
+  menu offers on the Dashboard tab and which is off by default. A tap on an item opens its read-out
+  (`DashboardActivityDetailView`, plugin `native-agents-today-detail-v1`): a subagent's steps on a timeline (the
+  time, a dot on a rail, what it did in plain words, in order) and its answer as formatted text; a command and its
+  output, laid out to read; a routine run's status and its result, with the rest of the run's record behind Run
+  details. It reads again every few seconds while the work runs. Templates open from an empty pile and from each
   pile's See all page.
 - **Computer** (the profile's screen tab) also has **Your computer**: the computer's own desktop (macOS, Linux or
   Windows) through its own VNC server, bridged by the plugin (`native-computer-screen-v1`). Open your computer

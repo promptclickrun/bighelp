@@ -118,7 +118,7 @@ struct SubagentCanvasState: Identifiable, Equatable, Sendable {
         case "subagent.thinking":
             hasStarted = true
             // Hosts that hide reasoning send the frame without its text.
-            guard !isFinished, let text = Self.text(payload["text"]) else { break }
+            guard !isFinished, let text = Self.text(payload["text"]), !Self.isHermesSpinner(text) else { break }
             let bounded = Self.bounded(text, Self.maximumThinkingLength)
             let index = reportedCount ?? toolCount
             if !liveSteps.contains(where: { $0.toolIndex == index && $0.kind == .thinking(bounded) }) {
@@ -184,6 +184,16 @@ struct SubagentCanvasState: Identifiable, Equatable, Sendable {
     private mutating func nextStepOrder() -> Int {
         stepArrivals += 1
         return stepArrivals
+    }
+
+    /// Hermes relays a helper's waiting spinner as thinking: a face, a space, then a verb and "...",
+    /// as in "(🔥) setting wing angle..." or "(¬‿¬) musing...". It says nothing about the work.
+    static func isHermesSpinner(_ text: String) -> Bool {
+        guard text.count <= 80, text.hasSuffix("..."), !text.contains(where: \.isNewline),
+              let verb = text.firstIndex(where: { $0.isASCII && $0.isLetter }) else { return false }
+        let face = text[..<verb]
+        return face.hasSuffix(" ") && face.trimmingCharacters(in: .whitespaces).count >= 2
+            && face.unicodeScalars.contains { !$0.isASCII }
     }
 
     static func lifecycle(forStatus status: String?) -> ChatActivityLifecycle {

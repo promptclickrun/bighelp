@@ -167,12 +167,14 @@ enum ChatCompletedTurnProjection {
         let hasUnsettledContent = work.contains { entry in
             switch entry {
             case .message(let item): item.metadata.delivery == "Streaming"
-            case .activity(let turn): turn.events.contains { $0.lifecycle == .running }
+            case .activity(let turn): turn.events.contains { $0.lifecycle == .running && $0.kind != .subagent }
             }
         }
         // Never fold the turn being delivered, including gaps between batches: it stays in place,
         // or Card and Minimal gather its work into one block. An older turn with a step that never
         // settled stays in place too, rather than a block that says the agent is still working.
+        // A helper left running in the background (async `delegate_task`) doesn't hold its turn
+        // open: Hermes ended the turn, and the chat's "In the background" chip shows the helper.
         let isLive = isActive || hasUnsettledContent
         let gathersLive = isActive && style?.gathersLiveWork == true
         guard !work.isEmpty, isLive ? gathersLive : foldsFinished else {

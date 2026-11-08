@@ -193,6 +193,9 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case agentsActivity = "agents.activity"
     /// One agent's subagents, background commands and scheduled task runs today (plugin, `native-agents-today-v1`).
     case agentsToday = "agents.today"
+    /// What one of those did: a subagent's steps and answer, a command's output, a routine run's output
+    /// (plugin, `native-agents-today-detail-v1`).
+    case agentsTodayDetail = "agents.today.detail"
     /// The computer's own desktop through its VNC server: whether it answers, and a ticket for the
     /// bridge (plugin, `native-computer-screen-v1`).
     case computerScreenStatus = "computer-screen.status"

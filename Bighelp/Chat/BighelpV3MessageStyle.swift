@@ -81,10 +81,16 @@ enum ChatMessageGrouping {
     /// Group chats perch the sender's avatar beside the last bubble of a run.
     static let perchedAvatarSize: CGFloat = 30
 
+    /// Messages further apart than this are separate runs, each with its own time: a scheduled
+    /// task's report in the Bot Chat hours after the last answer is not more of that answer.
+    static let maximumGap: TimeInterval = 5 * 60
+
     static func continuesGroup(_ current: ChatTranscriptEntry, next: ChatTranscriptEntry?) -> Bool {
         guard case .message(let item) = current, let next, case .message(let following) = next else { return false }
         // Two different agents in a group chat are separate runs.
-        return item.role == following.role && item.sender.id == following.sender.id
+        guard item.role == following.role, item.sender.id == following.sender.id else { return false }
+        guard let sent = item.metadata.timestamp, let nextSent = following.metadata.timestamp else { return true }
+        return abs(nextSent.timeIntervalSince(sent)) <= maximumGap
     }
 }
 

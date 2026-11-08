@@ -144,32 +144,64 @@ struct BackgroundWorkTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func todayAsksFromTheStartOfThePhonesDayAndKeepsWhatItShowedThroughAFailure() async {
+    func activitiesAskForAWeekFallBackForAnOlderPluginAndKeepWhatTheyShowed() async {
         let client = TodayClient()
         let today = AgentTodayModel()
-        #expect(AgentTodayModel.summary(today.phase) == "Loading…")
+        #expect(AgentTodayModel.summary(today.phase, showsRoutines: false) == "Loading…")
         #expect(!today.isExpanded, "Closed until the person opens it")
         today.use(client, scope: "home-mac")
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "America/Chicago")!
         let now = Date(timeIntervalSince1970: 1_794_092_000)
+        let week = AgentTodayModel.since(days: 7, now: now, calendar: calendar)
         await today.refresh(agentID: "nova", now: now, calendar: calendar)
-        #expect(client.asked == [calendar.startOfDay(for: now)])
+        #expect(client.asked == [week])
+        #expect(calendar.dateComponents([.day], from: week, to: calendar.startOfDay(for: now)).day == 6)
         #expect(today.items.map(\.id) == ["delegation:a", "cron:brief"])
         #expect(today.hasRunning)
-        #expect(AgentTodayModel.summary(today.phase) == "1 running · 1 finished")
+        // Routines show only when ⋯ › Show routines is on.
+        #expect(AgentTodayModel.summary(today.phase, showsRoutines: false, now: now, calendar: calendar) == "1 running")
+        #expect(AgentTodayModel.summary(today.phase, showsRoutines: true, now: now, calendar: calendar)
+                == "1 running · 1 done today")
 
         client.fails = true
         await today.refresh(agentID: "nova", now: now, calendar: calendar)
         #expect(today.items.count == 2, "A passing failure keeps the list")
 
+        // Plugin 3.47.0 refuses more than 48 hours back: today and yesterday from then on.
         let older = TodayClient()
-        older.supportsToday = false
+        older.refusesBefore = now.addingTimeInterval(-48 * 3_600)
+        let twoDays = AgentTodayModel()
+        twoDays.use(older, scope: "home-mac")
+        await twoDays.refresh(agentID: "nova", now: now, calendar: calendar)
+        #expect(older.asked == [week, AgentTodayModel.since(days: 2, now: now, calendar: calendar)])
+        #expect(twoDays.items.count == 2)
+
+        let none = TodayClient()
+        none.supportsToday = false
         let other = AgentTodayModel()
-        other.use(older, scope: "home-mac")
+        other.use(none, scope: "home-mac")
         #expect(other.phase == .unsupported)
-        #expect(AgentTodayModel.summary(other.phase) == "Update the plugin to see it")
-        #expect(AgentTodayModel.summary(.loaded([])) == "Nothing in the background yet")
+        #expect(AgentTodayModel.summary(other.phase, showsRoutines: false) == "Update the plugin to see it")
+        #expect(AgentTodayModel.summary(.loaded([]), showsRoutines: false) == "Nothing yet")
+    }
+
+    @Test func activitiesGroupByDayNewestFirstWithRunningWorkToday() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Chicago")!
+        let now = Date(timeIntervalSince1970: 1_794_092_000)
+        let hour: TimeInterval = 3_600
+        let items = [
+            AgentTodayItem(id: "old", kind: .command, title: "a", state: .done, endedAt: now - 30 * hour),
+            AgentTodayItem(id: "run", kind: .subagent, title: "b", state: .running, startedAt: now - 50 * hour),
+            AgentTodayItem(id: "now", kind: .subagent, title: "c", state: .done, endedAt: now - hour),
+            AgentTodayItem(id: "week", kind: .command, title: "d", state: .failed, endedAt: now - 4 * 24 * hour),
+            AgentTodayItem(id: "brief", kind: .scheduled, title: "e", state: .done, endedAt: now - 2 * hour),
+        ]
+        let days = AgentTodayModel.days(AgentTodayModel.visible(items, showsRoutines: false), now: now, calendar: calendar)
+        #expect(days.map(\.title) == ["Today", "Yesterday", "Tuesday"])
+        #expect(days[0].items.map(\.id) == ["run", "now"], "Running work is today's; routines stay hidden")
+        #expect(AgentTodayModel.visible(items, showsRoutines: true).contains { $0.id == "brief" })
     }
 }
 
@@ -232,11 +264,14 @@ private final class TodayClient: AgentBoardClient {
     let supportsFeedback = false
     var supportsToday = true
     var fails = false
+    /// Like plugin 3.47.0: a `since` older than this is refused (422).
+    var refusesBefore: Date?
     private(set) var asked: [Date] = []
 
     func today(agentID: String, since: Date) async throws -> [AgentTodayItem] {
         asked.append(since)
         if fails { throw WorkspaceClientError.transportUnavailable }
+        if let refusesBefore, since < refusesBefore { throw WorkspaceClientError.rejected(code: "invalid_request") }
         return AgentTodayItem.list([
             .object(["id": .string("cron:brief"), "kind": .string("scheduled"), "title": .string("Morning brief"),
                      "state": .string("done"), "endedAt": .number(1_794_038_460)]),

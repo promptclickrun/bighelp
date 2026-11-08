@@ -85,6 +85,60 @@ final class BotScreenUITests: BighelpUITestCase {
         }
     }
 
+    /// The computer's own desktop (demo: the demo screen): Your computer on the Screen tab, Watching,
+    /// Take control, and pinch zoom in both. Screenshots go to BIGHELP_BOT_SCREEN_EVIDENCE.
+    @MainActor
+    func testYourComputerOpensAndZoomsWatchingAndInControl() throws {
+        let folder = ProcessInfo.processInfo.environment["BIGHELP_BOT_SCREEN_EVIDENCE"]
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
+                               "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", "light"]
+        app.launch()
+        // Bots mode: the primary bot's chat, then its profile's Computer tab.
+        let primary = app.buttons["simple-bots.primary"]
+        XCTAssertTrue(primary.waitForExistence(timeout: 20))
+        primary.tap()
+        let identity = app.buttons["chat.identity"]
+        XCTAssertTrue(identity.waitForExistence(timeout: 10))
+        identity.tap()
+        let profile = element("simple-bots.profile", in: app)
+        if !profile.waitForExistence(timeout: 5) { identity.tap() }
+        XCTAssertTrue(profile.waitForExistence(timeout: 5))
+        let computerTab = app.buttons["simple-bots.profile.tab.computer"]
+        XCTAssertTrue(computerTab.waitForExistence(timeout: 10))
+        computerTab.tap()
+        let open = app.buttons["agent.screen.computer.open"]
+        XCTAssertTrue(open.waitForExistence(timeout: 10), "The demo computer's screen sharing answers")
+        if !open.isHittable { app.swipeUp() }
+        save(folder, "computer-1-tab", app)
+        open.tap()
+
+        let title = app.staticTexts["screen.viewer.title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        XCTAssertEqual(title.label, "Watching your computer")
+        let canvas = element("screen.viewer.canvas", in: app)
+        let takeControl = app.buttons["screen.viewer.take-control"]
+        waitUntil(timeout: 10) { takeControl.isEnabled }
+        canvas.pinch(withScale: 2.5, velocity: 2)
+        sleep(1)
+        save(folder, "computer-2-watching-zoomed", app)
+
+        takeControl.tap()
+        XCTAssertTrue(app.buttons["screen.viewer.hand-back"].waitForExistence(timeout: 5))
+        XCTAssertEqual(title.label, "You're in control")
+        XCTAssertEqual(app.buttons["screen.viewer.hand-back"].label, "Stop controlling")
+        canvas.pinch(withScale: 0.4, velocity: -2)
+        sleep(1)
+        save(folder, "computer-3-in-control-zoomed-out", app)
+        canvas.pinch(withScale: 3, velocity: 2)
+        sleep(1)
+        save(folder, "computer-4-in-control-zoomed-in", app)
+        app.buttons["screen.viewer.hand-back"].tap()
+        XCTAssertTrue(takeControl.waitForExistence(timeout: 5))
+        app.buttons["screen.viewer.close"].tap()
+        XCTAssertTrue(open.waitForExistence(timeout: 5))
+    }
+
     /// The demo screen draws a left click as an Ember (#FF8A7A) dot.
     private static func showsClickMark(_ image: UIImage) -> Bool {
         guard let cgImage = image.cgImage else { return false }

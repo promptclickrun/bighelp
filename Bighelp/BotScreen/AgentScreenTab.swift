@@ -56,14 +56,18 @@ final class BotScreenTabModel {
     private(set) var message: String?
     /// Hermes' own words for the last failure, for Nerd Mode.
     private(set) var hermesWords: String?
+    /// The computer's own desktop (plugin `native-computer-screen-v1`); nil when the plugin can't show it.
+    private(set) var computerStatus: ComputerScreenStatus?
 
     init(agentID: String, service: any BotScreenService) {
         self.agentID = agentID
         self.service = service
     }
 
-    /// The tab shows once the host has answered. An older Hermes (no screens) never does.
-    var showsTab: Bool { status != nil }
+    /// The tab shows once the host has answered about the agent's screen or the computer's own.
+    var showsTab: Bool { status != nil || computerStatus != nil }
+
+    var computer: (any ComputerScreenProviding)? { service.computer }
 
     func load() async {
         do {
@@ -72,6 +76,18 @@ final class BotScreenTabModel {
             if !next.running { picture = nil }
         } catch {
             // Unknown method: older Hermes, no tab. Anything else: try again next time.
+        }
+        await loadComputer()
+    }
+
+    func loadComputer() async {
+        guard let computer else { return }
+        do {
+            computerStatus = try await computer.computerStatus()
+        } catch WorkspaceClientError.unavailable(.unsupportedOperation) {
+            computerStatus = nil
+        } catch {
+            // A passing failure keeps what the tab shows.
         }
     }
 
@@ -145,7 +161,8 @@ struct AgentScreenTab: View {
         VStack(alignment: .leading, spacing: BighelpTokens.space16) {
             let activity = BotScreenActivity(chats: chats)
             if activity.count > 0 { activityRow(activity) }
-            if let status = model.status { content(status) }
+            if let status = model.status, status.supported || model.computerStatus == nil { content(status) }
+            if let computer = model.computerStatus { computerSection(computer) }
             if let message = model.message {
                 Text(message)
                     .font(.bighelp(.subheadline))
@@ -341,6 +358,50 @@ struct AgentScreenTab: View {
                 }
             }
         }
+    }
+
+    /// The computer's own desktop: open it, or how to turn its screen sharing on.
+    private func computerSection(_ computer: ComputerScreenStatus) -> some View {
+        VStack(alignment: .leading, spacing: BighelpTokens.space12) {
+            Text("Your computer")
+                .font(.bighelp(.headline))
+                .foregroundStyle(theme.primaryText)
+                .accessibilityAddTraits(.isHeader)
+            if computer.available {
+                sentence("See your computer's own screen, and take control of it from here.", symbol: "desktopcomputer")
+                Button(action: openComputer) {
+                    Label("Open your computer", systemImage: "arrow.up.left.and.arrow.down.right")
+                        .font(.bighelp(.body).weight(.semibold))
+                        .foregroundStyle(theme.actionForeground)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .background(Capsule().fill(theme.action))
+                        .contentShape(Capsule())
+                }
+                .bighelpPlainButtonStyle()
+                .accessibilityIdentifier("agent.screen.computer.open")
+            } else {
+                sentence(computer.setupSteps, symbol: "desktopcomputer")
+                    .accessibilityIdentifier("agent.screen.computer.setup")
+                Button {
+                    Task { await model.loadComputer() }
+                } label: {
+                    Text("Check again")
+                        .font(.bighelp(.subheadline).weight(.semibold))
+                        .foregroundStyle(theme.action)
+                        .frame(minHeight: BighelpTokens.hitTarget)
+                }
+                .bighelpPlainButtonStyle()
+                .accessibilityIdentifier("agent.screen.computer.check")
+            }
+        }
+        .padding(.top, BighelpTokens.space8)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("agent.screen.computer")
+    }
+
+    private func openComputer() {
+        guard let computer = model.computer else { return }
+        viewer = BotScreenViewerModel(agentID: model.agentID, agentName: agentName, size: .standard, service: computer)
     }
 
     private func nerdDetails(_ status: BotScreenStatus) -> some View {

@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// An agent's screen, full screen: watch it live, take control for a login, a code or
-/// a CAPTCHA, then hand it back. Dark whatever the app's look, like a video.
+/// An agent's screen, or the computer's own, full screen: watch it live, take control for a login, a
+/// code or a CAPTCHA, then hand it back. Dark whatever the app's look, like a video.
 struct BotScreenViewer: View {
     let model: BotScreenViewerModel
     /// The agent's chats open in the app, for Stop task.
@@ -11,12 +11,13 @@ struct BotScreenViewer: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @BighelpThemeReader private var theme
+    @State private var password = ""
 
     var body: some View {
         VStack(spacing: 0) {
             header
             ZStack {
-                BotScreenCanvas(model: model, label: "\(model.agentName)'s screen")
+                BotScreenCanvas(model: model, label: model.isComputer ? "Your computer's screen" : "\(model.agentName)'s screen")
                 overlay
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -54,7 +55,8 @@ struct BotScreenViewer: View {
             }
             Spacer(minLength: 0)
             if model.isInControl {
-                roundButton("checkmark", label: "Hand back to \(model.agentName)", identifier: "screen.viewer.hand-back") {
+                roundButton("checkmark", label: model.isComputer ? "Stop controlling" : "Hand back to \(model.agentName)",
+                            identifier: "screen.viewer.hand-back") {
                     Task { await model.handBack() }
                 }
                 .disabled(model.isChangingControl)
@@ -75,14 +77,14 @@ struct BotScreenViewer: View {
         switch model.control.holder {
         case .me: "You're in control"
         case .someoneElse: "Someone else is in control"
-        case .agent, .meBeforeReconnect: "\(model.agentName) is in control"
+        case .agent, .meBeforeReconnect: model.isComputer ? "Watching your computer" : "\(model.agentName) is in control"
         }
     }
 
     private var subtitle: String? {
         switch model.phase {
         case .connecting: model.hasPicture ? "Reconnecting…" : "Connecting…"
-        case .ended: nil
+        case .ended, .needsPassword: nil
         // The desktop's own name ("hermes:default") is a raw ID: Nerd Mode only.
         case .live: nerdModeEnabled ? model.desktopName : nil
         }
@@ -113,6 +115,8 @@ struct BotScreenViewer: View {
             .padding(BighelpTokens.space24)
             .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.black.opacity(0.8)))
             .padding(BighelpTokens.space24)
+        } else if case .needsPassword(let wrong) = model.phase {
+            passwordPrompt(wrong: wrong)
         } else if !model.hasPicture {
             Text("Connecting to the screen…")
                 .font(.bighelp(.subheadline))
@@ -133,6 +137,47 @@ struct BotScreenViewer: View {
             .allowsHitTesting(false)
             .accessibilityIdentifier("screen.viewer.notice")
         }
+    }
+
+    /// The computer's screen sharing password, kept on this phone for next time.
+    private func passwordPrompt(wrong: Bool) -> some View {
+        VStack(spacing: BighelpTokens.space12) {
+            Text(wrong ? "That password didn't work. Try again."
+                       : "Enter the screen sharing password you set on your computer.")
+                .font(.bighelp(.body))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+            SecureField("Password", text: $password)
+                .textContentType(.password)
+                .submitLabel(.go)
+                .onSubmit(connect)
+                .padding(.horizontal, BighelpTokens.space16)
+                .frame(minHeight: BighelpTokens.hitTarget)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(0.12)))
+                .accessibilityIdentifier("screen.viewer.password")
+            Button(action: connect) {
+                Text("Connect")
+                    .font(.bighelp(.body).weight(.semibold))
+                    .foregroundStyle(theme.actionForeground)
+                    .padding(.horizontal, BighelpTokens.space24)
+                    .frame(minHeight: BighelpTokens.hitTarget)
+                    .background(Capsule().fill(theme.action))
+                    .contentShape(Capsule())
+            }
+            .bighelpPlainButtonStyle()
+            .disabled(password.isEmpty)
+            .accessibilityIdentifier("screen.viewer.connect")
+        }
+        .frame(maxWidth: 360)
+        .padding(BighelpTokens.space24)
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.black.opacity(0.85)))
+        .padding(BighelpTokens.space24)
+    }
+
+    private func connect() {
+        guard !password.isEmpty else { return }
+        model.connect(password: password)
+        password = ""
     }
 
     // MARK: Controls

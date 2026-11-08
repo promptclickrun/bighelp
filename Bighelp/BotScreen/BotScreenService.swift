@@ -19,6 +19,8 @@ protocol BotScreenService: AnyObject {
     func openStream(_ observation: BotScreenObservation) async throws -> any RFBTransport
     /// `display.lease` and `display.status` from this host while the caller listens.
     func events() -> AsyncStream<BotScreenEvent>
+    /// The computer's own desktop on the same connection (plugin `native-computer-screen-v1`).
+    var computer: (any ComputerScreenProviding)? { get }
 }
 
 /// Hermes' `display.*` on the connected host. Each call uses the connection as it is
@@ -35,11 +37,13 @@ final class LiveBotScreenService: BotScreenService {
     private let signIn: WorkspaceSignIn
     private let hostID: UUID
     private let connection: @MainActor () -> Connection?
+    let computer: (any ComputerScreenProviding)?
 
     init(signIn: WorkspaceSignIn, hostID: UUID, connection: @escaping @MainActor () -> Connection?) {
         self.signIn = signIn
         self.hostID = hostID
         self.connection = connection
+        computer = LiveComputerScreenService(signIn: signIn, hostID: hostID, connection: connection)
     }
 
     func status(agentID: String) async throws -> BotScreenStatus {

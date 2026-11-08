@@ -149,7 +149,7 @@ final class DemoAgentBoardClient: AgentBoardClient {
                            state: .done, startedAt: ago(61), endedAt: ago(52),
                            detail: "Three picks with a table free on the 7th"),
             AgentTodayItem(id: "message:sleep", kind: .command, title: "./sync_sleep_data.sh", state: .failed,
-                           startedAt: ago(140), endedAt: ago(131), detail: "Exit 1"),
+                           startedAt: ago(60 * 26 + 9), endedAt: ago(60 * 26), detail: "Exit 1"),
             AgentTodayItem(id: "cron:brief", kind: .scheduled, title: "Morning brief", state: .done,
                            startedAt: ago(60 * 3), endedAt: ago(60 * 3 - 1)),
         ]

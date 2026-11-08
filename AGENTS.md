@@ -130,7 +130,7 @@ change in both repos.
 | `Bighelp/Code/` | Code mode (Settings › Modes › Code mode): its home (`CodeHomeView`), the message box's chips (project, new worktree or local, branch), `CodeLauncher`, Changes and Ship |
 | `Bighelp/Connectors/` | Settings › Connections (`AppsHubView`): Hermes' connectors as Native App Connections (the inline connect cards in chat, `connection.request`, `ConnectorCardStore`; `ConnectorAppsModel`) and Composio Apps (`Composio/`, [docs/COMPOSIO_APPS.md](docs/COMPOSIO_APPS.md)) |
 | `Bighelp/HTMLApps/` | Agents' HTML apps: the `html_app` card, the full-screen page and its `window.bighelp` bridge, the plugin's `html-apps` routes, the demo's sample apps |
-| `Bighelp/BotScreen/` | Bot Screen: an agent's Linux screen (Hermes `display.*`) in its profile's Screen tab, a native RFB client (`RFB/`) and the full-screen viewer with take control and hand back |
+| `Bighelp/BotScreen/` | Bot Screen: an agent's Linux screen (Hermes `display.*`) and the computer's own desktop (`ComputerScreen.swift`, the plugin's VNC bridge) in its profile's Computer tab, a native RFB client (`RFB/`, with VNC passwords) and the full-screen viewer with take control and hand back |
 | `Bighelp/Driving/` | An agent showing the person a place (`iphone_navigation`, #662): the place catalog and its playbooks (`DriveCatalog`), the navigator that plays one (`DriveNavigator`), and the overlay (island bar, chat dock) in its own window |
 | `Bighelp/Usage/` | The Usage page (☰ › Usage): plans and limits (`ProviderUsageStore`), Hermes' own analytics per agent and computer (`UsageStore`, `HostUsageLoader`), charts |
 | `Bighelp/Voice/` | Turn-based and live voice; on-device voices (`OnDevice/`, Phonon in `Packages/PhononTTS`) |
@@ -349,8 +349,9 @@ change in both repos.
   an idle bot then shows `BotChatActivity.background`, and a turn wins over it. The open chat reads Hermes' own
   `process.list` over its socket (`ChatBackgroundCommandsWatch`; `process.kill` stops one), and its "In the
   background" chip counts its subagents and running commands for everyone; a command's output shows with Nerd
-  Mode on. A bot's Dashboard lists the day's work from `agents/today` (`native-agents-today-v1`,
-  `AgentTodayModel`), asked from the start of the phone's day.
+  Mode on. A bot's Dashboard lists the last week's work by day as Activities from `agents/today`
+  (`native-agents-today-v1`, `AgentTodayModel`), asked from the start of the phone's day six days ago (plugin
+  3.47.0 takes 48 hours: then today and yesterday). Routines show only with ⋯ › Show routines.
 - **Plugin routes:**
   - Each route is a `WorkspaceOperation` case plus a `Route(path:feature:isMutation:maximumResponseBytes:)` in
     `DirectHermesNativeContext.swift`.

@@ -193,6 +193,10 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case agentsActivity = "agents.activity"
     /// One agent's subagents, background commands and scheduled task runs today (plugin, `native-agents-today-v1`).
     case agentsToday = "agents.today"
+    /// The computer's own desktop through its VNC server: whether it answers, and a ticket for the
+    /// bridge (plugin, `native-computer-screen-v1`).
+    case computerScreenStatus = "computer-screen.status"
+    case computerScreenObserve = "computer-screen.observe"
     /// Hermes' marketplace facts for the catalog plugins and the ones this computer won't install
     /// (plugin, `native-marketplace-v1`).
     case marketplacePlugins = "marketplace.plugins"

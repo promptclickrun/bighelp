@@ -49,11 +49,29 @@ struct ProviderUsageTests {
 
     @Test func activeProviderComesFirstAndHiddenOnesAreLeftOut() throws {
         let providers = try ProviderUsageReport(json: sample).providers
-        #expect(ProviderUsagePresentation.visible(providers, hidden: []).map(\.id) == ["openrouter", "claude", "hermes-xai"])
-        #expect(ProviderUsagePresentation.visible(providers, hidden: ["claude"]).map(\.id) == ["openrouter", "hermes-xai"])
+        #expect(ProviderUsagePresentation.visible(providers, hidden: [], order: []).map(\.id)
+                == ["openrouter", "claude", "hermes-xai"])
+        #expect(ProviderUsagePresentation.visible(providers, hidden: ["claude"], order: []).map(\.id)
+                == ["openrouter", "hermes-xai"])
         let hidden: Set<String> = ["b", "a"]
         #expect(ProviderUsagePreferences.hidden(ProviderUsagePreferences.raw(hidden)) == hidden)
         #expect(ProviderUsagePreferences.hidden("").isEmpty, "Nothing saved shows every provider")
+    }
+
+    /// Usage › Limits › Choose: the person's order wins, by provider, so it holds when the host names a
+    /// provider differently; a provider set up later goes after the ones they placed.
+    @Test func providersFollowTheOrderThePersonChose() throws {
+        let providers = try ProviderUsageReport(json: sample).providers
+        let order = ProviderUsagePreferences.moving(providers, from: [2], to: 0)
+        let raw = ProviderUsagePreferences.raw(order: order)
+        #expect(ProviderUsagePresentation.visible(providers, hidden: [], order: ProviderUsagePreferences.order(raw))
+                    .map(\.id) == ["hermes-xai", "claude", "openrouter"])
+        // Only one placed: it leads, the others keep their usual order after it.
+        #expect(ProviderUsagePresentation.visible(providers, hidden: [], order: [order[0]]).map(\.id)
+                == ["hermes-xai", "openrouter", "claude"])
+        #expect(ProviderUsagePresentation.visible(providers, hidden: ["claude"], order: order).map(\.id)
+                == ["hermes-xai", "openrouter"])
+        #expect(ProviderUsagePreferences.order("xai\nxai\nclaude") == ["xai", "claude"], "Each provider once")
     }
 
     /// Hidden providers came back after updates: the host names one provider differently

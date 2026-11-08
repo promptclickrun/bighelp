@@ -124,7 +124,7 @@ enum UsageWidgetPublisher {
 
     /// The plans Usage shows, in its order: the ones Hermes uses first, hidden ones left out.
     static func plans(_ report: ProviderUsageReport, hidden: Set<String>) -> [BighelpUsageSnapshot.Plan] {
-        ProviderUsagePresentation.visible(report.providers, hidden: hidden)
+        ProviderUsagePresentation.visible(report.providers, hidden: hidden, order: ProviderUsagePreferences.savedOrder)
             .prefix(BighelpUsageSnapshot.maximumPlans)
             .map { provider in
                 let brand = AIProviderBrandRegistry.resolve(id: ProviderUsagePresentation.logoProviderID(provider.id),

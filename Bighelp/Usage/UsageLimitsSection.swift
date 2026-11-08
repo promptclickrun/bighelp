@@ -14,6 +14,7 @@ struct UsageLimitsSection: View {
     let onPickComputers: (String) -> Void
 
     @AppStorage(ProviderUsagePreferences.hiddenKey) private var hiddenRaw = ""
+    @AppStorage(ProviderUsagePreferences.orderKey) private var orderRaw = ""
     @State private var showsAll = false
     @BighelpThemeReader private var theme
 
@@ -148,7 +149,8 @@ struct UsageLimitsSection: View {
             if store.state == .needsPluginUpdate {
                 UsageMessageCard(title: "Update the bighelp plugin\(hostName.map { " on \($0)" } ?? "") to see plans and limits.")
             } else if let report = store.report {
-                let providers = ProviderUsagePresentation.visible(report.providers, hidden: hidden)
+                let providers = ProviderUsagePresentation.visible(report.providers, hidden: hidden,
+                                                               order: ProviderUsagePreferences.order(orderRaw))
                 if report.providers.isEmpty {
                     UsageMessageCard(title: "No AI plans found\(hostName.map { " on \($0)" } ?? "").",
                                      detail: "bighelp shows coding tools on the computer and providers set up in Hermes.")
@@ -186,7 +188,8 @@ struct UsageLimitsSection: View {
     private func otherHost(_ host: HostUsage) -> some View {
         switch host.limits {
         case .loaded(let report)?:
-            let providers = ProviderUsagePresentation.visible(report.providers, hidden: hidden)
+            let providers = ProviderUsagePresentation.visible(report.providers, hidden: hidden,
+                                                               order: ProviderUsagePreferences.order(orderRaw))
             if report.providers.isEmpty {
                 UsageMessageCard(title: "No AI plans found on \(host.name).")
             } else if providers.isEmpty {

@@ -7,11 +7,15 @@ extension BotModeRoomStore {
     func configureNativeClient(_ client: (any HermesBotModeClient)?, preservingCatalog: Bool = false) {
         let retainedRooms = catalogRooms
         let retainedState = catalogState
+        let madeGroupChats = canCreateNativeRoom || groupChatsBeforeReconnect
         nativeObservations.values.forEach { $0.cancel() }
         nativeObservations.removeAll()
         nativeObservationTokens.removeAll()
         nativeClient = client
         invalidateNativeExecutionBoundary()
+        // Each connection asks Hermes again; until it answers, a reconnect to the same computer keeps
+        // New Group Chat. Another computer starts without it.
+        groupChatsBeforeReconnect = preservingCatalog && client != nil && madeGroupChats
         if preservingCatalog {
             catalogRooms = retainedRooms
             catalogState = retainedState == .loaded ? .loaded : .idle
@@ -70,6 +74,13 @@ extension BotModeRoomStore {
 
     var canCreateNativeRoom: Bool {
         nativeExecutionAvailable && nativeClient is any HermesBotModeCatalogClient
+    }
+
+    /// New Group Chat shows: Hermes said this connection can make group chats, or, until it answers,
+    /// the computer could before this reconnect. The create sheet still waits for `canCreateNativeRoom`.
+    var offersNewGroupChat: Bool {
+        guard nativeClient is any HermesBotModeCatalogClient else { return false }
+        return nativeCapabilities != nil ? nativeExecutionAvailable : groupChatsBeforeReconnect
     }
 
     func nativeRoomIsWorking(roomID: String) -> Bool {

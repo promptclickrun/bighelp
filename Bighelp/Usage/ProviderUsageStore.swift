@@ -253,6 +253,37 @@ enum ProviderUsagePreferences {
     static func raw(_ hidden: Set<String>) -> String {
         hidden.sorted().joined(separator: "\n")
     }
+
+    /// The order the person put the providers in, by the same per-provider key. Providers it doesn't
+    /// name (set up later) follow, in their usual order.
+    static let orderKey = "bighelp.provider-usage.order"
+
+    static func order(_ raw: String) -> [String] {
+        var seen = Set<String>()
+        return raw.split(separator: "\n").map { key(for: String($0)) }.filter { seen.insert($0).inserted }
+    }
+
+    static func raw(order: [String]) -> String { order.joined(separator: "\n") }
+
+    static var savedOrder: [String] { order(UserDefaults.standard.string(forKey: orderKey) ?? "") }
+
+    static func sorted(_ providers: [ProviderUsage], order: [String]) -> [ProviderUsage] {
+        guard !order.isEmpty else { return providers }
+        let rank = Dictionary(order.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+        // A stable sort: the named ones by their place, the rest after them as they came.
+        return providers.enumerated().sorted { lhs, rhs in
+            let left = rank[key(for: lhs.element.id)] ?? order.count + lhs.offset
+            let right = rank[key(for: rhs.element.id)] ?? order.count + rhs.offset
+            return left != right ? left < right : lhs.offset < rhs.offset
+        }.map(\.element)
+    }
+
+    /// The order after a drag in Choose: every provider shown there, by key.
+    static func moving(_ providers: [ProviderUsage], from source: IndexSet, to destination: Int) -> [String] {
+        var keys = providers.map { key(for: $0.id) }
+        keys.move(fromOffsets: source, toOffset: destination)
+        return keys
+    }
 }
 
 extension EnvironmentValues {

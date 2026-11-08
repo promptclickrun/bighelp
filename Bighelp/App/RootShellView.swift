@@ -1185,9 +1185,9 @@ struct RootShellView: View {
 
     /// Group chats use Hermes' hosted rooms, the same path as Agents › New group chat.
     var newGroupChatAction: (() -> Void)? {
-        guard let owner = currentWorkspaceOwner, botModeRooms.canCreateNativeRoom,
-              currentWorkspaceCapabilities.supports(.groupsCreate, owner: owner, profileID: nil)
-        else { return nil }
+        // The room store's own answer, not the published capability: that comes only after the whole
+        // connection's refresh, so New Group Chat took 10 seconds or more after every return to the app.
+        guard let owner = currentWorkspaceOwner, botModeRooms.offersNewGroupChat else { return nil }
         return {
             handleAgentWorkspaceAction(AgentWorkspaceActionRequest(owner: owner, action: .createGroup(seedProfileID: nil)))
         }

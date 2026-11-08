@@ -484,7 +484,7 @@ extension RootShellView {
                 }
             }
         case .createGroup(let seed):
-            guard botModeRooms.canCreateNativeRoom else {
+            guard botModeRooms.offersNewGroupChat else {
                 actionErrorMessage = WorkspaceUnavailableReason.driverUnavailable.message
                 return
             }

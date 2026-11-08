@@ -77,6 +77,9 @@ final class BotModeRoomStore {
     /// client. Persisted rooms remain loadable when this is false.
     let executionEnabled: Bool
     var nativeCapabilities: HermesBotModeCapabilities?
+    /// The computer made group chats before this reconnect to it; `offersNewGroupChat` keeps New Group
+    /// Chat until Hermes answers again.
+    var groupChatsBeforeReconnect = false
     var catalogState: BotModeRoomCatalogState = .idle
     var catalogRooms: [HermesBotModeRoomSummary] = []
     var isCatalogStale = false

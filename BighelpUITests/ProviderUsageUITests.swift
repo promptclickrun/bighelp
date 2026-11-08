@@ -89,6 +89,32 @@ final class ProviderUsageUITests: BighelpUITestCase {
         XCTAssertEqual(app.state, .runningForeground)
     }
 
+    /// Choose orders the plans (each row has a drag handle): the plan saved first is the one Limits shows
+    /// first, and Choose lists it first. XCUITest doesn't drive the list's drag, so the order is saved
+    /// the way a drag saves it.
+    @MainActor
+    func testLimitsFollowTheChosenOrder() throws {
+        let app = launch(["-bighelp.hosts.all-hosts", "NO", "-bighelp.provider-usage.order", "copilot"])
+        openMenu(app)
+        let usage = app.buttons["menu.usage"]
+        XCTAssertTrue(usage.waitForExistence(timeout: 8))
+        usage.tap()
+        let page = expectPage(app)
+        XCTAssertTrue(app.descendants(matching: .any)["provider-usage.copilot"].waitForExistence(timeout: 8),
+                      "Limits shows the plan put first")
+        XCTAssertFalse(app.descendants(matching: .any)["provider-usage.claude"].exists, "The rest wait under Show more")
+        save("usage-limits-ordered-\(appearance)", app)
+
+        let choose = app.buttons["usage.limits.choose"]
+        for _ in 0..<6 where !clearOfHeader(choose, in: app) { page.swipeDown() }
+        choose.tap()
+        let copilot = app.descendants(matching: .any)["usage.limits.row.copilot"]
+        let claude = app.descendants(matching: .any)["usage.limits.row.claude"]
+        XCTAssertTrue(copilot.waitForExistence(timeout: 5))
+        XCTAssertLessThan(copilot.frame.minY, claude.frame.minY, "Choose lists them in the same order")
+        save("usage-choose-ordered-\(appearance)", app)
+    }
+
     /// Rename… in a plan card's menu: replaces the name, or clears it with "".
     @MainActor
     private func rename(_ providerID: String, to name: String, in app: XCUIApplication, page: XCUIElement) {

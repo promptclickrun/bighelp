@@ -1184,6 +1184,48 @@ import UserNotifications
         #expect(fixture.hostAPI.workflowPuts.count == 1, "Sent only when it changes")
     }
 
+    /// Scheduled tasks, Deliveries and Group chats go with Peer chats, only to computers whose plugin has
+    /// them, and again only when one changes.
+    @Test func alertKindsReachComputersThatHaveThem() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let defaults = UserDefaults.standard
+        let keys = [BighelpPeerChatAlerts.key] + BighelpAlertKinds.Kind.allCases.map(\.key)
+        let previous = keys.map { defaults.object(forKey: $0) }
+        defer { for (key, value) in zip(keys, previous) { defaults.set(value, forKey: key) } }
+        for key in keys { defaults.removeObject(forKey: key) }
+        fixture.hostAPI.peerChatPreference = true
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+
+        // An older plugin: the kinds don't go.
+        await fixture.service.applyAlertPreferences()
+        #expect(fixture.hostAPI.kindPuts.isEmpty)
+
+        fixture.hostAPI.kindsPreference = true
+        defaults.set(false, forKey: BighelpAlertKinds.Kind.deliveries.key)
+        await fixture.service.applyAlertPreferences()
+        #expect(fixture.hostAPI.kindPuts == [["scheduledTasks": true, "deliveries": false, "groupChats": true]])
+        #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.alertKindsSent?["deliveries"] == false)
+        await fixture.service.applyAlertPreferences()
+        #expect(fixture.hostAPI.kindPuts.count == 1, "Sent only when it changes")
+        defaults.set(false, forKey: BighelpAlertKinds.Kind.groupChats.key)
+        await fixture.service.applyAlertPreferences()
+        #expect(fixture.hostAPI.kindPuts.last == ["scheduledTasks": true, "deliveries": false, "groupChats": false])
+    }
+
+    /// Scheduled tasks and Deliveries share one push topic: it stays on while either switch is, and with
+    /// it off both read as off, so turning one on turns on only that one.
+    @Test func scheduledTasksAndDeliveriesShareTheirTopic() {
+        let off = BighelpAlertKinds.switching(.deliveries, on: false, topicOn: true, scheduledTasks: true, deliveries: true)
+        #expect(off == (scheduledTasks: true, deliveries: false, topicOn: true))
+        let bothOff = BighelpAlertKinds.switching(.scheduledTasks, on: false, topicOn: true,
+                                                  scheduledTasks: true, deliveries: false)
+        #expect(bothOff == (scheduledTasks: false, deliveries: false, topicOn: false))
+        // The topic was off (set elsewhere) while both switches still say on: only the one turned on goes on.
+        let one = BighelpAlertKinds.switching(.deliveries, on: true, topicOn: false, scheduledTasks: true, deliveries: true)
+        #expect(one == (scheduledTasks: false, deliveries: true, topicOn: true))
+    }
+
     /// A scheduled task's alert names the job's chat or the job only for phones that open those
     /// links (#181). The phone says so once, and only to computers whose plugin has it.
     @Test func scheduledLinksReachComputersThatHaveThem() async throws {
@@ -1547,6 +1589,8 @@ import UserNotifications
         var peerChatPreference = false
         var workflowPreference = false
         var workflowPuts: [[String: Bool]] = []
+        var kindsPreference = false
+        var kindPuts: [[String: Bool]] = []
         var peerChatPuts: [Bool] = []
         var scheduledLinksPreference = false
         var scheduledLinkPuts: [Bool] = []
@@ -1590,7 +1634,8 @@ import UserNotifications
                 "preferences":peerChatPreference ? .object(["peerChats":.boolean(true),
                                                             "workflows":.boolean(workflowPreference),
                                                             "scheduledLinks":.boolean(scheduledLinksPreference),
-                                                            "channels":.boolean(channelsPreference)]) : .null,
+                                                            "channels":.boolean(channelsPreference),
+                                                            "kinds":.boolean(kindsPreference)]) : .null,
                 "producerCapabilities":.object(["sessionCompletion":.boolean(producerLoaded),"sessionFailure":.boolean(producerLoaded),"richLiveActivity":.boolean(producerLoaded),"nativeApproval":.boolean(supportedEvents.contains("approval.required")),"nativeClarification":.boolean(false)])]) }
             if suffix.hasSuffix("/preferences"), method == "PUT", let wanted = body?["peerChats"]?.boolean {
                 peerChatPuts.append(wanted)
@@ -1608,6 +1653,12 @@ import UserNotifications
                     }
                     scheduledLinkPuts.append(wanted)
                     answer["scheduledLinks"] = .boolean(wanted)
+                }
+                // Like plugin 3.49.0: the alert kinds are kept and sent back; an older plugin refuses them.
+                if let kinds = body?["kinds"]?.object {
+                    guard kindsPreference else { throw WorkspaceClientError.rejected(code: "invalid_request") }
+                    kindPuts.append(kinds.compactMapValues(\.boolean))
+                    answer["kinds"] = .object(kinds)
                 }
                 // Like plugin 3.27.0: channel rules are kept and sent back; an older plugin refuses them.
                 if let channels = body?["channels"] {

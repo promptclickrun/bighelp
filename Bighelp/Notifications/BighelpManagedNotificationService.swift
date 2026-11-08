@@ -503,6 +503,7 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
                                            workflows: loaded.supportsWorkflowAlertPreferences,
                                            scheduledLinks: loaded.supportsScheduledAlertLinks,
                                            channels: loaded.supportsChannelPreferences,
+                                           kinds: loaded.supportsAlertKinds,
                                            isCurrent: { (try? self.requireCurrent(host, credentials: credentials)) != nil })
             try requireCurrent(host, credentials: credentials)
         }
@@ -626,30 +627,36 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
     /// kind of workflow alert unless it turned that off (hosts with `preferences.workflows`). Hosts with
     /// `preferences.scheduledLinks` hear that this phone opens a scheduled task's alert in its job's
     /// chat or on the job (`BighelpScheduledAlertLinks`). Hosts with `preferences.channels` get this
-    /// phone's channel rules (`BighelpChannelAlerts`).
+    /// phone's channel rules (`BighelpChannelAlerts`), and hosts with `preferences.kinds` its Scheduled tasks,
+    /// Deliveries and Group chats switches (`BighelpAlertKinds`).
     /// Sent only when the host's confirmed choices differ from this phone's.
     private func syncAlertPreferences(host: BighelpConfiguredHost, profile: String, grant: BighelpManagedGrant,
                                       client: any DirectHostNotificationServing, workflows: Bool, scheduledLinks: Bool,
-                                      channels: Bool, isCurrent: @escaping @MainActor () -> Bool) async throws {
+                                      channels: Bool, kinds: Bool,
+                                      isCurrent: @escaping @MainActor () -> Bool) async throws {
         let wanted = BighelpPeerChatAlerts.isOn
         let wantedWorkflows = workflows ? BighelpWorkflowAlerts.current : nil
         let wantedChannels = channels ? BighelpChannelAlerts.current() : nil
+        let wantedKinds = kinds ? BighelpAlertKinds.current : nil
         let record = ledger.record(host: host, profile: profile)
         // Asked once per grant: a new grant on the host starts without it.
         let sendsLinks = scheduledLinks && record?.scheduledLinksGrantID != grant.grantId
         guard record?.peerChatsAlert != wanted || sendsLinks
                 || (wantedWorkflows != nil && record?.workflowAlertsSent != wantedWorkflows)
-                || (wantedChannels != nil && record?.channelAlertsSent != wantedChannels) else { return }
+                || (wantedChannels != nil && record?.channelAlertsSent != wantedChannels)
+                || (wantedKinds != nil && record?.alertKindsSent != wantedKinds) else { return }
         var body: [String: BighelpJSONValue] = ["version": .integer(1), "peerChats": .boolean(wanted)]
         if let wantedWorkflows { body["workflows"] = .object(wantedWorkflows.mapValues(BighelpJSONValue.boolean)) }
         if scheduledLinks { body["scheduledLinks"] = .boolean(true) }
         if let wantedChannels { body["channels"] = wantedChannels.body }
+        if let wantedKinds { body["kinds"] = .object(wantedKinds.mapValues(BighelpJSONValue.boolean)) }
         let value = try await client.request("/enrollments/\(grant.grantId)/preferences", method: "PUT", body: body,
                                              isCurrent: isCurrent)
         let confirmed = value.object?["workflows"]?.object?.compactMapValues(\.boolean)
         guard isCurrent(), value.object?["peerChats"]?.boolean == wanted,
               wantedWorkflows == nil || confirmed == wantedWorkflows,
               wantedChannels == nil || BighelpChannelAlerts.Rules(value.object?["channels"]) == wantedChannels,
+              wantedKinds == nil || value.object?["kinds"]?.object?.compactMapValues(\.boolean) == wantedKinds,
               !scheduledLinks || value.object?["scheduledLinks"]?.boolean == true,
               var current = ledger.record(host: host, profile: profile), current.grant == grant else {
             throw DirectHermesError.invalidResponse
@@ -657,11 +664,13 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         current.peerChatsAlert = wanted
         if let wantedWorkflows { current.workflowAlertsSent = wantedWorkflows }
         if let wantedChannels { current.channelAlertsSent = wantedChannels }
+        if let wantedKinds { current.alertKindsSent = wantedKinds }
         if scheduledLinks { current.scheduledLinksGrantID = grant.grantId }
         try ledger.save(current)
     }
 
-    /// Settings › Notifications › Peer chats or Workflows changed: tell every computer with notifications on.
+    /// Settings › Notifications › Peer chats, an alert kind or Workflows changed: tell every computer with
+    /// notifications on.
     /// A computer that can't be reached now gets it the next time a chat opens there.
     func applyAlertPreferences() async {
         for record in ledger.enrollments where record.enabled && !record.revokePending {
@@ -678,7 +687,8 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
             try? await syncAlertPreferences(host: host, profile: record.profile, grant: grant, client: client,
                                             workflows: loaded.supportsWorkflowAlertPreferences,
                                             scheduledLinks: loaded.supportsScheduledAlertLinks,
-                                            channels: loaded.supportsChannelPreferences, isCurrent: isCurrent)
+                                            channels: loaded.supportsChannelPreferences,
+                                            kinds: loaded.supportsAlertKinds, isCurrent: isCurrent)
         }
     }
 

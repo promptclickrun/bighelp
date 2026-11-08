@@ -1,22 +1,29 @@
 import SwiftUI
 
 /// Usage › Limits › Choose: which of the computer's plans and balances Usage
-/// shows, and the names you give them. All of them until you hide one; saved on this device.
+/// shows, in what order, and the names you give them. All of them until you hide one; saved on this device.
 struct ProviderUsageSettingsView: View {
     let store: ProviderUsageStore?
     /// The computer in use: names given here are for its plans.
     var gatewayID: String? = nil
     @AppStorage(ProviderUsagePreferences.hiddenKey) private var hiddenRaw = ""
+    @AppStorage(ProviderUsagePreferences.orderKey) private var orderRaw = ""
     @AppStorage(BighelpPlanNames.key, store: BighelpPlanNames.defaults) private var namesRaw = ""
     @State private var namesWhenOpened: String?
     @BighelpThemeReader private var theme
 
     private var hidden: Set<String> { ProviderUsagePreferences.hidden(hiddenRaw) }
 
+    /// Every plan, hidden ones too, in the order Usage shows them.
+    private var providers: [ProviderUsage] {
+        ProviderUsagePresentation.visible(store?.report?.providers ?? [], hidden: [],
+                                          order: ProviderUsagePreferences.order(orderRaw))
+    }
+
     var body: some View {
-        Form {
+        List {
             Section {
-                if let providers = store?.report?.providers, !providers.isEmpty {
+                if !providers.isEmpty {
                     ForEach(providers) { provider in
                         HStack(spacing: BighelpTokens.space12) {
                             AIProviderMarkView(providerID: ProviderUsagePresentation.logoProviderID(provider.id),
@@ -39,14 +46,19 @@ struct ProviderUsageSettingsView: View {
                                 .labelsHidden()
                                 .accessibilityIdentifier("usage.limits.choice.\(provider.id)")
                         }
+                        // Keeps the name field's and switch's own identifiers reachable.
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("usage.limits.row.\(provider.id)")
                     }
+                    .onMove { orderRaw = ProviderUsagePreferences.raw(order: ProviderUsagePreferences.moving(
+                        providers, from: $0, to: $1)) }
                 } else {
                     Text(emptyText)
                         .foregroundStyle(theme.secondaryText)
                         .accessibilityIdentifier("usage.limits.choice.empty")
                 }
             } footer: {
-                Text("The plans and providers set up on your computer. New ones show until you turn them off. A name you give a plan shows in Usage and its widgets.")
+                Text("The plans and providers set up on your computer. Drag to change the order Usage shows them in. New ones show until you turn them off. A name you give a plan shows in Usage and its widgets.")
             }
             .listRowBackground(theme.surface)
 
@@ -58,6 +70,7 @@ struct ProviderUsageSettingsView: View {
                 .listRowBackground(theme.surface)
             }
         }
+        .environment(\.editMode, .constant(.active))
         .scrollContentBackground(.hidden)
         .background(theme.canvas.ignoresSafeArea())
         .navigationTitle("Show in Usage")

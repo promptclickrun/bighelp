@@ -3,6 +3,12 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.75
+
+### Fixed
+
+- **Group chats:** a message that you send in a group chat shows at once. Before, it showed 3 to 5 seconds later.
+
 ## 2.6.74
 
 ### New

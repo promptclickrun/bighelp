@@ -1216,7 +1216,7 @@ struct SimpleBotsRowLabel: View {
                 if let busy, let line = busy.line {
                     Text(line)
                         .font(.bighelp(.body, weight: .medium))
-                        .foregroundStyle(busy == .waiting ? BighelpBrand.ember : theme.action)
+                        .foregroundStyle(lineColor(busy))
                         .lineLimit(1)
                         // The row says it as its value.
                         .accessibilityHidden(true)
@@ -1233,6 +1233,15 @@ struct SimpleBotsRowLabel: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
+    }
+
+    /// Needing you in ember, a turn in the action color, work in the background in plain ink.
+    private func lineColor(_ activity: BotChatActivity) -> Color {
+        switch activity {
+        case .waiting: BighelpBrand.ember
+        case .background: theme.primaryText
+        case .idle, .working: theme.action
+        }
     }
 
     private var titleText: some View {

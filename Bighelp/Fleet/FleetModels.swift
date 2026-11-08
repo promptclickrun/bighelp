@@ -82,18 +82,22 @@ struct FleetBotChat: Codable, Equatable, Sendable {
 
     var state: State
     var tool: String? = nil
+    /// Work it ran in the background while idle (`native-agents-background-v1`); nil in older copies.
+    var backgroundCount: Int? = nil
+    var backgroundTitle: String? = nil
 
     init(_ activity: BotChatActivity) {
         switch activity {
         case .idle: state = .idle
         case .working(let tool): state = .working; self.tool = tool
         case .waiting: state = .waiting
+        case .background(let work): state = .idle; backgroundCount = work.count; backgroundTitle = work.title
         }
     }
 
     var activity: BotChatActivity {
         switch state {
-        case .idle: .idle
+        case .idle: backgroundCount.flatMap { $0 > 0 ? .background(BotBackgroundWork(count: $0, title: backgroundTitle)) : nil } ?? .idle
         case .working: .working(tool: tool)
         case .waiting: .waiting
         }

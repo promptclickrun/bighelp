@@ -1,8 +1,9 @@
 import XCTest
 
-/// #504: Bots mode shows which bots are working on a turn and which need you. On the demo
-/// data with `-test-bot-activity`, Mina Shah browses the web in her Bot Chat and Jordan Lee needs
-/// you; with Multi-gateway, Sage Ortiz works on the sample Studio Mac. Light and dark.
+/// #504: Bots mode shows which bots are working on a turn and which need you, and (#890) which run
+/// work in the background. On the demo data with `-test-bot-activity`, Mina Shah browses the web in
+/// her Bot Chat, Jordan Lee needs you and Avery Park has work in the background; with Multi-gateway,
+/// Sage Ortiz works on the sample Studio Mac. Light and dark.
 /// TEST_RUNNER_BIGHELP_BOT_ACTIVITY_EVIDENCE=<folder> saves the screenshots there, and
 /// TEST_RUNNER_BIGHELP_BOT_ACTIVITY_REDUCED=1 says the simulator has Reduce Motion on (a test can't
 /// switch it), which names them "-reduced".
@@ -16,8 +17,9 @@ final class SimpleBotsActivityUITests: BighelpUITestCase {
             let jordan = app.buttons["simple-bots.bot.home"]
             XCTAssertTrue(wait(for: mina, toSay: "Browsing the web"), mina.label)
             XCTAssertTrue(wait(for: jordan, toSay: "Needs you"), jordan.label)
+            // Avery has no turn running but has work in the background: its tile says so, calmly.
             let primary = app.buttons["simple-bots.primary"]
-            XCTAssertEqual(primary.value as? String ?? "", "", "Avery is idle: nothing shows")
+            XCTAssertTrue(wait(for: primary, toSay: "2 things running in the background"), primary.value as? String ?? "")
             // Said once: the row's value, not again in its label.
             XCTAssertFalse(mina.label.contains("Browsing the web"), mina.label)
             save("home-\(appearance)", app)

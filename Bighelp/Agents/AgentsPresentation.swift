@@ -287,7 +287,7 @@ enum AgentLiveStatePresentation {
         botChats: [String: BotChatActivity] = [:]
     ) -> [String: AgentLiveState] {
         var states: [String: AgentLiveState] = [:]
-        for (profile, activity) in botChats where activity.isBusy { states[profile] = activity.liveState }
+        for (profile, activity) in botChats where activity.isOnTurn { states[profile] = activity.liveState }
         for room in rooms where !room.isDisbanded {
             for approval in pendingApprovals(room.roomID) {
                 guard let profile = room.members.first(where: { $0.memberID == approval.memberID })?.profile

@@ -406,8 +406,7 @@ extension RootShellView {
 
     /// The selected host, when it can make group chats.
     private var groupCreationReadyOwner: WorkspaceOwner? {
-        guard let owner = currentWorkspaceOwner, botModeRooms.canCreateNativeRoom,
-              currentWorkspaceCapabilities.supports(.groupsCreate, owner: owner, profileID: nil) else { return nil }
+        guard let owner = currentWorkspaceOwner, botModeRooms.offersNewGroupChat else { return nil }
         return owner
     }
 

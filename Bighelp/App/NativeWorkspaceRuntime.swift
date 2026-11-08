@@ -790,6 +790,9 @@ final class NativeWorkspaceRuntime {
                 try connections.installCapabilities(WorkspaceCapabilities(owner: owner, values: availability))
             }
             try publishCapabilities()
+            // Hermes' group chat answer comes alongside the rest, not after the sessions, scheduled tasks
+            // and projects below: New Group Chat shows as soon as Hermes answers.
+            async let roomCatalog: Void = rooms.refreshNativeRoomCatalog()
             // Reattach the visible conversation before optional workspace reads.
             // Failures remain isolated; a deleted chat cannot disable features.
             let retained = bridge.retainedSessionIDs
@@ -899,7 +902,7 @@ final class NativeWorkspaceRuntime {
                     optionalFeatureMessage = "Project actions could not be verified. Refresh this host before changing projects."
                 }
             }
-            await rooms.refreshNativeRoomCatalog()
+            await roomCatalog
             try require(owner, request: request)
             if rooms.nativeExecutionAvailable {
                 supported.formUnion([.groupsRead, .groupsCreate, .groupsSend, .groupsRename, .groupsStop,

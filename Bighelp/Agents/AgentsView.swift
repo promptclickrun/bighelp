@@ -594,7 +594,7 @@ struct AgentsView: View {
     }
 
     private var canCreateGroup: Bool {
-        onAction != nil && supports(.groupsCreate) && botModeRooms?.canCreateNativeRoom == true
+        onAction != nil && botModeRooms?.offersNewGroupChat == true
     }
 
     /// Direct native runtime owns the initial agent and room refresh so a view

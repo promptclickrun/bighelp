@@ -611,7 +611,8 @@ change in both repos.
   `Menu(primaryAction:)` or its own gesture (`AgentPinnedGrid`).
 - **Owners change on every reconnect:** `WorkspaceOwner` includes the connection generation, so returning to the app
   makes a new one. Keep per-computer state (like "this host has Kanban") by `cacheScopeID`, and don't turn a failed
-  check during a reconnect into "unavailable" (`KanbanAvailability`). The owner is nil while the connection is
+  check during a reconnect into "unavailable" (`KanbanAvailability`; New Group Chat:
+  `BotModeRoomStore.offersNewGroupChat`). The owner is nil while the connection is
   closed: that gap isn't another computer, so a page's data stays (`use(host:)` ignores nil).
 - **Each gateway has its own objects:** `AppState`, the stores and the chats belong to one gateway
   (`NativeWorkspaceRuntime`), and a gateway switch keeps `RootShellView` and hands it the new ones. Anything handed
@@ -841,7 +842,9 @@ sections can crash only on devices ("Thread stack size exceeded").
   as meters or as rings. Names people give plans (Usage › a plan's ••• › Rename…, or Choose) are per
   gateway, since one provider can be another account on another computer: `BighelpPlanNames` keeps them in
   the app group, keyed by `ProviderUsagePreferences.key(for:)`, and the widget puts them on itself
-  (`BighelpUsageSnapshot.named`), so a rename only reloads the widgets.
+  (`BighelpUsageSnapshot.named`), so a rename only reloads the widgets. Choose also orders the plans: a drag
+  saves `ProviderUsagePreferences.orderKey` on the device, by the same key, and Limits, the export and the
+  widgets' default list follow it; a provider set up later goes after the placed ones.
 - A Shortcut on a gateway that isn't in use switches bighelp to it, and the app starts connecting at once.
   `reconnect()` returns at once while another connection is under way, so the Shortcut waits for that one
   (`BighelpShortcutConnectionWait`). `ShortcutGatewaySwitchHostUITests` checks it on two real hosts.
@@ -893,6 +896,11 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   (`BighelpScheduledAlertLinks`). The plugin names them `scheduled.chat.<session>` and `scheduled.job.<job>`, only
   for phones that send `scheduledLinks` in their preferences; never a chat's own reference, because the run's text
   isn't in that chat. Scheduled alerts never replace each other.
+- Settings › Notifications splits the push topic "Scheduled tasks and deliveries" into two switches: Scheduled
+  tasks and Deliveries (what an agent sends with the plugin's `bighelp_send_notification` tool, outside a reply).
+  With Group chats they are switches on each computer (`BighelpAlertKinds`, plugin `preferences.kinds`); the
+  shared topic stays on while either is on. "Agents messaging each other" covers only turns another agent
+  started: the person's own messages in a Bot Chat alert like any reply.
 - Opening a chat, or returning to the app on one, clears its delivered alerts (`BighelpVisibleChats`).
 - A chat on screen is quiet for every kind of alert, questions and approvals too: they pop up in the chat itself
   (`BighelpForegroundAlert`). `BighelpVisibleChats` counts chat screens by token (a chat view made again can appear

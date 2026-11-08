@@ -93,6 +93,7 @@ struct BighelpManagedCapabilities: Decodable, Sendable {
     let preferences: Preferences?
     struct Preferences: Decodable, Sendable {
         let peerChats: Bool?; let workflows: Bool?; let scheduledLinks: Bool?; let channels: Bool?
+        let kinds: Bool?
     }
     var supportsPeerChatPreference: Bool { preferences?.peerChats == true }
     /// Workflow alert switches (plugin 3.7.0+).
@@ -101,6 +102,8 @@ struct BighelpManagedCapabilities: Decodable, Sendable {
     var supportsScheduledAlertLinks: Bool { preferences?.scheduledLinks == true }
     /// Settings › Notifications › Channels (plugin 3.27.0+, `BighelpChannelAlerts`).
     var supportsChannelPreferences: Bool { preferences?.channels == true }
+    /// Scheduled tasks, Deliveries and Group chats as switches of their own (`BighelpAlertKinds`).
+    var supportsAlertKinds: Bool { preferences?.kinds == true }
     var supportsCompletionEnrollment: Bool {
         guard let supportedEventTypes else { return false }
         return Set(supportedEventTypes).isSuperset(of: ManagedNotificationValidation.eventTypes)

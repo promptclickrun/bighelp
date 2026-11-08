@@ -45,6 +45,39 @@ enum BighelpPeerChatAlerts {
     static var isOn: Bool { UserDefaults.standard.bool(forKey: key) }
 }
 
+/// Settings › Notifications › Notify me about: Scheduled tasks, Deliveries (what an agent sends with its
+/// notify tool) and Group chats, each its own switch on the computer (plugin `preferences.kinds`). All
+/// start on. Scheduled tasks and Deliveries share the push service's "Scheduled tasks and deliveries" topic,
+/// which stays on while either is.
+enum BighelpAlertKinds {
+    enum Kind: String, CaseIterable, Identifiable {
+        case scheduledTasks, deliveries, groupChats
+        var id: String { rawValue }
+        var key: String { "bighelp.notifications.kinds.\(rawValue)" }
+    }
+
+    static func isOn(_ kind: Kind) -> Bool { UserDefaults.standard.object(forKey: kind.key) as? Bool ?? true }
+
+    /// What the computer stores for this device.
+    static var current: [String: Bool] {
+        Dictionary(uniqueKeysWithValues: Kind.allCases.map { ($0.rawValue, isOn($0)) })
+    }
+
+    /// Scheduled tasks or Deliveries switched: the two switches after it, and whether their shared push
+    /// topic is on. With the topic off both read as off, so turning one on turns on only that one.
+    static func switching(_ kind: Kind, on: Bool, topicOn: Bool, scheduledTasks: Bool, deliveries: Bool)
+        -> (scheduledTasks: Bool, deliveries: Bool, topicOn: Bool) {
+        var scheduled = topicOn && scheduledTasks
+        var delivered = topicOn && deliveries
+        switch kind {
+        case .scheduledTasks: scheduled = on
+        case .deliveries: delivered = on
+        case .groupChats: break
+        }
+        return (scheduled, delivered, scheduled || delivered)
+    }
+}
+
 /// Settings › Notifications › Workflows: which workflow alerts this device wants. All start on.
 enum BighelpWorkflowAlerts {
     enum Kind: String, CaseIterable, Identifiable {

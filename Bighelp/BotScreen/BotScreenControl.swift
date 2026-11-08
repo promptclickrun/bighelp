@@ -51,6 +51,8 @@ enum BotScreenStreamEnd: Equatable {
     case ticketRefused
     /// 4403: the host refused the socket (its address or origin rules).
     case notAllowed
+    /// 1011: the computer's own screen sharing didn't answer the plugin's bridge.
+    case noServer
     /// The socket closed or dropped some other way.
     case dropped
 
@@ -60,6 +62,7 @@ enum BotScreenStreamEnd: Equatable {
         case 4001: self = .screenGone
         case 4401: self = .ticketRefused
         case 4403: self = .notAllowed
+        case 1011: self = .noServer
         default: self = .dropped
         }
     }
@@ -82,7 +85,7 @@ struct BotScreenReconnects {
     /// How long to wait before the next try, or nil to stop and say why.
     mutating func delay(after end: BotScreenStreamEnd, now: Date = .now) -> Duration? {
         switch end {
-        case .screenGone, .notAllowed:
+        case .screenGone, .notAllowed, .noServer:
             return nil
         case .controlTaken, .ticketRefused:
             quick = quick.filter { now.timeIntervalSince($0) < Self.quickWindow } + [now]

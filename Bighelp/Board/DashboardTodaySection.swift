@@ -1,13 +1,14 @@
 import SwiftUI
 
-/// Today, at the top of a bot's Dashboard: one line until the person opens it, so Feed, Ideas and
-/// Goals stay where they were. Open, the subagents, background commands and scheduled task runs
-/// of the day, running first. It reads again while the Dashboard shows: often while something
-/// runs, rarely otherwise.
+/// Activities, at the top of a bot's Dashboard: one line until the person opens it, so Feed, Ideas
+/// and Goals stay where they were. Open, the subagents and background commands of the last days by
+/// day (Today, Yesterday, …), running first; routines too when ⋯ › Show routines is on. It reads
+/// again while the Dashboard shows: often while something runs, rarely otherwise.
 struct DashboardTodaySection: View {
     @Bindable var today: AgentTodayModel
     let agentID: String
     let agentName: String
+    @AppStorage(AgentTodayModel.showsRoutinesKey) private var showsRoutines = false
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @BighelpThemeReader private var theme
@@ -38,7 +39,7 @@ struct DashboardTodaySection: View {
         }
     }
 
-    private var summary: String { AgentTodayModel.summary(today.phase) }
+    private var summary: String { AgentTodayModel.summary(today.phase, showsRoutines: showsRoutines) }
 
     private var header: some View {
         Button {
@@ -59,15 +60,15 @@ struct DashboardTodaySection: View {
             .contentShape(.rect)
         }
         .bighelpPlainButtonStyle()
-        .accessibilityLabel("Today, \(summary)")
+        .accessibilityLabel("Activities, \(summary)")
         .accessibilityValue(today.isExpanded ? "Open" : "Closed")
-        .accessibilityHint("Shows the work \(agentName) runs in the background today")
+        .accessibilityHint("Shows the work \(agentName) ran in the background, by day")
         .driveTarget("dashboard.today.toggle")
         .accessibilityIdentifier("dashboard.today.toggle")
     }
 
     private var title: some View {
-        Text("Today")
+        Text("Activities")
             .font(.bighelp(.title3, weight: .bold))
             .foregroundStyle(theme.primaryText)
     }
@@ -88,11 +89,21 @@ struct DashboardTodaySection: View {
             note(String(localized: "Update the bighelp plugin on this computer to see what \(agentName) runs in the background."))
         case .failed:
             note(String(localized: "Today's work didn't load. It tries again in a moment."))
-        case .loaded(let items) where items.isEmpty:
-            note(String(localized: "Nothing yet. Subagents, background commands and scheduled tasks show here while they run and after they finish."))
-        case .loaded(let items):
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(items) { DashboardTodayRow(item: $0) }
+        case .loaded(let all):
+            let days = AgentTodayModel.days(AgentTodayModel.visible(all, showsRoutines: showsRoutines))
+            if days.isEmpty {
+                note(String(localized: "Nothing yet. Subagents and background commands show here while they run and after they finish."))
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(days) { day in
+                        Text(day.title)
+                            .font(.bighelp(.subheadline, weight: .semibold))
+                            .foregroundStyle(theme.secondaryText)
+                            .padding(.top, BighelpTokens.space8)
+                            .accessibilityAddTraits(.isHeader)
+                        ForEach(day.items) { DashboardTodayRow(item: $0) }
+                    }
+                }
             }
         }
     }

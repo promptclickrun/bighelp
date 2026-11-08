@@ -24,6 +24,8 @@ final class DemoBotScreenService: BotScreenService {
 
     func status(agentID: String) async throws -> BotScreenStatus { current }
 
+    var computer: (any ComputerScreenProviding)? { DemoComputerScreenService.shared }
+
     func start(agentID: String) async throws -> BotScreenStatus {
         running = true
         broadcast(.status(current))

@@ -1,9 +1,10 @@
 import SwiftUI
 import UIKit
 
-/// The live screen. Watching, or with "move the view" on: pinch to zoom and drag to look
-/// around. In control: a tap clicks, a long press right-clicks, one finger drags, two
-/// fingers scroll. On the Mac the mouse, trackpad and keyboard go straight to the screen.
+/// The live screen. Pinch zooms, watching or in control. Watching, or with "move the view" on: drag
+/// to look around. In control: a tap clicks, a long press right-clicks, one finger drags, and two
+/// fingers move a zoomed-in view, or scroll the screen at its normal size. On the Mac the mouse,
+/// trackpad and keyboard go straight to the screen.
 struct BotScreenCanvas: UIViewRepresentable {
     let model: BotScreenViewerModel
     let label: String
@@ -36,7 +37,8 @@ struct BotScreenCanvas: UIViewRepresentable {
     }
 }
 
-final class BotScreenCanvasView: UIView, UIScrollViewDelegate, UIKeyInput, UIPointerInteractionDelegate {
+final class BotScreenCanvasView: UIView, UIScrollViewDelegate, UIKeyInput, UIPointerInteractionDelegate,
+                                 UIGestureRecognizerDelegate {
     weak var model: BotScreenViewerModel?
 
     private let scrollView = UIScrollView()
@@ -125,7 +127,24 @@ final class BotScreenCanvasView: UIView, UIScrollViewDelegate, UIKeyInput, UIPoi
 
     func viewForZooming(in scrollView: UIScrollView) -> UIView? { screenView }
 
-    func scrollViewDidZoom(_ scrollView: UIScrollView) { centerScreen() }
+    func scrollViewDidZoom(_ scrollView: UIScrollView) {
+        centerScreen()
+        applyMode()
+    }
+
+    /// Zoomed in past the screen's fitted size.
+    private var isZoomedIn: Bool { scrollView.zoomScale > scrollView.minimumZoomScale + 0.01 }
+
+    /// The two-finger scroll of the screen: off while zoomed in, so two fingers move the view.
+    private var twoFingerScroll: UIGestureRecognizer? {
+        inputGestures.first { ($0 as? UIPanGestureRecognizer)?.minimumNumberOfTouches == 2 }
+    }
+
+    /// A pinch and a two-finger scroll start together; the pinch wins once it zooms.
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        other === scrollView.pinchGestureRecognizer
+    }
 
     private func centerScreen() {
         let content = scrollView.contentSize
@@ -141,8 +160,11 @@ final class BotScreenCanvasView: UIView, UIScrollViewDelegate, UIKeyInput, UIPoi
         // A Mac has a real right button; holding the left one is a drag, not a right-click.
         inputGestures.first { $0 is UILongPressGestureRecognizer }?.isEnabled = false
         #endif
-        scrollView.isScrollEnabled = !drivesScreen
-        scrollView.pinchGestureRecognizer?.isEnabled = !drivesScreen
+        // Pinch zooms whether watching or in control.
+        scrollView.pinchGestureRecognizer?.isEnabled = true
+        scrollView.isScrollEnabled = !drivesScreen || isZoomedIn
+        scrollView.panGestureRecognizer.minimumNumberOfTouches = drivesScreen ? 2 : 1
+        twoFingerScroll?.isEnabled = drivesScreen && !isZoomedIn
     }
 
     // MARK: Pointer
@@ -161,6 +183,7 @@ final class BotScreenCanvasView: UIView, UIScrollViewDelegate, UIKeyInput, UIPoi
         let twoFingers = UIPanGestureRecognizer(target: self, action: #selector(handleScroll))
         twoFingers.minimumNumberOfTouches = 2
         twoFingers.maximumNumberOfTouches = 2
+        twoFingers.delegate = self
         // A mouse wheel or trackpad scroll carries no touches at all.
         let wheel = UIPanGestureRecognizer(target: self, action: #selector(handleScroll))
         wheel.allowedScrollTypesMask = .all
@@ -215,6 +238,8 @@ final class BotScreenCanvasView: UIView, UIScrollViewDelegate, UIKeyInput, UIPoi
     }
 
     @objc private func handleScroll(_ recognizer: UIPanGestureRecognizer) {
+        // Zooming, not scrolling.
+        if let pinch = scrollView.pinchGestureRecognizer, [.began, .changed].contains(pinch.state) { return }
         switch recognizer.state {
         case .began:
             scrollCarry = .zero

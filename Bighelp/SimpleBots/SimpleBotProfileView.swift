@@ -84,6 +84,8 @@ struct SimpleBotProfileView: View {
     @State private var isArrangingTabs = false
     @State private var tabNotice: String?
     @State private var dashboard: BoardDashboardModel?
+    /// ⋯ › Show routines (on the Dashboard): scheduled task runs in Activities.
+    @AppStorage(AgentTodayModel.showsRoutinesKey) private var showsRoutines = false
     @State private var mark: SimpleBotMark?
     @State private var saveTask: Task<Void, Never>?
     @State private var saveState: String?
@@ -399,6 +401,10 @@ struct SimpleBotProfileView: View {
                     }
                     if context.canEdit {
                         Button("Edit Name and Role", systemImage: "pencil") { context.onEditDetails(profile) }
+                    }
+                    if shownTab == .dashboard {
+                        Toggle("Show routines", systemImage: "calendar.badge.clock", isOn: $showsRoutines)
+                            .accessibilityIdentifier("simple-bots.profile.show-routines")
                     }
                 } label: {
                     Image(systemName: "ellipsis")

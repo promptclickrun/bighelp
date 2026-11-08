@@ -1,3 +1,4 @@
+import CommonCrypto
 import Foundation
 
 /// The RFB (VNC, RFC 6143) messages bighelp sends to an agent's screen, and the
@@ -206,5 +207,30 @@ extension Array where Element == UInt8 {
     mutating func appendBigEndian(_ value: UInt32) {
         append(UInt8(value >> 24)); append(UInt8((value >> 16) & 0xFF))
         append(UInt8((value >> 8) & 0xFF)); append(UInt8(value & 0xFF))
+    }
+}
+
+/// VNC authentication (RFC 6143 §7.2.2): the challenge encrypted with DES, keyed by the first eight
+/// bytes of the password with each byte's bits reversed, as every VNC server expects.
+enum RFBVNCAuth {
+    static func response(challenge: [UInt8], password: String) -> Data? {
+        guard challenge.count == 16 else { return nil }
+        var key = [UInt8](repeating: 0, count: kCCKeySizeDES)
+        for (index, byte) in password.utf8.prefix(8).enumerated() { key[index] = reversed(byte) }
+        var output = [UInt8](repeating: 0, count: 16)
+        var moved = 0
+        let status = CCCrypt(CCOperation(kCCEncrypt), CCAlgorithm(kCCAlgorithmDES), CCOptions(kCCOptionECBMode),
+                             key, key.count, nil, challenge, challenge.count, &output, output.count, &moved)
+        guard status == CCCryptorStatus(kCCSuccess), moved == 16 else { return nil }
+        return Data(output)
+    }
+
+    static func reversed(_ byte: UInt8) -> UInt8 {
+        var value = byte, result: UInt8 = 0
+        for _ in 0..<8 {
+            result = result << 1 | value & 1
+            value >>= 1
+        }
+        return result
     }
 }

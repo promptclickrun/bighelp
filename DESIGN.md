@@ -575,10 +575,17 @@ text is SF Pro, as everywhere.
   order, and the answer always shows.
 - **Swipes**: from the left edge back to your bots; from the right, this bot's profile (the primary bot's on
   the home). The full app's swipe choices lead to places this mode hides, so they don't apply here.
-- **Dashboard** opens with **Today**, one line ("2 running · 4 finished") until it's tapped, so Feed, Ideas and
-  Goals stay where they were. Open, it lists the bot's subagents, background commands and scheduled task runs of the
-  day (running first, then newest), each with how it went and when (`DashboardTodaySection`, plugin
-  `native-agents-today-v1`). Templates open from an empty pile and from the Goals page.
+- **Dashboard** opens with **Activities**, one line ("2 running · 4 done today") until it's tapped, so Feed, Ideas
+  and Goals stay where they were. Open, it lists the bot's subagents and background commands of the last seven days
+  by day (Today, Yesterday, then weekdays), running first, each with how it went and when (`DashboardTodaySection`,
+  plugin `native-agents-today-v1`). Routines (scheduled task runs) show only with ⋯ › Show routines, which the ⋯
+  menu offers on the Dashboard tab and which is off by default. Templates open from an empty pile and from each
+  pile's See all page.
+- **Computer** (the profile's screen tab) also has **Your computer**: the computer's own desktop (macOS, Linux or
+  Windows) through its own VNC server, bridged by the plugin (`native-computer-screen-v1`). Open your computer
+  shows it in the same viewer as the agent's screen; Take control drives it, and the computer's screen sharing
+  password is asked once and kept in this phone's Keychain. Without a VNC server it says how to turn one on. Pinch
+  zooms whether watching or in control; zoomed in while in control, two fingers move the view.
 - **Profile**: the mark, name and role over every tab (Dashboard too), then the tabs: Dashboard, Info, Computer (its
   screen, when the host has one), Files and Media. Info is in named groups: Personality (Character, Instructions,
   Core Files), Defaults (Default Model, Default Voice, Active Project), What it can use (Connections, Marketplace,

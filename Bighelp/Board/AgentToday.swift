@@ -1,9 +1,10 @@
 import Foundation
 import Observation
 
-// An agent's background work today, on its Dashboard (Bots mode): the subagents, background
-// commands and scheduled task runs the plugin's `agents/today` reports (`native-agents-today-v1`),
-// running ones first. Only what the computer says; nothing here starts or stops work.
+// An agent's background work of the last days, on its Dashboard (Bots mode) as Activities, by day:
+// the subagents, background commands and, when the person asks, the routines (scheduled task runs)
+// the plugin's `agents/today` reports (`native-agents-today-v1`), running ones first. Only what the
+// computer says; nothing here starts or stops work.
 
 /// One piece of an agent's background work today.
 struct AgentTodayItem: Identifiable, Equatable, Sendable {
@@ -75,7 +76,7 @@ struct AgentTodayItem: Identifiable, Equatable, Sendable {
     }
 }
 
-/// The Today section's state for one bot: collapsed until the person opens it, so Feed, Ideas and
+/// The Activities section's state for one bot: collapsed until the person opens it, so Feed, Ideas and
 /// Goals stay where they were.
 @MainActor
 @Observable
@@ -90,6 +91,10 @@ final class AgentTodayModel {
 
     static let runningInterval: Duration = .seconds(10)
     static let quietInterval: Duration = .seconds(60)
+    /// The profile's ⋯ › Show routines: scheduled task runs in Activities. Off by default.
+    static let showsRoutinesKey = "bighelp.dashboard.activities.show-routines"
+    /// Today and the six days before it.
+    static let dayCount = 7
 
     private(set) var phase: Phase = .loading
     var isExpanded = false
@@ -97,6 +102,8 @@ final class AgentTodayModel {
     private(set) var connection = 0
     @ObservationIgnored private var client: (any AgentBoardClient)?
     @ObservationIgnored private var scope: String?
+    /// Plugin 3.47.0 takes at most 48 hours back: it gets today and yesterday.
+    @ObservationIgnored private var windowDays = dayCount
 
     /// The board's connection, which the Dashboard follows. While it reconnects there is none, and
     /// what the section shows stays until the next one answers; another computer starts over.
@@ -104,6 +111,7 @@ final class AgentTodayModel {
         guard let client, client !== self.client else { return }
         self.client = client
         connection &+= 1
+        windowDays = Self.dayCount
         if !client.supportsToday {
             phase = .unsupported
         } else if phase == .unsupported || scope != self.scope {
@@ -119,12 +127,19 @@ final class AgentTodayModel {
 
     var hasRunning: Bool { items.contains { $0.state == .running } }
 
-    /// One read of today's work, from the start of this phone's day.
+    /// One read of the last days' work, from the start of this phone's day six days ago.
     func refresh(agentID: String, now: Date = .now, calendar: Calendar = .current) async {
         guard let client, client.supportsToday else { return }
         let asked = connection
         do {
-            let items = try await client.today(agentID: agentID, since: calendar.startOfDay(for: now))
+            let items: [AgentTodayItem]
+            do {
+                items = try await client.today(agentID: agentID, since: Self.since(days: windowDays, now: now, calendar: calendar))
+            } catch WorkspaceClientError.rejected where windowDays > 2 {
+                // An older plugin refuses more than 48 hours: today and yesterday, from now on.
+                windowDays = 2
+                items = try await client.today(agentID: agentID, since: Self.since(days: 2, now: now, calendar: calendar))
+            }
             guard asked == connection else { return }
             if phase != .loaded(items) { phase = .loaded(items) }
         } catch is CancellationError {
@@ -137,26 +152,69 @@ final class AgentTodayModel {
         }
     }
 
+    static func since(days: Int, now: Date, calendar: Calendar) -> Date {
+        let today = calendar.startOfDay(for: now)
+        return calendar.date(byAdding: .day, value: -(max(1, days) - 1), to: today) ?? today
+    }
+
+    /// One day of Activities: "Today", "Yesterday", "Wednesday", "Oct 30".
+    struct Day: Identifiable, Equatable {
+        let id: Date
+        let title: String
+        let items: [AgentTodayItem]
+    }
+
+    /// The items to show: routines only when the person asked for them.
+    static func visible(_ items: [AgentTodayItem], showsRoutines: Bool) -> [AgentTodayItem] {
+        showsRoutines ? items : items.filter { $0.kind != .scheduled }
+    }
+
+    /// The items by day, newest day first. Running work is today's.
+    static func days(_ items: [AgentTodayItem], now: Date = .now, calendar: Calendar = .current) -> [Day] {
+        let today = calendar.startOfDay(for: now)
+        var byDay: [Date: [AgentTodayItem]] = [:]
+        for item in items {
+            let when = item.state == .running ? now : (item.endedAt ?? item.startedAt ?? now)
+            byDay[calendar.startOfDay(for: when), default: []].append(item)
+        }
+        return byDay.keys.sorted(by: >).map { day in
+            Day(id: day, title: title(for: day, today: today, calendar: calendar), items: byDay[day] ?? [])
+        }
+    }
+
+    private static func title(for day: Date, today: Date, calendar: Calendar) -> String {
+        let back = calendar.dateComponents([.day], from: day, to: today).day ?? 0
+        switch back {
+        case ...0: return String(localized: "Today")
+        case 1: return String(localized: "Yesterday")
+        case 2...6: return day.formatted(.dateTime.weekday(.wide))
+        default: return day.formatted(.dateTime.month(.abbreviated).day())
+        }
+    }
+
     private static func unsupported(_ error: WorkspaceClientError) -> Bool {
         if case .unavailable(.unsupportedOperation) = error { return true }
         if case .unavailable(.pluginRequired) = error { return true }
         return false
     }
 
-    /// The header's short line: "2 running · 4 finished".
-    static func summary(_ phase: Phase) -> String {
+    /// The header's short line: "2 running · 4 done today".
+    static func summary(_ phase: Phase, showsRoutines: Bool, now: Date = .now, calendar: Calendar = .current) -> String {
         switch phase {
         case .loading: return String(localized: "Loading…")
         case .unsupported: return String(localized: "Update the plugin to see it")
         case .failed: return String(localized: "Couldn't load")
-        case .loaded(let items):
+        case .loaded(let all):
+            let items = visible(all, showsRoutines: showsRoutines)
             let running = items.count { $0.state == .running }
-            let finished = items.count - running
-            switch (running, finished) {
-            case (0, 0): return String(localized: "Nothing in the background yet")
-            case (0, _): return String(localized: "\(finished) finished")
+            let today = items.count { item in
+                item.state != .running && calendar.isDate(item.endedAt ?? item.startedAt ?? .distantPast, inSameDayAs: now)
+            }
+            switch (running, today) {
+            case (0, 0): return items.isEmpty ? String(localized: "Nothing yet") : String(localized: "Nothing today")
+            case (0, _): return String(localized: "\(today) done today")
             case (_, 0): return String(localized: "\(running) running")
-            default: return String(localized: "\(running) running · \(finished) finished")
+            default: return String(localized: "\(running) running · \(today) done today")
             }
         }
     }

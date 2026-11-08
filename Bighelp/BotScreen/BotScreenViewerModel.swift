@@ -13,6 +13,8 @@ final class BotScreenViewerModel {
         case live
         /// Stopped trying; the sentence says why, in plain words.
         case ended(String)
+        /// The computer's own screen asks for its VNC password (again, when the last one was wrong).
+        case needsPassword(wrong: Bool)
     }
 
     let agentID: String
@@ -38,6 +40,8 @@ final class BotScreenViewerModel {
     }
     @ObservationIgnored private(set) var lastFrame: RFBFrame?
     @ObservationIgnored private let service: any BotScreenService
+    /// Set for the computer's own desktop: control is the person's alone, and it may ask for a password.
+    let computer: (any ComputerScreenProviding)?
     @ObservationIgnored private var session: RFBSession?
     @ObservationIgnored private var transport: (any RFBTransport)?
     @ObservationIgnored private var profileKey: String?
@@ -52,9 +56,18 @@ final class BotScreenViewerModel {
         self.agentName = agentName
         screenSize = size
         self.service = service
+        computer = service as? any ComputerScreenProviding
     }
 
     var isInControl: Bool { control.holder == .me }
+    var isComputer: Bool { computer != nil }
+
+    /// Keeps the computer's VNC password on this phone and connects again with it.
+    func connect(password: String) {
+        guard let computer, !password.isEmpty else { return }
+        computer.passwords.save(password)
+        retry()
+    }
 
     // MARK: Connection
 
@@ -71,6 +84,14 @@ final class BotScreenViewerModel {
             let end: BotScreenStreamEnd
             do {
                 end = try await attach()
+            } catch RFBError.needsPassword {
+                guard !Task.isCancelled, !isClosed else { return }
+                phase = .needsPassword(wrong: false)
+                return
+            } catch RFBError.wrongPassword {
+                guard !Task.isCancelled, !isClosed else { return }
+                phase = .needsPassword(wrong: true)
+                return
             } catch {
                 guard !Task.isCancelled, !isClosed else { return }
                 if let sentence = Self.endingSentence(for: error) {
@@ -115,7 +136,7 @@ final class BotScreenViewerModel {
             transport.close(handBack: true)
             throw CancellationError()
         }
-        let session = RFBSession(transport: transport)
+        let session = RFBSession(transport: transport, password: computer?.passwords.read())
         self.session = session
         self.transport = transport
         defer {
@@ -129,8 +150,8 @@ final class BotScreenViewerModel {
                 onServerInit: { [weak self] info in await self?.serverReady(info) },
                 onFrame: { [weak self] frame in await self?.show(frame) })
             return BotScreenStreamEnd(closeCode: transport.closeCode)
-        } catch RFBError.unsupportedSecurity {
-            throw RFBError.unsupportedSecurity
+        } catch let error as RFBError where [.unsupportedSecurity, .needsPassword, .wrongPassword].contains(error) {
+            throw error
         } catch {
             if Task.isCancelled || isClosed { throw CancellationError() }
             return BotScreenStreamEnd(closeCode: transport.closeCode)
@@ -306,6 +327,7 @@ final class BotScreenViewerModel {
         switch end {
         case .screenGone: "The screen was turned off."
         case .notAllowed: "Your computer didn't let bighelp open the screen."
+        case .noServer: "Your computer's screen sharing didn't answer. Check that it's on, then try again."
         case .controlTaken, .ticketRefused: "Someone else keeps taking control of the screen."
         case .dropped: "Lost the connection to the screen."
         }
@@ -315,7 +337,7 @@ final class BotScreenViewerModel {
     static func endingSentence(for error: any Error) -> String? {
         switch error {
         case RFBError.unsupportedSecurity:
-            "This screen asks for a password bighelp can't send."
+            "This screen asks for a sign-in bighelp can't send. Turn on a VNC password for it."
         case WorkspaceClientError.unavailable(.unsupportedOperation):
             "This computer's Hermes doesn't have screens yet."
         case WorkspaceClientError.rejected:

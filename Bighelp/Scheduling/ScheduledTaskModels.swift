@@ -283,7 +283,8 @@ struct ScheduledTask: Identifiable, Equatable, Sendable {
     var nextRun: Date?
     var status: ScheduledTaskStatus
     var lastResult: String?
-    var usesHostManagedExecution = false
+    /// What Hermes runs besides the instructions; nil for a plain prompt task.
+    var hostExecution: ScheduledTaskHostExecution? = nil
     var lastRun: Date? = nil
     var lastError: String? = nil
     var model: String? = nil
@@ -291,6 +292,17 @@ struct ScheduledTask: Identifiable, Equatable, Sendable {
 
     var isPaused: Bool { status == .paused }
     var identity: ScheduledTaskIdentity { .init(profileID: agentID, jobID: id) }
+}
+
+/// A task's `script`, `skills` or `no_agent` on Hermes. They stay on the computer: the app shows
+/// them and never sends them, so an edit (name, instructions, schedule, delivery) keeps them.
+struct ScheduledTaskHostExecution: Equatable, Sendable {
+    /// The script's file name, never its path on the computer.
+    var scriptName: String?
+    var skills: [String] = []
+    /// `no_agent`: the script is the whole run and Hermes sends what it prints; nothing reads
+    /// the instructions.
+    var runsWithoutAgent = false
 }
 
 struct ScheduledTaskDraft: Equatable, Sendable {
@@ -538,8 +550,9 @@ struct ScheduledTaskPresentation: Sendable {
         if task.status == .failed, [.pauseOrResume, .runNow].contains(action) {
             return .init(isVisible: true, isEnabled: false, reason: "Review the failed schedule on Hermes before running it again.")
         }
-        if task.usesHostManagedExecution, [.edit, .duplicate].contains(action) {
-            return .init(isVisible: true, isEnabled: false, reason: "This task uses host-managed scripts or skills. Edit its execution on Hermes.")
+        // A copy is made from the editor's fields alone, so it would lose the script and skills.
+        if task.hostExecution != nil, action == .duplicate {
+            return .init(isVisible: true, isEnabled: false, reason: "A copy would leave out this task's script or skills. Duplicate it on Hermes.")
         }
         switch action {
         case .edit, .pauseOrResume, .runNow:

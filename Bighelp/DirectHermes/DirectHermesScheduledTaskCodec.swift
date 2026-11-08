@@ -23,7 +23,7 @@ enum DirectHermesScheduledTaskCodec {
         let script = try D.optionalText(row["script"], maximum: 4_096)
         let skills = try row["skills"].map { try D.rows($0, maximum: 100) } ?? []
         if let noAgent = row["no_agent"], noAgent.boolean == nil { throw WorkspaceClientError.invalidResponse }
-        let hostManaged = row["no_agent"]?.boolean == true || script?.isEmpty == false || !skills.isEmpty
+        let execution = hostExecution(script: script, skills: skills, noAgent: row["no_agent"]?.boolean == true)
         return try ScheduledTask(
             id: DirectHermesCoreRequestScope.identifier(D.text(row["id"], maximum: 160)),
             agentID: profile,
@@ -36,8 +36,18 @@ enum DirectHermesScheduledTaskCodec {
             nextRun: date(row["next_run_at"]),
             status: status,
             lastResult: D.optionalText(row["last_status"], maximum: 512),
-            usesHostManagedExecution: hostManaged
+            hostExecution: execution
         )
+    }
+
+    /// Only the script's file name leaves the reader: its path is the computer's own business.
+    /// A skill that isn't a short name is left out rather than failing the whole list.
+    static func hostExecution(script: String?, skills: [BighelpJSONValue], noAgent: Bool) -> ScheduledTaskHostExecution? {
+        let scriptName = script?.split(whereSeparator: { $0 == "/" || $0 == "\\" }).last.map(String.init)
+        let names = skills.compactMap { $0.string?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { (1...128).contains($0.count) }
+        guard scriptName != nil || !names.isEmpty || noAgent else { return nil }
+        return ScheduledTaskHostExecution(scriptName: scriptName, skills: names, runsWithoutAgent: noAgent)
     }
 
     static func tasks(_ payload: Object, profile: String) throws -> [ScheduledTask] {

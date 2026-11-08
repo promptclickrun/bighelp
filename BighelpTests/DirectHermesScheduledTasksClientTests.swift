@@ -136,17 +136,52 @@ struct DirectHermesScheduledTasksClientTests {
         #expect(presentation.nextRunCopy.contains("Completed"))
     }
 
-    @Test func failedAndScriptJobsAreNotMisrepresentedAsOrdinaryPromptEdits() throws {
+    /// The script stays on the computer: the app keeps its file name, never its path. An edit
+    /// leaves the script alone; a copy would lose it, so only Duplicate is blocked.
+    @Test func aScriptTaskShowsItsScriptAndCanBeEditedButNotDuplicated() throws {
         var payload = job(state: "error")
         payload["no_agent"] = .boolean(true)
         payload["script"] = .string("/private/synthetic-script.sh")
         let task = try DirectHermesScheduledTaskCodec.task(.object(payload), profile: "research")
         #expect(task.status == .failed)
-        #expect(task.usesHostManagedExecution)
-        #expect(!String(describing: task).contains("/private/synthetic-script.sh"))
+        #expect(task.hostExecution == ScheduledTaskHostExecution(scriptName: "synthetic-script.sh", runsWithoutAgent: true))
+        #expect(!String(describing: task).contains("/private/"))
         let presentation = ScheduledTaskPresentation(task: task, agentName: "Research")
-        #expect(!presentation.action(.edit).isEnabled)
+        #expect(presentation.action(.edit).isEnabled)
         #expect(!presentation.action(.duplicate).isEnabled)
+    }
+
+    @Test func hostExecutionKeepsNamesAndSkipsSkillsItCannotRead() {
+        let execution = DirectHermesScheduledTaskCodec.hostExecution(
+            script: #"C:\jobs\nightly.ps1"#,
+            skills: [.string("ongoing-entity-loop"), .integer(3), .string(String(repeating: "x", count: 200)), .string(" ")],
+            noAgent: false)
+        #expect(execution == ScheduledTaskHostExecution(scriptName: "nightly.ps1", skills: ["ongoing-entity-loop"]))
+        #expect(DirectHermesScheduledTaskCodec.hostExecution(script: "", skills: [], noAgent: false) == nil)
+        #expect(DirectHermesScheduledTaskCodec.hostExecution(script: nil, skills: [.integer(3)], noAgent: false) == nil)
+    }
+
+    /// Retiming a script task keeps its blank instructions: the script is the job, and Hermes
+    /// keeps every field the update leaves out. A new task still needs instructions.
+    @Test func blankInstructionsAreSentOnlyAsAnUpdate() async throws {
+        let transport = try SchedulerPerformer()
+        transport.responses[.scheduledTaskDeliveryTargets] = [.success(targets())]
+        var saved = job()
+        saved["prompt"] = .string("")
+        saved["script"] = .string("nightly.sh")
+        saved["no_agent"] = .boolean(true)
+        transport.responses[.scheduledTaskUpdate] = [.success(saved)]
+        let changes = ScheduledTaskChanges(name: "Morning brief", instructions: " ", schedule: schedule, deliveryTarget: "local")
+        let task = try await client(transport).update(id: "job-1", agentID: "research", changes: changes)
+        let updates = transport.calls.last?.payload["updates"]?.object
+        #expect(updates?["prompt"] == .string(""))
+        #expect(updates?["script"] == nil && updates?["no_agent"] == nil && updates?["skills"] == nil)
+        #expect(task.hostExecution?.scriptName == "nightly.sh")
+
+        var blank = draft()
+        blank.instructions = ""
+        await #expect(throws: (any Error).self) { try await client(transport).create(blank) }
+        #expect(!transport.calls.contains { $0.operation == .scheduledTaskCreate })
     }
 
     @Test func implicitHomeDeliveryRequiresServingProfileProof() async throws {

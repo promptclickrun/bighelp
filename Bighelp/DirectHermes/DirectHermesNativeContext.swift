@@ -424,6 +424,10 @@ final class DirectHermesNativePluginClient {
             // Read while a bot's Dashboard shows; at most 200 short rows (the plugin caps the answer at 512 KB).
             return Route(path: "agents/today", feature: AgentTodayItem.feature,
                          isMutation: false, maximumResponseBytes: 524_288, timeout: 15)
+        case .agentsTodayDetail:
+            // Read while one item's read-out shows; the plugin caps the answer at 512 KB.
+            return Route(path: "agents/today/detail", feature: AgentTodayDetail.feature,
+                         isMutation: false, maximumResponseBytes: 524_288, timeout: 15)
         case .coreFilesList, .coreFilesRead, .coreFilesWrite:
             // A file is at most 512 KB, sent whole.
             return Route(path: operation.rawValue.replacingOccurrences(of: ".", with: "/"),

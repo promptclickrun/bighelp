@@ -97,6 +97,48 @@ final class BotDashboardUITests: BighelpUITestCase {
     }
 
     /// Screenshots for design review, only when `BIGHELP_DASHBOARD_SHOTS` names a folder: the
+    /// A tap on an Activities item opens what it did: a subagent's steps and answer, a command's output and a
+    /// routine's result, in light and dark. `BIGHELP_DASHBOARD_SHOTS` names a folder for the screenshots.
+    @MainActor
+    func testActivityReadouts() throws {
+        let folder = ProcessInfo.processInfo.environment["BIGHELP_DASHBOARD_SHOTS"]
+        if let folder { try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true) }
+        func shot(_ name: String, _ app: XCUIApplication) {
+            guard let folder else { return }
+            try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: folder).appendingPathComponent("\(name).png"))
+        }
+        for appearance in ["light", "dark"] {
+            let app = makeApp()
+            app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
+                                   "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", appearance,
+                                   "-bighelp.dashboard.swipe-tutorial-seen", "YES",
+                                   "-bighelp.dashboard.activities.show-routines", "YES"]
+            app.launch()
+            openProfile(app, bot: "simple-bots.primary")
+            let toggle = app.buttons["dashboard.today.toggle"]
+            XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+            toggle.tap()
+
+            func open(_ id: String, expecting element: String, _ name: String) {
+                let row = app.buttons["dashboard.today.item.\(id)"]
+                XCTAssertTrue(row.waitForExistence(timeout: 5), "\(id) is in Activities")
+                if !row.isHittable { app.swipeUp() }
+                row.tap()
+                XCTAssertTrue(app.descendants(matching: .any)[element].waitForExistence(timeout: 5),
+                              "\(id) opens with \(element)")
+                Thread.sleep(forTimeInterval: 0.6)
+                shot("activity-\(name)-\(appearance)", app)
+                app.buttons["dashboard.activity.done"].tap()
+                XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+            }
+            open("delegation:dinner", expecting: "dashboard.activity.answer", "subagent-done")
+            open("delegation:hotels", expecting: "dashboard.activity.steps", "subagent-running")
+            open("message:sleep", expecting: "dashboard.activity.output", "command-failed")
+            open("cron:brief", expecting: "dashboard.activity.answer", "routine")
+            app.terminate()
+        }
+    }
+
     /// Dashboard in light and dark, the tutorial, Today open, a brand-new bot and the Templates deck. A file
     /// `drag-start` there tells a watcher outside the test when a card is held mid-swipe.
     @MainActor

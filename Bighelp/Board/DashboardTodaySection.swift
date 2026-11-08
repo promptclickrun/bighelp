@@ -2,13 +2,15 @@ import SwiftUI
 
 /// Activities, at the top of a bot's Dashboard: one line until the person opens it, so Feed, Ideas
 /// and Goals stay where they were. Open, the subagents and background commands of the last days by
-/// day (Today, Yesterday, …), running first; routines too when ⋯ › Show routines is on. It reads
-/// again while the Dashboard shows: often while something runs, rarely otherwise.
+/// day (Today, Yesterday, …), running first; routines too when ⋯ › Show routines is on. A tap opens
+/// an item's read-out (`DashboardActivityDetailView`). It reads again while the Dashboard shows: often
+/// while something runs, rarely otherwise.
 struct DashboardTodaySection: View {
     @Bindable var today: AgentTodayModel
     let agentID: String
     let agentName: String
     @AppStorage(AgentTodayModel.showsRoutinesKey) private var showsRoutines = false
+    @State private var opened: AgentTodayItem?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @BighelpThemeReader private var theme
@@ -29,6 +31,12 @@ struct DashboardTodaySection: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("dashboard.today")
+        .bighelpSheet(item: $opened) { item in
+            DashboardActivityDetailView(item: item, agentID: agentID, client: today.client)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .bighelpSheetSize(.standard)
+        }
         .task(id: RefreshKey(agentID: agentID, connection: today.connection, isActive: scenePhase == .active)) {
             guard scenePhase == .active else { return }
             while !Task.isCancelled {
@@ -101,7 +109,12 @@ struct DashboardTodaySection: View {
                             .foregroundStyle(theme.secondaryText)
                             .padding(.top, BighelpTokens.space8)
                             .accessibilityAddTraits(.isHeader)
-                        ForEach(day.items) { DashboardTodayRow(item: $0) }
+                        ForEach(day.items) { item in
+                            Button { opened = item } label: { DashboardTodayRow(item: item) }
+                                .bighelpPlainButtonStyle()
+                                .accessibilityHint("Shows what it did")
+                                .accessibilityIdentifier("dashboard.today.item.\(item.id)")
+                        }
                     }
                 }
             }
@@ -118,21 +131,14 @@ struct DashboardTodaySection: View {
     }
 }
 
-/// One piece of today's work: what it is, how it went, and when.
+/// One piece of today's work: what it is, how it went, and when. A tap opens what it did.
 private struct DashboardTodayRow: View {
     let item: AgentTodayItem
     @BighelpThemeReader private var theme
 
     var body: some View {
         HStack(alignment: .top, spacing: BighelpTokens.space12) {
-            Image(systemName: symbol)
-                .font(.bighelp(.subheadline, weight: .semibold))
-                .foregroundStyle(item.state == .running ? theme.actionForeground
-                                 : item.state == .failed ? theme.danger : theme.primaryText)
-                .frame(width: 36, height: 36)
-                .background(RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(item.state == .running ? theme.action : theme.secondaryText.opacity(0.12)))
-                .accessibilityHidden(true)
+            DashboardActivityIcon(item: item)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
                     .font(item.kind == .command ? .bighelp(.body, weight: .semibold).monospaced()
@@ -154,25 +160,15 @@ private struct DashboardTodayRow: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            Image(systemName: "chevron.right")
+                .font(.bighelp(.footnote, weight: .semibold))
+                .foregroundStyle(theme.tertiaryText)
+                .padding(.top, BighelpTokens.space8)
+                .accessibilityHidden(true)
         }
         .padding(.vertical, BighelpTokens.space8)
+        .contentShape(.rect)
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("dashboard.today.item.\(item.id)")
-    }
-
-    private var symbol: String {
-        switch item.state {
-        case .running:
-            switch item.kind {
-            case .subagent: "person.2"
-            case .command: "terminal"
-            case .scheduled: "calendar.badge.clock"
-            }
-        case .done: "checkmark.circle"
-        case .failed: "xmark.circle"
-        case .stopped: "stop.circle"
-        case .unknown: "questionmark.circle"
-        }
     }
 
     /// What it is, then how it went: "Command · Didn't finish: Exit 1".
@@ -194,13 +190,7 @@ private struct DashboardTodayRow: View {
 
     /// "Running · 3 min" while it runs, else the time it ended (or started).
     static func when(_ item: AgentTodayItem, now: Date) -> String? {
-        if item.state == .running {
-            guard let started = item.startedAt else { return String(localized: "Running") }
-            let seconds = max(0, now.timeIntervalSince(started))
-            guard seconds >= 60 else { return String(localized: "Running · just started") }
-            let length = Duration.seconds(seconds).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
-            return String(localized: "Running · \(length)")
-        }
+        if item.state == .running { return DashboardActivityTime.running(since: item.startedAt, now: now) }
         return (item.endedAt ?? item.startedAt)?.formatted(date: .omitted, time: .shortened)
     }
 }

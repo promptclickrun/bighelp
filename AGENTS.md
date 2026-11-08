@@ -351,7 +351,10 @@ change in both repos.
   background" chip counts its subagents and running commands for everyone; a command's output shows with Nerd
   Mode on. A bot's Dashboard lists the last week's work by day as Activities from `agents/today`
   (`native-agents-today-v1`, `AgentTodayModel`), asked from the start of the phone's day six days ago (plugin
-  3.47.0 takes 48 hours: then today and yesterday). Routines show only with ⋯ › Show routines.
+  3.47.0 takes 48 hours: then today and yesterday). Routines show only with ⋯ › Show routines. A tap opens the
+  item's read-out from `agents/today/detail` (`native-agents-today-detail-v1`, `AgentTodayDetail`). In a chat, a
+  helper's late `subagent.*` events update the row of the turn that started it (`subagentTurnIDs`), and a helper
+  left running doesn't hold its finished turn open: the turn folds as Settings › Chat › Agent's work says.
 - **Plugin routes:**
   - Each route is a `WorkspaceOperation` case plus a `Route(path:feature:isMutation:maximumResponseBytes:)` in
     `DirectHermesNativeContext.swift`.

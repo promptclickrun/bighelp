@@ -541,7 +541,7 @@ final class NativeWorkspaceRuntime {
     static let pluginCapabilities: Set<WorkspaceCapability> = [
         .liveVoice, .wikiRead, .wikiEdit, .wikiDisconnect, .cardTemplates, .cards, .forms, .cloudNotifications,
         .phoneTools, .projectChangesRead, .agentBoard, .agentBoardFeedback, .agentBoardGoalCategories, .agentBoardFiles,
-        .agentBoardAnswers, .agentToday, .skillsImport,
+        .agentBoardAnswers, .agentToday, .agentTodayDetail, .skillsImport,
     ]
 
     func refresh() async {
@@ -843,6 +843,7 @@ final class NativeWorkspaceRuntime {
                 if context.features.contains("native-agent-board-files-v1") { supported.insert(.agentBoardFiles) }
                 if context.features.contains("native-agent-board-answers-v1") { supported.insert(.agentBoardAnswers) }
                 if context.features.contains(AgentTodayItem.feature) { supported.insert(.agentToday) }
+                if context.features.contains(AgentTodayDetail.feature) { supported.insert(.agentTodayDetail) }
                 if context.features.contains(DirectHermesSkillsAndToolsClient.importFeature) {
                     supported.insert(.skillsImport)
                 }

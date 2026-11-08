@@ -100,7 +100,8 @@ final class AgentTodayModel {
     var isExpanded = false
     /// Bumps with each new connection, so the section's reads start over on it.
     private(set) var connection = 0
-    @ObservationIgnored private var client: (any AgentBoardClient)?
+    /// The board connection, which an item's read-out reads through too.
+    @ObservationIgnored private(set) var client: (any AgentBoardClient)?
     @ObservationIgnored private var scope: String?
     /// Plugin 3.47.0 takes at most 48 hours back: it gets today and yesterday.
     @ObservationIgnored private var windowDays = dayCount

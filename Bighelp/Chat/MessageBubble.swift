@@ -219,26 +219,6 @@ struct MessageBubble: View {
                 document: document,
                 interaction: interaction
             )
-            .overlay(alignment: role == .human ? .bottomTrailing : .bottomLeading) {
-                if let reactionPresentation,
-                   !reactionPresentation.reactions.isEmpty,
-                   let onReaction {
-                    NativeMessageReactionBar(
-                        presentation: reactionPresentation,
-                        onSelection: onReaction
-                    )
-                    .offset(
-                        x: role == .human
-                            ? -NativeMessageReactionLayoutMetrics.edgeInset
-                            : NativeMessageReactionLayoutMetrics.edgeInset,
-                        y: NativeMessageReactionLayoutMetrics.attachmentOverlap
-                    )
-                }
-            }
-            .padding(
-                .bottom,
-                hasVisibleReactions ? NativeMessageReactionLayoutMetrics.attachmentOverlap : 0
-            )
             .overlay(alignment: .topTrailing) {
                 if isCopied && !uiV3Enabled {
                     Label("Copied", systemImage: "checkmark")
@@ -297,12 +277,21 @@ struct MessageBubble: View {
                     .foregroundStyle(theme.danger)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if uiV3Enabled, !isPendingSubmission, !isInterimReply {
-                if let metadata {
-                    TimelineMetadataView(metadata: metadata)
-                        .padding(.horizontal, 6)
-                        .padding(.top, 4)
+            // The time, then the tapbacks to its right, under the message: on the bubble they covered its text.
+            // A message that continues a run shows no time, so its tapbacks have the line to themselves.
+            let showsTime = uiV3Enabled && !isPendingSubmission && !isInterimReply && !continuesGroup
+                && metadata?.timestamp != nil
+            if showsTime || hasVisibleReactions {
+                HStack(spacing: BighelpTokens.space8) {
+                    if showsTime, let metadata {
+                        TimelineMetadataView(metadata: metadata)
+                    }
+                    if hasVisibleReactions, let reactionPresentation, let onReaction {
+                        NativeMessageReactionBar(presentation: reactionPresentation, onSelection: onReaction)
+                    }
                 }
+                .padding(.horizontal, 6)
+                .padding(.top, 4)
             }
         }
         .frame(maxWidth: uiV3Enabled ? .infinity : nil,

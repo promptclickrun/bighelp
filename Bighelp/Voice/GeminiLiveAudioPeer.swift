@@ -573,7 +573,12 @@ final class GeminiLiveAudioHold: @unchecked Sendable {
 /// The microphone side, used from the audio thread: it converts to 16 kHz 16-bit mono and sends
 /// 100 ms pieces straight to Gemini. Nothing here touches the main actor.
 final class GeminiLiveUplink: @unchecked Sendable {
-    private static let chunkBytes = Int(GeminiLiveWire.inputSampleRate / 10) * 2
+    /// What the wire's microphone format is, and how one piece of it is framed. Gemini sends 16 kHz
+    /// PCM as raw bytes; an OpenAI-Realtime speech server takes 24 kHz PCM base64 inside JSON, so
+    /// both are injected rather than fixed — the defaults are Gemini's, unchanged.
+    private let sampleRate: Double
+    private let encoder: @Sendable (Data) -> Data
+    private var chunkBytes: Int { Int(sampleRate / 10) * 2 }
     private let lock = NSLock()
     private var socket: URLSessionWebSocketTask?
     private var converter: AVAudioConverter?
@@ -586,6 +591,12 @@ final class GeminiLiveUplink: @unchecked Sendable {
     private var echoGate = GeminiLiveEchoGate()
     /// When the agent's voice already scheduled stops playing (`timeIntervalSinceReferenceDate`).
     private var agentPlaysUntil = 0.0
+
+    init(sampleRate: Double = GeminiLiveWire.inputSampleRate,
+         encoder: @escaping @Sendable (Data) -> Data = GeminiLiveWire.audio) {
+        self.sampleRate = sampleRate
+        self.encoder = encoder
+    }
 
     var echoReport: String {
         lock.lock()
@@ -600,7 +611,7 @@ final class GeminiLiveUplink: @unchecked Sendable {
     }
 
     func prepare(from format: AVAudioFormat) throws {
-        guard let target = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: GeminiLiveWire.inputSampleRate,
+        guard let target = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: sampleRate,
                                          channels: 1, interleaved: true),
               let converter = AVAudioConverter(from: format, to: target) else {
             throw BighelpRealtimeAudioPeer.Failure.audioUnavailable
@@ -665,13 +676,13 @@ final class GeminiLiveUplink: @unchecked Sendable {
         guard failure == nil, output.frameLength > 0, let samples = output.int16ChannelData?[0] else { return }
         pending.append(Data(bytes: samples, count: Int(output.frameLength) * 2))
         let playing = Date().timeIntervalSinceReferenceDate < agentPlaysUntil
-        while pending.count >= Self.chunkBytes {
-            let chunk = Data(pending.prefix(Self.chunkBytes))
-            pending.removeFirst(Self.chunkBytes)
+        while pending.count >= chunkBytes {
+            let chunk = Data(pending.prefix(chunkBytes))
+            pending.removeFirst(chunkBytes)
             for piece in echoGate.pass(chunk, level: Self.level(of: chunk), agentPlaying: playing) {
                 bytes &+= UInt64(piece.count)
                 frames &+= 1
-                socket.send(.string(String(decoding: GeminiLiveWire.audio(piece), as: UTF8.self))) { _ in }
+                socket.send(.string(String(decoding: encoder(piece), as: UTF8.self))) { _ in }
             }
         }
     }

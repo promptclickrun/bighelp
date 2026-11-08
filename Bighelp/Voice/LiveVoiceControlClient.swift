@@ -15,6 +15,9 @@ enum LiveVoiceProvider: String, CaseIterable, Identifiable, Sendable {
     case apiKey = "api_key"
     /// The phone talks to Gemini directly, with a single-use token the plugin makes from the agent's key.
     case gemini
+    /// The phone talks to a speech server the person runs, configured in Settings › Voice. The
+    /// server hears and speaks; Hermes answers, exactly as it does on the other two paths.
+    case localSpeechServer = "local_speech_server"
 
     var id: String { rawValue }
     var title: String {
@@ -22,6 +25,7 @@ enum LiveVoiceProvider: String, CaseIterable, Identifiable, Sendable {
         case .codexSubscription: "GPT-Live, Codex subscription"
         case .apiKey: "GPT-Live, API key (separate billing)"
         case .gemini: "Gemini Live, your Gemini key"
+        case .localSpeechServer: "Your own speech server"
         }
     }
 
@@ -30,6 +34,7 @@ enum LiveVoiceProvider: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .codexSubscription, .apiKey: "GPT-Live"
         case .gemini: "Gemini Live"
+        case .localSpeechServer: "Speech server"
         }
     }
 
@@ -42,6 +47,8 @@ enum LiveVoiceProvider: String, CaseIterable, Identifiable, Sendable {
                        "Enceladus", "Iapetus", "Umbriel", "Algieba", "Despina", "Erinome", "Algenib", "Rasalgethi",
                        "Laomedeia", "Achernar", "Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird",
                        "Zubenelgenubi", "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat"]
+        // The server keeps its own voice; "default" is what an unset voice sends.
+        case .localSpeechServer: ["default"]
         }
     }
     var defaultVoice: String {
@@ -49,23 +56,34 @@ enum LiveVoiceProvider: String, CaseIterable, Identifiable, Sendable {
         case .codexSubscription: "cove"
         case .apiKey: "marin"
         case .gemini: "Zephyr"
+        case .localSpeechServer: "default"
         }
     }
 
-    /// GPT-Live's media and events go through the plugin; Gemini's stay between the phone and Gemini.
-    var usesHostMedia: Bool { self != .gemini }
+    /// GPT-Live's media and events go through the plugin; Gemini's and a speech server's stay on
+    /// the phone's own connection.
+    var usesHostMedia: Bool {
+        switch self {
+        case .codexSubscription, .apiKey: true
+        case .gemini, .localSpeechServer: false
+        }
+    }
 }
 
 /// What the plugin answers an offer with: GPT-Live's answer SDP, or where the phone connects to Gemini.
 enum LiveVoiceAnswer: Equatable, Sendable {
     case sdp(String)
     case gemini(url: URL, token: String, model: String)
+    /// A server the person configured on this device: where it listens, and the key for its handshake.
+    case speechServer(url: URL, key: String, voice: String)
 }
 
 enum LiveVoiceControlError: Error, LocalizedError, Sendable {
     case invalidResponse, wrongOwner, unavailable, timedOut
     /// The host answers status for Gemini without a key for this agent.
     case geminiKeyMissing
+    /// A speech server call with no address saved in Settings › Voice.
+    case speechServerNotConfigured
     var errorDescription: String? {
         switch self {
         case .invalidResponse: "Your computer sent back a voice answer the app couldn't use. Try again."
@@ -73,6 +91,7 @@ enum LiveVoiceControlError: Error, LocalizedError, Sendable {
         case .unavailable: "Live voice isn't available on your computer right now. Try again, or use TTS voice mode."
         case .timedOut: "Your computer didn't answer in time. Try again."
         case .geminiKeyMissing: "This agent has no Gemini API key on your computer. Add one as GEMINI_API_KEY, then try again."
+        case .speechServerNotConfigured: "Add your speech server's address in Settings › Voice, then try again."
         }
     }
 }
@@ -158,18 +177,25 @@ final class LiveVoiceControlClient {
     private let operation: Operation
     private let isOwnerCurrent: @MainActor (LiveVoiceOwner) -> Bool
     private let onInvalidate: @MainActor () -> Void
+    /// Where a self-hosted speech server listens, read as the call starts: Settings › Voice owns
+    /// it, and the host never learns the address or the key.
+    private let speechServer: @MainActor () -> SpeechServerConfiguration?
     private var invalidated = false
 
     init(
         owner: LiveVoiceOwner,
         operation: @escaping Operation,
         isOwnerCurrent: @escaping @MainActor (LiveVoiceOwner) -> Bool,
-        onInvalidate: @escaping @MainActor () -> Void = {}
+        onInvalidate: @escaping @MainActor () -> Void = {},
+        speechServer: @escaping @MainActor () -> SpeechServerConfiguration? = {
+            SpeechServerSettings.configuration()
+        }
     ) {
         self.owner = owner
         self.operation = operation
         self.isOwnerCurrent = isOwnerCurrent
         self.onInvalidate = onInvalidate
+        self.speechServer = speechServer
     }
 
     var hasCurrentOwner: Bool { !invalidated && isOwnerCurrent(owner) }
@@ -180,12 +206,26 @@ final class LiveVoiceControlClient {
     }
 
     func status(provider: LiveVoiceProvider) async throws -> [String: BighelpJSONValue] {
-        try await request("voice.live.status", fields: ["provider": .string(provider.rawValue)])
+        if provider == .localSpeechServer {
+            // The server is on the person's own network, so the host has nothing to check: an
+            // address saved in Settings is the whole prerequisite.
+            guard speechServer() != nil, hasCurrentOwner else { throw LiveVoiceControlError.speechServerNotConfigured }
+            return ["available": .boolean(true), "enabled": .boolean(true),
+                    "interruptSupported": .boolean(false)]
+        }
+        return try await request("voice.live.status", fields: ["provider": .string(provider.rawValue)])
     }
 
     func offer(voiceID: String, provider: LiveVoiceProvider, voice: String, sdp: String) async throws -> LiveVoiceAnswer {
         guard provider.voices.contains(voice), !voiceID.isEmpty else { throw LiveVoiceControlError.invalidResponse }
         if provider.usesHostMedia { try BighelpRealtimeAudioPeer.validateAudioSDP(sdp) }
+        if provider == .localSpeechServer {
+            guard let server = speechServer(), hasCurrentOwner else {
+                throw LiveVoiceControlError.speechServerNotConfigured
+            }
+            // Nothing to ask the host: the address and the key are the ones the person saved here.
+            return .speechServer(url: server.url, key: server.key, voice: voice)
+        }
         let result = try await request("voice.live.offer", fields: [
             "voiceId": .string(voiceID), "provider": .string(provider.rawValue),
             "voice": .string(voice), "sdp": .string(sdp),

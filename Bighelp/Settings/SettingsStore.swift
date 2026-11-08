@@ -730,6 +730,8 @@ final class SettingsStore {
         case .codexSubscription: codexLiveVoice
         case .apiKey: apiLiveVoice
         case .gemini: geminiLiveVoice
+        // A speech server keeps its own voice; "default" is what an unset voice sends.
+        case .localSpeechServer: "default"
         }
     }
 
@@ -739,6 +741,8 @@ final class SettingsStore {
         case .codexSubscription: codexLiveVoice = voice
         case .apiKey: apiLiveVoice = voice
         case .gemini: geminiLiveVoice = voice
+        // Nothing to remember: the server chooses how it sounds.
+        case .localSpeechServer: break
         }
     }
 

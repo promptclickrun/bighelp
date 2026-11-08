@@ -414,9 +414,9 @@ final class LiveVoiceModel {
             }
             stopLocal()
             phase = .ended
-            cleanupMessage = provider == .gemini
-                ? geminiClose?.message ?? "Gemini ended the call. Work you started keeps going."
-                : "The host closed live voice. Accepted tasks were not cancelled."
+            cleanupMessage = provider.usesHostMedia
+                ? "The host closed live voice. Accepted tasks were not cancelled."
+                : geminiClose?.message ?? "The voice server ended the call. Work you started keeps going."
         default: break // Unknown events cannot execute/control tasks.
         }
     }

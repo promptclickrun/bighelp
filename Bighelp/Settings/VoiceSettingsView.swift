@@ -166,6 +166,11 @@ private struct VoicePreferenceSections: View {
     /// The agent these choices are for, on `computer`; nil edits the default for every agent.
     let computer: String?
     let agentID: String?
+    /// The speech server is kept on this device, not on the computer, so it is edited here.
+    @State private var serverAddress = ""
+    @State private var serverKey = ""
+    @State private var serverLoaded = false
+    @State private var serverAddressIsValid = true
 
     private var preference: AgentVoicePreference {
         settings.voicePreference(computer: computer, agentID: agentID)
@@ -189,6 +194,18 @@ private struct VoicePreferenceSections: View {
     private var voice: Binding<String> {
         Binding(get: { preference.liveVoice },
                 set: { settings.setLiveVoice($0, computer: computer, agentID: agentID) })
+    }
+
+    private func loadSpeechServer() {
+        guard !serverLoaded else { return }
+        serverLoaded = true
+        serverAddress = UserDefaults.standard.string(forKey: SpeechServerSettings.addressKey) ?? ""
+        serverKey = (try? SpeechServerKeyVault().load()) ?? ""
+    }
+
+    private func saveSpeechServer() {
+        guard serverLoaded else { return }
+        serverAddressIsValid = SpeechServerSettings.save(address: serverAddress, key: serverKey)
     }
 
     var body: some View {
@@ -227,6 +244,40 @@ private struct VoicePreferenceSections: View {
                 .accessibilityIdentifier("voice.settings.live-voice")
             } header: {
                 Text(VoiceConversationMode.codexLive.title)
+            }
+            if preference.liveProvider == .localSpeechServer {
+                Section {
+                    TextField("Server address", text: $serverAddress,
+                              prompt: Text("ws://192.168.1.20:8765/v1/realtime"))
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                        .onSubmit(saveSpeechServer)
+                        .accessibilityIdentifier("voice.settings.speech-server.address")
+                    SecureField("Key (optional)", text: $serverKey)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onSubmit(saveSpeechServer)
+                        .accessibilityIdentifier("voice.settings.speech-server.key")
+                    if !serverKey.isEmpty && serverAddressIsValid {
+                        Button("Remove key", role: .destructive) {
+                            serverKey = ""
+                            SpeechServerSettings.removeKey()
+                        }
+                        .accessibilityIdentifier("voice.settings.speech-server.remove-key")
+                    }
+                    if !serverAddressIsValid {
+                        Text("That isn't a WebSocket address. Use ws:// or wss://.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Your speech server")
+                } footer: {
+                    Text("Your phone talks to this server directly: it hears and speaks, and Hermes answers. Saved on this device, never on your computer.")
+                }
+                .onAppear(perform: loadSpeechServer)
+                .onDisappear(perform: saveSpeechServer)
             }
             HostPluginFeatureSection(feature: .liveVoice)
         } else {

@@ -61,6 +61,32 @@ GPT-Live gets from `poll`, so `NativeLiveVoiceSession` routes work the same way:
   the translator ignores it.
 
 A Gemini session lasts up to 30 minutes from its token; the call ends when Gemini closes the socket.
+
+### Your own speech server
+
+`LiveVoiceProvider.localSpeechServer` points a call at a server the person runs themselves, set in Settings ›
+Voice: a WebSocket address and an optional key, both kept on the device (`SpeechServerSettings`, the key in the
+Keychain). Nothing about it reaches the computer, so any Hermes host carries the call with no plugin support,
+and the key never crosses the network to the agent.
+
+The server hears and speaks; Hermes answers, through the same `NativeLiveVoiceSession` path as the other two
+providers. `SpeechServerWire` speaks the OpenAI Realtime WebSocket dialect:
+
+- `session.update` fixes 24 kHz PCM both ways, asks for server VAD, and turns `create_response` off. A server
+  with a model of its own must not answer each utterance itself, or the person hears two voices.
+- The phone sends only microphone audio (`input_audio_buffer.append`), through the same voice-processing engine
+  and echo gate as a Gemini call (`GeminiLiveUplink`, which takes the wire's sample rate and frame encoder).
+- A finished utterance arrives as `conversation.item.input_audio_transcription.completed`. That text is the
+  request (`SpeechServerTranslator` emits the `delegation` event, one id per utterance), and Hermes' answer goes
+  back as a `response.create` whose instructions ask for it to be read out word for word — held until nobody is
+  speaking, as Gemini's updates are.
+- Both OpenAI spellings of the reply events are read (`response.audio.delta` and `response.output_audio.delta`),
+  because servers in the wild predate the rename.
+
+`SpeechServerAudioPeer` is deliberately a peer of its own rather than a mode inside `GeminiLiveAudioPeer`: a
+fault in it can only cost a call on a server the person chose. It shares the microphone pipeline, the echo gate
+and the audio lease, so the two differ only in what they put on the wire. It keeps no call sound report.
+
 Gemini refuses a call the same way: it closes the socket with a code and its reason, for example
 `1011 "Token has been used too many times"`, `1011 "new_session_expire_time deadline exceeded"` (the token's
 60 seconds to start had passed) or `1008 "models/… is not found"`. The peer keeps them (`GeminiLiveClose`):

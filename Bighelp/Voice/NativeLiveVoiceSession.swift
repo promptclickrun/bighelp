@@ -26,6 +26,8 @@ final class NativeLiveVoiceSession {
         let id: String
         /// Gemini: events and results stay on the phone's own connection.
         let local: Bool
+        /// A speech server the person runs: the host never allocated it, so it has nothing to close.
+        let selfHosted: Bool
         var cursor = 0
         var seen: [String: String] = [:]
         var pending: [String: Task<Outcome, Never>] = [:]
@@ -35,9 +37,10 @@ final class NativeLiveVoiceSession {
         var closeCleanup: (@MainActor () async -> Void)?
         /// Requests that finished on this call, newest last, for `check_work`.
         var finished: [String] = []
-        init(id: String, local: Bool) {
+        init(id: String, local: Bool, selfHosted: Bool) {
             self.id = id
             self.local = local
+            self.selfHosted = selfHosted
         }
     }
 
@@ -71,6 +74,9 @@ final class NativeLiveVoiceSession {
         makePeer: @escaping @MainActor () -> any LiveVoiceAudioPeer = { BighelpRealtimeAudioPeer() },
         makeLocalPeer: @escaping @MainActor () -> any LiveVoiceAudioPeer & LiveVoiceLocalSession = {
             GeminiLiveAudioPeer()
+        },
+        makeSpeechServerPeer: @escaping @MainActor (String) -> any LiveVoiceAudioPeer & LiveVoiceLocalSession = {
+            SpeechServerAudioPeer(agentName: $0)
         }
     ) -> LiveVoiceModel {
         let client = LiveVoiceControlClient(owner: owner, operation: { [self] name, fields in
@@ -78,8 +84,15 @@ final class NativeLiveVoiceSession {
         }, isOwnerCurrent: { [isCurrent, owner] value in value == owner && isCurrent() },
             onInvalidate: { [weak self] in self?.retire() })
         let model = LiveVoiceModel(agentName: agentName, client: client, makePeer: { [weak self] in
+            guard let self else { return makePeer() }
+            // A speech server is a peer of its own: the same audio engine, a different wire.
+            if self.model?.provider == .localSpeechServer {
+                let peer = makeSpeechServerPeer(agentName)
+                self.adopt(peer)
+                return peer
+            }
             // The model asks for its peer as it starts, with the provider it starts with.
-            guard let self, self.model?.provider.usesHostMedia == false else { return makePeer() }
+            guard self.model?.provider.usesHostMedia == false else { return makePeer() }
             let peer = makeLocalPeer()
             self.adopt(peer)
             return peer
@@ -90,12 +103,13 @@ final class NativeLiveVoiceSession {
 
     func perform(_ name: String, fields: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] {
         guard !retired, isCurrent() else { throw LiveVoiceControlError.wrongOwner }
-        let local = fields["provider"]?.string.flatMap(LiveVoiceProvider.init(rawValue:))?.usesHostMedia == false
+        let selected = fields["provider"]?.string.flatMap(LiveVoiceProvider.init(rawValue:))
+        let local = selected?.usesHostMedia == false
         switch name {
         case "voice.live.status": return try await request(local ? .nativeVoiceGeminiStatus : .nativeVoiceStatus, fields)
         case "voice.live.offer":
             guard call == nil, let id = fields["voiceId"]?.string else { throw LiveVoiceControlError.invalidResponse }
-            let next = Call(id: id, local: local)
+            let next = Call(id: id, local: local, selfHosted: selected == .localSpeechServer)
             call = next
             // Snapshot cleanup while the original owner and native context are
             // still current. The handle is retained for this exact allocation,
@@ -117,9 +131,12 @@ final class NativeLiveVoiceSession {
             }
         case "voice.live.close":
             if fields["voiceId"]?.string == call?.id {
+                // The host never allocated a speech server call, so there is nothing there to close.
+                let selfHosted = call?.selfHosted == true
                 call = nil
                 pollTask?.cancel()
                 pollTask = nil
+                if selfHosted { return ["voiceId": fields["voiceId"] ?? .null] }
             }
             // Accepted native work is deliberately not cancelled with media.
             return try await request(.nativeVoiceClose, fields)
@@ -299,6 +316,12 @@ final class NativeLiveVoiceSession {
 
     private func retire() {
         retired = true
+        if call?.selfHosted == true {
+            call = nil
+            pollTask?.cancel()
+            pollTask = nil
+            return
+        }
         let identifier = call?.id
         let preparedCleanup = call?.closeCleanup
         call = nil

@@ -336,6 +336,8 @@ final class ChatModel {
     var botModeDiscardSubmissions: Set<String> = []
     var botModeDiscardErrors: [String: String] = [:]
     var botModeRoomObservation: UUID?
+    /// Messages sent to the group chat that the room's log doesn't have yet (`BotModeOutgoingMessage`).
+    var botModeOutgoing: [BotModeOutgoingMessage] = []
     let generatedMediaResolver: (any GeneratedMediaResolving)?
     var generatedMediaResolutionTasks: [String: Task<Void, Never>] = [:]
     var generatedMediaResolutionAttempts: [String: String] = [:]

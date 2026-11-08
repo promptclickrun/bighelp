@@ -5,14 +5,16 @@ extension BotModeRoomStore {
         text: String,
         roomID: String,
         senderSnapshot: TimelineSenderSnapshot?,
-        activitySink: ((BotModeRunActivity) -> Void)?
+        activitySink: ((BotModeRunActivity) -> Void)?,
+        onAccepted: ((String) -> Void)? = nil
     ) async throws {
         guard let nativeClient else { throw BotModeRoomError.executionUnavailable }
         try await settleUnconfirmedNativeStop(roomID: roomID)
         if let working = room(id: roomID), working.isNativeWorking {
             // Hermes queues a message sent while members work behind the
             // room's active drive, so it goes out now instead of waiting.
-            try await sendNativeFollowUp(text: text, roomID: roomID, senderSnapshot: senderSnapshot)
+            try await sendNativeFollowUp(text: text, roomID: roomID, senderSnapshot: senderSnapshot,
+                                         onAccepted: onAccepted)
             return
         }
         let boundary = nativeBoundaryGeneration
@@ -151,6 +153,7 @@ extension BotModeRoomStore {
             guard result.accepted, result.clientEventID == eventID else {
                 throw BotModeRoomError.nativeSendRejected
             }
+            onAccepted?(result.event.eventID)
             guard var marked = self.room(id: roomID), marked.runOwner == owner else {
                 throw CancellationError()
             }
@@ -240,7 +243,8 @@ extension BotModeRoomStore {
     func sendNativeFollowUp(
         text: String,
         roomID: String,
-        senderSnapshot: TimelineSenderSnapshot?
+        senderSnapshot: TimelineSenderSnapshot?,
+        onAccepted: ((String) -> Void)? = nil
     ) async throws {
         guard let nativeClient else { throw BotModeRoomError.executionUnavailable }
         let boundary = nativeBoundaryGeneration
@@ -303,6 +307,7 @@ extension BotModeRoomStore {
         }
         try recordNativeFollowUpReceipt(roomID: roomID, eventID: followUp.eventID,
                                         discussionEventID: result.event.eventID)
+        onAccepted?(result.event.eventID)
     }
 
     private func dropNativeFollowUp(roomID: String, eventID: String) throws {

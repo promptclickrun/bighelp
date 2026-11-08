@@ -167,6 +167,41 @@ struct BotModeStopTests {
         #expect(client.stopped.isEmpty)
     }
 
+    /// A message to a group chat shows the moment it's sent. The room's own row for it comes only after
+    /// the room is read before the send and again after it, seconds on a computer far away; then exactly
+    /// one copy shows.
+    @Test(.timeLimit(.minutes(1)))
+    func aSentMessageShowsAtOnceAndOnlyOnceTheRoomHasIt() async throws {
+        let (model, _, client) = try await stopTestChat(draft: "@everyone what next?", cancelID: nil)
+        client.onSend = {
+            let next = (client.logPages.joined().map(\.sequence).max() ?? client.stateLatestSequence) + 10
+            let server = "server-\(client.sentEventIDs.last ?? "")"
+            client.logPages.append([
+                .fixture(roomID: "bot-fixture", sequence: next, eventID: server, kind: "message.user",
+                         payload: ["text": .string("@everyone what next?")]),
+                .fixture(roomID: "bot-fixture", sequence: next + 1, eventID: "answer-\(next)", kind: "message.member",
+                         payload: ["member_id": .string("finance"), "text": .string("Here is the next step")]),
+                .fixture(roomID: "bot-fixture", sequence: next + 2, eventID: "settled-\(next)", kind: "room.activity",
+                         payload: ["status": .string("settled")]),
+            ])
+        }
+        func shown(_ text: String) -> Int {
+            model.botModeTimelineItems.filter { $0.role == .human && $0.content == .message(text) }.count
+        }
+        // The room's read before the send waits, as a slow computer's does.
+        client.blockGroupsState = true
+        let sending = Task { await model.send() }
+        while client.stateCallCount == 0 { await Task.yield() }
+        #expect(shown("@everyone what next?") == 1, "The message shows before the room has it")
+        #expect(model.draft.isEmpty)
+
+        client.blockGroupsState = false
+        client.releaseNextBlockedGroupsState()
+        await sending.value
+        #expect(shown("@everyone what next?") == 1, "The room's row replaced it: one copy")
+        #expect(model.botModeTimelineItems.contains { $0.content == .message("Here is the next step") })
+    }
+
     @Test func stopAgainKeepsTheDraftAndThenTheMessageGoesOut() async throws {
         let (model, store, client) = try await stopTestChat(draft: "@everyone what next?", cancelID: "stop-1")
         replyOnSend(client, roomID: "bot-fixture", text: "Here is the next step")

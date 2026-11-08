@@ -1,5 +1,15 @@
 import Foundation
 
+/// A message the person sent to a group chat. It shows at once: the room's own row for it comes only
+/// when its log is read again after Hermes takes the message, seconds later on a computer far away.
+struct BotModeOutgoingMessage: Equatable {
+    let id: String
+    let text: String
+    let sentAt: Date
+    /// The room event Hermes made for it; the row goes once the room's log has that event.
+    var eventID: String?
+}
+
 extension ChatModel {
     var isBotMode: Bool {
         botModeRoom != nil
@@ -50,14 +60,18 @@ extension ChatModel {
         draft = ""
         replyDraft = nil
         failureMessage = nil
+        let outgoing = beginBotModeOutgoing(message)
         do {
-            try await botModeRoomStore.send(text: message, roomID: roomID, senderSnapshot: currentUserSnapshot)
+            try await botModeRoomStore.send(text: message, roomID: roomID, senderSnapshot: currentUserSnapshot,
+                                            onAccepted: { [weak self] in self?.acceptBotModeOutgoing(outgoing, eventID: $0) })
         } catch is CancellationError {
+            dropBotModeOutgoing(outgoing)
             if draft.isEmpty { draft = message }
         } catch {
             let unconfirmed = botModeRoomStore.room(id: roomID)?.nativeFollowUps.contains {
                 $0.text == message && $0.discussionEventID == nil
             } == true
+            dropBotModeOutgoing(outgoing)
             if unconfirmed {
                 // The room's recovery sends it again under the same key, so
                 // the draft stays empty: sending it by hand could double it.
@@ -393,19 +407,60 @@ extension ChatModel {
     /// discussions between them. Both carry the room log's order.
     var botModeTimelineItems: [TimelineItem] {
         let messages = botModeMessageItems
-        guard let room = botModeRoom, !room.nativeNotices.isEmpty else { return messages }
+        guard let room = botModeRoom, !room.nativeNotices.isEmpty else { return messages + botModeOutgoingItems }
         let rows = BotModeRoomNoticePresentation.rows(
             notices: room.nativeNotices, messages: room.visibleEvents.compactMap(\.nativeEvent),
             names: botModeMemberNames, maximumContinues: botModeRoomSettings?.support.maximumContinues,
             allowsContinue: botModeRoomStore?.nativeCapabilities?.supports("groups.continue") == true)
-        guard !rows.isEmpty else { return messages }
+        guard !rows.isEmpty else { return messages + botModeOutgoingItems }
         let notices = rows.map { TimelineItem.groupNotice($0.row, sourceOrder: $0.notice.sourceOrder,
                                                           createdAt: $0.notice.event.createdAt) }
         return (messages + notices).enumerated().sorted { left, right in
             let leftOrder = left.element.metadata.sourceOrder ?? .max
             let rightOrder = right.element.metadata.sourceOrder ?? .max
             return leftOrder == rightOrder ? left.offset < right.offset : leftOrder < rightOrder
-        }.map(\.element)
+        }.map(\.element) + botModeOutgoingItems
+    }
+
+    /// The person's sent messages the room's log doesn't have yet, after everything else.
+    private var botModeOutgoingItems: [TimelineItem] {
+        guard !botModeOutgoing.isEmpty else { return [] }
+        let logged = Set(timelineEvents.map(\.id))
+        return botModeOutgoing.filter { $0.eventID.map(logged.contains) != true }.map { message in
+            TimelineItem(id: message.id, role: .human, sender: .user(snapshot: currentUserSnapshot),
+                         content: .message(message.text),
+                         metadata: TimelineMetadata(delivery: "Sending", timestamp: message.sentAt))
+        }
+    }
+
+    /// Shows a message sent to the group chat at once, before the room has it. Returns its row's ID.
+    func beginBotModeOutgoing(_ text: String) -> String {
+        let id = "bot-outgoing:\(UUID().uuidString)"
+        botModeOutgoing.append(BotModeOutgoingMessage(id: id, text: text, sentAt: .now))
+        rebuildTranscript()
+        return id
+    }
+
+    /// Hermes took the message as `eventID`: the room's row for that event replaces this one.
+    func acceptBotModeOutgoing(_ id: String, eventID: String) {
+        guard let index = botModeOutgoing.firstIndex(where: { $0.id == id }) else { return }
+        botModeOutgoing[index].eventID = eventID
+        pruneBotModeOutgoing()
+    }
+
+    /// The send failed. A message Hermes took stays until the room's log has it; any other goes, back to
+    /// the box or to the room's own recovery, whose resend the log shows when it lands.
+    func dropBotModeOutgoing(_ id: String) {
+        guard botModeOutgoing.contains(where: { $0.id == id && $0.eventID == nil }) else { return }
+        botModeOutgoing.removeAll { $0.id == id }
+        rebuildTranscript()
+    }
+
+    /// Forgets the messages the room's log now has.
+    func pruneBotModeOutgoing() {
+        guard !botModeOutgoing.isEmpty else { return }
+        let logged = Set(timelineEvents.map(\.id))
+        botModeOutgoing.removeAll { $0.eventID.map(logged.contains) == true }
     }
 
     /// Each member's name as the room shows it, for the lines about who took a message.
@@ -923,6 +978,7 @@ extension ChatModel {
                 model.isSending = model.botModeRoomStore?.nativeRoomIsWorking(roomID: botModeRoomID) == true
                 model.reconcileNativeBotModeSendRecovery()
             }
+            model.pruneBotModeOutgoing()
             model.rebuildTranscript()
         }
     }

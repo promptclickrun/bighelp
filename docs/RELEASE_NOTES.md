@@ -3,6 +3,23 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.74
+
+### New
+
+- **See what a background item did:** on a bot's **Dashboard**, tap an item in **Activities**. For a subagent, you see each step in order on a timeline, and then its answer. For a command, you see the command and its output. For a routine, you see how the run went and its result. While the work runs, the view updates by itself.
+- **Notifications from your agents:** an agent can send you a notification at any time, without a scheduled task. bighelp calls these notifications **Deliveries**.
+- **More notification switches:** in Settings › Notifications, **Scheduled tasks** and **Deliveries** are now two switches. You can turn on one and turn off the other. A new **Group chats** switch controls the notifications from group chats. Questions and approvals always notify you.
+- **Your order for plans:** in Usage, tap **Choose** next to Limits. Drag a plan to put it where you want it. Usage shows the plans in your order.
+
+The first three items need the bighelp plugin 3.49.0 on your computer.
+
+### Fixed
+
+- **Your own replies notify you:** with **Agents messaging each other** off, a reply to your own message in a bot's chat did not notify you. Now it does. This needs the bighelp plugin 3.49.0.
+- **New Group Chat:** in Bots mode, **New Group Chat** is in the + menu as soon as you open bighelp. Before, it could take 10 seconds or more.
+- **Subagents in a chat:** when a subagent works in the background, the chat now shows the finished turn in the style that you chose (Card, Minimal or Full). Before, the turn showed every step. The subagent's row also updates when it reports during your next message.
+
 ## 2.6.73
 
 ### New

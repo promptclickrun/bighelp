@@ -3,6 +3,17 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.73
+
+### New
+
+- **See and control your computer:** on a bot's **Computer** tab, **Your computer** shows the desktop of the computer that runs Hermes. This works on macOS, Linux and Windows. Tap **Open your computer**, then tap **Take control** to use it. First, turn on screen sharing with a password on the computer. On a Mac, go to System Settings › General › Sharing › Screen Sharing. Then turn on "VNC viewers may control screen with password". bighelp asks for this password one time. This needs the bighelp plugin 3.48.0.
+- **Activities:** on a bot's **Dashboard**, **Activities** replaces **Today**. It shows the background work of the last seven days, by day. To see routines in the list, tap ⋯ and then **Show routines**.
+
+### Fixed
+
+- **Zoom on a screen:** you can pinch to zoom on a screen while you are in control. Before, zoom worked only while you watched.
+
 ## 2.6.72
 
 ### New

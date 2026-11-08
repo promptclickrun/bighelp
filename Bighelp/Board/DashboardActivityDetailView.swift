@@ -169,7 +169,7 @@ enum DashboardActivityTime {
 
 // MARK: Subagent
 
-/// The subagent's task, each thing it did in order, then its answer.
+/// The subagent's task, what it did newest first (how it's going on top), then its answer.
 private struct DashboardSubagentReadout: View {
     let item: AgentTodayItem
     let subagent: AgentTodayDetail.Subagent
@@ -194,12 +194,14 @@ private struct DashboardSubagentReadout: View {
                             .foregroundStyle(theme.secondaryText)
                             .padding(.bottom, BighelpTokens.space8)
                     }
-                    ForEach(subagent.steps) { step in
-                        DashboardTimelineRow(at: step.at, dot: dot(step.state), isLast: false) {
+                    // Newest first, so a running step shows on top as it happens; the rail ends at the first step.
+                    ending(isLast: subagent.steps.isEmpty)
+                    let steps = Array(subagent.steps.reversed())
+                    ForEach(steps) { step in
+                        DashboardTimelineRow(at: step.at, dot: dot(step.state), isLast: step.id == steps.last?.id) {
                             DashboardStepText(step: step)
                         }
                     }
-                    ending
                 }
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("dashboard.activity.steps")
@@ -227,24 +229,24 @@ private struct DashboardSubagentReadout: View {
         }
     }
 
-    /// The timeline's last row: how it ended, or that it's still working.
+    /// The timeline's first row: how it ended, or that it's still working.
     @ViewBuilder
-    private var ending: some View {
+    private func ending(isLast: Bool) -> some View {
         switch item.state {
         case .running:
-            DashboardTimelineRow(at: nil, dot: .running, isLast: true) {
+            DashboardTimelineRow(at: nil, dot: .running, isLast: isLast) {
                 Text(subagent.steps.isEmpty ? "Starting…" : "Working…")
                     .font(.bighelp(.body, weight: .semibold))
                     .foregroundStyle(theme.primaryText)
             }
         case .done:
-            DashboardTimelineRow(at: item.endedAt, dot: .done, isLast: true) {
+            DashboardTimelineRow(at: item.endedAt, dot: .done, isLast: isLast) {
                 Text("Finished")
                     .font(.bighelp(.body, weight: .semibold))
                     .foregroundStyle(theme.primaryText)
             }
         case .failed, .stopped, .unknown:
-            DashboardTimelineRow(at: item.endedAt, dot: .failed, isLast: true) {
+            DashboardTimelineRow(at: item.endedAt, dot: .failed, isLast: isLast) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.state == .stopped ? "Stopped" : "Didn't finish")
                         .font(.bighelp(.body, weight: .semibold))

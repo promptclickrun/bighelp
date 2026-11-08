@@ -68,6 +68,20 @@ final class SubagentCanvasUITests: BighelpUITestCase {
         XCTAssertTrue(element(app, labelContaining: "ryokan-pick.md").exists)
         XCTAssertTrue(element(app, labelContaining: "Hotel Kanra is the best fit").waitForExistence(timeout: 10),
                       "The helper's reply shows once it finishes.")
+        // Finished: its tool calls and notes fold into one folder, as a finished turn does in the
+        // chat, so the reply is what shows. With no measured time, the folder says what it did.
+        let fold = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "chat.completed-turn:")).firstMatch
+        XCTAssertTrue(fold.waitForExistence(timeout: 5), "A finished helper's steps fold into one folder.")
+        XCTAssertTrue(fold.label.contains("kyoto-trip.md") && fold.label.contains("3 steps"), fold.label)
+        // Its notes on the way fold with the work, as in the chat.
+        let note = element(app, labelContaining: "Starting from the trip notes.")
+        XCTAssertFalse(note.exists, "The steps stay folded until opened.")
+        capture(app, "\(appearance)-4-canvas-folded")
+        fold.tap()
+        XCTAssertTrue(note.waitForExistence(timeout: 5), "Opening the folder shows the steps.")
+        XCTAssertTrue(element(app, labelContaining: "Read kyoto-trip.md, 1 step").exists, "Each tool folder is inside it.")
+        capture(app, "\(appearance)-4b-canvas-unfolded")
         app.swipeUp()
         capture(app, "\(appearance)-4-canvas-done")
 

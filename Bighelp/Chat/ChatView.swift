@@ -320,6 +320,7 @@ struct ChatView: View {
         .environment(\.bighelpUIV3Enabled, true)
         .environment(\.bighelpUIV2Enabled, true)
         .environment(\.chatActivityDisclosureStore, model.activityDisclosures)
+        .environment(\.chatWorkFolding, ChatWorkFolding(foldsFinished: foldCompletedTurns, style: workStyleInUse ?? .full))
         .modifier(ChatScheduledRetryLifecycle(model: model))
         .modifier(ChatBackgroundCommandsWatch(model: model))
         .onAppear {

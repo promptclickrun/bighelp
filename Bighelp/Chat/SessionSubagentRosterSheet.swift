@@ -406,20 +406,10 @@ private struct SessionSubagentDetailView: View {
                     .padding(BighelpTokens.space16)
                     .bighelpSurface(.card)
             } else {
-                let entries = transcriptEntries(for: record)
-                LazyVStack(alignment: .leading, spacing: BighelpTokens.space16) {
-                    ForEach(entries) { entry in
-                        switch entry {
-                        case .message(let item):
-                            TimelineItemView(
-                                item: item,
-                                onApprovalTap: { _ in }
-                            )
-                        case .activity(let turn):
-                            ChatActivityTurnView(turn: turn, isLive: record.isActive && entry.id == entries.last?.id)
-                        }
-                    }
-                }
+                let visibility = sessionCatalog?.activityVisibility(for: record) ?? .default
+                ChatFoldedSteps(entries: transcriptEntries(for: record, visibility: visibility),
+                                activityEvents: record.activityEvents, isLive: record.isActive,
+                                interimReplies: .following(visibility))
             }
 
             if let availabilityMessage {
@@ -431,11 +421,11 @@ private struct SessionSubagentDetailView: View {
         }
     }
 
-    private func transcriptEntries(for record: SessionRecord) -> [ChatTranscriptEntry] {
+    private func transcriptEntries(for record: SessionRecord, visibility: ChatActivityVisibility) -> [ChatTranscriptEntry] {
         ChatTranscriptProjection.entries(
             items: record.items,
             activityEvents: record.activityEvents,
-            visibility: sessionCatalog?.activityVisibility(for: record) ?? .default,
+            visibility: visibility,
             isBotMode: record.kind == .botMode,
             isScheduled: record.isCronSession
         )

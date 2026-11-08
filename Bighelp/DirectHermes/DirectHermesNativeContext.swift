@@ -415,6 +415,10 @@ final class DirectHermesNativePluginClient {
             // Read every few seconds while Bots mode's home or the Agents screen shows; at most 64 agents.
             return Route(path: "agents/activity", feature: DirectHermesBotChatActivityClient.feature,
                          isMutation: false, maximumResponseBytes: 32_768, timeout: 10)
+        case .agentsToday:
+            // Read while a bot's Dashboard shows; at most 100 short rows (the plugin caps the answer at 256 KB).
+            return Route(path: "agents/today", feature: AgentTodayItem.feature,
+                         isMutation: false, maximumResponseBytes: 262_144, timeout: 15)
         case .coreFilesList, .coreFilesRead, .coreFilesWrite:
             // A file is at most 512 KB, sent whole.
             return Route(path: operation.rawValue.replacingOccurrences(of: ".", with: "/"),

@@ -1,7 +1,8 @@
 import XCTest
 
 /// Demo fixtures only (`-test-subagent-canvas`): a turn with two helpers whose
-/// Hermes-shaped events and saved sessions run through the real native chat.
+/// Hermes-shaped events and saved sessions run through the real native chat, and a preview server
+/// the agent left running in the background.
 final class SubagentCanvasUITests: BighelpUITestCase {
     @MainActor
     func testWatchingASubagentShowsItsStepsLiveAndHowItEnded() throws {
@@ -21,11 +22,13 @@ final class SubagentCanvasUITests: BighelpUITestCase {
                                 "-test-subagent-canvas", "-loopdy.demo.appearance", appearance]
         app.launch()
 
-        // The rail says Subagents, and counts the ones working.
-        let rail = app.buttons["chat.session-status.subagents"]
-        XCTAssertTrue(rail.waitForExistence(timeout: 20), "Running helpers must surface the Subagents rail.")
-        XCTAssertTrue(rail.staticTexts["Subagents"].exists, "The rail is called Subagents, not Agents.")
-        XCTAssertEqual(rail.label, "2 active subagents")
+        // One chip says what runs in the background: the two helpers and the preview server.
+        let rail = app.buttons["chat.session-status.background"]
+        XCTAssertTrue(rail.waitForExistence(timeout: 20), "Running helpers must surface the background chip.")
+        XCTAssertTrue(rail.staticTexts["In the background"].exists)
+        expectation(for: NSPredicate(format: "label == %@", "In the background, 2 subagents · 1 command"),
+                    evaluatedWith: rail)
+        waitForExpectations(timeout: 10)
         capture(app, "\(appearance)-1-rail")
 
         rail.tap()
@@ -76,6 +79,39 @@ final class SubagentCanvasUITests: BighelpUITestCase {
         capture(app, "\(appearance)-5-roster-after")
     }
 
+    /// The agent left a preview server running: the sheet lists it under the helpers, with its
+    /// latest output (Nerd Mode is on in UI tests) and Stop; a script that ended says how.
+    @MainActor
+    func testABackgroundCommandShowsAndStops() throws {
+        continueAfterFailure = false
+        let app = makeApp()
+        app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
+                                "-test-subagent-canvas", "-loopdy.demo.appearance", "light"]
+        app.launch()
+        let rail = app.buttons["chat.session-status.background"]
+        XCTAssertTrue(rail.waitForExistence(timeout: 20))
+        expectation(for: NSPredicate(format: "label CONTAINS %@", "1 command"), evaluatedWith: rail)
+        waitForExpectations(timeout: 10)
+        rail.tap()
+
+        let preview = app.descendants(matching: .any)["background.command.proc_preview"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(app, labelContaining: "python3 -m http.server 8000").exists)
+        XCTAssertTrue(element(app, labelContaining: "Running · 6 min").exists)
+        XCTAssertTrue(app.descendants(matching: .any)["background.command.output.proc_preview"].exists,
+                      "Nerd Mode shows its latest output")
+        XCTAssertTrue(element(app, labelContaining: "Finished").exists, "The script that ended says how")
+        app.swipeUp()
+        capture(app, "light-9-commands")
+
+        let stop = app.buttons["background.command.stop.proc_preview"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 5))
+        stop.tap()
+        XCTAssertTrue(element(app, labelContaining: "Stopped").waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["background.command.stop.proc_preview"].exists, "A stopped command has no Stop")
+        capture(app, "light-10-command-stopped")
+    }
+
     @MainActor
     func testSteeringAndStoppingAHelperWhileItWorks() throws {
         try steerAndStop(appearance: "light")
@@ -94,7 +130,7 @@ final class SubagentCanvasUITests: BighelpUITestCase {
         app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
                                 "-test-subagent-canvas", "-loopdy.demo.appearance", appearance]
         app.launch()
-        let rail = app.buttons["chat.session-status.subagents"]
+        let rail = app.buttons["chat.session-status.background"]
         XCTAssertTrue(rail.waitForExistence(timeout: 20))
         rail.tap()
         let trains = app.buttons["subagent.native.roster.sa-trains"]

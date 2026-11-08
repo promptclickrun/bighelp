@@ -97,7 +97,7 @@ final class BotDashboardUITests: BighelpUITestCase {
     }
 
     /// Screenshots for design review, only when `BIGHELP_DASHBOARD_SHOTS` names a folder: the
-    /// Dashboard in light and dark, the tutorial, the Templates deck and a brand-new bot. A file
+    /// Dashboard in light and dark, the tutorial, Today open, a brand-new bot and the Templates deck. A file
     /// `drag-start` there tells a watcher outside the test when a card is held mid-swipe.
     @MainActor
     func testDashboardScreenshots() throws {
@@ -147,7 +147,25 @@ final class BotDashboardUITests: BighelpUITestCase {
                 Thread.sleep(forTimeInterval: 0.8)
             }
 
-            app.buttons["dashboard.templates"].tap()
+            // Today: closed over the piles, then open on the demo's background work.
+            let today = app.buttons["dashboard.today.toggle"]
+            XCTAssertTrue(today.waitForExistence(timeout: 5))
+            XCTAssertEqual(today.value as? String, "Closed", "Today stays closed until the person opens it")
+            today.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["dashboard.today.item.delegation:hotels"]
+                .waitForExistence(timeout: 5))
+            Thread.sleep(forTimeInterval: 0.6)
+            shot("today-\(appearance)", app)
+            today.tap()
+            app.terminate()
+
+            // The demo's brand-new bot: every pile empty, Templates from the empty Feed.
+            app.launch()
+            openProfile(app, bot: "simple-bots.bot.home")
+            XCTAssertTrue(app.descendants(matching: .any)["dashboard.feed.empty"].waitForExistence(timeout: 10))
+            Thread.sleep(forTimeInterval: 0.6)
+            shot("empty-bot-\(appearance)", app)
+            app.buttons["dashboard.feed.empty.templates"].tap()
             XCTAssertTrue(app.descendants(matching: .any)["dashboard.templates.sheet"].waitForExistence(timeout: 5))
             Thread.sleep(forTimeInterval: 0.8)
             shot("templates-\(appearance)", app)
@@ -155,14 +173,6 @@ final class BotDashboardUITests: BighelpUITestCase {
             Thread.sleep(forTimeInterval: 0.6)
             shot("templates-goals-\(appearance)", app)
             app.buttons["dashboard.templates.done"].tap()
-            app.terminate()
-
-            // The demo's brand-new bot: every pile empty.
-            app.launch()
-            openProfile(app, bot: "simple-bots.bot.home")
-            XCTAssertTrue(app.descendants(matching: .any)["dashboard.feed.empty"].waitForExistence(timeout: 10))
-            Thread.sleep(forTimeInterval: 0.6)
-            shot("empty-bot-\(appearance)", app)
             app.terminate()
         }
     }

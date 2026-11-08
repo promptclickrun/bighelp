@@ -343,6 +343,14 @@ change in both repos.
   works, 6 s idle), keyed by `cacheScopeID`; other gateways come from their all-hosts copies (`FleetBotChat`),
   only while fresh. Without the route it uses the Bot Chats the app knows to be running, and says nothing
   about updating. Never open or resume a chat to learn this.
+- **Background work (#890):** an agent keeps working after it answers: subagents (`delegate_task`), background
+  commands (`terminal(background=true)`) and scheduled tasks. With `native-agents-background-v1`, `agents/activity`
+  rows carry `background` (how many run now, in any chat and any Hermes process, and the newest one's title);
+  an idle bot then shows `BotChatActivity.background`, and a turn wins over it. The open chat reads Hermes' own
+  `process.list` over its socket (`ChatBackgroundCommandsWatch`; `process.kill` stops one), and its "In the
+  background" chip counts its subagents and running commands for everyone; a command's output shows with Nerd
+  Mode on. A bot's Dashboard lists the day's work from `agents/today` (`native-agents-today-v1`,
+  `AgentTodayModel`), asked from the start of the phone's day.
 - **Plugin routes:**
   - Each route is a `WorkspaceOperation` case plus a `Route(path:feature:isMutation:maximumResponseBytes:)` in
     `DirectHermesNativeContext.swift`.

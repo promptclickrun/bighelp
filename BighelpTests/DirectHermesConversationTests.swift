@@ -2033,7 +2033,7 @@ struct DirectHermesConversationTests {
         #expect(model.nativeSubagents.first?.childSessionID == "child-runtime-1")
         #expect(SessionStatusRailPresentation.items(
             goal: nil, subagents: [], nativeSubagents: model.nativeSubagents, tasks: nil
-        ).map(\.kind) == [.subagents])
+        ).map(\.kind) == [.background])
 
         client.receive(.init(
             type: "subagent.start", sessionID: "runtime",

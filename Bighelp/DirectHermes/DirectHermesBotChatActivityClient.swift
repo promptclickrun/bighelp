@@ -3,7 +3,7 @@ import Foundation
 /// The plugin's `agents/activity` route (`native-agents-activity-v1`): what each agent's Bot Chat is
 /// doing, in one read. It covers turns the app started, turns another agent asked for in another
 /// Hermes process (`message_agent`, `hermes -p <agent> chat -q`), and approvals or questions waiting
-/// on the person. Read-only.
+/// on the person, and (`native-agents-background-v1`) the work each one runs in the background. Read-only.
 @MainActor
 final class DirectHermesBotChatActivityClient: BotChatActivityReading {
     static let feature = "native-agents-activity-v1"
@@ -42,7 +42,7 @@ final class DirectHermesBotChatActivityClient: BotChatActivityReading {
             guard let row = value.object, let id = row["agentId"]?.string, asked.contains(id),
                   result[id] == nil, let state = row["state"]?.string else { continue }
             switch state {
-            case "idle": result[id] = .idle
+            case "idle": result[id] = BotBackgroundWork(json: row["background"]).map(BotChatActivity.background) ?? .idle
             case "waiting": result[id] = .waiting
             case "working":
                 let tool = row["tool"]?.string.flatMap { ChatToolNames.plainName($0) == nil ? nil : $0 }

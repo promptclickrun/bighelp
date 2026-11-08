@@ -137,8 +137,11 @@ final class DirectHermesScheduledTasksClient: ScheduledTasksClient {
         let profile = try DirectHermesCoreRequestScope.profile(agentID)
         let id = try DirectHermesCoreRequestScope.identifier(id)
         try scope.require(.schedulesEdit, profile: profile)
+        // Blank instructions are for a task whose script or skills are the job; Hermes refuses
+        // an update that leaves a task with nothing to run.
         let fields = try await fields(name: changes.name, instructions: changes.instructions,
-            schedule: changes.schedule, delivery: changes.deliveryTarget, profile: profile)
+            schedule: changes.schedule, delivery: changes.deliveryTarget, profile: profile,
+            allowsEmptyInstructions: true)
         try scope.require(.schedulesEdit, profile: profile)
         let response = try await scope.perform(.scheduledTaskUpdate, [
             "profile": .string(profile), "id": .string(id), "updates": .object(fields)
@@ -174,12 +177,12 @@ final class DirectHermesScheduledTasksClient: ScheduledTasksClient {
         )
     }
 
-    private func fields(name: String, instructions: String, schedule: ScheduleInput,
-                        delivery: String, profile: String) async throws -> [String: BighelpJSONValue] {
+    private func fields(name: String, instructions: String, schedule: ScheduleInput, delivery: String,
+                        profile: String, allowsEmptyInstructions: Bool = false) async throws -> [String: BighelpJSONValue] {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let instructions = instructions.trimmingCharacters(in: .whitespacesAndNewlines)
         _ = try WorkspaceManagementDecoder.text(.string(name), maximum: 240)
-        _ = try WorkspaceManagementDecoder.text(.string(instructions), maximum: 256_000)
+        _ = try WorkspaceManagementDecoder.text(.string(instructions), maximum: 256_000, empty: allowsEmptyInstructions)
         let request = try ScheduleRequestBuilder.hermesRequest(for: schedule)
         _ = try WorkspaceManagementDecoder.text(.string(request), maximum: 2_048)
         let targets = try await deliveryTargets()

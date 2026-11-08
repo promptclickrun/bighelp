@@ -604,6 +604,15 @@ time-zone presentation, validation, creation, editing, deletion, duplication,
 and agent filtering. The app constructs a canonical schedule request, and the
 authorized host confirms the resulting schedule.
 
+A task can also have a `script`, `skills` or `no_agent` on Hermes
+(`ScheduledTaskHostExecution`). The app keeps the script's file name, never its
+path, and shows it with the skills in Advanced. The editor sends only the name,
+instructions, schedule and delivery, and Hermes keeps every field an update
+leaves out, so an edit keeps the script. Instructions may be blank for such a
+task, and a script-only task (`no_agent`) shows no instructions box. Duplicate
+stays off for these tasks: a copy is made from the editor's fields and would
+lose the script.
+
 ### Approvals
 
 Approval cards present the requested action, provenance, consequence, and

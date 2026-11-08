@@ -318,8 +318,16 @@ struct ScheduledTaskDetailView: View {
                     }
                     detailLine("Delivery target", task.deliveryTarget, systemImage: "point.3.connected.trianglepath.dotted")
                     detailLine("Time zone", task.schedule.timeZoneDisclosure, systemImage: "globe")
-                    if task.usesHostManagedExecution {
-                        detailLine("Execution", "Uses host-managed scripts or skills", systemImage: "terminal")
+                    if let execution = task.hostExecution {
+                        if let script = execution.scriptName {
+                            detailLine("Script", script, systemImage: "terminal")
+                        }
+                        if !execution.skills.isEmpty {
+                            detailLine("Skills", execution.skills.joined(separator: ", "), systemImage: "books.vertical")
+                        }
+                        if execution.runsWithoutAgent {
+                            detailLine("Agent", "Not used: sends what the script prints", systemImage: "person.crop.circle.badge.xmark")
+                        }
                     }
                     duplicateButton(task)
                 } label: {
@@ -338,15 +346,26 @@ struct ScheduledTaskDetailView: View {
         }
     }
 
+    @ViewBuilder
     private func duplicateButton(_ task: ScheduledTask) -> some View {
-        let presentation = presentation(for: task)
-        return Button("Duplicate for another agent", systemImage: "doc.on.doc") {
+        let duplicate = presentation(for: task).action(.duplicate)
+        let isEnabled = duplicate.isEnabled && !agents.profiles.isEmpty && !store.isPending("create")
+        Button("Duplicate for another agent", systemImage: "doc.on.doc") {
             isDuplicatePickerPresented = true
         }
         .frame(minHeight: BighelpTokens.hitTarget)
-        .disabled(!presentation.action(.duplicate).isEnabled || agents.profiles.isEmpty || store.isPending("create"))
+        .disabled(!isEnabled)
+        // The form's text color hides a disabled button's dimming.
+        .opacity(isEnabled ? 1 : 0.45)
         .listRowBackground(theme.surface)
         .accessibilityIdentifier("scheduled-task.duplicate")
+        if let reason = duplicate.isEnabled ? nil : duplicate.reason {
+            Text(reason)
+                .bighelpFont(.metadata)
+                .foregroundStyle(theme.secondaryText)
+                .listRowBackground(theme.surface)
+                .accessibilityIdentifier("scheduled-task.duplicate.reason")
+        }
     }
 
     private func dangerZone(_ task: ScheduledTask) -> some View {

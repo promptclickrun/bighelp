@@ -75,7 +75,7 @@ enum LiveVoiceAnswer: Equatable, Sendable {
     case sdp(String)
     case gemini(url: URL, token: String, model: String)
     /// A server the person configured on this device: where it listens, and the key for its handshake.
-    case speechServer(url: URL, key: String, voice: String)
+    case speechServer(url: URL, key: String, voice: String, converses: Bool)
 }
 
 enum LiveVoiceControlError: Error, LocalizedError, Sendable {
@@ -224,7 +224,7 @@ final class LiveVoiceControlClient {
                 throw LiveVoiceControlError.speechServerNotConfigured
             }
             // Nothing to ask the host: the address and the key are the ones the person saved here.
-            return .speechServer(url: server.url, key: server.key, voice: voice)
+            return .speechServer(url: server.url, key: server.key, voice: voice, converses: server.converses)
         }
         let result = try await request("voice.live.offer", fields: [
             "voiceId": .string(voiceID), "provider": .string(provider.rawValue),

@@ -72,14 +72,24 @@ and the key never crosses the network to the agent.
 The server hears and speaks; Hermes answers, through the same `NativeLiveVoiceSession` path as the other two
 providers. `SpeechServerWire` speaks the OpenAI Realtime WebSocket dialect:
 
-- `session.update` fixes 24 kHz PCM both ways, asks for server VAD, and turns `create_response` off. A server
-  with a model of its own must not answer each utterance itself, or the person hears two voices.
 - The phone sends only microphone audio (`input_audio_buffer.append`), through the same voice-processing engine
   and echo gate as a Gemini call (`GeminiLiveUplink`, which takes the wire's sample rate and frame encoder).
-- A finished utterance arrives as `conversation.item.input_audio_transcription.completed`. That text is the
-  request (`SpeechServerTranslator` emits the `delegation` event, one id per utterance), and Hermes' answer goes
-  back as a `response.create` whose instructions ask for it to be read out word for word — held until nobody is
-  speaking, as Gemini's updates are.
+- Hermes' answer goes back as a `response.create` whose instructions ask for it to be read out word for word —
+  held until nobody is speaking, as Gemini's updates are.
+
+`session.update` fixes 24 kHz PCM both ways and asks for server VAD, and then there are two arrangements,
+chosen in Settings › Voice by **Let the server hold the conversation** (on unless changed):
+
+- **On: the server converses.** `create_response` is true and the session declares one tool, `start_work`.
+  The server's own model answers greetings, thanks and clarifications where the audio is, and hands anything
+  that needs facts, the person's data or an action to `start_work` with the request in their own words. That
+  is what keeps a call snappy: only real work goes to Hermes. The call answers the function with `started`
+  and sends no `response.create`, so the acknowledgment is not spoken twice; the result arrives later as text
+  to read out. `SpeechServerTranslator` takes the transcript as the caption only, never as a second request.
+- **Off: the server is a voice.** `create_response` is false: a server that has a model of its own must not
+  answer each utterance itself, or the person hears two voices. A finished utterance
+  (`conversation.item.input_audio_transcription.completed`) is then the request, and the translator emits one
+  `delegation` per sentence (`utterance_<n>`). This is the mode for a plain STT/TTS server.
 - Both OpenAI spellings of the reply events are read (`response.audio.delta` and `response.output_audio.delta`),
   because servers in the wild predate the rename.
 

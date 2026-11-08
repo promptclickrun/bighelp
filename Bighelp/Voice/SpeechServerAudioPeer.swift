@@ -20,6 +20,8 @@ final class SpeechServerAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
     private let agentName: String
     /// The voice the person chose for this agent, passed on the offer; a server may ignore it.
     private var voice = "default"
+    /// Whether the server's own model holds the conversation and hands work over, or is a voice only.
+    private var converses = true
     private let sessionCoordinator: VoiceAudioSessionCoordinator
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
@@ -31,7 +33,7 @@ final class SpeechServerAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
     private let hold = GeminiLiveAudioHold()
     private var socket: URLSessionWebSocketTask?
     private var receiver: Task<Void, Never>?
-    private let translator = SpeechServerTranslator()
+    private var translator = SpeechServerTranslator()
     private var observers: [any NSObjectProtocol] = []
     private var state: BighelpRealtimeAudioPeer.ConnectionState = .idle
     private var received = (bytes: UInt64(0), frames: UInt64(0))
@@ -74,10 +76,12 @@ final class SpeechServerAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
     }
 
     func apply(_ answer: LiveVoiceAnswer) async throws {
-        guard !closed, case let .speechServer(url, key, chosen) = answer else {
+        guard !closed, case let .speechServer(url, key, chosen, serverConverses) = answer else {
             throw BighelpRealtimeAudioPeer.Failure.invalidSDP
         }
         voice = chosen
+        converses = serverConverses
+        translator = SpeechServerTranslator(converses: serverConverses)
         var request = URLRequest(url: url)
         // Many private servers have no key at all; one that does wants it in the handshake.
         if !key.isEmpty { request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
@@ -87,7 +91,7 @@ final class SpeechServerAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
         publish(.connecting)
         task.resume()
         do {
-            let setup = SpeechServerWire.sessionUpdate(agentName: agentName, voice: voice)
+            let setup = SpeechServerWire.sessionUpdate(agentName: agentName, voice: voice, converses: converses)
             try await task.send(.string(String(decoding: setup, as: UTF8.self)))
         } catch {
             // The socket never opened: the server refused it, or the network failed on the way.
@@ -117,8 +121,10 @@ final class SpeechServerAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
         }
     }
 
-    /// The server has no functions of its own: anything it says is either audio or a transcript.
-    func answerFunction(id: String, name: String, response: [String: BighelpJSONValue]) {}
+    /// The one function a conversing server can call, answered with the app's own view of the work.
+    func answerFunction(id: String, name: String, response: [String: BighelpJSONValue]) {
+        send(SpeechServerWire.functionOutput(callID: id, response: response))
+    }
 
     private func deliverIfQuiet() {
         if translator.isReplying { awaitingReplySince = nil }
@@ -333,8 +339,9 @@ final class SpeechServerAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession {
             uplink.agentPlays(until: playbackEndsAt)
             // play() on a stopped engine raises an exception Swift can't catch.
             if engine.isRunning { player.play() }
-        case .answer:
-            break // The server has no functions; nothing to answer.
+        case let .answer(id, _, response, _):
+            // No response.create follows: the agent said its line, and the result speaks later.
+            send(SpeechServerWire.functionOutput(callID: id, response: response))
         }
     }
 

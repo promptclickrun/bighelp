@@ -11,7 +11,7 @@ struct SpeechServerWireTests {
     }
 
     @Test func theSessionAsksForSpeechDetectionWithoutResponses() throws {
-        let update = try json(SpeechServerWire.sessionUpdate(agentName: "Tandy", voice: "default"))
+        let update = try json(SpeechServerWire.sessionUpdate(agentName: "Tandy", voice: "default", converses: false))
         #expect(update.object?["type"]?.string == "session.update")
         let session = update.object?["session"]?.object
         #expect(session?["output_modalities"] == .array([.string("audio")]))
@@ -24,8 +24,56 @@ struct SpeechServerWireTests {
         // "default" is what an unset voice sends: the server keeps its own.
         #expect(session?["audio"]?.object?["output"]?.object?["voice"] == nil)
 
-        let named = try json(SpeechServerWire.sessionUpdate(agentName: "Tandy", voice: "Aoede"))
+        let named = try json(SpeechServerWire.sessionUpdate(agentName: "Tandy", voice: "Aoede", converses: false))
         #expect(named.object?["session"]?.object?["audio"]?.object?["output"]?.object?["voice"] == .string("Aoede"))
+    }
+
+    @Test func aConversingServerGetsTheToolAndAnswersItself() throws {
+        let update = try json(SpeechServerWire.sessionUpdate(agentName: "Tandy", voice: "default", converses: true))
+        let session = update.object?["session"]?.object
+        #expect(session?["audio"]?.object?["input"]?.object?["turn_detection"]?.object?["create_response"] == .boolean(true))
+        #expect(session?["tools"]?.array?.first?.object?["name"] == .string("start_work"))
+        #expect(session?["tool_choice"] == .string("auto"))
+        #expect(session?["instructions"]?.string?.contains("start_work") == true)
+    }
+
+    @Test func aStartWorkCallBecomesOneDelegationAndAnAnswer() throws {
+        let call = try #require(SpeechServerWire.decode(frame("""
+        {"type":"response.function_call_arguments.done","call_id":"call_abc","name":"start_work",
+         "arguments":"{\"request\":\"turn the porch light off\"}"}
+        """)).first)
+        guard case .functionCalls(let calls) = call, let one = calls.first else {
+            Issue.record("expected one function call"); return
+        }
+        #expect(one.id == "call_abc")
+        #expect(one.arguments["request"] == .string("turn the porch light off"))
+
+        let translator = SpeechServerTranslator(converses: true)
+        let outputs = translator.outputs(for: .functionCalls(calls))
+        #expect(outputs.contains(.answer(id: "call_abc", name: "start_work",
+                                         response: ["status": .string("started")], silent: false)))
+        #expect(outputs.last == .event(["kind": .string("delegation"), "id": .string("call_abc"),
+                                        "text": .string("turn the porch light off")]))
+
+        let answer = try json(SpeechServerWire.functionOutput(callID: "call_abc",
+                                                             response: ["status": .string("started")]))
+        #expect(answer.object?["type"]?.string == "conversation.item.create")
+        #expect(answer.object?["item"]?.object?["type"]?.string == "function_call_output")
+        #expect(answer.object?["item"]?.object?["call_id"]?.string == "call_abc")
+    }
+
+    @Test func aConversingServersTranscriptIsOnlyTheCaption() {
+        let translator = SpeechServerTranslator(converses: true)
+        let outputs = translator.outputs(for: .utterance("what's the weather"))
+        #expect(outputs.count == 2)
+        #expect(!outputs.contains { output in
+            if case .event(let event) = output { return event["kind"] == .string("delegation") }
+            return false
+        })
+        // A voice-only server still has nothing but the sentence to go on.
+        #expect(SpeechServerTranslator().outputs(for: .utterance("tidy Downloads")).last
+                == .event(["kind": .string("delegation"), "id": .string("utterance_1"),
+                           "text": .string("tidy Downloads")]))
     }
 
     @Test func outgoingFramesUseTheRealtimeShapes() throws {

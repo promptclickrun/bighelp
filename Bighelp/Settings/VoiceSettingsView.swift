@@ -171,6 +171,7 @@ private struct VoicePreferenceSections: View {
     @State private var serverKey = ""
     @State private var serverLoaded = false
     @State private var serverAddressIsValid = true
+    @State private var serverConverses = true
 
     private var preference: AgentVoicePreference {
         settings.voicePreference(computer: computer, agentID: agentID)
@@ -201,6 +202,7 @@ private struct VoicePreferenceSections: View {
         serverLoaded = true
         serverAddress = UserDefaults.standard.string(forKey: SpeechServerSettings.addressKey) ?? ""
         serverKey = (try? SpeechServerKeyVault().load()) ?? ""
+        serverConverses = UserDefaults.standard.object(forKey: SpeechServerSettings.conversesKey) as? Bool ?? true
     }
 
     private func saveSpeechServer() {
@@ -266,6 +268,12 @@ private struct VoicePreferenceSections: View {
                         }
                         .accessibilityIdentifier("voice.settings.speech-server.remove-key")
                     }
+                    Toggle("Let the server hold the conversation", isOn: $serverConverses)
+                        .onChange(of: serverConverses) { _, value in
+                            guard serverLoaded else { return }
+                            SpeechServerSettings.save(address: serverAddress, key: serverKey, converses: value)
+                        }
+                        .accessibilityIdentifier("voice.settings.speech-server.converses")
                     if !serverAddressIsValid {
                         Text("That isn't a WebSocket address. Use ws:// or wss://.")
                             .font(.footnote)

@@ -8,25 +8,33 @@ import Security
 struct SpeechServerConfiguration: Equatable, Sendable {
     let url: URL
     let key: String
+    /// Whether the server's own model holds the conversation and hands work to Hermes (the
+    /// snappy arrangement), or the server is a voice only and every sentence is a request.
+    let converses: Bool
 }
 
 enum SpeechServerSettings {
     static let addressKey = "bighelp.voice.speech-server.address"
+    static let conversesKey = "bighelp.voice.speech-server.converses"
     static let maximumAddressBytes = 512
     static let maximumKeyBytes = 1_024
 
     static func configuration(defaults: UserDefaults = .standard,
                               vault: SpeechServerKeyVault = SpeechServerKeyVault()) -> SpeechServerConfiguration? {
         guard let address = defaults.string(forKey: addressKey), let url = serverURL(from: address) else { return nil }
-        return SpeechServerConfiguration(url: url, key: (try? vault.load()) ?? "")
+        // A server that has never been told otherwise is assumed to have a model of its own: that is
+        // the arrangement worth having, and the one Conduit's local voice uses.
+        let converses = defaults.object(forKey: conversesKey) as? Bool ?? true
+        return SpeechServerConfiguration(url: url, key: (try? vault.load()) ?? "", converses: converses)
     }
 
     /// Saves what can be saved. An address that isn't a WebSocket URL is stored as typed so the
     /// field doesn't lose it, but no call starts from it until it is fixed.
     @discardableResult
-    static func save(address: String, key: String,
+    static func save(address: String, key: String, converses: Bool? = nil,
                      defaults: UserDefaults = .standard,
                      vault: SpeechServerKeyVault = SpeechServerKeyVault()) -> Bool {
+        if let converses { defaults.set(converses, forKey: conversesKey) }
         let trimmed = String(address.trimmingCharacters(in: .whitespacesAndNewlines).prefix(maximumAddressBytes))
         defaults.set(trimmed, forKey: addressKey)
         // An empty field means "not typed here", never "forget the key": Remove key is its own

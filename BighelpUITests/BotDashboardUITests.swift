@@ -119,20 +119,31 @@ final class BotDashboardUITests: BighelpUITestCase {
             XCTAssertTrue(toggle.waitForExistence(timeout: 10))
             toggle.tap()
 
-            func open(_ id: String, expecting element: String, _ name: String) {
+            func open(_ id: String, expecting element: String, _ name: String, check: () -> Void = {}) {
                 let row = app.buttons["dashboard.today.item.\(id)"]
                 XCTAssertTrue(row.waitForExistence(timeout: 5), "\(id) is in Activities")
                 if !row.isHittable { app.swipeUp() }
                 row.tap()
                 XCTAssertTrue(app.descendants(matching: .any)[element].waitForExistence(timeout: 5),
                               "\(id) opens with \(element)")
+                check()
                 Thread.sleep(forTimeInterval: 0.6)
                 shot("activity-\(name)-\(appearance)", app)
                 app.buttons["dashboard.activity.done"].tap()
                 XCTAssertTrue(toggle.waitForExistence(timeout: 5))
             }
             open("delegation:dinner", expecting: "dashboard.activity.answer", "subagent-done")
-            open("delegation:hotels", expecting: "dashboard.activity.steps", "subagent-running")
+            open("delegation:hotels", expecting: "dashboard.activity.steps", "subagent-running") {
+                // Newest first: how it's going on top, then the running step, down to the first step.
+                let steps = app.descendants(matching: .any)["dashboard.activity.steps"]
+                func row(_ text: String) -> XCUIElement {
+                    steps.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+                }
+                let working = row("Working"), newest = row("lisbon-trip.md"), first = row("alfama hotels october")
+                XCTAssertTrue(working.exists && newest.exists && first.exists, "The timeline shows its rows")
+                XCTAssertLessThan(working.frame.minY, newest.frame.minY, "How it's going is on top")
+                XCTAssertLessThan(newest.frame.minY, first.frame.minY, "The running step is above the first step")
+            }
             open("message:sleep", expecting: "dashboard.activity.output", "command-failed")
             open("cron:brief", expecting: "dashboard.activity.answer", "routine")
             app.terminate()

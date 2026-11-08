@@ -6,6 +6,9 @@ import SwiftUI
 struct SessionRow: View {
     let session: SessionSummary
     let agents: AgentDirectoryStore
+    /// Shows the chat's project on the preview line. Off when the list groups by project,
+    /// where the section header already says it.
+    var showsProject = true
 
     static let avatarSize: CGFloat = 52
     /// Separators start where the text column starts, like Messages.
@@ -57,6 +60,9 @@ struct SessionRow: View {
                             .accessibilityHidden(true)
                     }
                     SessionOriginTag(source: session.origin, size: timeSize * 0.85)
+                    if showsProject, let project = session.workspaceName, !project.isEmpty {
+                        SessionProjectTag(name: project, size: timeSize * 0.85)
+                    }
                     if session.hasDraft {
                         HStack(spacing: 2) {
                             Image(systemName: "pencil")
@@ -131,7 +137,8 @@ struct SessionRow: View {
         ].compactMap { $0 }.joined(separator: ", ")
         let stateLabel = state.isEmpty ? "" : "\(state). "
         let origin = SessionOrigin.label(session.origin).map { " Started in \($0)." } ?? ""
-        return "\(session.title). \(stateLabel)\(preview). \(agentNames.joined(separator: ", ")). \(kind).\(origin) \(session.updatedAt.formatted(.relative(presentation: .named)))"
+        let project = session.workspaceName.flatMap { $0.isEmpty ? nil : " In project \($0)." } ?? ""
+        return "\(session.title). \(stateLabel)\(preview). \(agentNames.joined(separator: ", ")). \(kind).\(origin)\(project) \(session.updatedAt.formatted(.relative(presentation: .named)))"
     }
 
     @BighelpThemeReader private var theme
@@ -394,6 +401,32 @@ struct SessionOriginTag: View {
                 .fixedSize()
                 .accessibilityLabel("Started in \(origin)")
         }
+    }
+
+    @BighelpThemeReader private var theme
+}
+
+/// The project a chat is in, as a small tag, so the chat list says where each chat lives
+/// without grouping the list by project.
+struct SessionProjectTag: View {
+    let name: String
+    var size: CGFloat = 13
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "folder")
+                .font(.system(size: size * 0.8, weight: .semibold))
+            Text(name)
+                .font(.system(size: size, weight: .semibold))
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .foregroundStyle(theme.secondaryText)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 1)
+        .background(theme.incomingMessageBackground, in: .capsule)
+        .frame(maxWidth: 140, alignment: .leading)
+        .accessibilityLabel("Project \(name)")
     }
 
     @BighelpThemeReader private var theme

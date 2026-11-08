@@ -3,6 +3,25 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.76
+
+### New
+
+- **Projects in the chat list:** a chat in a project shows the name of the project under its preview. To hide it, go to Settings › Chat and turn off Projects in the chat list.
+- **Sort projects:** in Projects, tap the sort button and choose Recently used or Name.
+- **Helper steps in one folder:** when a helper agent finishes, its steps go into one folder, and its reply shows below the folder. Tap the folder to see the steps.
+
+### Changed
+
+- **Newest step first:** in a bot's Activity, a subagent shows its newest step at the top. A step that runs now is at the top.
+- **Reactions:** a reaction shows to the right of the time under the message. It does not cover the message.
+- **Move to Project:** when you hold a chat, the menu shows the project of the chat. The list of projects shows that project first.
+- **Scheduled tasks with a script:** you can edit them. Their instructions can be empty. Advanced shows the name of the script.
+
+### Fixed
+
+- **Time of each message:** when an agent sends two messages a long time apart, each message shows its time. Before, the two messages showed as one message with one time.
+
 ## 2.6.75
 
 ### Fixed

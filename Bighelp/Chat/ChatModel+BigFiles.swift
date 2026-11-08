@@ -118,17 +118,30 @@ extension ChatModel {
         persistSession()
     }
 
+    /// Remove on a message whose files didn't go: it leaves the chat, with the phone's copies of its files.
+    /// The host drops a staged upload nobody finishes after a day.
+    func removeBigFileSend(rowID: String, files: [ChatBigFile]) {
+        bigFileSends.removeAll { $0.id == rowID }
+        for file in files {
+            BigFileUploadBoard.shared.finish(file.id)
+            BigFileStore.remove(file)
+        }
+        persistSession()
+    }
+
     private func failBigFiles(_ files: [ChatBigFile], rowID: String, message: String,
                               ordinaryAttachments: [ChatAttachment], orderedAttachments: [ChatDraftAttachment],
                               reason: String) {
         for file in files {
-            BigFileUploadBoard.shared.failed(file.id, message: reason) { [weak self] in
+            BigFileUploadBoard.shared.failed(file.id, message: reason, retry: { [weak self] in
                 // The host kept every piece it had, so trying again sends only the rest.
                 Task { @MainActor [weak self] in
                     await self?.sendBigFileDraft(message: message, ordinaryAttachments: ordinaryAttachments,
                                                  orderedAttachments: orderedAttachments, retrying: rowID)
                 }
-            }
+            }, remove: { [weak self] in
+                self?.removeBigFileSend(rowID: rowID, files: files)
+            })
         }
     }
 }

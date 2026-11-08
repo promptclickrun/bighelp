@@ -84,14 +84,18 @@ final class DirectHermesBigFileUploadHost: BigFileUploadHost {
         return connection
     }
 
-    func supportsBigFiles() async -> Bool {
+    func supportsBigFiles() async -> Bool { await supports(BigFileUploads.feature) }
+
+    func supportsSmallPieces() async -> Bool { await supports(BigFileUploads.smallPiecesFeature) }
+
+    private func supports(_ feature: String) async -> Bool {
         guard let connection = try? connection() else { return false }
         if let context = connection.workspace.nativeContext {
-            return context.features.contains(BigFileUploads.feature)
+            return context.features.contains(feature)
         }
         guard let value = try? await connection.workspace.perform(.nativeContext, payload: [:], owner: connection.owner),
               let features = value["features"]?.array else { return false }
-        return features.contains(.string(BigFileUploads.feature))
+        return features.contains(.string(feature))
     }
 
     func perform(_ operation: WorkspaceOperation,

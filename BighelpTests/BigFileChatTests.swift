@@ -135,14 +135,22 @@ struct BigFileChatTests {
         #expect(source.listed.last == "/home/fixture/garden/uploads/2026-10-31")
     }
 
-    @Test func aFailedUploadSaysWhyAndTryAgainRunsItsRetry() {
+    @Test func aFailedUploadSaysWhyAndTryAgainOrRemoveRunsOnce() {
         let board = BigFileUploadBoard.shared
         var retried = 0
-        board.failed("failing-file", message: BigFileUploadFailure.noSpace.message) { retried += 1 }
+        var removed = 0
+        board.failed("failing-file", message: BigFileUploadFailure.noSpace.message,
+                     retry: { retried += 1 }, remove: { removed += 1 })
         #expect(board.state(for: "failing-file") == .failed("Not sent. The computer is out of space for this file."))
         board.retry("failing-file")
         board.retry("failing-file")
-        #expect(retried == 1)
+        board.remove("failing-file")
+        #expect((retried, removed) == (1, 0), "Try again uses the failure up: Remove no longer acts on it")
+        board.failed("failing-file", message: BigFileUploadFailure.noSpace.message,
+                     retry: { retried += 1 }, remove: { removed += 1 })
+        board.remove("failing-file")
+        board.retry("failing-file")
+        #expect((retried, removed) == (1, 1))
         board.finish("failing-file")
         #expect(board.state(for: "failing-file") == nil)
         #expect(BigFileUploadTile.counted(34_000_000, of: 80_000_000).hasSuffix("MB"))

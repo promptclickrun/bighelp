@@ -10,12 +10,13 @@ final class BigFileUploadBoard {
 
     enum State: Equatable {
         case uploading(sentBytes: Int, byteCount: Int)
-        /// Why it didn't go, in plain words; the tile offers Try again.
+        /// Why it didn't go, in plain words; the tile offers Try again and Remove.
         case failed(String)
     }
 
     private(set) var states: [String: State] = [:]
     @ObservationIgnored private var retries: [String: @MainActor () -> Void] = [:]
+    @ObservationIgnored private var removals: [String: @MainActor () -> Void] = [:]
 
     func state(for fileID: String) -> State? { states[fileID] }
 
@@ -23,18 +24,29 @@ final class BigFileUploadBoard {
         states[fileID] = .uploading(sentBytes: min(sentBytes, byteCount), byteCount: byteCount)
     }
 
-    func failed(_ fileID: String, message: String, retry: @escaping @MainActor () -> Void) {
+    /// `remove` takes the message that holds the file out of the chat.
+    func failed(_ fileID: String, message: String, retry: @escaping @MainActor () -> Void,
+                remove: @escaping @MainActor () -> Void) {
         states[fileID] = .failed(message)
         retries[fileID] = retry
+        removals[fileID] = remove
     }
 
     func retry(_ fileID: String) {
         guard let retry = retries.removeValue(forKey: fileID) else { return }
+        removals[fileID] = nil
         retry()
+    }
+
+    func remove(_ fileID: String) {
+        guard let remove = removals.removeValue(forKey: fileID) else { return }
+        retries[fileID] = nil
+        remove()
     }
 
     func finish(_ fileID: String) {
         states[fileID] = nil
         retries[fileID] = nil
+        removals[fileID] = nil
     }
 }

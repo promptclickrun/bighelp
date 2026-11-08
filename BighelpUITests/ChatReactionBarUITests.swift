@@ -35,6 +35,12 @@ final class ChatReactionBarUITests: BighelpUITestCase {
         let badge = app.descendants(matching: .any)["chat.message-reactions.row-102"]
         XCTAssertTrue(badge.waitForExistence(timeout: 5), "A tap reacts at once")
         XCTAssertTrue(heart.waitForNonExistence(timeout: 5), "and closes the bar")
+        // The reaction sits on the message's time line, to the right of the time: on the bubble it covered the text.
+        let time = app.staticTexts.matching(identifier: "timeline-message-timestamp").allElementsBoundByIndex
+            .first { abs($0.frame.midY - badge.frame.midY) < badge.frame.height / 2 }
+        XCTAssertNotNil(time, "The reaction is on the time line under the message")
+        if let time { XCTAssertLessThanOrEqual(time.frame.maxX, badge.frame.minX, "to the right of the time") }
+        XCTAssertGreaterThanOrEqual(badge.frame.minY, reply.frame.maxY, "and never over the message's text")
         sleep(pause)
 
         reply.press(forDuration: 1)

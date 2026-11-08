@@ -4,14 +4,10 @@ import Testing
 
 @Suite
 struct IMessageChatPresentationTests {
-    @Test func reactionBadgesStayCompactAndOverlapTheBubbleEdge() {
+    /// Tapbacks sit on the time line under the message (`ChatReactionBarUITests`), small but easy to hit.
+    @Test func reactionBadgesStayCompact() {
         #expect(NativeMessageReactionLayoutMetrics.visualHeight < BighelpTokens.hitTarget)
         #expect(NativeMessageReactionLayoutMetrics.visualHeight >= 20)
-        #expect(NativeMessageReactionLayoutMetrics.attachmentOverlap > 0)
-        #expect(
-            NativeMessageReactionLayoutMetrics.attachmentOverlap
-                < NativeMessageReactionLayoutMetrics.visualHeight
-        )
     }
 
     @Test func proseBubblesUseConversationalWidths() {

@@ -150,11 +150,13 @@ enum ConversationFixtures {
             TimelineItem(id: "native-reaction-fixture:row:101", role: .human,
                          sender: .user(snapshot: .init(name: "You")),
                          content: .message("A calmer chat, with all of our tools."),
-                         metadata: .init(source: "UI preview", sourceOrder: 1)),
+                         metadata: .init(source: "UI preview", timestamp: Date(timeIntervalSince1970: 1_788_000_000),
+                                         sourceOrder: 1)),
             TimelineItem(id: "native-reaction-fixture:row:102", role: .assistant,
                          sender: agent,
                          content: .message("**Room for the conversation.**\n\nYour model, rich drafts, files, and voice stay close." + extra),
-                         metadata: .init(source: "UI preview", sourceOrder: 2)),
+                         metadata: .init(source: "UI preview", timestamp: Date(timeIntervalSince1970: 1_788_000_060),
+                                         sourceOrder: 2)),
         ]
         return SessionRecord(
             id: "demo-finance",

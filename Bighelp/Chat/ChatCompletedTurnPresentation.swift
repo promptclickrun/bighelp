@@ -477,3 +477,67 @@ struct ChatWorkReceipt: View {
         return "\(seconds / 3_600)h \((seconds % 3_600) / 60)m"
     }
 }
+
+/// How the chat folds finished work (Settings › Chat: Fold finished turns, and the work style). `ChatView`
+/// sets it, so pages that show an agent's steps outside the chat (a helper's) fold them the same way.
+struct ChatWorkFolding: Equatable, Sendable {
+    var foldsFinished = true
+    var style: ChatWorkStyle = .full
+}
+
+extension EnvironmentValues {
+    @Entry var chatWorkFolding = ChatWorkFolding()
+}
+
+/// A helper's steps, folded as the chat folds a finished turn: its tool calls and notes go into one
+/// "Worked for…" folder and its reply stays in view. While it works, its steps stay open.
+struct ChatFoldedSteps: View {
+    let entries: [ChatTranscriptEntry]
+    let activityEvents: [ChatActivityEvent]
+    let isLive: Bool
+    var interimReplies: ChatInterimReplyPlacement = .fold
+    @Environment(\.chatWorkFolding) private var folding
+    /// This page's open folders; the chat's own stay as they are.
+    @State private var disclosures = ChatActivityDisclosureStore()
+
+    var body: some View {
+        let liveEntryID = isLive ? entries.last?.id : nil
+        LazyVStack(alignment: .leading, spacing: BighelpTokens.space16) {
+            ForEach(Self.rows(entries, activityEvents: activityEvents, isLive: isLive, folding: folding,
+                              interimReplies: interimReplies)) { row in
+                switch row {
+                case .entry(let entry):
+                    step(entry, liveEntryID: liveEntryID)
+                case .completed(let turn):
+                    ChatCompletedTurnView(turn: turn, disclosures: disclosures, onDisclosureChange: {}) { entry in
+                        step(entry, liveEntryID: nil)
+                    }
+                case .liveWork:
+                    // Not made here: a running helper has no work style, so its steps stay open.
+                    EmptyView()
+                }
+            }
+        }
+    }
+
+    /// The chat's fold (`ChatCompletedTurnProjection`) over the steps, after marking the notes written on
+    /// the way to the answer, as the chat does.
+    static func rows(_ entries: [ChatTranscriptEntry], activityEvents: [ChatActivityEvent], isLive: Bool,
+                     folding: ChatWorkFolding, interimReplies: ChatInterimReplyPlacement) -> [ChatTurnDisplayRow] {
+        ChatCompletedTurnProjection.rows(
+            from: ChatInterimReplies.marking(entries, isSending: isLive, isBotMode: false,
+                                             activityEvents: activityEvents),
+            isSending: isLive, enabled: folding.foldsFinished, activityEvents: activityEvents,
+            interimReplies: interimReplies, style: isLive ? nil : folding.style)
+    }
+
+    @ViewBuilder
+    private func step(_ entry: ChatTranscriptEntry, liveEntryID: String?) -> some View {
+        switch entry {
+        case .message(let item):
+            TimelineItemView(item: item, onApprovalTap: { _ in })
+        case .activity(let turn):
+            ChatActivityTurnView(turn: turn, isLive: entry.id == liveEntryID)
+        }
+    }
+}

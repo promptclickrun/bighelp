@@ -3,6 +3,25 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.72
+
+### New
+
+- **Work in the background:** an agent can continue to work after it answers. For example, it can run subagents, a command such as a preview server, or a scheduled task. Now bighelp shows this work in three places:
+  - In a chat, **In the background** shows above the message box while subagents or commands run. Tap it to see each one. You can stop a command there.
+  - In Bots mode, a bot with work in the background shows a stack on its face. Its row tells you what runs.
+  - On a bot's **Dashboard**, **Today** lists the work of the day. Tap **Today** to open the list. **Today** replaces the **Templates** row. To open templates, go to **See all** on Feed, Ideas or Goals.
+
+  Bots mode and **Today** need the bighelp plugin 3.47.0 on your computer.
+- **Restart the Hermes dashboard:** in Settings › System, tap **Restart Hermes Dashboard**. After you install the plugin, bighelp asks you to restart Hermes, because the plugin starts to work only after the restart.
+- **Agent pictures in alerts:** an alert from an agent shows the agent's picture, as a message from a person does.
+
+### Fixed
+
+- **Live voice:** when live voice cannot start, the call screen tells you why. Tap **Try Again** to try again. When a Gemini call stops at once, the call screen shows the reason that Gemini gave.
+- **Plugin install:** if you remove the plugin on your computer, you can install it again from bighelp. Before, bighelp showed "The plugin install may still be running".
+- **New chats:** a new chat that has no messages opens again after a reconnect. Before, it could say "This chat isn't available right now".
+
 ## 2.6.71
 
 ### Fixed

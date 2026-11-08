@@ -2,10 +2,15 @@ import Foundation
 import SwiftUI
 
 /// One Messages-style inbox row: the agent avatar doubles as the live status,
-/// then a single title line and a single plain-text preview line.
+/// then a single title line and a single plain-text preview line, and the chat's
+/// project on a line of its own when `showsProject`.
 struct SessionRow: View {
     let session: SessionSummary
     let agents: AgentDirectoryStore
+    /// Settings › Chat › Projects in the chat list, unless the list groups by project, where
+    /// the section header already says it. A line of its own keeps the preview whole at every
+    /// text size.
+    var showsProject = false
 
     static let avatarSize: CGFloat = 52
     /// Separators start where the text column starts, like Messages.
@@ -72,6 +77,18 @@ struct SessionRow: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
+
+                if let project = shownProject {
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder")
+                            .font(.system(size: timeSize * 0.9))
+                        Text(project)
+                            .font(.system(size: timeSize, weight: .medium))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .foregroundStyle(theme.secondaryText)
+                }
             }
         }
         .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget, alignment: .leading)
@@ -79,6 +96,11 @@ struct SessionRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityIdentifier("session.row.\(session.id)")
+    }
+
+    private var shownProject: String? {
+        guard showsProject, let name = session.workspaceName, !name.isEmpty else { return nil }
+        return name
     }
 
     /// Live state from the catalog's real activity flag; nothing is inferred.
@@ -131,7 +153,8 @@ struct SessionRow: View {
         ].compactMap { $0 }.joined(separator: ", ")
         let stateLabel = state.isEmpty ? "" : "\(state). "
         let origin = SessionOrigin.label(session.origin).map { " Started in \($0)." } ?? ""
-        return "\(session.title). \(stateLabel)\(preview). \(agentNames.joined(separator: ", ")). \(kind).\(origin) \(session.updatedAt.formatted(.relative(presentation: .named)))"
+        let project = shownProject.map { " In project \($0)." } ?? ""
+        return "\(session.title). \(stateLabel)\(preview). \(agentNames.joined(separator: ", ")). \(kind).\(origin)\(project) \(session.updatedAt.formatted(.relative(presentation: .named)))"
     }
 
     @BighelpThemeReader private var theme

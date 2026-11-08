@@ -69,7 +69,7 @@ struct MoveChatToProjectSheet: View {
         } else if let projects {
             List {
                 Section {
-                    ForEach(projects) { row($0) }
+                    ForEach(Self.ordered(projects, currentProjectID: currentProjectID)) { row($0) }
                 } header: {
                     Text(chatTitle)
                 } footer: {
@@ -96,6 +96,20 @@ struct MoveChatToProjectSheet: View {
         } else {
             ProgressView("Loading projects")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    /// The chat's own project first, then the rest by name, so the row worth seeing is
+    /// never the one to hunt for.
+    static func ordered(
+        _ projects: [HermesWorkspaceSummary],
+        currentProjectID: String?
+    ) -> [HermesWorkspaceSummary] {
+        projects.sorted { lhs, rhs in
+            let leftIsCurrent = lhs.id == currentProjectID
+            let rightIsCurrent = rhs.id == currentProjectID
+            if leftIsCurrent != rightIsCurrent { return leftIsCurrent }
+            return lhs.name.localizedCompare(rhs.name) == .orderedAscending
         }
     }
 

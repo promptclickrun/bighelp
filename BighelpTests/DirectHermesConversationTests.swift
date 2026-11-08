@@ -2008,6 +2008,40 @@ struct DirectHermesConversationTests {
         #expect(projection.activities.isEmpty)
     }
 
+    /// What Hermes sent for an async `delegate_task` (recorded on a real host): the turn ends while the
+    /// helper works, and its steps keep coming during the next turn. They update the helper's own row, in
+    /// the turn that started it, so that turn settles and the next one gets no second copy.
+    @Test func aHelperKeepsItsRowWhenItsStepsArriveDuringTheNextTurn() {
+        var projection = DirectHermesProjection(conversationID: "native", profile: "default", storedID: "stored", epoch: "epoch")
+        var sequence = 0
+        func accept(_ type: String, _ payload: [String: BighelpJSONValue] = [:]) {
+            sequence += 1
+            _ = projection.accept(.init(type: type, sessionID: "runtime", payload: payload, sequence: sequence))
+        }
+        let helper: [String: BighelpJSONValue] = [
+            "subagent_id": .string("sa-0-1ed8bdbc"), "child_session_id": .string("child-1"),
+            "goal": .string("Read the file /etc/hosts with a tool, then write two sentences about it.")
+        ]
+        accept("message.start")
+        let firstTurn = projection.turnID
+        accept("subagent.start", helper)
+        accept("subagent.thinking", helper.merging(["text": .string("(🔥) setting wing angle...")]) { $1 })
+        accept("message.complete", ["text": .string("started")])
+        accept("session.info", ["running": .boolean(false)])
+        // The next turn starts before the helper's last steps.
+        accept("message.start")
+        accept("subagent.tool", helper.merging(["tool_name": .string("read_file"), "tool_preview": .string("hosts"),
+                                                "tool_count": .integer(1)]) { $1 })
+        accept("subagent.complete", helper.merging(["status": .string("completed"),
+                                                    "summary": .string("It maps localhost.")]) { $1 })
+
+        let rows = projection.activities.filter { $0.kind == .subagent }
+        #expect(rows.count == 1)
+        #expect(rows.first?.turnID == firstTurn)
+        #expect(rows.first?.lifecycle == .succeeded)
+        #expect(rows.first?.detail?.contains("wing angle") != true, "Hermes' spinner line isn't the helper's work")
+    }
+
     @Test func nativeSubagentStreamFeedsTheSessionAgentsRail() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

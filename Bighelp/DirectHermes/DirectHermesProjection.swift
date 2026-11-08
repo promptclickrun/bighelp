@@ -228,6 +228,8 @@ struct DirectHermesProjection {
     private(set) var controlSnapshot: DirectHermesSessionControlSnapshot?
     private(set) var reclaim: DirectHermesSessionReclaim?
     private var sideTaskTurnIDs: [Data: String] = [:]
+    /// The turn each helper (`subagent_id`) first reported in.
+    private var subagentTurnIDs: [String: String] = [:]
     private(set) var running = false
     private(set) var hasLiveEvents = false
     private(set) var turnID = "initial"
@@ -825,13 +827,24 @@ struct DirectHermesProjection {
             let subagentID = Self.nonempty(p["subagent_id"]?.string) ?? childSessionID
             guard let subagentID else { break }
             let key = "subagent:\(subagentID)"
-            let previous = activities.last { $0.eventID == "\(turnID):\(key)" }
-            let detail = type == "subagent.thinking" || type == "subagent.text"
-                ? (previous?.detail ?? "") + (p["text"]?.string ?? "")
-                : p["summary"]?.string ?? p["tool_preview"]?.string ?? p["text"]?.string
+            // A background helper keeps reporting after its turn ends, also during the next turn:
+            // its steps stay on the row of the turn that started it.
+            let helperTurn = subagentTurnIDs[subagentID] ?? turnID
+            if subagentTurnIDs[subagentID] == nil {
+                if subagentTurnIDs.count == 256, let first = subagentTurnIDs.keys.first { subagentTurnIDs[first] = nil }
+                subagentTurnIDs[subagentID] = helperTurn
+            }
+            let previous = activities.last { $0.eventID == "\(helperTurn):\(key)" }
+            // `subagent.text` streams the reply; each `subagent.thinking` is a whole note, or Hermes' spinner.
+            let detail: String? = switch type {
+            case "subagent.text": (previous?.detail ?? "") + (p["text"]?.string ?? "")
+            case "subagent.thinking": p["text"]?.string.flatMap { SubagentCanvasState.isHermesSpinner($0) ? nil : $0 }
+            default: p["summary"]?.string ?? p["tool_preview"]?.string ?? p["text"]?.string
+            }
             let activity = publishActivity(key: key, kind: .subagent,
                 title: Self.nonempty(p["goal"]?.string) ?? previous?.title ?? "Subagent",
-                detail: detail, payload: p, terminal: type == "subagent.complete", childID: subagentID)
+                detail: detail, payload: p, terminal: type == "subagent.complete", childID: subagentID,
+                turnOverride: helperTurn)
             change.activities = [activity]
             let startedAt = p["started_at"]?.number.flatMap {
                 $0.isFinite && $0 >= 0 && $0 <= Double(Int.max) ? Int($0) : nil

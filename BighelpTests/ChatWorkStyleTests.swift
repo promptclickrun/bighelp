@@ -100,6 +100,19 @@ struct ChatWorkStyleTests {
                 == ["message:q", "message:answer", "completed-turn:message:a"])
     }
 
+    /// Hermes ends the turn while a background helper still works (`delegate_task` async), so its row
+    /// is still running. The turn is done: it folds as its style says, and the chat's chip shows the helper.
+    @Test func aFinishedTurnFoldsWhileItsBackgroundHelperStillWorks() {
+        let helper = ChatActivityEvent(eventID: "t:subagent:sa-0", sessionID: "s", turnID: "t", kind: .subagent,
+                                       lifecycle: .running, title: "Read the hosts file", summary: nil, detail: nil,
+                                       occurredAt: 1, subagentID: "sa-0")
+        let entries = [human("q"), tool("w1"), .activity(ChatActivityTurn(id: "h", events: [helper])), reply("answer")]
+        #expect(rows(entries, isSending: false, style: .card).map(\.id)
+                == ["message:q", "completed-turn:activity:w1", "message:answer"])
+        #expect(rows(entries, isSending: false, style: .minimal).map(\.id)
+                == ["message:q", "message:answer", "completed-turn:activity:w1"])
+    }
+
     @Test func withFoldingOffFinishedWorkStaysOpenAndTheRunningTurnStillGathers() {
         #expect(rows(finished, isSending: false, style: .card, folds: false).map(\.id)
                 == ["message:q", "message:a", "activity:w1", "message:answer"])

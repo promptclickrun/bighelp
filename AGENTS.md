@@ -409,17 +409,20 @@ change in both repos.
   to the plugin's `uploads/*` routes in 4 MiB pieces instead (`BigFileUploader`), in any order, from a background
   `URLSession` (`BighelpBackgroundUploads`) that iOS keeps sending while the app is away. The host records a piece
   only once all of it arrived; after a drop the app asks `status` and sends only the rest, and starting the same
-  file again gets the same upload back. The app keeps its own copy on disk (`ChatBigFile`, `BigFileStore`, a
-  `.bigFile` draft) and never holds the whole file in memory. `finish` checks the SHA-256 and moves the file into
-  the agent's working folder (`uploads/<date>/<name>`, what its Files tab shows); stock `file.attach` then takes
-  it by `path` and tells the agent its type, size and place on disk, never its bytes. The app's
-  `[Video attached: … (size, length, picture)]` or `[File attached: … (size)]` note follows each `@file:` line.
-  One look per file (#721): while it goes up, a tile with a ring and "34 of 80 MB" (`BigFileUploadTile`,
-  progress in `BigFileUploadBoard` so only the ring redraws), or why it didn't go with Try again; once Hermes
-  takes the message (`onSubmissionAdmitted`), the row takes the sent text and shows each file as a line on the
-  rail (`ChatSentFileLine`), exactly what a reread rebuilds. A host path or `@file:` ref never shows as text; a
-  tap opens the bot's Files on the file (`BotProfileOpening.file`, `SimpleBotFilesModel.reveal`), a long press
-  shows the path. Hosts without the feature keep the 8 MiB limit and say to update the plugin.
+  file again gets the same upload back. A proxy in front of Hermes that refuses a piece (`413`; aiohttp and nginx
+  take 1 MB a request by default) gets the file again at once in 512 KiB pieces (`chunkBytes`, plugin
+  `native-uploads-small-pieces-v1`), never a quiet retry; an older plugin says to update it. The app keeps its own
+  copy on disk (`ChatBigFile`, `BigFileStore`, a `.bigFile` draft) and never holds the whole file in memory.
+  `finish` checks the SHA-256 and moves the file into the agent's working folder (`uploads/<date>/<name>`, what
+  its Files tab shows); stock `file.attach` then takes it by `path` and tells the agent its type, size and place
+  on disk, never its bytes. The app's `[Video attached: … (size, length, picture)]` or `[File attached: … (size)]`
+  note follows each `@file:` line. One look per file (#721): while it goes up, a tile with a ring and "34 of 80
+  MB" (`BigFileUploadTile`, progress in `BigFileUploadBoard` so only the ring redraws), or why it didn't go with
+  Try again and Remove; once Hermes takes the message (`onSubmissionAdmitted`), the row takes the sent text and
+  shows each file as a line on the rail (`ChatSentFileLine`), exactly what a reread rebuilds. A host path or
+  `@file:` ref never shows as text; a tap opens the bot's Files on the file (`BotProfileOpening.file`,
+  `SimpleBotFilesModel.reveal`), a long press shows the path. Hosts without the feature keep the 8 MiB limit and
+  say to update the plugin.
 - **Plugins and Hermes' marketplace:** the host's catalog route has no stars, featured picks or dates. The plugin's
   `marketplace/plugins` (`native-marketplace-v1`) reads them from Hermes' marketplace feed and adds Hermes' own
   install check (`installRefusal`), so Install goes off without the app comparing versions. The featured pick

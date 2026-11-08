@@ -427,7 +427,7 @@ use checked) and Add a computer; a computer's page leads with Use this computer,
 plugin and notifications, with its address and access folded away and Remove at the bottom.
 
 Nerd Mode (`settings.nerdModeEnabled`, also the `nerdModeEnabled` environment value) also gates technical detail
-inside everyday screens: the chat Info sheet's visibility toggles and host details, the subagent rail,
+inside everyday screens: the chat Info sheet's visibility toggles and host details, a background command's output,
 Skills/Session rows in the + sheet, Agent Studio's Advanced page and templates, the task editor/detail Advanced groups, and the extra sections on
 Settings › Chat. Everyday controls must never live only behind it.
 
@@ -538,8 +538,10 @@ text is SF Pro, as everywhere.
   a line takes the place of its latest message ("Browsing the web…", "Working…"). A face that can't act it out
   (a photo, or any face with Reduce Motion or Low Power Mode) gets a still badge for the kind of work instead
   (a globe while it browses, in the page's ink). One waiting on you (an approval, a question) gets a raised hand
-  in ember and "Needs you", which wins over working. It's only what the computer says (`BotChatActivityStore`):
-  unknown or out of date shows nothing, and it clears when the turn ends.
+  in ember and "Needs you", which wins over working. A bot with no turn running but work in the background
+  (subagents, background commands, a scheduled task, from any Hermes process) keeps a calm face with a still stack
+  badge, and its row says "In the background: Preview server" in plain ink; a turn wins over it. It's only what
+  the computer says (`BotChatActivityStore`): unknown or out of date shows nothing, and it clears when the work ends.
 - **Touch and hold** a bot: its latest message, then New Chat, Pin (Unpin when pinned), Rearrange, Move to
   Section (each section, No section, New Section…), Mark Read/Unread (its Bot Chat's, on the computer; kept on this device where the
   computer keeps no read state), Bot Profile, a divider, and Hide. Actions stay in that order; the primary bot has no Pin or Hide. Primary selection stays in
@@ -573,6 +575,10 @@ text is SF Pro, as everywhere.
   order, and the answer always shows.
 - **Swipes**: from the left edge back to your bots; from the right, this bot's profile (the primary bot's on
   the home). The full app's swipe choices lead to places this mode hides, so they don't apply here.
+- **Dashboard** opens with **Today**, one line ("2 running · 4 finished") until it's tapped, so Feed, Ideas and
+  Goals stay where they were. Open, it lists the bot's subagents, background commands and scheduled task runs of the
+  day (running first, then newest), each with how it went and when (`DashboardTodaySection`, plugin
+  `native-agents-today-v1`). Templates open from an empty pile and from the Goals page.
 - **Profile**: the mark, name and role over every tab (Dashboard too), then the tabs: Dashboard, Info, Computer (its
   screen, when the host has one), Files and Media. Info is in named groups: Personality (Character, Instructions,
   Core Files), Defaults (Default Model, Default Voice, Active Project), What it can use (Connections, Marketplace,

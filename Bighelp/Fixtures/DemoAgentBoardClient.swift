@@ -10,6 +10,7 @@ final class DemoAgentBoardClient: AgentBoardClient {
     let supportsFeedback = true
     let supportsGoalCategories = true
     let supportsAnswers = true
+    let supportsToday = true
     /// Ideas the person said Let's do it to, per agent.
     private(set) var accepted: [String: Set<String>] = [:]
 
@@ -134,6 +135,24 @@ final class DemoAgentBoardClient: AgentBoardClient {
                 - Sam's birthday is October 7.
                 """, updatedAt: ago(60 * 3)),
             user: .init(text: "Lives in Austin. Morning person. Coffee, no sugar.", updatedAt: ago(60 * 24 * 12)))
+    }
+
+    /// A busy day for the demo's bots; the brand-new ones have done nothing yet.
+    func today(agentID: String, since: Date) async throws -> [AgentTodayItem] {
+        guard !Self.startsEmpty(agentID) else { return [] }
+        return [
+            AgentTodayItem(id: "delegation:hotels", kind: .subagent, title: "Compare hotels near Alfama for October",
+                           state: .running, startedAt: ago(4)),
+            AgentTodayItem(id: "process:fares", kind: .command, title: "python3 watch_fares.py --route AUS-LIS",
+                           state: .running, startedAt: ago(38)),
+            AgentTodayItem(id: "delegation:dinner", kind: .subagent, title: "Shortlist restaurants for Sam's birthday",
+                           state: .done, startedAt: ago(61), endedAt: ago(52),
+                           detail: "Three picks with a table free on the 7th"),
+            AgentTodayItem(id: "message:sleep", kind: .command, title: "./sync_sleep_data.sh", state: .failed,
+                           startedAt: ago(140), endedAt: ago(131), detail: "Exit 1"),
+            AgentTodayItem(id: "cron:brief", kind: .scheduled, title: "Morning brief", state: .done,
+                           startedAt: ago(60 * 3), endedAt: ago(60 * 3 - 1)),
+        ]
     }
 
     private func seed() -> [AgentBoardItem] {

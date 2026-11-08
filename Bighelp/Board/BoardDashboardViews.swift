@@ -42,6 +42,8 @@ final class BoardDashboardModel {
     let agentID: String
     /// This bot's board. Its own store, so the shell's (the home agent's, which widgets show) stays put.
     let store = AgentBoardStore()
+    /// Its background work today, on the same connection.
+    let today = AgentTodayModel()
     private(set) var undo: Undo?
     var tutorialStep: DashboardTutorialStep?
     /// The sheet on the Dashboard. The model holds it so the profile can open one straight away
@@ -79,6 +81,7 @@ final class BoardDashboardModel {
             scope = connection.scope
             refreshSnoozes()
             await store.connect(client: connection.client, scope: connection.scope)
+            today.use(connection.client)
             if store.agentID != agentID || store.state == .idle { await store.load(agentID: agentID) }
         } else if shell.isWaitingForConnection {
             store.waitForConnection()
@@ -247,7 +250,8 @@ struct BoardDashboardOverlays: ViewModifier {
     }
 }
 
-/// The Dashboard tab: Templates, then the Feed, Ideas and Goals piles.
+/// The Dashboard tab: Today (closed until the person opens it), then the Feed, Ideas and Goals piles.
+/// Templates open from an empty pile and from each page.
 struct BoardDashboardView: View {
     @Bindable var model: BoardDashboardModel
     /// The bot's board, with its chat for Ask and blueprints.
@@ -274,7 +278,7 @@ struct BoardDashboardView: View {
         let piles = AgentBoardItem.Kind.dashboardOrder.map { ($0, model.cards($0)) }
         let cardCount = piles.map(\.1.count).reduce(0, +)
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-            templatesRow
+            DashboardTodaySection(today: model.today, agentID: model.agentID, agentName: context.agentName)
             switch store.state {
             case .failed, .unavailable:
                 BoardStateBanner(state: store.state, context: context)
@@ -332,28 +336,6 @@ struct BoardDashboardView: View {
             sheetContent(shown)
         }
         .blueprintFill($filling, context: context)
-    }
-
-    private var templatesRow: some View {
-        Button { model.sheet = .templates(.feed) } label: {
-            HStack(spacing: BighelpTokens.space8) {
-                Image(systemName: "square.grid.2x2")
-                    .font(.bighelp(.body, weight: .semibold))
-                    .foregroundStyle(theme.primaryText)
-                Text("Templates")
-                    .font(.bighelp(.title3, weight: .bold))
-                    .foregroundStyle(theme.primaryText)
-                Spacer(minLength: BighelpTokens.space8)
-                DashboardSeeAllLabel(title: String(localized: "Browse"))
-            }
-            .frame(minHeight: BighelpTokens.hitTarget)
-            .contentShape(.rect)
-        }
-        .bighelpPlainButtonStyle()
-        .accessibilityLabel("Templates")
-        .accessibilityHint("Starter prompts for Feed, Ideas and Goals, one card at a time")
-        .driveTarget("dashboard.templates")
-        .accessibilityIdentifier("dashboard.templates")
     }
 
     private func open(_ item: AgentBoardItem) {
@@ -443,7 +425,7 @@ extension AgentBoardItem.Kind {
     static let dashboardOrder: [Self] = [.feed, .idea, .goal]
 }
 
-/// "See all ›" and "Browse ›": the small link at the end of a section's header.
+/// "See all ›": the small link at the end of a section's header.
 private struct DashboardSeeAllLabel: View {
     let title: String
     @BighelpThemeReader private var theme

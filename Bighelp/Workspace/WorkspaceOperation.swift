@@ -191,6 +191,8 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case chatStop = "chat.stop"
     /// What each agent's Bot Chat is doing, in one read (plugin, `native-agents-activity-v1`).
     case agentsActivity = "agents.activity"
+    /// One agent's subagents, background commands and scheduled task runs today (plugin, `native-agents-today-v1`).
+    case agentsToday = "agents.today"
     /// Hermes' marketplace facts for the catalog plugins and the ones this computer won't install
     /// (plugin, `native-marketplace-v1`).
     case marketplacePlugins = "marketplace.plugins"

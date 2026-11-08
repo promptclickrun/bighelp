@@ -604,6 +604,14 @@ time-zone presentation, validation, creation, editing, deletion, duplication,
 and agent filtering. The app constructs a canonical schedule request, and the
 authorized host confirms the resulting schedule.
 
+A task whose execution belongs to the host — a `script`, profile `skills`, or
+`no_agent` — says so: its Advanced section shows the script's file name and the
+skills it loads, and the app never carries the script's host path. Editing such a
+task is allowed and stays inside what the editor owns (name, instructions,
+schedule, delivery); the host merges that update, so the script and its flags
+survive. Duplicating is the one action still blocked, because a copy is built from
+the draft and would silently lose the script.
+
 ### Approvals
 
 Approval cards present the requested action, provenance, consequence, and

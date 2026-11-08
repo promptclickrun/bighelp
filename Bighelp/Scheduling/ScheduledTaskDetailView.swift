@@ -318,7 +318,13 @@ struct ScheduledTaskDetailView: View {
                     }
                     detailLine("Delivery target", task.deliveryTarget, systemImage: "point.3.connected.trianglepath.dotted")
                     detailLine("Time zone", task.schedule.timeZoneDisclosure, systemImage: "globe")
-                    if task.usesHostManagedExecution {
+                    if let scriptName = task.scriptName, !scriptName.isEmpty {
+                        detailLine("Script", scriptName, systemImage: "doc.text")
+                    }
+                    if !task.skills.isEmpty {
+                        detailLine("Skills", task.skills.joined(separator: ", "), systemImage: "books.vertical")
+                    }
+                    if task.usesHostManagedExecution, task.scriptName?.isEmpty != false, task.skills.isEmpty {
                         detailLine("Execution", "Uses host-managed scripts or skills", systemImage: "terminal")
                     }
                     duplicateButton(task)

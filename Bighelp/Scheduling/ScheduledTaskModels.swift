@@ -284,6 +284,11 @@ struct ScheduledTask: Identifiable, Equatable, Sendable {
     var status: ScheduledTaskStatus
     var lastResult: String?
     var usesHostManagedExecution = false
+    /// The name of the host script backing this task, when it has one. Only the file's name: the
+    /// host path stays on the host, and the body is not something the app can edit.
+    var scriptName: String? = nil
+    /// Profile skills the host loads before the prompt runs.
+    var skills: [String] = []
     var lastRun: Date? = nil
     var lastError: String? = nil
     var model: String? = nil
@@ -538,8 +543,13 @@ struct ScheduledTaskPresentation: Sendable {
         if task.status == .failed, [.pauseOrResume, .runNow].contains(action) {
             return .init(isVisible: true, isEnabled: false, reason: "Review the failed schedule on Hermes before running it again.")
         }
-        if task.usesHostManagedExecution, [.edit, .duplicate].contains(action) {
-            return .init(isVisible: true, isEnabled: false, reason: "This task uses host-managed scripts or skills. Edit its execution on Hermes.")
+        // A host-managed task keeps its execution on the host: a `script`, `no_agent`, or
+        // profile `skills`. None of those ride in the editor's payload (name, instructions,
+        // schedule, delivery only), so Hermes merges the update and the script/skills survive
+        // untouched — editing the schedule or delivery target here is safe. Duplicating is
+        // not: the copy is created from the draft and would silently lose the script.
+        if task.usesHostManagedExecution, action == .duplicate {
+            return .init(isVisible: true, isEnabled: false, reason: "This task uses host-managed scripts or skills. Duplicate it on Hermes.")
         }
         switch action {
         case .edit, .pauseOrResume, .runNow:

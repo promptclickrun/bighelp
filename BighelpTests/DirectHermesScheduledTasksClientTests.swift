@@ -136,16 +136,21 @@ struct DirectHermesScheduledTasksClientTests {
         #expect(presentation.nextRunCopy.contains("Completed"))
     }
 
-    @Test func failedAndScriptJobsAreNotMisrepresentedAsOrdinaryPromptEdits() throws {
+    @Test func aScriptJobShowsTheScriptsNameAndOnlyBlocksDuplicating() throws {
         var payload = job(state: "error")
         payload["no_agent"] = .boolean(true)
         payload["script"] = .string("/private/synthetic-script.sh")
         let task = try DirectHermesScheduledTaskCodec.task(.object(payload), profile: "research")
         #expect(task.status == .failed)
         #expect(task.usesHostManagedExecution)
+        // The host path stays on the host; the app shows the file's name in Advanced.
+        #expect(task.scriptName == "synthetic-script.sh")
         #expect(!String(describing: task).contains("/private/synthetic-script.sh"))
         let presentation = ScheduledTaskPresentation(task: task, agentName: "Research")
-        #expect(!presentation.action(.edit).isEnabled)
+        // Editing name, schedule or delivery is safe: the editor payload carries only those and
+        // Hermes merges the update, so the script and its flags survive. A duplicate is built from
+        // the draft and would lose the script, so that stays blocked.
+        #expect(presentation.action(.edit).isEnabled)
         #expect(!presentation.action(.duplicate).isEnabled)
     }
 

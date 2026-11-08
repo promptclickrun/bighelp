@@ -36,7 +36,11 @@ enum DirectHermesScheduledTaskCodec {
             nextRun: date(row["next_run_at"]),
             status: status,
             lastResult: D.optionalText(row["last_status"], maximum: 512),
-            usesHostManagedExecution: hostManaged
+            usesHostManagedExecution: hostManaged,
+            // The file's name, never the host path: where the script lives is the host's business,
+            // and the app cannot edit its body anyway.
+            scriptName: script.flatMap { $0.isEmpty ? nil : ($0 as NSString).lastPathComponent },
+            skills: skills
         )
     }
 

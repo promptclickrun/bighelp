@@ -206,6 +206,9 @@ extension ChatModel {
         if let roomID = botModeRoomID,
            let botModeRoomStore,
            botModeRoomStore.room(id: roomID) != nil {
+            // The room's own row for it comes after several reads of the room; the person sees it now.
+            let outgoing = beginBotModeOutgoing(message)
+            defer { dropBotModeOutgoing(outgoing) }
             do {
                 try await botModeRoomStore.send(
                     text: message,
@@ -213,7 +216,8 @@ extension ChatModel {
                     senderSnapshot: currentUserSnapshot,
                     activitySink: { [weak self] activity in
                         self?.acceptBotModeActivity(activity)
-                    }
+                    },
+                    onAccepted: { [weak self] in self?.acceptBotModeOutgoing(outgoing, eventID: $0) }
                 )
                 guard isCurrentOwner(generation) else { return }
                 if botModeRoomStore.room(id: roomID)?.memberFailures.isEmpty == false {
@@ -612,12 +616,15 @@ extension ChatModel {
             switch request {
             case .botModeSend(let message, let roomID):
                 guard let botModeRoomStore else { throw BotModeRoomError.roomNotFound }
+                let outgoing = beginBotModeOutgoing(message)
+                defer { dropBotModeOutgoing(outgoing) }
                 try await botModeRoomStore.send(
                     text: message,
                     roomID: roomID,
                     activitySink: { [weak self] activity in
                         self?.acceptBotModeActivity(activity)
-                    }
+                    },
+                    onAccepted: { [weak self] in self?.acceptBotModeOutgoing(outgoing, eventID: $0) }
                 )
                 guard isCurrentOwner(generation) else { return }
                 draft = ""

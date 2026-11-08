@@ -1,14 +1,18 @@
 import Foundation
 
 extension BotModeRoomStore {
+    /// `onAccepted` hears the room event made for the message as soon as the room takes it, long before
+    /// the discussion this returns after ends.
     func send(
         text: String,
         roomID: String,
         senderSnapshot: TimelineSenderSnapshot? = nil,
-        activitySink: ((BotModeRunActivity) -> Void)? = nil
+        activitySink: ((BotModeRunActivity) -> Void)? = nil,
+        onAccepted: ((String) -> Void)? = nil
     ) async throws {
         if nativeClient != nil {
-            try await sendNative(text: text, roomID: roomID, senderSnapshot: senderSnapshot, activitySink: activitySink)
+            try await sendNative(text: text, roomID: roomID, senderSnapshot: senderSnapshot, activitySink: activitySink,
+                                 onAccepted: onAccepted)
             return
         }
         guard executionEnabled else { throw BotModeRoomError.executionUnavailable }
@@ -32,6 +36,7 @@ extension BotModeRoomStore {
             throw BotModeRoomError.persistenceConflict
         }
         replaceStored(accepted)
+        onAccepted?(humanEvent.id)
         guard let owner else { return }
 
         try await runFixtureTurn(

@@ -87,12 +87,14 @@ extension ChatModel {
         return .placed
     }
 
-    /// The chat opened again after a relaunch, its draft back from where it was saved: a share the
-    /// person put here whose words that draft still holds is in the box again, before any Send, so
-    /// the message carrying it settles it. Its files were only in memory and don't come back.
+    /// The chat opened again after a relaunch, its draft back from where it was saved: a share of
+    /// words only, put here, that the draft still holds is in the box again, before any Send, so the
+    /// message carrying it settles it. A share with files isn't: they were only in memory, and a
+    /// message with its words alone would spend them unsent. It stays listed for Open, which brings
+    /// every file back.
     func restoreSharesInBox(scope: String?) {
         guard let scope, let shareTracker, !referenceOwnerRetired else { return }
-        for share in shareTracker.sharesPlaced(in: conversationID, scope: scope) {
+        for share in shareTracker.sharesPlaced(in: conversationID, scope: scope) where share.files.isEmpty {
             guard share.isCarried(byText: draft, attachmentIDs: [], landedIDs: []),
                   shareLedger.beginPlacing(share) else { continue }
             applyShareEffects(shareLedger.finishPlacing(share.id))

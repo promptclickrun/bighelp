@@ -371,8 +371,10 @@ change in both repos.
   it's never listed again even if the deletion has to wait. A send that definitely failed puts the message back in
   the box with its share (never Try again or an automatic branch, which would send it without one); an unanswered
   one keeps its id, so its history (a reference's receipt) still settles it, after a relaunch too. A chat opened
-  again after a relaunch takes back, before any Send, each share placed in it that no message took and whose
-  words its restored draft still holds (`restoreSharesInBox`, from the share's own saved placement). The person
+  again after a relaunch takes back, before any Send, each share of words only placed in it that no message took
+  and whose words its restored draft still holds (`restoreSharesInBox`, from the share's own saved placement). A
+  share with files waits in the list: its words alone would spend files never sent, and Open brings them all
+  back, even into a box that has its words already (`PendingShareIntake` places the opened share first). The person
   taking a share's last file or words out of the box lets it go, kept and listed. The saved copy goes only when
   Hermes takes the message carrying it, or when the person deletes it in ☰ › Shared with bighelp (Bots mode: its
   Settings), which lists every waiting share; never by itself. `PendingShareInboxTests`, `PendingShareLedgerTests`

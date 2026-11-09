@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UIKit
 @testable import Bighelp
 
 /// A share from another app goes into the message box of the chat the person picked, through the
@@ -578,6 +579,69 @@ struct PendingShareComposerTests {
         #expect(relaunched.entries.isEmpty)
     }
 
+    // Its words are in the box already when the chat opens with it: after a relaunch (the draft came
+    // back, the photo was only in memory), or by chance on its first Open. The photo still comes.
+    @Test(arguments: [true, false])
+    func openingAShareWhoseWordsTheBoxHoldsStillBringsItsPhoto(afterARelaunch: Bool) async throws {
+        let share = try save(text: "Look at this", files: [photo])
+        if afterARelaunch {
+            let first = ChatModel(conversationID: "chat-1", client: ShareCountingClient(), initialItems: [])
+            let firstCenter = await center()
+            #expect(await first.placeShare(share, from: inbox, tracker: firstCenter) == .placed)
+            #expect(first.draft == "Look at this" && first.draftAttachments.count == 1)
+        }
+        let center = PendingShareCenter(inbox: PendingShareInbox(root: inbox.root))
+        await center.refresh()
+        let client = ShareCountingClient()
+        let model = ChatModel(conversationID: "chat-1", client: client, initialItems: [], initialDraft: "Look at this")
+
+        await open(model, center: center, handingOff: share)
+        #expect(model.draft == "Look at this", "Its words once")
+        #expect(model.draftAttachments.count == 1, "Its photo is in the box")
+
+        await model.send()
+        #expect(client.sentAttachmentCounts == [1], "The photo went with the words")
+        #expect(!savedIDs.contains(share.id))
+    }
+
+    @Test func wordsBackAfterARelaunchNeverSpendAShareWhosePhotoDidntComeBack() async throws {
+        let share = try save(text: "Look at this", files: [photo])
+        let center = PendingShareCenter(inbox: PendingShareInbox(root: inbox.root))
+        await center.refresh()
+        center.later(share.id)
+        let client = ShareCountingClient()
+        let model = ChatModel(conversationID: "chat-1", client: client, initialItems: [], initialDraft: "Look at this")
+
+        await open(model, center: center)
+        #expect(!model.holdsShare(share.id), "Only its words are here")
+        await model.send()
+        #expect(client.sent == ["Look at this"])
+        #expect(savedIDs.contains(share.id), "Kept, photo and all, to send")
+        let file = try #require(share.files.first)
+        #expect(FileManager.default.fileExists(atPath: inbox.fileURL(file, in: share).path))
+        #expect(center.entries.map(\.id) == [share.id])
+    }
+
+    /// The chat on top as it opens (`PendingShareIntake`), with a share handed to it, if any.
+    private func open(_ model: ChatModel, center: PendingShareCenter, handingOff share: PendingShare? = nil) async {
+        let state = AppState()
+        state.path = [.chat(conversationID: model.conversationID)]
+        if let share {
+            state.handOff(PendingShareHandoff(share: share, inbox: inbox,
+                destination: .init(scope: "scope-a", agentID: "default", sessionID: model.conversationID),
+                since: .now, onDropped: { _ in }))
+        }
+        await PendingShareIntake.take(into: model, appState: state, scope: "scope-a", center: center)
+    }
+
+    private var photo: SharedFile {
+        let png = UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8)).pngData { context in
+            UIColor.systemTeal.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 8, height: 8))
+        }
+        return ("Made-up photo.png", png, "public.png", "image/png", .image)
+    }
+
     @Test func aRefusedMessageIsBackInTheBoxOnceAndGoesOnceLater() async throws {
         for carriesShare in [true, false] {
             let words = "Refused words \(carriesShare)"
@@ -774,15 +838,18 @@ private final class WholeFileUploadHost: BigFileUploadHost, @unchecked Sendable 
 private final class ShareCountingClient: AttachmentConversationClient {
     var supportedAttachmentKinds: Set<ChatAttachment.Kind> = [.image, .file]
     private(set) var sent: [String] = []
+    private(set) var sentAttachmentCounts: [Int] = []
 
     func send(message: String, conversationID: String) async throws -> ConversationResponse {
         sent.append(message)
+        sentAttachmentCounts.append(0)
         return ConversationResponse(items: [])
     }
 
     func send(message: String, attachments: [ChatAttachment], conversationID: String,
               onDraft: @escaping (TimelineItem) -> Void) async throws -> ConversationResponse {
         sent.append(message)
+        sentAttachmentCounts.append(attachments.count)
         return ConversationResponse(items: [])
     }
 

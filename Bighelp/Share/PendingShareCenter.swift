@@ -224,8 +224,8 @@ final class PendingShareCenter: ChatShareTracking {
         try? Data("Three made-up points about the article.".utf8).write(to: notes)
         try? draft.addText("A made-up article about tidy kitchens.")
         try? draft.addLink("https://example.com/made-up-article")
-        try? draft.addFile(copying: notes, suggestedName: "Made-up notes.txt", kind: .file,
-                           typeIdentifier: "public.plain-text", mimeType: "text/plain", preferredExtension: "txt")
+        _ = try? draft.addFile(copying: notes, suggestedName: "Made-up notes.txt", kind: .file,
+                               typeIdentifier: "public.plain-text", mimeType: "text/plain", preferredExtension: "txt")
         _ = try? draft.commit(note: "Can you sum this up?")
     }
     #endif

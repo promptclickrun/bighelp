@@ -255,6 +255,20 @@ struct BigFileUploadTests {
         #expect(host.startPieceSizes == [nil, BigFileUploads.smallChunkBytes])
     }
 
+    /// A proxy that can't reach Hermes for a moment answers 502 with an error code of its own. That is a
+    /// dropped connection, not the plugin refusing the file: the piece goes again.
+    @Test func aProxysGatewayErrorIsADropNotARefusal() async throws {
+        let file = try await Self.file(bytes: 5_000_000)
+        defer { BigFileStore.remove(file) }
+        let host = FakeUploadHost()
+        host.gatewayErrors = [1]
+        let staged = try await BigFileUploader(host: host, sender: host, retryDelays: [.seconds(1)],
+                                               sleep: { _ in }).upload(file, agentID: "default")
+        #expect(!staged.path.isEmpty)
+        #expect(host.stored == (try Data(contentsOf: file.localURL)))
+        #expect(host.pieceOffsets.filter { $0 == host.chunkBytes }.count == 2)
+    }
+
     @Test func aHostThatStaysAwayEndsWithAReasonNotAnEndlessLoad() async throws {
         let file = try await Self.file(bytes: 5_000_000)
         defer { BigFileStore.remove(file) }
@@ -305,7 +319,8 @@ private final class WaitCount: @unchecked Sendable {
 /// The plugin's `uploads/*` as it behaves: fixed pieces in any order (4 MiB, or the size `start`
 /// asked for), a piece recorded only once all of it arrived and matched its checksum, the same file
 /// started again gets its pieces back, and `finish` checks the whole file. `proxyLimit` is a proxy
-/// in front of it that answers a bigger request with a plain 413, as aiohttp and nginx do.
+/// in front of it that answers a bigger request with a plain 413, as aiohttp and nginx do;
+/// `gatewayErrors` are pieces that proxy answers once with a 502 and an error code of its own.
 @MainActor
 private final class FakeUploadHost: BigFileUploadHost, BigFileChunkSending, @unchecked Sendable {
     var chunkBytes = 4 * 1_024 * 1_024
@@ -317,6 +332,7 @@ private final class FakeUploadHost: BigFileUploadHost, BigFileChunkSending, @unc
     var pieceRequests: [URLRequest] = []
     var pieceOffsets: [Int] = []
     var dropPieces: Set<Int> = []
+    var gatewayErrors: Set<Int> = []
     var preloaded: Set<Int> = []
     var preloadSource: URL?
     var staleOnce = false
@@ -419,6 +435,9 @@ private final class FakeUploadHost: BigFileUploadHost, BigFileChunkSending, @unc
         if dropPieces.remove(index) != nil {
             onSent(Int64(body.count / 2))
             throw URLError(.networkConnectionLost)
+        }
+        if gatewayErrors.remove(index) != nil {
+            return reply(502, ["error": .object(["code": .string("proxy_upstream_error")])])
         }
         let checksum = SHA256.hash(data: body).map { String(format: "%02x", $0) }.joined()
         guard offset % chunkBytes == 0, body.count == min(chunkBytes, byteCount - offset),

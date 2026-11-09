@@ -236,7 +236,12 @@ final class BigFileUploader {
                 }
                 let code = value?["error"]?.object?["code"]?.string ?? ""
                 // No code is no answer from the plugin (a proxy, or a request cut short): worth another try.
-                if code.isEmpty || code == "upload_finished" { return .failed(index, .connection, staleContext: false) }
+                // So is a 5xx other than the plugin's own `uploads_unavailable`: a proxy that can't reach
+                // Hermes answers 502 or 504, sometimes with an error code of its own.
+                let fromProxy = (500...599).contains(response.statusCode) && code != "uploads_unavailable"
+                if code.isEmpty || code == "upload_finished" || fromProxy {
+                    return .failed(index, .connection, staleContext: false)
+                }
                 return .failed(index, BigFileUploadFailure(code: code), staleContext: false)
             }
             guard let value else { return .failed(index, .connection, staleContext: false) }

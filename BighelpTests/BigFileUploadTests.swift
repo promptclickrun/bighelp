@@ -208,6 +208,67 @@ struct BigFileUploadTests {
         #expect(BigFileUploadFailure.pluginRequired.message.contains("update") || BigFileUploadFailure.pluginRequired.message.contains("Update"))
     }
 
+    /// A proxy in front of Hermes that takes 1 MB at most (nginx's and aiohttp's default) answers each 4 MB
+    /// piece with a plain 413. The file starts again in 512 KB pieces, at once, and goes through.
+    @Test func aProxyThatRefusesBigPiecesGetsTheFileInSmallPieces() async throws {
+        let file = try await Self.file(bytes: 5_000_000)
+        defer { BigFileStore.remove(file) }
+        let host = FakeUploadHost()
+        host.features.insert(BigFileUploads.smallPiecesFeature)
+        host.proxyLimit = 1_048_576
+        let waits = WaitCount()
+        let staged = try await BigFileUploader(host: host, sender: host, retryDelays: [.seconds(1), .seconds(1)],
+                                               sleep: { _ in waits.add() }).upload(file, agentID: "default")
+        #expect(!staged.path.isEmpty)
+        #expect(host.stored == (try Data(contentsOf: file.localURL)))
+        #expect(host.startPieceSizes == [nil, BigFileUploads.smallChunkBytes])
+        #expect(host.discardedUploads == [String(repeating: "9", count: 32)], "The refused upload is let go")
+        #expect(waits.value == 0, "A refusal is no dropped connection: nothing waits to try again")
+    }
+
+    @Test func aProxyRefusalOnAnOlderPluginSaysToUpdateItAtOnce() async throws {
+        let file = try await Self.file(bytes: 5_000_000)
+        defer { BigFileStore.remove(file) }
+        let host = FakeUploadHost()
+        host.proxyLimit = 1_048_576
+        let waits = WaitCount()
+        await #expect(throws: BigFileUploadError(failure: .proxyLimitNeedsPlugin)) {
+            try await BigFileUploader(host: host, sender: host, retryDelays: [.seconds(1), .seconds(1)],
+                                      sleep: { _ in waits.add() }).upload(file, agentID: "default")
+        }
+        #expect(waits.value == 0)
+        #expect(BigFileUploadFailure.proxyLimitNeedsPlugin.message.contains("Update the bighelp plugin"))
+    }
+
+    @Test func smallPiecesThatAreRefusedTooStopWithTheReason() async throws {
+        let file = try await Self.file(bytes: 5_000_000)
+        defer { BigFileStore.remove(file) }
+        let host = FakeUploadHost()
+        host.features.insert(BigFileUploads.smallPiecesFeature)
+        host.proxyLimit = 100_000
+        let waits = WaitCount()
+        await #expect(throws: BigFileUploadError(failure: .proxyLimit)) {
+            try await BigFileUploader(host: host, sender: host, retryDelays: [.seconds(1), .seconds(1)],
+                                      sleep: { _ in waits.add() }).upload(file, agentID: "default")
+        }
+        #expect(waits.value == 0)
+        #expect(host.startPieceSizes == [nil, BigFileUploads.smallChunkBytes])
+    }
+
+    /// A proxy that can't reach Hermes for a moment answers 502 with an error code of its own. That is a
+    /// dropped connection, not the plugin refusing the file: the piece goes again.
+    @Test func aProxysGatewayErrorIsADropNotARefusal() async throws {
+        let file = try await Self.file(bytes: 5_000_000)
+        defer { BigFileStore.remove(file) }
+        let host = FakeUploadHost()
+        host.gatewayErrors = [1]
+        let staged = try await BigFileUploader(host: host, sender: host, retryDelays: [.seconds(1)],
+                                               sleep: { _ in }).upload(file, agentID: "default")
+        #expect(!staged.path.isEmpty)
+        #expect(host.stored == (try Data(contentsOf: file.localURL)))
+        #expect(host.pieceOffsets.filter { $0 == host.chunkBytes }.count == 2)
+    }
+
     @Test func aHostThatStaysAwayEndsWithAReasonNotAnEndlessLoad() async throws {
         let file = try await Self.file(bytes: 5_000_000)
         defer { BigFileStore.remove(file) }
@@ -255,17 +316,23 @@ private final class WaitCount: @unchecked Sendable {
     func add() { lock.withLock { count += 1 } }
 }
 
-/// The plugin's `uploads/*` as it behaves: fixed 4 MiB pieces in any order, a piece
-/// recorded only once all of it arrived and matched its checksum, the same file started
-/// again gets its pieces back, and `finish` checks the whole file.
+/// The plugin's `uploads/*` as it behaves: fixed pieces in any order (4 MiB, or the size `start`
+/// asked for), a piece recorded only once all of it arrived and matched its checksum, the same file
+/// started again gets its pieces back, and `finish` checks the whole file. `proxyLimit` is a proxy
+/// in front of it that answers a bigger request with a plain 413, as aiohttp and nginx do;
+/// `gatewayErrors` are pieces that proxy answers once with a 502 and an error code of its own.
 @MainActor
 private final class FakeUploadHost: BigFileUploadHost, BigFileChunkSending, @unchecked Sendable {
-    let chunkBytes = 4 * 1_024 * 1_024
+    var chunkBytes = 4 * 1_024 * 1_024
     var features: Set<String> = [BigFileUploads.feature]
+    var proxyLimit: Int?
+    var startPieceSizes: [Int?] = []
+    var discardedUploads: [String] = []
     var operations: [WorkspaceOperation] = []
     var pieceRequests: [URLRequest] = []
     var pieceOffsets: [Int] = []
     var dropPieces: Set<Int> = []
+    var gatewayErrors: Set<Int> = []
     var preloaded: Set<Int> = []
     var preloadSource: URL?
     var staleOnce = false
@@ -282,6 +349,8 @@ private final class FakeUploadHost: BigFileUploadHost, BigFileChunkSending, @unc
 
     func supportsBigFiles() async -> Bool { features.contains(BigFileUploads.feature) }
 
+    func supportsSmallPieces() async -> Bool { features.contains(BigFileUploads.smallPiecesFeature) }
+
     func perform(_ operation: WorkspaceOperation,
                  payload: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] {
         operations.append(operation)
@@ -291,6 +360,15 @@ private final class FakeUploadHost: BigFileUploadHost, BigFileChunkSending, @unc
             if let startRefusal { throw WorkspaceClientError.rejected(code: startRefusal) }
             byteCount = payload["byteCount"]?.integer ?? 0
             sha = payload["sha256"]?.string ?? ""
+            let requested = payload["chunkBytes"]?.integer
+            startPieceSizes.append(requested)
+            if let requested, requested != chunkBytes {
+                // Another piece size is another upload.
+                chunkBytes = requested
+                uploadID = String(repeating: "8", count: 32)
+                received = []
+                bytes = Data()
+            }
             if bytes.isEmpty { bytes = Data(count: byteCount) }
             if let preloadSource, received.isEmpty {
                 // Pieces an earlier run sent before the app was closed.
@@ -313,7 +391,9 @@ private final class FakeUploadHost: BigFileUploadHost, BigFileChunkSending, @unc
             }
             return answer().merging(["finished": .boolean(true), "inWorkspace": .boolean(true),
                                      "path": .string("/srv/agent/uploads/2026-10-31/Clip.mov")]) { $1 }
-        case .uploadsDiscard: return ["discarded": .boolean(true)]
+        case .uploadsDiscard:
+            discardedUploads.append(payload["uploadId"]?.string ?? "")
+            return ["discarded": .boolean(true)]
         default: throw WorkspaceClientError.unavailable(.unsupportedOperation)
         }
     }
@@ -338,6 +418,11 @@ private final class FakeUploadHost: BigFileUploadHost, BigFileChunkSending, @unc
         pieceRequests.append(request)
         let offset = Int(request.value(forHTTPHeaderField: "X-Loopdy-Upload-Offset") ?? "") ?? -1
         pieceOffsets.append(offset)
+        if let proxyLimit, body.count > proxyLimit {
+            return (Data("Maximum request body size \(proxyLimit) exceeded.".utf8),
+                    HTTPURLResponse(url: URL(string: "https://hermes.example.invalid")!, statusCode: 413,
+                                    httpVersion: nil, headerFields: ["Content-Type": "text/plain"])!)
+        }
         if staleOnce {
             staleOnce = false
             return reply(412, ["error": .object(["code": .string("context_changed")])])
@@ -350,6 +435,9 @@ private final class FakeUploadHost: BigFileUploadHost, BigFileChunkSending, @unc
         if dropPieces.remove(index) != nil {
             onSent(Int64(body.count / 2))
             throw URLError(.networkConnectionLost)
+        }
+        if gatewayErrors.remove(index) != nil {
+            return reply(502, ["error": .object(["code": .string("proxy_upstream_error")])])
         }
         let checksum = SHA256.hash(data: body).map { String(format: "%02x", $0) }.joined()
         guard offset % chunkBytes == 0, body.count == min(chunkBytes, byteCount - offset),

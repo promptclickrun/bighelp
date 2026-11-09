@@ -223,6 +223,63 @@ enum ConversationFixtures {
         return session
     }
 
+    /// `-test-code-tool`: code the agent ran, as Hermes reports it (#926):
+    /// longer Python, a shell command that fails, and Python that prints one
+    /// number, the output that once closed the app (#924).
+    static var codeToolPreview: SessionRecord {
+        let sessionID = "demo-finance"
+        let python = """
+        import csv
+        from statistics import mean, median
+
+        # Weekly quiz scores from the class sheet
+        with open("scores.csv") as f:
+            rows = list(csv.DictReader(f))
+
+        scores = [float(r["score"]) for r in rows]
+        top = max(rows, key=lambda r: float(r["score"]))
+        low = [r["name"] for r in rows if float(r["score"]) < 70]
+
+        print(f"Average: {mean(scores):.1f}")
+        print(f"Median:  {median(scores):.1f}")
+        print(f"Top:     {top['name']} ({top['score']})")
+        if low:
+            print("Needs help:", ", ".join(low))
+        """
+        let tools: [(id: String, name: String, arguments: [String: Any], result: [String: Any], ms: Int)] = [
+            ("code-tool-python", "execute_code", ["code": python],
+             ["status": "success", "output": "Average: 84.5\nMedian:  86.0\nTop:     Maya (91)\nNeeds help: Sam, Priya\n",
+              "tool_calls_made": 0, "duration_seconds": 0.42], 420),
+            ("code-tool-shell", "terminal", ["command": "ls data && python3 check.py --week 45"],
+             ["output": "scores.csv\nroster.csv\nTraceback (most recent call last):\n  File \"check.py\", line 3\nFileNotFoundError: data/week45.csv",
+              "exit_code": 1, "error": NSNull()], 310),
+            ("code-tool-value", "execute_code", ["code": "print(round(sum([82, 91, 77, 88]) / 4, 1))"],
+             ["status": "success", "output": "84.5\n", "tool_calls_made": 0, "duration_seconds": 0.12], 120),
+        ]
+        func json(_ object: [String: Any]) -> String {
+            String(decoding: (try? JSONSerialization.data(withJSONObject: object, options: .sortedKeys)) ?? Data(),
+                   as: UTF8.self)
+        }
+        let activity = tools.enumerated().map { index, tool in
+            ChatActivityEvent(eventID: tool.id, sessionID: sessionID, turnID: "code-tool-turn", kind: .tool,
+                              lifecycle: .succeeded, title: tool.name, summary: nil, detail: nil,
+                              occurredAt: 2 + index, durationMilliseconds: tool.ms, toolCallID: "call-\(tool.id)",
+                              toolName: tool.name, arguments: json(tool.arguments), result: json(tool.result),
+                              sourceOrder: 2 + index)
+        }
+        let items = [
+            TimelineItem(id: "code-tool-question", role: .human, sender: .user(snapshot: .init(name: "You")),
+                         content: .message("What's the class average this week?"), metadata: .init(sourceOrder: 1)),
+            TimelineItem(id: "code-tool-answer", role: .assistant,
+                         sender: .agent(id: "finance", snapshot: .init(name: "Avery Park")),
+                         content: .message("The class average is 84.5, and Maya had the top score."),
+                         metadata: .init(sourceOrder: 10)),
+        ]
+        return SessionRecord(id: sessionID, kind: .direct, agentIDs: ["finance"], title: "Class scores",
+                             items: items, activityEvents: activity,
+                             activityVisibility: .init(showReasoning: true, showToolCalls: true), hasAcceptedMessage: true)
+    }
+
     static var completedTurnContextPreview: SessionRecord {
         let sessionID = "demo-finance"
         let agent = TimelineSender.agent(id: "finance", snapshot: .init(name: "Avery Park"))

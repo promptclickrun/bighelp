@@ -3,6 +3,13 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.78
+
+### Fixed
+
+- **Stop button:** in an agent's chat that another agent sent work to, the Stop button no longer flashes on and off while that agent works.
+- **Default Model:** a second change on a bot's Default Model page, for example a model from another provider, now saves. Before, it showed "This host request is invalid."
+
 ## 2.6.77
 
 ### New

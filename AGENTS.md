@@ -362,11 +362,19 @@ change in both repos.
   open bighelp. There `PendingShareReview` offers it, the person picks an agent and chat on the computer in use,
   and the chat takes it into its message box through the drop path (`ComposerAttachmentDrop.draftAttachment`);
   a new chat's share waits for the chat Hermes makes, never its local canvas (`PendingShareDestination.isTaken`).
-  Send works as for anything typed there. Each step after that is explicit (`ChatShareEvent`: staged, sending,
-  unconfirmed, back in the box, retired) and written to the share's placement at once, so a relaunch says
-  whether it may have been sent. The saved copy goes only when Hermes takes the message carrying it, or when the
-  person deletes it in ☰ › Shared with bighelp (Bots mode: its Settings), which lists every waiting share; never
-  by itself. `PendingShareInboxTests` and `PendingShareWaitTests` run under any Swift (no UIKit).
+  Send works as for anything typed there. From the box on, each chat's `PendingShareLedger` owns its shares: a
+  message that leaves the box carrying one gets its own id, and only an outcome naming that message moves it on
+  (dispatched, admitted, definitely refused, unknown, back in the box, retired). Its step to sending is saved
+  before the message goes (`dispatchShares`); if it can't be, the message goes back in the box unsent. The native
+  client binds that id to its own journal entry for the message (`PendingShareCorrelation`, recorded in
+  `recordSubmission`) and admits only that entry. Admission marks the share spent on disk before deleting it, so
+  it's never listed again even if the deletion has to wait. A send that definitely failed puts the message back in
+  the box with its share (never Try again or an automatic branch, which would send it without one); an unanswered
+  one keeps its id, so its history (a reference's receipt) still settles it, after a relaunch too. The person
+  taking a share's last file or words out of the box lets it go, kept and listed. The saved copy goes only when
+  Hermes takes the message carrying it, or when the person deletes it in ☰ › Shared with bighelp (Bots mode: its
+  Settings), which lists every waiting share; never by itself. `PendingShareInboxTests`, `PendingShareLedgerTests`
+  and `PendingShareWaitTests` run under any Swift (no UIKit); `PendingShareComposerTests` drive the chat.
 - **Plugin routes:**
   - Each route is a `WorkspaceOperation` case plus a `Route(path:feature:isMutation:maximumResponseBytes:)` in
     `DirectHermesNativeContext.swift`.

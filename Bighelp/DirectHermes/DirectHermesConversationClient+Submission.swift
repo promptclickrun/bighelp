@@ -237,8 +237,8 @@ extension DirectHermesConversationClient {
                                 return
                             }
                         } else if commandRejected || (!command && Self.isProvenInputRejection(error)) {
+                            // Not sent. The chat puts its words back in the box (`ChatModel.send`).
                             self.retireSubmission(submission.id)
-                            if self.model?.draft.isEmpty == true { self.model?.draft = message }
                             self.needsRecovery = self.journal.unresolved.contains { $0.id == submission.id }
                         } else { self.needsRecovery = true }
                         self.status = Self.safeMessage(error)

@@ -394,6 +394,10 @@ extension ChatModel {
                     putShareMessageBack(localHumanID, message: message, attachments: attachments,
                                         orderedAttachments: orderedAttachments)
                     failureMessage = "Message could not be delivered. It's back in the message box."
+                } else if restoresDraft, draft.isEmpty, !message.hasPrefix("/"),
+                          DirectHermesConversationClient.isProvenInputRejection(error) {
+                    // Hermes refused it before taking it: its words are back in the box, once.
+                    draft = message
                 }
             }
         }

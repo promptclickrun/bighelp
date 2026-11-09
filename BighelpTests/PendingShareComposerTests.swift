@@ -541,6 +541,31 @@ struct PendingShareComposerTests {
         #expect(placement(a.id)?.submission?.id != placement(b.id)?.submission?.id)
     }
 
+    @Test func aRefusedMessageIsBackInTheBoxOnceAndGoesOnceLater() async throws {
+        for carriesShare in [true, false] {
+            let words = "Refused words \(carriesShare)"
+            let rpc = ShareGateRPC()
+            rpc.refusal = DirectHermesError.rpcRejected(code: 4004)
+            let chat = try await NativeShareChat(rpc: rpc)
+            defer { chat.close() }
+            let center = await center()
+            let share: PendingShare? = try carriesShare ? save(text: words) : nil
+            if let share { #expect(await chat.model.placeShare(share, from: inbox, tracker: center) == .placed) }
+            else { chat.model.draft = words }
+
+            await chat.model.send()
+            #expect(chat.model.draft == words, "Back in the box once")
+            if let share { #expect(chat.model.holdsShare(share.id)) }
+
+            rpc.refusal = nil
+            let sending = Task { await chat.model.send() }
+            defer { sending.cancel() }
+            try await until { rpc.submits.count == 2 && (share.map { !savedIDs.contains($0.id) } ?? true) }
+            #expect(rpc.submits == [words, words])
+            #expect(chat.model.draft.isEmpty)
+        }
+    }
+
     // MARK: - Messages with files over 8 MB
 
     @Test func aBigFileMessageHermesMayHaveTakenIsNeverSentAgainEvenAfterARelaunch() async throws {

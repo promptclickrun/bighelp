@@ -543,6 +543,36 @@ struct PendingShareComposerTests {
 
     // MARK: - Messages with files over 8 MB
 
+    @Test func aBigFileMessageHermesMayHaveTakenIsNeverSentAgainEvenAfterARelaunch() async throws {
+        let share = try save(text: "Words with a big file")
+        let center = await center()
+        let rpc = ShareGateRPC()
+        rpc.losesReceipt = true
+        let chat = try await NativeShareChat(rpc: rpc)
+        defer { chat.close() }
+        #expect(await chat.model.placeShare(share, from: inbox, tracker: center) == .placed)
+        let file = try await bigFile("Clip.mov")
+        defer { BigFileStore.remove(file) }
+        try chat.model.addDraftBigFile(file)
+
+        // Hermes takes the prompt with its file, and its answer is lost.
+        await chat.model.send()
+        #expect(rpc.submits.count == 1 && rpc.submits.first?.hasPrefix("Words with a big file\n@file:") == true)
+        #expect(chat.model.bigFileSends.isEmpty, "Shown as sent, not waiting for Try again")
+        #expect(chat.model.items.contains { Self.text($0).hasPrefix("Words with a big file\n@file:") })
+        #expect(BigFileUploadBoard.shared.state(for: file.id) == nil)
+        BigFileUploadBoard.shared.retry(file.id)
+        #expect(rpc.submits.count == 1, "Nothing sends it again")
+        #expect(chat.model.retryRequest == nil && chat.model.failureMessage?.contains("unconfirmed") == true)
+        #expect(placement(share.id)?.submission?.state == .unconfirmed)
+
+        // bighelp opens again: it may have arrived, never "not sent".
+        let relaunched = PendingShareCenter(inbox: PendingShareInbox(root: inbox.root))
+        await relaunched.refresh()
+        #expect(relaunched.entries.map(\.id) == [share.id])
+        #expect(placement(share.id)?.recovery == .maybeSent)
+    }
+
     // A starts the turn and Hermes is slow to answer its prompt, though its events say the turn runs;
     // B goes queued behind it and is refused. Both orders.
     @Test(arguments: [true, false])
@@ -699,8 +729,8 @@ private final class ShareCountingClient: AttachmentConversationClient {
     }
 }
 
-/// A computer that answers a prompt with `streaming` and never ends the turn, refuses it, or holds
-/// its answer until the test gives one.
+/// A computer that answers a prompt with `streaming` and never ends the turn, refuses it, takes it
+/// and loses its answer, or holds its answer until the test gives one.
 @MainActor
 private final class ShareGateRPC: DirectHermesRPC {
     var onEvent: ((DirectHermesEvent) -> Void)?
@@ -708,6 +738,7 @@ private final class ShareGateRPC: DirectHermesRPC {
     var holdsSubmit = false
     /// Prompts starting with one of these wait for `answer(_:with:)`.
     var holdsPrompts: Set<String> = []
+    var losesReceipt = false
     private(set) var submits: [String] = []
     private var held: CheckedContinuation<BighelpJSONValue, any Error>?
     private var heldPrompts: [String: CheckedContinuation<BighelpJSONValue, any Error>] = [:]
@@ -742,6 +773,7 @@ private final class ShareGateRPC: DirectHermesRPC {
             let text = params["text"]?.string ?? ""
             submits.append(text)
             if let refusal { throw refusal }
+            if losesReceipt { throw DirectHermesError.disconnected(outcomeUnknown: true) }
             if let prefix = holdsPrompts.first(where: { text.hasPrefix($0) }) {
                 return try await withCheckedThrowingContinuation { heldPrompts[prefix] = $0 }
             }

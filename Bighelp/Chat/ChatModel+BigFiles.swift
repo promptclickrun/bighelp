@@ -115,7 +115,15 @@ extension ChatModel {
                 return
             }
             if startsPrimaryTurn { hasLocallyPendingPrimaryTurn = false }
-            // Its files didn't go, so Hermes hasn't the message: it waits for Try again.
+            if let unconfirmed = error as? DirectHermesConversationClient.UnconfirmedSend {
+                // Its message went with every file and no answer came: Hermes may have it. It shows as
+                // sent, with no Try again, and its shares stay "may have arrived" (the deferred
+                // `shareMessageUnknown`). A later read of the history settles it either way.
+                bigFileMessageAccepted(rowID: human.id, text: unconfirmed.submittedText, files: files)
+                failureMessage = "Message delivery is unconfirmed. It will not be sent again automatically."
+                return
+            }
+            // Its message never went to Hermes: it waits for Try again.
             shareMessageWaits(row: human.id)
             let reason = (error as? BigFileUploadError)?.failure.message ?? BigFileUploadFailure(error).message
             failBigFiles(files, rowID: human.id, message: message, ordinaryAttachments: ordinaryAttachments,

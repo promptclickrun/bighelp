@@ -2,6 +2,12 @@ import Foundation
 
 /// Whole-batch attachment validation, serial staging and retained upload intent.
 extension DirectHermesConversationClient {
+    /// A message with files whose prompt went to Hermes, with no answer or refusal back: Hermes may
+    /// have it, so it's never sent again on its own. `submittedText` is what went, `@file:` lines too.
+    struct UnconfirmedSend: Error {
+        let submittedText: String
+    }
+
     func send(message: String, attachments: [ChatAttachment], conversationID: String,
               onDraft: @escaping (TimelineItem) -> Void) async throws -> ConversationResponse {
         if attachments.isEmpty {
@@ -57,6 +63,8 @@ extension DirectHermesConversationClient {
         let entry = try recordSubmission(message, method: "pdf.attach", attachments: ordinaryAttachments)
         preparingAttachmentID = entry.id
         var didStartStaging = false
+        var didDispatchQueuedPrompt = false
+        var submittedText: String?
         defer { if preparingAttachmentID == entry.id { preparingAttachmentID = nil } }
         do {
             var references: [String] = []
@@ -108,6 +116,7 @@ extension DirectHermesConversationClient {
 
             let text = ([message] + references).filter { !$0.isEmpty }.joined(separator: "\n")
             let submission = try replaceSubmission(entry, text: text, method: "prompt.submit")
+            submittedText = text
             if needsRecovery, journal.unresolved.allSatisfy({ $0.id == entry.id }) {
                 needsRecovery = false
             }
@@ -120,6 +129,7 @@ extension DirectHermesConversationClient {
             let response: ConversationResponse
             if queued {
                 try Task.checkCancellation()
+                didDispatchQueuedPrompt = true
                 let accepted = try await rpc.request("prompt.submit", params: [
                     "session_id": .string(target.runtimeID),
                     "text": .string(text),
@@ -152,13 +162,19 @@ extension DirectHermesConversationClient {
                 submittedText: text
             )
         } catch {
+            // Once its prompt went, only Hermes' answer or a refusal says whether it arrived.
+            let promptWent = didDispatchQueuedPrompt || dispatchedSubmissionID == entry.id
+            let refused = error is RejectedPrompt || Self.definitePromptRefusalCode(error) != nil
+                || Self.isProvenInputRejection(error)
             if owner == generation {
-                if !didStartStaging { retireSubmission(entry.id) }
+                // A queued prompt Hermes refused wasn't sent: its message waits in the chat for Try again.
+                if !didStartStaging || (didDispatchQueuedPrompt && refused) { retireSubmission(entry.id) }
                 if journal.unresolved.contains(where: { $0.id == entry.id && $0.rejectionCode == nil }) {
                     needsRecovery = true
                 }
                 status = Self.safeMessage(error)
             }
+            if promptWent, !refused, let submittedText { throw UnconfirmedSend(submittedText: submittedText) }
             throw error
         }
     }

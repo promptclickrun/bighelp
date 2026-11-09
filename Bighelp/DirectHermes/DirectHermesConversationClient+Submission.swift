@@ -130,6 +130,7 @@ extension DirectHermesConversationClient {
                         if method == "prompt.submit" {
                             ChatPerformanceProbe.promptDispatched(conversationID: self.conversationID, submission: submission.id)
                         }
+                        self.dispatchedSubmissionID = submission.id
                         do {
                             result = try await self.rpc.request(method, params: params)
                         } catch DirectHermesError.rpcRejected(code: 4018, _) where method == "slash.exec" {
@@ -551,7 +552,7 @@ extension DirectHermesConversationClient {
         continuation?.resume(throwing: error)
     }
 
-    private static func isProvenInputRejection(_ error: Error, method: String = "prompt.submit") -> Bool {
+    static func isProvenInputRejection(_ error: Error, method: String = "prompt.submit") -> Bool {
         if let workspace = error as? DirectHermesWorkspaceError, case .midSessionRejected = workspace { return true }
         if method == "prompt.submit", (error as? DirectHermesError) == .activeSessionLimit { return true }
         guard let direct = error as? DirectHermesError, case .rpcRejected(let code, _) = direct else { return false }

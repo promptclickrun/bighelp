@@ -448,8 +448,10 @@ change in both repos.
   on disk, never its bytes. The app's `[Video attached: … (size, length, picture)]` or `[File attached: … (size)]`
   note follows each `@file:` line. One look per file (#721): while it goes up, a tile with a ring and "34 of 80
   MB" (`BigFileUploadTile`, progress in `BigFileUploadBoard` so only the ring redraws), or why it didn't go with
-  Try again and Remove; once Hermes takes the message (`onSubmissionAdmitted`), the row takes the sent text and
-  shows each file as a line on the rail (`ChatSentFileLine`), exactly what a reread rebuilds. A host path or
+  Try again and Remove; once Hermes takes the message (`onSubmissionAdmitted`, by journal entry), the row takes
+  the sent text and shows each file as a line on the rail (`ChatSentFileLine`), exactly what a reread rebuilds. A
+  prompt that went with no answer back looks the same, says delivery is unconfirmed and has no Try again
+  (`UnconfirmedSend`). A host path or
   `@file:` ref never shows as text; a tap opens the bot's Files on the file (`BotProfileOpening.file`,
   `SimpleBotFilesModel.reveal`), a long press shows the path. Hosts without the feature keep the 8 MiB limit and
   say to update the plugin.

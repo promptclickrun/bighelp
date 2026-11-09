@@ -327,6 +327,7 @@
 		2A9B76AAB859A209C1819624 /* PluginMarketplaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A5D4E05C574182D219973E /* PluginMarketplaceTests.swift */; };
 		2AD5EC547A554B6CEDDE45B7 /* ManagementSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 578DE4F4361908BAD8275D2F /* ManagementSearch.swift */; };
 		2B280F14781611D6C34CBDD5 /* ChatTimelineBuiltRowsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C5208F6702E30ED928E2AC /* ChatTimelineBuiltRowsTests.swift */; };
+		2B5A5C20C36FCAF68021702B /* PendingShareInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = D476A29FAFA9F813839D032A /* PendingShareInbox.swift */; };
 		2B6D0A06A0AAE3B12BABC044 /* DirectHermesGoalControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 748B753134C12DD4B400F46B /* DirectHermesGoalControl.swift */; };
 		2B94917A65166711CB2DD854 /* RootMarketplace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 583BA6F94639B8B2ECA04CA9 /* RootMarketplace.swift */; };
 		2C14571283AA53F318ED1ED3 /* ResponseHapticsSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE87973F7A7838E224AE097E /* ResponseHapticsSettingsTests.swift */; };
@@ -684,7 +685,9 @@
 		5668A121916F51DA9276A145 /* UsageSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 044F71569210C6A2E1914814 /* UsageSections.swift */; };
 		56A0D72C05321B3D12F213C6 /* BighelpGlassGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0301ED2BC34B085E0DC13039 /* BighelpGlassGroup.swift */; };
 		56FCC407B522F9E13122824A /* AgentBoardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 419249A452E114FBDD04C000 /* AgentBoardViews.swift */; };
+		571CE2FAD3293B9A359312D8 /* PendingShareInboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3E7C1AD17C0C94B0E20BB7D /* PendingShareInboxTests.swift */; };
 		572777425A63A9F9561CBB85 /* UnavailableAppClients.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2812581507CBD73FFE9CFE4B /* UnavailableAppClients.swift */; };
+		572DFDBE7453061715F05652 /* PendingShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110FD0EA31FFDAE0E57951D7 /* PendingShare.swift */; };
 		57370359189FFD63833B13ED /* UserIdentityStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113548A3FB4DC14DE70D90B3 /* UserIdentityStoreTests.swift */; };
 		5782EF05ED7B25A18E98AB3C /* KanbanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 953B22D814ABE8181BB7A195 /* KanbanService.swift */; };
 		57946B42A19C582B5AA73965 /* DirectHermesVoiceMediaTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AB67E399FCAF7E7DD9399B6 /* DirectHermesVoiceMediaTransport.swift */; };
@@ -2306,6 +2309,7 @@
 		10E8CACAEEB9CB965F521E5A /* WorkspaceFolderChooser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceFolderChooser.swift; sourceTree = "<group>"; };
 		110327E861D3E832B5032BF2 /* ReferenceNativeEditorAcceptanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceNativeEditorAcceptanceTests.swift; sourceTree = "<group>"; };
 		11073DDD6A9E23FFD6048851 /* MyTemplatesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyTemplatesTests.swift; sourceTree = "<group>"; };
+		110FD0EA31FFDAE0E57951D7 /* PendingShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingShare.swift; sourceTree = "<group>"; };
 		112773F6B2779C39B4332F60 /* pin.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = pin.json; sourceTree = "<group>"; };
 		112D329592AC95EB7826923E /* ScheduledTaskPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledTaskPresentationTests.swift; sourceTree = "<group>"; };
 		113548A3FB4DC14DE70D90B3 /* UserIdentityStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserIdentityStoreTests.swift; sourceTree = "<group>"; };
@@ -3846,9 +3850,11 @@
 		D3839FB429704BEC09A1DF03 /* BighelpRailCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpRailCard.swift; sourceTree = "<group>"; };
 		D3D2F8B1EC1B801E839E9497 /* templates-save.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "templates-save.json"; sourceTree = "<group>"; };
 		D3E4194DE5A3290DDC47268B /* SubagentCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubagentCanvasView.swift; sourceTree = "<group>"; };
+		D3E7C1AD17C0C94B0E20BB7D /* PendingShareInboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingShareInboxTests.swift; sourceTree = "<group>"; };
 		D421B3414A76F426CEB98DEC /* DirectHermesHostOperationsClient+Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DirectHermesHostOperationsClient+Diagnostics.swift"; sourceTree = "<group>"; };
 		D4640BEA8960ADFA9E7ED692 /* RawConfigurationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RawConfigurationStore.swift; sourceTree = "<group>"; };
 		D4683C7DFC7A443F70635533 /* BighelpMacSessionSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpMacSessionSidebar.swift; sourceTree = "<group>"; };
+		D476A29FAFA9F813839D032A /* PendingShareInbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingShareInbox.swift; sourceTree = "<group>"; };
 		D4BF8062D2F2C49ECB6B2A60 /* validate-v2.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "validate-v2.json"; sourceTree = "<group>"; };
 		D4EE1DC2822C5FC210D90AE0 /* BighelpWindowAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpWindowAppearance.swift; sourceTree = "<group>"; };
 		D4F646E405205B3A5C8D7BED /* WorkspaceManagementLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceManagementLayoutTests.swift; sourceTree = "<group>"; };
@@ -4873,6 +4879,15 @@
 			path = Kanban;
 			sourceTree = "<group>";
 		};
+		6A5390C41FC1214619896CE9 /* ShareShared */ = {
+			isa = PBXGroup;
+			children = (
+				110FD0EA31FFDAE0E57951D7 /* PendingShare.swift */,
+				D476A29FAFA9F813839D032A /* PendingShareInbox.swift */,
+			);
+			path = ShareShared;
+			sourceTree = "<group>";
+		};
 		76496EA6DB7DC2531B7D4D07 /* BighelpMacTests */ = {
 			isa = PBXGroup;
 			children = (
@@ -5693,6 +5708,7 @@
 				67FB49189817CF58FA1D72FD /* OnDeviceVoiceTests.swift */,
 				63BBC3D0A9A41D731EE9D5B0 /* OtherAppChatsTests.swift */,
 				D733A935B040D1310BC2E6A6 /* PendingHostCredentialTests.swift */,
+				D3E7C1AD17C0C94B0E20BB7D /* PendingShareInboxTests.swift */,
 				5ABB843955626E16B7224421 /* PeopleTests.swift */,
 				4A3548EA837BB0A869121EE7 /* PermissionCenterTests.swift */,
 				A693268CC41E91CE0E9F71A8 /* PersonalityStoreTests.swift */,
@@ -6513,6 +6529,7 @@
 				44572CEA4E3E39DE844D9BB2 /* Sessions */,
 				90B502F8048739163EBACCA0 /* Settings */,
 				082CEAE2C97E128D6BD6A03D /* SharedFoundation */,
+				6A5390C41FC1214619896CE9 /* ShareShared */,
 				DA26CE5DC0E8D308228DDFF0 /* Shortcuts */,
 				614BBCD37EA38E685C336160 /* SimpleBots */,
 				E87317C0A68052515FF0062E /* Spatial */,
@@ -8524,6 +8541,8 @@
 				FABF17D030EBAE209AEBBE4D /* OtherAppChats.swift in Sources */,
 				69DF7C03AA3CD81DF8380991 /* PairingManagementView.swift in Sources */,
 				09536479F69F0F340C5B946C /* PendingAgentFilesView.swift in Sources */,
+				572DFDBE7453061715F05652 /* PendingShare.swift in Sources */,
+				2B5A5C20C36FCAF68021702B /* PendingShareInbox.swift in Sources */,
 				A373CBFF47E5D96E97CECA90 /* PeopleAndChatView.swift in Sources */,
 				3D2B31DEB84155808BB13A35 /* PermissionCenter.swift in Sources */,
 				7077A30295A20B567E092DF9 /* PermissionsViews.swift in Sources */,
@@ -9353,6 +9372,7 @@
 				70A53193AF353DFF746F6072 /* OnDeviceVoiceTests.swift in Sources */,
 				59CF1CB77306DF14AF5C57B2 /* OtherAppChatsTests.swift in Sources */,
 				5F0B8C5D04DD1928B9A2878A /* PendingHostCredentialTests.swift in Sources */,
+				571CE2FAD3293B9A359312D8 /* PendingShareInboxTests.swift in Sources */,
 				4313B7CBC502A7BD1C69BE08 /* PeopleTests.swift in Sources */,
 				705A1F88DB322FF588173B53 /* PermissionCenterTests.swift in Sources */,
 				7B4202245F9346B035692A24 /* PersonalityStoreTests.swift in Sources */,

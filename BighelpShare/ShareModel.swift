@@ -1,181 +1,145 @@
 import Foundation
 import SwiftUI
 
-/// The sheet's whole state: pick an agent, pick a chat (or a new one), say a line, send.
+/// The share sheet: read what was shared onto the device, let the person add a note, save it for
+/// bighelp. It sends nothing and signs in to nothing; bighelp sends it, from the chat the person
+/// picks there, once they tap Send.
 @MainActor
 final class ShareModel: ObservableObject {
-    enum Step: Equatable {
-        case agents
-        case chats
-        case compose
+    struct Row: Identifiable, Equatable {
+        let id: Int
+        var kind: ShareCollector.Kind
+        var title: String
+        var detail: String
+        var problem: String?
+        var isReading: Bool
     }
 
-    @Published private(set) var step: Step = .agents
-    @Published private(set) var agents: [ShareAgent] = []
-    @Published private(set) var chats: [ShareChat] = []
-    @Published private(set) var agent: ShareAgent?
-    @Published private(set) var chat: ShareChat?
-    @Published var text = ""
-    @Published private(set) var busy = false
-    @Published private(set) var loading = true
-    @Published private(set) var sentChatID: String?
-    @Published private(set) var failure: String?
-
-    let input: ShareInput
-    private let credential: ShareCredential?
-    private var rpc: ShareRPC?
-
-    init(input: ShareInput) {
-        self.input = input
-        credential = ShareCredential.load()
-        agents = ShareCache.agents()
-        if let last = ShareCache.lastAgent, let known = agents.first(where: { $0.id == last }) {
-            agent = known
-        }
+    enum Phase: Equatable {
+        case reading
+        case ready
+        case saving
+        case saved
+        /// Nothing was saved; why.
+        case failed(String)
     }
 
-    var canSend: Bool {
-        !busy && sentChatID == nil && (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !input.isEmpty)
+    @Published private(set) var rows: [Row] = []
+    @Published private(set) var phase: Phase = .reading
+    @Published var note = ""
+
+    private let inbox: PendingShareInbox?
+    private var draft: PendingShareDraft?
+    private let cancellation = ShareCancellation()
+    private var reading: Task<Void, Never>?
+
+    init(inbox: PendingShareInbox? = PendingShareInbox.shared()) {
+        self.inbox = inbox
     }
 
-    var subtitle: String {
-        let parts = [input.link == nil ? nil : "a link",
-                     input.attachments.isEmpty ? nil : "\(input.attachments.count) attached",
-                     input.text.isEmpty ? nil : "text"].compactMap { $0 }
-        return parts.isEmpty ? "" : parts.joined(separator: " · ")
-    }
+    var problems: [String] { rows.compactMap(\.problem) }
 
-    // MARK: - Loading
+    var noteIsTooLong: Bool { note.utf8.count > (inbox?.limits.noteBytes ?? 0) }
 
-    func start() async {
-        guard credential != nil else {
-            loading = false
-            failure = "Open bighelp once to sign in, then share this again."
+    var canSave: Bool { phase == .ready && problems.isEmpty && !rows.isEmpty && !noteIsTooLong }
+
+    func start(_ providers: [NSItemProvider]) {
+        guard reading == nil else { return }
+        guard let inbox else {
+            phase = .failed(String(localized: "bighelp can't save shares on this device. Open bighelp and try again."))
             return
         }
-        loading = agents.isEmpty
-        await refreshAgents()
-        loading = false
+        guard !providers.isEmpty else {
+            phase = .failed(String(localized: "There was nothing to share."))
+            return
+        }
+        rows = providers.enumerated().map { index, provider in
+            Row(id: index, kind: ShareCollector.kind(of: provider) ?? .file,
+                title: provider.suggestedName ?? String(localized: "Reading…"), detail: "", isReading: true)
+        }
+        reading = Task {
+            // A sheet that was closed or ended mid-save leaves a staging folder; it goes now.
+            await Task.detached(priority: .utility) { inbox.removeAbandonedStaging() }.value
+            let draft: PendingShareDraft
+            do {
+                draft = try await Task.detached(priority: .userInitiated) { try inbox.begin() }.value
+            } catch {
+                phase = .failed(Self.message(for: .share(error as? PendingShareError ?? .storageUnavailable)))
+                return
+            }
+            self.draft = draft
+            for (index, provider) in providers.enumerated() {
+                if cancellation.isCancelled { return }
+                let outcome = await ShareCollector.collect(provider, into: draft, cancel: cancellation)
+                rows[index] = Row(id: index, kind: outcome.kind, title: outcome.title, detail: outcome.detail,
+                                  problem: outcome.failure.map(Self.message), isReading: false)
+            }
+            if !cancellation.isCancelled { phase = .ready }
+        }
     }
 
-    private func refreshAgents() async {
-        guard let credential else { return }
-        let rpc = ShareRPC(credential: credential)
-        self.rpc = rpc
+    /// Saves the share in one step. Afterwards it waits in bighelp until it's sent or deleted.
+    func save() async {
+        guard canSave, let draft else { return }
+        phase = .saving
+        let note = note
         do {
-            let result = try await rpc.call("profiles.list", ["include_sessions": false])
-            let rows = (result["profiles"] as? [[String: Any]]) ?? []
-            let agents = rows.compactMap { row -> ShareAgent? in
-                guard let id = row["id"] as? String, !id.isEmpty else { return nil }
-                let name = (row["name"] as? String) ?? (row["title"] as? String) ?? id
-                return ShareAgent(id: id, name: name)
-            }
-            if !agents.isEmpty {
-                self.agents = agents
-                ShareCache.store(agents: agents)
-                if agent == nil { agent = agents.first }
-            }
-            failure = nil
+            _ = try await Task.detached(priority: .userInitiated) { try draft.commit(note: note) }.value
+            phase = .saved
+        } catch let error as PendingShareError {
+            // A full inbox, or the device's storage: nothing was saved, and the person can still cancel.
+            phase = .failed(Self.message(for: .share(error)))
         } catch {
-            // The cached list is still worth showing; only say something when there is
-            // nothing to show at all.
-            if agents.isEmpty { failure = message(error) }
+            phase = .failed(Self.message(for: .share(.storageUnavailable)))
         }
     }
 
-    func open(_ chosen: ShareAgent) async {
-        agent = chosen
-        chat = nil
-        ShareCache.lastAgent = chosen.id
-        chats = ShareCache.chats(for: chosen.id)
-        step = .chats
-        guard let credential else { return }
-        let rpc = self.rpc ?? ShareRPC(credential: credential)
-        self.rpc = rpc
-        do {
-            let result = try await rpc.call("session.list", ["profile": chosen.id, "limit": 20])
-            let rows = (result["sessions"] as? [[String: Any]]) ?? []
-            let chats = rows.compactMap { row -> ShareChat? in
-                guard let id = (row["resolved_id"] as? String) ?? (row["id"] as? String), !id.isEmpty else { return nil }
-                // The same rule the app applies (`DirectHermesSessionSummary.supportsNativeResume`):
-                // a chat owned by another Hermes surface cannot be resumed here, and offering it
-                // in the sheet would only get refused after the person had typed a line.
-                guard Self.isResumable(source: row["source"] as? String ?? "", id: id) else { return nil }
-                let title = (row["title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Untitled chat"
-                return ShareChat(id: id, title: title)
+    /// Stops reading and throws away what was staged. A saved share stays.
+    func cancel() {
+        cancellation.cancel()
+        reading?.cancel()
+        guard let draft else { return }
+        self.draft = nil
+        Task.detached(priority: .userInitiated) { draft.rollback() }
+    }
+
+    static func message(for failure: ShareCollector.Failure) -> String {
+        switch failure {
+        case .timedOut:
+            return String(localized: "This didn't arrive in time. Try sharing it again.")
+        case .unsupported:
+            return String(localized: "bighelp can't take this kind of item.")
+        case .share(let error):
+            switch error {
+            case .nothingToShare:
+                return String(localized: "There was nothing to share.")
+            case .tooManyFiles(let limit):
+                return String(localized: "bighelp takes up to \(limit) photos and files at a time.")
+            case .fileTooLarge(_, let limit):
+                return String(localized: "This is over \(Self.size(limit)), the most bighelp can take.")
+            case .shareTooLarge(let limit):
+                return String(localized: "Together these are over \(Self.size(limit)). Share fewer at a time.")
+            case .textTooLong:
+                return String(localized: "This text is too long to share.")
+            case .noteTooLong:
+                return String(localized: "Your note is too long.")
+            case .tooManyLinks(let limit):
+                return String(localized: "bighelp takes up to \(limit) links at a time.")
+            case .unreadable:
+                return String(localized: "bighelp couldn't read this.")
+            case .emptyFile:
+                return String(localized: "This file is empty.")
+            case .inboxFull(let shares):
+                return String(localized: "bighelp is holding \(shares) shares you haven't sent. Open bighelp, send or delete some, then share this again.")
+            case .storageUnavailable, .gone, .finished:
+                return String(localized: "bighelp couldn't save this. Nothing was saved.")
+            case .cancelled:
+                return String(localized: "Cancelled.")
             }
-            if !chats.isEmpty {
-                self.chats = Array(chats.prefix(ShareCache.maximumChats))
-                ShareCache.store(chats: self.chats, for: chosen.id)
-            }
-        } catch {
-            if chats.isEmpty { failure = message(error) }
         }
     }
 
-    /// `nil` starts a new chat rather than continuing one.
-    func compose(into chosen: ShareChat?) {
-        chat = chosen
-        step = .compose
-        failure = nil
-    }
-
-    func back() {
-        switch step {
-        case .compose: step = .chats
-        case .chats: step = .agents
-        case .agents: break
-        }
-    }
-
-    // MARK: - Sending
-
-    func send() async {
-        guard let credential, let agent, canSend else { return }
-        busy = true
-        failure = nil
-        let rpc = self.rpc ?? ShareRPC(credential: credential)
-        self.rpc = rpc
-        let sender = ShareSender(rpc: rpc)
-        do {
-            let id = try await sender.send(text: prompt, attachments: input.attachments,
-                                           agent: agent.id, chatID: chat?.id)
-            sentChatID = id
-            // Keep the chat list honest for the next share.
-            if chat == nil, let agent = self.agent {
-                var updated = ShareCache.chats(for: agent.id)
-                updated.insert(ShareChat(id: id, title: text.isEmpty ? "Shared to " + agent.name : String(text.prefix(60))), at: 0)
-                ShareCache.store(chats: Array(updated.prefix(ShareCache.maximumChats)), for: agent.id)
-            }
-            rpc.disconnect()
-            self.rpc = nil
-        } catch {
-            failure = message(error)
-        }
-        busy = false
-    }
-
-    private static func isResumable(source: String, id: String) -> Bool {
-        if [ShareSender.sessionSource, "desktop", "tui", "cli"].contains(source) { return true }
-        // Hermes rewrites a Bot Chat's stored source to "local"; only its own rows are ours.
-        return source == "local" && id.hasPrefix("local-")
-    }
-
-    /// A link travels as the prompt's own first line, which is what the app's composer
-    /// does when someone pastes a URL.
-    private var prompt: String {
-        var lines: [String] = []
-        let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let link = input.link {
-            lines.append(link)
-            if !typed.isEmpty { lines.append(typed) }
-        } else if !typed.isEmpty {
-            lines.append(typed)
-        }
-        return lines.joined(separator: "\n")
-    }
-
-    private func message(_ error: Error) -> String {
-        (error as? LocalizedError)?.errorDescription ?? "Couldn't send this share."
+    private static func size(_ bytes: Int) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
     }
 }

@@ -54,8 +54,8 @@ targets:
       - target: BighelpNotificationService
         embed: true
         destinationFilters: [iOS, macCatalyst]
-      # The share sheet. iPhone and iPad only: the Mac app has its own Share menu and
-      # no share sheet, and Vision Pro has no share sheet either.
+      # The share sheet, which saves what's shared for bighelp to send. iPhone and iPad
+      # only for now: the Mac and Vision Pro builds don't embed it.
       - target: BighelpShare
         embed: true
         destinationFilters: [iOS]
@@ -175,22 +175,22 @@ targets:
         INFOPLIST_FILE: BighelpNotificationService/Info.plist
         APPLICATION_EXTENSION_API_ONLY: YES
         SKIP_INSTALL: YES
-  # Receives a link, text, picture or file from another app's share sheet and sends it to
-  # the agent the person picks. It reads the app's sign-in copy and cached agent list
-  # through the existing notification Keychain group and app group, so no new capability
-  # has to be registered for its bundle ID.
+  # Saves a link, text, photos or files shared from another app into the app group
+  # (Bighelp/ShareShared, PendingShareInbox). It has no sign-in, Keychain group or
+  # network: bighelp sends the share from the chat the person picks there (#922).
   BighelpShare:
     type: app-extension
     platform: iOS
     dependencies: []
     sources:
       - path: BighelpShare
+      - path: Bighelp/ShareShared
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.loopdy.mobile.share
         PRODUCT_NAME: BighelpShare
-        MARKETING_VERSION: 2.6.62
-        CURRENT_PROJECT_VERSION: 205
+        MARKETING_VERSION: 2.6.76
+        CURRENT_PROJECT_VERSION: 219
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: BighelpShare/BighelpShare.entitlements
         TARGETED_DEVICE_FAMILY: "1,2"

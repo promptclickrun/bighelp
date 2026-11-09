@@ -24,14 +24,15 @@ struct ChatToolCodeCell: Equatable, Sendable {
     let exitCode: Int?
     let ending: Ending
 
-    /// Bigger arguments or results are left to the plain details, so a cell
-    /// never parses an arbitrarily large value.
+    /// Bigger arguments or results are left to the plain details (a bounded
+    /// preview), so a cell never parses an arbitrarily large value.
     static let maximumCodeBytes = 65_536
     static let maximumResultBytes = 262_144
 
     static func make(for event: ChatActivityEvent) -> ChatToolCodeCell? {
         guard event.kind == .tool, let language = language(for: event.canonicalToolName),
-              let arguments = event.arguments, arguments.utf8.count <= maximumCodeBytes else { return nil }
+              let arguments = event.arguments, arguments.utf8.count <= maximumCodeBytes,
+              (event.result?.utf8.count ?? 0) <= maximumResultBytes else { return nil }
         let key = Key(language: language, arguments: arguments, result: event.result, lifecycle: event.lifecycle)
         if let cached = cache.withLock({ $0[key] }) { return cached.cell }
         let cell = make(key)
@@ -73,7 +74,7 @@ struct ChatToolCodeCell: Equatable, Sendable {
         if let result = key.result, !result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             // Hermes sends `{"output", "exit_code", "error"}` (terminal) or
             // `{"status", "output", "error"}` (execute_code), sometimes inside a JSON string.
-            var value = result.utf8.count <= maximumResultBytes ? json(result) : nil
+            var value = json(result)
             if let text = value as? String { value = json(text) }
             if let object = value as? [String: Any], object["output"] != nil || object["error"] != nil {
                 output = object["output"] as? String
@@ -85,6 +86,8 @@ struct ChatToolCodeCell: Equatable, Sendable {
             }
         }
         output = output.flatMap { $0.trimmingCharacters(in: .newlines).isEmpty ? nil : $0 }
+        // An error fails the run even when the output already says it and it isn't shown twice.
+        let reportsError = error != nil
         if let message = error, output?.contains(message) == true { error = nil }
 
         let ending: Ending = switch key.lifecycle {
@@ -92,7 +95,7 @@ struct ChatToolCodeCell: Equatable, Sendable {
         case .failed: .failed
         case .cancelled: .stopped
         case .succeeded, .recorded:
-            status == "error" || status == "timeout" || (exitCode ?? 0) != 0 ? .failed : .succeeded
+            reportsError || status == "error" || status == "timeout" || (exitCode ?? 0) != 0 ? .failed : .succeeded
         }
         return ChatToolCodeCell(language: key.language, code: code, lines: ChatCodeSyntax.lines(code, language: key.language),
                                 output: output, error: error, exitCode: exitCode, ending: ending)
@@ -150,6 +153,9 @@ enum ChatCodeSyntax {
         let language: ChatToolCodeCell.Language
         var lines: [ChatCodeLine] = []
         private var runs: [ChatCodeLine.Run] = []
+        /// The run being built, as scalars not yet copied: adding to a String a
+        /// character at a time copied the whole run each time, quadratic in its length.
+        private var pending: (range: Range<Int>, token: ChatCodeToken?)?
         private var index = 0
         /// Shell: the next word names a command.
         private var commandPosition = true
@@ -287,15 +293,22 @@ enum ChatCodeSyntax {
 
         private mutating func append(_ range: Range<Int>, _ token: ChatCodeToken?) {
             guard !range.isEmpty else { return }
-            let text = String(String.UnicodeScalarView(scalars[range]))
-            if let last = runs.last, last.token == token {
-                runs[runs.count - 1] = .init(text: last.text + text, token: token)
+            if let current = pending, current.token == token, current.range.upperBound == range.lowerBound {
+                pending = (current.range.lowerBound..<range.upperBound, token)
             } else {
-                runs.append(.init(text: text, token: token))
+                closeRun()
+                pending = (range, token)
             }
         }
 
+        private mutating func closeRun() {
+            guard let current = pending else { return }
+            runs.append(.init(text: String(String.UnicodeScalarView(scalars[current.range])), token: current.token))
+            pending = nil
+        }
+
         private mutating func flushLine() {
+            closeRun()
             lines.append(ChatCodeLine(runs: runs))
             runs = []
         }

@@ -74,6 +74,23 @@ struct ChatToolCodeCellTests {
         #expect(plain.output == "Command finished")
     }
 
+    /// A failure that only says so in `error` ends badly too.
+    @Test func anErrorAloneFailsTheRun() throws {
+        let cell = try #require(ChatToolCodeCell.make(for: event("terminal",
+            arguments: #"{"command":"sleep 900"}"#, result: #"{"output":"","exit_code":null,"error":"Command timed out"}"#)))
+        #expect(cell.error == "Command timed out")
+        #expect(cell.ending == .failed)
+    }
+
+    /// A result too big to read keeps the bounded plain details, never a
+    /// cell that shows its JSON as output and loses how it ended.
+    @Test func anOversizedResultKeepsThePlainDetails() {
+        let output = String(repeating: "x", count: ChatToolCodeCell.maximumResultBytes)
+        let result = #"{"output":""# + output + #"","exit_code":1,"error":null}"#
+        #expect(ChatToolCodeCell.make(for: event("terminal", arguments: #"{"command":"cat big.log"}"#,
+                                                 result: result)) == nil)
+    }
+
     @Test func aRunningCallHasCodeButNoOutputYet() throws {
         let cell = try #require(ChatToolCodeCell.make(for: event("execute_code",
             arguments: #"{"code":"import time"}"#, result: nil, lifecycle: .running)))
@@ -136,5 +153,12 @@ struct ChatToolCodeCellTests {
         let lines = ChatCodeSyntax.lines(code, language: .python)
         #expect(lines.map(\.text).joined(separator: "\n") == code)
         #expect(lines[0].runs.contains(.init(text: "f", token: .call)))
+    }
+
+    /// A long stretch of plain text is one run, built once.
+    @Test func aLongPlainStretchIsOneRun() {
+        let spaces = String(repeating: " ", count: 60_000)
+        let line = ChatCodeSyntax.lines("(" + spaces + ")", language: .python)[0]
+        #expect(line.runs == [.init(text: "(" + spaces + ")", token: nil)])
     }
 }

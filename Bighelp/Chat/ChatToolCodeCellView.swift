@@ -176,7 +176,7 @@ struct ChatToolCodeCellView: View {
             Text("View raw")
                 .font(.bighelp(.caption))
                 .foregroundStyle(theme.tertiaryText)
-                .frame(minHeight: BighelpTokens.scaled(32))
+                .frame(minHeight: BighelpTokens.hitTarget)
                 .contentShape(.rect)
         }
         .accessibilityIdentifier(identifier + ".view-raw")

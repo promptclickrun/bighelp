@@ -53,7 +53,7 @@ final class PendingShareCenter: ChatShareTracking {
         isPaused = false
         guard let inbox else { return }
         let spent = spent
-        let (entries, left) = await Task.detached(priority: .utility) { () -> ([PendingShareInbox.Entry], [String]) in
+        let (listed, left) = await Task.detached(priority: .utility) { () -> ([PendingShareInbox.Entry], [String]) in
             inbox.removeAbandonedStaging()
             // Delivered shares whose deletion didn't go through before.
             let left = inbox.removeDelivered()
@@ -64,7 +64,8 @@ final class PendingShareCenter: ChatShareTracking {
         }.value
         self.spent = self.spent.filter { FileManager.default.fileExists(atPath: inbox.folder($0).path) }
             .union(left)
-        let read = entries.filter { !self.spent.contains($0.id) }
+        let read = listed.filter { !self.spent.contains($0.id) }
+        // Compared with what was listed before: a share that wasn't there is new.
         let known = Set(entries.map(\.id))
         if read.contains(where: { !known.contains($0.id) }) { deferred.removeAll() }
         let ids = Set(read.map(\.id))

@@ -97,6 +97,10 @@ final class ShareModel: ObservableObject {
             let rows = (result["sessions"] as? [[String: Any]]) ?? []
             let chats = rows.compactMap { row -> ShareChat? in
                 guard let id = (row["resolved_id"] as? String) ?? (row["id"] as? String), !id.isEmpty else { return nil }
+                // The same rule the app applies (`DirectHermesSessionSummary.supportsNativeResume`):
+                // a chat owned by another Hermes surface cannot be resumed here, and offering it
+                // in the sheet would only get refused after the person had typed a line.
+                guard Self.isResumable(source: row["source"] as? String ?? "", id: id) else { return nil }
                 let title = (row["title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Untitled chat"
                 return ShareChat(id: id, title: title)
             }
@@ -149,6 +153,12 @@ final class ShareModel: ObservableObject {
             failure = message(error)
         }
         busy = false
+    }
+
+    private static func isResumable(source: String, id: String) -> Bool {
+        if [Self.sessionSource, "desktop", "tui", "cli"].contains(source) { return true }
+        // Hermes rewrites a Bot Chat's stored source to "local"; only its own rows are ours.
+        return source == "local" && id.hasPrefix("local-")
     }
 
     /// A link travels as the prompt's own first line, which is what the app's composer

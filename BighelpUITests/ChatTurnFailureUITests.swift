@@ -39,10 +39,11 @@ final class ChatTurnFailureUITests: BighelpUITestCase {
         XCTAssertTrue(opened, "Use another model opens All models.")
         XCTAssertTrue(openAI.label.contains("17% left · resets "), openAI.label)
         capture(app, "\(appearance)-3-plan-left")
-        app.buttons["chat.models.section.anthropic"].tap()
-        let limited = app.buttons["chat.models.row.anthropic:claude-opus-4.1"]
-        XCTAssertTrue(limited.waitForExistence(timeout: 5))
+        // A provider that ran out says until when, and its models still unfold.
+        let limited = app.buttons["chat.models.section.anthropic"]
         XCTAssertTrue(limited.label.contains("Limited until "), limited.label)
+        limited.tap()
+        XCTAssertTrue(app.buttons["chat.models.row.anthropic:claude-opus-4.1"].waitForExistence(timeout: 5))
         capture(app, "\(appearance)-4-plan-limited")
         app.buttons["chat.model-settings.done"].firstMatch.tap()
         XCTAssertTrue(card.waitForExistence(timeout: 10))

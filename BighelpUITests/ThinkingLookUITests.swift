@@ -19,7 +19,7 @@ final class ThinkingLookUITests: BighelpUITestCase {
             for _ in 0..<8 where !thinking.exists || !thinking.isHittable { studio.swipeUp() }
             thinking.tap()
 
-            // Noodle is the look out of the box.
+            // Noodle is the look out of the box (the pass before puts it back).
             let noodle = app.buttons["thinking-look.pick.noodle"]
             XCTAssertTrue(noodle.waitForExistence(timeout: 5))
             XCTAssertTrue(noodle.isSelected)
@@ -47,6 +47,11 @@ final class ThinkingLookUITests: BighelpUITestCase {
             XCTAssertTrue(clockwork.isSelected)
             XCTAssertFalse(noodle.isSelected)
             save("thinking-picked-\(appearance)", app)
+
+            // The pick is kept on the device, so the next pass starts from Noodle again.
+            for _ in 0..<6 where !noodle.isHittable { page.swipeDown() }
+            noodle.tap()
+            XCTAssertTrue(noodle.isSelected)
             app.terminate()
         }
     }

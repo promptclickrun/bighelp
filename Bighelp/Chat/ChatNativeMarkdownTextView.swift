@@ -242,8 +242,9 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
             unchangedPrefix: context.coordinator.renderedRevision == revision &- 1
                 ? context.coordinator.renderCache.unchangedPrefix : 0,
             to: view.textStorage)
-        // Text that changes after it first showed is an answer arriving.
-        let isGrowing = context.coordinator.renderedRevision != nil
+        // Text that gets longer after it first showed is an answer arriving. A finished answer
+        // that only gains its links keeps its size.
+        let isGrowing = context.coordinator.renderedText.map { updatedText.length > $0.length } ?? false
         context.coordinator.renderedText = updatedText
         context.coordinator.renderedRevision = revision
         context.coordinator.textChanged(in: host, isGrowing: isGrowing)

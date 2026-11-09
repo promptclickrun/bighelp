@@ -1,3 +1,4 @@
+import SwiftUI
 import Testing
 import UIKit
 @testable import Bighelp
@@ -86,7 +87,7 @@ struct ChatStreamingTextTests {
         view.textStorage.setAttributedString(text)
         let side = ChatNativeMarkdownSideLayouts(textStorage: view.textStorage)
         for width: CGFloat in [120, 280, 393, 700] {
-            let expected = view.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+            let expected = view.sizeThatFits(CGSize(width: width, height: CGFloat.greatestFiniteMagnitude))
             #expect(side.size(width: width).height == ceil(expected.height), "width \(width)")
         }
     }
@@ -104,7 +105,7 @@ struct ChatStreamingTextTests {
                                            to: view.textStorage)
         #expect(side.size(width: 200).height > short)
         #expect(side.size(width: 200).height
-                == ceil(view.sizeThatFits(CGSize(width: 200, height: .greatestFiniteMagnitude)).height))
+                == ceil(view.sizeThatFits(CGSize(width: 200, height: CGFloat.greatestFiniteMagnitude)).height))
         // Never more than a few widths, and none once the text is still.
         for width in stride(from: CGFloat(100), through: 600, by: 100) { _ = side.size(width: width) }
         #expect(view.textStorage.layoutManagers.count == 1 + ChatNativeMarkdownSideLayouts.limit)

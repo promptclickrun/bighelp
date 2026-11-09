@@ -73,7 +73,7 @@ extension BighelpThinkingLook {
         let shade = ThinkingAccent.shade(frame.active, 1.2, flow: store.phase * 0.3)
         var dot = Path()
         dot.addThinkingDot(frame.thumbX, frame.middle, radius: 4.5)
-        context.fill(dot, with: .color(paint.accent.color(shade)))
+        context.fill(dot, with: .color(paint.accent.thumbMark(shade)))
     }
 }
 
@@ -203,9 +203,9 @@ extension BighelpThinkingLook {
         cursor.move(to: CGPoint(x: x - 4, y: y - 11)); cursor.addLine(to: CGPoint(x: x + 4, y: y - 11))
         cursor.move(to: CGPoint(x: x - 4, y: y + 11)); cursor.addLine(to: CGPoint(x: x + 4, y: y + 11))
         if level > 0 {
-            context.strokeThinkingGlow(cursor, paint.accent.color(caret, opacity: 0.9), spread: 3 + 9 * level, lineWidth: 2.4)
+            context.strokeThinkingGlow(cursor, paint.accent.thumbMark(caret, opacity: 0.9), spread: 3 + 9 * level, lineWidth: 2.4)
         }
-        context.stroke(cursor, with: .color(paint.accent.color(caret)), style: StrokeStyle(lineWidth: 2.4, lineCap: .round))
+        context.stroke(cursor, with: .color(paint.accent.thumbMark(caret)), style: StrokeStyle(lineWidth: 2.4, lineCap: .round))
     }
 }
 

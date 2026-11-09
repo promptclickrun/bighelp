@@ -6,19 +6,29 @@ import SwiftUI
 struct ChatModelSettingsSheet: View {
     @Bindable var controls: SessionRuntimeControlModel
     /// The chat is still getting its session; Fast Mode waits for it.
-    var isAllocating = false
-    /// Opens on All models: the person asked for another model (a failed turn's Use another model).
-    var startsOnAllModels = false
+    let isAllocating: Bool
     let onDone: () -> Void
 
     @AppStorage(BighelpThinkingLook.storageKey) private var look = BighelpThinkingLook.defaultLook
-    @State private var showsAllModels = false
-    @State private var detent = PresentationDetent.medium
+    @State private var showsAllModels: Bool
+    @State private var detent: PresentationDetent
     @State private var sender = ThinkingLevelSender()
     /// The levels last read. Hermes hands out a new list after every change, and the control
     /// stays up while that loads.
     @State private var thinking = ChatThinkingLevels()
     @State private var confirmationToSubmit: SessionRuntimeModelConfirmation?
+
+    /// `startsOnAllModels`: the person asked for another model (a failed turn's Use another model),
+    /// so the sheet opens tall, on All models. Set as the sheet is made: pushed from a task after
+    /// it showed, the stack sometimes wasn't ready and stayed on the short sheet.
+    init(controls: SessionRuntimeControlModel, isAllocating: Bool = false, startsOnAllModels: Bool = false,
+         onDone: @escaping () -> Void) {
+        _controls = Bindable(wrappedValue: controls)
+        self.isAllocating = isAllocating
+        self.onDone = onDone
+        _showsAllModels = State(initialValue: startsOnAllModels)
+        _detent = State(initialValue: startsOnAllModels ? .large : .medium)
+    }
 
     var body: some View {
         NavigationStack {
@@ -45,10 +55,6 @@ struct ChatModelSettingsSheet: View {
         .presentationDragIndicator(.visible)
         .onChange(of: showsAllModels) { _, shown in detent = shown ? .large : .medium }
         .task {
-            if startsOnAllModels {
-                detent = .large
-                showsAllModels = true
-            }
             thinking.take(controls)
             await controls.loadPickersIfNeeded()
             await controls.loadFastModeIfNeeded()

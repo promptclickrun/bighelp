@@ -233,6 +233,18 @@ struct ThinkingAccent: Equatable, Sendable {
         return Color(.sRGB, red: rgb.0, green: rgb.1, blue: rgb.2, opacity: opacity)
     }
 
+    /// The same color for a mark on a thumb. Every thumb is light, in both modes, so the mark is
+    /// never lighter than a mid tone: night's Ink is nearly white, and its dot vanished on the thumb.
+    func thumbMark(_ amount: Double, opacity: Double = 1) -> Color {
+        let t = thinkingClamp(amount)
+        let hue = (from.hue + turn * t).truncatingRemainder(dividingBy: 360)
+        let rgb = Self.rgb(
+            hue: hue, saturation: thinkingLerp(from.saturation, to.saturation, t),
+            lightness: min(thinkingLerp(from.lightness, to.lightness, t), 0.46)
+        )
+        return Color(.sRGB, red: rgb.0, green: rgb.1, blue: rgb.2, opacity: opacity)
+    }
+
     /// Where a point at `place` sits between the two colors: all the person's at the bottom of the
     /// ladder, mostly the opposite at the top, with bands flowing toward the thumb.
     static func shade(_ level: Double, _ place: Double, flow: Double) -> Double {

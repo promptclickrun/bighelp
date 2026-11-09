@@ -360,9 +360,13 @@ change in both repos.
   so the share sheet can't open bighelp, and it holds no sign-in. It copies the share into the app group whole or
   not at all (`PendingShareDraft`: a staging folder under a lock file, moved into place in one rename) and says to
   open bighelp. There `PendingShareReview` offers it, the person picks an agent and chat on the computer in use,
-  and the chat takes it into its message box through the drop path (`ComposerAttachmentDrop.draftAttachment`).
-  Send works as for anything typed there. The saved copy goes once the box empties after holding it, or when the
-  person deletes it; never by itself. `PendingShareInboxTests` run under any Swift (no UIKit).
+  and the chat takes it into its message box through the drop path (`ComposerAttachmentDrop.draftAttachment`);
+  a new chat's share waits for the chat Hermes makes, never its local canvas (`PendingShareDestination.isTaken`).
+  Send works as for anything typed there. Each step after that is explicit (`ChatShareEvent`: staged, sending,
+  unconfirmed, back in the box, retired) and written to the share's placement at once, so a relaunch says
+  whether it may have been sent. The saved copy goes only when Hermes takes the message carrying it, or when the
+  person deletes it in ☰ › Shared with bighelp (Bots mode: its Settings), which lists every waiting share; never
+  by itself. `PendingShareInboxTests` and `PendingShareWaitTests` run under any Swift (no UIKit).
 - **Plugin routes:**
   - Each route is a `WorkspaceOperation` case plus a `Route(path:feature:isMutation:maximumResponseBytes:)` in
     `DirectHermesNativeContext.swift`.

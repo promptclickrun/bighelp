@@ -417,9 +417,12 @@ can't be read or is over a limit is named and nothing is saved.
 Nothing leaves the device until the person opens bighelp, picks the agent and
 chat, and taps Send there: the share goes into that chat's message box, and the
 usual AI data agreement, computer and attachment checks apply. bighelp deletes a
-share from the device once it has left that message box (sent, or removed there)
-or when the person deletes it; it never deletes a waiting share by itself, and a
-full inbox refuses the next share instead.
+share from the device only once Hermes takes the message that carries it, or when
+the person deletes it (☰ › Shared with bighelp, or Settings in Bots mode, lists
+every waiting share). A message still waiting for its connection, refused, or
+sent without Hermes confirming it keeps the share, marked so that bighelp can say
+it may already have arrived. bighelp never deletes a waiting share by itself, and
+a full inbox refuses the next share instead.
 
 ## 6. Cloud retention
 

@@ -1,16 +1,18 @@
 # Direct streaming and live voice
 
-> Current transport contract: [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md). Its Link fallback and account-backed admission discussion describes an older transport. Where transport details differ, use the versioned native contract and its source links.
+> Transport: [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md). This page covers streaming presentation and live voice only.
 
 bighelp keeps Hermes as the execution and canonical-history owner. The native app uses bounded session pages and a separate disposable live overlay. Full tool content is retrieved only when you open its complete-content reader.
 
-## Routes
+## Transport
 
-A paired host can expose the plugin-owned listener through a private Tailscale HTTPS origin. Configure the plugin with `hermes loopdy direct configure --origin https://HOST:PORT --port LOOPBACK_PORT --enabled`, then restart Hermes when ready. In the app, select that host and use its optional Direct Connection section to verify and enroll the route. The account-paired identity is required; Tailscale membership alone is not authorization.
+The app talks straight to the person's Hermes host: REST sign-in, WebSocket JSON-RPC on the dashboard's `/api/ws`,
+dashboard REST, and the plugin's HTTP routes under `/api/plugins/loopdy/native/…` (`loopdy` is the plugin's legacy
+ID). There is no bighelp account, no relay and no second route to fall back to. A command whose delivery is unknown
+is never sent again by itself. The full contract is in [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md).
 
-Direct requests reuse existing chat, workspace, attachments, approvals, voice and device-tool interfaces. A connection failure before a request can use Link. An ambiguously delivered command is not automatically repeated through another route. Direct admission uses a fresh device lifecycle lease from the account service, so this is not indefinite cloud-independent authorization.
-
-State-backed relay clients explicitly negotiate `state-backed-presentation-v1`. Recoverable drafts and activity do not accumulate as an offline animation backlog for those recipients. Reliable commands, results, attachments and legacy clients retain their existing delivery contract. A slow subscriber receives a reset and reconnects without blocking another phone. Transient sequence tracking never advances the reliable replay watermark.
+The old bighelp Link transport (account pairing, a plugin-owned listener set up with a `hermes loopdy direct`
+command, `state-backed-presentation-v1` relay negotiation) is retired, and chat no longer uses it.
 
 ## Voice
 
@@ -30,7 +32,7 @@ in the first person and never says "your agent" or "Hermes".
 
 ### GPT-Live
 
-GPT-Live defaults to **Codex subscription** (`gpt-live-1-codex`). The plugin uses Hermes-managed subscription credentials; the phone receives no bearer token. Native WebRTC carries audio directly to the provider while authenticated bighelp messages carry setup, captions and job controls. The provider sideband is connected before the answer SDP is returned.
+GPT-Live defaults to **Codex subscription** (`gpt-live-1-codex`). The plugin uses Hermes-managed subscription credentials; the phone receives no bearer token. The phone's WebRTC peer (`BighelpRealtimeAudioPeer`) carries audio directly to the provider. Setup, captions and job controls go through the plugin's `voice/status`, `voice/offer`, `voice/poll`, `voice/result` and `voice/close` routes (feature `native-voice-v1`) on the signed-in host connection. The provider sideband is connected before the answer SDP is returned.
 
 Requests the voice model hands over never wait for each other, so you can keep talking while work runs (`NativeLiveVoiceSession`). A request runs as a turn in the open chat when the chat is free. One made while the chat is working runs at once as a Hermes background task for that chat (`prompt.background`), beside the running turn; its answer goes back to the call when it arrives (`background.complete`) and shows in the chat. A background task uses the agent's Hermes tools, but not the phone's (Device access reaches only the chat itself). The same request said twice shares one run. Muting, barge-in and ending the call do not cancel accepted work. Unknown admission outcomes are reported, never resubmitted.
 
@@ -39,7 +41,7 @@ An explicitly selected API-key mode uses the distinct public `gpt-live-1` protoc
 ### Gemini Live
 
 On plugins that list `native-voice-gemini-v1`, the plugin answers a Gemini offer with a single-use token made
-from the agent's own `GEMINI_API_KEY` (the key stays on the host). The token locks the model, voice, brief and
+from the agent's own `GEMINI_API_KEY` or `GOOGLE_API_KEY` (the key stays on the host). The token locks the model, voice, brief and
 tools. `GeminiLiveAudioPeer` opens the phone's own WebSocket to Gemini with it and sends only the model name, then
 16 kHz microphone audio from one voice-processing `AVAudioEngine`, which cancels the agent's voice from the
 microphone without muting it, so the person can talk over the agent.
@@ -59,6 +61,15 @@ GPT-Live gets from `poll`, so `NativeLiveVoiceSession` routes work the same way:
   the translator ignores it.
 
 A Gemini session lasts up to 30 minutes from its token; the call ends when Gemini closes the socket.
+Gemini refuses a call the same way: it closes the socket with a code and its reason, for example
+`1011 "Token has been used too many times"`, `1011 "new_session_expire_time deadline exceeded"` (the token's
+60 seconds to start had passed) or `1008 "models/… is not found"`. The peer keeps them (`GeminiLiveClose`):
+Gemini's code and reason, the HTTP status if it refused the socket's opening request, or the network error
+if nothing came from Gemini. A call Gemini closed before it set the session up fails, and the call screen
+shows Gemini's words; a working call that Gemini ends says why, when Gemini gave a reason. Each step (connecting,
+setup sent, Gemini ready, goAway, the close) goes in the call's report, and the close goes in the
+`LiveVoiceAudio` log at once. The call screen keeps the last call's report, so Copy report works after a
+call that ended at once.
 
 Voice processing makes a configuration change right after the engine starts, on iPhone and in the simulator. The
 engine stops, and the peer starts it again (`GeminiLiveAudioPeer.restart`). The player stops first: started
@@ -95,10 +106,10 @@ voice only: no realtime model. The button shows only when the host can speak for
 
 ## Security and compatibility
 
-The plugin does not modify Hermes core or start a second model-execution service. All jobs use supported platform-adapter ingress and lifecycle/approval/clarification callbacks. iPhone device tools remain opt-in and require the existing verified host-context capability; unsupported hosts do not gain authority from a voice transcript or device identifier.
+The plugin does not modify Hermes core or start a second model-execution service. Voice work runs on the chat's own socket, as an ordinary turn (`prompt.submit`) or a Hermes background task (`prompt.background`), with Hermes' own approval and clarification requests. iPhone device tools remain opt-in and require the existing verified host-context capability; unsupported hosts do not gain authority from a voice transcript or device identifier.
 
 Per-session protected content files replace repeated whole-catalog transcript writes. Migration retains the old snapshot until the new manifest commits. Failed writes preserve the prior committed content. Account erasure removes all scoped revisions.
 
 ## Validation boundaries
 
-Automated verification covers state paging, content reconstruction, cache saturation, owner changes, independent jobs, subscription wire formatting, relay recipient isolation, native audio offer/answer handling and simulator UI. The subscription endpoint was exercised using actual Hermes-managed authentication with native SDP. Physical-device testing is not required for this release. Network conditions, Bluetooth/audio hardware and subjective conversational quality still warrant normal beta testing.
+Automated verification covers state paging, content reconstruction, cache saturation, owner changes, independent jobs, subscription wire formatting, native audio offer/answer handling and simulator UI. The subscription endpoint was exercised using actual Hermes-managed authentication with native SDP. Physical-device testing is not required for this release. Network conditions, Bluetooth/audio hardware and subjective conversational quality still warrant normal beta testing.

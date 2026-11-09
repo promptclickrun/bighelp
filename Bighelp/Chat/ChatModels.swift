@@ -158,6 +158,9 @@ struct TimelineMetadata: Codable, Equatable, Sendable {
     /// with their progress (`BigFileUploadBoard`). Once Hermes takes the message, its text names
     /// each file instead and the tiles go.
     var bigFiles: [ChatBigFile] = []
+    /// Display only, never saved: a group chat line about who took a message, or a discussion
+    /// Hermes paused (`BotModeRoomNoticeRow`). The row draws as the line, not as a message.
+    var groupNotice: BotModeRoomNoticeRow?
 
     private enum CodingKeys: String, CodingKey {
         case source, freshness, delivery, timestamp, turnDurationMilliseconds, sourceOrder,

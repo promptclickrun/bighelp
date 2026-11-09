@@ -92,14 +92,16 @@ extension UsageExportSnapshot {
                             else { "Plans and limits were still loading." }
                         return Computer(id: computer.id, name: computer.name, providers: [], note: note)
                     }
-                    let providers = ProviderUsagePresentation.visible(report.providers, hidden: hidden)
+                    let providers = ProviderUsagePresentation.visible(report.providers, hidden: hidden,
+                                                                  order: ProviderUsagePreferences.savedOrder)
                     return Computer(id: computer.id, name: computer.name, providers: providers,
                                     note: providers.isEmpty ? "No AI plans to show." : nil, used: used(providers))
                 }
             }
             switch computer.usage?.limits {
             case .loaded(let report)?:
-                let providers = ProviderUsagePresentation.visible(report.providers, hidden: hidden)
+                let providers = ProviderUsagePresentation.visible(report.providers, hidden: hidden,
+                                                                  order: ProviderUsagePreferences.savedOrder)
                 return Computer(id: computer.id, name: computer.name, providers: providers,
                                 note: providers.isEmpty ? "No AI plans to show." : nil, used: used(providers))
             case .needsPluginUpdate?:

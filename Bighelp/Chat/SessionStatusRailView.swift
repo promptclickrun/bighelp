@@ -2,7 +2,7 @@ import SwiftUI
 
 enum SessionStatusRailDestination: String, Identifiable {
     case goal
-    case subagents
+    case background
     case tasks
 
     var id: String { rawValue }
@@ -12,6 +12,8 @@ struct SessionStatusRailView: View {
     let goal: ChatGoalRailState?
     let subagents: [SessionSubagentSnapshot]
     let nativeSubagents: [NativeSubagentRailItem]
+    /// The chat's background commands that run now (`process.list`).
+    var runningCommands = 0
     let tasks: ChatTaskDrawerState?
     let onSelect: (SessionStatusRailKind) -> Void
     let onFittingVerticalDrag: (ChatRailScrollDirection) -> Void
@@ -20,8 +22,8 @@ struct SessionStatusRailView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var didDispatchFittingVerticalDrag = false
 
-    private var displayedSubagentCount: Int {
-        subagents.count + nativeSubagents.count
+    private var background: ChatBackgroundSummary {
+        ChatBackgroundSummary(subagents: subagents.count + nativeSubagents.count, commands: runningCommands)
     }
 
     var body: some View {
@@ -29,6 +31,7 @@ struct SessionStatusRailView: View {
             goal: goal,
             subagents: subagents,
             nativeSubagents: nativeSubagents,
+            runningCommands: runningCommands,
             tasks: tasks
         )
         return Group {
@@ -90,33 +93,69 @@ struct SessionStatusRailView: View {
 
     private func compactStatusButton(_ item: SessionStatusRailItem) -> some View {
         Button { onSelect(item.kind) } label: {
-            compactStatusLayout {
-                Text(statusTitle(item.kind))
-                    .font(.bighelp(.caption2))
-                    .foregroundStyle(theme.secondaryText)
-                    .fixedSize(horizontal: dynamicTypeSize.isAccessibilitySize, vertical: true)
-                if dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 4) }
-                Text(statusDetail(item.kind))
-                    .font(.bighelp(.caption).weight(.semibold))
-                    .foregroundStyle(theme.primaryText)
-                    .monospacedDigit()
+            if item.kind == .background {
+                backgroundLabel
+            } else {
+                compactStatusLabel(item)
             }
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 4)
-            .padding(.vertical, 4)
-            .frame(minWidth: BighelpTokens.hitTarget, maxWidth: .infinity,
-                   minHeight: BighelpTokens.hitTarget)
-            .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .companionComposerAnchor(.railLedge(item.kind.rawValue))
         .accessibilityLabel(accessibilityLabel(for: item.kind))
-        .accessibilityHint(item.kind == .subagents ? "Shows what each subagent is doing" : "Opens details")
+        .accessibilityHint(item.kind == .background ? "Shows what runs in the background" : "Opens details")
         .accessibilityIdentifier("chat.session-status.\(item.kind.rawValue)")
-        .accessibilityValue(item.kind == .subagents
+        .accessibilityValue(item.kind == .background
             ? subagentStreamAcceptanceFixture?.readinessValue(displayedSubagents: subagents) ?? ""
             : "")
+    }
+
+    /// In the background, as one chip: a stack in the action color, then what runs.
+    private var backgroundLabel: some View {
+        HStack(spacing: BighelpTokens.space8) {
+            Image(systemName: icon(for: .background))
+                .font(.bighelp(.caption, weight: .bold))
+                .foregroundStyle(theme.actionForeground)
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(theme.action))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(statusTitle(.background))
+                    .font(.bighelp(.caption, weight: .semibold))
+                    .foregroundStyle(theme.primaryText)
+                Text(statusDetail(.background))
+                    .font(.bighelp(.caption2))
+                    .foregroundStyle(theme.secondaryText)
+                    .monospacedDigit()
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.leading, 6)
+        .padding(.trailing, 12)
+        .padding(.vertical, 4)
+        .frame(minWidth: BighelpTokens.hitTarget, maxWidth: .infinity, minHeight: BighelpTokens.hitTarget,
+               alignment: .leading)
+        .contentShape(.rect)
+    }
+
+    private func compactStatusLabel(_ item: SessionStatusRailItem) -> some View {
+        compactStatusLayout {
+            Text(statusTitle(item.kind))
+                .font(.bighelp(.caption2))
+                .foregroundStyle(theme.secondaryText)
+                .fixedSize(horizontal: dynamicTypeSize.isAccessibilitySize, vertical: true)
+            if dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 4) }
+            Text(statusDetail(item.kind))
+                .font(.bighelp(.caption).weight(.semibold))
+                .foregroundStyle(theme.primaryText)
+                .monospacedDigit()
+        }
+        .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 4)
+        .frame(minWidth: BighelpTokens.hitTarget, maxWidth: .infinity,
+               minHeight: BighelpTokens.hitTarget)
+        .contentShape(.rect)
     }
 
     private func fullRailContent(_ items: [SessionStatusRailItem]) -> some View {
@@ -154,7 +193,7 @@ struct SessionStatusRailView: View {
         .companionComposerAnchor(.railLedge(item.kind.rawValue))
         .accessibilityLabel(accessibilityLabel(for: item.kind))
         .accessibilityIdentifier("chat.session-status.\(item.kind.rawValue)")
-        .accessibilityValue(item.kind == .subagents
+        .accessibilityValue(item.kind == .background
             ? subagentStreamAcceptanceFixture?.readinessValue(displayedSubagents: subagents) ?? ""
             : "")
     }
@@ -164,8 +203,8 @@ struct SessionStatusRailView: View {
         case .goal:
             guard let goal else { return "Goal" }
             return (goal.lifecycle == .paused ? "Paused · " : "") + goal.compactSummary
-        case .subagents:
-            return "\(displayedSubagentCount)"
+        case .background:
+            return background.detail
         case .tasks:
             return tasks.map { "\($0.completedCount)/\($0.totalCount)" } ?? "Session"
         }
@@ -174,7 +213,7 @@ struct SessionStatusRailView: View {
     private func statusTitle(_ kind: SessionStatusRailKind) -> String {
         switch kind {
         case .goal: "Goal"
-        case .subagents: "Subagents"
+        case .background: "In the background"
         case .tasks: "Tasks"
         }
     }
@@ -204,7 +243,7 @@ struct SessionStatusRailView: View {
     private func icon(for kind: SessionStatusRailKind) -> String {
         switch kind {
         case .goal: "target"
-        case .subagents: "cpu"
+        case .background: "square.stack.3d.up.fill"
         case .tasks: "checklist"
         }
     }
@@ -214,8 +253,8 @@ struct SessionStatusRailView: View {
         case .goal:
             guard let goal else { return "Goal" }
             return "Goal \(goal.lifecycle.rawValue), \(goal.compactSummary)"
-        case .subagents:
-            return displayedSubagentCount == 1 ? "1 active subagent" : "\(displayedSubagentCount) active subagents"
+        case .background:
+            return "In the background, \(background.detail)"
         case .tasks:
             guard let tasks else { return "Tasks" }
             return "Tasks, \(tasks.completedCount) of \(tasks.totalCount) completed"

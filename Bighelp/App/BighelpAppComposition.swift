@@ -141,6 +141,12 @@ struct BighelpAppComposition {
             do { try agentRepository.save(initialAgentProfiles) }
             catch { preconditionFailure("The synthetic Agents fixture could not be saved.") }
         }
+        if usesFixtures, SimpleBotsDemoSections.isOn {
+            for index in initialAgentProfiles.indices {
+                initialAgentProfiles[index].placement = SimpleBotsDemoSections.placement(for: initialAgentProfiles[index].id)
+            }
+            try? agentRepository.save(initialAgentProfiles)
+        }
         // "-test-agent-look travel:face" (or "travel:shape"): one demo agent wears a Hermes look, as
         // Hermes Desktop or the avatar designer saves it.
         if usesFixtures, let index = arguments.firstIndex(of: "-test-agent-look"), arguments.indices.contains(index + 1) {
@@ -291,6 +297,11 @@ struct BighelpAppComposition {
             if arguments.contains(BotModeActivityFixtureClient.launchArgument) {
                 botModeRooms.configureNativeActivityClient(BotModeActivityFixtureClient())
             }
+        }
+        if usesFixtures, arguments.contains(GroupSettingsDemoClient.launchArgument) {
+            botModeRooms.configureNativeClient(GroupSettingsDemoClient(
+                refusesSettings: arguments.contains(GroupSettingsDemoClient.refusesSettingsArgument)
+            ))
         }
         if usesFixtures, arguments.contains(TeamCallDemoGroupsClient.launchArgument) {
             botModeRooms.configureNativeClient(TeamCallDemoGroupsClient(
@@ -451,6 +462,7 @@ struct BighelpAppComposition {
                 #if DEBUG
                 if let clarificationFixture { return clarificationFixture }
                 if arguments.contains("-test-canvas-stream") || arguments.contains("-test-tool-stream")
+                    || arguments.contains("-test-first-answer")
                     || arguments.contains("-test-silent-reply") || arguments.contains("-test-table-reply")
                     || arguments.contains("-test-voice-steps") || arguments.contains("-test-music-card-reply") {
                     return CanvasStreamingFixtureClient(senderID: session.agentIDs.first ?? "default")
@@ -541,15 +553,21 @@ struct BighelpAppComposition {
                 let owner = LiveVoiceOwner(hostID: "fixture-host", authorizationID: "inert-ui-fixture",
                     agentID: session.agentIDs.first ?? "fixture-agent", sessionID: session.id)
                 if keepsReport {
-                    return DemoLiveVoiceReportCall.model(owner: owner, agentName: agent?.name ?? "bighelp")
+                    return .success(DemoLiveVoiceReportCall.model(owner: owner, agentName: agent?.name ?? "bighelp"))
                 }
                 let control = LiveVoiceControlClient(owner: owner, operation: { _, _ in
                     // Never reaches the peer, microphone, network or provider.
                     throw LiveVoiceControlError.unavailable
                 }, isOwnerCurrent: { $0 == owner })
-                return LiveVoiceModel(agentName: agent?.name ?? "bighelp", client: control,
-                    makePeer: { BighelpRealtimeAudioPeer(captureEnabled: false) })
+                return .success(LiveVoiceModel(agentName: agent?.name ?? "bighelp", client: control,
+                    makePeer: { BighelpRealtimeAudioPeer(captureEnabled: false) }))
             }
+        }
+        // `-test-live-voice-unavailable <reason>`: live voice can't start, for that reason (`pluginNotLoaded`).
+        if usesFixtures, let index = arguments.firstIndex(of: "-test-live-voice-unavailable") {
+            let reason = arguments.indices.contains(index + 1)
+                ? LiveVoiceUnavailable(rawValue: arguments[index + 1]) : nil
+            featureStore.configureLiveVoiceFactory { _, _, _ in .failure(reason ?? .pluginNotLoaded) }
         }
         #endif
         if usesOverflowStatusRailFixture {

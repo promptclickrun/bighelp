@@ -200,6 +200,43 @@ struct HermesBotModeContractTests {
         #expect(store.catalogRooms.isEmpty)
     }
 
+    /// Every return to the app is a new connection, which asks Hermes about group chats again. Until it
+    /// answers, a reconnect to the same computer keeps New Group Chat; another computer starts without it.
+    @Test func aReconnectKeepsNewGroupChatUntilHermesAnswers() async throws {
+        let store = BotModeRoomStore(client: BotModeFixtureClient(), executionEnabled: false,
+                                     nativeClient: GroupSettingsDemoClient())
+        #expect(!store.offersNewGroupChat, "Not before Hermes answers the first time")
+        await store.refreshNativeRoomCatalog()
+        #expect(store.canCreateNativeRoom)
+        #expect(store.offersNewGroupChat)
+
+        store.configureNativeClient(GroupSettingsDemoClient(), preservingCatalog: true)
+        #expect(!store.canCreateNativeRoom, "The new connection hasn't asked yet")
+        #expect(store.offersNewGroupChat)
+        // Kept through a second reconnect that happens before Hermes answers.
+        store.configureNativeClient(GroupSettingsDemoClient(), preservingCatalog: true)
+        #expect(store.offersNewGroupChat)
+        await store.refreshNativeRoomCatalog()
+        #expect(store.offersNewGroupChat)
+
+        store.configureNativeClient(BotModeCatalogFixtureClient(), preservingCatalog: false)
+        #expect(!store.offersNewGroupChat, "Another computer starts without it")
+        await store.refreshNativeRoomCatalog()
+        #expect(!store.offersNewGroupChat, "It can't make group chats")
+        store.configureNativeClient(nil, preservingCatalog: true)
+        #expect(!store.offersNewGroupChat)
+    }
+
+    /// A catalog Hermes refuses with a reason shows that reason, not a hint to check the
+    /// connection, which answered.
+    @Test func refusedCatalogShowsHermesReason() async throws {
+        let store = BotModeRoomStore(client: BotModeFixtureClient(), executionEnabled: false,
+                                     nativeClient: RefusingGroupCatalogClient())
+        await store.refreshNativeRoomCatalog()
+        #expect(store.catalogState
+            == .failed("Rooms could not be refreshed. Hermes said: the gateway that owns it did not answer"))
+    }
+
     @Test func readOnlyCatalogFixtureKeepsAllParticipantsAndRetiresOnHostChange() async throws {
         let store = BotModeRoomStore(client: BotModeFixtureClient(), executionEnabled: false,
                                      nativeClient: BotModeCatalogFixtureClient())
@@ -270,5 +307,12 @@ private final class DeferredGroupCatalogClient: BotModeCatalogFixtureClient {
             await withCheckedContinuation { pendingList = $0 }
         }
         return snapshot
+    }
+}
+
+private final class RefusingGroupCatalogClient: BotModeCatalogFixtureClient {
+    override func groupsCapabilities() async throws -> HermesBotModeCapabilities {
+        throw DirectHermesError.rpcRejected(code: 5114,
+                                            message: HermesRefusalMessage("the gateway that owns it did not answer"))
     }
 }

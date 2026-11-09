@@ -29,6 +29,10 @@ enum WorkspaceCapability: String, CaseIterable, Sendable {
     case agentBoardFiles
     /// Let's do it records the idea by its ID (plugin `native-agent-board-answers-v1`).
     case agentBoardAnswers
+    /// A bot's background work today on its Dashboard (plugin `native-agents-today-v1`).
+    case agentToday
+    /// What one Activities item did (plugin `native-agents-today-detail-v1`).
+    case agentTodayDetail
     /// A skill folder (.zip) uploaded to an agent (plugin `native-skills-import-v1`). A single
     /// SKILL.md needs only `skillsEdit`.
     case skillsImport

@@ -38,11 +38,19 @@ HOME and HERMES_HOME, then runs the matching HostSignInMatrixUITests:
             access card, Turn on (or Not now) answers it, and the agent says what its
             original call got back (DeviceAccessHostUITests; Reminders is granted to
             the app on the simulator first, so iOS doesn't ask)
+  appstate  no sign-in, with the bighelp plugin (--plugin) and two more agents: Bots
+            mode's top is rearranged and saved, the app is deleted from the
+            simulator and installed again, and the new install shows the same
+            top from the computer (BotsAppStateHostUITests, run twice)
   drafts    no sign-in, with the bighelp plugin (--plugin) and a scripted model:
             a made-up business card sent from the app becomes a contact draft,
             the review's Save writes once and the agent hears it at its next
             turn; a photo alone gets the offer, and the host refuses the agent's
             own contact create in that chat (ImageDraftsHostUITests)
+  apps      no sign-in, with the bighelp plugin (--plugin) and the same scripted model:
+            the agent shows an app from a page of about 5 MB that it wrote, the app
+            loads it in pieces, and the page's answer reaches the agent after Send
+            (HTMLAppsHostUITests)
 
 HERMES_DISABLE_LAZY_INSTALLS=1 keeps Hermes from "finishing a source update"
 into its checkout on first launch. Use a separate Hermes checkout anyway: never
@@ -96,6 +104,7 @@ TESTS = {
               "ShortcutGatewaySwitchHostUITests/testAskAnAgentSwitchesToItsGatewayAndGetsTheAnswer"],
     "drafts": ["ImageDraftsHostUITests/testAContactDraftFromAPhotoSavesOnceAndTheAgentHearsIt",
                "ImageDraftsHostUITests/testAPhotoAloneGetsTheOfferAndTheAgentCantAddTheContactItself"],
+    "apps": ["HTMLAppsHostUITests/testABigAppFromTheAgentOpensAndItsAnswerReachesTheAgent"],
     "bigfiles": ["BigFileHostUITests/testAnEightyMegabyteVideoReachesTheAgentAfterADrop"],
     "device": ["DeviceAccessHostUITests/testAToolThatIsOffAsksWithACardAndTheCallGoesOn",
                "DeviceAccessHostUITests/testNotNowGivesTheAgentAPlainRefusal",
@@ -313,7 +322,8 @@ class PhotoDraftModel(BaseHTTPRequestHandler):
     made-up business card with bighelp_draft_contact; a picture with no words gets the offer
     (bighelp_offer_photo_action); "direct contact test" calls iphone_contacts create itself,
     which the host must refuse in a chat with a picture; "outcome test" says which draft note
-    the plugin added to its turn."""
+    the plugin added to its turn. "app test" shows the probe's app (probe-app.html, about 5 MB, in the
+    working folder) with bighelp_show_app, and its answer gets "I got your answers"."""
 
     CONTACT = {"fields": {"given_name": "Riley", "organization": "Sample Studio", "job_title": "Designer",
                           "phones": [{"label": "work", "value": "+1 555 0142"}],
@@ -351,7 +361,10 @@ class PhotoDraftModel(BaseHTTPRequestHandler):
                        asked.split("[bighelp]")[0]).strip()
         call = None
         if not results:
-            if "contact draft test" in asked or "Make a contact from this card" in asked:
+            if "app test" in asked:
+                call = ("bighelp_show_app", {"title": "Probe app", "description": "A big page that checks apps open.",
+                                             "path": "probe-app.html", "sends_answers": True})
+            elif "contact draft test" in asked or "Make a contact from this card" in asked:
                 call = ("bighelp_draft_contact", self.CONTACT)
             elif "direct contact test" in asked:
                 call = ("iphone_contacts", {"operation": "create", "givenName": "Riley", "organization": "Sample Studio"})
@@ -370,8 +383,12 @@ class PhotoDraftModel(BaseHTTPRequestHandler):
                 note = asked.lower()
                 text = "Outcome note: " + ("saved" if "saved the contact draft" in note else
                                            "discarded" if "discarded the contact draft" in note else "none") + "."
+            elif "display_markdown" in outcome and "app_id" in outcome:
+                text = "Here is your app.\n\n" + outcome["display_markdown"]
             elif "display_markdown" in outcome:
                 text = "Here it is. Check it before you save.\n\n" + outcome["display_markdown"]
+            elif words.startswith("My answers to"):
+                text = "I got your answers: " + " ".join(words.splitlines()[1:])
             elif results:
                 text = "Tool said: " + str(outcome.get("error") or outcome.get("code") or results[-1][:200])
             else:
@@ -753,6 +770,112 @@ def run_fleet(args, repo: Path) -> int:
             model.server_close()
 
 
+def app_state_on_host(home: Path) -> dict:
+    """What the plugin keeps for each person: the keys, their revisions and the home orders, no values."""
+    folder = home / "plugin-data" / "loopdy" / "app-state"
+    people = {}
+    for path in sorted((folder / "people").glob("*.json")) if (folder / "people").exists() else []:
+        keys = json.loads(path.read_text()).get("keys", {})
+        layout = (keys.get("bots.layout") or {}).get("value") or {}
+        people[path.stem] = {"revisions": {key: entry.get("revision") for key, entry in keys.items()},
+                             "home": layout.get("home")}
+    computer = folder / "computer.json"
+    return {"computer": json.loads(computer.read_text()) if computer.exists() else None, "people": people}
+
+
+def run_appstate(args, repo: Path) -> int:
+    """One open host with the plugin and three agents. The app saves a Bots mode order, is deleted
+    from the simulator and installed again, and gets the order back from the host."""
+    if not args.plugin:
+        raise SystemExit("appstate mode needs --plugin <bighelp plugin folder>")
+    with tempfile.TemporaryDirectory(prefix="signin-appstate-", dir="/tmp") as temporary:
+        temp = Path(temporary).resolve()
+        home, project = temp / "home", temp / "project"
+        home.mkdir()
+        project.mkdir()
+        model = ThreadingHTTPServer(("127.0.0.1", 0), SyntheticModel)
+        threading.Thread(target=model.serve_forever, daemon=True).start()
+        port = free_port()
+        origin = f"http://127.0.0.1:{port}"
+        config = {"dashboard": {"public_url": origin},
+                  "model": {"default": "fixture-model", "provider": "custom",
+                            "base_url": f"http://127.0.0.1:{model.server_port}/v1", "api_key": "local-synthetic-no-auth"},
+                  "agent": {"max_turns": 3}, "terminal": {"backend": "local", "cwd": str(project)},
+                  "memory": {"memory_enabled": False, "user_profile_enabled": False},
+                  "plugins": {"enabled": ["loopdy"]}}
+        shutil.copytree(args.plugin, home / "plugins" / "loopdy",
+                        ignore=shutil.ignore_patterns("tests", "__pycache__", ".git"))
+        (home / "config.yaml").write_text(json.dumps(config))
+        session_token = secrets.token_urlsafe(32)
+        env = {k: os.environ[k] for k in ("PATH", "LANG", "TMPDIR") if k in os.environ}
+        env.update(HOME=str(home), HERMES_HOME=str(home), HERMES_DISABLE_LAZY_INSTALLS="1",
+                   HERMES_DASHBOARD_SESSION_TOKEN=session_token, PYTHONUNBUFFERED="1",
+                   NO_PROXY="127.0.0.1,localhost")
+        for name in ("researcher", "writer"):
+            subprocess.run([args.hermes, "profile", "create", name, "--no-alias", "--no-skills"], cwd=project,
+                           env=env, check=True, timeout=120, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        log = (args.results / "hermes-appstate.log").open("w")
+        process = subprocess.Popen([args.hermes, "serve", "--host", "127.0.0.1", "--port", str(port), "--isolated",
+                                    "--skip-build"], cwd=project, env=env, stdout=log, stderr=subprocess.STDOUT)
+        codes = []
+        try:
+            deadline = time.monotonic() + 90
+            while True:
+                if process.poll() is not None:
+                    raise RuntimeError("Hermes exited (appstate); see hermes-appstate.log")
+                try:
+                    if request_status(origin, session_token)[0] == 200:
+                        break
+                except OSError:
+                    pass
+                if time.monotonic() > deadline:
+                    raise TimeoutError("Hermes not ready (appstate)")
+                time.sleep(0.3)
+            for phase in ("save", "restore"):
+                # Deleted before each run: the first starts clean, the second is the reinstall. simctl can
+                # only delete an app from a booted simulator, and the test run leaves it shut down.
+                subprocess.run(["xcrun", "simctl", "bootstatus", args.simulator_id, "-b"], check=False, timeout=300,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["xcrun", "simctl", "uninstall", args.simulator_id, "app.loopdy.mobile"],
+                               check=True, timeout=120)
+                container = subprocess.run(["xcrun", "simctl", "get_app_container", args.simulator_id,
+                                            "app.loopdy.mobile", "data"], capture_output=True, timeout=60)
+                if container.returncode == 0:
+                    raise RuntimeError("bighelp is still installed after simctl uninstall")
+                print(json.dumps({"phase": phase, "app_deleted_before_run": True}), flush=True)
+                evidence = args.results / "appstate"
+                evidence.mkdir(parents=True, exist_ok=True)
+                client_env = dict(os.environ, TEST_RUNNER_BIGHELP_APP_STATE_HOST=f"{origin.removeprefix('http://')}|{phase}|writer",
+                                  TEST_RUNNER_BIGHELP_SIGNIN_EVIDENCE=str(evidence))
+                command = ["xcodebuild", "test-without-building", "-project", str(repo / "Bighelp.xcodeproj"),
+                           "-scheme", "Bighelp", "-destination", f"platform=iOS Simulator,id={args.simulator_id}",
+                           "-derivedDataPath", str(args.derived_data), "-parallel-testing-enabled", "NO",
+                           "-resultBundlePath", str(args.results / f"appstate-{phase}.xcresult"),
+                           "-only-testing:BighelpUITests/BotsAppStateHostUITests/testBotsOrderComesBackAfterAReinstall"]
+                with (args.results / f"xcodebuild-appstate-{phase}.log").open("w") as output:
+                    result = subprocess.run(command, env=client_env, cwd=repo, stdout=output, stderr=subprocess.STDOUT,
+                                            timeout=1500)
+                codes.append(result.returncode)
+                print(json.dumps({"phase": phase, "exit_code": result.returncode,
+                                  "app_state_on_host": app_state_on_host(home)}), flush=True)
+                if result.returncode:
+                    break
+            print(json.dumps({"session_sources_on_host": session_sources(home)}), flush=True)
+            return max(codes) if codes else 1
+        finally:
+            if (home / "logs").exists():
+                shutil.copytree(home / "logs", args.results / "hermes-appstate-logs", dirs_exist_ok=True)
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+            log.close()
+            model.shutdown()
+            model.server_close()
+
+
 def fixture_png(seed: str, width: int = 240, height: int = 160) -> bytes:
     """A made-up picture of about 100 KB: noise, so it doesn't compress away."""
     import random
@@ -770,12 +893,14 @@ def fixture_png(seed: str, width: int = 240, height: int = 160) -> bytes:
 def run_mode(mode: str, args, repo: Path) -> int:
     if mode == "fleet":
         return run_fleet(args, repo)
+    if mode == "appstate":
+        return run_appstate(args, repo)
     with tempfile.TemporaryDirectory(prefix=f"signin-{mode}-", dir="/tmp") as temporary:
         temp = Path(temporary).resolve()
         home, project = temp / "home", temp / "project"
         home.mkdir()
         project.mkdir()
-        model = ThreadingHTTPServer(("127.0.0.1", 0), PhotoDraftModel if mode == "drafts"
+        model = ThreadingHTTPServer(("127.0.0.1", 0), PhotoDraftModel if mode in ("drafts", "apps")
                                     else ToolTurnModel if mode in ("tools", "media", "bigfiles", "device") else SyntheticModel)
         model.sent_files, model.gone_files = [], []
         if mode == "media":
@@ -804,15 +929,15 @@ def run_mode(mode: str, args, repo: Path) -> int:
         # still resolves to this Mac, so gated hosts use it; single sign-on needs the
         # app on that same name, since the sign-in cookie belongs to it.
         public = f"http://127.0.0.1:{proxy.port}" if proxy \
-            else origin if mode in ("open", "tools", "widgets", "features", "update", "media", "drafts", "bigfiles",
-                                    "device") \
+            else origin if mode in ("open", "tools", "widgets", "features", "update", "media", "drafts", "apps",
+                                    "bigfiles", "device") \
             else f"http://hermes.localhost:{port}"
         config = {"dashboard": {"public_url": public},
                   "model": {"default": "fixture-model", "provider": "custom",
                             "base_url": f"http://127.0.0.1:{model.server_port}/v1", "api_key": "local-synthetic-no-auth"},
                   "agent": {"max_turns": 3}, "terminal": {"backend": "local", "cwd": str(project)},
                   "memory": {"memory_enabled": False, "user_profile_enabled": False}}
-        if mode in ("tools", "features", "media", "drafts", "bigfiles", "device"):
+        if mode in ("tools", "features", "media", "drafts", "apps", "bigfiles", "device"):
             if not args.plugin:
                 raise SystemExit(f"{mode} mode needs --plugin <bighelp plugin folder>")
             shutil.copytree(args.plugin, home / "plugins" / "loopdy",
@@ -824,6 +949,16 @@ def run_mode(mode: str, args, repo: Path) -> int:
                             ignore=shutil.ignore_patterns("__pycache__"))
             config["plugins"]["enabled"].append("bighelp-probe")
             config["image_gen"] = {"provider": "bighelp-probe"}
+        if mode == "apps":
+            # A page the agent wrote, big enough to come to the app in three pieces.
+            (project / "probe-app.html").write_text(
+                '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">'
+                '<title>Probe app</title></head><body><h1>Probe app</h1>'
+                '<button id="send">Send my pick</button><p id="note"></p><script>'
+                'document.getElementById("send").onclick = async () => {'
+                ' const sent = await window.bighelp.sendAnswer({Pick: "Blue", Size: 3});'
+                ' document.getElementById("note").textContent = sent ? "Sent." : "Not sent."; };'
+                '</script><!-- ' + "padding " * 640_000 + '--></body></html>')
         if mode == "features":
             seed_board(home, args.plugin)
             (project / "garden").mkdir()

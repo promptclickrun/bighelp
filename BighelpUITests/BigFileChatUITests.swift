@@ -47,6 +47,22 @@ final class BigFileChatUITests: BighelpUITestCase {
         }
     }
 
+    /// A file that didn't go can leave the chat: Remove takes the message and its tile away, so a
+    /// refused file never stays stuck at the bottom of the chat.
+    @MainActor
+    func testAFileThatDidNotGoCanBeRemoved() throws {
+        let app = launch("big-file-failed", appearance: "light")
+        let remove = app.buttons["chat.big-file.remove"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 15), "A file that didn't go offers Remove")
+        XCTAssertTrue(app.buttons["chat.big-file.retry"].exists, "and still Try again")
+        remove.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["chat.big-file"].waitForNonExistence(timeout: 5),
+                      "Remove takes the file's tile away")
+        XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "value CONTAINS 'from Saturday'"))
+            .firstMatch.exists, "and its message")
+        save("big-file-removed-light", app)
+    }
+
     @MainActor private func launch(_ hold: String, appearance: String) -> XCUIApplication {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES",

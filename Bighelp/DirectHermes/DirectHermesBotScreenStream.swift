@@ -68,17 +68,22 @@ final class DirectHermesBotScreenSocket: RFBTransport, @unchecked Sendable {
 }
 
 extension DirectHermesAuthenticator {
-    /// `wss://host/api/display/ws?display_ticket=…`: Hermes takes the ticket in the query on
+    /// `wss://host/api/display/ws?display_ticket=…` for an agent's screen, or the plugin's
+    /// `…/computer-screen/ws?ticket=…` for the computer's own: both take the ticket in the query on
     /// purpose (it's spent on first use and expires in 30 seconds).
     func botScreenStreamRequest(path: String, ticket: String) throws -> URLRequest {
-        guard path == BotScreenObservation.streamPath, !ticket.isEmpty, ticket.utf8.count <= 1_024 else {
-            throw WorkspaceClientError.invalidRequest
+        let ticketName: String
+        switch path {
+        case BotScreenObservation.streamPath: ticketName = "display_ticket"
+        case LiveComputerScreenService.streamPath: ticketName = "ticket"
+        default: throw WorkspaceClientError.invalidRequest
         }
+        guard !ticket.isEmpty, ticket.utf8.count <= 1_024 else { throw WorkspaceClientError.invalidRequest }
         guard var components = URLComponents(url: try http.endpoint.url(for: path), resolvingAgainstBaseURL: false) else {
             throw DirectHermesError.invalidEndpoint
         }
         components.scheme = http.endpoint.baseURL.scheme == "https" ? "wss" : "ws"
-        components.queryItems = [URLQueryItem(name: "display_ticket", value: ticket)]
+        components.queryItems = [URLQueryItem(name: ticketName, value: ticket)]
         guard let url = components.url else { throw DirectHermesError.invalidEndpoint }
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
         request.httpShouldHandleCookies = false

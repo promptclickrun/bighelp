@@ -228,6 +228,8 @@ struct DirectHermesProjection {
     private(set) var controlSnapshot: DirectHermesSessionControlSnapshot?
     private(set) var reclaim: DirectHermesSessionReclaim?
     private var sideTaskTurnIDs: [Data: String] = [:]
+    /// The turn each helper (`subagent_id`) first reported in.
+    private var subagentTurnIDs: [String: String] = [:]
     private(set) var running = false
     private(set) var hasLiveEvents = false
     private(set) var turnID = "initial"
@@ -602,7 +604,9 @@ struct DirectHermesProjection {
         return change
     }
 
-    mutating func accept(_ event: DirectHermesEvent) -> Change {
+    /// `arrivedAt` is when a live event reached the phone, nil for a replay. Hermes' events carry no
+    /// time, so a reply segment Hermes completes live takes this one until a reread gives the host's.
+    mutating func accept(_ event: DirectHermesEvent, arrivedAt: Date? = nil) -> Change {
         if let sequence = event.sequence {
             guard sequence > lastSequence else { return Change() }
             lastSequence = sequence
@@ -651,7 +655,7 @@ struct DirectHermesProjection {
             change.activities += finishReasoning()
             let interim = p["text"]?.string ?? ""
             if !interim.isEmpty {
-                change.items = [publishText(interim, eventKey: eventKey, complete: true)]
+                change.items = [publishText(interim, eventKey: eventKey, complete: true, at: arrivedAt)]
                 sealedSegmentID = segmentID
             }
             text = ""
@@ -688,7 +692,7 @@ struct DirectHermesProjection {
             if !final.isEmpty, reused, segmentID == nil, let settled = settleSealedAnswer(final) {
                 change.settledAnswer = settled
             } else if !final.isEmpty {
-                change.items = [publishText(final, eventKey: eventKey, complete: true, endsTurn: true)]
+                change.items = [publishText(final, eventKey: eventKey, complete: true, endsTurn: true, at: arrivedAt)]
             }
             // A bare message.complete also comes from child mirrors. It is a
             // segment final, not a turn final. session.info.running=false is the
@@ -823,13 +827,24 @@ struct DirectHermesProjection {
             let subagentID = Self.nonempty(p["subagent_id"]?.string) ?? childSessionID
             guard let subagentID else { break }
             let key = "subagent:\(subagentID)"
-            let previous = activities.last { $0.eventID == "\(turnID):\(key)" }
-            let detail = type == "subagent.thinking" || type == "subagent.text"
-                ? (previous?.detail ?? "") + (p["text"]?.string ?? "")
-                : p["summary"]?.string ?? p["tool_preview"]?.string ?? p["text"]?.string
+            // A background helper keeps reporting after its turn ends, also during the next turn:
+            // its steps stay on the row of the turn that started it.
+            let helperTurn = subagentTurnIDs[subagentID] ?? turnID
+            if subagentTurnIDs[subagentID] == nil {
+                if subagentTurnIDs.count == 256, let first = subagentTurnIDs.keys.first { subagentTurnIDs[first] = nil }
+                subagentTurnIDs[subagentID] = helperTurn
+            }
+            let previous = activities.last { $0.eventID == "\(helperTurn):\(key)" }
+            // `subagent.text` streams the reply; each `subagent.thinking` is a whole note, or Hermes' spinner.
+            let detail: String? = switch type {
+            case "subagent.text": (previous?.detail ?? "") + (p["text"]?.string ?? "")
+            case "subagent.thinking": p["text"]?.string.flatMap { SubagentCanvasState.isHermesSpinner($0) ? nil : $0 }
+            default: p["summary"]?.string ?? p["tool_preview"]?.string ?? p["text"]?.string
+            }
             let activity = publishActivity(key: key, kind: .subagent,
                 title: Self.nonempty(p["goal"]?.string) ?? previous?.title ?? "Subagent",
-                detail: detail, payload: p, terminal: type == "subagent.complete", childID: subagentID)
+                detail: detail, payload: p, terminal: type == "subagent.complete", childID: subagentID,
+                turnOverride: helperTurn)
             change.activities = [activity]
             let startedAt = p["started_at"]?.number.flatMap {
                 $0.isFinite && $0 >= 0 && $0 <= Double(Int.max) ? Int($0) : nil
@@ -938,7 +953,7 @@ struct DirectHermesProjection {
     }
 
     private mutating func publishText(_ value: String, eventKey: String, complete: Bool,
-                                      endsTurn: Bool = false) -> TimelineItem {
+                                      endsTurn: Bool = false, at time: Date? = nil) -> TimelineItem {
         if segmentID == nil { segmentID = "\(storedID):live:\(turnID):\(segment):\(eventKey)" }
         let id = segmentID!
         lastTextLookupWorkCount = 1
@@ -954,7 +969,8 @@ struct DirectHermesProjection {
         let old = index.map { items[$0] }
         if old == nil { arrival += 1 }
         let row = item(id: id, text: value, human: false, delivery: complete ? "Received" : "Streaming",
-            order: old?.metadata.sourceOrder ?? arrival, endsTurn: endsTurn)
+            order: old?.metadata.sourceOrder ?? arrival,
+            timestamp: (old?.metadata.timestamp ?? time)?.timeIntervalSince1970, endsTurn: endsTurn)
         if let index { items[index] = row; segmentIndex = index }
         else { segmentIndex = items.count; items.append(row) }
         return row

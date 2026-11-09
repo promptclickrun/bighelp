@@ -43,6 +43,15 @@ struct GeminiLiveAudioReportTests {
         #expect(diagnostics.report(GeminiLiveAudioState()).contains("Mixer output now: silent; loudest so far 0.500"))
     }
 
+    /// A call that ends before its audio starts (no microphone, or the session busy) still has a report and
+    /// closes. Its player has no engine, and AVFAudio raises an exception Swift can't catch for one that
+    /// is asked its time or told to stop.
+    @MainActor @Test func aPeerWhoseAudioNeverStartedReportsAndCloses() {
+        let peer = GeminiLiveAudioPeer()
+        #expect(peer.audioReport().contains("Player: stopped"))
+        peer.close()
+    }
+
     @Test func eventsKeepTheirTimesAndOnlyTheNewestStay() {
         let clock = Clock()
         let diagnostics = GeminiLiveAudioDiagnostics(clock: { clock.now })

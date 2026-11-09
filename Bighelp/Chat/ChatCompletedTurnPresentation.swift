@@ -167,12 +167,14 @@ enum ChatCompletedTurnProjection {
         let hasUnsettledContent = work.contains { entry in
             switch entry {
             case .message(let item): item.metadata.delivery == "Streaming"
-            case .activity(let turn): turn.events.contains { $0.lifecycle == .running }
+            case .activity(let turn): turn.events.contains { $0.lifecycle == .running && $0.kind != .subagent }
             }
         }
         // Never fold the turn being delivered, including gaps between batches: it stays in place,
         // or Card and Minimal gather its work into one block. An older turn with a step that never
         // settled stays in place too, rather than a block that says the agent is still working.
+        // A helper left running in the background (async `delegate_task`) doesn't hold its turn
+        // open: Hermes ended the turn, and the chat's "In the background" chip shows the helper.
         let isLive = isActive || hasUnsettledContent
         let gathersLive = isActive && style?.gathersLiveWork == true
         guard !work.isEmpty, isLive ? gathersLive : foldsFinished else {
@@ -315,8 +317,9 @@ enum ChatCompletedTurnProjection {
             .compactMap(\.durationMilliseconds).max() {
             return TimeInterval(duration) / 1_000
         }
-        // Older hosts have no measured duration. Use only persisted human/final
-        // message timestamps, never synthetic activity order or the render clock.
+        // Older hosts have no measured duration. Use only human/final message
+        // timestamps (saved, or when a live final arrived; a replay has none),
+        // never synthetic activity order or the render clock.
         guard let start = startedAt,
               let final = messages.last(where: { $0.role == .assistant && $0.metadata.delivery != "Streaming" }),
               let end = final.metadata.timestamp, end >= start else { return nil }
@@ -472,5 +475,69 @@ struct ChatWorkReceipt: View {
         if seconds < 60 { return "\(seconds)s" }
         if seconds < 3_600 { return "\(seconds / 60)m \(seconds % 60)s" }
         return "\(seconds / 3_600)h \((seconds % 3_600) / 60)m"
+    }
+}
+
+/// How the chat folds finished work (Settings › Chat: Fold finished turns, and the work style). `ChatView`
+/// sets it, so pages that show an agent's steps outside the chat (a helper's) fold them the same way.
+struct ChatWorkFolding: Equatable, Sendable {
+    var foldsFinished = true
+    var style: ChatWorkStyle = .full
+}
+
+extension EnvironmentValues {
+    @Entry var chatWorkFolding = ChatWorkFolding()
+}
+
+/// A helper's steps, folded as the chat folds a finished turn: its tool calls and notes go into one
+/// "Worked for…" folder and its reply stays in view. While it works, its steps stay open.
+struct ChatFoldedSteps: View {
+    let entries: [ChatTranscriptEntry]
+    let activityEvents: [ChatActivityEvent]
+    let isLive: Bool
+    var interimReplies: ChatInterimReplyPlacement = .fold
+    @Environment(\.chatWorkFolding) private var folding
+    /// This page's open folders; the chat's own stay as they are.
+    @State private var disclosures = ChatActivityDisclosureStore()
+
+    var body: some View {
+        let liveEntryID = isLive ? entries.last?.id : nil
+        LazyVStack(alignment: .leading, spacing: BighelpTokens.space16) {
+            ForEach(Self.rows(entries, activityEvents: activityEvents, isLive: isLive, folding: folding,
+                              interimReplies: interimReplies)) { row in
+                switch row {
+                case .entry(let entry):
+                    step(entry, liveEntryID: liveEntryID)
+                case .completed(let turn):
+                    ChatCompletedTurnView(turn: turn, disclosures: disclosures, onDisclosureChange: {}) { entry in
+                        step(entry, liveEntryID: nil)
+                    }
+                case .liveWork:
+                    // Not made here: a running helper has no work style, so its steps stay open.
+                    EmptyView()
+                }
+            }
+        }
+    }
+
+    /// The chat's fold (`ChatCompletedTurnProjection`) over the steps, after marking the notes written on
+    /// the way to the answer, as the chat does.
+    static func rows(_ entries: [ChatTranscriptEntry], activityEvents: [ChatActivityEvent], isLive: Bool,
+                     folding: ChatWorkFolding, interimReplies: ChatInterimReplyPlacement) -> [ChatTurnDisplayRow] {
+        ChatCompletedTurnProjection.rows(
+            from: ChatInterimReplies.marking(entries, isSending: isLive, isBotMode: false,
+                                             activityEvents: activityEvents),
+            isSending: isLive, enabled: folding.foldsFinished, activityEvents: activityEvents,
+            interimReplies: interimReplies, style: isLive ? nil : folding.style)
+    }
+
+    @ViewBuilder
+    private func step(_ entry: ChatTranscriptEntry, liveEntryID: String?) -> some View {
+        switch entry {
+        case .message(let item):
+            TimelineItemView(item: item, onApprovalTap: { _ in })
+        case .activity(let turn):
+            ChatActivityTurnView(turn: turn, isLive: entry.id == liveEntryID)
+        }
     }
 }

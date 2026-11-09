@@ -6,6 +6,19 @@ import Testing
 /// open chat and File changes read the new project at once.
 @MainActor
 struct ChatProjectMoveTests {
+    @Test func theMoveSheetListsTheChatsOwnProjectFirst() {
+        let projects = [
+            HermesWorkspaceSummary(id: "beta", name: "Beta", description: "", folderCount: 1, isActive: false),
+            HermesWorkspaceSummary(id: "alpha", name: "Alpha", description: "", folderCount: 1, isActive: false),
+            HermesWorkspaceSummary(id: "mine", name: "Zed", description: "", folderCount: 1, isActive: false),
+        ]
+
+        #expect(MoveChatToProjectSheet.ordered(projects, currentProjectID: "mine").map(\.id)
+            == ["mine", "alpha", "beta"])
+        #expect(MoveChatToProjectSheet.ordered(projects, currentProjectID: nil).map(\.name)
+            == ["Alpha", "Beta", "Zed"])
+    }
+
     @Test func aMoveRecordsTheChatsProjectWithoutChangingTheShownCatalog() async throws {
         let store = HermesWorkspaceStore(client: FixtureHermesWorkspaceClient())
         await store.load(agentID: "default")

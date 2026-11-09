@@ -77,6 +77,9 @@ final class BotModeRoomStore {
     /// client. Persisted rooms remain loadable when this is false.
     let executionEnabled: Bool
     var nativeCapabilities: HermesBotModeCapabilities?
+    /// The computer made group chats before this reconnect to it; `offersNewGroupChat` keeps New Group
+    /// Chat until Hermes answers again.
+    var groupChatsBeforeReconnect = false
     var catalogState: BotModeRoomCatalogState = .idle
     var catalogRooms: [HermesBotModeRoomSummary] = []
     var isCatalogStale = false
@@ -88,6 +91,15 @@ final class BotModeRoomStore {
     var nativeRetryAttemptsByRoom: [String: [String: HermesBotModeRetryAttempt]] = [:]
     var nativePendingDiscardsByRoom: [String: [HermesBotModePendingDiscard]] = [:]
     var nativeDriverWorkingByRoom: [String: Bool] = [:]
+    /// Each room's settings as this connection last read them (`groups.state`'s `context`).
+    var nativeRoomSettings: [String: HermesBotModeRoomSettings] = [:]
+    var nativeRoomSettingsStamps: [String: Int] = [:]
+    /// Rooms whose settings are on their way to Hermes, and the newest edit waiting behind one.
+    var nativeRoomSettingsSaving: Set<String> = []
+    var nativeRoomSettingsQueued: [String: HermesBotModeRoomContext] = [:]
+    /// Discussions whose Continue waits for Hermes, and why one didn't go.
+    var nativeContinuesInFlight: Set<String> = []
+    var nativeContinueProblems: [String: String] = [:]
     /// Other saved computers, for group chats with their agents (RoomLink).
     var peerHosts: (any HermesBotModePeerHosts)?
     /// Why an agent on another computer isn't linked to its room yet, by room.
@@ -379,7 +391,9 @@ final class BotModeRoomStore {
     }
 
     private static func presentationOrder(after rooms: [BotModeRoom]) -> Int {
-        (rooms.flatMap(\.visibleEvents).compactMap(\.sourceOrder).max() ?? 0) + 1
+        let messages = rooms.flatMap(\.visibleEvents).compactMap(\.sourceOrder).max() ?? 0
+        let notices = rooms.flatMap(\.nativeNotices).map(\.sourceOrder).max() ?? 0
+        return max(messages, notices) + 1
     }
 
     func replaceStored(_ room: BotModeRoom) {

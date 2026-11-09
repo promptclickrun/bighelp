@@ -121,9 +121,9 @@ struct BotScreenObservation: Equatable, Sendable {
     /// The only socket path bighelp opens; anything else from the host is refused.
     static let streamPath = "/api/display/ws"
 
-    init(ticket: String, viewerID: String, status: BotScreenStatus) {
+    init(ticket: String, path: String = Self.streamPath, viewerID: String, status: BotScreenStatus) {
         self.ticket = ticket
-        path = Self.streamPath
+        self.path = path
         self.viewerID = viewerID
         self.status = status
     }

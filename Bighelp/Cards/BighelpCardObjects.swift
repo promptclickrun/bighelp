@@ -9,8 +9,9 @@ import Foundation
 /// The validator and the renderer read props through these same initializers,
 /// so a card that validates always draws.
 enum BighelpCardObjects {
-    /// Photo drafts (`contact_draft`, `event_draft`) are objects too: plain props, no children.
-    static let types: Set<String> = Set(["contact", "place", "music"]).union(ImageDraftWire.types)
+    /// Photo drafts (`contact_draft`, `event_draft`) and agents' apps (`html_app`) are objects too:
+    /// plain props, no children.
+    static let types: Set<String> = Set(["contact", "place", "music", HTMLAppWire.type]).union(ImageDraftWire.types)
     /// What the speaker note says this app draws when the plugin knows about them.
     static let feature = "native-card-objects-v1"
     static let renders = ["contact", "place", "music"]
@@ -21,6 +22,7 @@ enum BighelpCardObjects {
         case "place": _ = try BighelpCardPlace(props: props)
         case "music": _ = try BighelpCardMusic(props: props)
         case "contact_draft", "event_draft": _ = try ImageDraft(type: type, props: props)
+        case HTMLAppWire.type: _ = try HTMLAppCard(props: props, title: "")
         default: throw BighelpCardValidationError.invalid
         }
     }

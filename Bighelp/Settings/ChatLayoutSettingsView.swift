@@ -14,6 +14,10 @@ enum ChatLayoutPreferences {
     /// Settings › Chat › Session title: the chat's title under the agent's name. Off by default.
     static let showsSessionTitleKey = "bighelp.chat.shows-session-title"
     static let showsSessionTitleByDefault = false
+    /// Settings › Chat › Projects in the chat list: each chat's project on a line of its own in
+    /// Chats. On by default.
+    static let showsChatProjectKey = "bighelp.chat-list.shows-project"
+    static let showsChatProjectByDefault = true
 
     /// The Pro Max and Plus phones are at least this tall, in points.
     static let tallPhoneHeight: CGFloat = 900

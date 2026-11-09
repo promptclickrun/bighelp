@@ -140,6 +140,9 @@ struct ChatView: View {
     let onVoiceTap: () -> Void
     let onApprovalTap: (ApprovalRequest) -> Void
     let onPeopleTap: () -> Void
+    /// A group chat Hermes runs: its name and ⋯ › Group Settings open Group Settings. Nil
+    /// leaves the item out, and the name opens the chat's info.
+    let onGroupSettingsTap: (() -> Void)?
     /// This chat's files, from ⋯ › Files. Nil leaves the item out.
     let onChatFilesTap: (() -> Void)?
     /// ⋯ › Move to Project…. Nil leaves the item out.
@@ -228,6 +231,7 @@ struct ChatView: View {
         onVoiceTap: @escaping () -> Void = {},
         onApprovalTap: @escaping (ApprovalRequest) -> Void = { _ in },
         onPeopleTap: @escaping () -> Void = {},
+        onGroupSettingsTap: (() -> Void)? = nil,
         onChatFilesTap: (() -> Void)? = nil,
         projectMenuItem: ChatProjectMenuItem? = nil,
         onNewChatTap: @escaping () -> Void = {},
@@ -273,6 +277,7 @@ struct ChatView: View {
         self.onVoiceTap = onVoiceTap
         self.onApprovalTap = onApprovalTap
         self.onPeopleTap = onPeopleTap
+        self.onGroupSettingsTap = onGroupSettingsTap
         self.onChatFilesTap = onChatFilesTap
         self.projectMenuItem = projectMenuItem
         self.onNewChatTap = onNewChatTap
@@ -315,7 +320,9 @@ struct ChatView: View {
         .environment(\.bighelpUIV3Enabled, true)
         .environment(\.bighelpUIV2Enabled, true)
         .environment(\.chatActivityDisclosureStore, model.activityDisclosures)
+        .environment(\.chatWorkFolding, ChatWorkFolding(foldsFinished: foldCompletedTurns, style: workStyleInUse ?? .full))
         .modifier(ChatScheduledRetryLifecycle(model: model))
+        .modifier(ChatBackgroundCommandsWatch(model: model))
         .onAppear {
             isChatVisible = true
             registerChatDissolve()
@@ -1000,11 +1007,11 @@ struct ChatView: View {
     private var groupConversationIdentityButton: some View {
         Button {
             dismissKeyboard()
-            onPeopleTap()
+            if let onGroupSettingsTap { onGroupSettingsTap() } else { onPeopleTap() }
         } label: {
             ChatConversationIdentityLabel(
                 title: model.botModeRoomTitle,
-                subtitle: nil,
+                subtitle: model.botModeLeadName.map { "Lead: \($0)" },
                 participants: resolvedIdentityParticipants,
                 theme: theme,
                 showsCaption: true,
@@ -1013,8 +1020,14 @@ struct ChatView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(model.botModeRoomTitle), \(groupParticipantSummary)")
-        .accessibilityHint("Opens People and Chat details")
+        .accessibilityValue(model.botModeLeadName.map { "Lead: \($0)" } ?? "")
+        .accessibilityHint(opensGroupSettings ? "Opens Group Settings" : "Opens People and Chat details")
         .accessibilityIdentifier("chat.people")
+    }
+
+    /// A group Hermes runs has Group Settings; any other group's name opens its people.
+    private var opensGroupSettings: Bool {
+        onGroupSettingsTap != nil && model.botModeRoom?.hasNativeRoom == true
     }
 
     private var groupParticipantSummary: String {
@@ -1041,13 +1054,21 @@ struct ChatView: View {
         }
     }
 
-    /// One list: Model & speed, the chat's and its agent's actions, Usage, then File changes and
-    /// Advanced. At accessibility sizes, This chat, Agent and More hold all but Model & speed, so no
-    /// level needs scrolling without reducing the font.
+    /// iOS keeps a menu under about 60% of the screen's height and draws it at the device's text size,
+    /// not bighelp's. The whole list, File changes and all, fits that at the default size
+    /// (`CompactChatMenuUITests`); from XL it folds into This chat, Agent and More.
+    private var foldsChatOptions: Bool {
+        let device = DynamicTypeSize(UIApplication.shared.preferredContentSizeCategory) ?? dynamicTypeSize
+        return device >= .xLarge || dynamicTypeSize.isAccessibilitySize
+    }
+
+    /// One list: a Bot Chat's New Bot Chat (the home chat's Switch agent), then This chat (with File
+    /// changes), Model (Model & speed, Usage) and More (Edit agent, Advanced). Folded, This chat, Agent
+    /// and More hold all but Model & speed, so no level needs scrolling without reducing the font.
     private var chatOptionsMenu: some View {
         Menu {
-            modelAndSpeedMenu
-            if dynamicTypeSize.isAccessibilitySize {
+            if foldsChatOptions {
+                modelAndSpeedMenu
                 Menu {
                     chatItems
                 } label: {
@@ -1056,13 +1077,15 @@ struct ChatView: View {
                 .accessibilityIdentifier("chat.options.this-chat")
                 if onNewBotChat != nil || !model.isBotMode {
                     Menu {
-                        agentItems
+                        newChatItems
+                        editAgentItem
                     } label: {
                         Label("Agent", systemImage: "person.crop.circle")
                     }
                     .accessibilityIdentifier("chat.options.agent")
                 }
                 Menu {
+                    // Here, not in This chat: four rows there need scrolling at the largest sizes.
                     fileChangesMenuItem
                     usageMenu
                     advancedMenu
@@ -1071,13 +1094,19 @@ struct ChatView: View {
                 }
                 .accessibilityIdentifier("chat.options.more")
             } else {
+                // Lines, not titles, between the groups: titles made the list taller than iOS lets a
+                // menu grow, so it scrolled.
+                Section { newChatItems }
                 Section {
                     chatItems
-                    agentItems
-                }
-                Section { usageMenu }
-                Section {
                     fileChangesMenuItem
+                }
+                Section {
+                    modelAndSpeedMenu
+                    usageMenu
+                }
+                Section {
+                    editAgentItem
                     advancedMenu
                 }
             }
@@ -1099,7 +1128,7 @@ struct ChatView: View {
         .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY } action: { optionsButtonBottom = $0 }
         #endif
         .accessibilityLabel("Conversation options")
-        .accessibilityHint("Model and speed, this chat, usage, file changes and advanced options")
+        .accessibilityHint("This chat, file changes, model and speed, usage and advanced options")
         .accessibilityIdentifier("chat.options")
         .modifier(ChatFastModeLoader(controls: model.runtimeControls,
                                     isAllocating: model.isAwaitingAuthoritativeSessionAllocation))
@@ -1141,9 +1170,16 @@ struct ChatView: View {
         }
     }
 
-    /// Rename, Move to Project and Files, and a group's Chat info (its members).
+    /// Rename, Move to Project and Files, and a group's Group Settings and Chat info (its members).
     @ViewBuilder
     private var chatItems: some View {
+        if opensGroupSettings, let onGroupSettingsTap {
+            Button("Group Settings", systemImage: "person.2") {
+                dismissKeyboard()
+                onGroupSettingsTap()
+            }
+            .accessibilityIdentifier("chat.group-settings")
+        }
         if model.isBotMode {
             Button("Chat info", systemImage: "info.circle") {
                 dismissKeyboard()
@@ -1176,9 +1212,9 @@ struct ChatView: View {
         }
     }
 
-    /// Edit agent, plus a Bot Chat's New Bot Chat and the home chat's Switch agent.
+    /// A Bot Chat's New Bot Chat and the home chat's Switch agent.
     @ViewBuilder
-    private var agentItems: some View {
+    private var newChatItems: some View {
         if let onNewBotChat {
             Button("New Bot Chat", systemImage: "arrow.trianglehead.counterclockwise") {
                 dismissKeyboard()
@@ -1193,6 +1229,10 @@ struct ChatView: View {
             }
             .accessibilityIdentifier("chat.switch-agent")
         }
+    }
+
+    @ViewBuilder
+    private var editAgentItem: some View {
         if !model.isBotMode {
             Button("Edit agent", systemImage: "person.crop.circle") {
                 presentCurrentAgentEditor()

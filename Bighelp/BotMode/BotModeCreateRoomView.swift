@@ -1,5 +1,12 @@
 import SwiftUI
 
+/// Bots mode's New Group Chat: a section to put the new group chat in.
+struct BotModeCreateSectionChoice {
+    let sections: [FleetSection]
+    /// Files the made group chat (its room ID) in the picked section.
+    let file: @MainActor (_ roomID: String, _ sectionID: String) -> Void
+}
+
 @MainActor
 struct BotModeCreateRoomView: View {
     let rooms: BotModeRoomStore
@@ -8,14 +15,18 @@ struct BotModeCreateRoomView: View {
     let onCreated: (String) -> Void
     /// New chat mode: one agent starts a 1:1 chat, two or more a group.
     let onStartDirect: ((String) -> Void)?
+    /// Bots mode: an optional Section row.
+    let sectionChoice: BotModeCreateSectionChoice?
     @State private var presentationOwnerID: String
 
     init(rooms: BotModeRoomStore, agents: AgentDirectoryStore, seedProfileID: String?,
+         sectionChoice: BotModeCreateSectionChoice? = nil,
          onStartDirect: ((String) -> Void)? = nil,
          onCreated: @escaping (String) -> Void) {
         self.rooms = rooms
         self.agents = agents
         self.seedProfileID = seedProfileID
+        self.sectionChoice = sectionChoice
         self.onStartDirect = onStartDirect
         self.onCreated = onCreated
         _presentationOwnerID = State(initialValue: rooms.nativePresentationOwnerID)
@@ -32,6 +43,11 @@ struct BotModeCreateRoomView: View {
     @State private var isSubmitting = false
     @State private var errorMessage: String?
     @State private var isAdvancedExpanded = false
+    @State private var routing: HermesBotModeRoomContext.Routing = .everyone
+    @State private var leadProfileID: String?
+    @State private var purpose = ""
+    @FocusState private var isPurposeFocused: Bool
+    @State private var sectionID: String?
 
     private var hasPendingCreation: Bool { rooms.room(id: roomID)?.nativePendingCreation != nil }
     private var ownerChanged: Bool { rooms.nativePresentationOwnerID != presentationOwnerID }
@@ -87,6 +103,9 @@ struct BotModeCreateRoomView: View {
                 Text("Participants")
             } footer: {
                 Text("Choose two to six agents on this host. Hermes fixes the participants when the room is created.")
+            }
+            if let sectionChoice {
+                Section { sectionPicker(sectionChoice) }
             }
             if let unseatableNote {
                 Section { Text(unseatableNote).accessibilityIdentifier("bot-mode.create.unseatable") }
@@ -163,6 +182,18 @@ struct BotModeCreateRoomView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
+                if offersRoomSettings { roomSettings }
+                if let sectionChoice, onStartDirect == nil {
+                    sectionPicker(sectionChoice)
+                        .padding(.horizontal, BighelpTokens.space16)
+                        .frame(minHeight: 52)
+                        .background(theme.surface, in: .rect(cornerRadius: 14))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(theme.border, lineWidth: BighelpTokens.hairline)
+                        }
+                }
+
                 if !rooms.canCreateNativeRoom, onStartDirect == nil || isGroupSelection {
                     Label("This host isn’t ready for group chats yet.", systemImage: "info.circle")
                         .bighelpFont(.label)
@@ -235,6 +266,121 @@ struct BotModeCreateRoomView: View {
         .background(theme.canvas.opacity(0.94))
     }
 
+    /// Hermes keeps a group's settings where it advertises `groups.context`; they're saved
+    /// right after the room exists.
+    private var offersRoomSettings: Bool {
+        rooms.nativeCapabilities?.supports("groups.context") == true && (onStartDirect == nil || isGroupSelection)
+    }
+
+    private var selectedProfiles: [AgentProfile] {
+        pickableProfiles.filter { selected.contains($0.id) }
+    }
+
+    private var roomSettings: some View {
+        VStack(alignment: .leading, spacing: BighelpTokens.space12) {
+            sectionCaption("When a message names nobody")
+            VStack(spacing: 0) {
+                routingOption(.everyone, title: "Everyone answers", hint: "Every bot gets a turn.")
+                if rooms.offersAutomaticRoutingForNewRooms {
+                    Divider()
+                    routingOption(.auto, title: "Pick who answers", hint: "A quick check picks who the message is for.")
+                }
+                if !selectedProfiles.isEmpty {
+                    Divider()
+                    leadOption
+                }
+            }
+            .padding(.horizontal, BighelpTokens.space16)
+            .background(theme.surface, in: .rect(cornerRadius: 14))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(theme.border, lineWidth: BighelpTokens.hairline)
+            }
+            .disabled(isSubmitting || hasPendingCreation || ownerChanged)
+            Text("@mentions and @everyone always go straight to the bots you name.")
+                .bighelpFont(.metadata)
+                .foregroundStyle(theme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            TextField("Purpose (optional)", text: $purpose, axis: .vertical)
+                .bighelpFont(.body)
+                .foregroundStyle(theme.primaryText)
+                .lineLimit(1...6)
+                .submitLabel(.done)
+                .padding(.horizontal, BighelpTokens.space16)
+                .padding(.vertical, BighelpTokens.space12)
+                .frame(minHeight: 52)
+                .background(theme.surface, in: .rect(cornerRadius: 14))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(theme.border, lineWidth: BighelpTokens.hairline)
+                }
+                .disabled(isSubmitting || hasPendingCreation || ownerChanged)
+                .focused($isPurposeFocused)
+                .accessibilityIdentifier("bot-mode.create.purpose")
+                .onChange(of: purpose) { _, value in
+                    // One line, as Hermes keeps it, so Return ends the edit.
+                    if value.contains("\n") { isPurposeFocused = false }
+                    let line = value.replacingOccurrences(of: "\n", with: " ")
+                    let limited = String(String.UnicodeScalarView(
+                        line.unicodeScalars.prefix(HermesBotModeRoomContext.maximumPurposeCharacters)))
+                    if limited != value { purpose = limited }
+                }
+        }
+        .onChange(of: selected) { _, members in
+            // A lead who leaves the selection takes lead routing with it.
+            if routing == .lead, leadProfileID.map(members.contains) != true {
+                routing = .everyone
+                leadProfileID = nil
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("bot-mode.create.routing")
+    }
+
+    private func routingOption(_ option: HermesBotModeRoomContext.Routing, title: String, hint: String) -> some View {
+        Button {
+            routing = option
+            leadProfileID = nil
+        } label: {
+            GroupRoutingOptionLabel(title: title, hint: hint, isSelected: routing == option)
+                .padding(.vertical, BighelpTokens.space4)
+        }
+        .bighelpPlainButtonStyle()
+        .accessibilityAddTraits(routing == option ? .isSelected : [])
+        .accessibilityIdentifier("bot-mode.create.routing.\(option.rawValue)")
+    }
+
+    private var leadOption: some View {
+        let lead = routing == .lead ? selectedProfiles.first { $0.id == leadProfileID } : nil
+        return Menu {
+            ForEach(selectedProfiles) { profile in
+                Button(profile.name) {
+                    routing = .lead
+                    leadProfileID = profile.id
+                }
+            }
+        } label: {
+            GroupRoutingOptionLabel(title: "A lead passes it on", hint: "The lead picks who takes it.",
+                                    isSelected: routing == .lead, detail: lead?.name, showsChevron: true)
+                .padding(.vertical, BighelpTokens.space4)
+        }
+        .bighelpPlainButtonStyle()
+        .accessibilityAddTraits(routing == .lead ? .isSelected : [])
+        .accessibilityValue(lead.map { "Lead: \($0.name)" } ?? "")
+        .accessibilityIdentifier("bot-mode.create.routing.lead")
+    }
+
+    /// What the new room starts with, or nil to keep Hermes' defaults (everyone answers).
+    private var newRoomContext: HermesBotModeRoomContext? {
+        guard offersRoomSettings else { return nil }
+        let context = HermesBotModeRoomContext(purpose: purpose, routing: routing,
+                                               leadMemberID: routing == .lead ? leadProfileID : nil)
+        guard context.isSavable, routing != .everyone || !HermesBotModeRoomContext.savedPurpose(purpose).isEmpty else {
+            return nil
+        }
+        return context
+    }
+
     /// Mention handles and hosting details most people never need.
     private var advancedDisclosure: some View {
         DisclosureGroup(isExpanded: $isAdvancedExpanded) {
@@ -282,6 +428,23 @@ struct BotModeCreateRoomView: View {
                 .stroke(theme.border, lineWidth: BighelpTokens.hairline)
         }
         .accessibilityIdentifier("bot-mode.create.advanced")
+    }
+
+    /// Section: none, or one of the person's sections.
+    private func sectionPicker(_ choice: BotModeCreateSectionChoice) -> some View {
+        Picker(selection: $sectionID) {
+            Text("None").tag(String?.none)
+            ForEach(choice.sections) { section in
+                Text(section.name).tag(Optional(section.id))
+            }
+        } label: {
+            Text("Section")
+                .bighelpFont(.body)
+                .foregroundStyle(theme.primaryText)
+        }
+        .pickerStyle(.menu)
+        .disabled(isSubmitting || hasPendingCreation || ownerChanged)
+        .accessibilityIdentifier("bot-mode.create.section")
     }
 
     /// The same handle assignment `createNativeRoom` sends to Hermes.
@@ -421,7 +584,10 @@ struct BotModeCreateRoomView: View {
                 profiles: agents.profiles.filter { selected.contains($0.id) }
             )
             guard !ownerChanged, !Task.isCancelled else { throw WorkspaceClientError.ownerChanged }
+            // A save Hermes doesn't confirm stays with the room, in its Group Settings.
+            if let newRoomContext { await rooms.saveNativeRoomContext(roomID: room.id, newRoomContext) }
             errorMessage = nil
+            if let sectionChoice, let sectionID { sectionChoice.file(room.id, sectionID) }
             onCreated(room.id)
             dismiss()
         } catch is CancellationError {

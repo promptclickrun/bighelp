@@ -2,7 +2,7 @@
 
 A separate Cloudflare Workers Static Assets service serves public provider artwork.
 It has no JavaScript entrypoint, account bindings, credentials, R2 dependency or
-request-time image transforms. Link, notifications and the marketing site are not
+request-time image transforms. The notification service and the marketing site are not
 modified by a logo deployment. Cloudflare currently documents static-file requests
 as free and unlimited, with no additional asset-storage charge:
 

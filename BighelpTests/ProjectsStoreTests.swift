@@ -17,6 +17,25 @@ struct ProjectsStoreTests {
         #expect(store.errorMessage != nil)
         #expect(store.chats["garden"]?.count == 2, "A failed reload keeps what's shown")
     }
+
+    @Test func projectsSortByNameAndByRecentUseKeepsTheCurrentProjectFirst() {
+        let projects = [
+            project(id: "z", name: "Zebra"),
+            project(id: "a", name: "apricot"),
+            project(id: "m", name: "Mint"),
+            project(id: "c", name: "Current", active: true),
+        ]
+
+        let byName = ProjectsSort.name.ordered(projects) { _ in nil }
+        #expect(byName.map(\.id) == ["c", "a", "m", "z"])
+
+        let byUse = ProjectsSort.recent.ordered(projects) { id in id == "z" ? .now : nil }
+        #expect(byUse.map(\.id) == ["c", "z", "a", "m"], "Used last month beats never used; a tie breaks by name")
+    }
+
+    private func project(id: String, name: String, active: Bool = false) -> HermesWorkspaceSummary {
+        HermesWorkspaceSummary(id: id, name: name, description: "", folderCount: 1, isActive: active)
+    }
 }
 
 @MainActor

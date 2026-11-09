@@ -109,10 +109,12 @@ extension ProviderUsage {
 }
 
 enum ProviderUsagePresentation {
-    /// The provider the agent chats with first, then the plugin's order.
-    static func visible(_ providers: [ProviderUsage], hidden: Set<String>) -> [ProviderUsage] {
+    /// In the order the person dragged them into (Usage › Limits › Choose), then the rest: the provider
+    /// the agent chats with first, then the plugin's order.
+    static func visible(_ providers: [ProviderUsage], hidden: Set<String>, order: [String]) -> [ProviderUsage] {
         let shown = providers.filter { !ProviderUsagePreferences.isHidden($0.id, in: hidden) }
-        return shown.filter(\.activeInHermes) + shown.filter { !$0.activeInHermes }
+        return ProviderUsagePreferences.sorted(shown.filter(\.activeInHermes) + shown.filter { !$0.activeInHermes },
+                                               order: order)
     }
 
     /// "Resets in 3 h 12 min", "Resets in 2 days".

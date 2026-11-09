@@ -56,6 +56,9 @@ struct BighelpNotificationSettingsView: View {
     @State private var operationToken = UUID()
     @State private var isConfirmingTurnOff = false
     @AppStorage(BighelpPeerChatAlerts.key) private var peerChatAlerts = false
+    @AppStorage(BighelpAlertKinds.Kind.scheduledTasks.key) private var scheduledTaskAlerts = true
+    @AppStorage(BighelpAlertKinds.Kind.deliveries.key) private var deliveryAlerts = true
+    @AppStorage(BighelpAlertKinds.Kind.groupChats.key) private var groupChatAlerts = true
     @State private var quietHours = BighelpQuietHours.load()
     @State private var quietHoursNote: String?
     @State private var turnOffStep: BighelpNotificationTurnOffStep?
@@ -420,7 +423,11 @@ struct BighelpNotificationSettingsView: View {
     private var topicsSection: some View {
         Section {
             ForEach(BighelpBuzzKitTopic.allCases, id: \.rawValue) { topic in
-                if let preference = preference(for: topic) {
+                if topic == .scheduledTasksAndDeliveries, let preference = preference(for: topic) {
+                    // One push topic, two switches: each a choice the computer applies.
+                    kindToggle(.scheduledTasks, topic: preference)
+                    kindToggle(.deliveries, topic: preference)
+                } else if let preference = preference(for: topic) {
                     Toggle(isOn: Binding(
                         get: { self.preference(for: topic)?.enabled ?? false },
                         set: { enabled in set(topic, enabled: enabled) }
@@ -461,6 +468,15 @@ struct BighelpNotificationSettingsView: View {
             .accessibilityValue(peerChatAlerts ? "On" : "Off")
             .accessibilityIdentifier("settings.notifications.peer-chats")
 
+            Toggle(isOn: $groupChatAlerts) {
+                kindLabel(.groupChats, isSaving: false)
+            }
+            .onChange(of: groupChatAlerts) { _, _ in
+                Task { await hostRegistry?.notificationSetup?.applyAlertPreferences() }
+            }
+            .accessibilityValue(groupChatAlerts ? "On" : "Off")
+            .accessibilityIdentifier("settings.notifications.kind.groupChats")
+
             if isLoading {
                 ProgressView("Loading notification topics…")
                     .accessibilityIdentifier("settings.notifications.topics-loading")
@@ -491,8 +507,71 @@ struct BighelpNotificationSettingsView: View {
             .accessibilityIdentifier("settings.notifications.reload-topics")
         } header: {
             Text("Notify Me About")
+        } footer: {
+            Text("Scheduled tasks, Deliveries and Group chats need bighelp plugin 3.49.0 or later on your computer. Before that, the first two switch together.")
+                .bighelpFont(.metadata)
+                .foregroundStyle(theme.secondaryText)
         }
         .listRowBackground(theme.surface)
+    }
+
+    /// Scheduled tasks or Deliveries: on while the push topic they share is on and this switch is.
+    private func kindToggle(_ kind: BighelpAlertKinds.Kind, topic: BighelpBuzzKitPreference) -> some View {
+        let isOn = topic.enabled && alertKind(kind)
+        return Toggle(isOn: Binding(get: { isOn }, set: { setAlertKind(kind, on: $0) })) {
+            kindLabel(kind, isSaving: savingTopicID == topic.id)
+        }
+        .disabled(isLoading || savingTopicID != nil || !isCurrent())
+        .accessibilityValue(isOn ? "On" : "Off")
+        .accessibilityIdentifier("settings.notifications.kind.\(kind.rawValue)")
+    }
+
+    private func kindLabel(_ kind: BighelpAlertKinds.Kind, isSaving: Bool) -> some View {
+        let title = switch kind {
+        case .scheduledTasks: String(localized: "Scheduled tasks")
+        case .deliveries: String(localized: "Deliveries")
+        case .groupChats: String(localized: "Group chats")
+        }
+        let detail = switch kind {
+        case .scheduledTasks: String(localized: "When a scheduled task finishes or has a problem.")
+        case .deliveries: String(localized: "When an agent sends you a notification on its own, not as a reply.")
+        case .groupChats: String(localized: "Replies in group chats. Questions and approvals still notify you.")
+        }
+        return VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+            Text(title)
+                .bighelpFont(.body)
+                .foregroundStyle(theme.primaryText)
+            Text(detail)
+                .bighelpFont(.metadata)
+                .foregroundStyle(theme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            if isSaving {
+                Text("Saving…")
+                    .bighelpFont(.metadata, weight: .semibold)
+                    .foregroundStyle(theme.action)
+            }
+        }
+        .padding(.vertical, BighelpTokens.space4)
+    }
+
+    private func alertKind(_ kind: BighelpAlertKinds.Kind) -> Bool {
+        switch kind {
+        case .scheduledTasks: scheduledTaskAlerts
+        case .deliveries: deliveryAlerts
+        case .groupChats: groupChatAlerts
+        }
+    }
+
+    /// The shared push topic follows the two switches (`BighelpAlertKinds.switching`); each computer hears
+    /// this phone's choices.
+    private func setAlertKind(_ kind: BighelpAlertKinds.Kind, on: Bool) {
+        let topicOn = preference(for: .scheduledTasksAndDeliveries)?.enabled == true
+        let next = BighelpAlertKinds.switching(kind, on: on, topicOn: topicOn,
+                                               scheduledTasks: scheduledTaskAlerts, deliveries: deliveryAlerts)
+        scheduledTaskAlerts = next.scheduledTasks
+        deliveryAlerts = next.deliveries
+        if next.topicOn != topicOn { set(.scheduledTasksAndDeliveries, enabled: next.topicOn) }
+        Task { await hostRegistry?.notificationSetup?.applyAlertPreferences() }
     }
 
     private var quietHoursSection: some View {

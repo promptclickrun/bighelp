@@ -1,5 +1,7 @@
 import Foundation
+import Observation
 import SwiftUI
+import UIKit
 
 /// A message sent before the chat could take it. It waits at the bottom of the chat with
 /// "Sending…" under it (`ChatCanvasRow.staged`) and goes out as this same row, so it stays put.
@@ -71,6 +73,7 @@ extension ChatModel {
         let item = humanItem(content: outgoing.message, attachments: outgoing.attachments)
         stagedSends.append(ChatStagedSend(item: item, outgoing: outgoing.staged(as: item),
                                           midSessionBehavior: midSessionBehavior))
+        ChatPerformanceProbe.sendRow(item.id, staged: true, in: self)
         failureMessage = nil
         draft = ""
         replyDraft = nil
@@ -116,6 +119,7 @@ extension ChatModel {
                 return
             }
             if isSending {
+                ChatPerformanceProbe.sendJoinedTurn(next.id, in: self)
                 await sendMidSession(next.outgoing, using: stagedMidSessionBehavior(next))
                 returnStagedSendsToBox(ifStillWaiting: next)
             } else {
@@ -139,16 +143,34 @@ extension ChatModel {
     /// Waits until `condition` holds. False if the chat gives up first: Send went off
     /// (`connectionIsOverdue`), or `connectionGrace` of time with the app open went by. Time away
     /// doesn't count, so a message sent just before the phone locks goes once the chat is back.
+    ///
+    /// It looks again only when something it reads changes (the chat's connection, its turn, a
+    /// failure), the app comes back or leaves, or the time left runs out: a message goes the moment
+    /// the chat can take it, not at the next check of a timer.
     func waitForConnection(until condition: () -> Bool) async -> Bool {
-        let step = Duration.milliseconds(100)
         var waited = Duration.zero
-        while !condition() {
-            guard !Task.isCancelled, !connectionIsOverdue, !referenceOwnerRetired, waited < connectionGrace
-            else { return false }
-            try? await Task.sleep(for: step)
-            if retryScheduling.appIsActive() { waited += step }
+        while true {
+            let wake = ChatReadinessWake()
+            let (ready, overdue, retired) = withObservationTracking {
+                (condition(), connectionIsOverdue, referenceOwnerRetired)
+            } onChange: {
+                Task { @MainActor in wake.fire() }
+            }
+            // A chat that closed, or a wait that was cancelled, never sends, even as it becomes ready.
+            guard !retired, !Task.isCancelled else { return false }
+            if ready { return true }
+            guard !overdue, waited < connectionGrace else { return false }
+            let active = retryScheduling.appIsActive()
+            var timeout = active ? connectionGrace - waited : nil
+            #if DEBUG && (targetEnvironment(simulator) || targetEnvironment(macCatalyst))
+            if let preview = ChatConnectingPreview.remaining { timeout = min(timeout ?? preview, preview) }
+            #endif
+            let start = ContinuousClock.now
+            await wake.wait(timeout: timeout)
+            // Counted up to what woke it: the app leaving wakes it as it leaves, so the time away after
+            // that isn't counted, and the time the app was open before it still is.
+            if active, let woke = wake.firedAt { waited += start.duration(to: woke) }
         }
-        return true
     }
 
     /// The chat never came for the staged messages: they go back in the box, oldest first and
@@ -208,5 +230,51 @@ enum ChatConnectingPreview {
         return Date(timeIntervalSinceNow: seconds)
     }()
     static var isConnecting: Bool { until.map { Date() < $0 } ?? false }
+    /// How long it still acts as connecting; nothing else tells a waiting message when it stops.
+    static var remaining: Duration? {
+        guard let until, isConnecting else { return nil }
+        return .milliseconds(until.timeIntervalSinceNow * 1_000)
+    }
 }
 #endif
+
+/// Wakes a waiting message (`ChatModel.waitForConnection`): when something it read changed, the app
+/// became active or stopped being active, its time ran out, or its task was cancelled.
+@MainActor
+private final class ChatReadinessWake {
+    private var continuation: CheckedContinuation<Void, Never>?
+    /// When it was first woken.
+    private(set) var firedAt: ContinuousClock.Instant?
+
+    func fire() {
+        if firedAt == nil { firedAt = .now }
+        continuation?.resume()
+        continuation = nil
+    }
+
+    func wait(timeout: Duration?) async {
+        let timer = timeout.map { timeout in
+            Task { @MainActor [weak self] in
+                guard (try? await Task.sleep(for: timeout)) != nil else { return }
+                self?.fire()
+            }
+        }
+        let center = NotificationCenter.default
+        let observers = [UIApplication.didBecomeActiveNotification, UIApplication.willResignActiveNotification].map {
+            center.addObserver(forName: $0, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.fire() }
+            }
+        }
+        defer {
+            timer?.cancel()
+            observers.forEach(center.removeObserver)
+        }
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                if firedAt != nil || Task.isCancelled { continuation.resume() } else { self.continuation = continuation }
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.fire() }
+        }
+    }
+}

@@ -24,6 +24,8 @@ struct VoicePresentation: Identifiable {
     let model: VoiceModel
     let conversationMode: VoiceConversationMode
     var liveModel: LiveVoiceModel? = nil
+    /// Why live voice couldn't start, when it was asked for and `liveModel` is nil.
+    var liveUnavailable: LiveVoiceUnavailable? = nil
 }
 
 enum PreparedRouteModel {
@@ -52,6 +54,7 @@ final class ShellFeatureStore {
     private let sessionControlMessaging: (any BighelpLinkSessionControlMessaging)?
     private let slashCommandCatalogClient: (any SlashCommandCatalogClient)?
     private let generatedMediaResolver: (any GeneratedMediaResolving)?
+    private let nativeModelEvicted: @MainActor (String, ObjectIdentifier) -> Void
     private let voiceClientFactory: ((SessionRecord, AgentProfile?) -> any VoiceSessionClient)?
     private let voiceInputLevelSource: () -> any VoiceInputLevelSource
     private let voiceHoldMusic: @MainActor () -> (any VoiceHoldMusicPlaying)?
@@ -70,6 +73,9 @@ final class ShellFeatureStore {
     /// A new chat that never sent anything was retired (Hermes dropped its unsaved session):
     /// its ID, agent and draft, so the screen showing it can open a fresh chat in its place.
     var onUnsentChatRetired: (@MainActor (String, String, String) -> Void)?
+    /// The same, kept until the screen takes it: a chat screen whose model is gone opens a fresh
+    /// chat from it rather than "This chat isn't available" (`takeRetiredUnsentChat`).
+    private var retiredUnsentChats: [String: (agentID: String, text: String)] = [:]
     private var chatModels: [String: ChatModel] = [:]
     private let navigationWorkspaceOwner: (@MainActor () -> WorkspaceOwner?)?
     private let nativeWarmSessionIsCurrent: @MainActor (SessionRecord, ChatModel) -> Bool
@@ -221,10 +227,13 @@ final class ShellFeatureStore {
     private var sessionsModel: SessionsModel?
     private var approvalModels: [String: ApprovalModel] = [:]
     private var voiceSessionSequences: [String: Int] = [:]
-    private var liveVoiceFactory: ((SessionRecord, AgentProfile?, ChatModel) -> LiveVoiceModel?)?
+    /// Makes a chat's live voice call, or says why it can't start there.
+    private var liveVoiceFactory: ((SessionRecord, AgentProfile?, ChatModel) -> Result<LiveVoiceModel, LiveVoiceUnavailable>)?
     private weak var activeLiveVoice: LiveVoiceModel?
 
-    func configureLiveVoiceFactory(_ factory: @escaping (SessionRecord, AgentProfile?, ChatModel) -> LiveVoiceModel?) {
+    func configureLiveVoiceFactory(
+        _ factory: @escaping (SessionRecord, AgentProfile?, ChatModel) -> Result<LiveVoiceModel, LiveVoiceUnavailable>
+    ) {
         liveVoiceFactory = factory
     }
 
@@ -305,6 +314,7 @@ final class ShellFeatureStore {
         sessionControlMessaging: (any BighelpLinkSessionControlMessaging)? = nil,
         slashCommandCatalogClient: (any SlashCommandCatalogClient)? = nil,
         generatedMediaResolver: (any GeneratedMediaResolving)? = nil,
+        nativeModelEvicted: @escaping @MainActor (String, ObjectIdentifier) -> Void = { _, _ in },
         recentModelHistory: RecentModelHistoryStore = RecentModelHistoryStore(),
         midSessionBehavior: @escaping @MainActor () -> MidSessionChatBehavior = { .steer }
     ) {
@@ -338,6 +348,7 @@ final class ShellFeatureStore {
         self.sessionControlMessaging = sessionControlMessaging
         self.slashCommandCatalogClient = slashCommandCatalogClient
         self.generatedMediaResolver = generatedMediaResolver
+        self.nativeModelEvicted = nativeModelEvicted
         self.recentModelHistory = recentModelHistory
         self.midSessionBehavior = midSessionBehavior
         conversationClientFactory = conversationClient ?? { session, agent in
@@ -388,7 +399,7 @@ final class ShellFeatureStore {
              .workspaceActivity, .workspaceSettings, .workspaceManagement, .workspaceConnections, .workspaceHub,
              .projects, .project, .kanban, .usage, .allHostsChats, .board,
              .workflows, .workflow, .workflowRun, .workflowSignoff, .workflowRuns, .codeChanges, .codeBatch,
-             .devFactory, .devFactoryRecipe, .devFactoryGroup, .devFactoryChanges, .simpleBotProfile:
+             .devFactory, .devFactoryRecipe, .devFactoryGroup, .devFactoryChanges, .simpleBotProfile, .groupSettings, .simpleBotsSection:
             nil
         }
     }
@@ -403,6 +414,14 @@ final class ShellFeatureStore {
               model.memberIDs.count == 1, let agentID = model.memberIDs.first else { return nil }
         return (agentID, model.draft)
     }
+
+    /// An unsent chat this store let go, once: what a fresh chat in its place starts from.
+    func takeRetiredUnsentChat(id: String) -> (agentID: String, text: String)? {
+        retiredUnsentChats.removeValue(forKey: id)
+    }
+
+    /// Whether `id` is an unsent chat this store let go that no fresh chat has replaced yet.
+    func hasRetiredUnsentChat(id: String) -> Bool { retiredUnsentChats[id] != nil }
 
     @discardableResult
     func prepare(_ route: AppRoute) -> Bool {
@@ -448,6 +467,7 @@ final class ShellFeatureStore {
                 agents: agents,
                 hostedRooms: botModeRooms
             )
+            sessionsModel?.unsentDraft = { [weak self] id in self?.unsentDraft(id) }
             return true
         case .scheduledTasks:
             return scheduledTasks != nil
@@ -466,7 +486,7 @@ final class ShellFeatureStore {
              .workspaceActivity, .workspaceSettings, .workspaceManagement, .workspaceConnections, .workspaceHub,
              .projects, .project, .kanban, .usage, .allHostsChats, .board,
              .workflows, .workflow, .workflowRun, .workflowSignoff, .workflowRuns, .codeChanges, .codeBatch,
-             .devFactory, .devFactoryRecipe, .devFactoryGroup, .devFactoryChanges, .simpleBotProfile:
+             .devFactory, .devFactoryRecipe, .devFactoryGroup, .devFactoryChanges, .simpleBotProfile, .groupSettings, .simpleBotsSection:
             return true
         }
     }
@@ -748,6 +768,7 @@ final class ShellFeatureStore {
         // A new chat that never sent anything: the screen showing it opens a fresh one in its place.
         if !model.isBotMode, model.transcriptEntries.isEmpty, model.memberIDs.count == 1,
            let agentID = model.memberIDs.first {
+            retiredUnsentChats[id] = (agentID, model.draft)
             onUnsentChatRetired?(id, agentID, model.draft)
         }
         // Removing the exact sink first prevents its final flush from writing
@@ -909,7 +930,9 @@ final class ShellFeatureStore {
         var protected = navigationOwnedConversationIDs
         var idleNativeIDs: [String] = []
         for (id, model) in chatModels {
+            // A message waiting in the chat for its connection ("Sending…") isn't sent yet: the chat owns it.
             if model.isSending || model.hasPendingIndependentMessageSubmission
+                || !model.stagedSends.isEmpty || model.stagedSendDrain != nil
                 || model.isHydratingHistory || model.isLoadingPreviousHistory
                 || navigationHydrations[id] != nil || canonicalSessionReentries[id] != nil {
                 protected.insert(id)
@@ -946,6 +969,8 @@ final class ShellFeatureStore {
             chatModels[id] = nil
             nativeModelUse[id] = nil
             hydratedNavigationModels[id] = nil
+            nativeModelEvicted(id, ObjectIdentifier(model))
+            catalog.compactSessionContent(id: id)
         }
     }
 
@@ -968,6 +993,7 @@ final class ShellFeatureStore {
         retentionTask = nil
         backgroundActivityProjections.removeAll()
         chatModels.removeAll()
+        retiredUnsentChats.removeAll()
         sessionsModel = nil
         approvalModels.removeAll()
         voiceSessionSequences.removeAll()
@@ -976,6 +1002,14 @@ final class ShellFeatureStore {
         unresolvedSubagentSnapshots.removeAll()
         hasDeferredDashboardRefresh = false
         dashboardModel.resetForAccountBoundary()
+    }
+
+    /// Whether a chat's message box holds something its saved draft doesn't show yet: files only the
+    /// open chat holds (they're never saved), or typing still in the draft journal. Nil when the
+    /// saved draft is the latest, as it is once the person leaves the chat (it saves then).
+    func unsentDraft(_ id: String) -> Bool? {
+        if chatModels[id]?.orderedDraftAttachments.isEmpty == false { return true }
+        return draftJournal?.pendingDraft(for: id).map(SessionRecord.holdsDraft)
     }
 
     func flushChatPersistence() {
@@ -1468,6 +1502,12 @@ final class ShellFeatureStore {
             onDraftJournal: journalDraft
         )
         referenceModel = model
+        // Reading the chat marks it read on Hermes (#862).
+        model.onRead = { [weak self, weak catalog] activity, reading in
+            guard let self, let catalog, self.accountGeneration == referenceGeneration,
+                  let referenceModel, self.chatModels[session.id] === referenceModel else { return }
+            catalog.noteRead(id: session.id, activity: activity, reading: reading)
+        }
         // A draft from the journal isn't in the chat yet: its next save writes it there.
         if !openingDraft.utf8.elementsEqual(session.draft.utf8) { model.persistSession(draftOnly: true) }
         // Turns Hermes runs on its own (a background process finished, another agent wrote in) never stream
@@ -1676,9 +1716,16 @@ final class ShellFeatureStore {
             : Self.voiceTranscript(from: session?.items ?? [])
 
         activeLiveVoice?.invalidateOwner()
-        let liveModel = conversationMode == .codexLive
-            ? session.flatMap { liveVoiceFactory?($0, agent, chatModel(for: $0)) }
-            : nil
+        let live: Result<LiveVoiceModel, LiveVoiceUnavailable>? = if conversationMode != .codexLive {
+            nil
+        } else if let liveVoiceFactory {
+            session.map { liveVoiceFactory($0, agent, chatModel(for: $0)) } ?? .failure(.chatOpening)
+        } else {
+            // Only demo mode runs without a computer to make the call.
+            .failure(.demo)
+        }
+        let liveModel = try? live?.get()
+        let liveUnavailable: LiveVoiceUnavailable? = if case .failure(let reason)? = live { reason } else { nil }
         liveModel?.configure(provider: liveProvider, voice: liveVoice)
         activeLiveVoice = liveModel
         return VoicePresentation(
@@ -1723,7 +1770,8 @@ final class ShellFeatureStore {
                 holdMusic: conversationMode == .codexLive || !voiceHoldMusicEnabled() ? nil : voiceHoldMusic()
             ),
             conversationMode: conversationMode,
-            liveModel: liveModel
+            liveModel: liveModel,
+            liveUnavailable: liveUnavailable
         )
     }
 

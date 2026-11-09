@@ -159,7 +159,7 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBo
                 "event_id": .string(eventID),
                 "name": .string(name),
             ])
-            let room = try decodeRoom(from: payload, allowedKeys: ["room"])
+            let room = try decodeRoom(from: payload)
             guard room.roomID == roomID,
                   let eventValue = payload["room"]?.object?["event"] else {
                 throw BighelpLinkWorkspaceClientError.invalidResponse
@@ -195,7 +195,7 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBo
                 "name": .string(name),
                 "members": .array(memberValues),
             ])
-            let room = try decodeRoom(from: payload, allowedKeys: ["room"])
+            let room = try decodeRoom(from: payload)
             guard room.roomID == roomID, room.name == name, room.members == members else {
                 throw BighelpLinkWorkspaceClientError.invalidResponse
             }
@@ -210,7 +210,7 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBo
                 "room_id": .string(roomID),
                 "include_disbanded": .boolean(includeDisbanded),
             ])
-            let room = try decodeRoom(from: payload, allowedKeys: ["room", "driver_status"])
+            let room = try decodeRoom(from: payload)
             guard room.roomID == roomID else {
                 throw BighelpLinkWorkspaceClientError.invalidResponse
             }
@@ -435,6 +435,51 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBo
         }
     }
 
+    /// Saves a room's settings. A retry with the same `event_id` gets the first save back.
+    func groupsContext(roomID: String, intent: HermesBotModeContextIntent) async throws -> HermesBotModeRoomContext {
+        try requireNonEmpty(roomID)
+        try requireNonEmpty(intent.eventID)
+        guard intent.context.isSavable else { throw BighelpLinkWorkspaceClientError.invalidRequest }
+        return try await owned {
+            let payload = try await workspace.perform(.groupsContext, payload: intent.request(roomID: roomID))
+            guard let context = HermesBotModeRoomContext(json: payload["context"]),
+                  let eventValue = payload["event"] else {
+                throw BighelpLinkWorkspaceClientError.invalidResponse
+            }
+            let event: HermesBotModeEvent
+            do { event = try JSONDecoder().decode(HermesBotModeEvent.self, from: JSONEncoder().encode(eventValue)) }
+            catch { throw BighelpLinkWorkspaceClientError.invalidResponse }
+            try HermesBotModeWireCodec.event(event)
+            guard event.roomID == roomID, event.eventID == intent.eventID, event.kind == "room.context_set" else {
+                throw BighelpLinkWorkspaceClientError.invalidResponse
+            }
+            return context
+        }
+    }
+
+    func groupsContinue(roomID: String, discussionEventID: String) async throws -> HermesBotModeEvent {
+        try requireNonEmpty(roomID)
+        try requireNonEmpty(discussionEventID)
+        return try await owned {
+            let payload = try await workspace.perform(.groupsContinue, payload: [
+                "room_id": .string(roomID),
+                "discussion_event_id": .string(discussionEventID),
+            ])
+            guard payload["continued"]?.boolean == true, let eventValue = payload["event"] else {
+                throw BighelpLinkWorkspaceClientError.invalidResponse
+            }
+            let event: HermesBotModeEvent
+            do { event = try JSONDecoder().decode(HermesBotModeEvent.self, from: JSONEncoder().encode(eventValue)) }
+            catch { throw BighelpLinkWorkspaceClientError.invalidResponse }
+            try HermesBotModeWireCodec.event(event)
+            guard event.roomID == roomID, event.kind == "room.continued",
+                  event.discussionEventID == discussionEventID else {
+                throw BighelpLinkWorkspaceClientError.invalidResponse
+            }
+            return event
+        }
+    }
+
     private func owned<T: Sendable>(_ operation: () async throws -> T) async throws -> T {
         try Task.checkCancellation()
         try requireCurrentOwner()
@@ -483,12 +528,11 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBo
         }
     }
 
-    private func decodeRoom(
-        from payload: [String: BighelpJSONValue],
-        allowedKeys: Set<String>
-    ) throws -> HermesBotModeRoomState {
-        guard Set(payload.keys).isSubset(of: allowedKeys),
-              let roomValue = payload["room"] else {
+    /// The room in a `groups.*` answer, with `driver_status` when Hermes sends it. Hermes adds
+    /// fields to these answers (`groups.state` gained `context`); the ones the app doesn't use
+    /// are ignored, and the room itself is still checked in full.
+    private func decodeRoom(from payload: [String: BighelpJSONValue]) throws -> HermesBotModeRoomState {
+        guard let roomValue = payload["room"] else {
             throw BighelpLinkWorkspaceClientError.invalidResponse
         }
         do {
@@ -497,12 +541,14 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBo
                 from: JSONEncoder().encode(roomValue)
             )
             try HermesBotModeWireCodec.room(room)
-            guard let rawDriverStatus = payload["driver_status"] else {
-                return room
+            var driverStatus: [String: BighelpJSONValue]?
+            if let rawDriverStatus = payload["driver_status"] {
+                guard case .object(let status) = rawDriverStatus else {
+                    throw BighelpLinkWorkspaceClientError.invalidResponse
+                }
+                driverStatus = status
             }
-            guard case .object(let driverStatus) = rawDriverStatus else {
-                throw BighelpLinkWorkspaceClientError.invalidResponse
-            }
+            // A context the app can't read hides the room's settings; the room still opens.
             return HermesBotModeRoomState(
                 roomID: room.roomID,
                 name: room.name,
@@ -514,7 +560,8 @@ final class BighelpLinkHermesBotModeClient: HermesBotModeCatalogClient, HermesBo
                 updatedAt: room.updatedAt,
                 latestSequence: room.latestSequence,
                 disbandedAt: room.disbandedAt,
-                driverStatus: driverStatus
+                driverStatus: driverStatus,
+                context: HermesBotModeRoomContext(json: payload["context"])
             )
         } catch {
             if let error = error as? BighelpLinkWorkspaceClientError {

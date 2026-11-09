@@ -5,15 +5,30 @@ import UserNotifications
 /// Chats on screen right now, so an alert for a conversation you're already
 /// looking at isn't also shown as a banner (like Messages), and its earlier
 /// alerts leave Notification Center once you're reading it.
+///
+/// A chat on screen while the app is in front is being read, so Hermes marks it read
+/// (`ChatModel.noteRead`): when it shows, when the app comes back to it, and when it stops
+/// showing or the app leaves the front. Every way of opening a chat ends here, and a chat
+/// that isn't on screen never counts.
 @MainActor
 final class BighelpVisibleChats {
     static let shared = BighelpVisibleChats()
+    /// Whether the app is in front; tests set their own.
+    var appIsActive: @MainActor () -> Bool = { UIApplication.shared.applicationState == .active }
 
     private init() {
-        // Back in the app on a chat you left open: its alerts are read now too.
+        // Back in the app on a chat you left open: its alerts are read now too, and so is the chat.
         _ = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
                                                object: nil, queue: .main) { _ in
-            MainActor.assumeIsolated { BighelpVisibleChats.shared.clearDelivered() }
+            MainActor.assumeIsolated {
+                BighelpVisibleChats.shared.clearDelivered()
+                BighelpVisibleChats.shared.appActivityChanged(isActive: true)
+            }
+        }
+        // Control Center, another app, the Lock Screen: what comes in from now on isn't read yet.
+        _ = NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification,
+                                               object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { BighelpVisibleChats.shared.appActivityChanged(isActive: false) }
         }
     }
 
@@ -39,8 +54,18 @@ final class BighelpVisibleChats {
             let entry = Entry(model)
             entry.screens = [screen]
             entries[ObjectIdentifier(model)] = entry
+            if appIsActive() { model.noteRead(reading: true) }
         }
         clearDelivered()
+    }
+
+    /// Whether the person is reading this chat: it's on screen and the app is in front.
+    func isReading(_ model: ChatModel) -> Bool {
+        entries[ObjectIdentifier(model)]?.model === model && appIsActive()
+    }
+
+    func appActivityChanged(isActive: Bool) {
+        for model in entries.values.compactMap(\.model) { model.noteRead(reading: isActive) }
     }
 
     /// A visible chat learned who it is (its connection arrived, or Hermes gave it a new
@@ -85,7 +110,10 @@ final class BighelpVisibleChats {
     func disappeared(_ model: ChatModel, screen: AnyHashable = "") {
         guard let entry = entries[ObjectIdentifier(model)] else { return }
         entry.screens.remove(screen)
-        if entry.screens.isEmpty || entry.model == nil { entries[ObjectIdentifier(model)] = nil }
+        guard entry.screens.isEmpty || entry.model == nil else { return }
+        entries[ObjectIdentifier(model)] = nil
+        // Away from the front, the app already said the chat stopped being read.
+        if entry.model === model, appIsActive() { model.noteRead(reading: false) }
     }
 
     /// Notification thread identifiers of the visible chats. Hosts send each

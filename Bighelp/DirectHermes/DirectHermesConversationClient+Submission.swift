@@ -121,6 +121,9 @@ extension DirectHermesConversationClient {
                         // than applying the host's default interrupt/redirect.
                         if !command { params["queued"] = .boolean(true) }
                         let result: BighelpJSONValue
+                        if method == "prompt.submit" {
+                            ChatPerformanceProbe.promptDispatched(conversationID: self.conversationID, submission: submission.id)
+                        }
                         do {
                             result = try await self.rpc.request(method, params: params)
                         } catch DirectHermesError.rpcRejected(code: 4018, _) where method == "slash.exec" {
@@ -165,6 +168,7 @@ extension DirectHermesConversationClient {
                             // presentation; voice must retain its waiter until
                             // a native message.start gives us a turn owner.
                             self.status = "Accepted by Hermes"
+                            ChatPerformanceProbe.promptUnattributed(submission.id)
                             self.promptSentAt = nil
                             self.admitted = true
                             self.takeSubmissionAdmitted()
@@ -183,6 +187,8 @@ extension DirectHermesConversationClient {
                                 self.model?.bindNewestUnsavedMessage(role: .human, toRow: row, from: self)
                             }
                             self.admissionOverlapped = self.submissionTurns.count > 1
+                            if self.admissionOverlapped { ChatPerformanceProbe.promptUnattributed(submission.id) }
+                            else { ChatPerformanceProbe.promptAdmitted(submission.id) }
                             self.selectPendingTurn()
                             self.admitted = true
                             self.status = "Working"

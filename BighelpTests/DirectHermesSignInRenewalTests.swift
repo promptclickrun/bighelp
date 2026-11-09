@@ -501,7 +501,7 @@ struct DirectHermesSignInRenewalTests {
         let signIn = HostPluginFeatureSection.unreachableMessage(WorkspaceClientError.authenticationRequired)
         let quiet = HostPluginFeatureSection.unreachableMessage(WorkspaceClientError.transportUnavailable)
 
-        #expect(restart.contains("restart the hermes serve process"))
+        #expect(restart.contains("Restart the dashboard and the messaging gateway"))
         #expect(signIn.contains("Sign in to the host again"))
         #expect(!signIn.contains("restart"))
         #expect(quiet.contains("Check again in a moment"))

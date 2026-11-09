@@ -42,6 +42,9 @@ struct HostPluginUpdateTests {
         #expect(Model.state(installed: "2.17.0", running: "2.17.0", latest: "2.16.1") == .upToDate)
         // Unknown running version (older plugins without native context) doesn't block.
         #expect(Model.state(installed: "2.16.1", running: nil, latest: "2.16.1") == .upToDate)
+        // On disk, but the dashboard hasn't loaded it (a first install): only a restart starts it.
+        #expect(Model.state(installed: "2.16.1", running: nil, latest: "2.16.1", loaded: false) == .restartNeeded)
+        #expect(Model.state(installed: "2.15.0", running: nil, latest: "2.16.1", loaded: false) == .updateAvailable)
         // Until GitHub names the newest release, nothing is offered.
         #expect(Model.state(installed: "1.0.0", running: "1.0.0", latest: nil) == .upToDate)
     }

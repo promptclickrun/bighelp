@@ -8,9 +8,12 @@ second scheduler. Artifacts means files in their originating sessions, not
 an invented universal host catalog.
 
 Scratchpad, GitHub and Wiki remain retired from app navigation. The Workspace
-menu and its search use `appMenuCases`, not the complete backend destination
-catalog. Native Wiki contracts, clients and plugin tests remain supported
-without adding a visible Wiki menu entry.
+menu (Hermes Tools) and its search use `appMenuCases`, not the complete backend
+destination catalog: it also leaves out Tasks, Usage (☰ › Usage) and the
+destinations for this app's own settings, which live in Settings. Native Wiki
+contracts and clients remain for older hosts that still list `native-wiki-v1`
+(current plugin releases no longer have the Wiki routes), without adding a
+visible Wiki menu entry.
 
 `NativeWorkspaceManagementClient` consumes the shared `WorkspaceOperationPerforming`
 boundary. It does not open a second socket, proxy arbitrary URLs, invoke shell
@@ -159,12 +162,13 @@ composition or a live user's Project authorization.
 
 ### Native Wiki identity
 
-Wiki ownership distinguishes legacy Link device authority from authenticated
-native Hermes principal authority. Native identity contains the endpoint,
+Wiki ownership keeps the retired Link transport's device authority
+(`WikiOwner.Authority.link`) apart from authenticated native Hermes principal
+authority, which is the only kind the app makes today. Native identity contains the endpoint,
 provider, principal and profile, with no invented Link device, account or
 authorization epoch. Its local storage namespace is domain-separated; opaque
-principal equality is byte-exact. Existing Link JSON encoding remains unchanged
-so protected filenames and recovery journals remain readable.
+principal equality is byte-exact. The legacy Link JSON encoding remains unchanged
+so protected filenames and recovery journals from older versions remain readable.
 
 The shared Wiki codecs retain byte/revision/upload validation and accept a
 finite native request seam without manufacturing Link frames. Native transport
@@ -174,7 +178,7 @@ The selected Codex UI retires Wiki navigation and the legacy chat
 reference-provider interface. Native Wiki contracts and clients remain
 available for backend integration without restoring those app surfaces.
 
-Native login does not require separate Wiki pairing or device enrollment.
+Native login does not require Wiki pairing or device enrollment.
 The compatible canonical plugin still owns grants, revision checks, shared
 principal/profile uploads, and protected source policy. Generated, mirrored and
 exported sources remain read-only even if the host supports file creation.

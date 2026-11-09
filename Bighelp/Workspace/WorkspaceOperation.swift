@@ -101,6 +101,10 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     /// Hermes' session path: end one member turn it lost track of (a host stopped mid-turn).
     case groupsDiscard = "groups.discard"
     case groupsApprove = "groups.approve"
+    /// A group chat's purpose, shared notes and who answers a message that names nobody.
+    case groupsContext = "groups.context"
+    /// One more budget of rounds and messages for a discussion Hermes paused at its cap.
+    case groupsContinue = "groups.continue"
     /// RoomLink, sent to the computer an agent lives on: a grant for that agent
     /// to join a room whose home is another computer.
     case groupsPeerInvite = "groups.peer.invite"
@@ -185,8 +189,21 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     /// Whether another Hermes process is running a chat now, and stopping that run (plugin, `native-chat-activity-v1`).
     case chatActivity = "chat.activity"
     case chatStop = "chat.stop"
+    /// A turn another process (the agent's gateway) runs in a chat, frame by frame (plugin, `native-chat-live-v1`).
+    case chatLive = "chat.live"
+    /// `message_agent` messages as the agents asked keep them (plugin, `native-agent-deliveries-v1`).
+    case agentDeliveries = "agents.deliveries"
     /// What each agent's Bot Chat is doing, in one read (plugin, `native-agents-activity-v1`).
     case agentsActivity = "agents.activity"
+    /// One agent's subagents, background commands and scheduled task runs today (plugin, `native-agents-today-v1`).
+    case agentsToday = "agents.today"
+    /// What one of those did: a subagent's steps and answer, a command's output, a routine run's output
+    /// (plugin, `native-agents-today-detail-v1`).
+    case agentsTodayDetail = "agents.today.detail"
+    /// The computer's own desktop through its VNC server: whether it answers, and a ticket for the
+    /// bridge (plugin, `native-computer-screen-v1`).
+    case computerScreenStatus = "computer-screen.status"
+    case computerScreenObserve = "computer-screen.observe"
     /// Hermes' marketplace facts for the catalog plugins and the ones this computer won't install
     /// (plugin, `native-marketplace-v1`).
     case marketplacePlugins = "marketplace.plugins"
@@ -212,6 +229,10 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case myTemplatesList = "my-templates.list"
     case myTemplatesSave = "my-templates.save"
     case myTemplatesDelete = "my-templates.delete"
+    /// The app's own layout and bot settings for one person, kept on the computer so a reinstall or
+    /// another device gets them back (plugin, `native-app-state-v1`).
+    case appStateRead = "app-state.read"
+    case appStateWrite = "app-state.write"
     /// Copies saved cards and addresses to more websites in an agent's vault, on the computer, so
     /// their numbers never come to the phone (plugin, `native-vault-link-v1`).
     case vaultLink = "vault.link"
@@ -227,6 +248,9 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case imageDraftsFinish = "image-drafts.finish"
     case imageDraftsDiscard = "image-drafts.discard"
     case imageDraftsReopen = "image-drafts.reopen"
+    /// Agents' HTML apps: an app's page and its latest data (plugin `native-html-apps-v1`, docs/HTML_APPS.md).
+    case htmlAppsGet = "html-apps.get"
+    case htmlAppsData = "html-apps.data"
     /// Composio Connect in Hermes, for Settings › Connections › Composio Apps (plugin `native-composio-v1`).
     case composioStatus = "composio.status"
     case composioInstall = "composio.install"

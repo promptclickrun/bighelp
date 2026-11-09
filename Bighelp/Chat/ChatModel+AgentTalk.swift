@@ -11,6 +11,17 @@ extension ChatModel {
         return { agentID, sessionID in await reader.steps(agentID: agentID, sessionID: sessionID) }
     }
 
+    /// The rail's open view: the other agent's turn on its gateway, and Stop.
+    var agentTalkRunAccess: AgentTalkRunAccess? {
+        guard let reader = agentTalkReader else { return nil }
+        return AgentTalkRunAccess(
+            frames: { agentID, sessionID, after, epoch in
+                await reader.liveFrames(agentID: agentID, sessionID: sessionID, after: after, epoch: epoch,
+                                        wait: .seconds(10), latest: false)
+            },
+            stop: { agentID, sessionID in await reader.stopOtherProcessRun(agentID: agentID, sessionID: sessionID) })
+    }
+
     /// Changes when a call to another agent starts or ends, so the chat reads
     /// the feed again then (and keeps reading while one runs).
     var agentTalkFollowKey: String {
@@ -64,6 +75,7 @@ extension ChatModel {
     /// agent stops working, and every 15 seconds for up to 20 minutes.
     func followAgentTalk() async {
         guard !agentTalkFollowKey.isEmpty else { return }
+        var deliveriesUnavailable = false
         let reader = agentTalkReader
         let sessionID = nativeConversationClient?.storedID ?? sourceSession?.remoteStoredID ?? conversationID
         let started = ContinuousClock.now
@@ -86,6 +98,23 @@ extension ChatModel {
                     working = agentTalkLive.hasWorkingRuns
                 }
             }
+            // Hermes 0.23 keeps each message with the agent asked: where it is, until it ends.
+            let talkCalls = ledgerReading.agentTalkCalls
+            var deliveriesOut = false
+            if let reader, !deliveriesUnavailable {
+                let pending = agentTalkLive.pendingDeliveries(in: talkCalls)
+                if !pending.isEmpty {
+                    if let read = await reader.deliveries(pending) {
+                        guard !Task.isCancelled else { return }
+                        agentTalkLive.update(deliveries: read, calls: talkCalls, asked: pending)
+                        working = working || read.contains { $0.state == .working }
+                        deliveriesOut = !agentTalkLive.pendingDeliveries(in: talkCalls).isEmpty
+                    } else {
+                        // An older plugin, or no connection: the chat's own notices still say what happened.
+                        deliveriesUnavailable = true
+                    }
+                }
+            }
             let awaiting = !agentTalkAwaitingDeliveries.isEmpty
                 && ContinuousClock.now - started < .seconds(20 * 60)
             if awaiting, (wasWorking && !working) || ContinuousClock.now - lastHistoryRead >= .seconds(15) {
@@ -93,7 +122,7 @@ extension ChatModel {
                 refreshFromHostSoon()
             }
             wasWorking = working
-            guard calls.contains(where: { $0.lifecycle == .running }) || working || awaiting else { return }
+            guard calls.contains(where: { $0.lifecycle == .running }) || working || awaiting || deliveriesOut else { return }
             try? await Task.sleep(for: .seconds(2))
         }
     }
@@ -104,6 +133,7 @@ extension ChatModel {
     /// device wrote in. Only its answer streams here, so the chat reads what Hermes saved.
     func hostTurnEnded(from owner: DirectHermesConversationClient) {
         guard (client as? DirectHermesConversationClient) === owner, !isBotMode else { return }
+        readTurnEnded()
         refreshFromHostSoon()
     }
 
@@ -128,7 +158,7 @@ extension ChatModel {
 extension ChatModel {
     /// The watch restarts with the chat, and pauses while this device's own turn runs.
     var otherProcessFollowKey: String {
-        guard !isBotMode, agentTalkReader != nil, !isSending else { return "" }
+        guard !isBotMode, agentTalkReader != nil, !isSending || followsGatewayTurn else { return "" }
         return conversationID
     }
 
@@ -153,6 +183,16 @@ extension ChatModel {
                 }
                 // An older plugin can't say; asking again won't change that.
                 if reading == .unavailable { return }
+            case .running(let run) where run.isLive && nativeConversationClient != nil:
+                // The agent's gateway runs it (Hermes 0.23): draw it as it goes, then read what Hermes saved.
+                otherProcessRun = run
+                try? await hostHistoryRefresh?()
+                guard !Task.isCancelled else { return }
+                await followGatewayTurn(reader: reader, sessionID: sessionID)
+                guard !Task.isCancelled else { return }
+                otherProcessRun = nil
+                refreshFromHostSoon()
+                continue
             case .running(let run):
                 reads += 1
                 if otherProcessRun == nil || run.toolName != otherProcessRun?.toolName || reads % 3 == 0 {
@@ -162,6 +202,41 @@ extension ChatModel {
             }
             try? await Task.sleep(for: .seconds(otherProcessRun == nil ? 10 : 4))
         }
+    }
+
+    /// The turn the agent's gateway runs in this chat, drawn as the chat draws its own turns (typing, the
+    /// activity card, the answer as it comes), from now: the chat already shows what Hermes saved of it, and
+    /// saved steps carry no call ID to match a replay against. Ends when the turn does, or when the feed
+    /// stops; a turn that started here and didn't end is settled empty, as Hermes' own forward does, and the
+    /// chat reads what Hermes saved.
+    func followGatewayTurn(reader: any AgentTalkReading, sessionID: String) async {
+        guard let client = nativeConversationClient,
+              let now = await reader.liveFrames(agentID: agentID, sessionID: sessionID, after: nil, epoch: nil,
+                                                wait: .seconds(5), latest: true),
+              !Task.isCancelled, now.isAttached, now.isRunning else { return }
+        followsGatewayTurn = true
+        defer { followsGatewayTurn = false }
+        var after = now.last
+        var epoch = now.epoch
+        var ended = false
+        client.receiveObserved(type: "message.start", payload: [:])
+        while !Task.isCancelled {
+            guard let feed = await reader.liveFrames(agentID: agentID, sessionID: sessionID, after: after,
+                                                     epoch: epoch, wait: .seconds(10), latest: false),
+                  !Task.isCancelled, feed.isAttached, !(feed.reset && after != nil) else { break }
+            epoch = feed.epoch ?? epoch
+            for frame in feed.frames {
+                if frame.type == "message.start" { ended = false }
+                if frame.type == "message.complete" { ended = true }
+                client.receiveObserved(type: frame.type, payload: frame.payload)
+            }
+            after = feed.last ?? after
+            if !feed.isRunning { break }
+        }
+        if !ended { client.receiveObserved(type: "message.complete", payload: ["text": .string("")]) }
+        // A turn this device didn't send ends when Hermes says it's idle. The gateway's last frames don't
+        // say so (`running` is all the plugin keeps of them); its feed did.
+        client.receiveObserved(type: "session.info", payload: ["running": .boolean(false)])
     }
 
     func stopOtherProcessRun() async {

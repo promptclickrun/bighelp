@@ -15,6 +15,26 @@ struct SuspendedChat: Equatable {
     let text: String
 }
 
+/// The chat the person was in when they left it for another place (Feed, Agents, Kanban…). The bar
+/// tab it was under opens it again, as any tab keeps its place.
+struct HeldChat: Equatable {
+    let conversationID: String
+    /// Picked from the full chat list: with Sessions in the bar, Sessions holds it, not Chat.
+    let openedFromList: Bool
+
+    /// The bar tab that opens it again: Chat (`.sessions`) or Sessions (`.sessionList`).
+    func tab(sessionsInBar: Bool) -> AppTab {
+        openedFromList && sessionsInBar ? .sessionList : .sessions
+    }
+
+    /// Chat is the chat of the agent in use, so it opens a 1:1 chat again only while that chat's
+    /// agent is in use (a board opened from it makes its agent the one in use). A group chat isn't
+    /// any one agent's.
+    static func fitsChat(members: [String], agentInUse: String?) -> Bool {
+        members.count != 1 || members.first == agentInUse
+    }
+}
+
 @MainActor
 @Observable
 final class AppState {
@@ -26,6 +46,8 @@ final class AppState {
     private(set) var pendingVoiceConversationID: String?
     /// Text a board "Ask" or "Discuss" leaves in the next new chat's composer.
     var pendingComposerText: String?
+    /// The chat left for another place; opening a chat, or another computer or account, forgets it.
+    private(set) var heldChat: HeldChat?
     /// The open chat's agent and text when the app left, while that chat had sent nothing.
     /// Hermes saves a chat only on its first message, so it can be gone on return.
     var suspendedChat: SuspendedChat?
@@ -57,6 +79,11 @@ final class AppState {
     }
 
     func select(_ tab: AppTab) {
+        // Leaving a chat for another place: the tab it was under opens it again. Chat and
+        // Sessions share a root, so moving between them leaves nothing behind.
+        if selectedTab == .sessions, tab != .sessions, tab != .sessionList, case .chat(let id)? = path.last {
+            heldChat = HeldChat(conversationID: id, openedFromList: chatOpenedFromList)
+        }
         switch tab {
         case .home, .inbox:
             selectedTab = .workspace
@@ -132,6 +159,8 @@ final class AppState {
     }
 
     func activateConversation(id: String, source: ConversationActivationSource) {
+        // The chat on screen now is the one a tab holds when the person leaves it.
+        heldChat = nil
         let route = AppRoute.chat(conversationID: id)
         // Already open (a notification, widget or link about it): go back to that copy. A second
         // copy would share its model, both would redraw every change, and Back would show it again.
@@ -182,6 +211,8 @@ final class AppState {
         pendingVoiceConversationID = nil
         clearComposerText()
         chatOpenedFromList = false
+        // Its chat is the other computer's.
+        heldChat = nil
     }
 
     func resetForAccountBoundary() {
@@ -191,6 +222,7 @@ final class AppState {
         pendingVoiceConversationID = nil
         clearComposerText()
         chatOpenedFromList = false
+        heldChat = nil
     }
 
     /// When `pendingComposerText` was left. A chat that opens much later (its open failed, or the

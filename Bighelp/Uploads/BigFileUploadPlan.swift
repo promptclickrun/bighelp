@@ -11,6 +11,10 @@ enum BigFileUploads {
     /// The largest piece the app accepts the host asking for.
     static let maximumChunkBytes = 16 * 1_024 * 1_024
     static let minimumChunkBytes = 64 * 1_024
+    /// A proxy in front of Hermes can refuse the plugin's 4 MiB pieces (nginx and aiohttp take 1 MiB by
+    /// default). A plugin with this feature then takes the file again in `smallChunkBytes` pieces.
+    static let smallPiecesFeature = "native-uploads-small-pieces-v1"
+    static let smallChunkBytes = 512 * 1_024
 
     /// What to say when a file is too big for this computer's plugin.
     static let updatePluginMessage =
@@ -127,6 +131,10 @@ enum BigFileUploadFailure: Equatable, Sendable {
     case tooLarge
     case expired
     case connection
+    /// Something in front of Hermes answered a piece with 413, even in small pieces.
+    case proxyLimit
+    /// The same, on a plugin that can't take small pieces yet.
+    case proxyLimitNeedsPlugin
     case other
 
     init(code: String) {
@@ -162,6 +170,10 @@ enum BigFileUploadFailure: Equatable, Sendable {
         case .tooLarge: BigFileUploads.tooLargeMessage
         case .expired: "Not sent. The computer let go of this file."
         case .connection: "Not sent. The connection to the computer dropped."
+        case .proxyLimit: "Not sent. A proxy in front of Hermes on the computer refuses the pieces of this file."
+        case .proxyLimitNeedsPlugin:
+            "Not sent. A proxy in front of Hermes on the computer refuses big pieces. Update the bighelp plugin "
+                + "on the computer to send this file in smaller pieces."
         case .other: "Not sent. The computer didn't take this file."
         }
     }

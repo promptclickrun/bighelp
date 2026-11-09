@@ -45,6 +45,14 @@ final class DemoSessionCatalogClient: SessionCatalogClient {
         return record
     }
 
+    /// Read state as Hermes keeps it, on the demo's own rows.
+    func setUnread(_ record: SessionRecord, unread: Bool) async throws {
+        guard let index = records.firstIndex(where: { $0.id == record.id }) else {
+            throw SessionCatalogError.invalidSession
+        }
+        records[index].isUnread = unread
+    }
+
     func refreshMetadata(_ record: SessionRecord) async throws -> SessionRecord? {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-test-held-session-metadata") {
@@ -102,6 +110,7 @@ final class DemoSessionCatalogClient: SessionCatalogClient {
             workspaceID: "demo-loopdy",
             workspaceName: "bighelp",
             items: ConversationFixtures.initialItems(conversationID: "demo-finance", agentID: "finance", agentName: "Avery Park"),
+            isUnread: false,
             hasAcceptedMessage: true
         ),
         SessionRecord(
@@ -112,6 +121,8 @@ final class DemoSessionCatalogClient: SessionCatalogClient {
             workspaceID: "demo-travel",
             workspaceName: "Travel Planning",
             items: ConversationFixtures.initialItems(conversationID: "demo-travel", agentID: "travel", agentName: "Mina Shah"),
+            // A reply nobody has read yet, as Hermes lists one.
+            isUnread: true,
             hasAcceptedMessage: true
         )
     ] + (1...48).map { index in
@@ -139,6 +150,8 @@ final class DemoSessionCatalogClient: SessionCatalogClient {
             agentIDs: agentIDs,
             title: kind == .botMode ? groupNames[(index / 3) % groupNames.count] : "Direct session \(index)",
             remoteSource: kind == .botMode ? nil : sources[index % sources.count],
+            // A half-written message waits in one chat's message box.
+            draft: index == 2 ? "Can you add oat milk and" : "",
             items: [
                 TimelineItem(
                     id: "demo-session-\(index)-message",
@@ -148,6 +161,7 @@ final class DemoSessionCatalogClient: SessionCatalogClient {
                     metadata: TimelineMetadata(delivery: "Delivered")
                 )
             ],
+            isUnread: index == 7 || index == 5,
             createdAt: updatedAt,
             updatedAt: updatedAt,
             hasAcceptedMessage: true

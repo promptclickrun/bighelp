@@ -12,6 +12,7 @@ struct CodeComposer: View {
     @Bindable var store: CodeHomeStore
     let agents: [AgentProfile]
     var avatarURL: (AgentProfile) -> URL? = { _ in nil }
+    var sections: [FleetSection] = []
     let onWorktrees: () -> Void
     @State private var message = ""
     @State private var isPickingProject = false
@@ -81,7 +82,7 @@ struct CodeComposer: View {
                 .bighelpSheetSize(.standard)
         }
         .bighelpSheet(isPresented: $isPickingRuntime) {
-            CodeRuntimePicker(store: store, agents: agents, avatarURL: avatarURL)
+            CodeRuntimePicker(store: store, agents: agents, avatarURL: avatarURL, sections: sections)
                 .bighelpSheetSize(.standard)
         }
         .task(id: isTypingCommand) {
@@ -668,12 +669,14 @@ struct CodeBranchPicker: View {
     @BighelpThemeReader private var theme
 }
 
-/// The agent chip's sheet: the agent new sessions run with, then its model (or the agent's
-/// own), reasoning level and fast mode. Each session applies them before its first message.
+/// The agent chip's sheet: the agent new sessions run with (under their sections, then the rest),
+/// then its model (or the agent's own), reasoning level and fast mode. Each session applies them
+/// before its first message.
 struct CodeRuntimePicker: View {
     @Bindable var store: CodeHomeStore
     var agents: [AgentProfile] = []
     var avatarURL: (AgentProfile) -> URL? = { _ in nil }
+    var sections: [FleetSection] = []
     @Environment(\.dismiss) private var dismiss
     @State private var providers: [BighelpLinkModelProvider] = []
     @State private var isLoading = true
@@ -684,27 +687,14 @@ struct CodeRuntimePicker: View {
         NavigationStack {
             Form {
                 if agents.count > 1 {
-                    Section("Agent") {
-                        ForEach(agents) { agent in
-                            Button {
-                                Task { await store.selectAgent(agent.id) }
-                            } label: {
-                                HStack(spacing: BighelpTokens.space12) {
-                                    AgentLiveAvatar(agentID: agent.id, displayName: agent.name, imageURL: avatarURL(agent),
-                                                    size: BighelpTokens.scaled(30), showsBadge: false)
-                                    Text(agent.name).foregroundStyle(theme.primaryText)
-                                    Spacer(minLength: 0)
-                                    if agent.id == store.agentID {
-                                        Image(systemName: "checkmark").foregroundStyle(theme.action)
-                                    }
-                                }
-                                .contentShape(.rect)
-                            }
-                            .bighelpPlainButtonStyle()
-                            .accessibilityIdentifier("code.runtime.agent.\(agent.id)")
+                    let grouped = FleetSectioning.grouped(agents, sections: sections, placement: \.placement)
+                    ForEach(Array(grouped.enumerated()), id: \.offset) { _, group in
+                        Section(group.section?.name ?? (grouped.count > 1 ? String(localized: "Other agents")
+                                                                            : String(localized: "Agent"))) {
+                            ForEach(group.items) { agent in agentRow(agent) }
                         }
+                        .listRowBackground(theme.surface)
                     }
-                    .listRowBackground(theme.surface)
                 }
                 Section("Model") {
                     NavigationLink {
@@ -745,6 +735,25 @@ struct CodeRuntimePicker: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("code.runtime")
+    }
+
+    private func agentRow(_ agent: AgentProfile) -> some View {
+        Button {
+            Task { await store.selectAgent(agent.id) }
+        } label: {
+            HStack(spacing: BighelpTokens.space12) {
+                AgentLiveAvatar(agentID: agent.id, displayName: agent.name, imageURL: avatarURL(agent),
+                                size: BighelpTokens.scaled(30), showsBadge: false)
+                Text(agent.name).foregroundStyle(theme.primaryText)
+                Spacer(minLength: 0)
+                if agent.id == store.agentID {
+                    Image(systemName: "checkmark").foregroundStyle(theme.action)
+                }
+            }
+            .contentShape(.rect)
+        }
+        .bighelpPlainButtonStyle()
+        .accessibilityIdentifier("code.runtime.agent.\(agent.id)")
     }
 
     private var modelTitle: String {

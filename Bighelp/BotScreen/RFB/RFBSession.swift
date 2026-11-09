@@ -38,14 +38,17 @@ actor RFBSession {
     }
 
     private let transport: any RFBTransport
+    /// The VNC password for a screen that asks for one (a computer's own screen sharing).
+    private let password: String?
     private var input = RFBInputBuffer()
     private var framebuffer: RFBFramebuffer?
     private var zrle: RFBZRLEDecoder?
     private let outbox: AsyncStream<Data>
     private let outboxContinuation: AsyncStream<Data>.Continuation
 
-    init(transport: any RFBTransport) {
+    init(transport: any RFBTransport, password: String? = nil) {
         self.transport = transport
+        self.password = password
         (outbox, outboxContinuation) = AsyncStream.makeStream(of: Data.self, bufferingPolicy: .bufferingNewest(512))
     }
 
@@ -99,15 +102,27 @@ actor RFBSession {
         case .v33:
             let type = try await u32()
             if type == 0 { throw RFBError.refused(try await reason()) }
-            guard type == 1 else { throw RFBError.unsupportedSecurity }
+            switch type {
+            case 1: break
+            case 2: try await vncAuthenticate(version: version)
+            default: throw RFBError.unsupportedSecurity
+            }
         case .v37, .v38:
             let count = try await u8()
             if count == 0 { throw RFBError.refused(try await reason()) }
-            // Hermes' Xvnc offers None only: the gateway's ticket is the login.
-            guard try await bytes(Int(count)).contains(1) else { throw RFBError.unsupportedSecurity }
-            try await transport.send(Data([1]))
-            if version == .v38, try await u32() != 0 {
-                throw RFBError.refused(try await reason())
+            // Hermes' Xvnc offers None only: the gateway's ticket is the login. A computer's own
+            // screen sharing (macOS, a VNC server) asks for its VNC password.
+            let offered = try await bytes(Int(count))
+            if offered.contains(1) {
+                try await transport.send(Data([1]))
+                if version == .v38, try await u32() != 0 {
+                    throw RFBError.refused(try await reason())
+                }
+            } else if offered.contains(2) {
+                try await transport.send(Data([2]))
+                try await vncAuthenticate(version: version)
+            } else {
+                throw RFBError.unsupportedSecurity
             }
         }
         // ClientInit: shared, so other viewers (and the agent's own tools) stay connected.
@@ -120,6 +135,20 @@ actor RFBSession {
         let name = String(decoding: try await bytes(nameLength), as: UTF8.self)
         try RFBFramebuffer.check(width: width, height: height)
         return ServerInfo(width: width, height: height, name: name)
+    }
+
+    /// VNC authentication: the server's 16-byte challenge, encrypted with the password.
+    private func vncAuthenticate(version: RFBVersion) async throws {
+        let challenge = try await bytes(16)
+        guard let password, !password.isEmpty else { throw RFBError.needsPassword }
+        guard let response = RFBVNCAuth.response(challenge: challenge, password: password) else {
+            throw RFBError.protocolViolation("challenge")
+        }
+        try await transport.send(response)
+        guard try await u32() == 0 else {
+            if version == .v38 { _ = try? await reason() }
+            throw RFBError.wrongPassword
+        }
     }
 
     private func reason() async throws -> String {

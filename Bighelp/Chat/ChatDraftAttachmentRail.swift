@@ -430,9 +430,12 @@ enum DraftAttachmentRailFixture {
         default:
             human = model.humanItem(content: words).carrying(bigFiles: [file])
             if state == "big-file-failed" {
-                BigFileUploadBoard.shared.failed(file.id, message: BigFileUploadFailure.noSpace.message) {
+                let rowID = human.id
+                BigFileUploadBoard.shared.failed(file.id, message: BigFileUploadFailure.noSpace.message, retry: {
                     BigFileUploadBoard.shared.uploading(file.id, sentBytes: 34_000_000, byteCount: file.byteCount)
-                }
+                }, remove: { [weak model] in
+                    model?.removeBigFileSend(rowID: rowID, files: [file])
+                })
             } else {
                 BigFileUploadBoard.shared.uploading(file.id, sentBytes: 34_000_000, byteCount: file.byteCount)
             }
@@ -471,8 +474,13 @@ enum DraftAttachmentRailFixture {
                 try? await Task.sleep(for: .milliseconds(100))
             }
             var id = seedBigFile(model, state: arguments[index + 1])
+            let failedFileID = "fixturebigfile00000000000000000a"
             for _ in 0..<10 {
                 try? await Task.sleep(for: .milliseconds(500))
+                // Remove clears the failed file's state; only a late load's removal is put back.
+                if arguments[index + 1] == "big-file-failed", BigFileUploadBoard.shared.state(for: failedFileID) == nil {
+                    break
+                }
                 if !model.items.contains(where: { $0.id == id }), !model.bigFileSends.contains(where: { $0.id == id }) {
                     id = seedBigFile(model, state: arguments[index + 1])
                 }

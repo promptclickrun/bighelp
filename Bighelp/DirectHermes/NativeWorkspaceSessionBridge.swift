@@ -43,7 +43,7 @@ final class NativeWorkspaceSessionBridge: SessionCatalogClient {
         let owner: WorkspaceOwner
         let client: DirectHermesConversationClient
         let modelIdentity: ObjectIdentifier
-        let task: Task<SessionRecord, Error>
+        let task: Task<SessionHydrationPage, Error>
     }
 
     struct AuthoritativeRecoveryFlight {

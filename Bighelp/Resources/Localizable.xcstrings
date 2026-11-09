@@ -290,6 +290,57 @@
         }
       }
     },
+    "%@ options": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ options"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@选项"
+          }
+        }
+      }
+    },
+    "%@ stay. They move to No section.": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ stay. They move to No section."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@会保留，并移到“无分组”。"
+          }
+        }
+      }
+    },
+    "%@ stays. It moves to No section.": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ stays. It moves to No section."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@会保留，并移到“无分组”。"
+          }
+        }
+      }
+    },
     "%@'s files show up here once it's back.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -358,6 +409,23 @@
         }
       }
     },
+    "%@, %@, unread": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, %@, unread"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%1$@，%2$@，未读"
+          }
+        }
+      }
+    },
     "%@, %lld": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -409,6 +477,23 @@
         }
       }
     },
+    "%@, pinned group chat": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, pinned group chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@，已置顶的群聊"
+          }
+        }
+      }
+    },
     "%@, your primary bot": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -438,6 +523,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "%@。%@"
+          }
+        }
+      }
+    },
+    "%lld bots": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld bots"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%lld 个机器人"
+          }
+        }
+      }
+    },
+    "%lld group chats": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld group chats"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%lld 个群聊"
           }
         }
       }
@@ -546,6 +665,40 @@
         }
       }
     },
+    "1 bot": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 bot"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "1 个机器人"
+          }
+        }
+      }
+    },
+    "1 group chat": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 group chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "1 个群聊"
+          }
+        }
+      }
+    },
     "2m ago": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -559,6 +712,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "2 分钟前"
+          }
+        }
+      }
+    },
+    "A bot is in one section at a time. Picking a bot from another section moves it here.": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A bot is in one section at a time. Picking a bot from another section moves it here."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "一个机器人一次只能在一个分组中。选择另一个分组中的机器人会把它移到这里。"
           }
         }
       }
@@ -784,6 +954,23 @@
         }
       }
     },
+    "Add Bots or Group Chats": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Bots or Group Chats"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "添加机器人或群聊"
+          }
+        }
+      }
+    },
     "Add from %@": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -950,6 +1137,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "高级"
+          }
+        }
+      }
+    },
+    "Agent": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "智能体"
           }
         }
       }
@@ -3986,6 +4190,23 @@
         }
       }
     },
+    "Defaults": {
+      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Defaults"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "默认设置"
+          }
+        }
+      }
+    },
     "Delete": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -3999,6 +4220,57 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "删除"
+          }
+        }
+      }
+    },
+    "Delete Group Chat": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Group Chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "删除群聊"
+          }
+        }
+      }
+    },
+    "Delete Section": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Section"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "删除分组"
+          }
+        }
+      }
+    },
+    "Delete “%@”?": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete “%@”?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "删除“%@”？"
           }
         }
       }
@@ -4224,6 +4496,23 @@
         }
       }
     },
+    "Drag your bots and group chats into the order you want, then tap Save. To keep this order on your other devices too, update the bighelp plugin on this computer.": {
+      "comment": "Rearrange in Bots mode when this computer's plugin can't keep the order (#857); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag your bots and group chats into the order you want, then tap Save. To keep this order on your other devices too, update the bighelp plugin on this computer."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "将机器人和群聊拖到你想要的顺序，然后轻点“保存”。要在你的其他设备上也保留这个顺序，请更新这台电脑上的 bighelp 插件。"
+          }
+        }
+      }
+    },
     "Drop": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -4258,6 +4547,23 @@
         }
       }
     },
+    "Edit Members": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit Members"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "编辑成员"
+          }
+        }
+      }
+    },
     "Edit Name and Role": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -4271,6 +4577,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "编辑名字和角色"
+          }
+        }
+      }
+    },
+    "Edit Sections": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit Sections"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "编辑分组"
+          }
+        }
+      }
+    },
+    "Edit Sections…": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit Sections…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "编辑分组…"
           }
         }
       }
@@ -5125,6 +5465,23 @@
         }
       }
     },
+    "Group Settings": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Group Settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "群聊设置"
+          }
+        }
+      }
+    },
     "Group chat": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -5567,6 +5924,23 @@
         }
       }
     },
+    "In %@": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在“%@”中"
+          }
+        }
+      }
+    },
     "Inbox": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -5788,6 +6162,23 @@
         }
       }
     },
+    "It has no bots or group chats.": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It has no bots or group chats."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "其中没有机器人或群聊。"
+          }
+        }
+      }
+    },
     "It sizes message text, on top of the text size in Appearance and your iPhone's own text size. Link previews show a web link's picture, title and summary in chats and the Feed. To make one, your iPhone opens that page, without cookies.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -5835,6 +6226,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "使用了 Cloudflare Access 保护"
+          }
+        }
+      }
+    },
+    "Its %lld bots and group chats stay. They move to No section.": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its %lld bots and group chats stay. They move to No section."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "其中的 %lld 个机器人和群聊会保留，并移到“无分组”。"
           }
         }
       }
@@ -6876,6 +7284,23 @@
         }
       }
     },
+    "Move to Section": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to Section"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "移到分组"
+          }
+        }
+      }
+    },
     "Move up": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -6889,6 +7314,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "上移"
+          }
+        }
+      }
+    },
+    "Moves from %@": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moves from %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "从“%@”移来"
           }
         }
       }
@@ -6957,6 +7399,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "我的模板"
+          }
+        }
+      }
+    },
+    "Name": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "名称"
           }
         }
       }
@@ -7181,6 +7640,40 @@
         }
       }
     },
+    "New Section": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Section"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "新建分组"
+          }
+        }
+      }
+    },
+    "New Section…": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Section…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "新建分组…"
+          }
+        }
+      }
+    },
     "New bot or group chat": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -7261,6 +7754,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "有新内容"
+          }
+        }
+      }
+    },
+    "New section": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New section"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "新分组"
           }
         }
       }
@@ -7346,6 +7856,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "未找到机器人"
+          }
+        }
+      }
+    },
+    "No bots or group chats to add yet.": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No bots or group chats to add yet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "还没有可添加的机器人或群聊。"
           }
         }
       }
@@ -7503,6 +8030,23 @@
         }
       }
     },
+    "No section": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No section"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无分组"
+          }
+        }
+      }
+    },
     "No sign-in": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -7639,6 +8183,40 @@
         }
       }
     },
+    "Not selected": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not selected"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未选择"
+          }
+        }
+      }
+    },
+    "Nothing hidden": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing hidden"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "没有隐藏的内容"
+          }
+        }
+      }
+    },
     "Nothing in %@ matches %@.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -7669,6 +8247,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "没有与%@匹配的结果。"
+          }
+        }
+      }
+    },
+    "Nothing to show here": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing to show here"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这里没有可显示的内容"
           }
         }
       }
@@ -8064,6 +8659,23 @@
         }
       }
     },
+    "Open": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "打开"
+          }
+        }
+      }
+    },
     "Open Camera Settings": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -8402,6 +9014,40 @@
         }
       }
     },
+    "Opens the group chat": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens the group chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "打开群聊"
+          }
+        }
+      }
+    },
+    "Opens the section": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens the section"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "打开分组"
+          }
+        }
+      }
+    },
     "Opens this folder": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -8517,6 +9163,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "其他"
+          }
+        }
+      }
+    },
+    "Other agents": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other agents"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "其他智能体"
           }
         }
       }
@@ -8766,6 +9429,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Personalities"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "个性"
+          }
+        }
+      }
+    },
+    "Personality": {
+      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personality"
           }
         },
         "zh-Hans": {
@@ -9691,6 +10371,23 @@
         }
       }
     },
+    "Rename Section": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename Section"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "重命名分组"
+          }
+        }
+      }
+    },
     "Rename chat": {
       "localizations": {
         "en": {
@@ -10454,6 +11151,57 @@
         }
       }
     },
+    "Section": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Section"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "分组"
+          }
+        }
+      }
+    },
+    "Section name": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Section name"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "分组名称"
+          }
+        }
+      }
+    },
+    "Sections": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sections"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "分组"
+          }
+        }
+      }
+    },
     "Secure credential vault": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -10518,6 +11266,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "查看所有会话"
+          }
+        }
+      }
+    },
+    "Selected": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已选择"
           }
         }
       }
@@ -12289,6 +13054,23 @@
         }
       }
     },
+    "Tap a name to rename it. Drag to change the order. Bots' sections show in Hermes Desktop too.": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap a name to rename it. Drag to change the order. Bots' sections show in Hermes Desktop too."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "轻点名称可重命名。拖动可更改顺序。机器人的分组也会显示在 Hermes Desktop 中。"
+          }
+        }
+      }
+    },
     "Tap sends with %@. Choose a one-time alternative below.": {
       "localizations": {
         "en": {
@@ -13256,6 +14038,40 @@
         }
       }
     },
+    "This permanently deletes the group on Hermes and stops its active work.": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This permanently deletes the group on Hermes and stops its active work."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这会在 Hermes 上永久删除该群组，并停止其正在进行的工作。"
+          }
+        }
+      }
+    },
+    "This section's bots and group chats are on other computers.": {
+      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This section's bots and group chats are on other computers."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此分组的机器人和群聊在其他电脑上。"
+          }
+        }
+      }
+    },
     "Time Zone": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -14154,6 +14970,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "%@做了什么"
+          }
+        }
+      }
+    },
+    "What it can use": {
+      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What it can use"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "可以使用的功能"
           }
         }
       }

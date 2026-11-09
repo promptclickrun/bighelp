@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UIKit
 @testable import Bighelp
 
 /// Send doesn't wait for the connection. A message sent while the chat comes back from the
@@ -69,6 +70,25 @@ struct ChatSendWhileConnectingTests {
         #expect(fixture.rpc.submits == ["Hello there"])
     }
 
+    /// A waiting message goes the moment the chat can take it. The wait follows the chat's own
+    /// state; it used to look again every 100 ms, so a message sat out the rest of that step.
+    @Test func aWaitingMessageGoesTheMomentTheChatCanTakeIt() async throws {
+        let fixture = try ConnectingFixture()
+        defer { fixture.close() }
+        try await fixture.client.recover(epoch: "epoch")
+        fixture.client.suspend()
+        fixture.model.draft = "Hello there"
+        await fixture.model.send()
+        #expect(fixture.model.stagedSends.count == 1)
+        for _ in 0..<20 { await Task.yield() }
+
+        fixture.client.rebind(fixture.rpc)
+        try await fixture.client.recover(epoch: "epoch")
+        // No sleeping from here: only the chat becoming ready can send the waiting message.
+        for _ in 0..<500 where fixture.rpc.submits.isEmpty { await Task.yield() }
+        #expect(fixture.rpc.submits == ["Hello there"])
+    }
+
     /// Texting two lines in a row before the chat connects: the first starts a turn and the
     /// second steers it once Hermes says the turn is live, the way two quick Sends would.
     @Test func twoQuickMessagesGoOutInOrder() async throws {
@@ -119,6 +139,50 @@ struct ChatSendWhileConnectingTests {
         #expect(model.stagedSends.isEmpty)
         #expect(model.draft == "First\n\nSecond\n\nStill typing")
         #expect(model.failureMessage == "Your computer didn't answer, so your messages are back in the message box.")
+    }
+
+    /// Time away from the app doesn't count toward giving up on a waiting message, and the time the app
+    /// was open before it left still does: back in the app, the message has only the rest of its time.
+    @Test func timeAwayDoesntCountWhileAMessageWaits() async throws {
+        let model = ChatModel(conversationID: "connecting", client: NativeWorkspaceUnavailableClient(), initialItems: [])
+        var active = true
+        model.retryScheduling.appIsActive = { active }
+        model.connectionGrace = .milliseconds(400)
+        model.draft = "Hello there"
+        await model.send()
+        try await Task.sleep(for: .milliseconds(250))
+
+        active = false
+        NotificationCenter.default.post(name: UIApplication.willResignActiveNotification, object: nil)
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(model.stagedSends.count == 1, "Away from the app, the message keeps waiting")
+
+        active = true
+        NotificationCenter.default.post(name: UIApplication.didBecomeActiveNotification, object: nil)
+        try await Task.sleep(for: .milliseconds(60))
+        #expect(model.stagedSends.count == 1, "Its time didn't run out while the app was away")
+        try await Task.sleep(for: .milliseconds(240))
+        #expect(model.stagedSends.isEmpty, "Only the rest of its time was left once the app came back")
+        #expect(model.draft == "Hello there")
+    }
+
+    /// A chat that closes just as its connection comes back sends nothing that was waiting in it.
+    @Test func aChatThatClosesAsItBecomesReadySendsNothing() async throws {
+        let fixture = try ConnectingFixture()
+        defer { fixture.close() }
+        try await fixture.client.recover(epoch: "epoch")
+        fixture.client.suspend()
+        fixture.model.draft = "Hello there"
+        await fixture.model.send()
+        #expect(fixture.model.stagedSends.count == 1)
+        for _ in 0..<20 { await Task.yield() }
+
+        fixture.model.referenceOwnerRetired = true
+        fixture.client.rebind(fixture.rpc)
+        try await fixture.client.recover(epoch: "epoch")
+        for _ in 0..<500 { await Task.yield() }
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(fixture.rpc.submits.isEmpty)
     }
 
     /// A reload while messages wait resets the chat's counts. The waiting rows keep IDs of their

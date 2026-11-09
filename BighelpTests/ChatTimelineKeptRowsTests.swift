@@ -236,6 +236,43 @@ struct ChatTimelineKeptRowsTests {
         #expect(button(25) === ahead, "A reconnect must not build the rows above again.")
     }
 
+    /// iOS changing from Light to Dark with a chat open (#855): the rows kept their Light look until
+    /// the chat was opened again.
+    @Test func aLiveChangeToDarkReachesTheRowsItBuilt() async throws {
+        let owner = NSObject()
+        let rows = (0..<40).map { ChatCanvasRow.divider("Row \($0)") }
+        let root = UIHostingController(rootView: NativeChatTimeline(
+            conversationID: "appearance", ownerID: ObjectIdentifier(owner), rows: rows,
+            controller: ChatTimelineController(), entryCount: rows.count) { row in
+                ColorSchemeProbe(id: row.id).frame(height: 100)
+            })
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        window.overrideUserInterfaceStyle = .light
+        window.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+        window.rootViewController = root
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        // The rows above are built one at a time once the chat is still.
+        try await Task.sleep(for: .seconds(1))
+        let table = try #require(Host.descendants(root.view, of: ChatTimelineTableView.self).first)
+        func title(_ row: Int) -> String? {
+            Host.descendants(table, of: UIButton.self).lazy.compactMap { $0.title(for: .normal) }
+                .first { $0.hasPrefix("divider:Row \(row) ") }
+        }
+        #expect(title(39) == "divider:Row 39 light")
+        #expect(title(25) == "divider:Row 25 light", "Row 25 must be built before it's on screen.")
+
+        window.overrideUserInterfaceStyle = .dark
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(title(39) == "divider:Row 39 dark", "A row on screen takes the new look at once.")
+
+        table.followsTail = false
+        table.scrollToRow(at: IndexPath(row: 25, section: 0), at: .top, animated: false)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(title(25) == "divider:Row 25 dark", "A row built in Light shows Dark when it scrolls in.")
+    }
+
     @Test func aMessageThatGainsAFollowerInItsGroupClosesUpToIt() async throws {
         let model = ChatModel(conversationID: "regrouped-rows", client: ConversationFixtureClient(), initialItems: [
             Self.message("question", .human, "What changed in the build?"),
@@ -259,6 +296,14 @@ private struct LoaderMotionProbe: View {
     @Environment(\.bighelpLoaderMotionOverride) private var override
 
     var body: some View { ProbeTitle(title: "\(id) \(override.sceneInactive ? "still" : "moving")") }
+}
+
+/// Says whether its row is drawn Light or Dark.
+private struct ColorSchemeProbe: View {
+    let id: String
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View { ProbeTitle(title: "\(id) \(colorScheme)") }
 }
 
 @MainActor @Observable private final class ChatScreenValues {

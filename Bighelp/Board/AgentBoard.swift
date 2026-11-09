@@ -522,12 +522,30 @@ protocol AgentBoardClient: AnyObject {
     var supportsFiles: Bool { get }
     /// One of a post's files, through the attachment routes and this phone's attachment cache.
     func file(agentID: String, itemID: String, file: AgentBoardItem.File) async throws -> ChatAttachment
+    /// The agent's background work today (`native-agents-today-v1`).
+    var supportsToday: Bool { get }
+    /// Today's subagents, background commands and scheduled task runs, from `since` (the start of
+    /// this phone's day) and everything still running.
+    func today(agentID: String, since: Date) async throws -> [AgentTodayItem]
+    /// What one of today's items did (`native-agents-today-detail-v1`).
+    var supportsTodayDetail: Bool { get }
+    func todayDetail(agentID: String, item: AgentTodayItem) async throws -> AgentTodayDetail
 }
 
 extension AgentBoardClient {
     var supportsGoalCategories: Bool { false }
     var supportsFiles: Bool { false }
     var supportsAnswers: Bool { false }
+    var supportsToday: Bool { false }
+    var supportsTodayDetail: Bool { false }
+
+    func today(agentID: String, since: Date) async throws -> [AgentTodayItem] {
+        throw WorkspaceClientError.unavailable(.unsupportedOperation)
+    }
+
+    func todayDetail(agentID: String, item: AgentTodayItem) async throws -> AgentTodayDetail {
+        throw WorkspaceClientError.unavailable(.unsupportedOperation)
+    }
 
     func accept(agentID: String, itemID: String) async throws {
         throw WorkspaceClientError.unavailable(.unsupportedOperation)
@@ -546,18 +564,22 @@ final class DirectHermesAgentBoardClient: AgentBoardClient {
     let supportsFeedback: Bool
     let supportsGoalCategories: Bool
     let supportsAnswers: Bool
+    let supportsToday: Bool
+    let supportsTodayDetail: Bool
     /// Chat's attachment client: the same chunked download, checks and cache. Only
     /// given when the plugin serves posts' files.
     private let files: DirectHermesGeneratedMediaClient?
 
     init(workspace: any WorkspaceOperationPerforming, owner: WorkspaceOwner, supportsFeedback: Bool,
-         supportsGoalCategories: Bool = false, supportsAnswers: Bool = false,
-         files: DirectHermesGeneratedMediaClient? = nil) {
+         supportsGoalCategories: Bool = false, supportsAnswers: Bool = false, supportsToday: Bool = false,
+         supportsTodayDetail: Bool = false, files: DirectHermesGeneratedMediaClient? = nil) {
         self.workspace = workspace
         self.owner = owner
         self.supportsFeedback = supportsFeedback
         self.supportsGoalCategories = supportsGoalCategories
         self.supportsAnswers = supportsAnswers
+        self.supportsToday = supportsToday
+        self.supportsTodayDetail = supportsTodayDetail
         self.files = files
     }
 
@@ -655,6 +677,20 @@ final class DirectHermesAgentBoardClient: AgentBoardClient {
         let result = try await perform(.boardIdentity, ["agentId": .string(agentID)])
         return AgentIdentityDocuments(soul: .init(json: result["soul"]), memory: .init(json: result["memory"]),
                                       user: .init(json: result["user"]))
+    }
+
+    func today(agentID: String, since: Date) async throws -> [AgentTodayItem] {
+        guard supportsToday else { throw WorkspaceClientError.unavailable(.unsupportedOperation) }
+        let result = try await perform(.agentsToday, ["agentId": .string(agentID),
+                                                      "since": .integer(Int(since.timeIntervalSince1970))])
+        guard let rows = result["items"]?.array else { throw WorkspaceClientError.invalidResponse }
+        return AgentTodayItem.list(rows)
+    }
+
+    func todayDetail(agentID: String, item: AgentTodayItem) async throws -> AgentTodayDetail {
+        guard supportsTodayDetail else { throw WorkspaceClientError.unavailable(.unsupportedOperation) }
+        let result = try await perform(.agentsTodayDetail, ["agentId": .string(agentID), "id": .string(item.id)])
+        return AgentTodayDetail(json: .object(result), listed: item)
     }
 }
 

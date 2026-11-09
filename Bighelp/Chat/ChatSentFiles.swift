@@ -144,7 +144,7 @@ struct ChatSentFileLine: View {
 }
 
 /// A file over 8 MB on its way (Colt's pick, #721): a ring around its mark fills as the pieces
-/// arrive and the size counts up; a file that didn't go says why, with Try again.
+/// arrive and the size counts up; a file that didn't go says why, with Try again and Remove.
 struct BigFileUploadTile: View {
     let file: ChatBigFile
     private var board: BigFileUploadBoard { .shared }
@@ -174,10 +174,14 @@ struct BigFileUploadTile: View {
             .frame(minWidth: 210, maxWidth: 320, alignment: .leading)
             .background(theme.outgoingMessageBackground, in: .rect(cornerRadius: 16, style: .continuous))
             if case .failed = state {
-                Button("Try again") { board.retry(file.id) }
-                    .font(.bighelp(.footnote, weight: .semibold))
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier("chat.big-file.retry")
+                HStack(spacing: BighelpTokens.space8) {
+                    Button("Remove", role: .destructive) { board.remove(file.id) }
+                        .accessibilityIdentifier("chat.big-file.remove")
+                    Button("Try again") { board.retry(file.id) }
+                        .accessibilityIdentifier("chat.big-file.retry")
+                }
+                .font(.bighelp(.footnote, weight: .semibold))
+                .buttonStyle(.bordered)
             }
         }
         .accessibilityElement(children: .contain)

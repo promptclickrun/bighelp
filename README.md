@@ -112,10 +112,10 @@ xcodebuild test -project Bighelp.xcodeproj -scheme Bighelp \
 | `BighelpMacUpdater/` | The Mac app's updates (Sparkle) |
 | `BighelpTests/`, `BighelpUITests/`, `BighelpVisionUITests/`, `BighelpWatchUITests/` | Tests |
 | `BighelpMac/`, `BighelpMacTests/` | An early desktop prototype on sample data. It is not the Mac app. |
-| `services/` | Cloudflare Workers: the notification service and relay, usage and diagnostics, the template and avatar catalogs, and the provider logos |
+| `services/` | Cloudflare Workers: the notification service, usage and diagnostics, the template and avatar catalogs, and the provider logos (plus the recovered source of an old relay, never deployed). See [docs/CLOUDFLARE_INFRASTRUCTURE.md](docs/CLOUDFLARE_INFRASTRUCTURE.md) |
 | `Scripts/` | Tests against real Hermes hosts, the Mac release, and other tools |
 | `Design/AvatarKit/` | Avatar artwork and the tools that export it |
-| `docs/` | Contracts and deep dives |
+| `docs/` | Contracts and deep dives. Start with [ARCHITECTURE.md](docs/ARCHITECTURE.md), [NATIVE_TRANSPORT.md](docs/NATIVE_TRANSPORT.md) and [DEVELOPMENT.md](docs/DEVELOPMENT.md) |
 
 [DESIGN.md](DESIGN.md) describes the look and feel. [AGENTS.md](AGENTS.md) is the guide for people and AI agents
 that work on the code.

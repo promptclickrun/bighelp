@@ -2008,6 +2008,40 @@ struct DirectHermesConversationTests {
         #expect(projection.activities.isEmpty)
     }
 
+    /// What Hermes sent for an async `delegate_task` (recorded on a real host): the turn ends while the
+    /// helper works, and its steps keep coming during the next turn. They update the helper's own row, in
+    /// the turn that started it, so that turn settles and the next one gets no second copy.
+    @Test func aHelperKeepsItsRowWhenItsStepsArriveDuringTheNextTurn() {
+        var projection = DirectHermesProjection(conversationID: "native", profile: "default", storedID: "stored", epoch: "epoch")
+        var sequence = 0
+        func accept(_ type: String, _ payload: [String: BighelpJSONValue] = [:]) {
+            sequence += 1
+            _ = projection.accept(.init(type: type, sessionID: "runtime", payload: payload, sequence: sequence))
+        }
+        let helper: [String: BighelpJSONValue] = [
+            "subagent_id": .string("sa-0-1ed8bdbc"), "child_session_id": .string("child-1"),
+            "goal": .string("Read the file /etc/hosts with a tool, then write two sentences about it.")
+        ]
+        accept("message.start")
+        let firstTurn = projection.turnID
+        accept("subagent.start", helper)
+        accept("subagent.thinking", helper.merging(["text": .string("(🔥) setting wing angle...")]) { $1 })
+        accept("message.complete", ["text": .string("started")])
+        accept("session.info", ["running": .boolean(false)])
+        // The next turn starts before the helper's last steps.
+        accept("message.start")
+        accept("subagent.tool", helper.merging(["tool_name": .string("read_file"), "tool_preview": .string("hosts"),
+                                                "tool_count": .integer(1)]) { $1 })
+        accept("subagent.complete", helper.merging(["status": .string("completed"),
+                                                    "summary": .string("It maps localhost.")]) { $1 })
+
+        let rows = projection.activities.filter { $0.kind == .subagent }
+        #expect(rows.count == 1)
+        #expect(rows.first?.turnID == firstTurn)
+        #expect(rows.first?.lifecycle == .succeeded)
+        #expect(rows.first?.detail?.contains("wing angle") != true, "Hermes' spinner line isn't the helper's work")
+    }
+
     @Test func nativeSubagentStreamFeedsTheSessionAgentsRail() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -2033,7 +2067,7 @@ struct DirectHermesConversationTests {
         #expect(model.nativeSubagents.first?.childSessionID == "child-runtime-1")
         #expect(SessionStatusRailPresentation.items(
             goal: nil, subagents: [], nativeSubagents: model.nativeSubagents, tasks: nil
-        ).map(\.kind) == [.subagents])
+        ).map(\.kind) == [.background])
 
         client.receive(.init(
             type: "subagent.start", sessionID: "runtime",
@@ -2460,6 +2494,104 @@ struct DirectHermesConversationTests {
         #expect(model.activityLedger.allEvents.filter { $0.kind == .reasoning }.map(\.detail) == ["Provider-recorded reasoning"])
     }
 
+    /// A reply shows its time as soon as Hermes completes it (#856). Hermes' live events carry no
+    /// time, and nothing reads the saved history after this device's own turn, so the time showed
+    /// only after Refresh chat or opening the chat again.
+    @Test func ownTurnReplyShowsItsTimeWhenHermesCompletesIt() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let rpc = DirectTestRPC()
+        rpc.handler = { method, _ in
+            .object(["status": .string(method == "prompt.submit" ? "streaming" : "queued")])
+        }
+        let client = try DirectHermesConversationClient(rpc: rpc, hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "stored", title: "Native", epoch: "epoch", drafts: .init(root: root))
+        defer { client.suspend() }
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        model.draft = "What's on my list today?"
+        let turn = Task { await model.send() }
+        for _ in 0..<200 where !rpc.requests.contains(where: { $0.method == "prompt.submit" }) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        client.receive(.init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 1))
+        client.receive(.init(type: "message.delta", sessionID: "runtime",
+                             payload: ["text": .string("Two things")], sequence: 2))
+        let streaming = try #require(model.items.last { $0.role == .assistant })
+        #expect(streaming.metadata.timestamp == nil)
+        let before = Date()
+        client.receive(.init(type: "message.complete", sessionID: "runtime",
+                             payload: ["text": .string("Two things: the dentist and the report.")], sequence: 3))
+        let after = Date()
+        client.receive(.init(type: "session.info", sessionID: "runtime",
+                             payload: ["running": .boolean(false)], sequence: 4))
+        let replies = model.items.filter { $0.role == .assistant }
+        #expect(replies.count == 1)
+        let reply = try #require(replies.first)
+        #expect(reply.id == streaming.id)
+        #expect(reply.metadata.sourceOrder == streaming.metadata.sourceOrder)
+        let time = try #require(reply.metadata.timestamp)
+        // Within a millisecond: the time is kept as seconds since 1970.
+        #expect(time.timeIntervalSince(before) > -0.001 && after.timeIntervalSince(time) > -0.001)
+        #expect(TimelineMetadataPresentation.timestampLabel(for: reply.metadata) != nil)
+        turn.cancel()
+    }
+
+    /// A reread puts the host's saved time on the reply in place of the phone's: the same row, in the
+    /// same place, never a second copy.
+    @Test func rereadPutsTheHostsSavedTimeOnTheLiveReplyInPlace() throws {
+        let sent = Date(timeIntervalSince1970: 1_000)
+        let arrived = Date(timeIntervalSince1970: 1_021)
+        var projection = DirectHermesProjection(conversationID: "chat", profile: "default", storedID: "saved", epoch: "epoch")
+        projection.retainVisible(items: [TimelineItem(
+            id: "chat-human", role: .human, sender: .user(snapshot: .init(name: "You")), content: .message("Work"),
+            metadata: .init(delivery: "Sent", timestamp: sent, sourceOrder: 1))], activities: [])
+        _ = projection.accept(.init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 1),
+                              arrivedAt: arrived)
+        let streaming = try #require(projection.accept(.init(type: "message.delta", sessionID: "runtime",
+            payload: ["text": .string("Do")], sequence: 2), arrivedAt: arrived).items.first)
+        #expect(streaming.metadata.timestamp == nil)
+        let live = try #require(projection.accept(.init(type: "message.complete", sessionID: "runtime",
+            payload: ["text": .string("Done")], sequence: 3), arrivedAt: arrived).items.first)
+        #expect(live.id == streaming.id)
+        #expect(live.metadata.timestamp == arrived)
+
+        projection.reconcileHistory([
+            .object(["row_id": .integer(1), "session_id": .string("saved"), "role": .string("user"),
+                     "text": .string("Work"), "timestamp": .number(1_000)]),
+            .object(["row_id": .integer(2), "session_id": .string("saved"), "role": .string("assistant"),
+                     "text": .string("Done"), "timestamp": .number(1_020)]),
+        ])
+
+        #expect(projection.items.map(\.id) == ["chat-human", live.id])
+        let reply = try #require(projection.items.last)
+        #expect(reply.metadata.timestamp == Date(timeIntervalSince1970: 1_020))
+        #expect(reply.metadata.sourceOrder == live.metadata.sourceOrder)
+        #expect(reply.content == .message("Done"))
+    }
+
+    /// A reply caught up from Hermes' event log ended earlier, at a time the phone doesn't know:
+    /// it takes its time only from the saved history, never the time it was caught up.
+    @Test func caughtUpReplyTakesNoTimeFromThePhone() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let client = try DirectHermesConversationClient(rpc: DirectTestRPC(), hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "stored", title: "Native", epoch: "epoch", drafts: .init(root: root))
+        defer { client.suspend() }
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        client.replayReceived([
+            .init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 1),
+            .init(type: "message.delta", sessionID: "runtime", payload: ["text": .string("Done")], sequence: 2),
+            .init(type: "message.complete", sessionID: "runtime", payload: ["text": .string("Done.")], sequence: 3),
+            .init(type: "session.info", sessionID: "runtime", payload: ["running": .boolean(false)], sequence: 4),
+        ])
+        let reply = try #require(model.items.last { $0.role == .assistant })
+        #expect(reply.content == .message("Done."))
+        #expect(reply.metadata.timestamp == nil)
+    }
+
     @Test func projectionKeepsDeltaOrderAndDoesNotFinishOnSegmentFinal() {
         var projection = DirectHermesProjection(conversationID: "a", profile: "default", storedID: "saved", epoch: "epoch")
         _ = projection.accept(DirectHermesEvent(type: "message.start", sessionID: "a", payload: [:], sequence: 1))
@@ -2503,8 +2635,8 @@ struct DirectHermesConversationTests {
         )
 
         // The final history row is the host's persisted completion timestamp.
-        // A live event has no end timestamp of its own, so this is the only
-        // source that may enable the legacy timestamp-difference fallback.
+        // A live event has no end timestamp of its own (a reply completed live
+        // takes the time it arrived), so the host's saved time wins here.
         projection.reconcileHistory([
             .object([
                 "row_id": .integer(1), "session_id": .string("saved"), "role": .string("user"),
@@ -3132,11 +3264,176 @@ struct NativeMidSessionTests {
         turn.cancel()
     }
 
-    /// Once this connection has said who's on this device, a chat with messages sends at once:
-    /// waiting for the note again added round trips to every message on a far host.
+    /// Every message says who's sending: the plugin names each message's writer from the latest
+    /// note, so once the host knows only the wait is skipped, never the note.
+    @Test func everyMessageSaysWhoIsSending() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let client = try DirectHermesConversationClient(rpc: DirectTestRPC(), hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "stored", title: "Native", epoch: "epoch", drafts: .init(root: root))
+        defer { client.suspend() }
+        let log = SpeakerLog()
+        client.speakerNote = RecordingSpeakerNote(log: log)
+        await client.noteSpeaker()
+        await client.noteSpeaker()
+        for _ in 0..<100 where log.events.count < 2 { await Task.yield() }
+        #expect(log.events == ["speaker:default/stored", "speaker:default/stored"])
+    }
+
+    /// Once the host has taken a note naming this person, a chat with messages sends at once:
+    /// waiting for the note again added round trips to every message on a far host. The message
+    /// still sends its own note.
     @Test func laterMessagesNeverWaitToSayWhoIsSending() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
+        let (client, rpc) = try await savedChatClient(root: root)
+        defer { client.suspend() }
+        let log = SpeakerLog()
+        let note = RecordingSpeakerNote(log: log)
+        client.speakerNote = note
+        await client.noteSpeaker()
+        note.delay = .seconds(30)
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        model.draft = "And tomorrow?"
+        let started = ContinuousClock.now
+        let turn = Task { await model.send() }
+        for _ in 0..<500 where !rpc.requests.contains(where: { $0.method == "prompt.submit" }) {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(rpc.requests.contains(where: { $0.method == "prompt.submit" }))
+        #expect(ContinuousClock.now - started < .milliseconds(600), "The message doesn't wait for the note")
+        #expect(log.events == ["speaker:default/saved"], "Its own note is still on its way")
+        turn.cancel()
+    }
+
+    /// A note the host didn't take (an older plugin, a dropped request) isn't remembered as taken:
+    /// the next message waits for its own note again, and that one counts once it's taken.
+    @Test func aMessageWaitsUntilTheHostHasTakenANote() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let (client, _) = try await savedChatClient(root: root)
+        defer { client.suspend() }
+        let log = SpeakerLog()
+        let note = RecordingSpeakerNote(log: log)
+        client.speakerNote = note
+        note.takes = false
+        await client.noteSpeaker()
+        #expect(client.notedSpeaker == nil)
+
+        note.takes = true
+        note.holds = true
+        let next = SpeakerWait(client)
+        await SpeakerWait.settle()
+        #expect(!next.isDone, "Nothing told the host who's sending yet")
+        note.release()
+        await next.task.value
+        #expect(client.notedSpeaker?.speaker == note.speaker)
+        #expect(log.events == ["speaker:default/saved", "speaker:default/saved"])
+    }
+
+    /// A newly saved name isn't the one the host has: the next message waits for the note that names it.
+    @Test func aNewNameWaitsForTheNoteThatSaysIt() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let (client, _) = try await savedChatClient(root: root)
+        defer { client.suspend() }
+        let note = RecordingSpeakerNote(log: SpeakerLog())
+        client.speakerNote = note
+        await client.noteSpeaker()
+        #expect(client.notedSpeaker?.speaker.name == "Avery")
+
+        note.speaker = ChatSpeaker(personID: "3f0b6a1e-5c2d-4e8f-9a7b-1c2d3e4f5a6b", name: "Morgan")
+        note.holds = true
+        let next = SpeakerWait(client)
+        await SpeakerWait.settle()
+        #expect(!next.isDone)
+        note.release()
+        await next.task.value
+        #expect(client.notedSpeaker?.speaker.name == "Morgan")
+    }
+
+    /// The plugin keeps who's speaking per stored session. After Hermes moves the chat to another one
+    /// (compaction), the next message waits for a note in it.
+    @Test func anotherStoredSessionWaitsForItsOwnNote() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let (client, _) = try await savedChatClient(root: root)
+        defer { client.suspend() }
+        let log = SpeakerLog()
+        let note = RecordingSpeakerNote(log: log)
+        client.speakerNote = note
+        await client.noteSpeaker()
+        client.adoptStoredID("saved-2")
+        #expect(log.events == ["speaker:default/saved"], "Moving the chat says nothing about who's sending")
+
+        note.holds = true
+        let next = SpeakerWait(client)
+        await SpeakerWait.settle()
+        #expect(!next.isDone)
+        note.release()
+        await next.task.value
+        #expect(log.events == ["speaker:default/saved", "speaker:default/saved-2"])
+        #expect(client.notedSpeaker?.storedID == "saved-2")
+    }
+
+    /// A note that lands after the chat lost its connection and got a new one doesn't count for the new
+    /// one; the next message there still notes, and waits for it.
+    @Test func aNoteFromBeforeAReconnectDoesntCount() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let (client, rpc) = try await savedChatClient(root: root)
+        defer { client.suspend() }
+        let log = SpeakerLog()
+        let note = RecordingSpeakerNote(log: log)
+        client.speakerNote = note
+        note.holds = true
+        let early = SpeakerWait(client)
+        await SpeakerWait.settle()
+        client.suspend()
+        client.rebind(rpc)
+        try await client.recover(epoch: "epoch")
+        note.release()
+        await early.task.value
+        #expect(client.notedSpeaker == nil)
+
+        await client.noteSpeaker()
+        #expect(client.notedSpeaker?.storedID == "saved")
+        #expect(log.events.count == 2)
+    }
+
+    /// A note taken on an earlier connection doesn't vouch for a new one: after a reconnect the next message
+    /// waits for its own note, and the messages after it on that connection go at once again.
+    @Test func aNewConnectionWaitsForItsOwnNote() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let (client, rpc) = try await savedChatClient(root: root)
+        defer { client.suspend() }
+        let log = SpeakerLog()
+        let note = RecordingSpeakerNote(log: log)
+        client.speakerNote = note
+        await client.noteSpeaker()
+        #expect(client.notedSpeaker != nil)
+
+        client.suspend()
+        client.rebind(rpc)
+        try await client.recover(epoch: "epoch")
+        note.holds = true
+        let next = SpeakerWait(client)
+        await SpeakerWait.settle()
+        #expect(!next.isDone, "The new connection hasn't said who's sending yet")
+        note.release()
+        await next.task.value
+
+        note.delay = .seconds(30)
+        let later = SpeakerWait(client)
+        await SpeakerWait.settle()
+        #expect(later.isDone, "Once it has, later messages go at once")
+        #expect(log.events.count == 2)
+    }
+
+    /// A chat with saved messages, recovered on its connection.
+    private func savedChatClient(root: URL) async throws -> (DirectHermesConversationClient, DirectTestRPC) {
         let rpc = DirectTestRPC()
         rpc.handler = { method, _ in
             switch method {
@@ -3155,22 +3452,9 @@ struct NativeMidSessionTests {
         }
         let client = try DirectHermesConversationClient(rpc: rpc, hostIdentity: "host", profile: "default",
             runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch", drafts: .init(root: root))
-        defer { client.suspend() }
-        let log = SpeakerLog()
-        client.speakerNote = RecordingSpeakerNote(log: log, delay: .seconds(30))
-        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
-        client.model = model
         try await client.recover(epoch: "epoch")
-        client.speakerNoted = true
-        model.draft = "And tomorrow?"
-        let started = ContinuousClock.now
-        let turn = Task { await model.send() }
-        for _ in 0..<500 where !rpc.requests.contains(where: { $0.method == "prompt.submit" }) {
-            try await Task.sleep(for: .milliseconds(5))
-        }
-        #expect(rpc.requests.contains(where: { $0.method == "prompt.submit" }))
-        #expect(ContinuousClock.now - started < .milliseconds(600), "The message doesn't wait for the note")
-        turn.cancel()
+        #expect(!client.projection.items.isEmpty)
+        return (client, rpc)
     }
 
     /// The chat's model sheet read "Reasoning: unknown" while the agent worked:
@@ -3227,7 +3511,7 @@ struct NativeMidSessionTests {
     var tailFails = true
 }
 
-@MainActor private final class DirectTestRPC: DirectHermesRPC {
+@MainActor final class DirectTestRPC: DirectHermesRPC {
     var onEvent: ((DirectHermesEvent) -> Void)?
     var result: BighelpJSONValue?
     var handler: (@MainActor (String, [String: BighelpJSONValue]) async throws -> BighelpJSONValue)?
@@ -3257,13 +3541,43 @@ struct NativeMidSessionTests {
 
 @MainActor private final class RecordingSpeakerNote: ChatSpeakerNoting {
     let log: SpeakerLog
-    let delay: Duration?
+    var delay: Duration?
+    var speaker: ChatSpeaker? = ChatSpeaker(personID: "3f0b6a1e-5c2d-4e8f-9a7b-1c2d3e4f5a6b", name: "Avery")
+    /// Whether the host takes the note; an older plugin or a dropped request doesn't.
+    var takes = true
+    /// Notes wait for `release()`, the way a far host takes its time.
+    var holds = false
+    private var held: [CheckedContinuation<Void, Never>] = []
     init(log: SpeakerLog, delay: Duration? = nil) {
         self.log = log
         self.delay = delay
     }
-    func note(agentID: String, storedSessionID: String) async {
+    @discardableResult
+    func note(agentID: String, storedSessionID: String) async -> ChatSpeaker? {
+        let named = speaker
+        if holds { await withCheckedContinuation { held.append($0) } }
         if let delay { try? await Task.sleep(for: delay) }
         log.events.append("speaker:\(agentID)/\(storedSessionID)")
+        return takes ? named : nil
     }
+    func release() {
+        holds = false
+        let waiting = held
+        held = []
+        waiting.forEach { $0.resume() }
+    }
+}
+
+/// Runs `noteSpeaker()` and says when the message it holds could go.
+@MainActor private final class SpeakerWait {
+    private(set) var isDone = false
+    private(set) var task: Task<Void, Never>!
+    init(_ client: DirectHermesConversationClient) {
+        task = Task { [weak self] in
+            await client.noteSpeaker()
+            self?.isDone = true
+        }
+    }
+    /// Main-actor turns without any time passing: a message waiting on its note is still waiting after them.
+    static func settle() async { for _ in 0..<50 { await Task.yield() } }
 }

@@ -11,7 +11,7 @@ struct ShellFeatureStoreTests {
         let owner = LiveVoiceOwner(hostID: "host", authorizationID: "owner", agentID: "default", sessionID: session.id)
         let client = LiveVoiceControlClient(owner: owner, operation: { _, _ in [:] }, isOwnerCurrent: { _ in true })
         let live = LiveVoiceModel(agentName: "Fixture", client: client)
-        harness.store.configureLiveVoiceFactory { record, _, _ in record.id == session.id ? live : nil }
+        harness.store.configureLiveVoiceFactory { record, _, _ in record.id == session.id ? .success(live) : .failure(.chatOpening) }
         let presentation = harness.store.makeVoicePresentation(
             for: session.id,
             conversationMode: .codexLive,
@@ -517,6 +517,29 @@ struct ShellFeatureStoreTests {
         #expect(harness.store.unsentChat(id: session.id) == nil)
     }
 
+    /// A computer switch keeps the shell but hands it a new store, which once never got the
+    /// screen's hook: an unsent chat let go there fell through to "This chat isn't available right
+    /// now". The store keeps what it needs, so the screen showing it opens a fresh chat anyway.
+    @Test func aRetiredChatThatNeverSentIsRememberedWithoutTheScreensHook() {
+        let session = record(id: "session_unsent_draft_0002")
+        let harness = makeStore(records: [session])
+        let route = AppRoute.chat(conversationID: session.id)
+        #expect(harness.store.prepare(route))
+        guard case .chat(let model) = harness.store.preparedModel(for: route) else {
+            Issue.record("Expected prepared Chat model")
+            return
+        }
+        model.draft = "Book the dentist"
+
+        harness.store.retireNavigationSession(id: session.id)
+
+        let retired = harness.store.takeRetiredUnsentChat(id: session.id)
+        #expect(retired?.agentID == "finance")
+        #expect(retired?.text == "Book the dentist")
+        // Taken once: the fresh chat that replaces it is the only one.
+        #expect(harness.store.takeRetiredUnsentChat(id: session.id) == nil)
+    }
+
     @Test func aRetiredChatWithMessagesIsNotReplacedByAFreshOne() async throws {
         let catalog = SessionCatalogStore(client: DemoSessionCatalogClient())
         let store = ShellFeatureStore(timing: .immediate, catalog: catalog)
@@ -540,6 +563,7 @@ struct ShellFeatureStoreTests {
         store.retireNavigationSession(id: session.id)
 
         #expect(retired == 0)
+        #expect(store.takeRetiredUnsentChat(id: session.id) == nil)
     }
 
     @Test func savedSessionNavigationRefreshesBeforePresentingRouteOwnedHydration() {
@@ -2118,7 +2142,7 @@ struct ShellFeatureStoreTests {
         let music = HoldMusicSpy()
         let (store, catalog) = makeStore(records: [session], holdMusic: music)
         let live = liveVoice(for: session)
-        store.configureLiveVoiceFactory { _, _, _ in live }
+        store.configureLiveVoiceFactory { _, _, _ in .success(live) }
 
         let presentation = store.makeVoicePresentation(for: session.id, conversationMode: .codexLive)
         #expect(presentation.liveModel === live)
@@ -2167,13 +2191,24 @@ struct ShellFeatureStoreTests {
         #expect(music.starts == 0, "Hold music played with Hold music turned off")
     }
 
+    /// Live voice that can't start says why, so the voice screen names the real step.
+    @Test func liveVoiceThatCannotStartSaysWhy() {
+        let session = record(id: "no-live")
+        let (store, _) = makeStore(records: [session])
+        store.configureLiveVoiceFactory { _, _, _ in .failure(.pluginNotLoaded) }
+        let presentation = store.makeVoicePresentation(for: session.id, conversationMode: .codexLive)
+        #expect(presentation.liveModel == nil)
+        #expect(presentation.liveUnavailable == .pluginNotLoaded)
+        #expect(store.makeVoicePresentation(for: session.id, conversationMode: .turnBased).liveUnavailable == nil)
+    }
+
     /// "Use TTS voice mode" opens a new turn-based presentation over the failed live one.
     @Test func switchingFromLiveToTurnBasedVoiceBringsTheHoldMusicBack() async {
         let session = record(id: "switch-hold")
         let music = HoldMusicSpy()
         let (store, _) = makeStore(records: [session], holdMusic: music)
         let live = liveVoice(for: session)
-        store.configureLiveVoiceFactory { _, _, _ in live }
+        store.configureLiveVoiceFactory { _, _, _ in .success(live) }
 
         let first = store.makeVoicePresentation(for: session.id, conversationMode: .codexLive)
         first.model.reconcileAgentRun(isActive: true)

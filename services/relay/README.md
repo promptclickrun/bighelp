@@ -1,5 +1,10 @@
 # Recovered Loopdy relay
 
+> **Historical.** This is a byte-exact recovery of an older deployed relay Worker. The app does not talk to it: its
+> notifications go through the notification service in [`services/link`](../link) (`link.loopdy.app`), and chat
+> goes straight to the Hermes host. The recovered fragments still name "Link enrollment" because they are exact
+> byte copies of the old module. The Link transport is retired in the app.
+
 Source-only recovery of the deployed **primary** relay into this repository.
 This is not a new service, notification feature, dependency upgrade, or
 deployment.

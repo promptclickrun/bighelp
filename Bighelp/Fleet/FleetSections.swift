@@ -53,14 +53,24 @@ struct FleetSectionDeletion: Equatable {
     let groupIDs: [String]
 }
 
+/// An agent a section change files or takes out, and how its placement is saved on its own
+/// computer: through the all-hosts copy here, through the live list in Bots mode.
+struct FleetSectionMember {
+    let id: String
+    let placement: AgentListPlacement?
+    let save: @MainActor (AgentListPlacement) async throws -> Void
+}
+
 enum FleetSectioning {
     /// Sections other devices made, rebuilt from the names their members
     /// carry. A known section takes its members' name only when they all
     /// agree (a rename elsewhere, fully saved). A section whose name is
     /// already listed joins it, so same-named sections on different hosts
     /// show as one. Mirrors Hermes Desktop's `adoptBotSectionsFromMeta`.
+    /// `held` (sections changed here whose members are still changing) are
+    /// neither added nor renamed.
     static func adopt(_ local: [FleetSection], placements: [AgentListPlacement],
-                      ignoring pendingDeletes: Set<String>) -> [FleetSection] {
+                      ignoring held: Set<String>) -> [FleetSection] {
         var order: [String] = []
         var names: [String: Set<String>] = [:]
         for placement in placements {
@@ -70,11 +80,12 @@ enum FleetSectioning {
         }
         let known = Set(local.map(\.id))
         var result = local.map { section -> FleetSection in
-            guard let agreed = names[section.id], agreed.count == 1, let name = agreed.first else { return section }
+            guard !held.contains(section.id), let agreed = names[section.id], agreed.count == 1,
+                  let name = agreed.first else { return section }
             return FleetSection(id: section.id, name: name)
         }
         var listedNames = Set(result.map { FleetSection.nameKey($0.name) })
-        for id in order where !known.contains(id) && !pendingDeletes.contains(id) {
+        for id in order where !known.contains(id) && !held.contains(id) {
             guard let name = names[id]?.sorted().first, listedNames.insert(FleetSection.nameKey(name)).inserted
             else { continue }
             result.append(FleetSection(id: id, name: name))
@@ -108,6 +119,22 @@ enum FleetSectioning {
         }
         return sections.map { FleetSectionBlock(section: $0, items: filed[$0.id] ?? []) }
             + [FleetSectionBlock(section: nil, items: loose)]
+    }
+
+    /// Items under their sections, in section order (sections with none left out), then the rest
+    /// (nil), in the order given.
+    static func grouped<Item>(_ items: [Item], sections: [FleetSection],
+                              placement: (Item) -> AgentListPlacement?) -> [(section: FleetSection?, items: [Item])] {
+        var filed: [String: [Item]] = [:]
+        var loose: [Item] = []
+        for item in items {
+            if let id = section(for: placement(item), in: sections)?.id { filed[id, default: []].append(item) }
+            else { loose.append(item) }
+        }
+        let blocks: [(section: FleetSection?, items: [Item])] = sections.compactMap { section in
+            filed[section.id].map { (section, $0) }
+        }
+        return blocks + (loose.isEmpty ? [] : [(nil, loose)])
     }
 }
 
@@ -155,18 +182,48 @@ extension FleetStore {
         saveSections()
     }
 
+    /// Puts sections in this order; any it doesn't name keep their places after it.
+    func orderSections(_ ids: [String]) {
+        let rank = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+        let ordered = sections.enumerated().sorted { left, right in
+            switch (rank[left.element.id], rank[right.element.id]) {
+            case let (l?, r?): l < r
+            case (.some, nil): true
+            case (nil, .some): false
+            case (nil, nil): left.offset < right.offset
+            }
+        }.map(\.element)
+        guard ordered != sections else { return }
+        sections = ordered
+        saveSections()
+    }
+
     /// Renames it here, then on each member, so other devices get the new name.
     func renameSection(_ id: String, to name: String) async {
+        await renameSection(id, to: name, members: members(of: id).map(sectionMember))
+    }
+
+    func renameSection(_ id: String, to name: String, members: [FleetSectionMember]) async {
         guard let clean = FleetSection.cleanName(name), let index = sections.firstIndex(where: { $0.id == id }),
               sections[index].name != clean else { return }
-        let members = members(of: id)
         sections[index].name = clean
         saveSections()
-        for agent in members where self.section(id: id) != nil {
-            var placement = agent.placement ?? AgentListPlacement()
+        // Until every member has the new name, the old one can't come back: from members filed under
+        // another computer's ID for it (which no listed section is named now), nor from members that
+        // still agree on it.
+        let token = UUID()
+        let others = Self.sectionIDs(of: members).subtracting([id])
+        let held = others.union([id])
+        for heldID in held { retiringSectionIDs[heldID] = token }
+        for member in members where self.section(id: id) != nil {
+            var placement = member.placement ?? AgentListPlacement()
             placement.sectionID = id
             placement.sectionName = clean
-            try? await savePlacement(placement, for: agent)
+            try? await member.save(placement)
+        }
+        catchUp(id, holding: held, token: token, carrying: held) { [weak self] agent in
+            guard let self, section(id: id)?.name == clean, agent.placement?.sectionName != clean else { return }
+            try? await file(agent, in: id)
         }
     }
 
@@ -174,30 +231,78 @@ extension FleetStore {
     /// unfiled list, never deleted. Returns what Undo needs.
     @discardableResult
     func deleteSection(_ id: String) -> FleetSectionDeletion? {
+        deleteSection(id, members: members(of: id).map(sectionMember))
+    }
+
+    @discardableResult
+    func deleteSection(_ id: String, members: [FleetSectionMember]) -> FleetSectionDeletion? {
         guard let index = sections.firstIndex(where: { $0.id == id }) else { return nil }
-        let members = members(of: id)
         let section = sections.remove(at: index)
         let groups = groupSectionIDs.filter { $0.value == id }.map(\.key)
         let deletion = FleetSectionDeletion(section: section, index: index, agentIDs: members.map(\.id), groupIDs: groups)
         let token = UUID()
-        pendingSectionDeletes[id] = token
+        // With it, the IDs its members on other computers carry for it, or the first member out lets
+        // another's bring it back.
+        let retiring = Self.sectionIDs(of: members).union([id])
+        for retired in retiring { retiringSectionIDs[retired] = token }
         for group in groups { groupSectionIDs[group] = nil }
         saveSections()
-        Task { @MainActor [weak self] in
-            for agent in members {
-                guard let self, pendingSectionDeletes[id] == token else { return }
-                var placement = agent.placement ?? AgentListPlacement()
+        sectionUnfiling[id] = Task { @MainActor [weak self] in
+            for member in members {
+                guard let self, retiringSectionIDs[id] == token else { return }
+                var placement = member.placement ?? AgentListPlacement()
                 placement.sectionID = nil
                 placement.sectionName = nil
-                try? await savePlacement(placement, for: agent)
+                try? await member.save(placement)
             }
-            if self?.pendingSectionDeletes[id] == token { self?.pendingSectionDeletes[id] = nil }
+            guard let self else { return }
+            sectionUnfiling[id] = nil
+            catchUp(id, holding: retiring, token: token, carrying: retiring) { [weak self] agent in
+                guard let self, retiringSectionIDs[id] == token else { return }
+                try? await file(agent, in: nil)
+            }
         }
         return deletion
     }
 
+    /// A section change's second pass. A bot filed in the section on another device can be missing
+    /// from the copies the change went by, and would bring the old section back when next read: the
+    /// other computers are read again, `late` gets each agent still filed under one of `ids`, and
+    /// only then can `adoptSections` take in `held` again.
+    private func catchUp(_ id: String, holding held: Set<String>, token: UUID, carrying ids: Set<String>,
+                         late: @escaping @MainActor (FleetAgent) async -> Void) {
+        sectionCatchUps[id] = Task { @MainActor [weak self] in
+            guard let self else { return }
+            refresh(force: true)
+            await waitForReads()
+            for agent in agents() where agent.placement?.sectionID.map(ids.contains) == true { await late(agent) }
+            release(held, token: token)
+        }
+    }
+
+    private static func sectionIDs(of members: [FleetSectionMember]) -> Set<String> {
+        Set(members.compactMap { $0.placement?.sectionID })
+    }
+
+    /// Lets `adoptSections` take these IDs in again, unless a later change holds them.
+    private func release(_ ids: Set<String>, token: UUID) {
+        for id in ids where retiringSectionIDs[id] == token { retiringSectionIDs[id] = nil }
+    }
+
+    /// Waits until a deleted section's members are out of it (Bots mode's sheets, tests).
+    func waitForSectionUnfiling(_ id: String) async {
+        await sectionUnfiling[id]?.value
+    }
+
+    /// Waits until a section change has reached the bots the copies didn't have (tests).
+    func waitForSectionCatchUp(_ id: String) async {
+        await sectionCatchUps[id]?.value
+    }
+
     func undoDeleteSection(_ deletion: FleetSectionDeletion) {
-        pendingSectionDeletes[deletion.section.id] = nil
+        if let token = retiringSectionIDs[deletion.section.id] {
+            release(Set(retiringSectionIDs.keys), token: token)
+        }
         guard !sections.contains(where: { $0.id == deletion.section.id }) else { return }
         sections.insert(deletion.section, at: min(deletion.index, sections.count))
         for group in deletion.groupIDs { groupSectionIDs[group] = deletion.section.id }
@@ -213,11 +318,23 @@ extension FleetStore {
 
     /// Files an agent into a section (nil takes it out), on its own host.
     func file(_ agent: FleetAgent, in sectionID: String?) async throws {
-        var placement = agent.placement ?? AgentListPlacement()
+        try await file(sectionMember(agent), in: sectionID)
+    }
+
+    func file(_ member: FleetSectionMember, in sectionID: String?) async throws {
+        var placement = member.placement ?? AgentListPlacement()
         let section = section(id: sectionID)
+        guard placement.sectionID != section?.id || placement.sectionName != section?.name else { return }
         placement.sectionID = section?.id
         placement.sectionName = section?.name
-        try await savePlacement(placement, for: agent)
+        try await member.save(placement)
+    }
+
+    /// An all-hosts agent, saved through `savePlacement`.
+    func sectionMember(_ agent: FleetAgent) -> FleetSectionMember {
+        FleetSectionMember(id: agent.id, placement: agent.placement) { [weak self] placement in
+            try await self?.savePlacement(placement, for: agent)
+        }
     }
 
     /// Hiding only changes the list: the agent keeps working everywhere else.
@@ -229,9 +346,34 @@ extension FleetStore {
 
     /// A group's section stays on this device, as Hermes Desktop keeps it.
     func file(_ group: FleetGroup, in sectionID: String?) {
-        groupSectionIDs[group.id] = section(id: sectionID)?.id
+        file(groupKey: group.id, in: sectionID)
+    }
+
+    /// By its list ID (`FleetGroup.id`), for group chats Bots mode shows from the gateway in use.
+    func file(groupKey: String, in sectionID: String?) {
+        let section = section(id: sectionID)?.id
+        guard groupSectionIDs[groupKey] != section else { return }
+        groupSectionIDs[groupKey] = section
         saveSections()
     }
+
+    /// Pinning a group chat puts it on top of Bots mode's home; unpinning takes it off.
+    func setPinned(groupKey: String, _ pinned: Bool) {
+        guard pinnedGroupIDs.contains(groupKey) != pinned else { return }
+        if pinned { pinnedGroupIDs.append(groupKey) } else { pinnedGroupIDs.removeAll { $0 == groupKey } }
+        pinnedGroupIDs = Array(pinnedGroupIDs.suffix(Self.maximumGroupChoices))
+        saveSections()
+    }
+
+    /// Hiding only changes Bots mode's home: the group chat keeps working, and search's filter shows it.
+    func setHidden(groupKey: String, _ hidden: Bool) {
+        guard hiddenGroupIDs.contains(groupKey) != hidden else { return }
+        if hidden { hiddenGroupIDs.append(groupKey) } else { hiddenGroupIDs.removeAll { $0 == groupKey } }
+        hiddenGroupIDs = Array(hiddenGroupIDs.suffix(Self.maximumGroupChoices))
+        saveSections()
+    }
+
+    static let maximumGroupChoices = 128
 
     private func members(of sectionID: String) -> [FleetAgent] {
         agents().filter { section(of: $0)?.id == sectionID }
@@ -292,11 +434,12 @@ extension FleetStore {
         return fenced
     }
 
-    /// Rebuilds sections other devices made from what their members carry.
-    func adoptSections() {
-        let placements = hosts.flatMap { snapshots[$0.id]?.agents ?? [] }.compactMap(\.placement)
+    /// Rebuilds sections other devices made from what their members carry: every host's copies,
+    /// and `live` (the gateway in use's own agents, which Bots mode reads without these copies).
+    func adoptSections(adding live: [AgentListPlacement] = []) {
+        let placements = hosts.flatMap { snapshots[$0.id]?.agents ?? [] }.compactMap(\.placement) + live
         let adopted = FleetSectioning.adopt(sections, placements: placements,
-                                            ignoring: Set(pendingSectionDeletes.keys))
+                                            ignoring: Set(retiringSectionIDs.keys))
         guard adopted != sections else { return }
         sections = adopted
         saveSections()
@@ -307,6 +450,9 @@ extension FleetStore {
     struct SavedSections: Codable {
         var sections: [FleetSection]
         var groups: [String: String]
+        /// Nil in files saved before Bots mode pinned and hid group chats.
+        var pinnedGroups: [String]? = nil
+        var hiddenGroups: [String]? = nil
     }
 
     var sectionsURL: URL { directory.appending(path: "sections.json", directoryHint: .notDirectory) }
@@ -321,12 +467,15 @@ extension FleetStore {
             return FleetSection(id: section.id, name: name)
         }.prefix(FleetSection.maximumCount).map { $0 }
         groupSectionIDs = saved.groups.filter { seen.contains($0.value) }
+        pinnedGroupIDs = Array((saved.pinnedGroups ?? []).prefix(Self.maximumGroupChoices))
+        hiddenGroupIDs = Array((saved.hiddenGroups ?? []).prefix(Self.maximumGroupChoices))
     }
 
     func saveSections() {
         let protector = BighelpLocalFileProtector()
         try? protector.prepareDirectory(directory, protection: .privateVisual, fileManager: .default)
-        if let data = try? JSONEncoder().encode(SavedSections(sections: sections, groups: groupSectionIDs)) {
+        if let data = try? JSONEncoder().encode(SavedSections(sections: sections, groups: groupSectionIDs,
+                                                               pinnedGroups: pinnedGroupIDs, hiddenGroups: hiddenGroupIDs)) {
             try? data.write(to: sectionsURL, options: [.atomic, .completeFileProtection])
         }
     }

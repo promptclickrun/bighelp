@@ -350,6 +350,83 @@ struct NativeLiveVoiceTests {
         _ = try await voice.perform("voice.live.offer", fields: ["voiceId": .string("voice-next"), "provider": .string("gemini")])
     }
 
+    /// Gemini refuses a call by closing its socket with a code and its reason. The call screen said
+    /// "Gemini ended the call" for every one of them, so nobody could tell why a call never started (#888).
+    @Test func geminiRefusingTheCallShowsGeminisReason() async throws {
+        let (model, peer) = try await startedGeminiCall()
+        defer { model.end() }
+        peer.onEvent?(["kind": .string("closed"), "ready": .boolean(false), "closeCode": .integer(1011),
+                       "reason": .string("Token has been used too many times")])
+
+        #expect(model.phase == .failed, "A call Gemini never set up failed; it didn't end")
+        let message = try #require(model.errorMessage)
+        #expect(message.contains("Gemini didn't start the call"))
+        #expect(message.contains("Token has been used too many times"))
+        #expect(model.audioReport() == "the call's report", "The report outlives a call Gemini refused at once")
+        #expect(model.keepsAudioReport, "Bots mode's Copy report still offers it")
+        #expect(!model.canRestartPlayback)
+    }
+
+    @Test func geminiEndingAWorkingCallSaysWhyAndKeepsTheWork() async throws {
+        let (model, peer) = try await startedGeminiCall()
+        defer { model.end() }
+        peer.onEvent?(["kind": .string("started")])
+        peer.onEvent?(["kind": .string("closed"), "ready": .boolean(true), "closeCode": .integer(1011),
+                       "reason": .string("The service is currently unavailable.")])
+
+        #expect(model.phase == .ended)
+        #expect(model.errorMessage == nil)
+        #expect(model.cleanupMessage == "Gemini ended the call. Gemini said: “The service is currently unavailable.” Work you started keeps going.")
+    }
+
+    @MainActor private final class ReportingPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, LiveVoiceAudioReporting {
+        var onConnectionState: (@MainActor (BighelpRealtimeAudioPeer.ConnectionState) -> Void)?
+        var onAudioRoute: (@MainActor (String) -> Void)?
+        var onInterruption: (@MainActor (Bool) -> Void)?
+        var onEvent: (@MainActor ([String: BighelpJSONValue]) -> Void)?
+        var applied = false
+        func makeOffer() async throws -> String { "" }
+        func applyAnswer(_ sdp: String) async throws { Issue.record("Gemini takes no SDP") }
+        func apply(_ answer: LiveVoiceAnswer) async throws {
+            applied = true
+            onConnectionState?(.connected)
+        }
+        func sendText(_ text: String) {}
+        func answerFunction(id: String, name: String, response: [String: BighelpJSONValue]) {}
+        func setMuted(_ muted: Bool) {}
+        func setPlaybackMuted(_ muted: Bool) {}
+        func setSpeakerEnabled(_ enabled: Bool) throws {}
+        func setDefaultSpeakerOutput() throws {}
+        func resumeAudio() throws {}
+        func statistics() async throws -> BighelpRealtimeAudioPeer.MediaStatistics { .init(audioDeviceRunning: true) }
+        func close() {}
+        func audioReport() -> String { "the call's report" }
+        func restartPlayback() {}
+    }
+
+    private func startedGeminiCall() async throws -> (LiveVoiceModel, ReportingPeer) {
+        let voice = NativeLiveVoiceSession(
+            owner: .init(hostID: "native", authorizationID: "auth", agentID: "juniper", sessionID: "stored"),
+            operation: { operation, payload in
+                switch operation {
+                case .nativeVoiceGeminiStatus: return ["available": .boolean(true), "enabled": .boolean(true)]
+                case .nativeVoiceGeminiOffer:
+                    return ["voiceId": payload["voiceId"]!, "transport": .string("websocket"),
+                            "url": .string("wss://generativelanguage.googleapis.com/ws/live"),
+                            "token": .string("auth_tokens/one"), "model": .string("models/gemini-3.8-live")]
+                case .nativeVoiceClose: return ["closed": .boolean(true)]
+                default: throw LiveVoiceControlError.unavailable
+                }
+            }, isCurrent: { true }, submit: { _ in "" })
+        let peer = ReportingPeer()
+        let model = voice.makeModel(agentName: "Juniper", makeLocalPeer: { peer })
+        model.configure(provider: .gemini, voice: "Kore")
+        model.start()
+        for _ in 0..<500 where !peer.applied { await Task.yield() }
+        try #require(peer.applied)
+        return (model, peer)
+    }
+
     @Test func nativeVoiceOperationsHaveNativePluginRoutes() {
         for operation in [WorkspaceOperation.nativeVoiceStatus, .nativeVoiceOffer, .nativeVoicePoll,
                           .nativeVoiceResult, .nativeVoiceClose, .nativeVoiceGeminiStatus, .nativeVoiceGeminiOffer] {

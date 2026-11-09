@@ -162,6 +162,7 @@
     <key>NSUserActivityTypes</key>
     <array>
         <string>app.loopdy.mobile.open</string>
+        <string>INSendMessageIntent</string>
     </array>
     <key>UIApplicationSceneManifest</key>
     <dict>

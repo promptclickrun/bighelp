@@ -53,8 +53,8 @@ enum DriveCatalog {
     /// Profile › Dashboard › Templates › one page of the deck.
     private static func templates(_ kind: AgentBoardItem.Kind, _ page: String) -> [DriveStep] {
         profileTab(.dashboard, String(localized: "Dashboard")) + [
-            .go(String(localized: "Templates"), .botProfile(BotProfileOpening(sheet: .templates(kind))),
-                tap: "dashboard.templates"),
+            // The Dashboard has no Templates button of its own: the deck opens straight away.
+            .go(String(localized: "Templates"), .botProfile(BotProfileOpening(sheet: .templates(kind)))),
             // The deck opens on this page; the spotlight marks its cards, what the page can do.
             .point(page, at: "dashboard.templates.deck"),
         ]
@@ -70,9 +70,14 @@ enum DriveCatalog {
                    String(localized: "A bot's own page: its look, Dashboard, settings, files and screen."),
                    keywords: ["profile", "about", "bot page"], needs: [.bot], playbooks: [.bots: [profile]]),
         DrivePlace("bot.dashboard", String(localized: "Dashboard"),
-                   String(localized: "The bot's Feed, Ideas and Goals as piles you swipe, with Templates on top."),
+                   String(localized: "The bot's Feed, Ideas and Goals as piles you swipe, with Today on top."),
                    keywords: ["dashboard", "piles", "cards", "feed", "ideas", "goals"], needs: [.bot],
                    playbooks: [.bots: profileTab(.dashboard, String(localized: "Dashboard"))]),
+        DrivePlace("bot.dashboard.today", String(localized: "Activities"),
+                   String(localized: "What the bot ran in the background, by day: subagents and commands."),
+                   keywords: ["activities", "today", "background", "running", "subagents", "processes", "commands", "activity"],
+                   needs: [.bot], playbooks: [.bots: profileTab(.dashboard, String(localized: "Dashboard"))
+                       + [.point(String(localized: "Activities"), at: "dashboard.today.toggle")]]),
         DrivePlace("bot.dashboard.templates.feed", String(localized: "Feed templates"),
                    String(localized: "Ready-made jobs the bot can do for your Feed. Swipe right to use one."),
                    keywords: ["feed", "templates", "what can feed do", "starter", "ideas for feed", "blueprints"],

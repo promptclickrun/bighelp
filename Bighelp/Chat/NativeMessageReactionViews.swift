@@ -3,8 +3,6 @@ import UIKit
 
 enum NativeMessageReactionLayoutMetrics {
     static let visualHeight: CGFloat = 26
-    static let attachmentOverlap: CGFloat = 13
-    static let edgeInset: CGFloat = 8
     static var hitPadding: CGFloat { (BighelpTokens.hitTarget - visualHeight) / 2 }
 }
 

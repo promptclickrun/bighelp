@@ -3,8 +3,10 @@
 Production transport contract: **native Hermes only for chat**. Cloudflare is
 limited to optional notifications and Live Activities. The current composition,
 voice boundary, enrollment isolation and verification requirements are defined
-in [Native transport](NATIVE_TRANSPORT.md). Retained Link/paired-Direct protocol
-sections below describe legacy compatibility code, not a selectable chat path.
+in [Native transport](NATIVE_TRANSPORT.md). The optional bighelp account and its
+Link transport are retired: the app no longer has them, and on a phone that once
+used them it deletes their leftover keys and settings at launch
+(`BighelpLinkAccountRetirement`).
 
 This document describes the technical behavior of the current implementation.
 It is not legal advice and does not replace a jurisdiction-specific privacy
@@ -13,17 +15,17 @@ policy, App Store disclosure review, or independent security audit.
 
 ## Optional iPhone tools
 
-The next release candidate adds independent, default-off Health, Calendar,
-Reminders and Location controls in Settings › Connections › Device access. Health data is read only for the user's health
+Settings › Connections › Device access has independent, default-off controls for
+Health, Calendar, Reminders, Location and the other phone tools. Health data is read only for the user's health
 and fitness questions. Before Health's first grant, a one-time note says that shared Health data goes to
 the person's Hermes computer and its AI provider, is not used for advertising, and can be turned off
 at any time. When an agent asks for a tool that's off, a card in the chat can turn on the same
 switch; it never turns one on by itself, and Not now refuses the call. Location shares where the phone is only when an agent
 asks, with While Using the App access; it's approximate unless the person allows
 precise location for that call. Calendar and Reminders permit direct reads and changes
-after explicit enablement and iOS authorization. Grants belong to the phone, its
-authorization epoch and the selected host. Turning a grant off blocks new and
-in-flight access; it does not revoke the underlying iOS permission.
+after explicit enablement and iOS authorization. One list of grants covers the
+phone, every host and every agent. Turning a grant off blocks new and in-flight
+access; it does not revoke the underlying iOS permission.
 
 ## What a live voice call tells the voice model
 
@@ -43,12 +45,13 @@ phone data and needs no iOS permission, so it's on until the person turns off
 "Let agents change how bighelp looks" in Device access (one switch for every
 host). It works only while that chat is open and bighelp is in front.
 
-Requested results travel through encrypted directed Link frames to the selected
-Hermes host and may be sent to its AI provider and retained in normal tool/chat
+Requested results travel over the chat's native Hermes connection to the host of
+that chat and may be sent to its AI provider and retained in normal tool/chat
 history. The native mutation journal and plugin retry cache retain only bounded
 identity and reconciliation metadata, never private read payloads. Health data
-is not used for advertising or analytics. Availability is foreground-only.
-Account erasure removes saved grants and the local mutation journal. See the
+is not used for advertising or analytics. Tools answer while bighelp is in front
+or in its short background grace. Only Arriving and leaving and a Shortcuts run
+reach past the open chat. See the
 [iPhone device-tools contract](IPHONE_DEVICE_TOOLS.md) for exact boundaries,
 Health empty-result semantics and the physical-device acceptance requirements.
 
@@ -138,7 +141,8 @@ or address is kept. See [TELEMETRY.md](TELEMETRY.md#host-location).
 
 bighelp aims to:
 
-- Keep message content unreadable to the Cloudflare routing layer.
+- Keep chat off bighelp's cloud services, and keep alert text unreadable to the
+  notification service.
 - Authenticate every authorized endpoint independently.
 - Make endpoint revocation enforceable without rotating every other device.
 - Prevent replay, cross-session substitution, malformed payloads, and stale
@@ -147,38 +151,31 @@ bighelp aims to:
   preferences.
 - Deliver notification text only after cryptographic authentication and
   decryption on the recipient device.
-- Minimize durable cloud data and separate account routing from APNs delivery.
+- Minimize durable cloud data.
 
 ## 2. Cryptographic design
 
-### Link account content key
+### Retired bighelp account and Link
 
-For a bighelp Link account, the app creates a random account content key on the
-device. Link message and workspace payloads are authenticated and encrypted with
-AES-GCM before they enter the bighelp Link routing plane. An independently
-authenticated native Hermes workspace does not acquire a Link account key or
-require Link pairing.
-
-During account registration, the app uses a passkey PRF result to wrap the
-account content key. The cloud stores the resulting encrypted envelope, not the
-plaintext account key. On sign-in, the passkey PRF result unwraps the key on the
-device.
+Older versions had an optional bighelp account (passkey sign-in, an account
+content key) and a Link transport that carried encrypted frames between the
+phone and a paired host. Both are gone from the app. Chat and plugin features
+run only over native Hermes ([Native transport](NATIVE_TRANSPORT.md)). At launch,
+the app deletes the account's leftover Keychain items and settings once
+(`BighelpLinkAccountRetirement`).
 
 ### Device authentication
 
-Each independently authenticated Link device creates its own P-256 signing key. The private key remains in the
-device Keychain; the public key is registered with the account service.
-Authenticated requests include freshness and replay-protection material and are
-verified against the device's current authorization epoch.
-
-Device-friendly names are encrypted with the account content key before cloud
-storage.
+Each phone's notification installation creates its own P-256 signing key. The
+private key remains in the device Keychain. The app registers the public key
+with the notification service. Signed requests include a timestamp, a nonce and the
+installation's current authorization epoch.
 
 ### Paired Watch companion
 
-The companion Watch is not an independent Link endpoint. It uses the
-OS-managed paired WatchConnectivity channel and receives no account content
-key, signing key, passkey grant or reusable host credential. The paired Watch
+The companion Watch never talks to a host. It uses the OS-managed paired
+WatchConnectivity channel to the iPhone and receives no signing key or reusable
+host credential. The paired Watch
 is trusted with the bounded session, approval and attention content displayed
 on its screen. The phone revalidates authority, offer identity, expiry and exact
 approval scope before submitting an action to the authorized host.
@@ -187,7 +184,7 @@ Phone action receipts and Watch recovery records are bounded, atomic,
 backup-excluded Application Support files protected until first user
 authentication. They can retain a bounded final voice reply for recovery for
 up to 24 hours. Watch recovery does not persist prompts or whole snapshots.
-Account/host changes invalidate offers and clear state when the Watch receives
+Host changes invalidate offers and clear state when the Watch receives
 the new context; already displayed data cannot be erased remotely while it is
 offline. Stale data cannot authorize new actions.
 
@@ -195,30 +192,6 @@ Watch system dictation follows Apple's language, permission and processing
 settings; it is not covered by the phone's on-device recognition guarantee.
 The app sends the reviewed text draft through the phone, not a raw microphone
 recording. Reply speech is explicitly requested and stops on backgrounding.
-
-### Host pairing
-
-Pairing uses a short-lived human-readable challenge. Approval transfers the
-account content key to the new Hermes host through an ephemeral Curve25519 key
-agreement, HKDF-derived wrapping key, and authenticated encryption. The pairing
-code is not a reusable credential and does not contain a private key.
-
-The host locally commits to the pairing flow, device coordinate, signing public
-key, and agreement public key. QR pairing carries the complete SHA-256
-commitment. Manual pairing requires a separately displayed 16-character
-fingerprint derived from that commitment. The app derives the commitment again
-from the server-inspected keys and refuses to release the account key if it does
-not match. The plugin ignores any pairing URL supplied by the service and
-constructs the verified URL from its own keys.
-
-### Link frames
-
-WebSocket frames contain routing and sequencing metadata plus AES-GCM
-ciphertext. The account/link Worker and Durable Object route this envelope
-without decrypting the content.
-
-The endpoints enforce monotonic sequence handling, acknowledgements, duplicate
-recognition, request/session matching, and bounded decoding.
 
 ### Encrypted alerts
 
@@ -250,8 +223,7 @@ notification service remains in the notification trust boundary.
 
 ### Not trusted with plaintext message content
 
-- bighelp's Cloudflare routing Worker
-- The per-account Durable Object
+- bighelp's notification service Worker (`link.loopdy.app`)
 - The notification relay database
 - The asynchronous APNs delivery queue
 - Apple Push Notification service for encrypted alert bodies
@@ -266,15 +238,17 @@ this build.
 
 ### Local customization
 
-bighelp does not expose a Marketplace, public catalog, publishing workflow, or
-remote installation service. Theme and card-template customization stays local.
+bighelp has no marketplace or publishing service for themes or card templates.
+Theme and card-template customization stays local. (Settings › Marketplace lists
+Hermes' own apps, skills and plugins, and installs them on the person's Hermes
+computer, not into bighelp.)
 Portable theme import and export move only files the user explicitly selects and
 do not upload, publish, or install executable content.
 
 ### Public provider artwork
 
 Provider logos use a dedicated public Cloudflare static-asset endpoint, separate
-from authenticated Link traffic. Requests contain no account credentials,
+from the notification service. Requests contain no credentials,
 conversation content, model selections, provider configuration or tracking IDs.
 The app retrieves the complete approved artwork catalog regardless of the selected
 provider. Cloudflare still receives ordinary connection metadata such as IP
@@ -288,7 +262,7 @@ compromised publishing account. Publishers control artwork only, never app code,
 provider identities or model routing.
 
 A bounded, replaceable cache of public images and catalog metadata lives in the
-app's Caches directory, independent of account data and excluded from backups by
+app's Caches directory, apart from other app data and excluded from backups by
 the operating system. Failed refreshes keep the last-good catalog; no cache uses
 bundled artwork. Successful catalog withdrawal removes the remote override on
 the next refresh, but cannot remotely erase copies on offline devices. Daily
@@ -317,39 +291,35 @@ never leave the device for speech, and which agents use it stays on the device.
 
 ### Important limitation
 
-End-to-end encryption protects content while it passes through bighelp's cloud
-services. It cannot protect content on a compromised authorized device or
-Hermes host. A configured provider may receive plaintext needed for the request.
+Chat does not pass through bighelp's cloud services: it goes from the phone to
+the Hermes host. End-to-end encryption protects alert text while it passes
+through the notification service. Neither can protect content on a compromised
+authorized device or Hermes host. A configured provider may receive plaintext needed for the request.
 Screen capture and visible Lock Screen content can also expose information.
 
 It also does not hide traffic metadata such as IP address, timing, connection
 duration, ciphertext size, or device-routing relationships from infrastructure
 providers.
 
-The routing service can still delay, suppress, or replay-invalid pairing
-traffic, but it cannot substitute a different host key without failing the QR
-commitment or separately displayed manual verification code.
+The notification service can still delay or drop alerts and Live Activity
+updates.
 
 ## 4. Data inventory
 
 | Data | On iOS device | bighelp Cloudflare | Hermes / providers |
 |---|---|---|---|
-| Messages and replies | Local session cache | Transient ciphertext only | Plaintext as needed to run the agent |
-| Attachments | Local session cache; memory during upload | Transient ciphertext only | Plaintext as needed to process the request |
+| Messages and replies | Local session cache | Not sent (chat goes straight to the host) | Plaintext as needed to run the agent |
+| Attachments | Local session cache; memory during upload | Not sent | Plaintext as needed to process the request |
 | Voice audio | Memory during on-device recognition | Not sent by bighelp | TTS voice: not sent as raw microphone audio. Full Duplex: streamed from the phone straight to the live voice provider the person picked (GPT-Live or Gemini Live) |
-| Voice transcript | Local session cache | Transient ciphertext only | Plaintext as the user request |
-| Synthesized speech audio | Memory during playback | Transient ciphertext only | Generated by the configured voice service |
-| Agent instructions/settings | Local presentation cache | Transient ciphertext for workspace operations | Stored according to Hermes configuration |
+| Voice transcript | Local session cache | Not sent | Plaintext as the user request |
+| Synthesized speech audio | Memory during playback | Not sent | Generated by the configured voice service |
+| Agent instructions/settings | Local presentation cache | Not sent | Stored according to Hermes configuration |
 | Device private/signing keys | Keychain | Never | Only keys generated by that endpoint |
-| Account content key | Keychain | Encrypted envelope only | Present on authorized endpoints |
-| Passkey biometric data | Apple authentication system | Never | Never |
-| Passkey public credential | System-managed locally | Durable public metadata | Not required |
-| Device name | Local | Authenticated ciphertext | Readable by authorized account endpoints |
 | Device/public-key metadata | Local | Durable operational metadata | Used to authorize endpoints |
 | APNs token | System/app memory and Keychain-related state | Encrypted at rest in relay storage | Not required |
 | Alert title/body | Device after decryption | Encrypted payload | Created by the authorized source |
 | Live Activity state | ActivityKit | Bounded state, encrypted at rest but readable during relay delivery and by Apple | Created from agent activity |
-| Static Card document and embedded values | Local transcript cache | Transient ciphertext only | Generated and validated on the authorized Hermes host |
+| Static Card document and embedded values | Local transcript cache | Not sent | Generated and validated on the authorized Hermes host |
 | Live Card source URL, response, and request metadata | Not accepted in build 3 | Not accepted in build 3 | Not accepted in build 3 |
 | Preferences | UserDefaults | Not uploaded as preferences | Not required |
 | Avatars | App sandbox | Filename metadata only through workspace flows | Image upload is not part of the current directory path |
@@ -363,24 +333,22 @@ available after the first device unlock so background networking and
 notification processing can operate.
 
 Native Hermes credentials use their stricter existing
-when-unlocked/device-only protection. Independent native hosts do not acquire a
-bighelp account identity: their metadata, credential items and drafts are scoped
-separately from optional cloud credentials. Cloud sign-out and account deletion
-do not erase independent host authentication or legacy account-keyed Direct
-sources awaiting verified migration. Those sources are not automatically exposed
-to another account or adopted by matching an address. Explicit host removal
-controls local Direct credential deletion; it is not remote token revocation.
-Opaque provider/principal comparisons are byte-exact, not display-name equality.
+when-unlocked/device-only protection. Each host's metadata, credential items and
+drafts are scoped to that host and are not adopted by another host that matches
+its address. Removing a host in the app deletes its saved credentials, its local
+notification enrollment and its drafts, and clears the phone's caches of agents'
+files, photo drafts and agents' apps. It never deletes the host's chats. Neither
+removal nor uninstalling the app is remote token revocation. Opaque provider/principal comparisons are
+byte-exact, not display-name equality.
 
 The native workspace also owns separate protected content manifests, transcript
-revisions, creation-intent journals and host-scoped preferences. Cloud erasure
-does not erase these independent sources or reset their navigation. Native
+revisions, creation-intent journals and host-scoped preferences. Native
 session creation persists its bounded intent before every non-idempotent
 mutation; a lost response remains uncertain across reconnect and cannot trigger
 an automatic replacement session. Recorded historical tool evidence uses a
 separate versioned cache and cannot imply a live or successful tool outcome.
 Native connection leases reject stale results without closing the shared host
-socket or switching to Link.
+socket.
 
 Ordinary native files stay local until Send. The complete batch is checked
 before upload, then files are staged serially through the exact live session.
@@ -404,21 +372,13 @@ agent's own `contacts.create` and `calendar.create` (`review_required`), so
 standing Device access can't turn a picture into a new contact or event without
 the person's review. Other phone tools keep their own switches and rules.
 
-Signing out attempts a signed request to revoke this device and its push/Live
-Activity authorization, then deletes bighelp Link runtime credentials,
-notification recipient keys, pinned host keys, account-scoped defaults, local
-content files, and all account-scoped in-memory state. Local erasure still runs
-if the remote revocation is unavailable, and the app surfaces that revocation
-could not be confirmed. Uninstall behavior alone should not be treated as
-remote revocation.
-
-The app stores the account and signing keys as software keys in device-only
-Keychain items rather than as Secure Enclave private-key objects. A sufficiently
+The app stores its notification signing and recipient keys as software keys in
+device-only Keychain items rather than as Secure Enclave private-key objects. A sufficiently
 privileged compromise after the first unlock may expose them.
 
 ### App sandbox
 
-Scratchpad text is an in-memory draft owned by the active account/host. Closing
+Scratchpad text is an in-memory draft owned by the active host. Closing
 the editor retains it for that running app session; switching owner or signing
 out clears it. It is not a cross-launch saved document unless the user exports
 it through the native Files picker. Sending to an agent only stages a Markdown
@@ -434,55 +394,35 @@ agent metadata, settings, avatars, and the last Plugins and Skills Hub lists of 
 computer (Caches, at most a month old) in its private container. The JSON
 repositories are versioned and crash-safe but do not add a separate
 application-level encryption layer. JSON and attachment directories explicitly
-use complete-until-first-user-authentication protection so background Link and
+use complete-until-first-user-authentication protection so background
 notification reconciliation can continue after the first unlock. Avatar files
 and directories use complete protection and remain unavailable while locked.
-Protected files and directories, including Link's pending encrypted transport
-state and corruption recovery backups, are explicitly excluded from device
-backups.
-
-The pending encrypted Link frame and its sequence/acknowledgement state are
-stored in protected Application Support JSON rather than backup-eligible
-UserDefaults. Existing per-device UserDefaults snapshots migrate to this file
-before their legacy keys are removed.
+Protected files and directories, including corruption recovery backups, are
+explicitly excluded from device backups.
 
 Anyone who can unlock or compromise the device may be able to read this local
 content.
 
 ## 6. Cloud retention
 
-The current Cloudflare deployment stores durable identity and delivery metadata
-but no readable chat-session database.
+The current Cloudflare deployment stores notification delivery metadata but no
+chat-session database. Chat never passes through it.
 
-- Passkey public records, account coordinates, and active device public keys
-  remain while the account/device remains authorized.
-- The service stores only hashes of access tokens.
-- Authentication challenges and access sessions become invalid after expiry or
-  consumption; immediate physical deletion of every expired row is not claimed.
-- Encrypted frames waiting for an offline endpoint are removed after recipient
-  acknowledgement or endpoint revocation. No independent time-based frame
-  expiration was verified.
-  The recipient overflow repair preserves these accepted obligations while
-  permitting future copies to saturated recipients to be skipped before
-  acceptance. It reserves recipient-local capacity rather than allowing one
-  offline device to exhaust every device's budget. Fresh session recovery can
-  restore only content actually stored by the host, not every skipped transient
-  event. See [Legacy Link retention](LINK_RETENTION.md) for the policy, migration,
-  ordering, and separately authorized rollout requirements.
-- Push registrations persist while authorized or leased.
+- Notification installations and their device public keys remain while
+  authorized.
+- Push registrations persist while authorized or leased. Push tokens are
+  encrypted at rest.
 - Alert payloads are encrypted at rest and delivery records are pruned by the
   relay lifecycle.
 - Revocation tombstones and idempotency metadata are retained only for
   consistency and replay protection.
 - Aggregate counters do not contain prompts or replies.
 
-Account deletion is available in the app and requires a fresh passkey assertion.
-The Link service revokes every device push registration and Live Activity,
-deletes the passkey account and device directory rows, closes active sockets,
-and purges the per-account Durable Object. The service performs a second object
-purge after deleting the account directory to close races with an already
-authenticated request. The app removes its local account-scoped state only
-after the service confirms deletion.
+The app no longer creates a bighelp account and no longer offers account
+deletion. The current app does not use records that older versions made for the
+retired account (passkey public records, account coordinates, device public
+keys and encrypted Link frames). See [Legacy Link retention](LINK_RETENTION.md)
+for how the service treated them.
 
 Logical deletion is not a guarantee that every infrastructure backup or
 provider recovery copy is immediately physically unrecoverable. Cloudflare,
@@ -496,15 +436,14 @@ should remain short, reviewed, and enforced automatically.
 
 | Permission/service | Why it is used | Privacy behavior |
 |---|---|---|
-| Camera | Pairing QR codes and optional Reflective Vision | Frames are not recorded or stored by the feature |
+| Camera | Photos and document scans you attach to chats, and optional Reflective Vision | Reflective Vision frames are not recorded or stored; photos and scans go only to the chat you send them in |
 | Microphone | Voice conversation input | TTS voice: raw audio remains on device. Full Duplex: raw audio goes from the phone straight to the chosen live voice provider while the call is open, never through bighelp's services |
 | Speech recognition | Convert speech to text | On-device recognition is required |
 | Photos | Select profile and agent avatars | Images are processed and stored locally |
 | Location (while using the app) | The agent's `iphone_location` tool, after you turn on Location for a host | Asked for when you turn the switch on; approximate unless you allow precise location for a call; sent to that host and its AI provider, never kept by bighelp |
-| Face ID / device authentication | Passkey user verification | Biometric data is handled by the OS |
 | Notifications | Agent alerts | Alert text is encrypted for the recipient device |
 | Live Activities | Agent progress on Lock Screen/Dynamic Island | Shows bounded status plus session and agent labels |
-| Local network | Connecting to an explicitly configured native Hermes host | Native-first workspace access still requires host authentication; HTTPS uses Apple trust, and policy-supported local HTTP requires explicit consent. Link is a separate optional connection |
+| Local network | Connecting to an explicitly configured native Hermes host | Native-first workspace access still requires host authentication; HTTPS uses Apple trust, and policy-supported local HTTP requires explicit consent |
 
 Apple and network providers necessarily process delivery metadata such as IP
 addresses, device tokens, app topics, timing, and service diagnostics according
@@ -517,25 +456,43 @@ and both the Hermes plugin and iOS app reject nonempty `data_sources`. Opening a
 Card therefore does not disclose the device IP, timing, URL, or query to a Card
 source host. See [bighelp Cards](BIGHELP_CARDS.md) for the static release contract.
 
+### Agents' apps
+
+An agent's HTML app is not a Card. Its page is the agent's own code, and bighelp
+renders it as made: when the person opens the app, the page can load and send
+anything it asks for, so the sites it uses see the device's IP address, as in
+a browser. Nothing loads until the person taps Open App. Each app has its own
+origin and storage, apart from bighelp's own data and other apps. The page
+gets no host address, credential or chat text from bighelp: only the data the
+agent gave the app, through the plugin. Links open outside bighelp, and the
+camera and microphone are refused. An answer from the app goes to the agent
+only after the person sees the exact message and taps Send. See
+[Agents' HTML apps](HTML_APPS.md).
+
 ## 8. Privacy manifest
 
 The app declares:
 
 - Tracking: **false**
 - Tracking domains: none
-- Collected data: a linked device identifier used for app functionality
-- Required-reason API use: preferences and elapsed-time measurement
+- Collected data, each linked to the install ID, for app functionality and
+  analytics, never for tracking: device ID, product interaction, crash data,
+  performance data and other diagnostic data (see Usage and diagnostics)
+- Required-reason API use: preferences, file timestamps and system boot time
+  (elapsed-time measurement)
 
-bighelp does not declare user content as collected by its cloud because the
-current deployed frame-routing path receives authenticated ciphertext, has no
-frame-decryption operation, and does not retain a readable session store. This
-classification depends on the documented key-establishment design. Review it
+bighelp does not declare user content as collected by its cloud. Chat goes from
+the phone straight to the person's Hermes host. With current plugins, alert
+text reaches the notification service only as ciphertext for the phone (older
+plugins that don't seal alerts still send readable title and text). No cloud service keeps a
+readable session store. This classification depends on the documented
+alert-encryption design. Review it
 with qualified privacy counsel before release.
 
 This conclusion must be revisited if any of the following changes:
 
 - Cloud code gains a content-decryption key
-- Pairing or sender-key provisioning changes the documented trust assumptions
+- Notification sender-key provisioning changes the documented trust assumptions
 - Message, transcript, attachment, or prompt content is logged
 - Readable content is added to D1, Durable Object, KV, R2, Analytics, or queues
 - Retention expands beyond real-time delivery needs
@@ -567,13 +524,11 @@ clients of the serving profile, not per-device ACLs. No generic filesystem, conf
 control or raw-microphone-upload surface is added.
 See [Workspace management](WORKSPACE_MANAGEMENT.md) for the exact feature scope.
 
-Native Wiki recovery records distinguish authenticated Hermes endpoint/provider/
-principal/profile ownership from legacy Link device ownership. The bounded
-native principal coordinates are held in protected local Wiki state; no token,
-password, device enrollment, or account content key is introduced. Its storage
-namespace cannot overlap a legacy Link account namespace. Legacy Link encoding
-and local recovery filenames remain unchanged. Current transport authorization
-is checked separately from the stable persisted principal identity.
+Native Wiki recovery records are owned by the authenticated Hermes
+endpoint/provider/principal/profile. The bounded native principal coordinates
+stay in protected local Wiki state. This adds no token, password or device
+enrollment. Current transport authorization is checked separately from the
+stable persisted principal identity.
 
 Read-only native Project Changes uses the canonical plugin's registered
 Project/session checks and existing safe Git engine. It does not infer
@@ -583,13 +538,12 @@ sent to new analytics or cloud endpoints. The content token is an optimistic
 before/after check, not an immutable filesystem lease; this adapter cannot stage,
 commit, fetch, pull, push or execute commands.
 
-The iOS app includes no analytics, advertising, crash-reporting, or behavioral
-tracking SDK. Production code must not log:
+The iOS app includes no third-party analytics, advertising, crash-reporting, or
+behavioral tracking SDK (its own usage and diagnostics are described above). Production code must not log:
 
 - Credentials or private keys
-- Passkey assertions
 - APNs tokens
-- Account or device authorization material
+- Host or device authorization material
 - Plaintext prompts, responses, attachments, or decrypted notifications
 - Full server error bodies
 
@@ -602,20 +556,17 @@ redacted and minimize retention.
 - This project makes no claim of an independent third-party security audit.
 - The custom protocol depends on correct implementation at both iOS and Hermes
   endpoints.
-- A compromised authorized endpoint can read account content.
+- A compromised authorized endpoint can read the content it is authorized for.
 - A compromised device after unlock can read local caches.
-- Manual pairing relies on the user comparing the host's separate 16-character
-  verification code; QR pairing carries the full key commitment.
-- The account service provisions notification sender trust. No separate
+- The notification service provisions notification sender trust. No separate
   transparency or continuity system verifies it.
 - E2E content encryption does not provide anonymity or hide traffic patterns.
 - Availability depends on Cloudflare, APNs, the Hermes host, configured
   providers, and Apple services used by enabled features.
 - Live Activity state is privacy-reduced, not equivalent to the encrypted alert
   channel.
-- Independently authenticated native Hermes is selected by production composition
-  for its own workspace. Its native API, authentication and Apple-networking
-  acceptance are separate from Link validation; neither proves the other.
+- Chat runs only over native Hermes, so its protection depends on the Hermes
+  host's own authentication and on Apple networking.
 
 ## 12. Export and legal review
 
@@ -631,15 +582,16 @@ Report suspected vulnerabilities privately using the process in
 
 ## Explicit Wiki folder setup
 
-Saving Add Wiki authorizes a safe existing host folder for the current authenticated device/profile through the separately negotiated `wiki.connect` operation. New grants are read-only; a typed suggestion alone grants nothing. Filesystem traversal, symlink ancestors, sensitive and system roots, the configured Hermes control home, and Wiki state are excluded. The operation cannot adopt, overwrite or bypass overlapping grants held by another device/profile/pairing authority. Existing grants retain their generation and policy; new grants receive a fresh generation. Host-local grant/revoke administration remains separate.
+Current bighelp plugin releases no longer have the Wiki routes. This section applies only to an older host that still lists `native-wiki-v1`.
 
-Authorized Wiki metadata can disclose the chosen absolute source folder over the existing account-wide encrypted Link. When a page or section is explicitly referenced, its full source path accompanies the selected snapshot as bounded JSON metadata and follows normal chat/model-provider disclosure. Visible tags use the title. Other holders of the account key may decrypt this traffic. Path metadata is absent on older hosts and is not inferred from a display name.
+Saving Add Wiki authorizes a safe existing host folder for the current authenticated device/profile through the separately negotiated `wiki.connect` operation. New grants are read-only; a typed suggestion alone grants nothing. Filesystem traversal, symlink ancestors, sensitive and system roots, the configured Hermes control home, and Wiki state are excluded. The operation cannot adopt, overwrite or bypass overlapping grants held by another device or profile. Existing grants retain their generation and policy; new grants receive a fresh generation. Host-local grant/revoke administration remains separate.
+
+Authorized Wiki metadata can disclose the chosen absolute source folder to the app over the authenticated native Hermes connection. When a page or section is explicitly referenced, its full source path accompanies the selected snapshot as bounded JSON metadata and follows normal chat/model-provider disclosure. Visible tags use the title. Path metadata is absent on older hosts and is not inferred from a display name.
 
 ## Group presentation preferences
 
 The Agents screen keeps pinned and archived group preferences locally on this
 device, scoped to the authenticated workspace. Archiving here hides the group
 from the active Agents list; Archived groups can restore it. This does not stop
-Hermes work or delete its transcript. Account-data erasure clears these
-preferences. Delete is a separate confirmed action through Hermes' native
+Hermes work or delete its transcript. Delete is a separate confirmed action through Hermes' native
 `groups.disband` operation, which stops the room and permanently retires its ID.

@@ -107,7 +107,8 @@ class BighelpUITestCase: XCTestCase {
         case "chat.session-controls", "chat.fast-mode": groups = ["chat.options.model-speed"]
         case "chat.context-window", "chat.provider-usage", "chat.compact":
             groups = ["chat.options.more", "chat.options.usage"]
-        case "chat.info", "chat.rename", "chat.move-project", "chat.files": groups = ["chat.options.this-chat"]
+        case "chat.info", "chat.group-settings", "chat.rename", "chat.move-project", "chat.files":
+            groups = ["chat.options.this-chat"]
         case "chat.edit-current-agent", "chat.new-bot-chat", "chat.switch-agent": groups = ["chat.options.agent"]
         case "chat.options.usage", "chat.options.advanced", "chat.file-changes": groups = ["chat.options.more"]
         case "chat.force-refresh", "chat.options.display": groups = ["chat.options.more", "chat.options.advanced"]
@@ -136,7 +137,7 @@ class BighelpUITestCase: XCTestCase {
     @MainActor
     func chatMenuElement(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         let titles: [String: [String]] = [
-            "chat.info": ["Chat info"], "chat.rename": ["Rename…"], "chat.move-project": ["Move to Project…", "Move…"],
+            "chat.info": ["Chat info"], "chat.group-settings": ["Group Settings"], "chat.rename": ["Rename…"], "chat.move-project": ["Move to Project…", "Move…"],
             "chat.files": ["Files"], "chat.edit-current-agent": ["Edit agent"],
             "chat.new-bot-chat": ["New Bot Chat"], "chat.switch-agent": ["Switch agent"], "chat.compact": ["Compact"],
             "chat.file-changes": ["File changes"], "chat.options.usage": ["Usage"], "chat.options.advanced": ["Advanced"],

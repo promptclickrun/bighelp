@@ -142,6 +142,25 @@ final class RegistryFleetReader: FleetHostReading {
         return try await body(workspace, owner, current, client)
     }
 
+    /// A host the all-hosts view keeps connected, for its plugin routes (app state). It never
+    /// connects one, and it's nil once the host is selected or its connection goes.
+    func connectedPluginWorkspace(_ hostID: UUID) -> DirectHermesWorkspaceClient? {
+        guard registry.keepsOtherHostsConnected, registry.selectedHostID != hostID, registry.isWorkspaceReady,
+              let host = registry.hosts.first(where: { $0.id == hostID }) else { return nil }
+        let store = registry.workspace(for: host)
+        guard store.isConnected, !store.isConnecting,
+              let verified = try? store.verifiedConnection(for: host, generation: registry.generation) else { return nil }
+        let client = verified.client, owner = verified.owner
+        let generation = owner.connectionGeneration
+        let current: @MainActor () -> WorkspaceOwner? = { [weak registry, weak store] in
+            guard let registry, let store, registry.selectedHostID != hostID, store.isConnected,
+                  store.connectionGeneration == generation else { return nil }
+            return owner
+        }
+        return DirectHermesWorkspaceClient(rpc: client, http: client, owner: owner,
+                                           capabilities: .init(owner: owner), currentOwner: current)
+    }
+
     /// Another host's connection kept open until `release`: for a group chat
     /// with its agents on screen, or a Team Call they speak in.
     func holdWorkspace(_ hostID: UUID) async throws -> HeldWorkspace {
@@ -242,8 +261,28 @@ final class RegistryFleetReader: FleetHostReading {
             reconcileClosedRuntime: { _ in throw HermesSessionMaintenanceError.invalidRequest }
         ).foreignSessions(profileID: defaultProfile, source: nil, offset: 0, limit: 10)
         return FleetSnapshot(agents: agents, chats: chats,
-                             tasks: tasks.map { FleetTask(hostID: hostID, scheduledTask: $0) }, refreshedAt: Date(),
+                             tasks: tasks.map { FleetTask(hostID: hostID, scheduledTask: $0) },
+                             groups: await groups(hostID, workspace: workspace, owner: owner, profiles: profiles),
+                             refreshedAt: Date(),
                              otherAppChats: otherApps.map { $0.sessions.map { FleetOtherAppChat(hostID: hostID, item: $0) } })
+    }
+
+    /// Its group chats, for Bots mode's Multi-gateway: the first page, to list and open. A host
+    /// that can't list them has none here.
+    private static func groups(_ hostID: UUID, workspace: DirectHermesWorkspaceClient, owner: WorkspaceOwner,
+                               profiles: [AgentProfile]) async -> [FleetGroup] {
+        guard let payload = try? await workspace.perform(.groupsList, payload: [
+            "offset": .integer(0), "limit": .integer(50), "include_disbanded": .boolean(false),
+        ], owner: owner),
+            let data = try? JSONEncoder().encode(BighelpJSONValue.object(payload)),
+            let page = try? JSONDecoder().decode(HermesBotModeRoomListPage.self, from: data) else { return [] }
+        let names = Dictionary(profiles.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        return page.rooms.filter { $0.disbandedAt == nil }.map { room in
+            FleetGroup(hostID: hostID, roomID: room.roomID, name: room.name,
+                       memberNames: room.members.map { names[$0.profile] ?? $0.handle },
+                       updatedAt: Date(timeIntervalSince1970: room.updatedAt), isWorking: false,
+                       canRename: false, canDelete: false, memberIDs: room.members.map(\.profile))
+        }
     }
 
     static let workingStatuses: Set<String> = ["starting", "working", "streaming", "resuming"]

@@ -88,6 +88,61 @@ final class AvatarCreatorUITests: BighelpUITestCase {
         save("studio-new-body-\(appearance)", app)
     }
 
+    /// A swipe up on the row of bodies opens all of them in a grid, by set, with the avatar still in
+    /// view; a pick there changes it. The handle shows one row again, even with the grid scrolled,
+    /// and the row still scrolls sideways.
+    @MainActor
+    func testSwipingUpOnTheBodiesOpensEveryBody() throws {
+        let appearance = ProcessInfo.processInfo.environment["BIGHELP_AVATAR_APPEARANCE"] ?? "light"
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance,
+                               "-test-agent-companion", "finance:bighelp-biggie"]
+        app.launch()
+        let any = app.descendants(matching: .any)
+        openChooser(of: "finance", in: app)
+        any["avatar.chooser.studio"].firstMatch.tap()
+        let stage = any["bot.studio.stage"].firstMatch
+        XCTAssertTrue(stage.waitForExistence(timeout: 10))
+
+        let gallery = any["bot.studio.gallery"].firstMatch
+        let peak = app.buttons["bot.studio.choice.Peak"].firstMatch
+        XCTAssertTrue(peak.waitForExistence(timeout: 5) && peak.isHittable)
+        drag(peak, by: -220)
+        XCTAssertTrue(gallery.waitForExistence(timeout: 5), "A swipe up opens every body")
+        XCTAssertTrue(stage.isHittable, "The avatar stays in view")
+        save("studio-gallery-\(appearance)", app)
+
+        let bow = app.buttons["bot.studio.choice.Bow"].firstMatch
+        for _ in 0..<12 where !(bow.exists && bow.isHittable) { gallery.swipeUp() }
+        bow.tap()
+        XCTAssertTrue(stage.label.hasSuffix("Bow"), "A pick in the gallery: \(stage.label)")
+        XCTAssertTrue(gallery.exists, "The gallery stays open for the next pick")
+        save("studio-gallery-picked-\(appearance)", app)
+
+        let handle = app.buttons["bot.studio.gallery.toggle"].firstMatch
+        handle.tap()
+        XCTAssertTrue(gallery.waitForNonExistence(timeout: 5), "The handle shows one row again")
+
+        XCTAssertTrue(peak.waitForExistence(timeout: 5))
+        let start = peak.frame.minX
+        peak.swipeLeft()
+        XCTAssertTrue(!peak.exists || peak.frame.minX < start - 50, "The row scrolls sideways")
+        XCTAssertFalse(gallery.exists, "A sideways swipe keeps one row")
+
+        handle.tap()
+        XCTAssertTrue(gallery.waitForExistence(timeout: 5), "The handle opens it too")
+        app.buttons["bot.studio.tab.eyes"].firstMatch.tap()
+        XCTAssertFalse(gallery.exists, "Another tab shows its own row")
+        XCTAssertFalse(handle.isHittable, "Only Body has the gallery")
+    }
+
+    /// A slow, deliberate drag from the middle of `element`, up for a negative `height`.
+    @MainActor
+    private func drag(_ element: XCUIElement, by height: CGFloat) {
+        let start = element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: height)))
+    }
+
     /// PetDex shows only pets, opened on the agent's own.
     @MainActor
     func testPetDexShowsOnlyPets() throws {

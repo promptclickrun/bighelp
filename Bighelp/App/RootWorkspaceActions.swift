@@ -484,7 +484,7 @@ extension RootShellView {
                 }
             }
         case .createGroup(let seed):
-            guard botModeRooms.canCreateNativeRoom else {
+            guard botModeRooms.offersNewGroupChat else {
                 actionErrorMessage = WorkspaceUnavailableReason.driverUnavailable.message
                 return
             }
@@ -510,11 +510,12 @@ extension RootShellView {
                       case .chat(let model)? = featureStore.preparedModel(for: route) else {
                     throw WorkspaceClientError.unavailable(.unsupportedOperation)
                 }
-                if settings { groupSettingsModel = model }
+                if settings { appState.open(.groupSettings(roomID: room.id, conversationID: model.conversationID)) }
                 else { appState.activateConversation(id: record.id, source: .sessions) }
             } catch {
                 guard currentWorkspaceOwner == owner else { return }
-                actionErrorMessage = "Hermes could not open this group. Check the host and try again."
+                actionErrorMessage = "Hermes could not open this group. "
+                    + (HermesRefusalMessage.sentence(in: error) ?? "Check the host and try again.")
             }
         }
     }

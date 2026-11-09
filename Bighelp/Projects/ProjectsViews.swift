@@ -14,11 +14,58 @@ struct ProjectsContext {
     let onManage: () -> Void
 }
 
+/// How the Projects screen orders its list. Saved on this device (`@AppStorage`), so it
+/// survives hosts and launches without a trip to Settings.
+enum ProjectsSort: String, CaseIterable, Identifiable, Sendable {
+    case recent
+    case name
+
+    static let storageKey = "bighelp.projects.sort"
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .recent: String(localized: "Recently used")
+        case .name: String(localized: "Name")
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .recent: "clock.arrow.circlepath"
+        case .name: "textformat.abc"
+        }
+    }
+
+    /// Sorts the catalog. The computer's current project leads in both orders; a project
+    /// nobody has used yet sorts last under Recently used and by its name under Name.
+    func ordered(
+        _ projects: [HermesWorkspaceSummary],
+        lastActive: (String) -> Date?
+    ) -> [HermesWorkspaceSummary] {
+        projects.sorted { lhs, rhs in
+            if lhs.isActive != rhs.isActive { return lhs.isActive }
+            switch self {
+            case .name:
+                return lhs.name.localizedCompare(rhs.name) == .orderedAscending
+            case .recent:
+                let left = lastActive(lhs.id) ?? .distantPast
+                let right = lastActive(rhs.id) ?? .distantPast
+                return left == right
+                    ? lhs.name.localizedCompare(rhs.name) == .orderedAscending
+                    : left > right
+            }
+        }
+    }
+}
+
 /// Projects keep related chats and folders together, like Projects in Claude.
 /// Each is a Hermes project: chats started in it run in its folder.
 struct ProjectsHomeView: View {
     let context: ProjectsContext
     @State private var isCreating = false
+    @AppStorage(ProjectsSort.storageKey) private var sort = ProjectsSort.recent
 
     var body: some View {
         let workspaces = context.workspaces
@@ -32,7 +79,7 @@ struct ProjectsHomeView: View {
                     if catalog.workspaces.isEmpty {
                         empty
                     }
-                    ForEach(sorted(catalog.workspaces)) { project in
+                    ForEach(sort.ordered(catalog.workspaces, lastActive: { context.store.details[$0]?.lastActive })) { project in
                         Button { context.onOpenProject(project.id) } label: {
                             ProjectCard(project: project, details: context.store.details[project.id])
                         }
@@ -69,6 +116,22 @@ struct ProjectsHomeView: View {
             }
             #endif
             ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Picker("Sort", selection: $sort) {
+                        ForEach(ProjectsSort.allCases) { option in
+                            Label(option.title, systemImage: option.systemImage)
+                                .tag(option)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                }
+                .accessibilityLabel("Sort projects")
+                .accessibilityValue(sort.title)
+                .accessibilityIdentifier("projects.sort")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Button { isCreating = true } label: { Image(systemName: "plus") }
                     .accessibilityLabel("New project")
                     .accessibilityIdentifier("projects.new")
@@ -88,16 +151,6 @@ struct ProjectsHomeView: View {
     private func reload() async {
         await context.workspaces.load(agentID: context.agentID)
         await context.store.refresh()
-    }
-
-    /// Recently used first; the current project leads.
-    private func sorted(_ projects: [HermesWorkspaceSummary]) -> [HermesWorkspaceSummary] {
-        projects.sorted { lhs, rhs in
-            if lhs.isActive != rhs.isActive { return lhs.isActive }
-            let left = context.store.details[lhs.id]?.lastActive ?? .distantPast
-            let right = context.store.details[rhs.id]?.lastActive ?? .distantPast
-            return left == right ? lhs.name.localizedCompare(rhs.name) == .orderedAscending : left > right
-        }
     }
 
     private var empty: some View {

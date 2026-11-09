@@ -1897,6 +1897,30 @@ struct SessionCatalogStoreTests {
         #expect(client.operations.isEmpty)
     }
 
+    @Test func markingAChatUnreadReachesTheHostAndShowsHere() async throws {
+        let original = Self.record(id: "unread-session", title: "A reply arrived")
+        let client = MutationRecordingSessionCatalogClient(records: [original])
+        let catalog = SessionCatalogStore(client: client, records: [original])
+
+        try await catalog.setSessionUnread(id: original.id, unread: true)
+
+        #expect(client.operations == [.unread(id: original.id, unread: true)])
+        #expect(catalog.session(id: original.id)?.isUnread == true)
+
+        try await catalog.setSessionUnread(id: original.id, unread: false)
+
+        #expect(catalog.session(id: original.id)?.isUnread == false)
+        #expect(client.operations.last == .unread(id: original.id, unread: false))
+    }
+
+    @Test func aSavedDraftShowsInTheRowSummary() {
+        var record = Self.record(id: "draft-session", title: "Half written")
+        record.draft = "Let's book the"
+        #expect(record.summary.hasDraft)
+        record.draft = "   "
+        #expect(record.summary.hasDraft == false)
+    }
+
     @Test func authoritativeRefreshPreservesTheLocalPinState() async throws {
         let original = Self.record(id: "locally-pinned-session", title: "Pin me")
         let client = MutationRecordingSessionCatalogClient(records: [original])
@@ -2078,6 +2102,7 @@ struct SessionCatalogStoreTests {
 private enum RecordedSessionMutation: Equatable {
     case rename(id: String, title: String)
     case pin(id: String, pinned: Bool)
+    case unread(id: String, unread: Bool)
     case archive(id: String)
     case delete(id: String)
 }
@@ -2111,6 +2136,11 @@ private final class MutationRecordingSessionCatalogClient: SessionCatalogClient 
     func setPinned(_ record: SessionRecord, pinned: Bool) async throws {
         if let failure { throw failure }
         operations.append(.pin(id: record.id, pinned: pinned))
+    }
+
+    func setUnread(_ record: SessionRecord, unread: Bool) async throws {
+        if let failure { throw failure }
+        operations.append(.unread(id: record.id, unread: unread))
     }
 
     func archive(_ record: SessionRecord) async throws {

@@ -26,6 +26,9 @@ struct SessionsView: View {
     @Environment(\.bighelpUIV2Enabled) private var uiV2Enabled
     @Environment(\.bighelpUIV3Enabled) private var uiV3Enabled
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    /// Settings › Chat › Projects in the chat list, saved on this device only.
+    @AppStorage(ChatLayoutPreferences.showsChatProjectKey)
+    private var showsChatProject = ChatLayoutPreferences.showsChatProjectByDefault
     private enum ActionDialog {
         case rename(SessionSummary)
         case delete(SessionSummary)
@@ -772,11 +775,17 @@ struct SessionsView: View {
                 } label: {
                     VStack(spacing: 5) {
                         SessionIdentityView(session: session, agents: agents, size: 64, state: state)
-                        Text(session.title)
-                            .font(.system(size: pinnedTitleSize, weight: .semibold))
-                            .foregroundStyle(theme.primaryText)
-                            .lineLimit(1)
-                            .frame(maxWidth: .infinity)
+                        // As Bots mode's top bots: the dot after the name.
+                        HStack(spacing: BighelpTokens.space4) {
+                            Text(session.title)
+                                .font(.system(size: pinnedTitleSize, weight: session.isUnread ? .bold : .semibold))
+                                .foregroundStyle(theme.primaryText)
+                                .lineLimit(1)
+                            if session.isUnread {
+                                Circle().fill(theme.information).frame(width: 9, height: 9)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
                         if state != .idle {
                             AgentLiveStateLabel(state: state, font: .system(size: sectionCaptionSize))
                         }
@@ -796,7 +805,8 @@ struct SessionsView: View {
                 #endif
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Pinned chat, \(session.title)")
-                .accessibilityValue(state == .idle ? "" : state.label)
+                .accessibilityValue([session.isUnread ? "Unread" : nil, state == .idle ? nil : state.label]
+                    .compactMap { $0 }.joined(separator: ", "))
                 .accessibilityIdentifier("session.pin.\(session.id)")
             }
         }
@@ -807,7 +817,7 @@ struct SessionsView: View {
 
     private func nativeSessionButton(_ session: SessionSummary, model: SessionsModel) -> some View {
         Button { onSelect(session) } label: {
-            SessionRow(session: session, agents: agents)
+            SessionRow(session: session, agents: agents, showsProject: showsChatProject && !organizeByProjects)
         }
         .buttonStyle(.plain)
         .disabled(mutatingSessionIDs.contains(session.id))
@@ -818,6 +828,19 @@ struct SessionsView: View {
         .contextMenu { sessionActions(session, model: model) }
         .swipeActions(edge: .leading, allowsFullSwipe: false) {
             if model.canManageConversation(session) {
+                // Only a computer that keeps read state can take it (`tracksUnread`).
+                if session.tracksUnread {
+                    Button {
+                        performMutation(sessionID: session.id) {
+                            try await model.setSessionUnread(id: session.id, unread: !session.isUnread)
+                        }
+                    } label: {
+                        Label(session.isUnread ? "Read" : "Unread",
+                              systemImage: session.isUnread ? "message" : "message.badge")
+                    }
+                    .tint(theme.information)
+                    .accessibilityIdentifier("session.swipe.unread.\(session.id)")
+                }
                 Button {
                     performMutation(sessionID: session.id) {
                         try await model.setSessionPinned(id: session.id, pinned: !session.isPinned)
@@ -867,14 +890,23 @@ struct SessionsView: View {
         projectMove != nil && session.kind == .direct && session.agentIDs.count == 1
     }
 
+    /// Move to Project…, showing the project the chat is in now, as the chat's ⋯ menu does,
+    /// so nobody has to open the sheet to find out where the chat lives.
     @ViewBuilder
     private func moveToProjectButton(_ session: SessionSummary) -> some View {
         if canMoveToProject(session) {
             Button {
                 projectMoveTarget = session
             } label: {
-                Label("Move to Project…", systemImage: "folder")
+                Text(dynamicTypeSize.isAccessibilitySize ? "Move…" : "Move to Project…")
+                if !dynamicTypeSize.isAccessibilitySize,
+                   let name = session.workspaceName, !name.isEmpty {
+                    Text(name)
+                }
+                Image(systemName: "folder")
             }
+            .accessibilityLabel(session.workspaceName.map { "Move to Project…, now in \($0)" }
+                ?? "Move to Project…")
             .accessibilityIdentifier("session.action.move-project.\(session.id)")
         }
     }
@@ -900,6 +932,18 @@ struct SessionsView: View {
                 Label(session.isPinned ? "Unpin" : "Pin", systemImage: session.isPinned ? "pin.slash" : "pin")
             }
             .accessibilityIdentifier("session.action.pin.\(session.id)")
+
+            if session.tracksUnread {
+                Button {
+                    performMutation(sessionID: session.id) {
+                        try await model.setSessionUnread(id: session.id, unread: !session.isUnread)
+                    }
+                } label: {
+                    Label(session.isUnread ? "Mark Read" : "Mark Unread",
+                          systemImage: session.isUnread ? "message" : "message.badge")
+                }
+                .accessibilityIdentifier("session.action.unread.\(session.id)")
+            }
 
             Button {
                 performMutation(sessionID: session.id) {
@@ -937,19 +981,25 @@ struct SessionsView: View {
                 projectMoveTarget = session
             })
         }
-        items += [
-            MacTileMenu.Item(title: session.isPinned ? "Unpin" : "Pin",
-                             systemImage: session.isPinned ? "pin.slash" : "pin") {
+        items.append(MacTileMenu.Item(title: session.isPinned ? "Unpin" : "Pin",
+                                      systemImage: session.isPinned ? "pin.slash" : "pin") {
+            performMutation(sessionID: session.id) {
+                try await model.setSessionPinned(id: session.id, pinned: !session.isPinned)
+            }
+        })
+        if session.tracksUnread {
+            items.append(MacTileMenu.Item(title: session.isUnread ? "Mark Read" : "Mark Unread",
+                                          systemImage: session.isUnread ? "message" : "message.badge") {
                 performMutation(sessionID: session.id) {
-                    try await model.setSessionPinned(id: session.id, pinned: !session.isPinned)
+                    try await model.setSessionUnread(id: session.id, unread: !session.isUnread)
                 }
-            },
-            MacTileMenu.Item(title: "Archive", systemImage: "archivebox") {
-                performMutation(sessionID: session.id) {
-                    try await model.archiveSession(id: session.id)
-                }
-            },
-        ]
+            })
+        }
+        items.append(MacTileMenu.Item(title: "Archive", systemImage: "archivebox") {
+            performMutation(sessionID: session.id) {
+                try await model.archiveSession(id: session.id)
+            }
+        })
         if model.canDeleteConversation {
             items.append(MacTileMenu.Item(title: "Delete", systemImage: "trash", isDestructive: true, startsGroup: true) {
                 actionDialog = .delete(session)
@@ -1118,7 +1168,7 @@ struct SessionsView: View {
                                     Button {
                                         onSelect(session)
                                     } label: {
-                                        SessionRow(session: session, agents: agents)
+                                        SessionRow(session: session, agents: agents, showsProject: showsChatProject && !organizeByProjects)
                                     }
                                     .buttonStyle(.plain)
                                     .disabled(mutatingSessionIDs.contains(session.id))
@@ -1148,6 +1198,23 @@ struct SessionsView: View {
                                                 )
                                             }
                                             .accessibilityIdentifier("session.action.pin.\(session.id)")
+
+                                            if session.tracksUnread {
+                                                Button {
+                                                    performMutation(sessionID: session.id) {
+                                                        try await model.setSessionUnread(
+                                                            id: session.id,
+                                                            unread: !session.isUnread
+                                                        )
+                                                    }
+                                                } label: {
+                                                    Label(
+                                                        session.isUnread ? "Mark Read" : "Mark Unread",
+                                                        systemImage: session.isUnread ? "message" : "message.badge"
+                                                    )
+                                                }
+                                                .accessibilityIdentifier("session.action.unread.\(session.id)")
+                                            }
 
                                             Button {
                                                 performMutation(sessionID: session.id) {

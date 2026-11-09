@@ -97,7 +97,60 @@ final class BotDashboardUITests: BighelpUITestCase {
     }
 
     /// Screenshots for design review, only when `BIGHELP_DASHBOARD_SHOTS` names a folder: the
-    /// Dashboard in light and dark, the tutorial, the Templates deck and a brand-new bot. A file
+    /// A tap on an Activities item opens what it did: a subagent's steps and answer, a command's output and a
+    /// routine's result, in light and dark. `BIGHELP_DASHBOARD_SHOTS` names a folder for the screenshots.
+    @MainActor
+    func testActivityReadouts() throws {
+        let folder = ProcessInfo.processInfo.environment["BIGHELP_DASHBOARD_SHOTS"]
+        if let folder { try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true) }
+        func shot(_ name: String, _ app: XCUIApplication) {
+            guard let folder else { return }
+            try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: folder).appendingPathComponent("\(name).png"))
+        }
+        for appearance in ["light", "dark"] {
+            let app = makeApp()
+            app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
+                                   "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", appearance,
+                                   "-bighelp.dashboard.swipe-tutorial-seen", "YES",
+                                   "-bighelp.dashboard.activities.show-routines", "YES"]
+            app.launch()
+            openProfile(app, bot: "simple-bots.primary")
+            let toggle = app.buttons["dashboard.today.toggle"]
+            XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+            toggle.tap()
+
+            func open(_ id: String, expecting element: String, _ name: String, check: () -> Void = {}) {
+                let row = app.buttons["dashboard.today.item.\(id)"]
+                XCTAssertTrue(row.waitForExistence(timeout: 5), "\(id) is in Activities")
+                if !row.isHittable { app.swipeUp() }
+                row.tap()
+                XCTAssertTrue(app.descendants(matching: .any)[element].waitForExistence(timeout: 5),
+                              "\(id) opens with \(element)")
+                check()
+                Thread.sleep(forTimeInterval: 0.6)
+                shot("activity-\(name)-\(appearance)", app)
+                app.buttons["dashboard.activity.done"].tap()
+                XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+            }
+            open("delegation:dinner", expecting: "dashboard.activity.answer", "subagent-done")
+            open("delegation:hotels", expecting: "dashboard.activity.steps", "subagent-running") {
+                // Newest first: how it's going on top, then the running step, down to the first step.
+                let steps = app.descendants(matching: .any)["dashboard.activity.steps"]
+                func row(_ text: String) -> XCUIElement {
+                    steps.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+                }
+                let working = row("Working"), newest = row("lisbon-trip.md"), first = row("alfama hotels october")
+                XCTAssertTrue(working.exists && newest.exists && first.exists, "The timeline shows its rows")
+                XCTAssertLessThan(working.frame.minY, newest.frame.minY, "How it's going is on top")
+                XCTAssertLessThan(newest.frame.minY, first.frame.minY, "The running step is above the first step")
+            }
+            open("message:sleep", expecting: "dashboard.activity.output", "command-failed")
+            open("cron:brief", expecting: "dashboard.activity.answer", "routine")
+            app.terminate()
+        }
+    }
+
+    /// Dashboard in light and dark, the tutorial, Today open, a brand-new bot and the Templates deck. A file
     /// `drag-start` there tells a watcher outside the test when a card is held mid-swipe.
     @MainActor
     func testDashboardScreenshots() throws {
@@ -147,7 +200,25 @@ final class BotDashboardUITests: BighelpUITestCase {
                 Thread.sleep(forTimeInterval: 0.8)
             }
 
-            app.buttons["dashboard.templates"].tap()
+            // Today: closed over the piles, then open on the demo's background work.
+            let today = app.buttons["dashboard.today.toggle"]
+            XCTAssertTrue(today.waitForExistence(timeout: 5))
+            XCTAssertEqual(today.value as? String, "Closed", "Today stays closed until the person opens it")
+            today.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["dashboard.today.item.delegation:hotels"]
+                .waitForExistence(timeout: 5))
+            Thread.sleep(forTimeInterval: 0.6)
+            shot("today-\(appearance)", app)
+            today.tap()
+            app.terminate()
+
+            // The demo's brand-new bot: every pile empty, Templates from the empty Feed.
+            app.launch()
+            openProfile(app, bot: "simple-bots.bot.home")
+            XCTAssertTrue(app.descendants(matching: .any)["dashboard.feed.empty"].waitForExistence(timeout: 10))
+            Thread.sleep(forTimeInterval: 0.6)
+            shot("empty-bot-\(appearance)", app)
+            app.buttons["dashboard.feed.empty.templates"].tap()
             XCTAssertTrue(app.descendants(matching: .any)["dashboard.templates.sheet"].waitForExistence(timeout: 5))
             Thread.sleep(forTimeInterval: 0.8)
             shot("templates-\(appearance)", app)
@@ -155,14 +226,6 @@ final class BotDashboardUITests: BighelpUITestCase {
             Thread.sleep(forTimeInterval: 0.6)
             shot("templates-goals-\(appearance)", app)
             app.buttons["dashboard.templates.done"].tap()
-            app.terminate()
-
-            // The demo's brand-new bot: every pile empty.
-            app.launch()
-            openProfile(app, bot: "simple-bots.bot.home")
-            XCTAssertTrue(app.descendants(matching: .any)["dashboard.feed.empty"].waitForExistence(timeout: 10))
-            Thread.sleep(forTimeInterval: 0.6)
-            shot("empty-bot-\(appearance)", app)
             app.terminate()
         }
     }

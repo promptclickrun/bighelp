@@ -200,3 +200,97 @@ struct GeminiLiveTranslator {
         .event(["kind": .string(kind), "role": .string(role), "text": .string(String(text.suffix(8_000)))])
     }
 }
+
+/// Why Gemini's socket closed. Gemini refuses a call by closing the socket with a code and its reason
+/// ("Token has been used too many times", "new_session_expire_time deadline exceeded", a model it doesn't
+/// have), and the call screen said "Gemini ended the call" for all of them (#888). Kept for the call screen,
+/// the call's report and the `LiveVoiceAudio` log; never the token.
+struct GeminiLiveClose: Error, Equatable, Sendable {
+    /// Gemini had set the session up (`setupComplete`): the call was working.
+    var ready: Bool
+    /// The WebSocket close code Gemini sent.
+    var code: Int?
+    /// Gemini's own reason, `sanitized`.
+    var reason: String?
+    /// Gemini answered the socket's opening request with this HTTP status instead.
+    var httpStatus: Int?
+    /// Nothing came from Gemini: the network failed with this error code (a `URLError` code, else the
+    /// underlying one, often POSIX).
+    var networkError: Int?
+
+    /// WebSocket close reasons are at most 123 bytes; anything longer isn't Gemini's.
+    static let maximumReasonLength = 160
+
+    init(ready: Bool, code: Int? = nil, reason: String? = nil, httpStatus: Int? = nil, networkError: Int? = nil) {
+        self.ready = ready
+        self.code = code
+        self.reason = reason
+        self.httpStatus = httpStatus
+        self.networkError = networkError
+    }
+
+    /// What `task` knows once a send or receive on it failed with `error`.
+    init(task: URLSessionWebSocketTask, error: any Error, ready: Bool) {
+        let code = task.closeCode == .invalid ? nil : task.closeCode.rawValue
+        let status = (task.response as? HTTPURLResponse)?.statusCode
+        let refused = status.flatMap { $0 == 101 ? nil : $0 }
+        self.init(ready: ready, code: code,
+                  reason: task.closeReason.flatMap { Self.sanitized(String(decoding: $0, as: UTF8.self)) },
+                  httpStatus: refused,
+                  networkError: code == nil && refused == nil ? (error as? URLError)?.code.rawValue ?? (error as NSError).code : nil)
+    }
+
+    /// The `closed` call event's fields, through `NativeLiveVoiceSession` to `LiveVoiceModel`.
+    var event: [String: BighelpJSONValue] {
+        var event: [String: BighelpJSONValue] = ["kind": .string("closed"), "ready": .boolean(ready)]
+        if let code { event["closeCode"] = .integer(code) }
+        if let reason { event["reason"] = .string(reason) }
+        if let httpStatus { event["httpStatus"] = .integer(httpStatus) }
+        if let networkError { event["networkError"] = .integer(networkError) }
+        return event
+    }
+
+    /// Nil for a `closed` event without Gemini's details (a host's own close).
+    init?(event: [String: BighelpJSONValue]) {
+        guard let ready = event["ready"]?.boolean else { return nil }
+        self.init(ready: ready, code: event["closeCode"]?.integer,
+                  reason: event["reason"]?.string.flatMap(Self.sanitized),
+                  httpStatus: event["httpStatus"]?.integer, networkError: event["networkError"]?.integer)
+    }
+
+    /// What the call screen says, with Gemini's own words when it gave a reason.
+    var message: String {
+        let said = reason.map { " Gemini said: “\($0)”" } ?? ""
+        if ready {
+            if networkError != nil { return "The connection to Gemini dropped. Work you started keeps going." }
+            if code == nil || code == URLSessionWebSocketTask.CloseCode.normalClosure.rawValue, reason == nil {
+                return "Gemini ended the call. Work you started keeps going."
+            }
+            return "Gemini ended the call.\(said) Work you started keeps going."
+        }
+        if let httpStatus { return "Gemini refused the call (HTTP \(httpStatus))." }
+        if let reason { return "Gemini didn't start the call. Gemini said: “\(reason)”" }
+        if let code { return "Gemini didn't start the call (code \(code))." }
+        return "This \(BighelpPlatform.isMac ? "Mac" : "device") couldn't reach Gemini. Check its internet connection, then try again."
+    }
+
+    /// One line for the report and the log.
+    var summary: String {
+        var parts = [ready ? "after setup" : "before setup"]
+        if let code { parts.append("code \(code)") }
+        if let httpStatus { parts.append("HTTP \(httpStatus)") }
+        if let networkError { parts.append("network error \(networkError)") }
+        if let reason { parts.append("“\(reason)”") }
+        return "Gemini closed the socket " + parts.joined(separator: ", ")
+    }
+
+    /// Gemini's reason as words on one line, without anything that looks like a token or a key.
+    static func sanitized(_ text: String) -> String? {
+        var cleaned = String(text.unicodeScalars.map { CharacterSet.controlCharacters.contains($0) ? " " : Character($0) })
+        for secret in [#"auth_tokens/\S+"#, #"AIza[0-9A-Za-z_\-]+"#, #"(?i)key=\S+"#] {
+            cleaned = cleaned.replacingOccurrences(of: secret, with: "…", options: .regularExpression)
+        }
+        cleaned = cleaned.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return cleaned.isEmpty ? nil : String(cleaned.prefix(maximumReasonLength))
+    }
+}

@@ -122,6 +122,7 @@ struct BighelpApp: App {
         if arguments.contains("-use-demo-fixtures"), !arguments.contains("-test-no-configured-hosts") {
             fleet = FleetStore(reader: FleetFixtureReader(), directory: FileManager.default.temporaryDirectory
                 .appending(path: "bighelp-fleet-demo-\(ProcessInfo.processInfo.processIdentifier)"))
+            if SimpleBotsDemoSections.isOn { SimpleBotsDemoSections.seed(fleet) }
             peerHosts = DemoRoomPeerHosts(fleet: fleet)
         }
         #endif
@@ -169,6 +170,25 @@ struct BighelpApp: App {
             }
         }
         PhotoActionsSettingsStore.shared.connection = { imageDraftsConnection().map { ($0.scope, $0.api) } }
+        // Agents' apps: the computer in use, or the demo's sample apps.
+        HTMLAppHost.connection = {
+            if usesDemoWorkspace, !connections.isDirectSelected {
+                let scope = (try? WorkspaceAuthority.fixture(id: demoHosts.selectedHostID ?? "demo"))?.cacheScopeID ?? "demo"
+                return (scope, HTMLAppsAPI(client: DemoHTMLAppsClient.shared))
+            }
+            guard let owner = connections.owner else { return nil }
+            return (owner.cacheScopeID, HTMLAppsAPI(client: DirectHermesHTMLAppsClient(workspace: { connections.workspace })))
+        }
+        let demoAgents = composition.agentDirectory
+        Self.startBotsAppState(registry: hostRegistry, connections: connections, fleet: fleet,
+                               settings: composition.settings, companions: composition.companion,
+                               demo: usesDemoWorkspace ? demoHosts : nil, liveAgents: {
+            if let runtime = nativeWorkspaces.current { return (runtime.authority.cacheScopeID, runtime.agents) }
+            guard usesDemoWorkspace, !connections.isDirectSelected,
+                  let scope = (try? WorkspaceAuthority.fixture(id: demoHosts.selectedHostID ?? "demo"))?.cacheScopeID
+            else { return nil }
+            return (scope, demoAgents)
+        })
         let nativeWorkspaceKey: @MainActor () -> BighelpShortcutWorkspaceKey? = {
             if usesDemoWorkspace, !connections.isDirectSelected { return nil }
             guard hostRegistry.connectionMode == .independent || connections.isDirectSelected else { return nil }
@@ -290,6 +310,11 @@ struct BighelpApp: App {
             BotScreenEventHub.shared.receive(hostID: host.id, event: event)
             Task { @MainActor [weak notificationComposition] in
                 await notificationComposition?.receiveNativeEvent(host, event)
+            }
+        }
+        hostRegistry.onServicesChanged = { [weak nativeWorkspaces] hostID in
+            Task { @MainActor [weak nativeWorkspaces] in
+                await nativeWorkspaces?.reloadAfterHostChange(hostID: hostID)
             }
         }
         _demoHosts = State(initialValue: composition.demoHosts)
@@ -683,6 +708,12 @@ struct BighelpApp: App {
             .environment(\.bighelpNotificationContext, notificationContext)
             .task(id: nativeWorkspaces.synchronizationKey) {
                 await nativeWorkspaces.synchronize()
+            }
+            // Bots mode's order, sections and bot settings from the person's computers.
+            .task(id: Self.botsAppStateKey(connections: workspaceConnections, registry: hostRegistry,
+                                           isActive: scenePhase == .active)) {
+                guard scenePhase == .active else { return }
+                await BotsAppStateSync.shared.sync()
             }
             .environment(\.managedNotificationService, notificationComposition.service)
             .task(id: notificationComposition.revision.description + ":" + hostRegistry.generation.uuidString + ":" + String(scenePhase == .active)) {

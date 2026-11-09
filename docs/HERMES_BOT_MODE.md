@@ -1,30 +1,36 @@
 # Hermes Bot Mode
 
-> Current transport contract: [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md). Its legacy Link transport discussion is historical; the current native groups path uses core JSON-RPC. Where transport details differ, use the versioned native contract and its source links.
+> Transport: [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md). Group chats use Hermes' own `groups.*` JSON-RPC methods over
+> the app's native WebSocket connection to the dashboard. The retired bighelp Link relay plays no part. Some type
+> names still say `Link` (for example `BighelpLinkHermesBotModeClient`, aliased as `HermesHostedRoomClient`); they
+> are legacy names only.
 
 ## Product boundary
 
-bighelp supports Hermes and is building its own bighelp Native harness. Neither
-path replaces the other. The Goose-based iOS/Companion runtime remains under
-development; the local Bot Mode fixture runner is not that production engine.
+Group chats run on Hermes. The local Bot Mode fixture runner
+(`BotModeFixtureClient`) only drives fixtures and tests; it is not a production
+engine.
 
-For Hermes hosts, Hermes owns room membership, routing, task execution,
-idempotency, fencing and the durable event log. The iOS app presents that state through one typed `groups.*` client. It can use
-native authenticated Direct workspace operations or explicitly selected,
-authenticated encrypted Link. Direct does not require a bighelp account.
-The plugin forwards these fixed operations through Hermes' existing
-`tui_gateway.server.handle_request` dispatcher. No second daemon, private
-database adapter or synthesized member-turn prompt is needed.
+Hermes owns room membership, routing, task execution, idempotency, fencing and
+the durable event log. The iOS app presents that state through one typed
+`groups.*` client (`HermesHostedRoomClient`, made in `NativeWorkspaceRuntime`).
+It sends each operation as a `WorkspaceOperation` that
+`DirectHermesWorkspaceClient` maps to a core Hermes JSON-RPC call on the
+signed-in socket, with a fixed list of allowed fields per method. No bighelp
+account, second daemon, private database adapter or synthesized member-turn
+prompt is needed. The plugin is needed only for the optional room activity and
+typing feed (see below), which reads Hermes' own room state through its
+`tui_gateway.server.handle_request` dispatcher.
 
 ## Readiness and ownership
 
-The client is bound to the selected transport's verified authority, selected host
-and authentication/connection generations. Only that host's rooms are listed;
+The client is bound to the current `WorkspaceOwner`: the selected host, its
+sign-in and its connection generation. Only that host's rooms are listed;
 switching hosts retires old catalog results, observers and actions before the
 replacement context is exposed.
 Check ownership and cancellation around every await. A stale completion must
-never update a newly selected instance. Negotiate `groups.capabilities` after
-Link verification. Execution requires protocol 2, a running driver, an authority
+never update a newly selected instance. Negotiate `groups.capabilities` once the
+connection is signed in. Execution requires protocol 2, a running driver, an authority
 identifier, the necessary methods and the `room_identity` and `monotonic_log`
 features. Advertising methods alone does not prove that the driver runs. Peer
 room-link enablement is not required for local hosted rooms.
@@ -75,11 +81,9 @@ verified same-owner data; no automatic cross-owner or cross-transport pending
 intent import is authorized. Hermes history is normally recovered through its
 room catalog and log.
 
-Link advertises `groups-results-v1` for a separately bounded groups-result
-envelope. Only an opted-in request receives the corresponding result marker.
-Legacy envelopes and limits remain unchanged. Native log authority is validated
-at its exact schema path; this never permits gateway or secret-bearing keys in
-arbitrary workspace payloads. Event bytes are never truncated to fit transport.
+Native log authority is validated at its exact schema path; this never permits
+gateway or secret-bearing keys in arbitrary workspace payloads. Event bytes are
+never truncated to fit transport.
 
 ## Agents on other computers
 
@@ -183,6 +187,46 @@ so a local and a peer `default` never share a voice).
   tool calls or claim token streaming when the hosted-room log only provides
   completed member messages.
 
+## Group settings, routing and Continue
+
+Hermes 0.23 keeps settings for the rooms it runs itself (`gateway/hosted_room_context.py`),
+in one `room.context_set` event: `purpose` (one line, at most 500 characters; Hermes
+collapses whitespace), `notes` (at most 4,096 bytes, trimmed), `routing` (`everyone`, the
+default; `lead`; or `auto`) and `lead_member_id` (only with `lead`, a seated member). The app
+goes by what each room returns, never by version:
+
+- `groups.state` returns them as `context`. A room without it has none of these settings,
+  and Group Settings shows only its name and members. A context without `routing`, or with a
+  routing the app doesn't know, hides that choice, and a save leaves `routing` out so Hermes
+  keeps it. `driver_status.routing_modes` says what the room's runtime runs: "Pick who
+  answers" shows only where it lists `auto` (or the room already uses it).
+  `driver_status.max_continues` is how many times one discussion may continue.
+- `groups.context` `{room_id, event_id, purpose, notes, routing?, lead_member_id?}` answers
+  `{context, event}`. An omitted routing field keeps Hermes' value. The edit is saved with the
+  room first (`nativePendingContext`) and keeps its `event_id` until Hermes answers, so a
+  retry after a lost answer gets the first save back. A refusal keeps the edit and says why
+  (another computer runs the room: "This Group Chat is managed by another gateway."). New
+  Group Chat saves its choice the same way once the room exists.
+- A lead's pick is `room.assignment` `{lead_member_id, member_ids, fallback}` (`fallback`: the
+  lead's answer named nobody, so the lead takes it); the automatic pick is `room.routed`
+  `{member_ids, everyone, fallback}` (`fallback`: the pick failed, so everyone answers).
+  @mentions, @all/@everyone, scheduled posts and replies in a thread skip both. Hermes
+  writes them as the room's gateway; the app keeps them, a pause (`room.activity` with
+  `bounded`), `room.continued` and `room.stop_requested` beside the messages
+  (`nativeNotices`, a key older builds don't read) and shows each as one centered line. A
+  line names only members still in the room, and one naming nobody is left out. Which bots an
+  @mention reached isn't in the log, so the app doesn't say it.
+- A discussion pauses after 10 member messages or 3 rounds. `groups.continue`
+  `{room_id, discussion_event_id}` answers `{continued, event}` with a `room.continued` and
+  grants one more budget, at most `max_continues` times. The pause's card offers Continue and
+  Stop (`groups.stop`) until a later Continue or pause for that discussion, a Stop after its
+  message, a newer message in its thread, or the last Continue moves it on (Hermes'
+  `paused_discussion`).
+
+Vectors: `BighelpTests/Fixtures/HermesGroups/room-settings.json`, from the Hermes 0.23.0
+source, not a recording. Tests: `HermesGroupRoomSettingsTests`. Demo: `-preview-group-settings`
+(`GroupSettingsDemoClient`; `-preview-group-settings-refused` refuses every save).
+
 ## Mentions, authors and optional live activity
 
 The hosted driver, not the local fixture parser, chooses recipients. It matches
@@ -244,21 +288,19 @@ an unconfirmed close relies on the host's bounded inactivity lease.
 
 ## Verification and release
 
-Run `HermesBotModeContractTests`, `HermesGroupsHostPathTests` (both paths' recorded replies), `BighelpLinkHermesBotModeClientTests`,
-`BighelpLinkHermesBotModeApprovalTests`, `BotModeRoomStoreTests` and
+Run `HermesBotModeContractTests`, `HermesGroupsHostPathTests` (both paths' recorded replies), `HermesGroupRoomSettingsTests`, `BighelpLinkHermesBotModeClientTests`,
+`BighelpLinkHermesBotModeApprovalTests`, `NativeHermesGroupFlowTests`, `BotModeRoomStoreTests` and
 `ChatBotModeIntegrationTests` along with the chat interaction regression gate.
-The Link client tests cover request shapes, cancelled/stale results, idempotency,
+The `BighelpLinkHermesBotModeClient` tests (a legacy name) cover request shapes, cancelled/stale results, idempotency,
 cursor validation and driver status. Store checks cover persistence, replay,
 capability gating and room execution. Preserve the separate local fixture tests.
 
-Run the plugin contract and workspace-control suites with the official Hermes
-source on `PYTHONPATH`. Publish the matching plugin separately from the iOS
+Run the plugin's room activity tests (`tests/test_room_activity.py`) with the
+official Hermes source on `PYTHONPATH`. Publish the matching plugin separately from the iOS
 archive, then activate it using Hermes' supported installer/updater. An app
 upload does not activate a plugin on a user's host. Record source, simulator,
 live host and TestFlight evidence separately; none substitutes for the others.
-Include `test_hosted_room_contract` and the portable
-`bighelp-plugin/tests/fixtures/groups-result-v1.json` vector for negotiated
-envelope and encryption coverage.
+`Scripts/RoomLinkProbe.py` checks a room across two isolated real hosts.
 
 Room discovery on the Hermes host must exclude invalid profile directories and
 deleted-profile tombstones. In the September 10 host version, enumerating every

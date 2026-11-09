@@ -311,7 +311,8 @@ extension RootShellView {
             }
             return
         }
-        agents.select(agent.id)
+        // Over the primary agent too: a board opened from a chat makes that chat's agent primary.
+        agents.makeHomeAgent(agent.id)
         if appState.selectedTab == .sessions { openHomeChat(replacing: true) }
     }
 
@@ -405,8 +406,7 @@ extension RootShellView {
 
     /// The selected host, when it can make group chats.
     private var groupCreationReadyOwner: WorkspaceOwner? {
-        guard let owner = currentWorkspaceOwner, botModeRooms.canCreateNativeRoom,
-              currentWorkspaceCapabilities.supports(.groupsCreate, owner: owner, profileID: nil) else { return nil }
+        guard let owner = currentWorkspaceOwner, botModeRooms.offersNewGroupChat else { return nil }
         return owner
     }
 
@@ -571,6 +571,8 @@ extension RootShellView {
         let goalCategories: Bool
         let files: Bool
         let answers: Bool
+        let today: Bool
+        let todayDetail: Bool
         let fixtures: Bool
         /// The selected computer will reconnect by itself (it has a saved sign-in).
         let reconnects: Bool
@@ -589,8 +591,12 @@ extension RootShellView {
         let answers = owner.map {
             currentWorkspaceCapabilities.supports(.agentBoardAnswers, owner: $0, profileID: nil)
         } ?? false
+        let today = owner.map { currentWorkspaceCapabilities.supports(.agentToday, owner: $0, profileID: nil) } ?? false
+        let todayDetail = owner.map {
+            currentWorkspaceCapabilities.supports(.agentTodayDetail, owner: $0, profileID: nil)
+        } ?? false
         return AgentBoardClientKey(owner: owner, board: board, feedback: feedback, goalCategories: goalCategories,
-                                   files: files, answers: answers, fixtures: usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true,
+                                   files: files, answers: answers, today: today, todayDetail: todayDetail, fixtures: usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true,
                                    reconnects: nativeWorkspaceStore?.hasSavedConnection == true)
     }
 
@@ -656,7 +662,8 @@ extension RootShellView {
                 cache: .shared) : nil
             let client = DirectHermesAgentBoardClient(workspace: workspace, owner: owner, supportsFeedback: key.feedback,
                                                       supportsGoalCategories: key.goalCategories,
-                                                      supportsAnswers: key.answers, files: files)
+                                                      supportsAnswers: key.answers, supportsToday: key.today,
+                                                      supportsTodayDetail: key.todayDetail, files: files)
             // Feed, Ideas and Goals widgets set to another agent read its board the same way.
             BighelpWidgetBoardLoader.shared.configure(client: client, scope: owner.cacheScopeID)
             await agentBoard.connect(client: client, scope: owner.cacheScopeID)

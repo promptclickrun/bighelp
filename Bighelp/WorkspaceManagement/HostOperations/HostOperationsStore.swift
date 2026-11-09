@@ -34,6 +34,9 @@ final class HostOperationsStore {
     private(set) var errorMessage: String?
     private(set) var successMessage: String?
 
+    /// Called when a gateway start or restart finished: the gateway runs its own copy of the bighelp
+    /// plugin, so the app reads the computer again (`BighelpHostRegistry.noteServicesChanged`).
+    @ObservationIgnored var onServicesChanged: (@MainActor () -> Void)?
     @ObservationIgnored private let client: DirectHermesHostOperationsClient
     @ObservationIgnored private let isCurrent: @MainActor () -> Bool
     @ObservationIgnored private let suppliedOperationTargetProfileID: String?
@@ -635,6 +638,7 @@ final class HostOperationsStore {
         switch status.phase {
         case .succeeded:
             successMessage = "Hermes reported that \(receipt.action.rawValue) completed. Authoritative state was refreshed where available."
+            if receipt.action == .gatewayStart || receipt.action == .gatewayRestart { onServicesChanged?() }
         case .failed(let code):
             errorMessage = "Hermes reported that \(receipt.action.rawValue) failed with exit code \(code). The action was not retried."
         case .outcomeUnknown:

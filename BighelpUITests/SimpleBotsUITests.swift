@@ -45,8 +45,10 @@ final class SimpleBotsUITests: BighelpUITestCase {
             save("simple-settings-\(appearance)", app)
             app.buttons["simple-bots.settings.close"].tap()
 
-            // Create New Bot.
+            // Create New Bot: + opens a short menu, New Bot first.
+            XCTAssertEqual(app.buttons["simple-bots.new"].label, "Add")
             app.buttons["simple-bots.new"].tap()
+            XCTAssertTrue(app.buttons["New Bot"].waitForExistence(timeout: 5))
             app.buttons["New Bot"].tap()
             let name = app.textFields["simple-bots.create.name"]
             XCTAssertTrue(name.waitForExistence(timeout: 5))
@@ -552,7 +554,7 @@ final class SimpleBotsUITests: BighelpUITestCase {
             let bot = app.buttons["simple-bots.bot.travel"]
             XCTAssertTrue(bot.waitForExistence(timeout: 15))
             bot.press(forDuration: 1.2)
-            let labels = ["New Chat", "Pin", "Rearrange", "Mark Unread", "Bot Profile", "Hide"]
+            let labels = ["New Chat", "Pin", "Rearrange", "Move to Section", "Mark Unread", "Bot Profile", "Hide"]
             for label in labels {
                 XCTAssertTrue(app.buttons[label].waitForExistence(timeout: 3), "First-level action: \(label)")
                 XCTAssertTrue(app.buttons[label].isHittable)

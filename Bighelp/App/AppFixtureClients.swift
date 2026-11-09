@@ -308,8 +308,9 @@ final class DemoAgentDirectoryClient: AgentDirectoryClient, AgentListPlacementWr
 }
 
 #if DEBUG
-/// `-test-bot-activity`: on the demo data, Mina is browsing the web in her Bot Chat and Jordan needs
-/// you, so the home's working states show without a host (UI tests and screenshots).
+/// `-test-bot-activity`: on the demo data, Mina is browsing the web in her Bot Chat, Jordan needs
+/// you and Avery has work running in the background, so the home's working states show without a
+/// host (UI tests and screenshots).
 @MainActor
 final class DemoBotChatActivity: BotChatActivityReading {
     static let launchArgument = "-test-bot-activity"
@@ -321,6 +322,7 @@ final class DemoBotChatActivity: BotChatActivityReading {
             result[id] = switch id {
             case "travel": .working(tool: "web_search")
             case "home": .waiting
+            case "finance": .background(BotBackgroundWork(count: 2, title: "Reconcile September card statements"))
             default: .idle
             }
         }

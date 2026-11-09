@@ -4,8 +4,9 @@ import Foundation
 // MARK: - Client
 
 /// Owner-bound client for Hermes host operations. It controls the messaging
-/// gateway only; there is deliberately no API or label for restarting
-/// `hermes serve` from the connection it hosts.
+/// gateway only: Hermes has no API for restarting the dashboard (`hermes serve`)
+/// from the connection it hosts. The bighelp plugin running in the dashboard
+/// does that in place (`DirectHermesNativePluginClient.restartHost`).
 @MainActor
 final class DirectHermesHostOperationsClient: HermesHostActionStatusClient {
     nonisolated static let maximumRawConfigurationBytes = 256 * 1_024

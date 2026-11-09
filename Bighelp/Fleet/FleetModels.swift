@@ -70,6 +70,8 @@ struct FleetGroup: Codable, Equatable, Sendable, Identifiable {
     var isWorking: Bool
     var canRename: Bool
     var canDelete: Bool
+    /// Its members' profile IDs on that host, for their faces; nil in snapshots saved before.
+    var memberIDs: [String]? = nil
 
     var id: String { FleetID.make(hostID, "group/" + roomID) }
 }
@@ -80,18 +82,22 @@ struct FleetBotChat: Codable, Equatable, Sendable {
 
     var state: State
     var tool: String? = nil
+    /// Work it ran in the background while idle (`native-agents-background-v1`); nil in older copies.
+    var backgroundCount: Int? = nil
+    var backgroundTitle: String? = nil
 
     init(_ activity: BotChatActivity) {
         switch activity {
         case .idle: state = .idle
         case .working(let tool): state = .working; self.tool = tool
         case .waiting: state = .waiting
+        case .background(let work): state = .idle; backgroundCount = work.count; backgroundTitle = work.title
         }
     }
 
     var activity: BotChatActivity {
         switch state {
-        case .idle: .idle
+        case .idle: backgroundCount.flatMap { $0 > 0 ? .background(BotBackgroundWork(count: $0, title: backgroundTitle)) : nil } ?? .idle
         case .working: .working(tool: tool)
         case .waiting: .waiting
         }
@@ -168,6 +174,8 @@ enum FleetOpen: Equatable, Sendable {
     case task(jobID: String, profileID: String)
     case newChat(profileID: String)
     case group(roomID: String)
+    /// A group chat's settings (Bots mode's Group Settings).
+    case groupSettings(roomID: String)
     /// A new group chat with these agents, from New chat's Group chat. `peers`
     /// are agents on other computers; this host is the group's home.
     case newGroup(profileIDs: [String], peers: [HermesBotModePeerCandidate] = [])
@@ -210,7 +218,7 @@ struct FleetPendingOpen: Equatable, Sendable {
         switch open {
         case .agent(let id), .newChat(let id), .routines(let id), .botProfile(let id): id
         case .chat(let id, _, _), .task(_, let id): id
-        case .group, .newGroup, .destination: nil
+        case .group, .groupSettings, .newGroup, .destination: nil
         }
     }
 }

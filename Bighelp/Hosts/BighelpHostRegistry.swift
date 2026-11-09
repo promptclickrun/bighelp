@@ -98,6 +98,8 @@ final class BighelpHostRegistry {
     @ObservationIgnored var nativeChatPrepared: ((BighelpConfiguredHost, DirectHermesChat) -> Void)?
     @ObservationIgnored var prepareChat: ((BighelpConfiguredHost, DirectHermesChat) async throws -> Void)?
     @ObservationIgnored var onNativeEvent: ((BighelpConfiguredHost, DirectHermesEvent) -> Void)?
+    /// Called with a host whose computer serves something new (`noteServicesChanged`).
+    @ObservationIgnored var onServicesChanged: ((UUID) -> Void)?
     @ObservationIgnored private var workspaces: [UUID: DirectHermesWorkspaceStore] = [:]
     @ObservationIgnored private var vaults: [UUID: DirectHermesKeychainVault] = [:]
     @ObservationIgnored private var draftStores: [UUID: DirectHermesDraftStore] = [:]
@@ -162,6 +164,13 @@ final class BighelpHostRegistry {
             deviceID: linkedDeviceID, authorizationEpoch: linkedAuthorizationEpoch,
             mode: .link, forceReload: false
         )
+    }
+
+    /// Something on `hostID`'s computer changed what it serves: the bighelp plugin was installed or
+    /// turned on, or its dashboard or messaging gateway restarted. The app then reads that computer
+    /// again, so its features and modes show what it serves now.
+    func noteServicesChanged(hostID: UUID) {
+        onServicesChanged?(hostID)
     }
 
     /// Publishes a feature-ready token only for the still-current host owner.
@@ -411,6 +420,9 @@ final class BighelpHostRegistry {
         Task { await AgentAttachmentCache.shared.removeAll() }
         // Photo drafts' edits and pending Saves hold a person's details; same one-way names, same rule.
         ImageDraftStore.shared.eraseLocalData()
+        // Agents' apps: their pages kept on the phone and what each page stored for itself.
+        HTMLAppCache().eraseAll()
+        Task { await HTMLAppWebView.eraseStorage() }
         vault.invalidate(); draftStores[host.id]?.invalidate()
         hosts = remaining; selectedHostID = selection
         selectedWorkspace = selectedHost.map { workspace(for: $0) }

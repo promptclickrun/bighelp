@@ -38,9 +38,9 @@ final class NativeSubagentProductionUITests: BighelpUITestCase {
                       "The delegated prompt must be sendable.")
         send.tap()
 
-        let rail = app.buttons["chat.session-status.subagents"]
+        let rail = app.buttons["chat.session-status.background"]
         XCTAssertTrue(rail.waitForExistence(timeout: 60),
-                      "A native subagent start event must surface the Subagents rail.")
+                      "A native subagent start event must surface the background chip.")
         capture("real-subagent-rail-running-2102", app, directory: artifactDirectory)
 
         rail.tap()
@@ -134,7 +134,7 @@ final class NativeSubagentProductionUITests: BighelpUITestCase {
             thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98))
         )
         let closed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            !app.navigationBars["Subagents"].exists && !app.navigationBars["Session agents"].exists
+            !app.navigationBars["In the background"].exists && !app.navigationBars["Session agents"].exists
         }, object: app)
         XCTAssertEqual(
             XCTWaiter.wait(for: [closed], timeout: 10),

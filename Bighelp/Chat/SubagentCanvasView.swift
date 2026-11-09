@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Watch one helper agent: what it was asked, its steps as they happen in the
-/// chat's own tool folders, and how it ended. It follows the chat's model, so
-/// it updates while open and keeps the end state after the helper finishes.
+/// chat's own tool folders (one folder once it ends, as the chat folds a finished
+/// turn), and how it ended. It follows the chat's model, so it updates while open
+/// and keeps the end state after the helper finishes.
 struct SubagentCanvasView: View {
     let model: ChatModel
     let subagentID: String
@@ -247,19 +248,7 @@ struct SubagentCanvasView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("subagent.canvas.waiting")
             } else {
-                LazyVStack(alignment: .leading, spacing: BighelpTokens.space16) {
-                    ForEach(entries) { entry in
-                        switch entry {
-                        case .message(let item):
-                            TimelineItemView(item: item, onApprovalTap: { _ in })
-                        case .activity(let turn):
-                            ChatActivityTurnView(
-                                turn: turn,
-                                isLive: state.phase == .working && entry.id == entries.last?.id
-                            )
-                        }
-                    }
-                }
+                ChatFoldedSteps(entries: entries, activityEvents: transcript.events, isLive: isRunning(state))
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("subagent.canvas.steps")
             }

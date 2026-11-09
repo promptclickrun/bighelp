@@ -18,13 +18,15 @@ extension RootShellView {
     /// chat takes its place (starting a new chat replaces the chat on top) with its text.
     func replaceLostChat(id: String, agentID: String?, text: String) {
         guard case .chat(let shown)? = appState.path.last, shown == id else { return }
+        let retired = featureStore.takeRetiredUnsentChat(id: id)
         let remembered = appState.suspendedChat?.chatID == id ? appState.suspendedChat : nil
         appState.suspendedChat = nil
-        let draft = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? (remembered?.text ?? "") : text
+        let draft = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? (retired?.text ?? remembered?.text ?? "") : text
         if !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             appState.leaveComposerText(draft)
         }
-        startNewChat(explicitAgentID: agentID ?? remembered?.agentID)
+        startNewChat(explicitAgentID: agentID ?? retired?.agentID ?? remembered?.agentID)
     }
 
     /// A chat screen left without its chat (its live state was let go while it was open): open the
@@ -45,11 +47,23 @@ extension RootShellView {
         }
     }
 
-    /// Hooks the store's retire signal to the screen. Called whenever the root appears.
+    /// Hooks the store's retire signal to the screen: again for each computer's store, since a
+    /// computer switch keeps this view and hands it the new one (as `DriveShellHooks` does, #666).
     func watchForLostChats() {
         featureStore.onUnsentChatRetired = { id, agentID, text in
             replaceLostChat(id: id, agentID: agentID, text: text)
         }
+    }
+}
+
+/// Hands the screen's lost-chat hook to each computer's store (`watchForLostChats`). Its own
+/// modifier: in `RootShellView`'s body the type checker ran out of time.
+struct LostChatHooks: ViewModifier {
+    let featureStore: ShellFeatureStore
+    let attach: () -> Void
+
+    func body(content: Content) -> some View {
+        content.onChange(of: ObjectIdentifier(featureStore), initial: true) { attach() }
     }
 }
 

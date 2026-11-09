@@ -182,7 +182,8 @@ extension ChatView {
             Color.clear.frame(height: BighelpTokens.space4)
         case .agentTalk(let talk):
             ChatAgentTalkRail(talk: talk, chatAgentID: model.agentID, senderResolver: senderResolver,
-                              live: model.agentTalkLive.activities, loadSteps: model.agentTalkStepsLoader)
+                              live: model.agentTalkLive.activities, loadSteps: model.agentTalkStepsLoader,
+                              access: model.agentTalkRunAccess, onDisclosureChange: beginDisclosureReview)
         case .earlierMessage(let item):
             // Not one of this chat's own messages: Try again couldn't reach it.
             TimelineItemView(item: item, onApprovalTap: onApprovalTap,
@@ -193,6 +194,19 @@ extension ChatView {
         case .staged(let item):
             TimelineItemView(item: item, onApprovalTap: onApprovalTap, pendingSend: .staged,
                              senderResolver: senderResolver, mentionIdentities: model.messageMentionIdentities)
+        case .groupNotice(let notice):
+            let discussion = notice.pausedDiscussionEventID
+            BotModeRoomNoticeView(
+                notice: notice,
+                isContinuing: discussion.map { model.botModeRoomStore?.nativeContinuesInFlight.contains($0) == true } ?? false,
+                isStopping: model.isBotModeStopInFlight,
+                problem: discussion.flatMap { model.botModeRoomStore?.nativeContinueProblems[$0] },
+                onContinue: {
+                    guard let discussion else { return }
+                    Task { await model.continueBotModeDiscussion(discussion) }
+                },
+                onStop: { Task { await model.stopPausedBotModeDiscussion() } }
+            )
         case .divider(let title): timelineDivider(title)
         case .previousHistory: previousHistoryButton
         case .welcome: emptyTimeline

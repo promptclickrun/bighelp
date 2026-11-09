@@ -21,6 +21,8 @@ struct AgentsView: View {
     /// Which agents' Bot Chats are working or need you, kept current while this screen shows.
     var botChatActivity: BotChatActivityStore? = nil
     var botChatActivitySource: BotChatActivitySource? = nil
+    /// The sections, as cards that open their pages (Bots mode's); nil or empty shows nothing.
+    var sectionCards: AnyView? = nil
 
     @State private var query = ""
     @State private var groupPreferences = AgentGroupPreferences()
@@ -111,6 +113,16 @@ struct AgentsView: View {
                         .bighelpListSearchRow()
                 }
                 if showsFeatured { featuredSection(states) }
+                if query.isEmpty, groupFilterProfileID == nil, let sectionCards {
+                    Section {
+                        sectionCards
+                            .listRowInsets(EdgeInsets(top: BighelpTokens.space4, leading: 0,
+                                                      bottom: BighelpTokens.space8, trailing: 0))
+                            .listRowSeparator(.hidden)
+                    }
+                    .listRowBackground(theme.canvas)
+                    .listSectionSeparator(.hidden)
+                }
                 ForEach(
                     AgentDirectoryPresentation.sectionOrder(filteredToProfileID: groupFilterProfileID),
                     id: \.self
@@ -582,7 +594,7 @@ struct AgentsView: View {
     }
 
     private var canCreateGroup: Bool {
-        onAction != nil && supports(.groupsCreate) && botModeRooms?.canCreateNativeRoom == true
+        onAction != nil && botModeRooms?.offersNewGroupChat == true
     }
 
     /// Direct native runtime owns the initial agent and room refresh so a view

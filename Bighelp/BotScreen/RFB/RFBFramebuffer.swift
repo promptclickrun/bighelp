@@ -110,4 +110,8 @@ enum RFBError: Error, Equatable {
     case unsupportedSecurity
     /// The server said no during the handshake.
     case refused(String)
+    /// The screen asks for its VNC password, and bighelp has none for it.
+    case needsPassword
+    /// The VNC password didn't work.
+    case wrongPassword
 }

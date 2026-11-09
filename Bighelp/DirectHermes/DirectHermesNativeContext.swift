@@ -411,10 +411,31 @@ final class DirectHermesNativePluginClient {
         case .chatStop:
             return Route(path: "chat/stop", feature: DirectHermesAgentTalkReader.chatActivityFeature,
                          isMutation: true, maximumResponseBytes: 4_096, timeout: 10)
+        case .chatLive:
+            // Waits up to 10 seconds for new frames; an answer holds a turn's text and tool output.
+            return Route(path: "chat/live", feature: DirectHermesAgentTalkReader.chatLiveFeature, isMutation: false,
+                         maximumResponseBytes: 2_097_152, timeout: 30)
+        case .agentDeliveries:
+            // Read every few seconds while a message to another agent is out; replies are at most 32,000 characters.
+            return Route(path: "agents/deliveries", feature: DirectHermesAgentTalkReader.deliveriesFeature,
+                         isMutation: false, maximumResponseBytes: 1_048_576, timeout: 10)
         case .agentsActivity:
             // Read every few seconds while Bots mode's home or the Agents screen shows; at most 64 agents.
             return Route(path: "agents/activity", feature: DirectHermesBotChatActivityClient.feature,
                          isMutation: false, maximumResponseBytes: 32_768, timeout: 10)
+        case .computerScreenStatus, .computerScreenObserve:
+            // Read when the Computer tab shows, and once for each viewer connection.
+            return Route(path: operation.rawValue.replacingOccurrences(of: ".", with: "/"),
+                         feature: LiveComputerScreenService.feature, isMutation: false,
+                         maximumResponseBytes: 4_096, timeout: 10)
+        case .agentsToday:
+            // Read while a bot's Dashboard shows; at most 200 short rows (the plugin caps the answer at 512 KB).
+            return Route(path: "agents/today", feature: AgentTodayItem.feature,
+                         isMutation: false, maximumResponseBytes: 524_288, timeout: 15)
+        case .agentsTodayDetail:
+            // Read while one item's read-out shows; the plugin caps the answer at 512 KB.
+            return Route(path: "agents/today/detail", feature: AgentTodayDetail.feature,
+                         isMutation: false, maximumResponseBytes: 524_288, timeout: 15)
         case .coreFilesList, .coreFilesRead, .coreFilesWrite:
             // A file is at most 512 KB, sent whole.
             return Route(path: operation.rawValue.replacingOccurrences(of: ".", with: "/"),
@@ -453,6 +474,11 @@ final class DirectHermesNativePluginClient {
         case .myTemplatesDelete:
             return Route(path: "my-templates/delete", feature: MyTemplatesWire.feature, isMutation: true,
                          maximumResponseBytes: 16_384)
+        case .appStateRead, .appStateWrite:
+            // Two keys of at most 64 KB each; a person's whole file is at most 512 KB.
+            return Route(path: operation.rawValue.replacingOccurrences(of: ".", with: "/"),
+                         feature: AppStateWire.feature, isMutation: operation == .appStateWrite,
+                         maximumResponseBytes: 589_824, timeout: 20)
         case .vaultLink:
             return Route(path: "vault/link", feature: CredentialVault.linkFeature, isMutation: true,
                          maximumResponseBytes: 65_536)
@@ -483,6 +509,13 @@ final class DirectHermesNativePluginClient {
             // image-drafts.claim -> image-drafts/claim
             return Route(path: operation.rawValue.replacingOccurrences(of: ".", with: "/"),
                          feature: ImageDraftWire.feature, isMutation: true, maximumResponseBytes: 16_384)
+        case .htmlAppsGet:
+            // A page in pieces of up to 2 MiB, base64 in JSON: every piece fits the usual answer cap.
+            return Route(path: "html-apps/get", feature: HTMLAppWire.feature, isMutation: false, timeout: 60)
+        case .htmlAppsData:
+            // Read every few seconds while a live app is open; at most 1 MiB of data.
+            return Route(path: "html-apps/data", feature: HTMLAppWire.feature, isMutation: false,
+                         maximumResponseBytes: 2 * 1_024 * 1_024 + 131_072, timeout: 10)
         case .peopleSpeaking:
             // Sent before each message; a slow host never holds a message for long.
             return Route(path: "people/speaking", feature: "native-people-v1", isMutation: true,

@@ -46,6 +46,7 @@ extension ChatModel {
         // (or queues) through sendMidSession, which has its own checks.
         guard permitsOrdinaryComposerSend,
               isBotMode || isMidSessionTurnLive || directTransportIsReady || stagesComposerMessage else { return }
+        ChatPerformanceProbe.sendTapped(self)
         // iOS starts a Live Activity only while bighelp is in front, and a turn with a file starts after
         // the file is up, often after the person left: the card starts now and the turn joins it.
         if !isBotMode, !isMidSessionTurnLive { nativeConversationClient?.onSendStarted?() }
@@ -82,6 +83,7 @@ extension ChatModel {
             return
         }
         if isSending {
+            ChatPerformanceProbe.sendJoinedTurn(in: self)
             await sendMidSession(using: defaultMidSessionBehavior)
             return
         }
@@ -190,6 +192,7 @@ extension ChatModel {
             if let item = items.last {
                 localHumanID = item.id
                 appendProjectedMessage(item)
+                ChatPerformanceProbe.sendRow(item.id, staged: false, fromComposer: restoresDraft, in: self)
             }
         }
         // A staged message left the box when it was staged; the box holds the next one now.
@@ -203,6 +206,9 @@ extension ChatModel {
         if let roomID = botModeRoomID,
            let botModeRoomStore,
            botModeRoomStore.room(id: roomID) != nil {
+            // The room's own row for it comes after several reads of the room; the person sees it now.
+            let outgoing = beginBotModeOutgoing(message)
+            defer { dropBotModeOutgoing(outgoing) }
             do {
                 try await botModeRoomStore.send(
                     text: message,
@@ -210,7 +216,8 @@ extension ChatModel {
                     senderSnapshot: currentUserSnapshot,
                     activitySink: { [weak self] activity in
                         self?.acceptBotModeActivity(activity)
-                    }
+                    },
+                    onAccepted: { [weak self] in self?.acceptBotModeOutgoing(outgoing, eventID: $0) }
                 )
                 guard isCurrentOwner(generation) else { return }
                 if botModeRoomStore.room(id: roomID)?.memberFailures.isEmpty == false {
@@ -278,17 +285,22 @@ extension ChatModel {
             return
         }
 
+        if let localHumanID { ChatPerformanceProbe.sendHandedOff(localHumanID) }
         do {
             let response = try await sendAwaitingClient {
                 try await sendThroughClient(
                     message,
                     attachments: attachments,
                     slashSelection: slashSelection,
-                    ownerGeneration: generation
+                    ownerGeneration: generation,
+                    timedRow: localHumanID
                 )
             }
             guard isCurrentOwner(generation) else { return }
             try appendValidated(response.items)
+            for item in response.items where item.role == .assistant {
+                ChatPerformanceProbe.answerReceived(item.id, answering: localHumanID, in: self)
+            }
             if attachments.isEmpty,
                DirectHermesGoalControlProjection.argument(from: message) != nil {
                 await refreshNativeGoalControl(reportFailure: true)
@@ -357,6 +369,11 @@ extension ChatModel {
     }
 
     func stop() async {
+        // A turn this chat only watches stops where it runs.
+        if followsGatewayTurn {
+            await stopOtherProcessRun()
+            return
+        }
         guard canStop else { return }
         if let roomID = botModeRoomID, let botModeRoomStore {
             let generation = ownerGeneration
@@ -604,12 +621,15 @@ extension ChatModel {
             switch request {
             case .botModeSend(let message, let roomID):
                 guard let botModeRoomStore else { throw BotModeRoomError.roomNotFound }
+                let outgoing = beginBotModeOutgoing(message)
+                defer { dropBotModeOutgoing(outgoing) }
                 try await botModeRoomStore.send(
                     text: message,
                     roomID: roomID,
                     activitySink: { [weak self] activity in
                         self?.acceptBotModeActivity(activity)
-                    }
+                    },
+                    onAccepted: { [weak self] in self?.acceptBotModeOutgoing(outgoing, eventID: $0) }
                 )
                 guard isCurrentOwner(generation) else { return }
                 draft = ""
@@ -690,11 +710,13 @@ extension ChatModel {
         return try await body()
     }
 
+    /// `timedRow` is the person's row this send answers, for the chat speed checks (`ChatPerformanceProbe`).
     func sendThroughClient(
         _ message: String,
         attachments: [ChatAttachment] = [],
         slashSelection: SlashCommandSelection? = nil,
-        ownerGeneration: Int
+        ownerGeneration: Int,
+        timedRow: String? = nil
     ) async throws -> ConversationResponse {
         try validateAttachmentSupport(attachments)
         // A command's failure isn't sent again as text.
@@ -702,7 +724,7 @@ extension ChatModel {
         if attachments.isEmpty, let slashSelection, let native = nativeConversationClient {
             return try await native.sendCommand(message: message, selection: slashSelection,
                 conversationID: conversationID, onDraft: { [weak self] item in
-                    self?.acceptStreamingDraft(item, ownerGeneration: ownerGeneration)
+                    self?.acceptTimedDraft(item, ownerGeneration: ownerGeneration, timedRow: timedRow)
                 })
         }
         if let attachmentClient = client as? any AttachmentConversationClient {
@@ -711,7 +733,7 @@ extension ChatModel {
                 attachments: attachments,
                 conversationID: conversationID,
                 onDraft: { [weak self] item in
-                    self?.acceptStreamingDraft(item, ownerGeneration: ownerGeneration)
+                    self?.acceptTimedDraft(item, ownerGeneration: ownerGeneration, timedRow: timedRow)
                 }
             )
         }
@@ -722,9 +744,15 @@ extension ChatModel {
             message: message,
             conversationID: conversationID,
             onDraft: { [weak self] item in
-                self?.acceptStreamingDraft(item, ownerGeneration: ownerGeneration)
+                self?.acceptTimedDraft(item, ownerGeneration: ownerGeneration, timedRow: timedRow)
             }
         )
+    }
+
+    /// A draft this send's own client call delivered: it answers `timedRow`.
+    private func acceptTimedDraft(_ item: TimelineItem, ownerGeneration: Int, timedRow: String?) {
+        acceptStreamingDraft(item, ownerGeneration: ownerGeneration)
+        ChatPerformanceProbe.answerReceived(item.id, answering: timedRow, in: self)
     }
 
     func acceptStreamingDraft(_ item: TimelineItem, ownerGeneration: Int) {

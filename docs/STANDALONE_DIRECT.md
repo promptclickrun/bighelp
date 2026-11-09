@@ -1,15 +1,25 @@
 # Standalone Direct Hermes
 
-> Current transport contract: [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md). Its account setup, Link comparison and missing-feature list describe an older implementation. Where transport details differ, use the versioned native contract and its source links.
+> **Historical name.** "Standalone Direct" was the native Hermes connection while the bighelp Link transport
+> (bighelp account, pairing, relay) still existed beside it. Link is retired. The native connection is now the only
+> way bighelp talks to Hermes, and it needs no bighelp account. The current contract is
+> [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md). This page keeps the parts that are still true: setup, credentials and
+> recovery limits.
 
-Connect your bighelp account to a reachable `hermes serve` backend without bighelp Link chat pairing. Account sign-in, host authentication and optional notification enrollment have separate authority. Existing Link chats remain separate.
+bighelp connects straight to a reachable Hermes dashboard (`hermes dashboard` or `hermes serve`): REST sign-in,
+WebSocket JSON-RPC on `/api/ws`, dashboard REST, and the optional plugin's routes under
+`/api/plugins/loopdy/native/…` (`loopdy` is the plugin's legacy ID). Host authentication and optional notification
+enrollment have separate authority.
 
 ## Connect
 
-1. Sign in to or create your bighelp account. With no configured hosts, the shared Connect Host wizard opens. Later, use **Accounts and Devices → Add Host**.
+1. On first run, the Connect step opens host setup. Later, use **Settings › System › Computers › Add a computer**.
 2. Enter your host URL or IP and port.
-3. Choose a supported provider-issued access token, host username/password login, or browser sign-in. Browser sign-in uses the system authentication session, IPv4 loopback callback and PKCE.
-4. Connect, then enable optional notifications or continue without them. Select a profile and start or reopen an eligible native session.
+3. Sign in the way the host allows: a provider-issued access token, host username and password, or browser sign-in.
+   Browser sign-in uses the system authentication session, an IPv4 loopback callback and PKCE. A host with no
+   sign-in set up connects with the dashboard's own session token. A host behind Cloudflare Access also takes an
+   Access service token (client ID and secret).
+4. Connect, then add the plugin and notifications if you want them. Pick an agent and start or reopen a chat.
 
 Your host must already be running a current Hermes backend and be reachable from the phone. For Tailscale, both devices must be connected to the appropriate tailnet. bighelp does not install Tailscale, start the host, expose a listener, or modify tailnet access rules.
 
@@ -19,23 +29,26 @@ See the [official Hermes remote-backend guide](https://hermes-agent.nousresearch
 
 ## Credentials
 
-A remote access token is a bearer issued by the host's authentication provider. A model-provider API key or legacy dashboard bootstrap token is not interchangeable with it. Legacy bootstrap tokens are supported only for an explicitly allowed literal loopback endpoint whose backend advertises that mode.
+A remote access token is a bearer issued by the host's authentication provider. A model-provider API key is not interchangeable with it. The dashboard's session token is used only when the host reports that no sign-in is required.
 
 Username/password login uses the host's native authorization exchange. bighelp stores the resulting session in device-only Keychain storage, not the password. Login redirects are validated rather than followed blindly. Connections are bound to the exact endpoint and verified host account. Forgetting a connection removes the local login, not server history.
 
-## Included
+## What works
 
-- Profile and saved native-session discovery.
-- Streaming assistant text, reasoning, tool results and subagent activity.
-- Stop, steer and queued text, supported slash commands, session model selection, approvals and single-question clarification.
-- Retained drafts and native history/replay recovery. A confirmed turn can settle after a same-process reconnect without manual receipt cleanup. An unconfirmed submission is never automatically resent.
-- Independent Direct and Link ownership. Direct does not take over an active messaging-gateway chat.
+Chat, files and pictures (`file.attach`, `image.attach_bytes`, `pdf.attach`, and big files through the plugin),
+streaming text, reasoning, tool results and subagent activity, Stop, steer and queue, slash commands, model choice,
+approvals and clarifying questions (several at once too) all run over this connection. With the plugin installed,
+the plugin features also work: live voice, cards and forms, device tools, project changes, notifications and the
+rest listed in [hermes/EXTENSIONS.md](hermes/EXTENSIONS.md). Each one shows only when the host's `/native/context`
+lists its feature; otherwise the app says to update the plugin.
+
+Drafts are kept, and history and replay recovery are native. A confirmed turn can settle after a same-process reconnect without manual receipt cleanup. An unconfirmed submission is never automatically resent. The app does not take over a chat that is active on a messaging gateway.
 
 ## Current limits
 
-This is a standalone native connection, **not full feature parity with bighelp Link**. Attachments, voice, Wiki, bighelp Cards/form RPC, phone integration, project-change browsing, the full provider/model picker, multi-question clarification and subagent detail/control windows are not connected through this mode yet. Unavailable composer actions are hidden; the connection menu explains support boundaries. None silently falls back to Link.
+Wiki: the app still has a Wiki client (plugin feature `native-wiki-v1`), but the current plugin no longer lists that feature, so Wiki is unavailable on current hosts.
 
-The direct chat socket does not itself provide closed-app APNs. Optional managed notifications use separate signed-device enrollment and a compatible installed plugin; iOS can suspend the connection. Reopening reattaches the native session where possible. If the original runtime has disappeared, explicitly open its saved session; the app does not silently invoke the host's cold-resume/auto-continuation policy.
+The chat socket does not itself provide closed-app pushes. Optional notifications use a separate signed-device enrollment and the plugin; iOS can suspend the connection. Coming back reattaches the chat. If Hermes ended the chat's runtime meanwhile, the app resumes the saved session by itself (`onRetainedStreamsNeedResume`) and a chat route without its model reopens (`reopenChatRoute`).
 
 The host's replay ring is finite. When complete live replay is unavailable, retained rows stay in place and additional native snapshot information may appear as recovery detail. Saved tool history can contain less detail than the live stream. Uncertain queue/steer consumption remains reviewable.
 
@@ -43,4 +56,4 @@ The host's replay ring is finite. When complete live replay is unavailable, reta
 
 The source was exercised against an isolated, unmodified Hermes backend using generated credentials and an explicitly synthetic local model. Hermes ran an actual temporary-directory terminal command. Apple URLSession and iOS Keychain checks covered password and bearer authentication, refusal, streaming, history and reconnect. Native UI checks covered both login modes, typing/sending, close/reopen and a second send. An active-reconnect check preserved row identities and an unsent draft.
 
-These are native simulator and loopback integration results. They do not claim a physical iPhone/Tailscale trial, real-provider latency measurement, production host activation, or APNs delivery. No host, plugin, relay or cloud rollout is included in this source change.
+These are native simulator and loopback integration results. They do not claim a physical iPhone/Tailscale trial, real-provider latency measurement, production host activation, or push delivery.

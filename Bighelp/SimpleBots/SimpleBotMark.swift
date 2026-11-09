@@ -323,14 +323,15 @@ struct SimpleBotMarkView: View {
 
 /// What a bot is doing, on its face, when the face can't act it out: a still badge, so it reads with
 /// Reduce Motion and on a photo.
-/// Working shows the kind of work (a globe while it browses); needing you, a raised hand.
+/// Working shows the kind of work (a globe while it browses); needing you, a raised hand; work in the
+/// background, a stack.
 struct SimpleBotActivityBadge: View {
     let activity: BotChatActivity
     let size: CGFloat
     @BighelpThemeReader private var theme
 
     var body: some View {
-        Image(systemName: activity == .waiting ? "hand.raised.fill" : activity.activityKind.systemImage)
+        Image(systemName: activity.badgeSymbol)
             .font(.system(size: size * 0.5, weight: .bold))
             .foregroundStyle(activity == .waiting ? Color.white : theme.actionForeground)
             .frame(width: size, height: size)
@@ -365,6 +366,14 @@ final class SimpleBotMarkStore {
     func set(_ mark: SimpleBotMark?, scope: String, agentID: String) {
         let key = CompanionStore.agentKey(agentScope: scope, agentID: agentID)
         marks[key] = mark
+        while marks.count > Self.maximumMarks, let first = marks.keys.sorted().first { marks[first] = nil }
+        if let data = try? JSONEncoder().encode(marks) { defaults.set(data, forKey: Self.defaultsKey) }
+    }
+
+    /// Every mark at once, from app state on the computers (`BotsAppState`).
+    func replaceAll(_ next: [String: SimpleBotMark]) {
+        guard marks != next else { return }
+        marks = next
         while marks.count > Self.maximumMarks, let first = marks.keys.sorted().first { marks[first] = nil }
         if let data = try? JSONEncoder().encode(marks) { defaults.set(data, forKey: Self.defaultsKey) }
     }
@@ -417,12 +426,13 @@ struct SimpleBotFace: View {
         .accessibilityLabel(name)
     }
 
-    /// Needing you always shows its hand. The kind of work shows as a badge only on a face that
-    /// can't act it out: a photo, or any face with Reduce Motion or Low Power Mode.
+    /// Needing you always shows its hand, and work in the background its stack: the face stays calm
+    /// for it. The kind of work on a turn shows as a badge only on a face that can't act it out: a
+    /// photo, or any face with Reduce Motion or Low Power Mode.
     static func showsBadge(for activity: BotChatActivity, faceMoves: Bool) -> Bool {
         switch activity {
         case .idle: false
-        case .waiting: true
+        case .waiting, .background: true
         case .working: !faceMoves
         }
     }

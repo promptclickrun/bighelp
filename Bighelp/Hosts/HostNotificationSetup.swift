@@ -45,6 +45,39 @@ enum BighelpPeerChatAlerts {
     static var isOn: Bool { UserDefaults.standard.bool(forKey: key) }
 }
 
+/// Settings › Notifications › Notify me about: Scheduled tasks, Deliveries (what an agent sends with its
+/// notify tool) and Group chats, each its own switch on the computer (plugin `preferences.kinds`). All
+/// start on. Scheduled tasks and Deliveries share the push service's "Scheduled tasks and deliveries" topic,
+/// which stays on while either is.
+enum BighelpAlertKinds {
+    enum Kind: String, CaseIterable, Identifiable {
+        case scheduledTasks, deliveries, groupChats
+        var id: String { rawValue }
+        var key: String { "bighelp.notifications.kinds.\(rawValue)" }
+    }
+
+    static func isOn(_ kind: Kind) -> Bool { UserDefaults.standard.object(forKey: kind.key) as? Bool ?? true }
+
+    /// What the computer stores for this device.
+    static var current: [String: Bool] {
+        Dictionary(uniqueKeysWithValues: Kind.allCases.map { ($0.rawValue, isOn($0)) })
+    }
+
+    /// Scheduled tasks or Deliveries switched: the two switches after it, and whether their shared push
+    /// topic is on. With the topic off both read as off, so turning one on turns on only that one.
+    static func switching(_ kind: Kind, on: Bool, topicOn: Bool, scheduledTasks: Bool, deliveries: Bool)
+        -> (scheduledTasks: Bool, deliveries: Bool, topicOn: Bool) {
+        var scheduled = topicOn && scheduledTasks
+        var delivered = topicOn && deliveries
+        switch kind {
+        case .scheduledTasks: scheduled = on
+        case .deliveries: delivered = on
+        case .groupChats: break
+        }
+        return (scheduled, delivered, scheduled || delivered)
+    }
+}
+
 /// Settings › Notifications › Workflows: which workflow alerts this device wants. All start on.
 enum BighelpWorkflowAlerts {
     enum Kind: String, CaseIterable, Identifiable {
@@ -240,7 +273,7 @@ enum HostNotificationState: String, Codable, Sendable {
         case .installed: "Plugin installed. Finishing setup…"
         case .enabled: "Notifications enabled."
         case .verificationRequired: "Check your saved setup to continue."
-        case .backendRestartRequired: "Restart the hermes serve process on the host (not just the messaging gateway), then check again."
+        case .backendRestartRequired: "Restart the Hermes dashboard and the messaging gateway on your computer, then check again."
         case .prerequisitesRequired: "This computer needs notification support."
         case .permissionDenied: "This computer doesn't allow plugin installation."
         case .managementRejected: "This computer rejected installation. Check Hermes for details."
@@ -348,6 +381,9 @@ final class HostNotificationSetupModel {
     private(set) var failure: BighelpNotificationSetupFailure?
     /// The failure is from an earlier run: whatever stopped it may be fixed now.
     private(set) var failureIsFromEarlierRun = false
+    /// The last setup installed, updated or turned on the plugin. It takes effect only after the
+    /// Hermes dashboard and the messaging gateway restart (`PluginRestartPrompt`).
+    private(set) var pluginChanged = false
     /// The commit an install uses: the newest release, looked up only when one is needed.
     private(set) var pin: HostPluginPin?
     private(set) var release: PluginRelease?
@@ -563,11 +599,14 @@ final class HostNotificationSetupModel {
         isWorking = true
         failure = nil
         failureIsFromEarlierRun = false
+        pluginChanged = false
         defer { if operation == operationID { isWorking = false } }
         @MainActor func owns() -> Bool {
             registry.generation == owner && registry.accountScope == scope && operation == operationID
                 && registry.hosts.contains(where: { $0.id == hostID }) && !Task.isCancelled
         }
+        // A newer Hermes serves a new plugin's routes as soon as they're asked for: read it again.
+        defer { if pluginChanged { registry.noteServicesChanged(hostID: hostID) } }
         var host = original
         let workspace = management
         // Where setup is, so an error says which step it stopped.
@@ -626,6 +665,7 @@ final class HostNotificationSetupModel {
                         identifier: pin.identifier, revision: pin.revision,
                         profile: nil, phase: .verified
                     )
+                    pluginChanged = true
                     try finish(.installed, host: &host)
                     return
                 }
@@ -654,6 +694,7 @@ final class HostNotificationSetupModel {
                         }
                         return
                     }
+                    pluginChanged = true
                 }
                 // The pin controls an installation we initiate, not compatibility
                 // of an operator's existing plugin. Enrollment verifies the live
@@ -691,7 +732,9 @@ final class HostNotificationSetupModel {
             if matches.isEmpty {
                 // A lost reply may still be executing on the backend. Absence is
                 // not proof of rejection and never authorizes duplicate install.
-                if let intent = host.pluginIntent, intent.phase != .consented {
+                // An install this app confirmed can't still be running: the plugin
+                // was removed on the computer since, so it installs again.
+                if let intent = host.pluginIntent, Self.isUnfinished(intent) {
                     try fail(.pluginInstallMayBeRunning, step, "install_pending", state: .outcomeUnknown, host: &host)
                     return
                 }
@@ -780,6 +823,7 @@ final class HostNotificationSetupModel {
                 }
             }
             host.pluginIntent = HostPluginIntent(identifier: pin.identifier, revision: pin.revision, profile: nil, phase: .verified)
+            pluginChanged = true
             try finish(.installed, host: &host)
             step = .startingSetup
             try await enrollInstalled(host: &host, connection: workspace.savedConnection, isCurrent: { owns() })

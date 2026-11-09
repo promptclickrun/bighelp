@@ -1,5 +1,14 @@
 # Legacy Link recipient overflow policy
 
+> **Historical.** This page covers the retired Link transport (bighelp account, pairing, and encrypted frames
+> sent through the Link Worker's per-account Durable Object). The app no longer uses it. Chat and plugin features
+> now run over native Hermes: see [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md), and
+> [SECURITY_AND_PRIVACY.md](SECURITY_AND_PRIVACY.md) for what is stored where. The app keeps no Link frames. At
+> launch it removes the old Link keychain items and settings one time (`BighelpLinkAccountRetirement`; a locked
+> phone tries again at the next launch). The Worker in `services/link` (`link.loopdy.app`) is now the notification
+> service. Its source still holds the Link frame queue and the limits on this page
+> (`services/link/src/pending-delivery.ts`), but no current app build sends frames to it.
+
 Related incident: #75. This repair changes legacy encrypted-v1 admission only;
 it does not require Direct, recipient lanes, native-session migration, a host
 plugin update, or a new native application build.

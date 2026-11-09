@@ -13,6 +13,8 @@ struct VoicePresentationContainer: View {
     let onWorkspaceTap: () -> Void
     /// Switches Settings to turn-based voice and reopens voice.
     var onUseTurnBased: (() -> Void)? = nil
+    /// Opens live voice again, once what stopped it may be gone.
+    var onTryAgain: (() -> Void)? = nil
     /// The chat's live work, so the avatar acts out what the agent is doing.
     var chatActivity: () -> AgentActivityKind = { .idle }
     /// The step the agent is on, in plain words ("Checking your calendars…").
@@ -35,8 +37,10 @@ struct VoicePresentationContainer: View {
                 }
             } else {
                 NavigationStack {
-                    LiveVoiceUnavailableView(agentID: agentID, agentImageURL: agentImageURL,
-                                             onClose: onEnded, onUseTurnBased: onUseTurnBased)
+                    LiveVoiceUnavailableView(reason: presentation.liveUnavailable ?? .connecting,
+                                             agentID: agentID, agentImageURL: agentImageURL,
+                                             onClose: onEnded, onUseTurnBased: onUseTurnBased,
+                                             onTryAgain: onTryAgain)
                 }
             }
         }
@@ -47,13 +51,15 @@ struct VoicePresentationContainer: View {
     }
 }
 
-/// Shown when Settings chose live voice but the host can't provide it. The
-/// choice stays with Settings; this screen explains how to change it.
+/// Shown when Settings chose live voice but it can't start here: says why and what fixes it.
+/// The choice stays with Settings; Use TTS voice mode changes it.
 private struct LiveVoiceUnavailableView: View {
+    let reason: LiveVoiceUnavailable
     let agentID: String?
     let agentImageURL: URL?
     let onClose: () -> Void
     let onUseTurnBased: (() -> Void)?
+    let onTryAgain: (() -> Void)?
 
     @BighelpThemeReader private var theme
 
@@ -63,14 +69,23 @@ private struct LiveVoiceUnavailableView: View {
             AvatarView(stableID: agentID ?? "agent", displayName: "Agent",
                        imageURL: agentImageURL, size: 140, state: .idle)
                 .accessibilityHidden(true)
-            Text("Live voice isn't available")
+            Text(reason.title)
                 .font(.bighelp(.title2).weight(.bold))
                 .foregroundStyle(theme.primaryText)
-            Text("Your Hermes computer doesn't support live voice yet. TTS voice mode listens on this \(BighelpPlatform.isMac ? "Mac" : "phone") and answers in the voice set up on your computer.")
+                .multilineTextAlignment(.center)
+            Text(reason.message)
                 .font(.bighelp(.body))
                 .foregroundStyle(theme.secondaryText)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, BighelpTokens.space32)
+                .accessibilityIdentifier("voice.live-unavailable.message")
+            if onUseTurnBased != nil {
+                Text("TTS voice mode listens on this \(BighelpPlatform.isMac ? "Mac" : "phone") and answers in the voice set up on your computer.")
+                    .font(.bighelp(.footnote))
+                    .foregroundStyle(theme.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, BighelpTokens.space32)
+            }
             Spacer()
             if let onUseTurnBased {
                 Button(action: onUseTurnBased) {
@@ -83,6 +98,19 @@ private struct LiveVoiceUnavailableView: View {
                 .buttonStyle(.plain)
                 .padding(.horizontal, BighelpTokens.space24)
                 .accessibilityIdentifier("voice.live-unavailable.use-turn-based")
+            }
+            if let onTryAgain, reason.canTryAgain {
+                Button(action: onTryAgain) {
+                    Text("Try Again")
+                        .font(.bighelp(.headline))
+                        .foregroundStyle(theme.action)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .overlay(Capsule().strokeBorder(theme.action, lineWidth: 1.5))
+                        .contentShape(.capsule)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, BighelpTokens.space24)
+                .accessibilityIdentifier("voice.live-unavailable.try-again")
             }
             // Close is secondary when turn-based voice is the way forward.
             Button(action: onClose) {

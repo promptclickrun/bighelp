@@ -10,13 +10,23 @@ enum BotChatActivity: Equatable, Sendable {
     case working(tool: String?)
     /// Waiting on the person: an approval or a question. It wins over working.
     case waiting
+    /// No turn runs, but work it started goes on in the background (plugin `native-agents-background-v1`).
+    case background(BotBackgroundWork)
 
     var isBusy: Bool { self != .idle }
 
-    /// The kind of work, for the face's pose and badge.
+    /// On a turn or waiting on the person: worth reading again soon.
+    var isOnTurn: Bool {
+        switch self {
+        case .working, .waiting: true
+        case .idle, .background: false
+        }
+    }
+
+    /// The kind of work, for the face's pose and badge. Background work leaves the face calm.
     var activityKind: AgentActivityKind {
         switch self {
-        case .idle: .idle
+        case .idle, .background: .idle
         case .waiting: .waiting
         case .working(let tool?): AgentActivityKind(toolName: tool)
         case .working(nil): .thinking
@@ -25,9 +35,18 @@ enum BotChatActivity: Equatable, Sendable {
 
     var liveState: AgentLiveState {
         switch self {
-        case .idle: .idle
+        case .idle, .background: .idle
         case .working: .thinking
         case .waiting: .nudge
+        }
+    }
+
+    /// The face's still badge: a raised hand, the kind of work, or a stack for background work.
+    var badgeSymbol: String {
+        switch self {
+        case .waiting: "hand.raised.fill"
+        case .background: "square.stack.3d.up.fill"
+        case .idle, .working: activityKind.systemImage
         }
     }
 
@@ -38,6 +57,12 @@ enum BotChatActivity: Equatable, Sendable {
         case .waiting: String(localized: "Needs you")
         case .working(let tool?): AgentActivityKind(toolName: tool).label + "…"
         case .working(nil): String(localized: "Working…")
+        case .background(let work):
+            switch (work.title, work.count) {
+            case (let title?, 1): String(localized: "In the background: \(title)")
+            case (let title?, let count): String(localized: "In the background: \(title) +\(count - 1)")
+            case (nil, let count): String(localized: "In the background · \(count)")
+            }
         }
     }
 
@@ -48,18 +73,48 @@ enum BotChatActivity: Equatable, Sendable {
         case .waiting: String(localized: "Needs you")
         case .working(let tool?): AgentActivityKind(toolName: tool).label
         case .working(nil): String(localized: "Working")
+        case .background(let work):
+            work.count == 1 ? String(localized: "1 thing running in the background")
+                            : String(localized: "\(work.count) things running in the background")
         }
     }
 
-    /// Two signals for one bot: needing the person wins, then working, then idle; unknown gives way.
+    /// Two signals for one bot: needing the person wins, then working, then background work, then
+    /// idle; unknown gives way.
     static func merged(_ first: BotChatActivity?, _ second: BotChatActivity?) -> BotChatActivity? {
         switch (first, second) {
         case (.waiting?, _), (_, .waiting?): .waiting
         case (.working?, _): first
         case (_, .working?): second
+        case (.background?, _): first
+        case (_, .background?): second
         case (.idle?, _), (_, .idle?): .idle
         default: nil
         }
+    }
+}
+
+/// How much an agent runs in the background now, in any of its chats: subagents, background
+/// commands and scheduled task runs, with the newest one's plain title.
+struct BotBackgroundWork: Equatable, Sendable {
+    static let maximumTitleLength = 120
+
+    let count: Int
+    let title: String?
+
+    init(count: Int, title: String? = nil) {
+        self.count = count
+        self.title = title
+    }
+
+    /// The plugin's `background` field, leniently: nil when there's nothing usable.
+    init?(json value: BighelpJSONValue?) {
+        guard let object = value?.object,
+              let count = object["count"]?.integer ?? object["count"]?.number.flatMap({ $0.isFinite ? Int(exactly: $0.rounded()) : nil }),
+              (1...10_000).contains(count) else { return nil }
+        let title = object["title"]?.string.map { $0.split(whereSeparator: \.isWhitespace).joined(separator: " ") }
+            .flatMap { $0.isEmpty ? nil : String($0.prefix(Self.maximumTitleLength)) }
+        self.init(count: count, title: title)
     }
 }
 
@@ -213,7 +268,7 @@ final class BotChatActivityStore {
         }
     }
 
-    /// One read. True when a bot is working or needs the person.
+    /// One read. True when a bot is on a turn or needs the person.
     @discardableResult
     func tick() async -> Bool {
         guard let source else { return false }
@@ -263,7 +318,8 @@ final class BotChatActivityStore {
             added = true
         }
         if added { generation &+= 1 }
-        return values.values.contains(where: \.isBusy)
+        // Background work can run for hours: only a turn or a question reads again sooner.
+        return values.values.contains(where: \.isOnTurn)
     }
 
     static let maximumCells = 512

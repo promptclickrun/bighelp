@@ -3,6 +3,162 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.76
+
+### New
+
+- **Projects in the chat list:** a chat in a project shows the name of the project under its preview. To hide it, go to Settings › Chat and turn off Projects in the chat list.
+- **Sort projects:** in Projects, tap the sort button and choose Recently used or Name.
+- **Helper steps in one folder:** when a helper agent finishes, its steps go into one folder, and its reply shows below the folder. Tap the folder to see the steps.
+
+### Changed
+
+- **Newest step first:** in a bot's Activity, a subagent shows its newest step at the top. A step that runs now is at the top.
+- **Reactions:** a reaction shows to the right of the time under the message. It does not cover the message.
+- **Move to Project:** when you hold a chat, the menu shows the project of the chat. The list of projects shows that project first.
+- **Scheduled tasks with a script:** you can edit them. Their instructions can be empty. Advanced shows the name of the script.
+
+### Fixed
+
+- **Time of each message:** when an agent sends two messages a long time apart, each message shows its time. Before, the two messages showed as one message with one time.
+
+## 2.6.75
+
+### Fixed
+
+- **Group chats:** a message that you send in a group chat shows at once. Before, it showed 3 to 5 seconds later.
+
+## 2.6.74
+
+### New
+
+- **See what a background item did:** on a bot's **Dashboard**, tap an item in **Activities**. For a subagent, you see each step in order on a timeline, and then its answer. For a command, you see the command and its output. For a routine, you see how the run went and its result. While the work runs, the view updates by itself.
+- **Notifications from your agents:** an agent can send you a notification at any time, without a scheduled task. bighelp calls these notifications **Deliveries**.
+- **More notification switches:** in Settings › Notifications, **Scheduled tasks** and **Deliveries** are now two switches. You can turn on one and turn off the other. A new **Group chats** switch controls the notifications from group chats. Questions and approvals always notify you.
+- **Your order for plans:** in Usage, tap **Choose** next to Limits. Drag a plan to put it where you want it. Usage shows the plans in your order.
+
+The first three items need the bighelp plugin 3.49.0 on your computer.
+
+### Fixed
+
+- **Your own replies notify you:** with **Agents messaging each other** off, a reply to your own message in a bot's chat did not notify you. Now it does. This needs the bighelp plugin 3.49.0.
+- **New Group Chat:** in Bots mode, **New Group Chat** is in the + menu as soon as you open bighelp. Before, it could take 10 seconds or more.
+- **Subagents in a chat:** when a subagent works in the background, the chat now shows the finished turn in the style that you chose (Card, Minimal or Full). Before, the turn showed every step. The subagent's row also updates when it reports during your next message.
+
+## 2.6.73
+
+### New
+
+- **See and control your computer:** on a bot's **Computer** tab, **Your computer** shows the desktop of the computer that runs Hermes. This works on macOS, Linux and Windows. Tap **Open your computer**, then tap **Take control** to use it. First, turn on screen sharing with a password on the computer. On a Mac, go to System Settings › General › Sharing › Screen Sharing. Then turn on "VNC viewers may control screen with password". bighelp asks for this password one time. This needs the bighelp plugin 3.48.0.
+- **Activities:** on a bot's **Dashboard**, **Activities** replaces **Today**. It shows the background work of the last seven days, by day. To see routines in the list, tap ⋯ and then **Show routines**.
+
+### Fixed
+
+- **Zoom on a screen:** you can pinch to zoom on a screen while you are in control. Before, zoom worked only while you watched.
+
+## 2.6.72
+
+### New
+
+- **Work in the background:** an agent can continue to work after it answers. For example, it can run subagents, a command such as a preview server, or a scheduled task. Now bighelp shows this work in three places:
+  - In a chat, **In the background** shows above the message box while subagents or commands run. Tap it to see each one. You can stop a command there.
+  - In Bots mode, a bot with work in the background shows a stack on its face. Its row tells you what runs.
+  - On a bot's **Dashboard**, **Today** lists the work of the day. Tap **Today** to open the list. **Today** replaces the **Templates** row. To open templates, go to **See all** on Feed, Ideas or Goals.
+
+  Bots mode and **Today** need the bighelp plugin 3.47.0 on your computer.
+- **Restart the Hermes dashboard:** in Settings › System, tap **Restart Hermes Dashboard**. After you install the plugin, bighelp asks you to restart Hermes, because the plugin starts to work only after the restart.
+- **Agent pictures in alerts:** an alert from an agent shows the agent's picture, as a message from a person does.
+
+### Fixed
+
+- **Live voice:** when live voice cannot start, the call screen tells you why. Tap **Try Again** to try again. When a Gemini call stops at once, the call screen shows the reason that Gemini gave.
+- **Plugin install:** if you remove the plugin on your computer, you can install it again from bighelp. Before, bighelp showed "The plugin install may still be running".
+- **New chats:** a new chat that has no messages opens again after a reconnect. Before, it could say "This chat isn't available right now".
+
+## 2.6.71
+
+### Fixed
+
+- **Apps open:** in 2.6.70, an agent's app showed its card, but **Open App** said "The app didn't open." Now the app opens. An app's page can be up to 16 MB. Update the bighelp plugin on your computer to 3.46.1.
+
+## 2.6.70
+
+### New
+
+- **Apps from your agents:** ask an agent for a small app, for example a budget planner or a dashboard. The agent makes the app, and the chat shows a card for it. Tap **Open App** to use the app on the full screen. An app can show live data, which changes while the app is open. When the agent allows it, the app can send your answer back: bighelp shows you the message first, and sends it only when you tap **Send**. Update the bighelp plugin on your computer to 3.46.0 to use apps.
+
+## 2.6.69
+
+### Fixed
+
+- **Dark mode in an open chat:** when your iPhone changes from Light to Dark while a chat is open, the agent's messages change too. Before, they kept their Light colors and were almost invisible until you opened the chat again.
+- **Sections on more than one computer:** when you rename or delete a section that holds bots from more than one computer, the change gets to every bot. Before, the old section could stay or come back, and you had to do the action again.
+
+## 2.6.68
+
+### New
+
+- **Sections in Bots mode:** put bots and group chats in sections, like folders on the Home Screen. Tap + and then New Section. Each section shows as a card with the faces of its members. Tap a card to open the section. A section can hold bots from more than one computer. Chat mode's Agents and Code mode's agent list show the same sections.
+- **Group chats in Bots mode:** tap + and then New Group Chat. You can pin, hide, arrange and move a group chat, as you do with a bot.
+- **Who answers in a group chat:** in Group Settings, pick who answers a message that names nobody. The choices are every bot, a lead bot that gives the message to the right bots, or an automatic pick. Each group chat also has a purpose and shared notes that every bot keeps in mind. A long discussion stops after 10 messages, and you can tap Continue.
+- **Unread chats:** a chat with a new answer that you did not read shows a dot, and its title is bold. A chat that holds a message that you did not send shows "Draft".
+
+### Changed
+
+- **Your order on every device:** bighelp keeps your bot order, your sections, your pins and each bot's settings on your computer. Another phone, an iPad or a new install of bighelp gets them again. This needs bighelp plugin 3.45.0.
+
+### Fixed
+
+- **Phone tools stay on:** when a phone tool ran a long time (for example Location), the chat lost its phone tools until you left it. Now bighelp connects them again by itself. With plugin 3.45.0, Location also gets more time.
+- **The time of an answer:** an answer from an agent shows its time as soon as it ends. Before, the time showed only after you opened the chat again.
+
+## 2.6.67
+
+### Changed
+
+- **Answers show sooner:** after you send a message, the first words of the answer show on the screen sooner.
+- **Waiting messages go at once:** a message that waits for the connection goes as soon as bighelp can send it.
+- **Faster return to long chats:** when you go back to a long chat, bighelp reads only its newest messages again. The older messages that you loaded stay.
+
+### Fixed
+
+- **The agent knows who writes:** on a computer that several people share, the agent knows again who sends each message.
+- **Waiting messages stay:** a message that waits for the connection stays when you open many other chats.
+
+## 2.6.66
+
+### Fixed
+
+- **Group chats open again:** a newer Hermes sends more facts about a group chat. bighelp did not accept them, and no group chat opened. Now group chats open. When Hermes cannot do a group request, bighelp shows the reason of Hermes.
+
+## 2.6.65
+
+### New
+
+- **All bodies in Bot Studio:** swipe up on the row of bodies to see all of them in a grid, in their sets. Tap a body to use it. Your avatar stays at the top. To see one row again, tap the handle above the bodies.
+
+### Changed
+
+- **The bar keeps your place:** leave a chat for Feed, Ideas or another place. The tab that you left then opens the same chat again. With Sessions in the bar, Sessions opens the chat that you picked from its list. When you change the agent, Chat opens the chat of that agent.
+- **New Bot in Bots mode:** the + button opens New Bot. The gray New Group Chat item is gone. You make group chats in Chat mode.
+
+## 2.6.64
+
+### Fixed
+
+- **No crash with Arriving and leaving:** when an agent saved a place to watch, bighelp crashed. After that, bighelp crashed every time it opened. Now bighelp opens again, and the places that your agents saved work.
+
+## 2.6.63
+
+### New
+
+- **Bot Studio in Create New Bot:** when you make a bot, pick a body from Bot Studio and a color, or tap Surprise me. To change the eyes, shape or moves, tap Eyes, shape and moves. To see all bodies, tap More. The bot keeps its look on your other devices and in Hermes Desktop.
+
+### Changed
+
+- **Groups on a bot's Info page:** the rows are in groups: Personality, Defaults, What it can use and Routines. Add routine is at the top of Routines. Advanced Options is at the bottom.
+- **A clear order in the chat ⋯ menu:** New Bot Chat is at the top. Then come the items for this chat, then Model & speed and Usage, then Edit agent and Advanced. You do not have to scroll when File changes shows. If your iPhone uses a large text size, the menu shows This chat, Agent and More.
+
 ## 2.6.62
 
 ### New

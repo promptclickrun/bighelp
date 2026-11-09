@@ -6,6 +6,8 @@ import Foundation
 protocol BigFileUploadHost: AnyObject {
     /// Whether this computer's plugin takes big files (`native-uploads-v1`); reads its context if needed.
     func supportsBigFiles() async -> Bool
+    /// Whether it takes a file again in small pieces (`BigFileUploads.smallPiecesFeature`).
+    func supportsSmallPieces() async -> Bool
     func perform(_ operation: WorkspaceOperation, payload: [String: BighelpJSONValue]) async throws
         -> [String: BighelpJSONValue]
     func chunkRequest(_ chunk: DirectHermesBigFileChunk) async throws -> URLRequest
@@ -62,7 +64,9 @@ final class BigFileUploader {
         }
         var waits = retryDelays[...]
         var restartedDamaged = false
-        var receipt = try await retrying(&waits) { try await self.start(file, agentID: agentID) }
+        // The host's piece size until a proxy refuses it; then `BigFileUploads.smallChunkBytes`.
+        var pieceBytes: Int?
+        var receipt = try await retrying(&waits) { try await self.start(file, agentID: agentID, chunkBytes: pieceBytes) }
         let sent = SentBytes(onProgress: onProgress, byteCount: file.byteCount)
         sent.confirm(receipt)
         while true {
@@ -84,13 +88,30 @@ final class BigFileUploader {
                     guard failure.retriesQuietly, let wait = waits.popFirst() else { throw Self.error(error) }
                     try await sleep(wait)
                 }
-                receipt = try await retrying(&waits) { try await self.status(receipt, file: file, agentID: agentID) }
+                receipt = try await retrying(&waits) {
+                    try await self.status(receipt, file: file, agentID: agentID, chunkBytes: pieceBytes)
+                }
                 sent.confirm(receipt)
                 continue
             }
             let before = receipt.received
             let round = await sendPieces(missing, of: file, receipt: receipt, sent: sent)
             receipt = round.receipt
+            if round.failure == .proxyLimit {
+                // Something in front of Hermes refuses requests this big: send the file again in small
+                // pieces, at once. Waiting wouldn't change its answer.
+                guard receipt.plan.chunkBytes > BigFileUploads.smallChunkBytes else {
+                    throw BigFileUploadError(failure: .proxyLimit)
+                }
+                guard await host.supportsSmallPieces() else { throw BigFileUploadError(failure: .proxyLimitNeedsPlugin) }
+                await discard(receipt.uploadID)
+                pieceBytes = BigFileUploads.smallChunkBytes
+                receipt = try await retrying(&waits) {
+                    try await self.start(file, agentID: agentID, chunkBytes: pieceBytes)
+                }
+                sent.confirm(receipt)
+                continue
+            }
             if let failure = round.failure, !failure.retriesQuietly {
                 throw BigFileUploadError(failure: failure)
             }
@@ -103,7 +124,9 @@ final class BigFileUploader {
                 throw BigFileUploadError(failure: round.failure ?? .connection)
             }
             try await sleep(wait)
-            receipt = try await retrying(&waits) { try await self.status(receipt, file: file, agentID: agentID) }
+            receipt = try await retrying(&waits) {
+                try await self.status(receipt, file: file, agentID: agentID, chunkBytes: pieceBytes)
+            }
             sent.confirm(receipt)
         }
     }
@@ -115,22 +138,25 @@ final class BigFileUploader {
 
     // Steps
 
-    private func start(_ file: ChatBigFile, agentID: String) async throws -> BigFileUploadReceipt {
-        let value = try await host.perform(.uploadsStart, payload: [
+    /// `chunkBytes` nil leaves the piece size to the host (4 MiB).
+    private func start(_ file: ChatBigFile, agentID: String, chunkBytes: Int?) async throws -> BigFileUploadReceipt {
+        var payload: [String: BighelpJSONValue] = [
             "agentId": .string(agentID), "fileName": .string(file.fileName), "mimeType": .string(file.mimeType),
             "byteCount": .integer(file.byteCount), "sha256": .string(file.sha256),
-        ])
+        ]
+        if let chunkBytes { payload["chunkBytes"] = .integer(chunkBytes) }
+        let value = try await host.perform(.uploadsStart, payload: payload)
         return try BigFileUploadReceipt(value, expectedByteCount: file.byteCount)
     }
 
     private func status(_ receipt: BigFileUploadReceipt, file: ChatBigFile,
-                        agentID: String) async throws -> BigFileUploadReceipt {
+                        agentID: String, chunkBytes: Int?) async throws -> BigFileUploadReceipt {
         do {
             let value = try await host.perform(.uploadsStatus, payload: ["uploadId": .string(receipt.uploadID)])
             return try BigFileUploadReceipt(value, expectedByteCount: file.byteCount, expectedUploadID: receipt.uploadID)
         } catch let error where Self.code(of: error) == "upload_not_found" {
             // A day went by, or the host was cleaned up: begin again.
-            return try await start(file, agentID: agentID)
+            return try await start(file, agentID: agentID, chunkBytes: chunkBytes)
         }
     }
 
@@ -200,6 +226,8 @@ final class BigFileUploader {
             let (body, response) = try await sender.send(request, fromFile: pieceFile, onSent: onSent)
             let value = (try? JSONDecoder().decode(BighelpJSONValue.self, from: body))?.object
             guard (200...299).contains(response.statusCode) else {
+                // Too big for something on the way (a proxy's plain 413, or the plugin's own): no retry helps.
+                if response.statusCode == 413 { return .failed(index, .proxyLimit, staleContext: false) }
                 if response.statusCode == 412 || response.statusCode == 428 {
                     return .failed(index, .connection, staleContext: true)
                 }
@@ -208,7 +236,12 @@ final class BigFileUploader {
                 }
                 let code = value?["error"]?.object?["code"]?.string ?? ""
                 // No code is no answer from the plugin (a proxy, or a request cut short): worth another try.
-                if code.isEmpty || code == "upload_finished" { return .failed(index, .connection, staleContext: false) }
+                // So is a 5xx other than the plugin's own `uploads_unavailable`: a proxy that can't reach
+                // Hermes answers 502 or 504, sometimes with an error code of its own.
+                let fromProxy = (500...599).contains(response.statusCode) && code != "uploads_unavailable"
+                if code.isEmpty || code == "upload_finished" || fromProxy {
+                    return .failed(index, .connection, staleContext: false)
+                }
                 return .failed(index, BigFileUploadFailure(code: code), staleContext: false)
             }
             guard let value else { return .failed(index, .connection, staleContext: false) }

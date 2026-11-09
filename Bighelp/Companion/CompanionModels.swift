@@ -517,6 +517,21 @@ final class CompanionStore {
         "\(agentScope.utf8.count):\(agentScope)\(agentID.utf8.count):\(agentID)"
     }
 
+    /// The scope and agent of an `agentKey`; nil for anything else.
+    nonisolated static func agentKeyParts(_ key: String) -> (scope: String, agentID: String)? {
+        var rest = Array(key.utf8)[...]
+        func part() -> String? {
+            guard let colon = rest.firstIndex(of: UInt8(ascii: ":")),
+                  let count = Int(String(decoding: rest[..<colon], as: UTF8.self)), count >= 0,
+                  rest.endIndex - colon - 1 >= count else { return nil }
+            let start = colon + 1
+            defer { rest = rest[(start + count)...] }
+            return String(bytes: rest[start..<(start + count)], encoding: .utf8)
+        }
+        guard let scope = part(), let agentID = part(), rest.isEmpty, !agentID.isEmpty else { return nil }
+        return (scope, agentID)
+    }
+
     private struct PersistedState: Codable {
         let schemaVersion: Int
         let isEnabled: Bool

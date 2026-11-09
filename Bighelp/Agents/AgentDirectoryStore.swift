@@ -64,6 +64,9 @@ final class AgentDirectoryStore {
     var avatarDirectory: URL? { avatarDirectoryProvider() }
 
     private let client: any AgentDirectoryClient
+    /// Keeps the list on this device after a change made here, as each load does, so the next
+    /// launch opens with it. Set by the workspace that owns the saved list.
+    @ObservationIgnored var savesProfiles: (([AgentProfile]) -> Void)?
     private let defaults: UserDefaults
     private let currentHostID: () -> String?
     private let avatarDirectoryProvider: () -> URL?
@@ -325,6 +328,7 @@ final class AgentDirectoryStore {
             if let index = profiles.firstIndex(where: { $0.id == profileID }) { profiles[index].placement = previous }
             throw error
         }
+        savesProfiles?(profiles)
     }
 
     @discardableResult
@@ -569,6 +573,50 @@ private struct RemoteAgentAvatarCache {
 }
 
 extension AgentDirectoryStore {
+    /// A sign-in's pinned agents (in order), the ones unpinned on purpose and its primary agent:
+    /// what Bots mode's top shows, kept on the computer too (`BotsAppState`).
+    struct SavedPins: Equatable, Sendable {
+        var pinned: [String] = []
+        var unpinned: [String] = []
+        var primary: String?
+    }
+
+    var savedPins: SavedPins {
+        SavedPins(pinned: pinnedAgentIDs, unpinned: unpinnedAgentIDs.sorted(), primary: primaryAgentID)
+    }
+
+    /// Pins from another device: kept as they came, then the default agent is pinned as usual unless unpinned.
+    func applySavedPins(_ pins: SavedPins) {
+        guard pins != savedPins else { return }
+        var seen = Set<String>()
+        pinnedAgentIDs = pins.pinned.filter { seen.insert($0).inserted }.prefix(Self.pinnedAgentLimit).map { $0 }
+        unpinnedAgentIDs = Set(pins.unpinned)
+        primaryAgentID = pins.primary
+        persistPinState()
+        persistPrimaryAgent()
+        reconcilePinnedAgents()
+    }
+
+    static func savedPins(in defaults: UserDefaults, hostBucket: String) -> SavedPins {
+        SavedPins(pinned: savedPinnedAgentIDs(in: defaults, hostBucket: hostBucket) ?? [],
+                  unpinned: savedUnpinnedAgentIDs(in: defaults, hostBucket: hostBucket) ?? [],
+                  primary: (defaults.dictionary(forKey: Keys.primaryAgentIDByHost) as? [String: String])?[hostBucket])
+    }
+
+    /// Saves a sign-in's pins where its Agents screen reads them, for one that isn't in use.
+    static func savePins(_ pins: SavedPins, in defaults: UserDefaults, hostBucket: String) {
+        var pinned = defaults.dictionary(forKey: Keys.pinnedAgentIDsByHost) as? [String: [String]] ?? [:]
+        var unpinned = defaults.dictionary(forKey: Keys.unpinnedAgentIDsByHost) as? [String: [String]] ?? [:]
+        var primaries = defaults.dictionary(forKey: Keys.primaryAgentIDByHost) as? [String: String] ?? [:]
+        var seen = Set<String>()
+        pinned[hostBucket] = pins.pinned.filter { seen.insert($0).inserted }.prefix(pinnedAgentLimit).map { $0 }
+        unpinned[hostBucket] = pins.unpinned.sorted()
+        primaries[hostBucket] = pins.primary
+        defaults.set(pinned, forKey: Keys.pinnedAgentIDsByHost)
+        defaults.set(unpinned, forKey: Keys.unpinnedAgentIDsByHost)
+        defaults.set(primaries, forKey: Keys.primaryAgentIDByHost)
+    }
+
     /// A host's pinned agents, as saved while it was selected (the all-hosts
     /// view reads them for hosts that aren't).
     static func savedPinnedAgentIDs(in defaults: UserDefaults, hostBucket: String) -> [String]? {

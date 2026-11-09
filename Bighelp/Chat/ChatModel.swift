@@ -16,10 +16,21 @@ final class ChatModel {
     let agentTalkLive = ChatAgentTalkLive()
     /// Another Hermes process running this chat now (an agent another one asked), from the plugin.
     var otherProcessRun: ChatOtherProcessRun?
+    /// The chat draws a turn the agent's gateway runs (Hermes 0.23) as its own, from the plugin's frames:
+    /// Stop goes to the gateway, and the watch keeps going while the turn makes the chat busy.
+    var followsGatewayTurn = false
     /// Reads this chat's saved history again from the host (set by the shell; nil in previews and tests).
     @ObservationIgnored var hostHistoryRefresh: (@MainActor () async throws -> Void)?
     @ObservationIgnored var hostRefreshTask: Task<Void, Never>?
     @ObservationIgnored var hostRefreshRequested = false
+    /// Tells this chat's catalog the person read it, or stopped (`SessionCatalogStore.noteRead`; set by the shell).
+    @ObservationIgnored var onRead: (@MainActor (SessionReadActivity, Bool) -> Void)?
+    /// Turns that ended here, for `readActivity`.
+    @ObservationIgnored var turnsEnded = 0
+    @ObservationIgnored var readSettleTask: Task<Void, Never>?
+    /// How long after a turn ends the chat on screen is marked read: Hermes saves the turn's last
+    /// rows just after it says the turn is over, and a mark sent before them would count them unread.
+    @ObservationIgnored var readSettleDelay: Duration = .seconds(2)
 
     @ObservationIgnored let responseTextGrowthSubject = PassthroughSubject<ResponseTextGrowth, Never>()
     var responseTextGrowth: AnyPublisher<ResponseTextGrowth, Never> {
@@ -156,7 +167,9 @@ final class ChatModel {
                 hasRestoredPrimaryTurn = false
                 lastSubmittedMessage = nil
                 if oldValue {
+                    ChatPerformanceProbe.turnEnded(self)
                     lastTurnEndedAt = Date()
+                    readTurnEnded()
                     flushPersistence()
                     if let native = nativeConversationClient { forgetAgentFileFailures(from: native, onlyRefused: true) }
                 }
@@ -259,6 +272,14 @@ final class ChatModel {
     /// is guaranteed to exist. Keep that live status separate from the
     /// persisted Link roster so missing child navigation never invents a route.
     var nativeSubagents: [NativeSubagentRailItem] = []
+    /// Commands the agent runs in the background in this chat (`process.list`), running first. Only
+    /// the sheet reads them: their output changes with every read.
+    var backgroundCommands: [ChatBackgroundCommand] = []
+    /// What the chip and the message box read, kept apart so a command's new output never redraws the box.
+    var runningBackgroundCommands = 0
+    var hasBackgroundCommands = false
+    /// The connection whose Hermes has no `process.list`: it isn't asked again.
+    @ObservationIgnored var backgroundCommandsUnsupported: ObjectIdentifier?
     /// What each helper did, kept after it finishes so its canvas can show the end.
     var subagentCanvases = SubagentCanvasLedger()
     /// The chat's own ⋯ choice (`setReasoningVisible`, `setToolCallsVisible`); nil while it
@@ -318,6 +339,8 @@ final class ChatModel {
     var botModeDiscardSubmissions: Set<String> = []
     var botModeDiscardErrors: [String: String] = [:]
     var botModeRoomObservation: UUID?
+    /// Messages sent to the group chat that the room's log doesn't have yet (`BotModeOutgoingMessage`).
+    var botModeOutgoing: [BotModeOutgoingMessage] = []
     let generatedMediaResolver: (any GeneratedMediaResolving)?
     var generatedMediaResolutionTasks: [String: Task<Void, Never>] = [:]
     var generatedMediaResolutionAttempts: [String: String] = [:]

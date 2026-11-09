@@ -164,7 +164,7 @@ Some problems do not go away when you try again. For these problems, bighelp doe
 | NS-327 | The plugin install can still run on your computer. | Wait one minute. Then try again. | Nothing. |
 | NS-328 | Your computer did not confirm the plugin install. | Try again. If the problem continues, tap **Set Up Again**. | If the problem continues, the code, its details and the Hermes log from the same time. |
 | NS-329 | The plugin did not start. | Turn on the plugin in Hermes. Then try again. | If the problem continues, the code and its details. |
-| NS-330 | Hermes does not show the notification part of the plugin yet. | Restart the `hermes serve` process on the computer, not only the messaging gateway. Then try again. | Nothing. |
+| NS-330 | Hermes does not show the notification part of the plugin yet. | Restart the Hermes dashboard (`hermes dashboard` or `hermes serve`) and the messaging gateway on the computer. Then try again. | Nothing. |
 | NS-331 | The plugin on your computer is too old for notifications. | Update the plugin. Then try again. | Nothing. |
 | NS-340 | Your computer cannot connect to the notification service. | Examine the internet connection of the computer. Let its firewall allow `link.loopdy.app`. Then try again. | If the problem continues, the code and its details. |
 | NS-341 | The network of your computer sent its connection to a different place. | Examine the proxy settings of the computer. Then try again. | If the problem continues, the code and its details. |

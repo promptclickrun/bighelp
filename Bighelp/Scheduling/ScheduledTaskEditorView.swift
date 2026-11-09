@@ -152,19 +152,40 @@ struct ScheduledTaskEditorView: View {
 
     private var whatSection: some View {
         Section {
-            TextField(
-                "For example, summarize my unread email and flag anything urgent",
-                text: $instructions,
-                axis: .vertical
-            )
-            .lineLimit(3...6)
-            .accessibilityLabel("Instructions")
-            .accessibilityIdentifier("scheduled-task.editor.instructions")
+            // A script-only task never reads its instructions, so there is nothing to type.
+            if task?.hostExecution?.runsWithoutAgent == true {
+                Label {
+                    Text("Runs a script on your computer and sends what it prints.")
+                        .foregroundStyle(theme.primaryText)
+                } icon: {
+                    Image(systemName: "terminal")
+                        .foregroundStyle(theme.secondaryText)
+                }
+                .bighelpFont(.body)
+                .frame(minHeight: BighelpTokens.hitTarget, alignment: .leading)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("scheduled-task.editor.script-only")
+            } else {
+                TextField(
+                    "For example, summarize my unread email and flag anything urgent",
+                    text: $instructions,
+                    axis: .vertical
+                )
+                .lineLimit(3...6)
+                .accessibilityLabel("Instructions")
+                .accessibilityIdentifier("scheduled-task.editor.instructions")
+            }
             TextField("Give it a short name", text: $name)
                 .accessibilityLabel("Task name")
                 .accessibilityIdentifier("scheduled-task.editor.name")
         } header: {
             ScheduledTaskSectionCaption(title: "What should it do?")
+        } footer: {
+            if let execution = task?.hostExecution, !execution.runsWithoutAgent {
+                Text("It also runs a script or skills on your computer, so instructions are optional.")
+                    .bighelpFont(.metadata)
+                    .foregroundStyle(theme.secondaryText)
+            }
         }
         .listRowBackground(theme.surface)
     }
@@ -197,8 +218,10 @@ struct ScheduledTaskEditorView: View {
                         Text(selectedAgent.name)
                             .bighelpFont(.label)
                             .foregroundStyle(theme.primaryText)
-                        if task != nil {
-                            Text("Tasks stay with their agent. Use Duplicate on the task to hand it to someone else.")
+                        if let task {
+                            Text(task.hostExecution == nil
+                                 ? "Tasks stay with their agent. Use Duplicate on the task to hand it to someone else."
+                                 : "Tasks stay with their agent.")
                                 .bighelpFont(.metadata)
                                 .foregroundStyle(theme.secondaryText)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -433,7 +456,9 @@ struct ScheduledTaskEditorView: View {
     private func save() async {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedInstructions = instructions.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty, !trimmedInstructions.isEmpty, let schedule else {
+        // A task with a script or skills has its work on the computer; others need instructions.
+        let needsInstructions = task?.hostExecution == nil
+        guard !trimmedName.isEmpty, !needsInstructions || !trimmedInstructions.isEmpty, let schedule else {
             validationMessage = "Add what it should do, a short name, and a complete schedule before saving."
             return
         }

@@ -1,15 +1,13 @@
 # iPhone tools for Hermes
 
-> Current transport contract: [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md). Its Link delivery discussion is historical; current native tools use the authenticated native device-tools bridge. Where transport details differ, use the versioned native contract and its source links.
+> How the app talks to Hermes in general: [NATIVE_TRANSPORT.md](NATIVE_TRANSPORT.md). This page is the
+> contract for the phone tools and their channel, the plugin's `device-tools/*` routes.
 
-Requires bighelp plugin 2.11.0 or later on the Hermes host.
-
-Host plugin 2.11.2 is required for the corrected phone-tool delivery path.
-Version 2.11.1 accepts Hermes' canonical composite turn IDs; 2.11.2 schedules the
-whole tool operation on the gateway's Link event loop. Hermes async tools run on
-separate worker loops and cannot directly acquire the gateway connection's send
-lock or own its response futures. Update the host plugin and restart the gateway
-to activate these fixes. Build 13 and existing iOS permissions remain compatible.
+The phone tools need the bighelp plugin on the Hermes host, with `native-device-tools-v1` in
+`/native/context`. That feature covers Apple Health, Calendar and Reminders. Every other tool has a feature
+of its own (see [Supported operations](#supported-operations)). The plugin lists none of them when Hermes
+has no tool execution middleware for it ([Components](#components-and-required-versions)). After a plugin
+update, restart the Hermes dashboard so the new copy runs.
 
 ## User contract
 
@@ -22,14 +20,16 @@ keep the post-fetch authorization check. See Apple's
 [asynchronous reminder retrieval](https://developer.apple.com/documentation/eventkit/retrieving-events-and-reminders).
 
 Device access has independent switches for Apple Health, Calendar, Reminders, Contacts,
-Photos, Location, Arriving and leaving, Alarms and timers, Music, Focus and Shortcuts.
+Photos, Location, Arriving and leaving, Alarms and timers, Music, Focus, Shortcuts,
+Appearance and Show you around (Navigation).
 Apple Health came back in #750 (see [Apple Health](#apple-health)); 2.3.0 (105) had removed it
 after App Review (guideline 2.5.1) found no health feature in the app.
 Every data control starts off. An agent can still ask for one that's off: its call shows a
 connect card in the chat ([Connect cards](#connect-cards)), whose Turn on flips the same switch. Enabling one requests its native iOS permission from
-that explicit foreground action. Appearance ("Let agents change how bighelp looks") is
-the exception: it shares no data and Appearance undoes any change, so it's on until the
-person turns it off, and it needs no iOS permission. Calendar and Reminders authorize direct reads,
+that explicit foreground action. Appearance ("Let agents change how bighelp looks") and
+Navigation ("Let agents show you around bighelp") are the exceptions: they share no data
+and change nothing the person can't change back, so they're on until the person turns them
+off, and they need no iOS permission. Calendar and Reminders authorize direct reads,
 creation, updates and deletion after enablement, with no per-operation approval.
 Location is read-only. OS permission by itself never enables agent access.
 
@@ -42,7 +42,7 @@ switch off: the tool is paused (`isUsable` is false, it isn't offered to the hos
 the row says to allow access in iOS Settings; it comes back when iOS allows it again.
 Turning a control off invalidates active work immediately. Switching host, signing
 out, the background grace ending or losing protected-data access invalidates in-flight
-operations. Account erasure deletes persisted grants and mutation outcomes.
+operations.
 Re-enabling a grant cannot revive a read started under an older grant revision.
 
 The phone must be unlocked and connected, and bighelp open: active, or inactive (a
@@ -62,34 +62,31 @@ reminder text or request arguments. The journal is protected, atomically written
 excluded from backups and bounded to 512 records / 2 MB. No raw Apple data should
 be added to diagnostics.
 
-Hermes and the future bighelp Native harness remain complementary. The unfinished
-Native harness is not required and is not treated as operational.
-
 ## Components and required versions
 
 | Component | Responsibility |
 | --- | --- |
-| Hermes `ToolExecutionContext` extension | Carries immutable authenticated ingress ownership to official plugin handlers and hooks, with official session/turn/tool-call IDs. |
-| bighelp plugin 2.11.2 | Registers `iphone_health`, `iphone_calendar`, `iphone_reminders`; uses the gateway connection loop to target the verified phone and correlate canonical Hermes turn IDs. |
-| Link relay with `directed-frames-v1` | Negotiates exact-recipient delivery and queues only for that active paired device. Legacy sockets never receive a broadcast fallback. |
-| iOS `DeviceToolPermissions` | Persists opt-in grants and fences asynchronous work by scope/revision. |
-| iOS `DeviceToolCoordinator` | Validates envelopes, deadlines, ownership and grants; bounds concurrency and journals mutation outcomes. |
-| iOS `AppleDeviceToolService` | Executes the finite HealthKit, EventKit and location operations with authorization checks around native boundaries. |
-| iOS `DeviceAccessCardStore` | Shows a connect card in the chat when an agent calls a tool that's off, and lets the call go on once the person turns it on (`DeviceAccessAsk`). |
-| iOS live socket | Receipts authenticated requests before native execution and sends directed correlated results without blocking chat streaming. |
+| Hermes tool execution middleware | Hermes runs each `iphone_*` call through the middleware the plugin registers (`register_middleware`, `hermes_cli.middleware`), with Hermes' own profile, session, turn and tool call IDs. A Hermes without that middleware surface gets no phone tools: the plugin leaves `native-device-tools-v1` out of `/native/context`. |
+| Plugin phone-tool hub (`native_device_tools.py`) | Holds each chat's channel and its lease, checks every call's arguments (`device_tool_contract.py`), queues calls for the phone, waits for answers and remembers finished calls so a retry never runs twice. Every profile's copy of the plugin in one Hermes process shares one hub. |
+| Plugin routes `device-tools/connect`, `poll`, `result`, `close` | The phone's side of the channel, under `/api/plugins/loopdy/native/`, behind the dashboard's own sign-in. |
+| iOS `NativeDeviceToolSession` | Opens the open chat's channel, polls it, checks each request, sends each result and closes the channel. Opens it again when the host ended it (`runReopeningWhileHeld`). |
+| iOS `DeviceToolPermissions` | Keeps the switches (`grantsKey`) and a revision that fences work started under an older grant. |
+| iOS `DeviceAccessCardStore`, `DeviceAccessAsk` | Shows a connect card in the chat when an agent calls a tool that's off, and lets the call go on once the person turns it on ([Connect cards](#connect-cards)). |
+| iOS `DeviceToolCoordinator` | Checks each request's envelope, deadline, owner and grant before and after it runs. Runs at most four calls and one change at a time, and journals changes (`DeviceToolFileJournal`). |
+| iOS `DeviceToolCatalog` | Lists every operation the phone answers and which ones are journaled. |
+| iOS `DeviceToolRouter` | Sends each operation to the `DeviceCapabilityTool` that owns it (Contacts, Photos, Arriving and leaving, Alarms, Music, Focus, Shortcuts) after it checks that iOS still allows it. Apple Health, Calendar, Reminders and Location go to `AppleDeviceToolService`. The coordinator calls `DeviceAppearanceTool` and `DeviceNavigationTool` itself. |
 
-The generic Hermes source extension is documented in
-`docs/TOOL_EXECUTION_CONTEXT.md` in the Hermes checkout. It is required: plugin
-registration omits phone tools on older Hermes versions. The context is
-runtime-only, excluded from prompts, tool schemas, transcripts and session
-persistence. Queued events retain exact ownership; different owners are not
-merged or steered into each other's turns. CLI, cron, restart-recovered events
-and delegated children lack phone context and fail closed. Never infer a phone
-from the last active chat or model-provided arguments.
+Hermes passes the call's coordinates to the middleware. The plugin drops any channel, device, host,
+session, agent, turn or request ID that the model adds to the arguments. A call matches a channel only by its
+agent and chat (`(profile, session)`). A chat with no channel (the command line, a scheduled job, a helper
+agent's own session) has no phone: its call fails with `phone_unavailable` at once, unless that chat had a
+channel in the last two minutes ([Transport](#transport-and-ownership)). Never infer a phone from the last
+active chat or from model-provided arguments.
 
-The plugin constructs context from the verified Link frame's phone ID and
-phone epoch, with the authenticated host ID as an attribute and profile as
-scope. Phone and host authorization epochs are independent.
+The phone opens the channel with its own device ID (`loopdy.native-device-tools.device-id`, a UUID kept
+on the device), the host ID and authorization epoch of its scope (`DeviceToolScope`), the agent and the
+chat's session ID. The plugin copies them into every request, and checks that each result names the same
+ones.
 
 Every agent on the host has the phone tools when the plugin lists
 `native-device-tools-agents-v1` (plugin 3.30.0): Hermes loads a separate copy of the
@@ -112,34 +109,94 @@ seconds apart (`NativeDeviceToolSession.runReopeningWhileHeld`); any change to
 the chat or connection cancels the wait. While it waits, Device access says it
 connects again in a moment; if another device keeps the chat, it says so.
 
+A channel that the host ended opens again by itself while the chat stays open and
+its tools stay on. The host ends a channel that the phone still uses when its
+30-second lease runs out while a slow tool runs past its call's deadline (the phone
+does not poll while a tool runs, and the plugin holds the channel only until that
+deadline), when the same phone opens another channel for the chat, when Hermes
+unloads the agent's plugin, or when the plugin starts again. The next poll or
+answer then gets `phone_unavailable` or `channel_not_found`. A lost connection, a
+time-out, a changed context (`context_changed`), a missed request (`feed_gap`), a
+channel opened under another sign-in or an earlier run of the plugin
+(`channel_owner_changed`) and a plugin that is not ready (`device_tools_unavailable`) also end a channel. The phone opens a new channel
+after 1, 2, 4, 8, 16 and 32 seconds (`NativeDeviceToolSession.reopenWaits`). Then
+it stops, and Device access says that it is not connected. The first try comes
+quickly: for two minutes (`LAPSE_MEMORY_SECONDS`), the plugin keeps a call that
+finds no channel waiting for the phone that had one, and the new channel takes the
+call. A channel that stayed open for a minute starts the waits again. A refusal
+that a new channel can't fix (`profile_not_served`, `profile_not_found`,
+`session_not_found`, `channel_capacity`) stops at once. A change to the chat or
+connection, or the end of the background grace, cancels the wait.
+
+A tool that runs past its call's window loses only that answer. Location's
+precise-location question, its fix and the address can take a while, so the
+plugin gives `location.current` 60 seconds instead of the usual 30. At the
+deadline the host tells the agent, and then it refuses the late answer
+(`result_replay`, `result_unknown` or `result_expired`). The channel continues
+with the next call.
+
 ## Transport and ownership
 
-The existing encrypted Link connection carries version-1
-`device.tool.status`, `device.tool.request` and `device.tool.result` payloads.
-The outer frame's `targetDeviceId` must identify an active opposite-role device
-in the same account. Unknown, revoked, wrong-role, self or unsupported targets
-are rejected without fan-out. This controls routing; existing account content
-encryption is shared across paired account participants, not a new
-recipient-specific encryption scheme.
+The phone reaches the plugin over HTTP, on the same signed-in dashboard connection
+as the rest of the app's plugin routes. Each route is a `POST` to
+`/api/plugins/loopdy/native/device-tools/<action>` with the native request guard:
+`If-Match` with the context ETag and a lowercase-UUID `X-Loopdy-Request-ID`. The
+phone refuses an answer that doesn't echo its request ID or that has another ETag.
+Answers are at most 256 KiB.
+
+- `connect`: `channelId` (a new lowercase UUID for each channel), `deviceId`,
+  `hostId`, `authorizationEpoch`, `agentId`, `sessionId` and `enabled` (the tools
+  that are on and that iOS allows now). With `native-device-permission-request-v1`
+  it also sends `askable` ([Connect cards](#connect-cards)). The phone leaves out a
+  tool whose own feature the plugin doesn't list, because an older plugin refuses
+  the whole channel over a name it doesn't know. The answer is
+  `{channelId, connected: true}`. Refusals that open nothing: `channel_ambiguous`,
+  `profile_not_served`, `profile_not_found`, `session_not_found`,
+  `channel_capacity` (64 channels on a host) and `channel_id_consumed`.
+- `poll`: `channelId` and `after`, the last sequence the phone handled. The
+  answer has `next` and at most 8 `requests`, each `{sequence, request}`, in
+  order. The phone checks the whole batch before it runs any of it. Each poll
+  renews the channel's 30-second lease. The phone polls every 0.75 seconds. A
+  channel with only Appearance and Navigation polls every 8 seconds while the
+  chat's turn isn't running.
+- `result`: `channelId` and one `device.tool.result`. The answer is
+  `{accepted: true}`. An answer the host no longer waits for is refused with
+  `result_replay`, `result_unknown` or `result_expired`.
+- `close`: `channelId`. When the channel ends only because bighelp went to the
+  background, and the plugin lists `native-device-tools-wait-v1`, the phone adds
+  `reason: "paused"`: calls the phone never received keep waiting for it. Any
+  other close fails the chat's waiting calls.
 
 Requests and results bind `requestId`, `deviceId`, `hostId`,
 `authorizationEpoch`, `sessionId`, `agentId`, `turnId`, `operation` and
-`sentAt`; requests also carry `expiresAt` and bounded arguments. Official
-tool-call coordinates generate a stable request ID. Reusing that ID with
-different arguments produces a conflict. The native request limit is 20 KB;
-the plugin additionally limits arguments to 16 KB. Native results are bounded
-to 128 KB. Host timeout is normally 30 seconds (bounded to 20–60 seconds);
-the native envelope permits no more than 120 seconds, or 300 seconds for a call to a
-tool the channel offered as `askable` ([Connect cards](#connect-cards)).
+`sentAt`; requests also carry `expiresAt` and bounded arguments. Hermes'
+tool-call coordinates make a stable request ID. Reusing that ID with
+different arguments is `request_conflict`. The request limit is 20 KiB, and
+arguments at most 16 KiB, on both sides. Results are bounded to 128 KB.
 
-Status is advisory. Every operation still checks the live native grant,
-open (active, inactive or background grace)/protected-data state, selected host,
-account and expiry. Results
-recheck those conditions after native execution and while waiting for the
-outbox. Reconnect or backpressure cannot replay private results after permission
-revocation, ownership change or downgrade to a legacy relay. A pending private
-result without its original in-memory authorization guard is retired through
-authenticated outbox reconciliation.
+The host gives most calls 30 seconds. `shortcuts.run`, `photos.save` and
+`location.current` get 60, and the first two 10 more for a late answer. A call
+to a tool the channel offered as `askable` gets 300. The phone refuses a request
+whose window is longer than 120 seconds, or 300 for an askable tool.
+
+Before an operation runs, and again after each native step (`authorize`), the
+coordinator checks:
+
+- the live switch and its grant revision
+- that bighelp is open (active, inactive, the background grace or a Shortcuts handoff)
+- protected data
+- the selected host and chat
+- the expiry
+
+The phone never sends a result made under a grant or owner that changed. It
+answers `owner_changed`, `permission_disabled`, `device_unavailable`,
+`request_cancelled` or `request_expired` instead.
+
+When the phone never answers, the host tells the agent which kind of silence it
+was. A call the phone never received, or one that only reads, is
+`phone_unavailable`: the agent may try again. A call that the phone received and
+that can change something is `outcome_unknown`, and so is every `shortcuts.run`
+and `photos.save`: the agent must check before it tries again.
 
 Native work permits at most four active operations and one mutation. The plugin
 keeps bounded pending requests and metadata-only mutation outcomes; read payloads
@@ -518,8 +575,9 @@ the person types the names their agents may run in Device access › Shortcuts
   bighelp with its output. Returns `{id, status (completed, cancelled or
   failed), output, truncated}` (output ≤ 8000 characters; a failed run's
   output is Shortcuts' `errorMessage`). The journal keeps only `id`, so a retry
-  never runs it twice. The host waits up to 60 seconds and holds the channel's
-  lease meanwhile; a run that doesn't come back in time is `outcome_unknown`.
+  never runs it twice. The host gives the call 60 seconds, takes a late answer
+  for 10 more, and holds the channel meanwhile; a run that doesn't come back in
+  time is `outcome_unknown`.
   A second run while one is out is `device_busy`.
 - While the run is out in Shortcuts (at most 60 seconds), bighelp counts as
   open for the phone tools (`DeviceToolHandoff`): leaving for Shortcuts doesn't
@@ -535,15 +593,18 @@ A contact or event read from a picture goes through a reviewed draft
 ([Image drafts](IMAGE_DRAFTS.md)), never straight to Contacts or Calendar. So in
 a chat that holds a picture the person sent, or one where `photos.get` gave the
 agent a photo, the phone answers `contacts.create` and `calendar.create` with
-`failed` and code `review_required` before it journals or touches anything, and
-`payload.note` tells the agent to use `bighelp_draft_contact` or
-`bighelp_draft_event`. Lists, updates, deletes, every other tool, and every chat
+`failed` and code `review_required` before it journals or touches anything
+(`ImageDraftWriteFence`), and `payload.note` tells the agent to use
+`bighelp_draft_contact` or `bighelp_draft_event`. The plugin gives the same answer
+before the call leaves the host when it knows the chat holds such a picture. Lists, updates, deletes, every other tool, and every chat
 without a picture behave as before, standing grants included.
 
 ## Mutation reconciliation
 
-Persist the request fingerprint as started before calling EventKit. Completed
-mutations retain only ID/revision/deleted metadata. A duplicate completed request
+Every operation `DeviceToolCatalog` marks as journaled is a mutation. The
+coordinator saves the request fingerprint as started (`DeviceToolFileJournal`,
+`device-tool-outcomes-v1.json`) before the native call. Completed mutations
+retain only ID/revision/deleted metadata, and a shortcut run's `status`. A duplicate completed request
 returns the known result. A started request without a confirmed outcome returns
 `outcome_unknown` and is never automatically executed again. A callback failure
 after a possible commit is also uncertain; inspect current native state before
@@ -576,25 +637,21 @@ The app reads HealthKit and never writes it. Keep it that way:
 
 Native suites:
 `DeviceToolPermissionsTests`, `AppleDeviceToolServiceTests`,
-`DeviceToolCoordinatorTests`, `DeviceToolFileJournalTests`, `DeviceLocationToolTests`,
-`DeviceAppearanceToolTests`, `AgentAppearanceUITests`, `DeviceAccessCardsTests`,
-`DeviceAccessCardUITests`,
-`BighelpLinkDirectedDeviceToolTests`, existing socket/backpressure and account
-erasure suites, and `DeviceToolPermissionsUITests`.
+`DeviceToolCoordinatorTests`, `DeviceToolFileJournalTests`, `NativeDeviceToolSessionTests`,
+`DeviceToolHandoffTests`, `DeviceAccessCardsTests`, `DeviceLocationToolTests`,
+`DeviceAppearanceToolTests`, `AgentDriveTests`, the other `Device*ToolTests` (Contacts,
+Photos, Arriving and leaving, Alarms, Music, Focus, Shortcuts), `ImageDraftWriteFenceTests`,
+and the UI tests `DeviceToolPermissionsUITests`, `DeviceAccessCardUITests`,
+`AgentAppearanceUITests` and `AgentDriveUITests`. `DeviceAccessHostUITests` runs against a
+real host.
 
-Plugin tests exercise registration with/without supported Hermes context,
-authenticated ownership, independent phone/host epochs, same-second grant
-transitions, directed frames, correlation, timeouts, concurrent identities,
-mutation deduplication, uncertain writes and non-caching of private reads.
-Hermes tests cover runtime-only context propagation, queued owner separation,
-delegation isolation and official tool-call identifiers. Relay tests verify
-single-device queues and negative routing without legacy fallback.
-
-The registered Calendar handler must also be tested from a separate worker loop
-with the real encrypted Link client and a contended gateway send lock. Verify
-one directed request, gateway-owned result futures, permission disable and
-disconnect during a pending call, and a stopped gateway loop. Same-loop fake
-clients do not establish the Hermes-to-phone delivery boundary.
+Plugin tests (`test_native_device_tools.py`, `test_native_device_tools_agents.py`,
+`test_native_device_permission_request.py`, `test_device_tool_contract.py`,
+`test_iphone_device_capabilities.py`) cover the middleware registration with and without
+Hermes' middleware surface, channel ownership and leases, the same phone replacing its
+own channel, calls that wait for a paused or lapsed phone, request IDs from Hermes'
+call coordinates, timeouts, concurrent chats and agents, mutation deduplication,
+uncertain writes, askable calls and non-caching of private reads.
 
 Run iPhone and iPad composer interaction checks alongside this integration.
 Preserve the full visible input focus target and microphone/Send alignment in

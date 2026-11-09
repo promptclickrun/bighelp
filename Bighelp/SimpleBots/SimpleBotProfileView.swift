@@ -84,6 +84,8 @@ struct SimpleBotProfileView: View {
     @State private var isArrangingTabs = false
     @State private var tabNotice: String?
     @State private var dashboard: BoardDashboardModel?
+    /// ⋯ › Show routines (on the Dashboard): scheduled task runs in Activities.
+    @AppStorage(AgentTodayModel.showsRoutinesKey) private var showsRoutines = false
     @State private var mark: SimpleBotMark?
     @State private var saveTask: Task<Void, Never>?
     @State private var saveState: String?
@@ -399,6 +401,10 @@ struct SimpleBotProfileView: View {
                     }
                     if context.canEdit {
                         Button("Edit Name and Role", systemImage: "pencil") { context.onEditDetails(profile) }
+                    }
+                    if shownTab == .dashboard {
+                        Toggle("Show routines", systemImage: "calendar.badge.clock", isOn: $showsRoutines)
+                            .accessibilityIdentifier("simple-bots.profile.show-routines")
                     }
                 } label: {
                     Image(systemName: "ellipsis")
@@ -730,122 +736,165 @@ struct SimpleBotProfileView: View {
                                       : String(localized: "This computer doesn't let the app change this bot."))
     }
 
+    /// Info: Personality, Defaults and What it can use, then Routines and, last, Advanced Options.
+    /// A group shows only the rows this computer offers, and none of a group that has none.
     private func info(_ profile: AgentProfile) -> some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-            SimpleBotsCard {
-                // Edit avatar: Bot Studio, PetDex or a photo.
-                Button { isStudioPresented = true } label: {
-                    SimpleBotsRow(title: String(localized: "Character"), leading: Image(systemName: "face.smiling")) {
-                        HStack(spacing: BighelpTokens.space8) {
-                            face(profile, size: 28)
-                                .accessibilityHidden(true)
-                            SimpleBotsDisclosure()
-                        }
+            infoGroup(String(localized: "Personality"), [.character, .instructions, .coreFiles], profile: profile)
+            infoGroup(String(localized: "Defaults"), [.defaultModel, .defaultVoice, .activeProject], profile: profile)
+            infoGroup(String(localized: "What it can use"), [.connections, .marketplace, .credentialVault, .photoActions],
+                      profile: profile)
+            routines(profile)
+            infoGroup(nil, [.advancedOptions], profile: profile)
+        }
+    }
+
+    private enum InfoRow: Hashable {
+        case character, instructions, coreFiles, defaultModel, defaultVoice, activeProject
+        case connections, marketplace, credentialVault, photoActions, advancedOptions
+    }
+
+    private func offers(_ row: InfoRow) -> Bool {
+        switch row {
+        case .character, .instructions, .photoActions: true
+        case .coreFiles: context.makeCoreFiles != nil
+        case .defaultModel: modelDefaults != nil
+        case .defaultVoice: voice != nil
+        case .activeProject: projects != nil
+        case .connections: context.makeConnections != nil
+        case .marketplace: context.makeMarketplace != nil
+        case .credentialVault: vault != nil
+        case .advancedOptions: advancedOptions != nil
+        }
+    }
+
+    @ViewBuilder
+    private func infoGroup(_ title: String?, _ rows: [InfoRow], profile: AgentProfile) -> some View {
+        let shown = rows.filter(offers)
+        if !shown.isEmpty {
+            // Spaced like Routines, whose label and card sit straight in the tab's stack.
+            VStack(alignment: .leading, spacing: BighelpTokens.space12) {
+                if let title { SimpleBotsSectionLabel(title: title) }
+                SimpleBotsCard {
+                    ForEach(Array(shown.enumerated()), id: \.element) { index, row in
+                        if index > 0 { SimpleBotsDivider() }
+                        infoRow(row, profile: profile)
                     }
-                }
-                .buttonStyle(.plain)
-                .driveTarget("simple-bots.profile.character")
-                .accessibilityIdentifier("simple-bots.profile.character")
-                SimpleBotsDivider()
-                Button { isInstructionsPresented = true } label: {
-                    SimpleBotsRow(title: String(localized: "Instructions"), leading: Image(systemName: "doc.text"))
-                }
-                .buttonStyle(.plain)
-                .disabled(!context.canEdit)
-                .driveTarget("simple-bots.profile.instructions")
-                .accessibilityIdentifier("simple-bots.profile.instructions")
-                if let makeCoreFiles = context.makeCoreFiles {
-                    SimpleBotsDivider()
-                    Button {
-                        coreFiles = makeCoreFiles(profile.id).map { CoreFilesPresentation(source: $0, botName: profile.name) }
-                    } label: {
-                        SimpleBotsRow(title: String(localized: "Core Files"), leading: Image(systemName: "doc.text.magnifyingglass"))
-                    }
-                    .buttonStyle(.plain)
-                    .driveTarget("simple-bots.profile.core-files")
-                    .accessibilityIdentifier("simple-bots.profile.core-files")
-                }
-                if let projects {
-                    SimpleBotsDivider()
-                    Button { isProjectPresented = true } label: {
-                        SimpleBotsRow(title: String(localized: "Active Project"), leading: Image(systemName: "folder"),
-                                      value: activeProjectName(projects))
-                    }
-                    .buttonStyle(.plain)
-                    .driveTarget("simple-bots.profile.active-project")
-                    .accessibilityIdentifier("simple-bots.profile.active-project")
-                }
-                SimpleBotsDivider()
-                Button { isPhotoActionsPresented = true } label: {
-                    SimpleBotsRow(title: String(localized: "Photo actions"), leading: Image(systemName: "photo.badge.checkmark"))
-                }
-                .buttonStyle(.plain)
-                .disabled(!context.canEdit)
-                .driveTarget("simple-bots.profile.photo-actions")
-                .accessibilityIdentifier("simple-bots.profile.photo-actions")
-                if let modelDefaults {
-                    SimpleBotsDivider()
-                    Button { isModelPresented = true } label: {
-                        SimpleBotsRow(title: String(localized: "Default Model"), leading: Image(systemName: "cpu"),
-                                      value: modelName(modelDefaults))
-                    }
-                    .buttonStyle(.plain)
-                    .driveTarget("simple-bots.profile.default-model")
-                    .accessibilityIdentifier("simple-bots.profile.default-model")
-                }
-                if let voice {
-                    SimpleBotsDivider()
-                    Button { isVoicePresented = true } label: {
-                        SimpleBotsRow(title: String(localized: "Default Voice"), leading: Image(systemName: "waveform"),
-                                      value: voice.summary)
-                    }
-                    .buttonStyle(.plain)
-                    .driveTarget("simple-bots.profile.default-voice")
-                    .accessibilityIdentifier("simple-bots.profile.default-voice")
-                }
-                if context.makeConnections != nil {
-                    SimpleBotsDivider()
-                    Button { isConnectionsPresented = true } label: {
-                        SimpleBotsRow(title: String(localized: "Connections"),
-                                      leading: Image(systemName: "app.connected.to.app.below.fill"))
-                    }
-                    .buttonStyle(.plain)
-                    .driveTarget("simple-bots.profile.connections")
-                    .accessibilityIdentifier("simple-bots.profile.connections")
-                }
-                if let vault {
-                    SimpleBotsDivider()
-                    Button { isVaultPresented = true } label: {
-                        SimpleBotsRow(title: String(localized: "Credential Vault"), leading: Image(systemName: "lock.shield"),
-                                      value: vaultSummary(vault))
-                    }
-                    .buttonStyle(.plain)
-                    .driveTarget("simple-bots.profile.credential-vault")
-                    .accessibilityIdentifier("simple-bots.profile.credential-vault")
-                }
-                if let makeMarketplace = context.makeMarketplace {
-                    SimpleBotsDivider()
-                    // Made when it opens, so its plugin list is read only then.
-                    Button { marketplace = makeMarketplace(profile.id) } label: {
-                        SimpleBotsRow(title: String(localized: "Marketplace"), leading: Image(systemName: "storefront"))
-                    }
-                    .buttonStyle(.plain)
-                    .driveTarget("simple-bots.profile.marketplace")
-                    .accessibilityIdentifier("simple-bots.profile.marketplace")
-                }
-                if advancedOptions != nil {
-                    SimpleBotsDivider()
-                    Button { isAdvancedPresented = true } label: {
-                        SimpleBotsRow(title: String(localized: "Advanced Options"),
-                                      leading: Image(systemName: "slider.horizontal.3"))
-                    }
-                    .buttonStyle(.plain)
-                    .driveTarget("simple-bots.profile.advanced-options")
-                    .accessibilityIdentifier("simple-bots.profile.advanced-options")
                 }
             }
+        }
+    }
 
-            routines(profile)
+    @ViewBuilder
+    private func infoRow(_ row: InfoRow, profile: AgentProfile) -> some View {
+        switch row {
+        case .character:
+            // Edit avatar: Bot Studio, PetDex or a photo.
+            Button { isStudioPresented = true } label: {
+                SimpleBotsRow(title: String(localized: "Character"), leading: Image(systemName: "face.smiling")) {
+                    HStack(spacing: BighelpTokens.space8) {
+                        face(profile, size: 28)
+                            .accessibilityHidden(true)
+                        SimpleBotsDisclosure()
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .driveTarget("simple-bots.profile.character")
+            .accessibilityIdentifier("simple-bots.profile.character")
+        case .instructions:
+            Button { isInstructionsPresented = true } label: {
+                SimpleBotsRow(title: String(localized: "Instructions"), leading: Image(systemName: "doc.text"))
+            }
+            .buttonStyle(.plain)
+            .disabled(!context.canEdit)
+            .driveTarget("simple-bots.profile.instructions")
+            .accessibilityIdentifier("simple-bots.profile.instructions")
+        case .coreFiles:
+            if let makeCoreFiles = context.makeCoreFiles {
+                Button {
+                    coreFiles = makeCoreFiles(profile.id).map { CoreFilesPresentation(source: $0, botName: profile.name) }
+                } label: {
+                    SimpleBotsRow(title: String(localized: "Core Files"), leading: Image(systemName: "doc.text.magnifyingglass"))
+                }
+                .buttonStyle(.plain)
+                .driveTarget("simple-bots.profile.core-files")
+                .accessibilityIdentifier("simple-bots.profile.core-files")
+            }
+        case .defaultModel:
+            if let modelDefaults {
+                Button { isModelPresented = true } label: {
+                    SimpleBotsRow(title: String(localized: "Default Model"), leading: Image(systemName: "cpu"),
+                                  value: modelName(modelDefaults))
+                }
+                .buttonStyle(.plain)
+                .driveTarget("simple-bots.profile.default-model")
+                .accessibilityIdentifier("simple-bots.profile.default-model")
+            }
+        case .defaultVoice:
+            if let voice {
+                Button { isVoicePresented = true } label: {
+                    SimpleBotsRow(title: String(localized: "Default Voice"), leading: Image(systemName: "waveform"),
+                                  value: voice.summary)
+                }
+                .buttonStyle(.plain)
+                .driveTarget("simple-bots.profile.default-voice")
+                .accessibilityIdentifier("simple-bots.profile.default-voice")
+            }
+        case .activeProject:
+            if let projects {
+                Button { isProjectPresented = true } label: {
+                    SimpleBotsRow(title: String(localized: "Active Project"), leading: Image(systemName: "folder"),
+                                  value: activeProjectName(projects))
+                }
+                .buttonStyle(.plain)
+                .driveTarget("simple-bots.profile.active-project")
+                .accessibilityIdentifier("simple-bots.profile.active-project")
+            }
+        case .connections:
+            Button { isConnectionsPresented = true } label: {
+                SimpleBotsRow(title: String(localized: "Connections"),
+                              leading: Image(systemName: "app.connected.to.app.below.fill"))
+            }
+            .buttonStyle(.plain)
+            .driveTarget("simple-bots.profile.connections")
+            .accessibilityIdentifier("simple-bots.profile.connections")
+        case .marketplace:
+            if let makeMarketplace = context.makeMarketplace {
+                // Made when it opens, so its plugin list is read only then.
+                Button { marketplace = makeMarketplace(profile.id) } label: {
+                    SimpleBotsRow(title: String(localized: "Marketplace"), leading: Image(systemName: "storefront"))
+                }
+                .buttonStyle(.plain)
+                .driveTarget("simple-bots.profile.marketplace")
+                .accessibilityIdentifier("simple-bots.profile.marketplace")
+            }
+        case .credentialVault:
+            if let vault {
+                Button { isVaultPresented = true } label: {
+                    SimpleBotsRow(title: String(localized: "Credential Vault"), leading: Image(systemName: "lock.shield"),
+                                  value: vaultSummary(vault))
+                }
+                .buttonStyle(.plain)
+                .driveTarget("simple-bots.profile.credential-vault")
+                .accessibilityIdentifier("simple-bots.profile.credential-vault")
+            }
+        case .photoActions:
+            Button { isPhotoActionsPresented = true } label: {
+                SimpleBotsRow(title: String(localized: "Photo actions"), leading: Image(systemName: "photo.badge.checkmark"))
+            }
+            .buttonStyle(.plain)
+            .disabled(!context.canEdit)
+            .driveTarget("simple-bots.profile.photo-actions")
+            .accessibilityIdentifier("simple-bots.profile.photo-actions")
+        case .advancedOptions:
+            Button { isAdvancedPresented = true } label: {
+                SimpleBotsRow(title: String(localized: "Advanced Options"),
+                              leading: Image(systemName: "slider.horizontal.3"))
+            }
+            .buttonStyle(.plain)
+            .driveTarget("simple-bots.profile.advanced-options")
+            .accessibilityIdentifier("simple-bots.profile.advanced-options")
         }
     }
 
@@ -870,23 +919,8 @@ struct SimpleBotProfileView: View {
         if let store = context.scheduledTasks {
             let tasks = store.tasks.filter { $0.agentID == profile.id }
             SimpleBotsSectionLabel(title: String(localized: "Routines"))
+            // Add routine first, so it stays in the same place however many routines there are.
             SimpleBotsCard {
-                if tasks.isEmpty {
-                    Text("No routines yet")
-                        .font(.bighelp(.body))
-                        .foregroundStyle(theme.tertiaryText)
-                        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-                        .padding(.horizontal, BighelpTokens.space20)
-                } else {
-                    ForEach(tasks) { task in
-                        Button { context.onOpenRoutine(task) } label: {
-                            SimpleBotsRow(title: task.name, detail: task.scheduleDescription)
-                        }
-                        .buttonStyle(.plain)
-                        SimpleBotsDivider()
-                    }
-                }
-                if tasks.isEmpty { SimpleBotsDivider() }
                 Button { newRoutine = true } label: {
                     Label("Add routine", systemImage: "plus")
                         .font(.bighelp(.body))
@@ -898,6 +932,22 @@ struct SimpleBotProfileView: View {
                 .buttonStyle(.plain)
                 .driveTarget("simple-bots.profile.add-routine")
                 .accessibilityIdentifier("simple-bots.profile.add-routine")
+                SimpleBotsDivider()
+                if tasks.isEmpty {
+                    Text("No routines yet")
+                        .font(.bighelp(.body))
+                        .foregroundStyle(theme.tertiaryText)
+                        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                        .padding(.horizontal, BighelpTokens.space20)
+                } else {
+                    ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
+                        if index > 0 { SimpleBotsDivider() }
+                        Button { context.onOpenRoutine(task) } label: {
+                            SimpleBotsRow(title: task.name, detail: task.scheduleDescription)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
             .task { if store.loadState == .idle { await store.load() } }
         }

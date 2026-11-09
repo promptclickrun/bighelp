@@ -47,8 +47,8 @@ struct ChatAgentTalk: Identifiable, Equatable {
     var isLive: Bool { !runningCalls.isEmpty }
 
     /// The conversation in order. Each call is the message sent and the answer;
-    /// an answer that arrived later replaces its placeholder.
-    func messages(chatAgentID: String) -> [ChatAgentTalkMessage] {
+    /// an answer that arrived later replaces its placeholder, as does one the agent asked kept (`live`).
+    func messages(chatAgentID: String, live: [String: AgentTalkLiveActivity] = [:]) -> [ChatAgentTalkMessage] {
         var ordered: [ChatAgentTalkMessage] = []
         var positions: [String: Int] = [:]
         func put(_ message: ChatAgentTalkMessage) {
@@ -79,7 +79,7 @@ struct ChatAgentTalk: Identifiable, Equatable {
                     case .answered: state = event.agentTalkReply?.text.map(ChatAgentTalkMessage.State.said)
                     case .failed: state = .noAnswer
                     case .queued: state = answer.map { $0.text.map(ChatAgentTalkMessage.State.said) ?? .noAnswer }
-                        ?? .waiting
+                        ?? live[event.id]?.delivery.map(ChatAgentTalkMessage.State.init(delivery:)) ?? .waiting
                     case nil: state = nil
                     }
                 }
@@ -188,6 +188,12 @@ struct ChatAgentTalkIndex {
                     close()
                     guard case .message(let text) = item.content else { continue }
                     if let delivery = AgentTalkDelivery.parse(text) {
+                        if delivery.isStillOut {
+                            // Hermes 0.23's waiter stopped waiting while the agent works on: no answer, and
+                            // the call's delivery says what becomes of it.
+                            hiddenItems.insert(item.id)
+                            continue
+                        }
                         let call = callsByProcess[delivery.processID]
                         if let call, answeredByMessage.contains(call.id) {
                             // The answer came in as the agent's own message; the notice only repeats it.
@@ -276,6 +282,16 @@ struct ChatAgentTalkMessage: Identifiable, Equatable {
         case noAnswer
 
         var isPlaceholder: Bool { self == .working || self == .waiting }
+
+        /// Where a `message_agent` message is, as the agent asked keeps it.
+        init(delivery: AgentDelivery) {
+            switch delivery.state {
+            case .queued: self = .waiting
+            case .working: self = .working
+            case .answered: self = delivery.reply.map(State.said) ?? .noAnswer
+            case .withdrawn, .failed: self = .noAnswer
+            }
+        }
     }
 
     let id: String
@@ -304,6 +320,8 @@ struct AgentTalkLiveActivity: Equatable, Sendable {
     /// The Hermes tool the other agent is running, if any.
     let toolName: String?
     let isWorking: Bool
+    /// A `message_agent` message on Hermes 0.23: where it is, as the agent asked keeps it.
+    var delivery: AgentDelivery?
 }
 
 /// Words for the rail, apart from the view so they can be tested.
@@ -316,7 +334,7 @@ enum ChatAgentTalkPresentation {
 
     static func label(for talk: ChatAgentTalk, chatAgentID: String, resolver: TimelineSenderResolver,
                       live: [String: AgentTalkLiveActivity] = [:]) -> String {
-        let messages = talk.messages(chatAgentID: chatAgentID)
+        let messages = talk.messages(chatAgentID: chatAgentID, live: live)
         if let running = talk.runningCalls.last, let call = running.agentTalkCall {
             let name = name(for: call.targetID, fallback: call.fallbackTargetName, resolver: resolver)
             return working(name, live[running.id]) ?? String(localized: "Asking \(name)…")
@@ -327,6 +345,20 @@ enum ChatAgentTalkPresentation {
                   let activity = live[event.id], activity.isWorking else { continue }
             let name = name(for: call.targetID, fallback: call.fallbackTargetName, resolver: resolver)
             return working(name, activity) ?? String(localized: "\(name) is working on it…")
+        }
+        // Hermes 0.23 keeps the message with the agent asked: say where it is.
+        for piece in talk.pieces.reversed() {
+            guard case .call(let event, .none) = piece, let call = event.agentTalkCall, call.route == .message,
+                  let delivery = live[event.id]?.delivery else { continue }
+            let name = name(for: call.targetID, fallback: call.fallbackTargetName, resolver: resolver)
+            switch delivery.state {
+            case .queued: return String(localized: "Waiting for \(name)")
+            case .working: break
+            case .answered: return String(localized: "\(name) answered")
+            case .withdrawn: return String(localized: "Message to \(name) withdrawn")
+            case .failed: return String(localized: "\(name) didn't answer")
+            }
+            break
         }
         // A `message_agent` message and its answer are two rows, each where it happened: say which.
         if talk.pieces.count == 1 {
@@ -391,7 +423,8 @@ enum ChatAgentTalkPresentation {
 }
 
 /// The rail itself: the agents' faces stacked, what passed between them, and
-/// a tap to read it.
+/// a tap to read it. A `message_agent` message Hermes 0.23 keeps with the agent asked opens in place
+/// instead: that agent's steps as it works, then its answer (`ChatAgentTalkRunPanel`).
 @MainActor
 struct ChatAgentTalkRail: View {
     let talk: ChatAgentTalk
@@ -399,20 +432,67 @@ struct ChatAgentTalkRail: View {
     let senderResolver: TimelineSenderResolver
     var live: [String: AgentTalkLiveActivity] = [:]
     var loadSteps: AgentTalkStepsLoader?
+    var access: AgentTalkRunAccess?
+    var onDisclosureChange: () -> Void = {}
 
     @State private var isPresented = false
+    @State private var isExpanded = false
     @Environment(\.bighelpActivityLoaderFocus) private var loaderFocus
     @BighelpThemeReader private var theme
 
     static func loaderID(_ talk: ChatAgentTalk) -> String { "agent-talk:\(talk.id)" }
 
-    private var playsLoader: Bool { talk.isLive && (loaderFocus?.allows(Self.loaderID(talk)) ?? true) }
+    /// A call still running, or an agent working on a message it was sent.
+    private var playsLoader: Bool {
+        let working = talk.isLive || talk.pieces.contains { piece in
+            guard case .call(let event, _) = piece else { return false }
+            return live[event.id]?.isWorking == true
+        }
+        return working && (loaderFocus?.allows(Self.loaderID(talk)) ?? true)
+    }
+
+    /// The newest `message_agent` message with a delivery: the agent it went to, and where it is.
+    private var run: (agentID: String, name: String, delivery: AgentDelivery)? {
+        guard access != nil else { return nil }
+        for piece in talk.pieces.reversed() {
+            guard case .call(let event, _) = piece, let call = event.agentTalkCall, call.route == .message,
+                  let delivery = live[event.id]?.delivery else { continue }
+            return (call.targetID, ChatAgentTalkPresentation.name(for: call.targetID, fallback: call.fallbackTargetName,
+                                                                  resolver: senderResolver), delivery)
+        }
+        return nil
+    }
 
     var body: some View {
+        let run = run
+        VStack(spacing: BighelpTokens.space8) {
+            line(opensInPlace: run != nil)
+            if isExpanded, let run, let access {
+                ChatAgentTalkRunPanel(agentID: run.agentID, name: run.name, delivery: run.delivery, access: access)
+                    .padding(.horizontal, BighelpTokens.space12)
+            }
+        }
+        .bighelpSheet(isPresented: $isPresented) {
+            ChatAgentTalkSheet(talk: talk, chatAgentID: chatAgentID, senderResolver: senderResolver, live: live,
+                               loadSteps: loadSteps)
+                .bighelpSheetSize(.large)
+        }
+    }
+
+    private func open(inPlace: Bool) {
+        guard inPlace else {
+            isPresented = true
+            return
+        }
+        onDisclosureChange()
+        isExpanded.toggle()
+    }
+
+    private func line(opensInPlace: Bool) -> some View {
         let label = ChatAgentTalkPresentation.label(for: talk, chatAgentID: chatAgentID,
                                                     resolver: senderResolver, live: live)
-        Button {
-            isPresented = true
+        return Button {
+            open(inPlace: opensInPlace)
         } label: {
             HStack(spacing: BighelpTokens.space8) {
                 ChatAgentFaceStack(agents: talk.participants(chatAgentID: chatAgentID), resolver: senderResolver,
@@ -423,7 +503,7 @@ struct ChatAgentTalkRail: View {
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .bighelpShimmer(isActive: playsLoader)
-                Image(systemName: "chevron.right")
+                Image(systemName: opensInPlace ? (isExpanded ? "chevron.up" : "chevron.down") : "chevron.right")
                     .font(.bighelp(.caption).weight(.semibold))
                     .foregroundStyle(theme.tertiaryText)
                     .accessibilityHidden(true)
@@ -437,16 +517,13 @@ struct ChatAgentTalkRail: View {
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel(label)
-        .accessibilityHint("Shows what the agents said to each other.")
+        .accessibilityHint(opensInPlace ? (isExpanded ? "Hides the agent's work." : "Shows the agent's work.")
+                           : "Shows what the agents said to each other.")
+        .accessibilityValue(opensInPlace ? (isExpanded ? "Open" : "Closed") : "")
         .accessibilityIdentifier("chat.agent-talk.\(talk.id)")
-        .accessibilityAction { isPresented = true }
+        .accessibilityAction { open(inPlace: opensInPlace) }
         .contextMenu {
             Button("Show conversation", systemImage: "bubble.left.and.bubble.right") { isPresented = true }
-        }
-        .bighelpSheet(isPresented: $isPresented) {
-            ChatAgentTalkSheet(talk: talk, chatAgentID: chatAgentID, senderResolver: senderResolver, live: live,
-                               loadSteps: loadSteps)
-                .bighelpSheetSize(.large)
         }
     }
 }

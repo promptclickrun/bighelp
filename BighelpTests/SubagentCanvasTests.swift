@@ -70,6 +70,17 @@ struct SubagentCanvasTests {
         #expect(state.currentActivity == BighelpToolActivityCatalog.thinking.label)
     }
 
+    /// Hermes relays the helper's waiting spinner ("(🔥) setting wing angle...") as thinking too.
+    @Test func hermesSpinnerLinesAreNotSteps() throws {
+        var ledger = SubagentCanvasLedger()
+        ledger.accept(type: "subagent.thinking", payload: Self.event(["text": .string("(🔥) setting wing angle...")]))
+        ledger.accept(type: "subagent.thinking", payload: Self.event(["text": .string("(｡•́︿•̀｡) pondering...")]))
+        ledger.accept(type: "subagent.thinking", payload: Self.event(["text": .string("(Two of them) are booked out...")]))
+        let state = try #require(ledger["sa-1"])
+        #expect(state.liveSteps.count == 1)
+        #expect(state.transcript().events.first?.reasoningText == "(Two of them) are booked out...")
+    }
+
     @Test func replayedEventsDoNotRepeatSteps() throws {
         var ledger = Self.liveLedger()
         ledger.accept(type: "subagent.tool", payload: Self.event(["tool_name": .string("web_search")], tools: 2))

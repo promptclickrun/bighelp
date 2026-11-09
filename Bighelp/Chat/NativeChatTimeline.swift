@@ -16,6 +16,8 @@ enum ChatCanvasRow: Identifiable, Equatable {
     case workTrailEnd(String)
     /// Agents messaging each other, back-to-back messages as one rail.
     case agentTalk(ChatAgentTalk)
+    /// A group chat line about who took a message, or a paused discussion with Continue and Stop.
+    case groupNotice(BotModeRoomNoticeRow)
     case earlierMessage(TimelineItem)
     case divider(String)
     case previousHistory(Bool, String?)
@@ -50,6 +52,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case .activityDetail(let event): "activity-detail:\(event.id)"
         case .workTrailEnd(let id): "work-trail-end:\(id)"
         case .agentTalk(let talk): "agent-talk:\(talk.id)"
+        case .groupNotice(let notice): "group-notice:\(notice.id)"
         case .earlierMessage(let item): "earlier:\(item.id)"
         case .divider(let label): "divider:\(label)"
         case .previousHistory: "chat.previous-history"
@@ -86,6 +89,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         case (.activityDetail(let a), .activityDetail(let b)): a == b
         case (.workTrailEnd(let a), .workTrailEnd(let b)): a == b
         case (.agentTalk(let a), .agentTalk(let b)): a == b
+        case (.groupNotice(let a), .groupNotice(let b)): a == b
         case (.earlierMessage(let a), .earlierMessage(let b)), (.staged(let a), .staged(let b)): a == b
         case (.divider(let a), .divider(let b)), (.botStatus(let a), .botStatus(let b)), (.failure(let a), .failure(let b)): a == b
         case (.previousHistory(let a, let b), .previousHistory(let c, let d)): a == c && b == d
@@ -161,7 +165,9 @@ enum ChatCanvasTranscriptProjection {
         }
         func append(_ entry: ChatTranscriptEntry, inOpenedTurn: Bool = false) {
             guard case .activity(let turn) = entry else {
-                if case .message(let item) = entry, talk.hides(item) {
+                if case .message(let item) = entry, let notice = item.metadata.groupNotice {
+                    result.append(.groupNotice(notice))
+                } else if case .message(let item) = entry, talk.hides(item) {
                     return
                 } else if case .message(let item) = entry, let piece = talk.piece(for: item) {
                     appendTalk(piece)
@@ -674,12 +680,14 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
         private var prewarm: DispatchWorkItem?
         private var memoryWarning: NSObjectProtocol?
         private var lastScrolledAt: CFTimeInterval = 0
-        private var pendingUpdate: (parent: NativeChatTimeline, environment: EnvironmentValues)?
+        private var pendingUpdate: (parent: NativeChatTimeline, environment: EnvironmentValues, style: Style)?
         private var updateScheduled = false
         /// A streamed answer can arrive far faster than it can be laid out again, and each layout of a
         /// long answer kept the main thread from the reader's drag. After an update is laid out, the
         /// next waits this long.
         static var updateInterval: CFTimeInterval { 0.05 }
+        /// The turn whose first readable answer last skipped that wait (`answeredTurn`): once a turn.
+        private var firstAnswerTurn: String?
 
         func install(on table: ChatTimelineTableView) {
             dataSource = UITableViewDiffableDataSource(tableView: table) { [weak self] table, indexPath, id in
@@ -699,11 +707,17 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             table.onLayout = { [weak self, weak table] in
                 guard let self, let table else { return }
                 self.publishPosition(of: table)
+                if let id = self.conversationID {
+                    ChatPerformanceProbe.timelineLaidOut(table, conversationID: id)
+                }
             }
         }
 
         func scheduleUpdate(_ parent: NativeChatTimeline, environment: EnvironmentValues, table: ChatTimelineTableView) {
-            pendingUpdate = (parent, environment)
+            // The rows' look is read now, while SwiftUI runs updateUIView: SwiftUI calls it again only
+            // for the environment values read during it. Read in the update below, a change from Light
+            // to Dark with the chat open never reached the rows (#855).
+            pendingUpdate = (parent, environment, Style(environment))
             guard !updateScheduled else { return }
             updateScheduled = true
             // Diffable self-sizing measures hosting views synchronously. Do
@@ -721,7 +735,12 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             }
             let sameChat = update.parent.conversationID == conversationID && update.parent.ownerID == ownerID
             let wait = table.updateLaidOutAt + Self.updateInterval - CACurrentMediaTime()
-            if sameChat, wait > 0 || table.isScrolling {
+            // The first words of an answer show at once instead of waiting out the wait after the
+            // update before them (the agent's work, a spinner), while the reader follows the newest
+            // message and isn't touching or scrolling the chat. Words after them wait as before.
+            let firstAnswer = sameChat && wait > 0 && table.followsTail && !table.isUserInteracting
+                && !table.isScrolling && !table.isAnimatingReturn && takesFirstAnswer(update.parent.rows)
+            if sameChat, (wait > 0 && !firstAnswer) || table.isScrolling {
                 table.applyCustomContentInsets(update.parent.contentInsets)
                 let delay = table.isScrolling ? Self.updateInterval / 2 : max(wait, 0.005)
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak table] in
@@ -731,8 +750,15 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             }
             updateScheduled = false
             pendingUpdate = nil
-            ChatPerformanceProbe.measure("timeline.update") {
-                self.update(update.parent, environment: update.environment, table: table)
+            if firstAnswer {
+                // Kept apart from `timeline.update`: this is the answer row's first build and sizing.
+                ChatPerformanceProbe.measure("timeline.first_answer_update") {
+                    self.update(update.parent, environment: update.environment, style: update.style, table: table)
+                }
+            } else {
+                ChatPerformanceProbe.measure("timeline.update") {
+                    self.update(update.parent, environment: update.environment, style: update.style, table: table)
+                }
             }
             table.applyCustomContentInsets(update.parent.contentInsets)
             table.accessibilityValue = "\(update.parent.entryCount) conversation entries"
@@ -742,6 +768,34 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
         func cancelPendingUpdate() {
             pendingUpdate = nil
             prewarm?.cancel()
+        }
+
+        /// Whether `next` brings the current turn's first readable answer, which the rows on screen don't
+        /// show yet, and this turn hasn't had its answer shown at once already.
+        private func takesFirstAnswer(_ next: [ChatCanvasRow]) -> Bool {
+            guard let turn = Self.answeredTurn(in: next), turn != firstAnswerTurn,
+                  Self.answeredTurn(in: rows) != turn else { return false }
+            firstAnswerTurn = turn
+            return true
+        }
+
+        /// The turn an answer with words in it ends the rows with: the ID of the person's message it
+        /// answers (empty before any), or nil while the rows since that message have no such answer.
+        /// Looks back only as far as that message.
+        static func answeredTurn(in rows: [ChatCanvasRow]) -> String? {
+            var answered = false
+            for row in rows.reversed() {
+                switch row {
+                case .staged(let item):
+                    return answered ? item.id : nil
+                case .transcript(.entry(.message(let item))) where item.role == .human:
+                    return answered ? item.id : nil
+                case .transcript(.entry(.message(let item))) where item.role == .assistant:
+                    if case .message(let text) = item.content, text.contains(where: { !$0.isWhitespace }) { answered = true }
+                default: break
+                }
+            }
+            return answered ? "" : nil
         }
 
         func releaseBuiltRows() {
@@ -861,7 +915,8 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             return (start, end)
         }
 
-        func update(_ parent: NativeChatTimeline, environment: EnvironmentValues, table: ChatTimelineTableView) {
+        private func update(_ parent: NativeChatTimeline, environment: EnvironmentValues, style nextStyle: Style,
+                            table: ChatTimelineTableView) {
             // Preserve known visible heights before a structural update makes
             // UIKit estimate the old viewport again. Changed rows are still
             // invalidated below and always receive native self-sizing.
@@ -874,7 +929,6 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             rowContent = parent.rowContent
             defer { schedulePrewarm(table) }
             live.take(environment)
-            let nextStyle = Style(environment)
             let previousContext = rowContext
             rowContext = parent.rowContext
             let styleChanged = style != nextStyle || previousContext.density != rowContext.density
@@ -887,6 +941,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             if reset {
                 table.followsTail = true
                 table.isAnimatingReturn = false
+                firstAnswerTurn = nil
                 heights.removeAll()
                 estimates.removeAll()
                 built.removeAll()

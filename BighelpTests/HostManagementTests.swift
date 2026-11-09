@@ -372,6 +372,8 @@ import Testing
         #expect(model.state == .installed)
         #expect(management.actions == ["list", "toggle", "list"])
         #expect(!management.actions.contains("install"))
+        // Turned on just now: it takes effect after the dashboard and the gateway restart.
+        #expect(model.pluginChanged)
     }
 
     /// No app build pins the plugin: an install uses the newest release on GitHub.
@@ -381,6 +383,8 @@ import Testing
         let management = Manager(saved: fixture.saved)
         let releases = try FixedPluginReleases.release("3.0.0", "c")
         management.onInstall = { management.rows = [fixture.row(sha: String(repeating: "c", count: 40), version: "3.0.0")] }
+        var changed: [UUID] = []
+        fixture.registry.onServicesChanged = { changed.append($0) }
         let model = HostNotificationSetupModel(host: fixture.host, registry: fixture.registry, releases: releases,
                                                management: management, enrollNotifications: false)
         await model.enable()
@@ -388,6 +392,9 @@ import Testing
         let install = try #require(management.requests.first { $0["action"] == .string("install") })
         #expect(install["ref"] == .string(String(repeating: "c", count: 40)))
         #expect(install["force"] == .boolean(false))
+        // The app reads the computer again (a newer Hermes serves the routes at once) and asks for the restarts.
+        #expect(model.pluginChanged)
+        #expect(changed == [fixture.host.id])
     }
 
     @Test func anOlderPluginIsUpdatedAndANewerOrEqualOneIsKept() async throws {
@@ -404,6 +411,8 @@ import Testing
             let install = management.requests.first { $0["action"] == .string("install") }
             #expect((install != nil) == replaced, "\(installed)")
             if replaced { #expect(install?["force"] == .boolean(true)) }
+            // A kept plugin already runs: nothing to restart for it.
+            #expect(model.pluginChanged == replaced, "\(installed)")
         }
     }
 
@@ -618,6 +627,27 @@ import Testing
         #expect(model.state == .prerequisitesRequired)
         #expect(management.actions == ["list"])
         #expect(setup.calls == 1)
+    }
+
+    /// An install the app confirmed finished, then the plugin removed on the computer: nothing of
+    /// that install can still be running, so the app installs again. It once said "the plugin
+    /// install may still be running" for good.
+    @Test func aConfirmedInstallRemovedOnTheComputerCanBeInstalledAgain() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        var host = fixture.host
+        host.pluginIntent = .init(identifier: fixture.pin.identifier, revision: String(repeating: "b", count: 40),
+                                  profile: nil, phase: .verified)
+        try fixture.registry.update(host)
+        let management = Manager(saved: fixture.saved)
+        management.onInstall = { management.rows = [fixture.row(sha: String(repeating: "c", count: 40), version: "3.0.0")] }
+        let model = HostNotificationSetupModel(host: host, registry: fixture.registry,
+                                               releases: try FixedPluginReleases.release("3.0.0", "c"),
+                                               management: management, enrollNotifications: false)
+        await model.enable()
+        #expect(model.state == .installed)
+        #expect(management.actions.filter { $0 == "install" }.count == 1)
+        #expect(model.pluginChanged)
     }
 
     @Test func unknownAbsentInstallNeverRetriesAndObservedPluginIsReused() async throws {

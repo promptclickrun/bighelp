@@ -77,7 +77,6 @@ struct RootShellView: View {
     @State var groupCreationOwner: WorkspaceOwner?
     /// The chat header's New chat: one agent starts a 1:1 chat, several a group.
     @State var newChatPicker: NewChatPickerRequest?
-    @State var groupSettingsModel: ChatModel?
     @State private var isStartingNewChat = false
     @State private var newChatStartID: UUID?
     @State private var fixtureCanonicalSessions: [String: String] = [:]
@@ -235,6 +234,8 @@ struct RootShellView: View {
             recordLive: recordLiveFleet, openPending: openPendingFleetIfReady,
             syncHosts: syncFleetHosts, cancelReads: { fleet?.cancelReads() },
             setKeepsConnected: setKeepsFleetHostsConnected))
+        .modifier(FleetSectionAdoption(placements: agents.profiles.compactMap(\.placement),
+                                       adopt: { fleet?.adoptSections(adding: $0) }))
         .environment(\.agentDeletion, agentDeletionAction)
         .focusedSceneValue(\.bighelpShellActions, menuCommandActions)
         .bighelpThemePresentation(theme)
@@ -261,21 +262,14 @@ struct RootShellView: View {
                 .environment(\.agentDeletion, agentDeletionAction)
         }
         .bighelpSheet(isPresented: $isGroupCreationPresented) {
-            BotModeCreateRoomView(rooms: botModeRooms, agents: agents, seedProfileID: groupCreationSeed) { roomID in
+            BotModeCreateRoomView(rooms: botModeRooms, agents: agents, seedProfileID: groupCreationSeed,
+                                  sectionChoice: groupSectionChoice) { roomID in
                 // A reconnect while the sheet was open is still this computer.
                 guard let owner = groupCreationOwner, isCurrentSignIn(owner),
                       let current = currentWorkspaceOwner else { return }
                 openHostedGroup(roomID, owner: current, settings: false)
             }
             .bighelpSheetSize(.standard)
-        }
-        .bighelpSheet(isPresented: Binding(
-            get: { groupSettingsModel != nil }, set: { if !$0 { groupSettingsModel = nil } }
-        )) {
-            if let model = groupSettingsModel {
-                PeopleAndChatView(model: model, agents: agents)
-                    .bighelpSheetSize(.standard)
-            }
         }
         // With Settings open (Settings › System › Add Host), Settings presents it: one view shows one sheet.
         .modifier(HostSetupSheet(registry: hostRegistry, isActive: !isUnifiedSettingsPresented))
@@ -361,7 +355,7 @@ struct RootShellView: View {
         .modifier(IncomingLinks(open: handleIncomingURL))
         // A voice start that can't open says why; the voice stage mustn't hide that.
         .onChange(of: actionErrorMessage != nil) { _, failed in if failed { VoiceLaunchState.shared.finish() } }
-        .onAppear { watchForLostChats() }
+        .modifier(LostChatHooks(featureStore: featureStore, attach: watchForLostChats))
         .modifier(DriveShellHooks(appState: appState, featureStore: featureStore, agents: agents,
                                   settings: settings, usesDemoFixtures: usesDemoFixtures))
         .modifier(BighelpShortcutParameterUpdates(agents: agents, scheduledTasks: featureStore.scheduledTasks,
@@ -462,7 +456,6 @@ struct RootShellView: View {
         lifecycleProfileID = nil
         lifecyclePresentationID = nil
         isGroupCreationPresented = false
-        groupSettingsModel = nil
         fixtureCanonicalSessions = [:]
     }
 
@@ -618,7 +611,8 @@ struct RootShellView: View {
                 groupFilterRequest: $agentGroupFilterRequest,
                 createRequest: $agentCreateRequest,
                 botChatActivity: botChatActivity,
-                botChatActivitySource: botChatActivitySource
+                botChatActivitySource: botChatActivitySource,
+                sectionCards: AnyView(SimpleBotsSectionsArea(context: simpleBotsContext))
             )
             // The one main action, where a thumb rests, as on All agents.
             .overlay(alignment: .bottomTrailing) {
@@ -1050,6 +1044,7 @@ struct RootShellView: View {
 
     private func selectTab(_ tab: AppTab) {
         if tab == .sessionList {
+            if openHeldChat(under: tab) { return }
             openAllSessions()
             return
         }
@@ -1061,7 +1056,9 @@ struct RootShellView: View {
             return
         }
         if tab == .sessions, opensHomeChat {
-            // Chat is the agent's own chat; ☰ and swipe-back reach the full list.
+            // The chat you left under Chat opens again; otherwise Chat is the agent's own chat.
+            // ☰ and swipe-back reach the full list either way.
+            if openHeldChat(under: tab) { return }
             openHomeChat()
         } else if tab == .sessions {
             openSessions(filteredTo: nil)
@@ -1072,6 +1069,23 @@ struct RootShellView: View {
         } else {
             appState.select(tab)
         }
+    }
+
+    /// The chat the person left under `tab` (Chat or Sessions) for another place, while this
+    /// computer still lists it. False when there's none, and the tab opens as it always has. Chat
+    /// skips a 1:1 chat whose agent is no longer the one in use: it opens that agent's chat instead.
+    private func openHeldChat(under tab: AppTab) -> Bool {
+        guard !fleetModeOn, let held = appState.heldChat,
+              held.tab(sessionsInBar: barTabs.contains(.sessionList)) == tab,
+              let record = sessionCatalog.session(id: held.conversationID),
+              tab == .sessionList || HeldChat.fitsChat(members: record.agentIDs, agentInUse: homeAgent?.id)
+        else { return false }
+        appState.select(.sessions)
+        // A chat from the list keeps Back to the list.
+        appState.chatOpenedFromList = held.openedFromList
+        // A group chat opens its room, as it did from the list.
+        openSessionSelection(record.summary)
+        return true
     }
 
     /// Projects, Kanban, Workflows or Usage from the bottom bar: opened the way ☰ opens
@@ -1171,9 +1185,9 @@ struct RootShellView: View {
 
     /// Group chats use Hermes' hosted rooms, the same path as Agents › New group chat.
     var newGroupChatAction: (() -> Void)? {
-        guard let owner = currentWorkspaceOwner, botModeRooms.canCreateNativeRoom,
-              currentWorkspaceCapabilities.supports(.groupsCreate, owner: owner, profileID: nil)
-        else { return nil }
+        // The room store's own answer, not the published capability: that comes only after the whole
+        // connection's refresh, so New Group Chat took 10 seconds or more after every return to the app.
+        guard let owner = currentWorkspaceOwner, botModeRooms.offersNewGroupChat else { return nil }
         return {
             handleAgentWorkspaceAction(AgentWorkspaceActionRequest(owner: owner, action: .createGroup(seedProfileID: nil)))
         }

@@ -17,26 +17,34 @@ final class CompactChatMenuUITests: BighelpUITestCase {
 
     @MainActor
     func testCompactMenuAndFastModeInLightDarkAndLargeText() {
-        for (appearance, large) in [("light", false), ("dark", true)] {
+        // The whole list, File changes and all, at the default size; from XL the menu folds into This
+        // chat, Agent and More, and at accessibility sizes Advanced also folds its switches into Display.
+        for (appearance, size) in [("light", nil), ("light", "UICTContentSizeCategoryXL"),
+                                   ("dark", "UICTContentSizeCategoryAccessibilityXXXL")] {
+            let accessibility = size?.contains("Accessibility") == true
+            let large = size != nil
             let app = makeApp()
             app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3",
                                    "-test-v3-header-context", "-test-fast-mode", "-loopdy.demo.appearance", appearance]
-            if large { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] }
+            if let size { app.launchArguments += ["-UIPreferredContentSizeCategoryName", size] }
             app.launch()
             let options = app.buttons["chat.options"].firstMatch
             XCTAssertTrue(options.waitForExistence(timeout: 20))
             options.tap()
-            evidence("compact-menu-\(appearance)")
+            evidence("compact-menu-\(appearance)-\(size ?? "default")")
             let rootRows = large
                 ? ["chat.options.model-speed", "chat.options.this-chat", "chat.options.agent", "chat.options.more"]
-                : ["chat.options.model-speed", "chat.rename", "chat.move-project", "chat.files", "chat.edit-current-agent",
-                   "chat.options.usage", "chat.file-changes", "chat.options.advanced"]
+                : ["chat.switch-agent", "chat.rename", "chat.move-project", "chat.files", "chat.file-changes",
+                   "chat.options.model-speed", "chat.options.usage", "chat.edit-current-agent", "chat.options.advanced"]
             for title in rootRows {
                 let row = chatMenuElement(title, in: app)
-                XCTAssertTrue(row.waitForExistence(timeout: 5), title)
-                XCTAssertTrue(row.isHittable, "\(title) must be reachable without scrolling")
-                XCTAssertTrue(app.windows.firstMatch.frame.contains(row.frame), "\(title) must fit on screen")
+                let at = size ?? "the default size"
+                XCTAssertTrue(row.waitForExistence(timeout: 5), "\(title) at \(at)")
+                XCTAssertTrue(row.isHittable, "\(title) must be reachable without scrolling at \(at)")
+                XCTAssertTrue(app.windows.firstMatch.frame.contains(row.frame), "\(title) must fit on screen at \(at)")
             }
+            // The largest accessibility size still scrolls these four rows, as before the list was regrouped.
+            if !accessibility { assertMenuDoesNotScroll(app, at: size ?? "the default size") }
             chatMenuElement("chat.options.model-speed", in: app).tap()
             let fast = chatMenuElement("chat.fast-mode", in: app)
             XCTAssertTrue(fast.waitForExistence(timeout: 8))
@@ -57,8 +65,8 @@ final class CompactChatMenuUITests: BighelpUITestCase {
                 ["chat.rename", "chat.move-project", "chat.files"],
                 ["chat.switch-agent", "chat.edit-current-agent"],
                 ["chat.file-changes", "chat.options.usage", "chat.options.advanced"],
-                ["chat.provider-usage", "chat.context-window", "chat.compact"],
-                ["chat.options.display"],
+                ["chat.provider-usage", "chat.context-window", "chat.compact"]
+            ] + (accessibility ? [["chat.options.display"]] : []) + [
                 ["chat.visibility.reasoning", "chat.visibility.tool-calls"]
             ] : [
                 ["chat.provider-usage", "chat.context-window", "chat.compact"],
@@ -73,6 +81,7 @@ final class CompactChatMenuUITests: BighelpUITestCase {
                     XCTAssertTrue(item.exists && item.isHittable, "\(identifier) must not need scrolling")
                     if item.exists { XCTAssertTrue(app.windows.firstMatch.frame.contains(item.frame)) }
                 }
+                if !accessibility { assertMenuDoesNotScroll(app, at: "\(size ?? "the default size") in \(identifiers[0])'s menu") }
             }
             app.terminate()
         }
@@ -128,6 +137,16 @@ final class CompactChatMenuUITests: BighelpUITestCase {
         XCTAssertTrue(off.waitForExistence(timeout: 5))
         off.tap()
         XCTAssertTrue(waitForElement(row, predicate: NSPredicate(format: "label CONTAINS %@", "Off")))
+    }
+
+    /// A row cut off at the bottom still counts as hittable, so check the menu itself: one taller than
+    /// iOS lets it be gets a scroll bar of more than one page.
+    @MainActor
+    private func assertMenuDoesNotScroll(_ app: XCUIApplication, at size: String) {
+        let bars = app.collectionViews.otherElements.matching(NSPredicate(format: "label BEGINSWITH %@", "Vertical scroll bar"))
+        for bar in bars.allElementsBoundByIndex where !bar.label.hasSuffix(" 1 page") {
+            XCTFail("The menu scrolls at \(size): \(bar.label)")
+        }
     }
 
     @MainActor

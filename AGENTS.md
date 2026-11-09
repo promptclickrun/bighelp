@@ -78,9 +78,19 @@ change in both repos.
     gateway's bot goes through `openFleet`; the home stays under the Noodle loader (`SimpleBotsOpeningOverlay`,
     with Cancel) until the bot opens. A computer that doesn't answer gives the selection back to the one the tap
     came from (`FleetSwitchFallback`), so neither the app nor its next launch is left on it.
-  - First run (`FirstRunOnboardingView`) is Welcome, Connect, the optional plugin, notifications (only once the
-    plugin is in), then Choose your mode (`FirstRunMode`: Bots, Sessions, Code). Optional steps have a small Skip;
-    Connect and the mode don't. `FirstRunOnboarding.afterConnectKey` keeps it on screen after host setup's own
+  - Sections are folders of bots and group chats (`Bighelp/SimpleBots/SimpleBotsSections.swift`): cards on
+    Bots mode's home and the Agents screen, a page of their own (`AppRoute.simpleBotsSection`, the home view
+    with a `sectionID`), and Code mode's agent picker lists agents by them. A bot's section is its profile's
+    `AgentListPlacement` (Hermes Desktop's field, saved on its own computer through `SimpleBotsSectionEditor`);
+    the sections list and each group chat's section, pin and hide are `FleetStore`'s, kept on the computers too
+    (`bots.layout`). Same-named sections on two computers are one (`FleetSectioning`). With one gateway shown, a
+    section whose members are all elsewhere stays off (`SimpleBotsSectioning.elsewhere`). + in Bots mode is
+    New Bot, New Group Chat and New Section, each only where it can work (`SimpleBotsNewItem`); the bot and
+    group chat menus come from `SimpleBotsMenuAction`.
+  - First run (`FirstRunOnboardingView`) is Welcome (with an optional Appearance step behind Appearance options),
+    the AI data agreement if not given yet, Connect, the optional plugin, notifications (only once the plugin is
+    in), then Choose your mode (`FirstRunMode`: Bots, Chat for `.sessions`, Code). Optional steps have a small
+    Skip; Connect and the mode don't. `FirstRunOnboarding.afterConnectKey` keeps it on screen after host setup's own
     finish. The mode cards show screenshots (`OnboardingMode*` assets); retake them when those homes change.
   - While every host's data shows (all-hosts view or Multi-gateway), the other hosts stay connected
     (`keepsFleetHostsConnected`), through the background grace too, so opening on one is instant.
@@ -119,7 +129,8 @@ change in both repos.
 | `Bighelp/Kanban/` | Kanban on Hermes' Kanban plugin: board model, lanes, cards, Vision Pro window and pinch-drag |
 | `Bighelp/Code/` | Code mode (Settings › Modes › Code mode): its home (`CodeHomeView`), the message box's chips (project, new worktree or local, branch), `CodeLauncher`, Changes and Ship |
 | `Bighelp/Connectors/` | Settings › Connections (`AppsHubView`): Hermes' connectors as Native App Connections (the inline connect cards in chat, `connection.request`, `ConnectorCardStore`; `ConnectorAppsModel`) and Composio Apps (`Composio/`, [docs/COMPOSIO_APPS.md](docs/COMPOSIO_APPS.md)) |
-| `Bighelp/BotScreen/` | Bot Screen: an agent's Linux screen (Hermes `display.*`) in its profile's Screen tab, a native RFB client (`RFB/`) and the full-screen viewer with take control and hand back |
+| `Bighelp/HTMLApps/` | Agents' HTML apps: the `html_app` card, the full-screen page and its `window.bighelp` bridge, the plugin's `html-apps` routes, the demo's sample apps |
+| `Bighelp/BotScreen/` | Bot Screen: an agent's Linux screen (Hermes `display.*`) and the computer's own desktop (`ComputerScreen.swift`, the plugin's VNC bridge) in its profile's Computer tab, a native RFB client (`RFB/`, with VNC passwords) and the full-screen viewer with take control and hand back |
 | `Bighelp/Driving/` | An agent showing the person a place (`iphone_navigation`, #662): the place catalog and its playbooks (`DriveCatalog`), the navigator that plays one (`DriveNavigator`), and the overlay (island bar, chat dock) in its own window |
 | `Bighelp/Usage/` | The Usage page (☰ › Usage): plans and limits (`ProviderUsageStore`), Hermes' own analytics per agent and computer (`UsageStore`, `HostUsageLoader`), charts |
 | `Bighelp/Voice/` | Turn-based and live voice; on-device voices (`OnDevice/`, Phonon in `Packages/PhononTTS`) |
@@ -204,9 +215,12 @@ change in both repos.
 - **Who is sending:** before each new turn, `DirectHermesChatSpeakerNote` posts `people/speaking` (plugin
   `native-people-v1`): the chat's stored session ID, a person ID from iCloud Keychain (`BighelpPersonID`, one per
   Apple ID) and the name the person saved. The plugin puts the name in the chat brief and, once a chat has had two
-  people, a note on each message that only the model sees. It starts alongside the pre-send connection check. A
-  chat's first message waits for it (capped at 1.2 s; the plugin records the brief's person once), and so does the
-  first from each connection; later turns read the note when they reach the model, so they go at once. `UserIdentity.name` is empty until someone saves one; "You" is an on-screen placeholder
+  people, a note on each message that only the model sees. Every new turn and queued message sends its own note,
+  alongside the pre-send connection check, and only at Send: a note makes this person the chat's speaker at once,
+  so opening a chat never sends one. A steer into the running turn sends none. A chat's first message waits for it (capped at 1.2 s; the plugin records the brief's person once), and
+  so does any message until the host has taken a note naming this person, with the name they have now, in this
+  stored session on this connection (`notedSpeaker`); later turns read the note when they reach the model, so they
+  go at once. `UserIdentity.name` is empty until someone saves one; "You" is an on-screen placeholder
   (`displayName`) and must never be sent. Names are at most 40 characters.
 - **A lost create never locks an agent out:** every `session.create` sends the creation record's `intentID` as
   `idempotency_key` (Hermes keeps it 5 minutes and answers a retry with the same session). An unfinished first Bot
@@ -215,6 +229,10 @@ change in both repos.
 - **A turn stays pending while it streams:** after `prompt.submit` returns `streaming`, the chat isn't "ready for a
   new turn" until the turn ends. A mid-turn Send must go through the steer/queue path (`sendMidSession`). Steer is
   the default.
+- **A reply's time comes from the phone until a reread:** Hermes' live events carry no time, and nothing reads
+  the saved history after this device's own turn. A reply segment Hermes completes live takes the time it
+  arrived (`DirectHermesProjection.accept(_:arrivedAt:)`); a replay takes none, since it ended at a time the
+  phone doesn't know. A reread puts the host's saved time on the same row (#856).
 - **Live voice is Full Duplex, and it is the agent:** each agent picks its provider (GPT-Live on the Codex
   subscription or an API key, or Gemini Live) and voice (`AgentVoiceChoices`). The plugin's brief names the
   agent, so the voice model speaks as it, never about "your agent". Gemini's media and events stay between the
@@ -224,7 +242,9 @@ change in both repos.
   (`GeminiLiveAudioPeer.restart`), or it takes Gemini's voice and plays none. A test that only counts bytes
   received can't see that; check what finished playing. The call audio report (`GeminiLiveAudioDiagnostics`,
   log category `LiveVoiceAudio`) shows where the sound stops on a device; Settings › Voice › Debug (Nerd Mode)
-  shows it on the call screen and has Restart sound.
+  shows it on the call screen and has Restart sound. Gemini refuses a call by closing the socket with a code
+  and its reason; the call screen shows Gemini's words (`GeminiLiveClose`), never a bare "Gemini ended the
+  call" (#888).
   With plugin `native-voice-context-v1`, the offer also says who is talking and where
   (`LiveVoiceCallContext`): the agent's shown name, the person's saved name (never "You"), the time zone and,
   only while Device access › Location is usable, a coarse place (`LiveVoicePlace`: city, region, country from
@@ -266,6 +286,11 @@ change in both repos.
   v0.22.4's gateway listener on the session path; features, retry and discard, RoomLink and seatable
   profiles differ. Go by what `groups.capabilities` and each pending action say, never the version
   (docs/HERMES_BOT_MODE.md, vectors in `BighelpTests/Fixtures/HermesGroups`).
+- **Group chats' settings:** where `groups.state` returns `context`, Group Settings (`GroupSettingsView`,
+  `AppRoute.groupSettings`) sets who answers a message that names nobody, the purpose and shared notes through
+  `groups.context`, each edit kept with the room under one `event_id` until Hermes answers. Hermes' picks
+  (`room.assignment`, `room.routed`) and paused discussions (`room.activity` `bounded`, Continue through
+  `groups.continue`) are lines in the chat, kept in `nativeNotices` (docs/HERMES_BOT_MODE.md › Group settings).
 - **Hermes makes every Bot Chat:** Hermes delivers other agents' messages into the chat titled "Bot Chat" and
   takes over only its own native chat (`local-…`); a Bot Chat made over the app's socket (source `bighelp`) got
   renamed `Bot Chat (bighelp <id>)` and replaced, context and all, the first time another agent wrote. So the first
@@ -278,6 +303,14 @@ change in both repos.
   (`canonical_session`, `canonicalBotChat`) so a refresh can't drop it. Hermes names it only when
   `profiles.list` asks for the agents' sessions (`include_sessions`, its default), so the catalog asks; without
   them every refresh dropped the saved Bot Chat, and the first tap on a bot waited on a full lookup.
+- **Read state** (#862): Hermes' `last_read_at` is a watermark. A chat is unread once anything happens in it after
+  that, the person's own messages too, and a chat no client ever marked counts as read. So the app marks a chat read
+  each time it's read (`BighelpVisibleChats` → `ChatModel.noteRead` → `SessionCatalogStore.noteRead`): as it shows,
+  2 s after a turn ends on screen, and as it stops showing or the app leaves the front. A chat that isn't on screen
+  is never marked, and one read again with nothing new isn't marked twice. Rows without `unread` mean the host
+  keeps none: Mark Read and Mark Unread hide (`SessionSummary.tracksUnread`). Bots mode shows Hermes' state where
+  there is one, else the marks kept on the device (`SimpleBotsReadState`). The Chats list's Draft reads the draft
+  journal without observing it (`ChatDraftJournal.pendingDraft`).
 - **Archived:** the catalog lists `archived=include` and keeps rows Hermes' idle sweep archived
   (`auto_archived`); deliberately archived chats live in Archived Chats (`archivedChats`, Restore).
 - **Send never waits for the connection:** while a chat has no working connection (back from the background, a
@@ -285,9 +318,24 @@ change in both repos.
   just started isn't live yet, Send, the message box and Stop stay on. A message sent then waits at the bottom of
   the chat with "Sending…" under it (`stagedSends`, `ChatCanvasRow.staged`), outside the transcript: a recovery's
   readback would drop a local row as stale. Staged messages go out in order once the chat can take them, each as
-  the row it waited in: a new turn, or a steer once the turn is live. Send goes off only after 25 s without a
-  connection while the app is open (`connectionIsOverdue`, `ChatConnectionGrace`); staged messages then go back in
-  the box. Commands (`/…`) and PDF pages still need the connection and wait in the box.
+  the row it waited in: a new turn, or a steer once the turn is live. The wait (`waitForConnection`) follows the
+  chat's own state through Observation, the app coming and going, and the time left, never a polling timer, so
+  whatever decides `takesMessageNow` must be observed (`pendingID` and `waiter` are). Send goes off only after
+  25 s without a connection while the app is open (`connectionIsOverdue`, `ChatConnectionGrace`); staged messages
+  then go back in the box. Commands (`/…`) and PDF pages still need the connection and wait in the box.
+- **A message's connection check:** before `prompt.submit`, `prepareForAdmission` skips its `gateway.ping` only when
+  the host sent something on that socket in the last 5 s (`admissionFreshness`). Coming back to the app or a
+  network change (`verifyLiveness`) voids that until a ping sent after it is answered: frames from before can sit
+  in a dead socket's buffer. A prompt sent on a socket that dies anyway is journaled as uncertain, never resent.
+- **App state on the computer:** Bots mode's order, the sections, each group chat's section, pin and hide, Multi-gateway's
+  primary bot and each bot's voice, mark, pet and character are also kept for each person on their computers
+  (plugin `native-app-state-v1`, keys `bots.layout` and `bots.settings`; `Bighelp/AppState/`), so a reinstall
+  or another device gets them back. The stores stay where screens read them; `BotsAppStateSync` turns their
+  changes into patches and puts the newest revision from every computer reached back in them. Items are named
+  by the computer's own ID (`<computerId>/<profile>`), never by this phone's host ID or sign-in scope. A value
+  lists the computers it covers: a computer reached for the first time gets this phone's part, and a value
+  already there wins (a fresh install never sends empty choices). Keep JSON fields the app doesn't know. The
+  plugin refuses only values shaped like credentials; links and IDs go as they are.
 - **Who's working:** Bots mode's home and the Agents screen show each agent's Bot Chat working or needing
   you from the plugin's `agents/activity` (`native-agents-activity-v1`): Hermes' turn leases in any process
   (the app, `message_agent`, `chat -q`) and the dashboard's open prompts, for up to 64 agents in one read.
@@ -295,6 +343,18 @@ change in both repos.
   works, 6 s idle), keyed by `cacheScopeID`; other gateways come from their all-hosts copies (`FleetBotChat`),
   only while fresh. Without the route it uses the Bot Chats the app knows to be running, and says nothing
   about updating. Never open or resume a chat to learn this.
+- **Background work (#890):** an agent keeps working after it answers: subagents (`delegate_task`), background
+  commands (`terminal(background=true)`) and scheduled tasks. With `native-agents-background-v1`, `agents/activity`
+  rows carry `background` (how many run now, in any chat and any Hermes process, and the newest one's title);
+  an idle bot then shows `BotChatActivity.background`, and a turn wins over it. The open chat reads Hermes' own
+  `process.list` over its socket (`ChatBackgroundCommandsWatch`; `process.kill` stops one), and its "In the
+  background" chip counts its subagents and running commands for everyone; a command's output shows with Nerd
+  Mode on. A bot's Dashboard lists the last week's work by day as Activities from `agents/today`
+  (`native-agents-today-v1`, `AgentTodayModel`), asked from the start of the phone's day six days ago (plugin
+  3.47.0 takes 48 hours: then today and yesterday). Routines show only with ⋯ › Show routines. A tap opens the
+  item's read-out from `agents/today/detail` (`native-agents-today-detail-v1`, `AgentTodayDetail`). In a chat, a
+  helper's late `subagent.*` events update the row of the turn that started it (`subagentTurnIDs`), and a helper
+  left running doesn't hold its finished turn open: the turn folds as Settings › Chat › Agent's work says.
 - **Plugin routes:**
   - Each route is a `WorkspaceOperation` case plus a `Route(path:feature:isMutation:maximumResponseBytes:)` in
     `DirectHermesNativeContext.swift`.
@@ -311,6 +371,15 @@ change in both repos.
   - It looks up the release's exact commit, installs it, reads it back, and never replaces a newer or equal
     plugin. An install that may still be running on the host is finished with the commit it asked for.
   - When the app needs a newer plugin feature, gate it on `/native/context` and say "update the plugin".
+  - A plugin installed, turned on or updated takes effect only after two restarts: the Hermes dashboard
+    (`hermes dashboard` or `hermes serve`, which serves the app's connection and the plugin's routes) and the
+    messaging gateway (its own copy: reply alerts, other agents' messages). "Installed and enabled" reads the
+    plugin list on disk, not what runs. Every place that installs it asks to restart both
+    (`PluginRestartPrompt`), and Settings › System has Restart Hermes Dashboard beside the gateway's. Hermes
+    can't restart the dashboard for an app, so the plugin running in it does (`native-host-restart-v1`);
+    before the dashboard has loaded the plugin, only the computer can. After an install or a restart,
+    `BighelpHostRegistry.noteServicesChanged` has the runtime read the computer again (`reloadAfterHostChange`).
+    Live voice that can't start says why (`LiveVoiceUnavailable`), never only "not supported".
   - Test the app against the plugin's `main` on the Mac, not through a CI workflow.
 - **Agents talking to each other:** the app reads them from the tool calls Hermes recorded (`AgentTalkCall`:
   `hermes -p <agent> chat -q`, `hermes peer dm`, `message_agent`) and from the messages other agents send in
@@ -319,6 +388,16 @@ change in both repos.
   normalization on both sides). Each Hermes agent loads only its own plugins, and usually only the default agent
   has bighelp's, so nothing that must reach every agent can be a plugin prompt section: Teamwork writes each
   agent's `platform_hints.bighelp.append` instead.
+  Hermes 0.23 runs `message_agent` through the other agent's gateway: the call returns a `delivery_id`, a
+  background waiter (`bot_mode_dm.py --run-delivery`) gives up after about 30 minutes, and the agent asked keeps a
+  receipt. So the rail reads where each message is from the plugin's `agents/deliveries`
+  (`native-agent-deliveries-v1`, `AgentDelivery`), never the waiter's notice (`isStillOut`), and the waiter is no
+  background command. Tapped, a delivered message's rail opens in place (`ChatAgentTalkRunPanel`): the agent's
+  steps from the plugin's `chat/live` (`native-chat-live-v1`, which relays the gateway's own frames), then its
+  answer. The agent's own chat draws a turn its gateway runs as its own (`followGatewayTurn`): from now, since
+  saved steps carry no call ID to match a replay against, ended by `running: false` as any turn this device didn't
+  send, and Stop goes to `chat/stop`. Hermes saves the delivered message as an `internal_notification`; one that
+  is another agent's message shows (`DirectHermesHistoryRow.isVisible`).
 - **Files agents send** (`MEDIA:` lines, generated pictures): the plugin's `attachments/resolve` + `attachments/fetch`
   routes serve them in ~3 MB pieces. After the first piece the rest download three at a time, and a dropped piece is
   asked for again from its offset. Finished files are kept on the phone (`AgentAttachmentCache`, Caches, 512 MB, least
@@ -340,17 +419,20 @@ change in both repos.
   to the plugin's `uploads/*` routes in 4 MiB pieces instead (`BigFileUploader`), in any order, from a background
   `URLSession` (`BighelpBackgroundUploads`) that iOS keeps sending while the app is away. The host records a piece
   only once all of it arrived; after a drop the app asks `status` and sends only the rest, and starting the same
-  file again gets the same upload back. The app keeps its own copy on disk (`ChatBigFile`, `BigFileStore`, a
-  `.bigFile` draft) and never holds the whole file in memory. `finish` checks the SHA-256 and moves the file into
-  the agent's working folder (`uploads/<date>/<name>`, what its Files tab shows); stock `file.attach` then takes
-  it by `path` and tells the agent its type, size and place on disk, never its bytes. The app's
-  `[Video attached: … (size, length, picture)]` or `[File attached: … (size)]` note follows each `@file:` line.
-  One look per file (#721): while it goes up, a tile with a ring and "34 of 80 MB" (`BigFileUploadTile`,
-  progress in `BigFileUploadBoard` so only the ring redraws), or why it didn't go with Try again; once Hermes
-  takes the message (`onSubmissionAdmitted`), the row takes the sent text and shows each file as a line on the
-  rail (`ChatSentFileLine`), exactly what a reread rebuilds. A host path or `@file:` ref never shows as text; a
-  tap opens the bot's Files on the file (`BotProfileOpening.file`, `SimpleBotFilesModel.reveal`), a long press
-  shows the path. Hosts without the feature keep the 8 MiB limit and say to update the plugin.
+  file again gets the same upload back. A proxy in front of Hermes that refuses a piece (`413`; aiohttp and nginx
+  take 1 MB a request by default) gets the file again at once in 512 KiB pieces (`chunkBytes`, plugin
+  `native-uploads-small-pieces-v1`), never a quiet retry; an older plugin says to update it. The app keeps its own
+  copy on disk (`ChatBigFile`, `BigFileStore`, a `.bigFile` draft) and never holds the whole file in memory.
+  `finish` checks the SHA-256 and moves the file into the agent's working folder (`uploads/<date>/<name>`, what
+  its Files tab shows); stock `file.attach` then takes it by `path` and tells the agent its type, size and place
+  on disk, never its bytes. The app's `[Video attached: … (size, length, picture)]` or `[File attached: … (size)]`
+  note follows each `@file:` line. One look per file (#721): while it goes up, a tile with a ring and "34 of 80
+  MB" (`BigFileUploadTile`, progress in `BigFileUploadBoard` so only the ring redraws), or why it didn't go with
+  Try again and Remove; once Hermes takes the message (`onSubmissionAdmitted`), the row takes the sent text and
+  shows each file as a line on the rail (`ChatSentFileLine`), exactly what a reread rebuilds. A host path or
+  `@file:` ref never shows as text; a tap opens the bot's Files on the file (`BotProfileOpening.file`,
+  `SimpleBotFilesModel.reveal`), a long press shows the path. Hosts without the feature keep the 8 MiB limit and
+  say to update the plugin.
 - **Plugins and Hermes' marketplace:** the host's catalog route has no stars, featured picks or dates. The plugin's
   `marketplace/plugins` (`native-marketplace-v1`) reads them from Hermes' marketplace feed and adds Hermes' own
   install check (`installRefusal`), so Install goes off without the app comparing versions. The featured pick
@@ -374,6 +456,10 @@ change in both repos.
   that carried the call, and the call goes on. Apple Health is read only and asks once about sharing first. The
   channel runs while bighelp is active, inactive or in the background grace, and in any agent's chat on a plugin with
   `native-device-tools-agents-v1`; after the grace it closes as `paused` so the host waits for the phone.
+  A channel the host ended (its 30 s lease ran out while a slow tool ran, the plugin unloaded or started again, a
+  lost connection) opens again by itself while the chat keeps its tools, with longer waits each time and a limit
+  (`runReopeningWhileHeld`, `reopenWaits`); a late answer the host no longer takes loses only that answer, never
+  the channel. Before, any of these left the chat without phone tools until the person left it (#861).
   Two reach past the open chat: Arriving and leaving sends its message from the background (`DeviceGeofenceMonitor`),
   and a Shortcuts run keeps the call alive while Shortcuts is in front (`DeviceToolHandoff`).
 - **Agents show the way** (`iphone_navigation`, `Bighelp/Driving/`): a place in `DriveCatalog` is only one the
@@ -386,7 +472,14 @@ change in both repos.
   (`ImageDraftStore`): it claims the draft on the host, journals the write (`DeviceToolFileJournal`) and reads it back,
   so a second tap or a relaunch never writes twice; without access it opens Apple's own editor, whose Done is the
   Save. In a chat that holds the person's picture the phone answers `contacts.create` and `calendar.create` with
-  `review_required`. Each agent's Photo actions page sits beside its Instructions.
+  `review_required`. Each agent's Photo actions page sits beside its Instructions in Agent Studio, and in What it
+  can use on a bot's profile.
+- **Agents' apps** ([docs/HTML_APPS.md](docs/HTML_APPS.md), plugin `native-html-apps-v1`): an agent's HTML app is an
+  `html_app` card (title, description, Open App); the chat never draws the HTML. Open App loads the page from its own
+  `bighelp-app://<app id>/` origin in a full-screen web view (`HTMLAppWebView`) and renders it as made: any site or
+  library loads, while links and new windows open outside and the camera and microphone are refused. Its only way to
+  the app is `window.bighelp` (`HTMLAppBridge`): data the plugin serves (read every 5 s while a live app is open) and
+  `sendAnswer`, which shows the exact message and sends only on the person's Send, as their next message.
 - **Hermes versions never gate connections or features.** Older, newer, custom and absent version strings are
   metadata, not an allowlist. Check actual host capabilities and route responses instead.
   - Hosts differ, so parse leniently: ignore unknown keys and treat most parts as optional.
@@ -467,7 +560,9 @@ change in both repos.
   Never walk the ledger once per turn (`ChatLedgerIndex`) or insert into it one event at a time when building
   it (`ChatActivityLedger.init`). XCUITest queries build every row of a long chat (seconds, over 1 GB at
   300 turns), so time one with `ChatLoadSpeedUITests` (`BIGHELP_SPEED`, `BIGHELP_SPEED_TURNS`) or the DEBUG
-  autopilot and probe (`ChatPerformanceAutopilot`, `-test-chat-performance-probe`). `-test-long-chat-heavy`
+  autopilot and probe (`ChatPerformanceAutopilot`, `-test-chat-performance-probe`). The probe's `send_to_answer`
+  times each message from Send to its answer's first words on screen (`ChatSendTimings`, local only); the
+  autopilot's `send` with `BIGHELP_PERF_SENDS` and demo mode's `-test-first-answer` measure it. `-test-long-chat-heavy`
   (`BIGHELP_SPEED_HEAVY`) makes every turn as big as a chat near half a million tokens. Work done for each
   message as it's drawn must not grow with its text beyond the drawing itself: `MarkdownDocument`'s plain
   text is worked out only when read. The probe's `main_busy_ms` counts main run loop turns over 8.3 ms, a
@@ -486,7 +581,8 @@ change in both repos.
 - **Streaming under a drag:** Hermes sends an answer a few words at a time, and each piece lays the whole answer
   out again, so each timeline update waits 50 ms after the last one's layout, and while the reader drags or the chat
   decelerates (`NativeChatTimeline` `applyPendingUpdate`, `isScrolling`); otherwise a drag got a few touch
-  updates a second. Rows resize without UIKit's 0.3 s self-sizing animation, which piled up and bounced a
+  updates a second. Only a turn's first readable words skip the 50 ms, once a turn, while the reader follows
+  the newest message and isn't touching the chat (`takesFirstAnswer`). Rows resize without UIKit's 0.3 s self-sizing animation, which piled up and bounced a
   streaming answer. To reproduce by hand, run demo mode with `-test-tool-stream -test-tool-stream-fast-tail`
   and drag while the answer streams at a model's pace; the other fixtures are slower and pause during
   gestures, so they never showed this.
@@ -528,12 +624,14 @@ change in both repos.
   `Menu(primaryAction:)` or its own gesture (`AgentPinnedGrid`).
 - **Owners change on every reconnect:** `WorkspaceOwner` includes the connection generation, so returning to the app
   makes a new one. Keep per-computer state (like "this host has Kanban") by `cacheScopeID`, and don't turn a failed
-  check during a reconnect into "unavailable" (`KanbanAvailability`). The owner is nil while the connection is
+  check during a reconnect into "unavailable" (`KanbanAvailability`; New Group Chat:
+  `BotModeRoomStore.offersNewGroupChat`). The owner is nil while the connection is
   closed: that gap isn't another computer, so a page's data stays (`use(host:)` ignores nil).
 - **Each gateway has its own objects:** `AppState`, the stores and the chats belong to one gateway
   (`NativeWorkspaceRuntime`), and a gateway switch keeps `RootShellView` and hands it the new ones. Anything handed
   over once in `.onAppear` keeps the first gateway's: an agent's drive moved a navigation that wasn't on screen
-  (#666). Hand it over again when they change (`DriveShellHooks`).
+  (#666), and an unsent chat let go on another gateway said "This chat isn't available". Hand it over again
+  when they change (`DriveShellHooks`, `watchForLostChats`).
 
 ### Crashes that only happen on a real iPhone
 
@@ -757,7 +855,9 @@ sections can crash only on devices ("Thread stack size exceeded").
   as meters or as rings. Names people give plans (Usage › a plan's ••• › Rename…, or Choose) are per
   gateway, since one provider can be another account on another computer: `BighelpPlanNames` keeps them in
   the app group, keyed by `ProviderUsagePreferences.key(for:)`, and the widget puts them on itself
-  (`BighelpUsageSnapshot.named`), so a rename only reloads the widgets.
+  (`BighelpUsageSnapshot.named`), so a rename only reloads the widgets. Choose also orders the plans: a drag
+  saves `ProviderUsagePreferences.orderKey` on the device, by the same key, and Limits, the export and the
+  widgets' default list follow it; a provider set up later goes after the placed ones.
 - A Shortcut on a gateway that isn't in use switches bighelp to it, and the app starts connecting at once.
   `reconnect()` returns at once while another connection is under way, so the Shortcut waits for that one
   (`BighelpShortcutConnectionWait`). `ShortcutGatewaySwitchHostUITests` checks it on two real hosts.
@@ -797,12 +897,23 @@ sections can crash only on devices ("Thread stack size exceeded").
 Helpful, never a pile to clear (`BighelpNotificationGrouping`):
 - Alerts stack per agent, not per chat. The notification service extension sets the thread from the opened title (the agent's
   name) and keeps the chat in `loopdy.sessionReference`, which the "chat on screen" check reads.
+- An alert with a picture shows as a message from its agent (a communication notification,
+  `BighelpPushDisplay.communication`): the agent's picture stands where bighelp's icon would. The buttons and
+  picture go on the held content first, so a timeout still shows them, and the message keeps the alert's
+  interruption level. Alerts the app posts itself while open keep the icon. Apple asks for the Communication
+  Notifications entitlement on the app: the iPhone and iPad app (`BighelpCarPlay.entitlements`) and the
+  notification service both carry it, and both App IDs need the capability.
 - A newer reply for a chat removes that chat's earlier replies; questions and approvals stay until dealt with.
 - Helper (subagent) results arrive passive: Notification Center only, no banner or sound.
 - A scheduled task's alert opens the chat where its job was made, else the job in Scheduled tasks
   (`BighelpScheduledAlertLinks`). The plugin names them `scheduled.chat.<session>` and `scheduled.job.<job>`, only
   for phones that send `scheduledLinks` in their preferences; never a chat's own reference, because the run's text
   isn't in that chat. Scheduled alerts never replace each other.
+- Settings › Notifications splits the push topic "Scheduled tasks and deliveries" into two switches: Scheduled
+  tasks and Deliveries (what an agent sends with the plugin's `bighelp_send_notification` tool, outside a reply).
+  With Group chats they are switches on each computer (`BighelpAlertKinds`, plugin `preferences.kinds`); the
+  shared topic stays on while either is on. "Agents messaging each other" covers only turns another agent
+  started: the person's own messages in a Bot Chat alert like any reply.
 - Opening a chat, or returning to the app on one, clears its delivered alerts (`BighelpVisibleChats`).
 - A chat on screen is quiet for every kind of alert, questions and approvals too: they pop up in the chat itself
   (`BighelpForegroundAlert`). `BighelpVisibleChats` counts chat screens by token (a chat view made again can appear

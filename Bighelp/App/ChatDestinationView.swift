@@ -313,6 +313,11 @@ struct ChatDestinationView: View {
         voicePresentation = makeVoice(.turnBased)
     }
 
+    /// Live voice couldn't start yet (still connecting, or a step on the computer): try it again.
+    private func tryLiveVoiceAgain() {
+        voicePresentation = makeVoice(agentVoice.mode)
+    }
+
     private var forceRefreshAction: (@MainActor () async throws -> Void)? {
         guard model.nativeConversationClient != nil, !model.isBotMode else { return nil }
         return {
@@ -359,6 +364,14 @@ struct ChatDestinationView: View {
             },
             onApprovalTap: onOpenApproval,
             onPeopleTap: { isPeopleAndChatPresented = true },
+            onGroupSettingsTap: model.botModeRoomID == nil ? nil : {
+                // Read at the tap: this body must not read the room, which changes with each message.
+                if let roomID = model.botModeRoom?.nativeRoomID {
+                    appState.open(.groupSettings(roomID: roomID, conversationID: model.conversationID))
+                } else {
+                    isPeopleAndChatPresented = true
+                }
+            },
             onChatFilesTap: { isSessionFilesPresented = true },
             projectMenuItem: projectMenuItem,
             onNewChatTap: onNewChat,
@@ -558,6 +571,7 @@ struct ChatDestinationView: View {
                 onEnded: { voicePresentation = nil },
                 onWorkspaceTap: openMenuFromVoice,
                 onUseTurnBased: useTurnBasedVoice,
+                onTryAgain: tryLiveVoiceAgain,
                 chatActivity: { [model] in model.liveActivityKind },
                 chatStep: { [model] in model.liveStepPhrase }
             )

@@ -191,6 +191,31 @@ struct AgentTalkDeliveryTests {
         #expect(model.items.last?.role == .assistant, "The answer came in as it streamed")
     }
 
+    /// The plugin keeps saying the agent's gateway runs the chat, but its feed can't be followed to the
+    /// turn's end: no feed at all, or one that starts and then stops. Stop stays put, and the chat asks
+    /// again after its usual wait. Asked again at once, it flipped Stop on and off a few times a second.
+    @Test(arguments: [false, true])
+    func aGatewayRunWhoseFeedCantBeFollowedKeepsStopSteady(feedStartsThenStops: Bool) async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let client = try DirectHermesConversationClient(rpc: DirectTestRPC(), hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "stored", title: "Bot Chat", epoch: "epoch",
+            drafts: DirectHermesDraftStore(root: root))
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        let reader = UnfollowableRunReader(feedStartsThenStops: feedStartsThenStops)
+        reader.model = model
+        client.agentTalk = reader
+
+        let follow = Task { await model.followOtherProcess() }
+        try await Task.sleep(for: .milliseconds(1_500))
+        #expect(reader.reads == 1, "Asked again after the wait, not in a loop")
+        #expect(reader.clearedBetweenReads == 0, "Stop never went away while the run went on")
+        #expect(model.otherProcessRun != nil && !model.isSending)
+        follow.cancel()
+        await follow.value
+    }
+
     // MARK: Helpers
 
     private func call() -> ChatActivityEvent {
@@ -261,5 +286,37 @@ private final class FakeLiveReader: AgentTalkReading {
         asked.append((after, latest))
         if !latest { onFollow?() }
         return batches.isEmpty ? nil : batches.removeFirst()
+    }
+}
+
+/// The plugin's `chat/activity` saying another process runs the chat, live on its gateway, while
+/// `chat/live` can't follow it to the turn's end. After 20 reads it stops answering.
+@MainActor
+private final class UnfollowableRunReader: AgentTalkReading {
+    weak var model: ChatModel?
+    private let feedStartsThenStops: Bool
+    private(set) var reads = 0
+    private(set) var clearedBetweenReads = 0
+
+    init(feedStartsThenStops: Bool) { self.feedStartsThenStops = feedStartsThenStops }
+
+    func runs(agentID: String, sessionID: String, calls: [AgentTalkRunQuery]) async -> [AgentTalkRun]? { nil }
+    func steps(agentID: String, sessionID: String) async -> [String]? { nil }
+
+    func otherProcessRun(agentID: String, sessionID: String) async -> ChatOtherProcessReading {
+        await Task.yield()
+        if reads > 0, model?.otherProcessRun == nil { clearedBetweenReads += 1 }
+        reads += 1
+        return reads > 20 ? .unavailable : .running(.init(toolName: "terminal", canStop: true, isLive: true))
+    }
+
+    func liveFrames(agentID: String, sessionID: String, after: Int?, epoch: String?, wait: Duration,
+                    latest: Bool) async -> AgentLiveFrames? {
+        await Task.yield()
+        guard feedStartsThenStops, latest else {
+            return feedStartsThenStops ? nil
+                : .init(isAttached: false, isRunning: false, epoch: nil, frames: [], last: nil, reset: false)
+        }
+        return .init(isAttached: true, isRunning: true, epoch: "g1", frames: [], last: 40, reset: false)
     }
 }

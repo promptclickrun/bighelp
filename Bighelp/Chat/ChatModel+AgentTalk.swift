@@ -188,11 +188,16 @@ extension ChatModel {
                 otherProcessRun = run
                 try? await hostHistoryRefresh?()
                 guard !Task.isCancelled else { return }
-                await followGatewayTurn(reader: reader, sessionID: sessionID)
+                if await followGatewayTurn(reader: reader, sessionID: sessionID) {
+                    guard !Task.isCancelled else { return }
+                    otherProcessRun = nil
+                    refreshFromHostSoon()
+                    continue
+                }
                 guard !Task.isCancelled else { return }
-                otherProcessRun = nil
-                refreshFromHostSoon()
-                continue
+                // Its feed couldn't be followed to the turn's end: the run still shows, with Stop, and the
+                // chat asks again after the wait. Asked again at once, Stop flipped on and off for good.
+                reads += 1
             case .running(let run):
                 reads += 1
                 if otherProcessRun == nil || run.toolName != otherProcessRun?.toolName || reads % 3 == 0 {
@@ -208,17 +213,20 @@ extension ChatModel {
     /// activity card, the answer as it comes), from now: the chat already shows what Hermes saved of it, and
     /// saved steps carry no call ID to match a replay against. Ends when the turn does, or when the feed
     /// stops; a turn that started here and didn't end is settled empty, as Hermes' own forward does, and the
-    /// chat reads what Hermes saved.
-    func followGatewayTurn(reader: any AgentTalkReading, sessionID: String) async {
+    /// chat reads what Hermes saved. True once the feed said the turn ended; false when there was no feed to
+    /// follow, or it stopped first.
+    @discardableResult
+    func followGatewayTurn(reader: any AgentTalkReading, sessionID: String) async -> Bool {
         guard let client = nativeConversationClient,
               let now = await reader.liveFrames(agentID: agentID, sessionID: sessionID, after: nil, epoch: nil,
                                                 wait: .seconds(5), latest: true),
-              !Task.isCancelled, now.isAttached, now.isRunning else { return }
+              !Task.isCancelled, now.isAttached, now.isRunning else { return false }
         followsGatewayTurn = true
         defer { followsGatewayTurn = false }
         var after = now.last
         var epoch = now.epoch
         var ended = false
+        var turnEnded = false
         client.receiveObserved(type: "message.start", payload: [:])
         while !Task.isCancelled {
             guard let feed = await reader.liveFrames(agentID: agentID, sessionID: sessionID, after: after,
@@ -231,12 +239,16 @@ extension ChatModel {
                 client.receiveObserved(type: frame.type, payload: frame.payload)
             }
             after = feed.last ?? after
-            if !feed.isRunning { break }
+            if !feed.isRunning {
+                turnEnded = true
+                break
+            }
         }
         if !ended { client.receiveObserved(type: "message.complete", payload: ["text": .string("")]) }
         // A turn this device didn't send ends when Hermes says it's idle. The gateway's last frames don't
         // say so (`running` is all the plugin keeps of them); its feed did.
         client.receiveObserved(type: "session.info", payload: ["running": .boolean(false)])
+        return turnEnded
     }
 
     func stopOtherProcessRun() async {

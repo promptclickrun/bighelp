@@ -138,7 +138,9 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
         guard current.defaults == baseline.defaults, current.support == baseline.support else {
             throw WorkspaceClientError.conflict
         }
-        try validate(desired, baseline: current, agentID: agentID)
+        // The catalog to check against: a save before this one, from the same page too, retired the cached copy.
+        let providers = try await loadModelProviders(agentID: agentID)
+        try validate(desired, baseline: current, providers: providers)
         let mainModelChanged = desired.mainChats.providerID != current.defaults.mainChats.providerID
             || desired.mainChats.modelID != current.defaults.mainChats.modelID
         let mainReasoningChanged = desired.mainChats.reasoningEffort != current.defaults.mainChats.reasoningEffort
@@ -281,7 +283,8 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
         return Snapshot(defaults: defaults, support: support)
     }
 
-    private func validate(_ desired: AgentRuntimeDefaults, baseline: Snapshot, agentID: String) throws {
+    private func validate(_ desired: AgentRuntimeDefaults, baseline: Snapshot,
+                          providers: [BighelpLinkModelProvider]) throws {
         guard desired.scheduledTasks.reasoningEffort.isEmpty,
               desired.scheduledTasks.fastMode == baseline.defaults.scheduledTasks.fastMode,
               desired.subagents.fastMode == baseline.defaults.subagents.fastMode else {
@@ -294,7 +297,6 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
             // Turning it off is always safe, including a default left behind
             // after switching to an unsupported model on another client.
             if desired.mainChats.fastMode == .on {
-                let providers = providerCache[agentID] ?? []
                 guard FastMode.unavailableReason(provider: providers.first { $0.id == desired.mainChats.providerID },
                                                  model: desired.mainChats.modelID) == nil else {
                     throw WorkspaceClientError.unavailable(.unsupportedOperation)
@@ -308,9 +310,9 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
                     throw WorkspaceClientError.unavailable(.policyRestricted)
                 }
                 if scope == .mainChats || !new.providerID.isEmpty || !new.modelID.isEmpty {
-                    guard providerCache[agentID]?.contains(where: {
+                    guard providers.contains(where: {
                         $0.id == new.providerID && $0.models.contains(new.modelID)
-                    }) == true else { throw WorkspaceClientError.invalidRequest }
+                    }) else { throw WorkspaceClientError.invalidRequest }
                 }
             }
             if new.reasoningEffort != old.reasoningEffort,

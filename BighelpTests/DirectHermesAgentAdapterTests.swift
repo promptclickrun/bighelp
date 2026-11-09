@@ -679,6 +679,27 @@ struct DirectHermesAgentAdapterTests {
         #expect(reads() == 2, "The replacement's answer is the one kept")
     }
 
+    /// Default Model: a save clears the cached catalog, so a second change on the page, here a model on
+    /// another provider, was refused as "This host request is invalid" without reaching the host. It's
+    /// checked against the host's catalog, read again.
+    @Test func aModelOnAnotherProviderSavesAfterAnotherChangeOnThePage() async throws {
+        let workspace = try AgentNativeWorkspace()
+        workspace.otherProviders = [("other-provider", ["three"])]
+        let client = CachedAgentRuntimeDefaultsClient(base: runtime(workspace), connectionIdentity: "host")
+        let editor = AgentRuntimeDefaultsEditorModel(agentID: "studio", client: client)
+        await editor.load()
+        editor.selectReasoning("high", for: .mainChats)
+        try await editor.saveIfNeeded()
+
+        editor.selectModel(providerID: "other-provider", modelID: "three", for: .mainChats)
+        try await editor.saveIfNeeded()
+        #expect(editor.errorMessage == nil)
+        let configure = try #require(workspace.calls.last { $0.operation == .profilesConfigure })
+        #expect(configure.payload["provider"] == .string("other-provider"))
+        #expect(configure.payload["model"] == .string("three"))
+        #expect(editor.draft.mainChats.providerID == "other-provider" && !editor.isDirty)
+    }
+
     @Test func ignoredCronReasoningKeyIsRejectedWithoutMutation() async throws {
         let workspace = try AgentNativeWorkspace()
         let client = runtime(workspace)
@@ -889,6 +910,8 @@ private final class AgentNativeWorkspace: WorkspaceOperationPerforming {
     var mainModel = "one"
     var mainProvider = "native-provider"
     var availableModels = ["one", "two", "unavailable"]
+    /// More providers in the catalog, after the agent's own.
+    var otherProviders: [(slug: String, models: [String])] = []
     var loseFastReceipt = false
     /// `model.options` answers wait for `releaseModelOptions()`, oldest first.
     var holdsModelOptions = false
@@ -1014,6 +1037,7 @@ private final class AgentNativeWorkspace: WorkspaceOperationPerforming {
                             "confirm_required": .boolean(true), "confirm_message": .string("This synthetic model may cost more.")]
                 }
                 mainModel = model
+                if let provider = payload["provider"]?.string { mainProvider = provider }
                 applied["model"] = .boolean(true)
             }
             return ["ok": .boolean(true), "applied": .object(applied)]
@@ -1038,7 +1062,10 @@ private final class AgentNativeWorkspace: WorkspaceOperationPerforming {
                     ($0, .object(["fast": .boolean(true)]))
                 })),
                 "unavailable_models": .array([.string("unavailable")])
-            ])]), "model": .string(mainModel), "provider": .string("native-provider")]
+            ])] + otherProviders.map { other in .object([
+                "slug": .string(other.slug), "name": .string(other.slug), "is_current": .boolean(false),
+                "is_user_defined": .boolean(false), "models": .array(other.models.map(BighelpJSONValue.string)),
+            ]) }), "model": .string(mainModel), "provider": .string("native-provider")]
         case .agentDefaultsGet:
             return config
         case .agentDefaultsSet:

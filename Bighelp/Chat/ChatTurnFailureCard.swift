@@ -115,7 +115,7 @@ struct ChatTurnFailureCard: View {
         switch fix {
         case .tryAgain: Task { await model.retryFailedTurn() }
         case .tryAgainAt(let date): model.scheduleRetry(at: date)
-        case .useAnotherModel, .pickAnotherModel: model.requestSessionControls()
+        case .useAnotherModel, .pickAnotherModel: model.requestSessionControls(allModels: true)
         case .fixSignIn, .checkProviders: onOpenProviderAccounts?()
         case .addCredit(let url): openURL(url)
         case .startNewChat: onNewChat()

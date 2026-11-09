@@ -1214,7 +1214,7 @@ struct ChatModelTests {
         controls.reconcileSessionRuntime(SessionRuntimeSnapshot(
             model: "Hermes-4-405B", provider: "nous", observedAt: Date()
         ))
-        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Reasoning: unknown")
+        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Thinking: unknown")
 
         controls.setTurnActive(true)
         await controls.loadSummaryIfNeeded()
@@ -1226,7 +1226,7 @@ struct ChatModelTests {
         #expect(messaging.opened.map(\.kind) == [.reasoning])
         let summary = ChatModelSummaryPresentation(controls: controls)
         #expect(summary.modelName == ModelNameCatalogStore.shared.displayName(for: "Hermes-4-405B"))
-        #expect(summary.reasoning == "Reasoning: High")
+        #expect(summary.reasoning == "Thinking: High")
         #expect(summary.providerID == "nous")
     }
 
@@ -1246,7 +1246,7 @@ struct ChatModelTests {
             now: { 1_788_000_000 }
         )
         controls.reconcileSessionReasoning("", observedAt: .distantPast)
-        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Reasoning: Auto")
+        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Thinking: Auto")
         controls.reconcileSessionReasoning("louder", observedAt: Date())
         #expect(controls.currentReasoningValue == "reset", "Unknown levels are ignored")
 
@@ -1257,7 +1257,7 @@ struct ChatModelTests {
 
         controls.setTurnActive(true)
         controls.reconcileSessionReasoning("medium", observedAt: Date())
-        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Reasoning: Medium")
+        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Thinking: Medium")
     }
 
     /// A new chat already knows its agent's defaults, so nothing is read.
@@ -1276,7 +1276,7 @@ struct ChatModelTests {
         await controls.loadSummaryIfNeeded()
         #expect(messaging.opened.isEmpty)
         let summary = ChatModelSummaryPresentation(controls: controls)
-        #expect(summary.reasoning == "Reasoning: Auto")
+        #expect(summary.reasoning == "Thinking: Auto")
         #expect(summary.providerID == "openai")
     }
 

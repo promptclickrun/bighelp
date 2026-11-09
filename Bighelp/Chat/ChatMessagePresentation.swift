@@ -7,7 +7,13 @@ enum ChatBubbleMenuAction: Equatable, Sendable {
 }
 
 struct ChatBubbleInteraction: Equatable, Sendable {
-    let copyText: String
+    /// The message's own source, when Copy takes that instead of what the bubble shows.
+    private let canonicalSource: String?
+    private let document: MarkdownDocument
+    /// Worked out when read (Copy, Select text), never while a message draws: the visible text
+    /// runs Foundation's Markdown parser over every paragraph, and a bubble made this for each
+    /// streamed piece of a long answer.
+    var copyText: String { canonicalSource ?? document.visiblePlainText }
     let menuActions: [ChatBubbleMenuAction]
     /// Holding the message floats the reaction bar over it, apart from the menu.
     let offersReactions: Bool
@@ -18,7 +24,8 @@ struct ChatBubbleInteraction: Equatable, Sendable {
 
     init(document: MarkdownDocument, canFork: Bool, canReact: Bool = false,
          canonicalSource: String? = nil) {
-        copyText = canonicalSource ?? document.visiblePlainText
+        self.canonicalSource = canonicalSource
+        self.document = document
         menuActions = [.copy, .selectText] + (canFork ? [.forkFromHere] : [])
         offersReactions = canReact
     }

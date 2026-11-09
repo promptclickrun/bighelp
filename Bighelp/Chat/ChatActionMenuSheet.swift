@@ -121,12 +121,10 @@ struct ChatActionMenuSheet: View {
         }
         .bighelpSheet(isPresented: $isModelPickerPresented) {
             if let controls = runtimeControls {
-                ChatSessionControlsPopover(controls: controls, usesWideLayout: false) {
+                ChatModelSettingsSheet(controls: controls) {
                     isModelPickerPresented = false
                     page = .main
                 }
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
                 .bighelpSheetSize(.standard)
             }
         }
@@ -306,7 +304,7 @@ struct ChatActionMenuSheet: View {
         case .main: String(localized: "Add to chat")
         case .agents: String(localized: "Choose agent")
         case .skillsAndTools: String(localized: "Skills & Plugins")
-        case .modelAndReasoning: String(localized: "Model & reasoning")
+        case .modelAndReasoning: String(localized: "Model settings")
         }
     }
 

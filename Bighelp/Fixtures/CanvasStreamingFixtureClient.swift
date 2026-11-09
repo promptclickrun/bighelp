@@ -225,12 +225,15 @@ final class CanvasStreamingFixtureClient: ConversationFixtureClient, StreamingCo
         // `-test-tool-stream-tail-count <n>` sends that many pieces instead: at the bottom of a long
         // chat each piece takes far longer than 25 ms, and 1,200 of them took minutes.
         let fastTail = args.contains("-test-tool-stream-fast-tail")
+        // `-test-tool-stream-paragraphs`: each part of the fast tail is a paragraph of its own, as
+        // most answers are written. Without it the whole tail is one paragraph, the worst case.
+        let partBreak = args.contains("-test-tool-stream-paragraphs") ? "\n\n" : "\n"
         let tailCount = args.firstIndex(of: "-test-tool-stream-tail-count")
             .flatMap { args.indices.contains($0 + 1) ? Int(args[$0 + 1]) : nil }
         for index in 0..<(tailCount ?? (fastTail ? 1_200 : twoTurns ? 10 : 40)) {
             try await Task.sleep(for: .milliseconds(fastTail ? 25 : 80))
             tail += fastTail
-                ? (index.isMultiple(of: 6) ? "\nAnswer part \(index): " : "") + "the **answer** keeps growing "
+                ? (index.isMultiple(of: 6) ? "\(partBreak)Answer part \(index): " : "") + "the **answer** keeps growing "
                 : "Tail update \(index): **stable streaming** with accumulated work.\n"
             onDraft(TimelineItem(id: tailID, role: .assistant,
                 sender: .agent(id: senderID, snapshot: .init(name: "Canvas fixture")),

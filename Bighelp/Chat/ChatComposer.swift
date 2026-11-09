@@ -392,6 +392,7 @@ struct ChatComposer: View, Equatable {
                     .submitLabel(.send)
                     .disabled(model.isComposerInputDisabled)
                     .onSubmit { send() }
+                ComposerModelChip(model: model).equatable()
                 primaryAction
             }
             // iMessage-style field: a fixed-radius continuous shape reads as a
@@ -750,6 +751,50 @@ private enum ChatComposerSheet: String, Identifiable {
 /// Geometry for the composer's text field. The leading inset equals the
 /// continuous corner's visual footprint at single-line height so the first
 /// glyph and the placeholder never touch the curve.
+/// The chat's provider mark and a chevron, in the message box before the microphone: a tap opens
+/// Model settings. Dimmed while the agent answers, when the model and level are fixed. Group
+/// chats have no model of their own, and no chip.
+private struct ComposerModelChip: View, Equatable {
+    let model: ChatModel
+
+    nonisolated static func == (lhs: ComposerModelChip, rhs: ComposerModelChip) -> Bool {
+        lhs.model === rhs.model
+    }
+
+    var body: some View {
+        if let controls = model.runtimeControls {
+            let summary = ChatModelSummaryPresentation(controls: controls)
+            let isLocked = ChatRuntimeSelectionLockout.isLocked(isTurnActive: controls.isTurnActive)
+                || model.isAwaitingAuthoritativeSessionAllocation
+            Button { model.requestModelSettings() } label: {
+                HStack(spacing: 3) {
+                    if let providerID = summary.providerID {
+                        AIProviderMarkView(providerID: providerID, providerName: summary.providerName ?? providerID,
+                                           context: .chatSessionCompactControl, size: BighelpTokens.scaled(18))
+                    } else {
+                        Image(systemName: "cpu").font(.system(size: 15, weight: .medium))
+                    }
+                    Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
+                }
+                .foregroundStyle(theme.secondaryText)
+                .padding(.horizontal, BighelpTokens.space4)
+                .frame(minWidth: BighelpTokens.scaled(40), minHeight: BighelpTokens.hitTarget)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.bighelpPress)
+            .disabled(isLocked)
+            .opacity(isLocked ? 0.4 : 1)
+            .accessibilityLabel("Model settings")
+            .accessibilityValue("\(summary.modelName), \(summary.reasoning)")
+            .accessibilityHint(isLocked ? ChatRuntimeSelectionLockout.accessibilityHint
+                               : "Opens the model and thinking level for this chat.")
+            .accessibilityIdentifier("chat.composer.model")
+        }
+    }
+
+    @BighelpThemeReader private var theme: BighelpTheme
+}
+
 enum ComposerFieldMetrics {
     static var cornerRadius: CGFloat { BighelpTokens.scaled(24) }
     /// Painted diameter of the attach and send circles; hit areas stay at the hit target.

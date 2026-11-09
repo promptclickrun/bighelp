@@ -6,14 +6,18 @@ import UIKit
 /// from the first differing attribute run, even when the characters match.
 @MainActor
 enum ChatNativeTextStorageUpdater {
-    static func apply(_ updated: NSAttributedString, previous: NSAttributedString?, to storage: NSTextStorage) {
+    /// `unchangedPrefix` is how much of `previous` the caller knows `updated` starts with
+    /// (`ChatNativeMarkdownRenderCache.unchangedPrefix`): the comparison starts there, so a long
+    /// answer's finished blocks aren't compared again for each piece.
+    static func apply(_ updated: NSAttributedString, previous: NSAttributedString?, unchangedPrefix: Int = 0,
+                      to storage: NSTextStorage) {
         // TextKit may add fallback fonts and other internal attributes. Diff
         // canonical renders so those platform adjustments do not turn every
         // append into a replacement beginning at character zero.
         let previous = previous ?? NSAttributedString(string: "")
-        let textPrefix = storage.string == previous.string
+        let textPrefix = (storage.string as NSString).isEqual(to: previous.string)
             ? (previous.string as NSString).commonPrefix(with: updated.string, options: .literal).utf16.count : 0
-        var unchanged = 0
+        var unchanged = min(max(unchangedPrefix, 0), textPrefix)
         while unchanged < textPrefix {
             var oldRange = NSRange()
             var newRange = NSRange()
@@ -58,6 +62,58 @@ final class ChatNativeMarkdownIdealLayout {
                 || manager.firstUnlaidCharacterIndex() >= storage.length { return size }
             height *= 2
         }
+    }
+}
+
+/// A message's height at each width SwiftUI asks about while the message is on screen. SwiftUI
+/// proposes several widths while it sizes a row, and a text view asked for its size lays its whole
+/// text out again every time: four times for each streamed piece of a long answer. Each width
+/// here has its own layout on the same text, so when the text grows, each lays out only what
+/// was added. They hold more copies of the layout, so `release` drops them once the text has
+/// stopped changing.
+@MainActor
+final class ChatNativeMarkdownSideLayouts {
+    private struct Layout {
+        let manager: NSLayoutManager
+        let container: NSTextContainer
+    }
+
+    static let limit = 3
+    private weak var storage: NSTextStorage?
+    private var layouts: [Layout] = []
+
+    init(textStorage: NSTextStorage) {
+        storage = textStorage
+    }
+
+    /// What a text view with no insets and no line padding measures at `width`.
+    func size(width: CGFloat) -> CGSize {
+        guard let storage else { return .zero }
+        let layout: Layout
+        if let index = layouts.firstIndex(where: { $0.container.size.width == width }) {
+            layout = layouts.remove(at: index)
+        } else {
+            if layouts.count == Self.limit { storage.removeLayoutManager(layouts.removeFirst().manager) }
+            let container = NSTextContainer(size: CGSize(width: width, height: .greatestFiniteMagnitude))
+            container.lineFragmentPadding = 0
+            container.lineBreakMode = .byWordWrapping
+            let manager = NSLayoutManager()
+            manager.addTextContainer(container)
+            storage.addLayoutManager(manager)
+            layout = Layout(manager: manager, container: container)
+        }
+        // Most recently used last, so the oldest goes first.
+        layouts.append(layout)
+        layout.manager.ensureLayout(for: layout.container)
+        let used = layout.manager.usedRect(for: layout.container)
+        // A text view counts the empty line after a final line break.
+        let height = max(used.maxY, layout.manager.extraLineFragmentRect.maxY)
+        return CGSize(width: ceil(used.width), height: ceil(height))
+    }
+
+    func release() {
+        for layout in layouts { storage?.removeLayoutManager(layout.manager) }
+        layouts.removeAll()
     }
 }
 
@@ -119,6 +175,13 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
         let host = ChatMessageTextHost(textView: view)
         host.addInteraction(UIContextMenuInteraction(delegate: context.coordinator.menu))
         context.coordinator.idealLayout = ChatNativeMarkdownIdealLayout(textStorage: view.textStorage)
+        context.coordinator.sideLayouts = ChatNativeMarkdownSideLayouts(textStorage: view.textStorage)
+        // Read by VoiceOver and tests when they ask: making it from the whole answer for each
+        // streamed piece was work nobody read.
+        host.accessibilityLabelSource = { [weak coordinator = context.coordinator] in
+            guard let coordinator, let text = coordinator.renderedText else { return nil }
+            return "\(coordinator.accessibilitySpeakerName): \(ChatMentionRendering.plainText(text, usingNames: true))"
+        }
         return host
     }
 
@@ -144,10 +207,14 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
             UIAccessibilityCustomAction(name: "Select text") { _ in onSelect(); return true }
         ]) + (onFork.map { action in [UIAccessibilityCustomAction(name: "Fork from here") { _ in action(); return true }] } ?? [])
         let accentColor = UIColor(accent)
-        view.linkTextAttributes = [
-            .foregroundColor: accentColor,
-            .underlineStyle: NSUnderlineStyle.single.rawValue,
-        ]
+        // Setting these lays the text out again, so only when the color changed.
+        if context.coordinator.linkColor != accentColor {
+            context.coordinator.linkColor = accentColor
+            view.linkTextAttributes = [
+                .foregroundColor: accentColor,
+                .underlineStyle: NSUnderlineStyle.single.rawValue,
+            ]
+        }
         let updatedText = context.coordinator.renderCache.render(
             document: document,
             style: ChatNativeMarkdownStyle(
@@ -164,16 +231,22 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
                 citationLinks: citationLinks
             )
         )
-        let textChanged = context.coordinator.renderedText?.isEqual(to: updatedText) != true
-        if textChanged || context.coordinator.accessibilitySpeakerName != speakerName {
-            view.accessibilityLabel = "\(speakerName): \(ChatMentionRendering.plainText(updatedText, usingNames: true))"
-            context.coordinator.accessibilitySpeakerName = speakerName
-        }
-        guard textChanged else { return }
+        context.coordinator.accessibilitySpeakerName = speakerName
+        let revision = context.coordinator.renderCache.revision
+        guard context.coordinator.renderedRevision != revision else { return }
 
         let previousSelection = view.selectedRange
-        ChatNativeTextStorageUpdater.apply(updatedText, previous: context.coordinator.renderedText, to: view.textStorage)
+        ChatNativeTextStorageUpdater.apply(
+            updatedText, previous: context.coordinator.renderedText,
+            // Only the change just made is described; a view that missed one compares from the start.
+            unchangedPrefix: context.coordinator.renderedRevision == revision &- 1
+                ? context.coordinator.renderCache.unchangedPrefix : 0,
+            to: view.textStorage)
+        // Text that changes after it first showed is an answer arriving.
+        let isGrowing = context.coordinator.renderedRevision != nil
         context.coordinator.renderedText = updatedText
+        context.coordinator.renderedRevision = revision
+        context.coordinator.textChanged(in: host, isGrowing: isGrowing)
         if previousSelection.location != NSNotFound {
             let location = min(previousSelection.location, updatedText.length)
             view.selectedRange = NSRange(
@@ -198,9 +271,18 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
             }
         }
         let measured = context.coordinator.renderCache.measure(width: width) { width in
-            ChatPerformanceProbe.measure("text.layout.constrained") {
-                host.textView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+            // `UITextView.sizeThatFits` lays the whole text out again on every call, also at the
+            // width the view already has, and the view's own container is only as tall as the
+            // view. So only a view not yet on screen is measured that way. One on screen has a
+            // layout of its own for each width it's asked about, the width it shows at too:
+            // text that grew is laid out only where it grew.
+            let textView = host.textView
+            guard textView.bounds.width > 0, let sideLayouts = context.coordinator.sideLayouts else {
+                return ChatPerformanceProbe.measure("text.layout.constrained") {
+                    textView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+                }
             }
+            return ChatPerformanceProbe.measure("text.layout.side") { sideLayouts.size(width: width) }
         }
         return CGSize(width: width, height: ceil(measured.height))
     }
@@ -210,12 +292,34 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
         /// The message menu: Reply, Copy and the rest, with the reaction bar.
         let menu = ChatMessageMenuDriver()
         var idealLayout: ChatNativeMarkdownIdealLayout?
+        var sideLayouts: ChatNativeMarkdownSideLayouts?
         var renderedText: NSAttributedString?
-        var accessibilitySpeakerName: String?
+        /// `renderCache.revision` of `renderedText`.
+        var renderedRevision: Int?
+        var accessibilitySpeakerName = ""
+        var linkColor: UIColor?
         var openURL: OpenURLAction
+        private var sideLayoutRelease: DispatchWorkItem?
 
         init(openURL: OpenURLAction) {
             self.openURL = openURL
+        }
+
+        /// The side layouts and the text view's room to grow are for text that is growing. Once
+        /// it has been still for a moment they go, and a later question about another width
+        /// makes a side layout again.
+        @MainActor
+        func textChanged(in host: ChatMessageTextHost, isGrowing: Bool) {
+            if isGrowing { host.growsInSteps = true }
+            sideLayoutRelease?.cancel()
+            let release = DispatchWorkItem { [weak self, weak host] in
+                MainActor.assumeIsolated {
+                    self?.sideLayouts?.release()
+                    host?.growsInSteps = false
+                }
+            }
+            sideLayoutRelease = release
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: release)
         }
 
         func textView(
@@ -245,6 +349,8 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
 /// which wins over the text view's own long-press; taps still select words and open links.
 final class ChatMessageTextHost: UIView {
     let textView: UITextView
+    /// The message as VoiceOver reads it, made when its text view is asked for its label.
+    var accessibilityLabelSource: (@MainActor () -> String?)?
 
     init(textView: UITextView) {
         self.textView = textView
@@ -257,9 +363,27 @@ final class ChatMessageTextHost: UIView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
+    /// A text view that doesn't scroll keeps its text container as tall as itself, and lays all
+    /// of its text out again whenever its height changes: once for every line a streamed answer
+    /// gained. While the text grows, the text view is this view's height rounded up to
+    /// `growthStep`, and this view clips it, so that happens once in many lines.
+    var growsInSteps = false {
+        didSet {
+            guard growsInSteps != oldValue else { return }
+            // The clip is only for the room below the text; selection handles reach past the edge.
+            clipsToBounds = growsInSteps
+            setNeedsLayout()
+        }
+    }
+    static let growthStep: CGFloat = 480
+
     override func layoutSubviews() {
         super.layoutSubviews()
-        textView.frame = bounds
+        var frame = bounds
+        if growsInSteps, frame.height > 0 {
+            frame.size.height = (frame.height / Self.growthStep).rounded(.up) * Self.growthStep
+        }
+        if textView.frame != frame { textView.frame = frame }
     }
 
     override func didMoveToWindow() {

@@ -438,7 +438,7 @@ Settings › Chat. Everyday controls must never live only behind it.
 The chat's ⋯ menu is one list, the same with Nerd Mode on or off: New Bot Chat in an agent's Bot Chat (Switch agent
 in the home chat); then This chat (a group chat's Group Settings and Chat info, where its members are, Rename…, Move to Project… with
 the chat's project, Files, and File changes when available); then Model (Model & speed, Usage); then More (Edit
-agent, Advanced). Model & speed contains Model & reasoning and Fast Mode. Usage contains provider usage, Context
+agent, Advanced). Model & speed contains Model settings and Fast Mode. Usage contains provider usage, Context
 window and Compact. Existing technical controls stay in Advanced. The groups have lines between them, not titles:
 iOS keeps a menu under about 60% of the screen's height, and titles made the list scroll. Keep every level short
 enough to navigate without scrolling, File changes included (`CompactChatMenuUITests`). iOS draws the menu at the
@@ -463,8 +463,8 @@ Agent entries (including Agents → Message and All hosts) use the canonical Bot
 creates an ordinary conversation, and picking a saved chat still opens that exact conversation. A failed Bot Chat
 lookup offers a retry rather than silently falling back to an unrelated chat; stale navigation results are ignored.
 
-A chat's model and reasoning (`ChatModelSummaryRow`) show in the avatar's profile, at the top of Info and at the top of
-the context pop-up, each with Change into Model & reasoning. Showing them reads the reasoning once, never while the agent
+A chat's model and thinking level (`ChatModelSummaryRow`) show in the avatar's profile, at the top of Info and at the top of
+the context pop-up, each with Change into Model settings. Showing them reads the level once, never while the agent
 is replying. Deleting an agent stops its reply and clears its unsent drafts on this device instead of refusing; only a
 group chat that includes it holds the delete back, by name.
 
@@ -509,10 +509,24 @@ Compacting (⋯ › Usage › Compact, or Hermes on its own when the context fil
 message box: a chip whose four-step bar moves once a second (still with Reduce Motion), then Compacted with the tokens
 before and after for two seconds before it shrinks away. Hermes' own status starts and ends it.
 
-Model & reasoning (`ChatSessionControlsPopover`) never makes people scroll for reasoning. The chosen model and the
-reasoning slider (`BighelpReasoningSlider`: one notch per level, the fill covers the notches up to the choice) stay
-at the top. Search and the filter chips (Pinned, Recent, then each provider) sit under them, and only the short list
-of models scrolls. Picking a model or level changes nothing until Apply.
+Model settings (`ChatModelSettingsSheet`) is a short sheet: the chat's model, the Thinking control and, when the
+model has it, Fast Mode. The model chip in the message box opens it (the provider's mark and a chevron, before the
+microphone), and so do ⋯ › Model & speed and Change beside a chat's model. Every choice is sent as it's made; there
+is no Apply, and a refused choice falls back with the reason on top. The model row opens All models
+(`ChatAllModelsView`): search, Starred, then one folding section per provider with its plan, a star on every model
+and the model in use filled in. The chat's own provider starts unfolded. A failed turn's Use another model opens
+All models directly.
+
+The Thinking control (`BighelpThinkingControl`, `Bighelp/DesignSystem/ThinkingSlider/`) works as hermex's Thinking
+slider does: a tap on the track or a level's name picks it, a sideways drag follows the finger with a tick per level
+and sends one change on release, a vertical swipe scrolls the sheet, VoiceOver adjusts it, the Mac's arrow keys step
+a level, and the largest text sizes get a plain list. Hermes' automatic level is the Auto button beside the value,
+not a point on the track. It wears one of six looks of our own (`BighelpThinkingLook`: Noodle, Train of Thought,
+Clockwork, Meadow, Ink Bloom, Wide Awake), picked in Settings › Appearance › Thinking, where each can be tried.
+A look's colors climb with the level (Noodle and Train of Thought turn from the person's color toward its opposite)
+and every look stands still at the lowest level. These drawings repaint while they show, which bighelp avoids
+everywhere else: at most 60 frames a second, only on screen, never under Reduce Motion, and paused once the control
+rests at the bottom.
 
 Long instructions (an agent's SOUL, a personality) have an expand icon that opens them full screen
 (`FocusedTextEditorButton` + `focusedTextEditor`). Edits go straight into the form; Done keeps them and Save saves the

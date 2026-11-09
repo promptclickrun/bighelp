@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// "Claude Opus 4.6 · Reasoning: High" for the chat on screen.
+/// "Claude Opus 4.6 · Thinking: High" for the chat on screen.
 struct ChatModelSummaryPresentation: Equatable {
     let modelName: String
     let reasoning: String
@@ -11,9 +11,9 @@ struct ChatModelSummaryPresentation: Equatable {
     init(controls: SessionRuntimeControlModel) {
         modelName = controls.modelDisplayName
         if let label = controls.currentReasoningLabel {
-            reasoning = "Reasoning: \(label)"
+            reasoning = "Thinking: \(label)"
         } else {
-            reasoning = controls.isLoadingReasoning ? "Reasoning: checking…" : "Reasoning: unknown"
+            reasoning = controls.isLoadingReasoning ? "Thinking: checking…" : "Thinking: unknown"
         }
         providerID = controls.currentProvider
         providerName = controls.currentProvider.map { provider in
@@ -26,7 +26,7 @@ struct ChatModelSummaryPresentation: Equatable {
 }
 
 /// The chat's model and reasoning where people look during a chat: the context
-/// pop-up, the avatar's profile and Info. Tapping it opens Model & reasoning,
+/// pop-up, the avatar's profile and Info. Tapping it opens Model settings,
 /// except while the agent is replying (the choice is fixed until the turn ends).
 struct ChatModelSummaryRow: View {
     let controls: SessionRuntimeControlModel
@@ -42,7 +42,7 @@ struct ChatModelSummaryRow: View {
                     .disabled(isLocked)
                     .accessibilityHint(isLocked
                         ? ChatRuntimeSelectionLockout.accessibilityHint
-                        : "Opens Model & reasoning for this chat.")
+                        : "Opens Model settings for this chat.")
             } else {
                 label(summary, showsChange: false)
             }

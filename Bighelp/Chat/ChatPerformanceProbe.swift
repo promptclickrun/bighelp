@@ -169,6 +169,12 @@ final class ChatPerformanceRecorder: NSObject {
     /// Unlike frame gaps this doesn't depend on the simulator's display: a turn over
     /// 8.3 ms is a dropped frame on a 120 Hz iPhone.
     private var busyTurns: [Double] = []
+    /// The longest turns, with when each began and what was measured during it: which work a
+    /// stall was made of, which the totals can't say.
+    private var longestTurns: [(at: Double, milliseconds: Double, work: [String: Double])] = []
+    private var turnWork: [String: Double] = [:]
+    /// Moments named by the autopilot (a send, a turn's end), to place the longest turns by.
+    private var marks: [[String: Any]] = []
     private var wokeAt: CFTimeInterval?
     private var observer: CFRunLoopObserver?
     private var lastTick: CFTimeInterval?
@@ -256,8 +262,15 @@ final class ChatPerformanceRecorder: NSObject {
         let now = CACurrentMediaTime()
         if activity == .afterWaiting {
             wokeAt = now
+            turnWork.removeAll(keepingCapacity: true)
         } else if let wokeAt {
-            busyTurns.append((now - wokeAt) * 1_000)
+            let milliseconds = (now - wokeAt) * 1_000
+            busyTurns.append(milliseconds)
+            if milliseconds > 50 {
+                longestTurns.append(((wokeAt - phaseStart) * 1_000, milliseconds, turnWork))
+                longestTurns.sort { $0.milliseconds > $1.milliseconds }
+                if longestTurns.count > 8 { longestTurns.removeLast() }
+            }
             self.wokeAt = nil
         }
     }
@@ -287,6 +300,12 @@ final class ChatPerformanceRecorder: NSObject {
             stat.max = Swift.max(stat.max, milliseconds)
         }
         stats[key] = stat
+        // Timed work adds its milliseconds to the turn it ran in; counted work adds one, under "name#".
+        if wokeAt != nil { turnWork[milliseconds == nil ? key + "#" : key, default: 0] += milliseconds ?? 1 }
+    }
+
+    func mark(_ name: String) {
+        marks.append(["name": name, "at_ms": ((CACurrentMediaTime() - phaseStart) * 1_000).rounded()])
     }
 
     func reset() {
@@ -296,6 +315,8 @@ final class ChatPerformanceRecorder: NSObject {
         queueGaps.removeAll()
         frameGaps.removeAll()
         busyTurns.removeAll()
+        longestTurns.removeAll()
+        marks.removeAll()
         sends.clearFinished()
         lastTick = nil
         lastFrame = nil
@@ -323,7 +344,9 @@ final class ChatPerformanceRecorder: NSObject {
             "main_busy_ms": [
                 "total": busyTurns.reduce(0, +), "max": busyTurns.max() ?? 0,
                 "over_8ms": busyTurns.filter { $0 > 8.3 }.count, "over_16ms": busyTurns.filter { $0 > 16.7 }.count,
+                "longest": longestTurns.map { ["at_ms": $0.at.rounded(), "ms": $0.milliseconds.rounded(), "work": $0.work] },
             ],
+            "marks": marks,
             "footprint_mib": Double(Self.footprintBytes()) / 1_048_576,
             "send_to_answer": sends.reading(),
             "live": Self.liveCounts.withLock { $0 },
@@ -489,17 +512,29 @@ final class ChatPerformanceAutopilot: NSObject {
 
     /// Sends the draft (or a short request) and reads once the turn ends. `BIGHELP_PERF_SENDS` sends
     /// that many, each once the turn before it ended, and reads once after the last: the reading's
-    /// `send_to_answer` has each one from Send to its answer on screen.
+    /// `send_to_answer` has each one from Send to its answer on screen. `BIGHELP_PERF_SEND_TEXTS`
+    /// sends its messages instead, split at `||` (a real host: a `/model` command, then a request),
+    /// and reads 3 s after the last turn ends, to take in what the app does once an answer has
+    /// landed. The reading's `marks` say when each was sent and when its turn ended.
     private func send(_ recorder: ChatPerformanceRecorder) {
         guard let model = BighelpVisibleChats.shared.models.first else { return }
-        let count = max(1, Int(ProcessInfo.processInfo.environment["BIGHELP_PERF_SENDS"] ?? "") ?? 1)
+        let texts = ProcessInfo.processInfo.environment["BIGHELP_PERF_SEND_TEXTS"]?
+            .components(separatedBy: "||").filter { !$0.isEmpty } ?? []
+        let count = texts.isEmpty ? max(1, Int(ProcessInfo.processInfo.environment["BIGHELP_PERF_SENDS"] ?? "") ?? 1)
+            : texts.count
         recorder.reset()
         Task { @MainActor in
             for index in 0..<count {
-                if model.draft.isEmpty { model.draft = count == 1 ? "Run the weekly checks" : "Run check \(index + 1)" }
+                if !texts.isEmpty {
+                    model.draft = texts[index]
+                } else if model.draft.isEmpty {
+                    model.draft = count == 1 ? "Run the weekly checks" : "Run check \(index + 1)"
+                }
+                recorder.mark("send \(index + 1)")
                 await model.send()
                 while model.isSending { try? await Task.sleep(for: .milliseconds(100)) }
-                try? await Task.sleep(for: .milliseconds(500))
+                recorder.mark("turn \(index + 1) ended")
+                try? await Task.sleep(for: .milliseconds(texts.isEmpty || index < count - 1 ? 500 : 3_000))
             }
             recorder.read()
         }

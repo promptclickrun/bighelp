@@ -12,6 +12,8 @@ enum SettingsDestination: Hashable, Sendable {
     case chatLayout
     /// Appearance › App layout: the bottom bar and the order of ☰.
     case appLayout
+    /// Appearance › Thinking: the look of the Thinking control.
+    case thinking
     /// Connections: this device's access, then Native App Connections and Composio Apps, then the
     /// credential vault. Device access opens from it as `.section(.permissions)`.
     case apps

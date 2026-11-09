@@ -70,7 +70,7 @@ enum ChatTurnFailureFix: Equatable, Sendable {
     case tryAgain
     /// Sends the message again when the limit lifts, while the chat is open.
     case tryAgainAt(Date)
-    /// Opens Model & reasoning for this chat.
+    /// Opens Model settings for this chat.
     case useAnotherModel
     case pickAnotherModel
     /// Opens Settings › AI providers.

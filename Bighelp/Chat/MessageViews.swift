@@ -56,6 +56,13 @@ struct TimelineSenderResolver {
             description = Self.spokenSentFiles(reply.body, attachments: item.attachments)
         } else if item.role == .human, case .message(let text) = item.content {
             description = Self.spokenSentFiles(text, attachments: item.attachments)
+        } else if item.role == .assistant, case .message(let raw) = item.content,
+                  item.metadata.delivery == "Streaming" {
+            // An answer still arriving is spoken as it is written, without the lines for files
+            // still to come. Working out its parts for each piece parsed the whole answer again
+            // every time.
+            description = item.attachments.isEmpty
+                ? DirectHermesGeneratedMediaClient.pendingFiles(raw, role: .assistant).text : raw
         } else if item.role == .assistant, case .message(let raw) = item.content {
             // Files still to come have their own tile and label: never read a host path aloud.
             let text = item.attachments.isEmpty ? DirectHermesGeneratedMediaClient.pendingFiles(raw, role: .assistant).text : raw

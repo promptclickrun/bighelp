@@ -112,6 +112,12 @@ final class DirectHermesKeychainVault: DirectHermesCredentialVault {
         // Security.framework is external storage: read back the exact item before
         // accepting rotation, rather than trusting an OSStatus alone.
         guard try load() == connection else { throw DirectHermesError.secureStorageUnavailable }
+        // The share extension sends with a narrower copy in the notification group; it never
+        // reads this item. Test and harness vaults name their own service, so only the
+        // production sign-in mirrors.
+        if service == DirectHermesShareCredential.primaryService {
+            DirectHermesShareCredential.store(connection)
+        }
     }
 
     /// Promote only after the verified host has a durable registry entry.
@@ -167,5 +173,8 @@ final class DirectHermesKeychainVault: DirectHermesCredentialVault {
         guard try load() == nil else { throw DirectHermesError.secureStorageUnavailable }
         stagedConnection = nil
         requiresRegistryReference = false
+        if service == DirectHermesShareCredential.primaryService {
+            DirectHermesShareCredential.clear()
+        }
     }
 }

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>bighelp</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- The group the app already shares with its notification extension: reading the
+	     sign-in copy needs it, and using an existing group avoids registering a new
+	     capability for a bundle ID the maintainer has not created yet. -->
+	<key>BighelpNotificationKeychainGroup</key>
+	<string>$(AppIdentifierPrefix)app.loopdy.mobile.notification</string>
+	<!-- App Transport Security is per bundle: without this the extension cannot reach a
+	     host on the LAN, a private VPN or Tailscale even though the app can. Keep in step
+	     with Bighelp/Info.plist. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>100.64.0.0/10</key>
+			<dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict>
+			<key>10.0.0.0/8</key>
+			<dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict>
+			<key>172.16.0.0/12</key>
+			<dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict>
+			<key>192.168.0.0/16</key>
+			<dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict>
+			<key>169.254.0.0/16</key>
+			<dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict>
+			<key>127.0.0.0/8</key>
+			<dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict>
+			<key>fd7a:115c:a1e0::/48</key>
+			<dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict>
+			<key>fc00::/7</key>
+			<dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict>
+			<key>lan</key>
+			<dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/><key>NSIncludesSubdomains</key><true/></dict>
+			<key>home.arpa</key>
+			<dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/><key>NSIncludesSubdomains</key><true/></dict>
+			<key>local</key>
+			<dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/><key>NSIncludesSubdomains</key><true/></dict>
+			<key>ts.net</key>
+			<dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/><key>NSIncludesSubdomains</key><true/></dict>
+			<key>beta.tailscale.net</key>
+			<dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/><key>NSIncludesSubdomains</key><true/></dict>
+			<key>localhost</key>
+			<dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict>
+		</dict>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>bighelp sends what you share to the Hermes computer you chose on your home network, VPN or Tailscale.</string>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.share-services</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<!-- A link, a line of text, or up to four pictures or files. Movies are left
+			     out on purpose: an extension cannot hold a video in memory, and the app's
+			     chunked uploader does not run here. -->
+			<key>NSExtensionActivationRule</key>
+			<dict>
+				<key>NSExtensionActivationSupportsText</key>
+				<true/>
+				<key>NSExtensionActivationSupportsWebURLWithMaxCount</key>
+				<integer>1</integer>
+				<key>NSExtensionActivationSupportsImageWithMaxCount</key>
+				<integer>4</integer>
+				<key>NSExtensionActivationSupportsFileWithMaxCount</key>
+				<integer>4</integer>
+			</dict>
+		</dict>
+	</dict>
+</dict>
+</plist>

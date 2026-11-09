@@ -111,8 +111,8 @@ extension DirectHermesConversationClient {
             if needsRecovery, journal.unresolved.allSatisfy({ $0.id == entry.id }) {
                 needsRecovery = false
             }
-            onSubmissionAdmitted = { onAccepted(text) }
-            defer { onSubmissionAdmitted = nil }
+            onSubmissionAdmitted[entry.id] = { onAccepted(text) }
+            defer { onSubmissionAdmitted[entry.id] = nil }
             guard !needsRecovery, currentPDFAttachmentTarget == target else {
                 throw DirectHermesWorkspaceError.reviewRequired
             }

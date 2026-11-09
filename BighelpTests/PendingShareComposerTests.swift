@@ -540,6 +540,142 @@ struct PendingShareComposerTests {
         #expect(messages.count == 2 && Set(messages.map(\.id)).count == 2)
         #expect(placement(a.id)?.submission?.id != placement(b.id)?.submission?.id)
     }
+
+    // MARK: - Messages with files over 8 MB
+
+    // A starts the turn and Hermes is slow to answer its prompt, though its events say the turn runs;
+    // B goes queued behind it and is refused. Both orders.
+    @Test(arguments: [true, false])
+    func eachMessageWithBigFilesSettlesOnlyOnItsOwnAdmission(aAnswersFirst: Bool) async throws {
+        let rpc = ShareGateRPC()
+        rpc.holdsPrompts = ["Message A", "Message B"]
+        let chat = try await NativeShareChat(rpc: rpc)
+        defer { chat.close() }
+        let a = try await bigFile("A.mov")
+        let b = try await bigFile("B.mov")
+        defer {
+            for file in [a, b] { BigFileUploadBoard.shared.finish(file.id); BigFileStore.remove(file) }
+        }
+        let model = chat.model
+
+        model.draft = "Message A"
+        try model.addDraftBigFile(a)
+        let sendingA = Task { await model.send() }
+        defer { sendingA.cancel() }
+        try await until { rpc.isHolding("Message A") }
+        chat.client.receive(.init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 1))
+        try await until { model.isMidSessionTurnLive }
+
+        model.draft = "Message B"
+        try model.addDraftBigFile(b)
+        let sendingB = Task { await model.send() }
+        try await until { rpc.isHolding("Message B") }
+
+        let streaming = BighelpJSONValue.object(["status": .string("streaming"), "user_row_id": .integer(41)])
+        let refusal = DirectHermesError.rpcRejected(code: 4004)
+        if aAnswersFirst {
+            rpc.answer("Message A", with: .success(streaming))
+            try await until { !model.bigFileSends.contains { Self.text($0) == "Message A" } }
+            rpc.answer("Message B", with: .failure(refusal))
+            await sendingB.value
+        } else {
+            rpc.answer("Message B", with: .failure(refusal))
+            await sendingB.value
+            rpc.answer("Message A", with: .success(streaming))
+            try await until { !model.bigFileSends.contains { Self.text($0) == "Message A" } }
+        }
+
+        // A: Hermes took it, so it's in the chat and the phone's copy of its file is gone.
+        #expect(model.items.contains { Self.text($0).hasPrefix("Message A\n@file:") })
+        #expect(!FileManager.default.fileExists(atPath: a.localURL.path))
+        // B: refused, waiting with Try again, its own file kept.
+        #expect(model.bigFileSends.map { Self.text($0) } == ["Message B"])
+        #expect(FileManager.default.fileExists(atPath: b.localURL.path), "B's file is kept for Try again")
+        #expect(Self.waitsForTryAgain(b.id))
+    }
+
+    private func bigFile(_ name: String) async throws -> ChatBigFile {
+        let source = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString + "-" + name)
+        try Data("synthetic \(name) \(UUID().uuidString)".utf8).write(to: source)
+        defer { try? FileManager.default.removeItem(at: source) }
+        return try await BigFileStore.prepare(copying: source, fileName: name, mimeType: "application/octet-stream")
+    }
+
+    private func until(_ condition: () -> Bool) async throws {
+        for _ in 0..<1_000 where !condition() { try await Task.sleep(for: .milliseconds(2)) }
+        try #require(condition())
+    }
+
+    private static func text(_ item: TimelineItem) -> String {
+        guard case .message(let text) = item.content else { return "" }
+        return text
+    }
+
+    private static func waitsForTryAgain(_ fileID: String) -> Bool {
+        if case .failed = BigFileUploadBoard.shared.state(for: fileID) { return true }
+        return false
+    }
+}
+
+/// A chat on a real native client over `ShareGateRPC`, with a computer that takes big files.
+@MainActor
+private struct NativeShareChat {
+    let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    let rpc: ShareGateRPC
+    let client: DirectHermesConversationClient
+    let model: ChatModel
+
+    init(rpc: ShareGateRPC) async throws {
+        self.rpc = rpc
+        client = try DirectHermesConversationClient(rpc: rpc, hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch", drafts: .init(root: root))
+        client.bigFileHost = WholeFileUploadHost()
+        model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        try await client.recover(epoch: "epoch")
+    }
+
+    func close() {
+        rpc.hangUp()
+        client.suspend()
+        try? FileManager.default.removeItem(at: root)
+    }
+}
+
+/// The plugin's `uploads/*` for files it already holds whole: every piece is there from the start.
+@MainActor
+private final class WholeFileUploadHost: BigFileUploadHost, @unchecked Sendable {
+    private var names: [String: String] = [:]
+
+    func supportsBigFiles() async -> Bool { true }
+
+    func supportsSmallPieces() async -> Bool { true }
+
+    func perform(_ operation: WorkspaceOperation,
+                 payload: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] {
+        switch operation {
+        case .uploadsStart:
+            let id = String((payload["sha256"]?.string ?? "").prefix(32))
+            let byteCount = payload["byteCount"]?.integer ?? 0
+            names[id] = payload["fileName"]?.string
+            return ["uploadId": .string(id), "byteCount": .integer(byteCount), "chunkBytes": .integer(4 * 1_024 * 1_024),
+                    "receivedChunks": .array([.integer(0)]), "finished": .boolean(false)]
+        case .uploadsFinish:
+            let id = payload["uploadId"]?.string ?? ""
+            return ["uploadId": .string(id), "finished": .boolean(true), "inWorkspace": .boolean(true),
+                    "path": .string("/srv/agent/uploads/2026-11-09/" + (names[id] ?? ""))]
+        case .uploadsDiscard:
+            return ["discarded": .boolean(true)]
+        default:
+            throw WorkspaceClientError.unavailable(.unsupportedOperation)
+        }
+    }
+
+    func chunkRequest(_ chunk: DirectHermesBigFileChunk) async throws -> URLRequest {
+        throw WorkspaceClientError.unavailable(.unsupportedOperation)
+    }
+
+    func reloadContext() async throws {}
 }
 
 /// Counts what reached the computer, and takes the kinds of attachment a test says.
@@ -570,13 +706,28 @@ private final class ShareGateRPC: DirectHermesRPC {
     var onEvent: ((DirectHermesEvent) -> Void)?
     var refusal: DirectHermesError?
     var holdsSubmit = false
+    /// Prompts starting with one of these wait for `answer(_:with:)`.
+    var holdsPrompts: Set<String> = []
     private(set) var submits: [String] = []
     private var held: CheckedContinuation<BighelpJSONValue, any Error>?
+    private var heldPrompts: [String: CheckedContinuation<BighelpJSONValue, any Error>] = [:]
     var isHoldingSubmit: Bool { held != nil }
 
     func releaseSubmit(throwing error: any Error) {
         held?.resume(throwing: error)
         held = nil
+    }
+
+    func isHolding(_ prefix: String) -> Bool { heldPrompts[prefix] != nil }
+
+    func answer(_ prefix: String, with result: Result<BighelpJSONValue, any Error>) {
+        heldPrompts.removeValue(forKey: prefix)?.resume(with: result)
+    }
+
+    /// The connection drops: every prompt still held ends.
+    func hangUp() {
+        for prompt in heldPrompts.values { prompt.resume(throwing: DirectHermesError.notConnected) }
+        heldPrompts = [:]
     }
 
     func request(_ method: String, params: [String: BighelpJSONValue]) async throws -> BighelpJSONValue {
@@ -588,10 +739,19 @@ private final class ShareGateRPC: DirectHermesRPC {
             return .object(["session_id": .string("runtime"), "stored_session_id": .string("saved"),
                             "running": .boolean(false), "messages": .array([])])
         case "prompt.submit":
-            if case .string(let text) = params["text"] { submits.append(text) }
+            let text = params["text"]?.string ?? ""
+            submits.append(text)
             if let refusal { throw refusal }
+            if let prefix = holdsPrompts.first(where: { text.hasPrefix($0) }) {
+                return try await withCheckedThrowingContinuation { heldPrompts[prefix] = $0 }
+            }
             if holdsSubmit { return try await withCheckedThrowingContinuation { held = $0 } }
             return .object(["status": .string("streaming"), "user_row_id": .integer(40 + submits.count)])
+        case "file.attach":
+            let path = params["path"]?.string ?? ""
+            return .object(["attached": .boolean(true), "uploaded": .boolean(false),
+                            "name": .string(params["name"]?.string ?? ""), "path": .string(path),
+                            "ref_path": .string(path), "ref_text": .string("@file:" + path)])
         case "subagent.list":
             return .object(["subagents": .array([])])
         case "session.control.read":

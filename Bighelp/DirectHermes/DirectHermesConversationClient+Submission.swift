@@ -44,9 +44,7 @@ extension DirectHermesConversationClient {
 
     /// Hermes admitted journal entry `entry`.
     func takeSubmissionAdmitted(_ entry: UUID) {
-        let admitted = onSubmissionAdmitted
-        onSubmissionAdmitted = nil
-        admitted?()
+        onSubmissionAdmitted.removeValue(forKey: entry)?()
         admitShares(of: entry)
     }
 

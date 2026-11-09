@@ -485,6 +485,12 @@ hand them the work their roles cover, without being asked.
 
 An opened "Worked for…" fold shows its tools directly, never a "Called N tools" folder inside it.
 
+A tapped tool call unfolds what it took and gave back, readable: key facts as label and value, text with real
+line breaks. Code it ran (Hermes' `execute_code`, Python, and `terminal`, Shell) unfolds as one notebook cell
+(`ChatToolCodeCellView`): the language with Copy and full screen, the code with line numbers and colors, folded
+after 10 lines behind Show all, then under a line in the same card what it printed, with a dot for how it ended
+(Output, or Exit code 1 in red) and its own Copy. View raw under the card opens Hermes' own input or result.
+
 Settings › Chat › Agent's work (`ChatWorkStyle`) picks how one-to-one chats show an agent's work; group chats
 keep their folders. **Card** (the default): while the agent works, one soft card says who's working, how long and
 how many steps, with its newest four steps under that, older ones fading out at the top (`ChatLiveWorkView`).

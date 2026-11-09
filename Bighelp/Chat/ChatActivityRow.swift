@@ -3,7 +3,8 @@ import UIKit
 
 /// One tool call or helper agent inside an unfolded work trail, as a step
 /// line hanging from the trail's rail. A tool call unfolds its full details
-/// (arguments, result) in place. Each one is its own recycled timeline row.
+/// (arguments, result) in place; code it ran unfolds as a notebook cell
+/// (`ChatToolCodeCellView`). Each one is its own recycled timeline row.
 struct ChatActivityRow: View {
     let event: ChatActivityEvent
     let onDisclosureChange: () -> Void
@@ -94,19 +95,25 @@ struct ChatActivityRow: View {
 
     @ViewBuilder
     private var toolDetails: some View {
-        let sections = detailSections
+        // Code a tool ran shows as a cell in place of its input and result.
+        let codeCell = event.contentReference == nil ? ChatToolCodeCell.make(for: event) : nil
+        let sections = detailSections(showsCodeCell: codeCell != nil)
         if let reference = event.contentReference {
             Text("Preview — complete content is stored on Hermes.")
                 .font(.bighelp(.caption))
                 .foregroundStyle(.secondary)
             BighelpSessionContentDisclosure(sessionID: reference.sessionID, rowID: reference.rowID)
         }
-        if sections.isEmpty {
+        if let codeCell {
+            ChatToolCodeCellView(cell: codeCell, event: event, identifier: "chat.activity.\(event.eventID).code-cell",
+                                 onDisclosureChange: onDisclosureChange)
+        }
+        if sections.isEmpty, codeCell == nil {
             Text("Hermes did not provide additional details for this call.")
                 .bighelpFont(.metadata)
                 .foregroundStyle(theme.tertiaryText)
                 .fixedSize(horizontal: false, vertical: true)
-        } else {
+        } else if !sections.isEmpty {
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                 ForEach(sections, id: \.label) { section in
                     VStack(alignment: .leading, spacing: BighelpTokens.space4) {
@@ -155,15 +162,15 @@ struct ChatActivityRow: View {
         }
     }
 
-    private var detailSections: [(label: String, value: String)] {
+    private func detailSections(showsCodeCell: Bool) -> [(label: String, value: String)] {
         var sections: [(String, String)] = []
         if let summary = nonempty(event.summary) {
             sections.append(("Summary", summary))
         }
-        if let arguments = nonempty(event.arguments) {
+        if !showsCodeCell, let arguments = nonempty(event.arguments) {
             sections.append(("Input", arguments))
         }
-        if let result = nonempty(event.result) {
+        if !showsCodeCell, let result = nonempty(event.result) {
             sections.append(("Result", result))
         }
         if let detail = nonempty(event.detail), detail != event.summary, detail != event.result {

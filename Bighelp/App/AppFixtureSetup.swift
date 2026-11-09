@@ -48,6 +48,10 @@ enum AppFixtureSetup {
            let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
             initialSessions[index] = ConversationFixtures.toolDisclosureScrollPreview
         }
+        if usesFixtures, arguments.contains("-test-code-tool"),
+           let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
+            initialSessions[index] = ConversationFixtures.codeToolPreview
+        }
         if usesFixtures, arguments.contains("-test-thinking-style"),
            let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
             initialSessions[index] = ConversationFixtures.thinkingStylePreview

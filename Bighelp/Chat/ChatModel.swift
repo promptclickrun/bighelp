@@ -80,6 +80,7 @@ final class ChatModel {
             } else {
                 persistSession(draftOnly: true)
             }
+            releaseHeldSharesIfBoxIsEmpty()
         }
     }
     /// The draft as Send, the placeholder and the mention list need it. It changes only when one
@@ -99,11 +100,19 @@ final class ChatModel {
     /// Ordinary files/images and PDF-page selections in the exact order the
     /// user added them. `draftAttachments` remains the ordinary-file view used
     /// by existing clients and persisted reference drafts.
-    var orderedDraftAttachments: [ChatDraftAttachment] = []
+    var orderedDraftAttachments: [ChatDraftAttachment] = [] {
+        didSet { releaseHeldSharesIfBoxIsEmpty() }
+    }
     /// Photos or files still being read in; Send waits for them.
-    var draftAttachmentImport: DraftAttachmentImportProgress?
+    var draftAttachmentImport: DraftAttachmentImportProgress? {
+        didSet { releaseHeldSharesIfBoxIsEmpty() }
+    }
     /// Ones that didn't attach, with why and a way to try again; Send waits for these too.
-    var draftAttachmentFailures: [DraftAttachmentFailure] = []
+    var draftAttachmentFailures: [DraftAttachmentFailure] = [] {
+        didSet { releaseHeldSharesIfBoxIsEmpty() }
+    }
+    /// Shares from other apps this message box holds (`placeShare`), until they leave it.
+    @ObservationIgnored var heldShares: [ChatHeldShare] = []
     var pdfAttachmentReceipts: [DirectHermesPDFAttachmentReceipt] = []
     var isPDFDraftSendInFlight = false
     var referenceSelections: [ReferenceDraftSelection] = []

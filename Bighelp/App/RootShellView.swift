@@ -222,6 +222,7 @@ struct RootShellView: View {
         agentHomeSheets(rootContent)
         .modifier(AIDataConsentGate(inFirstSetup: presentsFirstRunOnboarding || hostRegistry?.isWorkspaceReady != true,
                                     usesDemoData: usesWorkspaceFixtures))
+        .modifier(pendingShareReview)
         .modifier(FleetSheets(
             fleet: fleet, gate: $fleetGateRequest, isNewChatPresented: $isFleetNewChatPresented,
             onGate: { destination, hostID in openFleet(.destination(destination), on: hostID) },

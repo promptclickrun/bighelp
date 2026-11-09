@@ -49,6 +49,9 @@ struct ChatBackgroundResult: Codable, Equatable, Sendable {
         case Self.helpersKind:
             self.init(helpersReport: text, title: title, metadata: metadata)
         case Self.commandKind:
+            // `message_agent`'s waiter ending is about the message to that agent: the agent-talk rail reads it
+            // (`AgentTalkDelivery`), never a command's results.
+            guard !(text.contains("bot_mode_dm") && text.contains("--run-delivery")) else { return nil }
             self.init(commandReport: text, title: title)
         case nil, "":
             guard text.hasPrefix("[ASYNC DELEGATION ") else { return nil }

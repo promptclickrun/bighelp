@@ -411,6 +411,14 @@ final class DirectHermesNativePluginClient {
         case .chatStop:
             return Route(path: "chat/stop", feature: DirectHermesAgentTalkReader.chatActivityFeature,
                          isMutation: true, maximumResponseBytes: 4_096, timeout: 10)
+        case .chatLive:
+            // Waits up to 10 seconds for new frames; an answer holds a turn's text and tool output.
+            return Route(path: "chat/live", feature: DirectHermesAgentTalkReader.chatLiveFeature, isMutation: false,
+                         maximumResponseBytes: 2_097_152, timeout: 30)
+        case .agentDeliveries:
+            // Read every few seconds while a message to another agent is out; replies are at most 32,000 characters.
+            return Route(path: "agents/deliveries", feature: DirectHermesAgentTalkReader.deliveriesFeature,
+                         isMutation: false, maximumResponseBytes: 1_048_576, timeout: 10)
         case .agentsActivity:
             // Read every few seconds while Bots mode's home or the Agents screen shows; at most 64 agents.
             return Route(path: "agents/activity", feature: DirectHermesBotChatActivityClient.feature,

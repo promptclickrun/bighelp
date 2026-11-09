@@ -16,6 +16,9 @@ final class ChatModel {
     let agentTalkLive = ChatAgentTalkLive()
     /// Another Hermes process running this chat now (an agent another one asked), from the plugin.
     var otherProcessRun: ChatOtherProcessRun?
+    /// The chat draws a turn the agent's gateway runs (Hermes 0.23) as its own, from the plugin's frames:
+    /// Stop goes to the gateway, and the watch keeps going while the turn makes the chat busy.
+    var followsGatewayTurn = false
     /// Reads this chat's saved history again from the host (set by the shell; nil in previews and tests).
     @ObservationIgnored var hostHistoryRefresh: (@MainActor () async throws -> Void)?
     @ObservationIgnored var hostRefreshTask: Task<Void, Never>?

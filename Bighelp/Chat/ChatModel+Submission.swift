@@ -369,6 +369,11 @@ extension ChatModel {
     }
 
     func stop() async {
+        // A turn this chat only watches stops where it runs.
+        if followsGatewayTurn {
+            await stopOtherProcessRun()
+            return
+        }
         guard canStop else { return }
         if let roomID = botModeRoomID, let botModeRoomStore {
             let generation = ownerGeneration

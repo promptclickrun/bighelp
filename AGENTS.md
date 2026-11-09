@@ -388,6 +388,16 @@ change in both repos.
   normalization on both sides). Each Hermes agent loads only its own plugins, and usually only the default agent
   has bighelp's, so nothing that must reach every agent can be a plugin prompt section: Teamwork writes each
   agent's `platform_hints.bighelp.append` instead.
+  Hermes 0.23 runs `message_agent` through the other agent's gateway: the call returns a `delivery_id`, a
+  background waiter (`bot_mode_dm.py --run-delivery`) gives up after about 30 minutes, and the agent asked keeps a
+  receipt. So the rail reads where each message is from the plugin's `agents/deliveries`
+  (`native-agent-deliveries-v1`, `AgentDelivery`), never the waiter's notice (`isStillOut`), and the waiter is no
+  background command. Tapped, a delivered message's rail opens in place (`ChatAgentTalkRunPanel`): the agent's
+  steps from the plugin's `chat/live` (`native-chat-live-v1`, which relays the gateway's own frames), then its
+  answer. The agent's own chat draws a turn its gateway runs as its own (`followGatewayTurn`): from now, since
+  saved steps carry no call ID to match a replay against, ended by `running: false` as any turn this device didn't
+  send, and Stop goes to `chat/stop`. Hermes saves the delivered message as an `internal_notification`; one that
+  is another agent's message shows (`DirectHermesHistoryRow.isVisible`).
 - **Files agents send** (`MEDIA:` lines, generated pictures): the plugin's `attachments/resolve` + `attachments/fetch`
   routes serve them in ~3 MB pieces. After the first piece the rest download three at a time, and a dropped piece is
   asked for again from its offset. Finished files are kept on the phone (`AgentAttachmentCache`, Caches, 512 MB, least

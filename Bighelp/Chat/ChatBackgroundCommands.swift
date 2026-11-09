@@ -49,18 +49,24 @@ struct ChatBackgroundCommand: Identifiable, Equatable, Sendable {
 
     /// The `process.list` answer: running first, then the newest. Nil when it isn't one. A
     /// subagent's own commands (`sa-…` tasks) are left out: they're part of that subagent's work,
-    /// which the chip already counts.
+    /// which the chip already counts. So is Hermes 0.23's wait for another agent's answer: it is a
+    /// message to that agent, which the chat's agent-talk rail shows.
     static func list(_ response: BighelpJSONValue, now: Date = .now) -> [ChatBackgroundCommand]? {
         guard let rows = response.object?["processes"]?.array else { return nil }
         var seen: Set<String> = []
         let commands = rows.prefix(maximumCommands)
             .filter { $0.object?["owner_task_id"]?.string?.hasPrefix("sa-") != true }
             .compactMap { ChatBackgroundCommand(json: $0, now: now) }
-            .filter { seen.insert($0.id).inserted }
+            .filter { !$0.isMessageToAnotherAgent && seen.insert($0.id).inserted }
         return commands.sorted { lhs, rhs in
             if lhs.isRunning != rhs.isRunning { return lhs.isRunning }
             return (lhs.startedAt ?? .distantPast) > (rhs.startedAt ?? .distantPast)
         }
+    }
+
+    /// `message_agent`'s waiter (`bot_mode_dm.py --run-delivery … -p <agent>`).
+    var isMessageToAnotherAgent: Bool {
+        command.contains("bot_mode_dm.py") && command.contains("--run-delivery")
     }
 
     /// How it ended, in plain words.

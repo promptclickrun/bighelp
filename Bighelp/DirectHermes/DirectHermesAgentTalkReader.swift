@@ -35,17 +35,74 @@ protocol AgentTalkReading: AnyObject {
     func otherProcessRun(agentID: String, sessionID: String) async -> ChatOtherProcessReading
     /// Stops that run as Ctrl-C would. False when nothing was stopped.
     func stopOtherProcessRun(agentID: String, sessionID: String) async -> Bool
+    /// The frames of the turn the agent's gateway runs in that chat, after `after` (the turn from its start when
+    /// nil), waiting up to `wait` for new ones. With `latest`, no frames: only where the gateway is now, for a
+    /// chat that shows what Hermes saved of the turn. Nil when the host can't say.
+    func liveFrames(agentID: String, sessionID: String, after: Int?, epoch: String?, wait: Duration,
+                    latest: Bool) async -> AgentLiveFrames?
+    /// Where `message_agent` messages are, as the agents asked keep them. Nil when the host can't say.
+    func deliveries(_ queries: [AgentDeliveryQuery]) async -> [AgentDelivery]?
 }
 
 extension AgentTalkReading {
     func otherProcessRun(agentID: String, sessionID: String) async -> ChatOtherProcessReading { .unavailable }
     func stopOtherProcessRun(agentID: String, sessionID: String) async -> Bool { false }
+    func liveFrames(agentID: String, sessionID: String, after: Int?, epoch: String?, wait: Duration,
+                    latest: Bool) async -> AgentLiveFrames? { nil }
+    func deliveries(_ queries: [AgentDeliveryQuery]) async -> [AgentDelivery]? { nil }
 }
 
 /// A chat another Hermes process is running: the tool it's on, and whether Stop can reach it.
 struct ChatOtherProcessRun: Equatable, Sendable {
     let toolName: String?
     let canStop: Bool
+    /// The agent's gateway runs it (Hermes 0.23), so its frames can be followed (`liveFrames`).
+    var isLive = false
+}
+
+/// A turn the agent's gateway runs, as the plugin relays it (`native-chat-live-v1`): Hermes' own socket frames,
+/// numbered by the gateway.
+struct AgentLiveFrames: Equatable, Sendable {
+    struct Frame: Equatable, Sendable {
+        let sequence: Int
+        let type: String
+        let payload: [String: BighelpJSONValue]
+    }
+
+    /// The plugin follows the chat on the gateway; false without a gateway.
+    let isAttached: Bool
+    let isRunning: Bool
+    /// The gateway's numbering; another one means start the turn again.
+    let epoch: String?
+    let frames: [Frame]
+    /// The last frame's number, to ask after.
+    let last: Int?
+    /// Frames were missed: the turn starts again from its start.
+    let reset: Bool
+}
+
+/// A `message_agent` message to look up: the agent it went to and the delivery ID the tool call returned.
+struct AgentDeliveryQuery: Hashable, Sendable {
+    let agentID: String
+    let deliveryID: String
+}
+
+/// Where a `message_agent` message is, from the receipt the agent asked keeps (`native-agent-deliveries-v1`).
+struct AgentDelivery: Equatable, Sendable {
+    enum State: String, Sendable {
+        case queued, working, answered, withdrawn, failed
+
+        var isFinal: Bool { self == .answered || self == .withdrawn || self == .failed }
+    }
+
+    let agentID: String
+    let deliveryID: String
+    let state: State
+    /// The agent's Bot Chat, where it works on the message.
+    let sessionID: String?
+    /// The Hermes tool it runs now.
+    let toolName: String?
+    let reply: String?
 }
 
 enum ChatOtherProcessReading: Equatable, Sendable {
@@ -79,6 +136,10 @@ enum AgentTalkMessageHash {
 final class DirectHermesAgentTalkReader: AgentTalkReading {
     static let feature = "native-agent-talk-v1"
     static let chatActivityFeature = "native-chat-activity-v1"
+    static let chatLiveFeature = "native-chat-live-v1"
+    static let deliveriesFeature = "native-agent-deliveries-v1"
+    static let maximumDeliveries = 16
+    static let maximumFrames = 600
     static let maximumCalls = 16
     static let maximumRuns = 32
     static let maximumSteps = 12
@@ -94,7 +155,61 @@ final class DirectHermesAgentTalkReader: AgentTalkReading {
               let working = response["working"]?.boolean else { return .unavailable }
         guard working else { return .idle }
         let tool = response["tool"]?.string.flatMap { $0.count <= 64 ? $0 : nil }
-        return .running(ChatOtherProcessRun(toolName: tool, canStop: response["canStop"]?.boolean == true))
+        return .running(ChatOtherProcessRun(toolName: tool, canStop: response["canStop"]?.boolean == true,
+                                            isLive: response["live"]?.boolean == true))
+    }
+
+    func liveFrames(agentID: String, sessionID: String, after: Int?, epoch: String?, wait: Duration,
+                    latest: Bool) async -> AgentLiveFrames? {
+        var payload: [String: BighelpJSONValue] = [
+            "agentId": .string(agentID), "sessionId": .string(sessionID),
+            "waitMs": .integer(Int(min(max(wait, .zero), .seconds(15)).components.seconds) * 1_000),
+        ]
+        if latest { payload["latest"] = .boolean(true) }
+        payload["after"] = after.map(BighelpJSONValue.integer) ?? .null
+        payload["epoch"] = epoch.map(BighelpJSONValue.string) ?? .null
+        return await perform(.chatLive, payload: payload).flatMap(Self.frames(from:))
+    }
+
+    static func frames(from response: [String: BighelpJSONValue]) -> AgentLiveFrames? {
+        guard let attached = response["attached"]?.boolean, let events = response["events"]?.array else { return nil }
+        let frames = events.prefix(maximumFrames).compactMap { value -> AgentLiveFrames.Frame? in
+            guard let row = value.object, let sequence = row["seq"]?.integer, let type = row["type"]?.string,
+                  type.count <= 64 else { return nil }
+            return AgentLiveFrames.Frame(sequence: sequence, type: type, payload: row["payload"]?.object ?? [:])
+        }
+        return AgentLiveFrames(isAttached: attached, isRunning: response["running"]?.boolean == true,
+                               epoch: response["epoch"]?.string.flatMap { $0.count <= 128 ? $0 : nil },
+                               frames: frames, last: response["last"]?.integer, reset: response["reset"]?.boolean == true)
+    }
+
+    func deliveries(_ queries: [AgentDeliveryQuery]) async -> [AgentDelivery]? {
+        let asked = queries.filter { AgentTalkIdentity.isProfileID($0.agentID) && Self.isDeliveryID($0.deliveryID) }
+            .prefix(Self.maximumDeliveries)
+        guard !asked.isEmpty else { return [] }
+        let payload: [String: BighelpJSONValue] = ["deliveries": .array(asked.map {
+            .object(["agentId": .string($0.agentID), "deliveryId": .string($0.deliveryID)])
+        })]
+        return await perform(.agentDeliveries, payload: payload).flatMap(Self.deliveries(from:))
+    }
+
+    static func deliveries(from response: [String: BighelpJSONValue]) -> [AgentDelivery]? {
+        guard let values = response["deliveries"]?.array else { return nil }
+        return values.prefix(maximumDeliveries).compactMap { value in
+            guard let row = value.object, let agent = row["agentId"]?.string, AgentTalkIdentity.isProfileID(agent),
+                  let delivery = row["deliveryId"]?.string, isDeliveryID(delivery),
+                  let state = row["state"]?.string.flatMap(AgentDelivery.State.init(rawValue:)) else { return nil }
+            let session = row["sessionId"]?.string.flatMap { AgentTalkIdentity.isSessionID($0) ? $0 : nil }
+            let tool = row["tool"]?.string.flatMap { ChatToolNames.plainName($0) == nil ? nil : $0 }
+            let reply = row["reply"]?.string.flatMap { $0.isEmpty ? nil : String($0.prefix(32_000)) }
+            return AgentDelivery(agentID: agent, deliveryID: delivery, state: state, sessionID: session,
+                                 toolName: tool, reply: reply)
+        }
+    }
+
+    /// Hermes' delivery IDs: SHA-256 hex.
+    nonisolated static func isDeliveryID(_ value: String) -> Bool {
+        value.count == 64 && value.allSatisfy { $0.isHexDigit && !$0.isUppercase }
     }
 
     func stopOtherProcessRun(agentID: String, sessionID: String) async -> Bool {
@@ -103,8 +218,12 @@ final class DirectHermesAgentTalkReader: AgentTalkReading {
 
     private func perform(_ operation: WorkspaceOperation, agentID: String,
                          sessionID: String) async -> [String: BighelpJSONValue]? {
+        await perform(operation, payload: ["agentId": .string(agentID), "sessionId": .string(sessionID)])
+    }
+
+    private func perform(_ operation: WorkspaceOperation,
+                         payload: [String: BighelpJSONValue]) async -> [String: BighelpJSONValue]? {
         guard let workspace = currentWorkspace(), let owner = workspace.owner else { return nil }
-        let payload: [String: BighelpJSONValue] = ["agentId": .string(agentID), "sessionId": .string(sessionID)]
         do {
             return try await workspace.perform(operation, payload: payload, owner: owner)
         } catch WorkspaceClientError.conflict {
@@ -189,9 +308,51 @@ extension ChatActivityEvent {
 @MainActor
 @Observable
 final class ChatAgentTalkLive {
-    private(set) var activities: [String: AgentTalkLiveActivity] = [:]
+    private(set) var runs: [String: AgentTalkLiveActivity] = [:]
+    /// Hermes 0.23 deliveries, by the call that sent each.
+    private(set) var deliveries: [String: AgentDelivery] = [:]
+    /// Deliveries the host had no receipt for.
+    @ObservationIgnored private var unknown: Set<String> = []
+
+    /// Each call's other agent: a delivery's state wins over a run read from the agent's history.
+    var activities: [String: AgentTalkLiveActivity] {
+        guard !deliveries.isEmpty else { return runs }
+        var merged = runs
+        for (call, delivery) in deliveries {
+            let working = delivery.state == .working
+            merged[call] = AgentTalkLiveActivity(sessionID: delivery.sessionID ?? runs[call]?.sessionID,
+                                                 toolName: working ? delivery.toolName : nil, isWorking: working,
+                                                 delivery: delivery)
+        }
+        return merged
+    }
 
     var hasWorkingRuns: Bool { activities.values.contains(where: \.isWorking) }
+
+    /// The deliveries still to read: each queued `message_agent` call with a delivery ID, until it ends.
+    func pendingDeliveries(in calls: [ChatActivityEvent]) -> [AgentDeliveryQuery] {
+        var seen = Set<AgentDeliveryQuery>()
+        return calls.reversed().compactMap { call -> AgentDeliveryQuery? in
+            guard let talk = call.agentTalkCall, talk.route == .message, call.agentTalkReply?.outcome == .queued,
+                  let delivery = call.agentTalkReply?.deliveryID, AgentTalkIdentity.isProfileID(talk.targetID),
+                  deliveries[call.id]?.state.isFinal != true, !unknown.contains(delivery) else { return nil }
+            let query = AgentDeliveryQuery(agentID: talk.targetID, deliveryID: delivery)
+            return seen.insert(query).inserted ? query : nil
+        }
+    }
+
+    /// Takes each call's delivery as its agent keeps it. A delivery the host has no receipt for (an agent on
+    /// another computer, a receipt Hermes cleaned up) keeps its last state and isn't asked about again.
+    func update(deliveries read: [AgentDelivery], calls: [ChatActivityEvent], asked: [AgentDeliveryQuery] = []) {
+        var result = deliveries
+        for call in calls {
+            guard let id = call.agentTalkReply?.deliveryID,
+                  let delivery = read.first(where: { $0.deliveryID == id }) else { continue }
+            result[call.id] = delivery
+        }
+        if result != deliveries { deliveries = result }
+        unknown.formUnion(asked.map(\.deliveryID).filter { id in !read.contains { $0.deliveryID == id } })
+    }
 
     /// Each call takes the earliest unclaimed run its message started with that agent.
     func update(runs: [AgentTalkRun], calls: [ChatActivityEvent]) {
@@ -207,6 +368,6 @@ final class ChatAgentTalkLive {
             guard let query = call.agentTalkRunQuery else { continue }
             claim(call) { $0.agentID == query.agentID && $0.messageHash == query.messageHash }
         }
-        if result != activities { activities = result }
+        if result != self.runs { self.runs = result }
     }
 }

@@ -110,14 +110,23 @@ struct DashboardTodaySection: View {
                             .padding(.top, BighelpTokens.space8)
                             .accessibilityAddTraits(.isHeader)
                         ForEach(day.items) { item in
-                            Button { opened = item } label: { DashboardTodayRow(item: item) }
+                            Button { open(item) } label: { DashboardTodayRow(item: item) }
                                 .bighelpPlainButtonStyle()
-                                .accessibilityHint("Shows what it did")
+                                .accessibilityHint(item.message.map { "Opens \($0.agentName)'s chat" } ?? "Shows what it did")
                                 .accessibilityIdentifier("dashboard.today.item.\(item.id)")
                         }
                     }
                 }
             }
+        }
+    }
+
+    /// A message to another agent opens that agent's chat, where it works on it; anything else, what it did.
+    private func open(_ item: AgentTodayItem) {
+        if let message = item.message {
+            BighelpIncomingLinkCenter.shared.open(BighelpShortcutLinks.agentHome(message.agentID))
+        } else {
+            opened = item
         }
     }
 
@@ -138,11 +147,17 @@ private struct DashboardTodayRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: BighelpTokens.space12) {
-            DashboardActivityIcon(item: item)
+            if let message = item.message {
+                AgentLiveAvatar(agentID: message.agentID, displayName: message.agentName, imageURL: nil,
+                                size: 36, showsBadge: false)
+                    .accessibilityHidden(true)
+            } else {
+                DashboardActivityIcon(item: item)
+            }
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.title)
-                    .font(item.kind == .command ? .bighelp(.body, weight: .semibold).monospaced()
-                                                : .bighelp(.body, weight: .semibold))
+                Text(item.message.map { String(localized: "Asked \($0.agentName)") } ?? item.title)
+                    .font(item.kind == .command && item.message == nil ? .bighelp(.body, weight: .semibold).monospaced()
+                                                                       : .bighelp(.body, weight: .semibold))
                     .foregroundStyle(theme.primaryText)
                     .lineLimit(2)
                 Text(Self.detail(item))
@@ -171,8 +186,24 @@ private struct DashboardTodayRow: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// What it is, then how it went: "Command · Didn't finish: Exit 1".
+    /// What it is, then how it went: "Command · Didn't finish: Exit 1". A message to another agent says
+    /// where it is with that agent: "Ralph is running a command…", "Ralph answered".
     static func detail(_ item: AgentTodayItem) -> String {
+        if let message = item.message {
+            let name = message.agentName
+            switch message.state {
+            case .working:
+                return message.toolName.flatMap { tool in
+                    let phrase = ChatToolPhrase.phrase(forTool: tool, arguments: nil).live
+                    return String(localized: "\(name) is \(phrase.prefix(1).lowercased() + phrase.dropFirst())")
+                } ?? String(localized: "\(name) is working on it…")
+            case .queued: return String(localized: "Waiting for \(name)")
+            case .answered: return String(localized: "\(name) answered")
+            case .withdrawn: return String(localized: "Withdrawn")
+            case .failed: return String(localized: "\(name) didn't answer")
+            case nil: return item.state == .running ? String(localized: "Waiting for \(name)") : String(localized: "Message")
+            }
+        }
         let kind = switch item.kind {
         case .subagent: String(localized: "Subagent")
         case .command: String(localized: "Command")

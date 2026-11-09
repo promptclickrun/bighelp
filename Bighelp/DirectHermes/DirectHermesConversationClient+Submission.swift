@@ -42,10 +42,16 @@ extension DirectHermesConversationClient {
                                 commandSelection: selection)
     }
 
-    func takeSubmissionAdmitted() {
-        let admitted = onSubmissionAdmitted
-        onSubmissionAdmitted = nil
-        admitted?()
+    /// Hermes admitted journal entry `entry`.
+    func takeSubmissionAdmitted(_ entry: UUID) {
+        onSubmissionAdmitted.removeValue(forKey: entry)?()
+        admitShares(of: entry)
+    }
+
+    /// The shares bound to this entry, and only those, arrived.
+    func admitShares(of entry: UUID) {
+        guard let submission = shareCorrelations.admit(entry: entry) else { return }
+        model?.shareMessageAdmitted(submission)
     }
 
     func submit(message: String, conversationID: String,
@@ -124,6 +130,7 @@ extension DirectHermesConversationClient {
                         if method == "prompt.submit" {
                             ChatPerformanceProbe.promptDispatched(conversationID: self.conversationID, submission: submission.id)
                         }
+                        self.dispatchedSubmissionID = submission.id
                         do {
                             result = try await self.rpc.request(method, params: params)
                         } catch DirectHermesError.rpcRejected(code: 4018, _) where method == "slash.exec" {
@@ -158,6 +165,7 @@ extension DirectHermesConversationClient {
                                 sender: .agent(id: self.profile, snapshot: .init(name: "Hermes")),
                                 content: .message(output), metadata: .init(source: "Direct Hermes", delivery: "Received"))
                             self.model?.acceptExternal([row])
+                            self.admitShares(of: submission.id)
                             self.admitted = true
                             self.terminalSeen = true
                             self.completeSubmissionIfReady()
@@ -171,7 +179,7 @@ extension DirectHermesConversationClient {
                             ChatPerformanceProbe.promptUnattributed(submission.id)
                             self.promptSentAt = nil
                             self.admitted = true
-                            self.takeSubmissionAdmitted()
+                            self.takeSubmissionAdmitted(submission.id)
                             if self.returnsVoiceReply {
                                 self.queuedVoiceAwaitingTurn = self.submissionTurns.isEmpty
                                 self.selectPendingTurn()
@@ -182,7 +190,7 @@ extension DirectHermesConversationClient {
                             }
                         } else if ["streaming", "ok"].contains(response["status"]?.string ?? "") {
                             // A message waiting outside the transcript joins it first, so it's the one bound.
-                            self.takeSubmissionAdmitted()
+                            self.takeSubmissionAdmitted(submission.id)
                             if !command || expandedToPrompt, let row = response["user_row_id"]?.integer {
                                 self.model?.bindNewestUnsavedMessage(role: .human, toRow: row, from: self)
                             }
@@ -229,8 +237,8 @@ extension DirectHermesConversationClient {
                                 return
                             }
                         } else if commandRejected || (!command && Self.isProvenInputRejection(error)) {
+                            // Not sent. The chat puts its words back in the box (`ChatModel.send`).
                             self.retireSubmission(submission.id)
-                            if self.model?.draft.isEmpty == true { self.model?.draft = message }
                             self.needsRecovery = self.journal.unresolved.contains { $0.id == submission.id }
                         } else { self.needsRecovery = true }
                         self.status = Self.safeMessage(error)
@@ -394,6 +402,7 @@ extension DirectHermesConversationClient {
             // This journal protects uncertain delivery, not agent consumption.
             // A validated receipt transfers queue ownership to Hermes. Retiring
             // our receipt never resends text or claims the steer was consumed.
+            admitShares(of: entry.id)
             retireSubmission(entry.id)
             status = behavior == .steer ? "Steer accepted by Hermes" : "Queued on Hermes"
             return .accepted
@@ -421,6 +430,8 @@ extension DirectHermesConversationClient {
         next.unresolved.append(entry)
         try drafts.save(next, scope: scope)
         journal = next
+        // The send that records this entry names the shares its message carries, if any.
+        shareCorrelations.bind(entry: entry.id, to: PendingShareCorrelation.submission)
         if let model { projection.retainVisible(items: model.items, activities: model.activityLedger.allEvents) }
         projection.reserveOrder(model?.items.compactMap(\.metadata.sourceOrder).max() ?? 0)
         return entry
@@ -468,6 +479,8 @@ extension DirectHermesConversationClient {
             throw DirectHermesWorkspaceError.reviewRequired
         }
         let current = journal.unresolved[index]
+        // Definitely not admitted: nothing may settle its shares any more.
+        shareCorrelations.drop(entry: current.id)
         var next = journal
         next.unresolved[index] = .init(id: current.id, text: current.composerText ?? current.text,
             method: current.method, createdAt: current.createdAt, composerText: current.composerText,
@@ -477,6 +490,8 @@ extension DirectHermesConversationClient {
     }
 
     func retireSubmission(_ id: UUID) {
+        // Admitted entries settled their shares already; any other way out of the journal doesn't.
+        shareCorrelations.drop(entry: id)
         var next = journal
         next.unresolved.removeAll { $0.id == id }
         do { try drafts.save(next, scope: scope); journal = next }
@@ -537,7 +552,7 @@ extension DirectHermesConversationClient {
         continuation?.resume(throwing: error)
     }
 
-    private static func isProvenInputRejection(_ error: Error, method: String = "prompt.submit") -> Bool {
+    static func isProvenInputRejection(_ error: Error, method: String = "prompt.submit") -> Bool {
         if let workspace = error as? DirectHermesWorkspaceError, case .midSessionRejected = workspace { return true }
         if method == "prompt.submit", (error as? DirectHermesError) == .activeSessionLimit { return true }
         guard let direct = error as? DirectHermesError, case .rpcRejected(let code, _) = direct else { return false }

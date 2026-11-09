@@ -44,11 +44,25 @@ extension ChatModel {
             bigFileSends.append(human)
         }
         if Data(outgoingDraftText.utf8) == Data(message.utf8), orderedDraftAttachments == orderedAttachments {
+            // Its shares wait with it while its files go up, kept until Hermes takes it.
+            sharesLeaveBox(as: human.id, message: message, attachments: orderedAttachments)
             draft = ""
             replyDraft = nil
             draftAttachments = []
             orderedDraftAttachments = []
         }
+        // Where its shares are going is saved before any file goes, the first time and on Try again.
+        let shareDispatch = dispatchShares(human.id)
+        if shareDispatch == .unsaved {
+            bigFileSends.removeAll { $0.id == human.id }
+            putBackInBox(message, attachments: ordinaryAttachments, orderedAttachments: orderedAttachments,
+                         returning: human.id)
+            failureMessage = Self.unsavedShareMessage
+            retryRequest = nil
+            return
+        }
+        // A share this message carries that no outcome below settled may have reached Hermes.
+        defer { shareMessageUnknown(row: human.id) }
         failureMessage = nil
         retryRequest = nil
         if startsPrimaryTurn {
@@ -66,27 +80,31 @@ extension ChatModel {
             flushPersistence()
         }
         do {
-            let receipt = try await native.sendDraftAttachments(
-                message: message,
-                draftAttachments: orderedAttachments,
-                conversationID: conversationID,
-                queued: !startsPrimaryTurn,
-                onBigFileProgress: { id, progress in
-                    board.uploading(id, sentBytes: progress.sentBytes, byteCount: progress.byteCount)
-                },
-                onAccepted: { [weak self] text in
-                    self?.bigFileMessageAccepted(rowID: human.id, text: text, files: files)
-                },
-                onDraft: { [weak self] item in
-                    self?.acceptStreamingDraft(item, ownerGeneration: generation)
-                }
-            )
+            let receipt = try await PendingShareCorrelation.$submission.withValue(shareDispatch.id) {
+                try await native.sendDraftAttachments(
+                    message: message,
+                    draftAttachments: orderedAttachments,
+                    conversationID: conversationID,
+                    queued: !startsPrimaryTurn,
+                    onBigFileProgress: { id, progress in
+                        board.uploading(id, sentBytes: progress.sentBytes, byteCount: progress.byteCount)
+                    },
+                    onAccepted: { [weak self] text in
+                        self?.bigFileMessageAccepted(rowID: human.id, text: text, files: files)
+                    },
+                    onDraft: { [weak self] item in
+                        self?.acceptStreamingDraft(item, ownerGeneration: generation)
+                    }
+                )
+            }
+            if let id = shareDispatch.id { shareMessageAdmitted(id) }
             // A turn that answered at once may not have reported its admission first.
             bigFileMessageAccepted(rowID: human.id, text: receipt.submittedText, files: files)
             guard isCurrentOwner(generation) || !startsPrimaryTurn else { return }
             try appendValidated(receipt.response.items)
             if !receipt.pdfAttachments.isEmpty { pdfAttachmentReceipts = receipt.pdfAttachments }
         } catch is CancellationError {
+            shareMessageWaits(row: human.id)
             failBigFiles(files, rowID: human.id, message: message, ordinaryAttachments: ordinaryAttachments,
                          orderedAttachments: orderedAttachments,
                          reason: BigFileUploadFailure.connection.message)
@@ -97,6 +115,16 @@ extension ChatModel {
                 return
             }
             if startsPrimaryTurn { hasLocallyPendingPrimaryTurn = false }
+            if let unconfirmed = error as? DirectHermesConversationClient.UnconfirmedSend {
+                // Its message went with every file and no answer came: Hermes may have it. It shows as
+                // sent, with no Try again, and its shares stay "may have arrived" (the deferred
+                // `shareMessageUnknown`). A later read of the history settles it either way.
+                bigFileMessageAccepted(rowID: human.id, text: unconfirmed.submittedText, files: files)
+                failureMessage = "Message delivery is unconfirmed. It will not be sent again automatically."
+                return
+            }
+            // Its message never went to Hermes: it waits for Try again.
+            shareMessageWaits(row: human.id)
             let reason = (error as? BigFileUploadError)?.failure.message ?? BigFileUploadFailure(error).message
             failBigFiles(files, rowID: human.id, message: message, ordinaryAttachments: ordinaryAttachments,
                          orderedAttachments: orderedAttachments, reason: reason)
@@ -122,6 +150,8 @@ extension ChatModel {
     /// The host drops a staged upload nobody finishes after a day.
     func removeBigFileSend(rowID: String, files: [ChatBigFile]) {
         bigFileSends.removeAll { $0.id == rowID }
+        // A share it carried stays saved, to send another way.
+        shareMessageRemoved(row: rowID)
         for file in files {
             BigFileUploadBoard.shared.finish(file.id)
             BigFileStore.remove(file)

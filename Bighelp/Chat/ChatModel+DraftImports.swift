@@ -113,5 +113,7 @@ extension ChatModel {
 
     func removeDraftAttachmentFailure(id: String) {
         draftAttachmentFailures.removeAll { $0.id == id }
+        // The person took it out: a share whose last part it was is out of this chat, kept.
+        reviewSharesInBox()
     }
 }

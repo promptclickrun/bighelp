@@ -159,8 +159,16 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
     @ObservationIgnored let attachmentResolver: (any AgentAttachmentResolving)?
     /// Where files over 8 MB go (plugin `native-uploads-v1`); nil keeps the 8 MB limit.
     @ObservationIgnored var bigFileHost: (any BigFileUploadHost)?
-    /// Once, when Hermes takes the prompt now being submitted (`streaming` or `queued`).
-    @ObservationIgnored var onSubmissionAdmitted: (@MainActor () -> Void)?
+    /// Once, when Hermes takes a message with files, by its journal entry: a message sent while
+    /// another waits for its answer never runs, or clears, the other's.
+    @ObservationIgnored var onSubmissionAdmitted: [UUID: @MainActor () -> Void] = [:]
+    /// The journal entry whose request `submit` last handed to Hermes. From then on only Hermes'
+    /// answer, or a refusal, says whether it arrived.
+    @ObservationIgnored var dispatchedSubmissionID: UUID?
+    /// Journal entries whose message carries shares from other apps, bound as each entry is recorded
+    /// (`PendingShareCorrelation`). Only Hermes admitting that very entry settles its shares, long
+    /// before its turn ends (`ChatModel.shareMessageAdmitted`).
+    @ObservationIgnored var shareCorrelations = PendingShareCorrelations()
     /// Says who is sending before each new turn (hosts several people share).
     @ObservationIgnored var speakerNote: (any ChatSpeakerNoting)?
     /// Who the host last took a note for, in which stored session, on which connection (`generation`).

@@ -54,6 +54,11 @@ targets:
       - target: BighelpNotificationService
         embed: true
         destinationFilters: [iOS, macCatalyst]
+      # The share sheet, which saves what's shared for bighelp to send. iPhone and iPad
+      # only for now: the Mac and Vision Pro builds don't embed it.
+      - target: BighelpShare
+        embed: true
+        destinationFilters: [iOS]
       - target: BighelpLiveActivity
         embed: true
         destinationFilters: [iOS, visionOS]
@@ -170,6 +175,30 @@ targets:
         INFOPLIST_FILE: BighelpNotificationService/Info.plist
         APPLICATION_EXTENSION_API_ONLY: YES
         SKIP_INSTALL: YES
+  # Saves a link, text, photos or files shared from another app into the app group
+  # (Bighelp/ShareShared, PendingShareInbox). It has no sign-in, Keychain group or
+  # network: bighelp sends the share from the chat the person picks there (#922).
+  BighelpShare:
+    type: app-extension
+    platform: iOS
+    dependencies: []
+    sources:
+      - path: BighelpShare
+      - path: Bighelp/ShareShared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.loopdy.mobile.share
+        PRODUCT_NAME: BighelpShare
+        MARKETING_VERSION: 2.6.76
+        CURRENT_PROJECT_VERSION: 219
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: BighelpShare/BighelpShare.entitlements
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: BighelpShare/Info.plist
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+        SWIFT_EMIT_LOC_STRINGS: YES
   BighelpLiveActivity:
     type: app-extension
     # The Home widgets run on Vision Pro too (visionOS 26); the Live Activity is iOS-only.

@@ -222,6 +222,7 @@ struct RootShellView: View {
         agentHomeSheets(rootContent)
         .modifier(AIDataConsentGate(inFirstSetup: presentsFirstRunOnboarding || hostRegistry?.isWorkspaceReady != true,
                                     usesDemoData: usesWorkspaceFixtures))
+        .modifier(pendingShareReview)
         .modifier(FleetSheets(
             fleet: fleet, gate: $fleetGateRequest, isNewChatPresented: $isFleetNewChatPresented,
             onGate: { destination, hostID in openFleet(.destination(destination), on: hostID) },
@@ -1387,11 +1388,16 @@ struct RootShellView: View {
         return actions
     }
 
-    func startNewChat(explicitAgentID: String?, startsVoice: Bool = false) {
-        runNewChatStart(retry: { startNewChat(explicitAgentID: explicitAgentID, startsVoice: startsVoice) }) {
+    /// `opened` gets the chat Hermes made, after the local canvas it showed first has passed it on.
+    func startNewChat(explicitAgentID: String?, startsVoice: Bool = false,
+                      opened: (@MainActor (String) -> Void)? = nil) {
+        runNewChatStart(retry: { startNewChat(explicitAgentID: explicitAgentID, startsVoice: startsVoice,
+                                              opened: opened) }) {
             let outcome = try await newChatCoordinator.start(explicitAgentID: explicitAgentID,
                                                              beforePresentation: presentNewChatDissolve)
-            if startsVoice, case .opened(let id, _) = outcome { appState.requestVoiceMode(for: id) }
+            guard case .opened(let id, _) = outcome else { return }
+            if startsVoice { appState.requestVoiceMode(for: id) }
+            opened?(id)
         }
     }
 

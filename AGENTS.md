@@ -128,6 +128,7 @@ change in both repos.
 | `Bighelp/Agents/`, `Board/`, `Companion/` | Agents, Feed/Ideas/Goals, the avatar kit renderer |
 | `Bighelp/Kanban/` | Kanban on Hermes' Kanban plugin: board model, lanes, cards, Vision Pro window and pinch-drag |
 | `Bighelp/Code/` | Code mode (Settings › Modes › Code mode): its home (`CodeHomeView`), the message box's chips (project, new worktree or local, branch), `CodeLauncher`, Changes and Ship |
+| `BighelpShare/`, `Bighelp/ShareShared/`, `Bighelp/Share/` | The share sheet (#922): the extension saves what's shared into the app group (`PendingShareInbox`, Foundation only and shared with the app), and the app's review puts it in the message box of the chat the person picks (`PendingShareCenter`, `ChatModel.placeShare`) |
 | `Bighelp/Connectors/` | Settings › Connections (`AppsHubView`): Hermes' connectors as Native App Connections (the inline connect cards in chat, `connection.request`, `ConnectorCardStore`; `ConnectorAppsModel`) and Composio Apps (`Composio/`, [docs/COMPOSIO_APPS.md](docs/COMPOSIO_APPS.md)) |
 | `Bighelp/HTMLApps/` | Agents' HTML apps: the `html_app` card, the full-screen page and its `window.bighelp` bridge, the plugin's `html-apps` routes, the demo's sample apps |
 | `Bighelp/BotScreen/` | Bot Screen: an agent's Linux screen (Hermes `display.*`) and the computer's own desktop (`ComputerScreen.swift`, the plugin's VNC bridge) in its profile's Computer tab, a native RFB client (`RFB/`, with VNC passwords) and the full-screen viewer with take control and hand back |
@@ -355,6 +356,29 @@ change in both repos.
   item's read-out from `agents/today/detail` (`native-agents-today-detail-v1`, `AgentTodayDetail`). In a chat, a
   helper's late `subagent.*` events update the row of the turn that started it (`subagentTurnIDs`), and a helper
   left running doesn't hold its finished turn open: the turn folds as Settings › Chat › Agent's work says.
+- **The share sheet only saves:** iOS supports `NSExtensionContext.open` only in Today and iMessage extensions,
+  so the share sheet can't open bighelp, and it holds no sign-in. It copies the share into the app group whole or
+  not at all (`PendingShareDraft`: a staging folder under a lock file, moved into place in one rename) and says to
+  open bighelp. There `PendingShareReview` offers it, the person picks an agent and chat on the computer in use,
+  and the chat takes it into its message box through the drop path (`ComposerAttachmentDrop.draftAttachment`);
+  a new chat's share waits for the chat Hermes makes, never its local canvas (`PendingShareDestination.isTaken`).
+  Send works as for anything typed there. From the box on, each chat's `PendingShareLedger` owns its shares: a
+  message that leaves the box carrying one gets its own id, and only an outcome naming that message moves it on
+  (dispatched, admitted, definitely refused, unknown, back in the box, retired). Its step to sending is saved
+  before the message goes (`dispatchShares`); if it can't be, the message goes back in the box unsent. The native
+  client binds that id to its own journal entry for the message (`PendingShareCorrelation`, recorded in
+  `recordSubmission`) and admits only that entry. Admission marks the share spent on disk before deleting it, so
+  it's never listed again even if the deletion has to wait. A send that definitely failed puts the message back in
+  the box with its share (never Try again or an automatic branch, which would send it without one); an unanswered
+  one keeps its id, so its history (a reference's receipt) still settles it, after a relaunch too. A chat opened
+  again after a relaunch takes back, before any Send, each share of words only placed in it that no message took
+  and whose words its restored draft still holds (`restoreSharesInBox`, from the share's own saved placement). A
+  share with files waits in the list: its words alone would spend files never sent, and Open brings them all
+  back, even into a box that has its words already (`PendingShareIntake` places the opened share first). The person
+  taking a share's last file or words out of the box lets it go, kept and listed. The saved copy goes only when
+  Hermes takes the message carrying it, or when the person deletes it in ☰ › Shared with bighelp (Bots mode: its
+  Settings), which lists every waiting share; never by itself. `PendingShareInboxTests`, `PendingShareLedgerTests`
+  and `PendingShareWaitTests` run under any Swift (no UIKit); `PendingShareComposerTests` drive the chat.
 - **Plugin routes:**
   - Each route is a `WorkspaceOperation` case plus a `Route(path:feature:isMutation:maximumResponseBytes:)` in
     `DirectHermesNativeContext.swift`.
@@ -428,8 +452,10 @@ change in both repos.
   on disk, never its bytes. The app's `[Video attached: … (size, length, picture)]` or `[File attached: … (size)]`
   note follows each `@file:` line. One look per file (#721): while it goes up, a tile with a ring and "34 of 80
   MB" (`BigFileUploadTile`, progress in `BigFileUploadBoard` so only the ring redraws), or why it didn't go with
-  Try again and Remove; once Hermes takes the message (`onSubmissionAdmitted`), the row takes the sent text and
-  shows each file as a line on the rail (`ChatSentFileLine`), exactly what a reread rebuilds. A host path or
+  Try again and Remove; once Hermes takes the message (`onSubmissionAdmitted`, by journal entry), the row takes
+  the sent text and shows each file as a line on the rail (`ChatSentFileLine`), exactly what a reread rebuilds. A
+  prompt that went with no answer back looks the same, says delivery is unconfirmed and has no Try again
+  (`UnconfirmedSend`). A host path or
   `@file:` ref never shows as text; a tap opens the bot's Files on the file (`BotProfileOpening.file`,
   `SimpleBotFilesModel.reveal`), a long press shows the path. Hosts without the feature keep the 8 MiB limit and
   say to update the plugin.

@@ -144,6 +144,8 @@ struct SimpleBotsSettingsContext {
     /// Archived Chats, and opening one of them.
     var catalog: SessionCatalogStore? = nil
     var onOpenSession: (SessionSummary) -> Void = { _ in }
+    /// Shares from other apps waiting to be sent (`PendingShareListView`); its row shows while any wait.
+    var pendingShares: PendingShareReviewContext? = nil
     /// A bot's Advanced Options, where its approvals are set; nil hides the row.
     var makeAdvancedOptions: ((String) -> AdvancedOptionsContext?)? = nil
 }
@@ -469,6 +471,17 @@ struct SimpleBotsSettingsView: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("simple-bots.settings.archived")
                 .driveTarget("simple-bots.settings.archived")
+            }
+            if let pendingShares = context.pendingShares, PendingShareCenter.shared.waitingCount > 0 {
+                SimpleBotsDivider()
+                NavigationLink {
+                    PendingShareListView(center: .shared, context: pendingShares)
+                } label: {
+                    SimpleBotsRow(title: String(localized: "Shared with bighelp"),
+                                  value: "\(PendingShareCenter.shared.waitingCount)")
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("simple-bots.settings.shared-with-bighelp")
             }
             SimpleBotsDivider()
             // The sheet's stack draws the full Settings for this value (`RootShellView`).

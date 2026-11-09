@@ -63,6 +63,9 @@ final class AppState {
     /// Chats that send their draft once connected: a branch made when Hermes refused a
     /// message because another Hermes process held the original (`continueInBranch`).
     var sendsDraftOnOpen: Set<String> = []
+    /// A share from another app on its way to the message box of the chat the person picked
+    /// (`PendingShareCenter`). Only that chat takes it, never another computer's.
+    private(set) var pendingShare: PendingShareHandoff?
 
     /// The Settings sheet. It lives here, not in the shell's view state, so code outside the
     /// view (an agent's drive) can open it straight to a page: `openSettings(at:)`.
@@ -213,6 +216,7 @@ final class AppState {
         chatOpenedFromList = false
         // Its chat is the other computer's.
         heldChat = nil
+        dropPendingShare()
     }
 
     func resetForAccountBoundary() {
@@ -223,6 +227,33 @@ final class AppState {
         clearComposerText()
         chatOpenedFromList = false
         heldChat = nil
+        dropPendingShare()
+    }
+
+    /// Sends a share to the chat about to open. It replaces any earlier one, which is offered again.
+    func handOff(_ share: PendingShareHandoff) {
+        dropPendingShare()
+        pendingShare = share
+    }
+
+    /// The share, if this chat is the one it's for: on top, and the very chat its destination names
+    /// (a new chat's only once Hermes has made it, never its local canvas), within
+    /// `pendingComposerLifetime`.
+    func takePendingShare(conversationID: String, isOnTop: Bool, now: Date = .now) -> PendingShareHandoff? {
+        guard let share = pendingShare else { return nil }
+        guard now.timeIntervalSince(share.since) <= Self.pendingComposerLifetime else {
+            dropPendingShare()
+            return nil
+        }
+        guard isOnTop, share.destination.isTaken(by: conversationID) else { return nil }
+        pendingShare = nil
+        return share
+    }
+
+    private func dropPendingShare() {
+        guard let share = pendingShare else { return }
+        pendingShare = nil
+        share.onDropped(share.share.id)
     }
 
     /// When `pendingComposerText` was left. A chat that opens much later (its open failed, or the
@@ -266,4 +297,15 @@ final class AppState {
         pendingVoiceConversationID = nil
         return true
     }
+}
+
+/// A share from another app handed to the chat it's for (`AppState.handOff`).
+struct PendingShareHandoff: Identifiable {
+    let id = UUID()
+    let share: PendingShare
+    let inbox: PendingShareInbox
+    let destination: PendingShareDestination
+    let since: Date
+    /// No chat took it (a host or account change, or it waited too long); it's offered again.
+    let onDropped: @MainActor (String) -> Void
 }

@@ -71,6 +71,8 @@ extension ChatModel {
         guard !outgoing.message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 || !outgoing.orderedAttachments.isEmpty else { return }
         let item = humanItem(content: outgoing.message, attachments: outgoing.attachments)
+        // A share in the box waits with it, still saved: a waiting message lives only in memory.
+        sharesLeaveBox(as: item.id, message: outgoing.message, attachments: outgoing.orderedAttachments)
         stagedSends.append(ChatStagedSend(item: item, outgoing: outgoing.staged(as: item),
                                           midSessionBehavior: midSessionBehavior))
         ChatPerformanceProbe.sendRow(item.id, staged: true, in: self)
@@ -90,7 +92,9 @@ extension ChatModel {
               let index = stagedSends.firstIndex(where: { $0.id == item.id }) else { return nil }
         stagedSends.remove(at: index)
         guard itemIndexByID[item.id] == nil else {
-            return humanItem(content: outgoing.message, attachments: outgoing.attachments)
+            let renamed = humanItem(content: outgoing.message, attachments: outgoing.attachments)
+            shareMessageRenamed(item.id, to: renamed.id)
+            return renamed
         }
         return item.ordered(takeTranscriptOrder())
     }
@@ -189,9 +193,12 @@ extension ChatModel {
 
     /// Puts an unsent message back in the box, before anything typed since, so neither is lost.
     /// Messages still waiting behind it can't go out without it: they come back too, after it.
-    func putBackInBox(_ message: String, attachments: [ChatAttachment], orderedAttachments: [ChatDraftAttachment]) {
+    /// Shares they carried (`messageID`'s, and the waiting ones') are in the box again.
+    func putBackInBox(_ message: String, attachments: [ChatAttachment], orderedAttachments: [ChatDraftAttachment],
+                      returning messageID: String? = nil) {
         let waiting = stagedSends
         stagedSends = []
+        sharesReturnToBox(from: (messageID.map { [$0] } ?? []) + waiting.map(\.id))
         draft = ([message] + waiting.map(\.outgoing.message) + [draft])
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .joined(separator: "\n\n")

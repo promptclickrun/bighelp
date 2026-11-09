@@ -58,17 +58,9 @@ enum ComposerAttachmentDrop {
         providers.contains(where: isAttachment)
     }
 
-    /// Dragged text and links offer the plain-text and URL types that strings
-    /// and URLs write. A file offers its own type instead: a .txt file arrives
-    /// as `public.plain-text` and never as `public.utf8-plain-text`.
+    /// The same reading as the share sheet's (`SharedItemTypes`).
     static func isAttachment(_ provider: NSItemProvider) -> Bool {
-        let types = provider.registeredTypeIdentifiers.compactMap { UTType($0) }
-        guard !types.isEmpty else { return false }
-        if types.contains(where: { $0.conforms(to: .image) }) { return true }
-        return !types.contains { type in
-            type == .utf8PlainText || type == .utf16PlainText
-                || (type.conforms(to: .url) && !type.conforms(to: .fileURL))
-        }
+        SharedItemTypes.isAttachment(provider.registeredTypeIdentifiers.compactMap { UTType($0) })
     }
 
     /// Starts reading every dropped photo and file at once: a drag's data is only
@@ -89,20 +81,30 @@ enum ComposerAttachmentDrop {
             let read = Task { try await readFile(from: provider) }
             return DraftAttachmentLoader(draftNamed: provider.suggestedName, load: { @MainActor [weak model] in
                 let file = try await read.value
-                if let copy = file.largeFile {
-                    defer { try? FileManager.default.removeItem(at: copy.deletingLastPathComponent()) }
-                    return .bigFile(try await BigFileStore.importing(copy, fileName: file.name, mimeType: file.mimeType,
-                                                                     byteCount: file.byteCount, into: model))
-                }
-                return .attachment(try ChatAttachmentPreparer().prepare(
-                    id: "attachment_\(UUID().uuidString.lowercased())",
-                    fileName: file.name,
-                    mimeType: file.mimeType,
-                    data: file.data
-                ))
+                // The copy kept past UIKit's callback goes once the app has its own.
+                defer { if let copy = file.largeFile { try? FileManager.default.removeItem(at: copy.deletingLastPathComponent()) } }
+                return try await draftAttachment(from: file, id: "attachment_\(UUID().uuidString.lowercased())",
+                                                 into: model)
             })
         }
         return (kind, loaders)
+    }
+
+    /// A read file as the draft takes it: a photo or file up to 8 MB prepared in memory, a bigger
+    /// file copied to the app's own storage to go in pieces (refused with "update the plugin" when
+    /// the chat's computer can't take it). Shares from other apps take the same path.
+    @MainActor
+    static func draftAttachment(from file: DroppedFile, id: String, into model: ChatModel?) async throws -> ChatDraftAttachment {
+        if let large = file.largeFile {
+            return .bigFile(try await BigFileStore.importing(large, fileName: file.name, mimeType: file.mimeType,
+                                                             byteCount: file.byteCount, into: model))
+        }
+        return .attachment(try ChatAttachmentPreparer().prepare(
+            id: id,
+            fileName: file.name,
+            mimeType: file.mimeType,
+            data: file.data
+        ))
     }
 
     struct DroppedFile: Sendable {
@@ -120,56 +122,53 @@ enum ComposerAttachmentDrop {
     /// Starts on the main actor with the drop's provider; UIKit reads on its own queue.
     @MainActor
     static func readFile(from provider: NSItemProvider) async throws -> DroppedFile {
-        let registered = provider.registeredTypeIdentifiers.compactMap { UTType($0) }
-        let images = registered.filter { $0.conforms(to: .image) }
-        guard let type = images.first(where: { !$0.conforms(to: .tiff) }) ?? images.first ?? registered.first else {
+        guard let type = SharedItemTypes.fileType(provider.registeredTypeIdentifiers.compactMap { UTType($0) }) else {
             throw ChatAttachmentError.invalidMIMEType
         }
-        let isImage = type.conforms(to: .image)
         return try await withCheckedThrowingContinuation { continuation in
             _ = provider.loadFileRepresentation(forTypeIdentifier: type.identifier) { url, error in
                 guard let url else {
                     continuation.resume(throwing: error ?? ChatAttachmentError.invalidSize)
                     return
                 }
-                do {
-                    let values = try url.resourceValues(forKeys: [.fileSizeKey, .isDirectoryKey])
-                    if values.isDirectory == true { throw ChatAttachmentError.invalidMIMEType }
-                    // Photos are prepared down from up to the preparer's input limit.
-                    let limit = isImage ? ImageAttachmentPreparer.maximumInputBytes : BigFileUploads.maximumBytes
-                    guard let size = values.fileSize, size > 0, size <= limit else {
-                        if isImage { throw ChatAttachmentError.invalidSize }
-                        throw BigFileUploadError(failure: .tooLarge)
-                    }
-                    let fallbackName = (isImage ? "image" : "file")
-                        + (type.preferredFilenameExtension.map { ".\($0)" } ?? "")
-                    let name = url.lastPathComponent.isEmpty ? fallbackName : url.lastPathComponent
-                    if !isImage, BigFileUploads.isBig(size) {
-                        // UIKit removes its file after this callback; keep a copy to read in pieces.
-                        let folder = FileManager.default.temporaryDirectory
-                            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-                        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-                        let copy = folder.appending(path: name)
-                        try FileManager.default.copyItem(at: url, to: copy)
-                        continuation.resume(returning: DroppedFile(
-                            name: name,
-                            mimeType: type.preferredMIMEType
-                                ?? UTType(filenameExtension: url.pathExtension)?.preferredMIMEType
-                                ?? "application/octet-stream",
-                            data: Data(), largeFile: copy, byteCount: size))
-                        return
-                    }
-                    continuation.resume(returning: DroppedFile(
-                        name: name,
-                        mimeType: type.preferredMIMEType
-                            ?? UTType(filenameExtension: url.pathExtension)?.preferredMIMEType
-                            ?? "application/octet-stream",
-                        data: try Data(contentsOf: url)
-                    ))
-                } catch {
-                    continuation.resume(throwing: error)
-                }
+                continuation.resume(with: Result { try droppedFile(at: url, type: type, copiesBigFile: true) })
             }
         }
+    }
+
+    /// Reads a file on disk the way a dropped one is: a photo up to the preparer's input limit, any
+    /// other file up to the plugin's. `copiesBigFile` keeps a copy of one over 8 MB, for a file iOS
+    /// deletes after its callback; otherwise the file itself is read later, a piece at a time.
+    /// `name` and `mimeType` replace what the file's own name and type say.
+    static func droppedFile(at url: URL, type: UTType, name: String? = nil, mimeType: String? = nil,
+                            copiesBigFile: Bool) throws -> DroppedFile {
+        let isImage = type.conforms(to: .image)
+        let values = try url.resourceValues(forKeys: [.fileSizeKey, .isDirectoryKey])
+        if values.isDirectory == true { throw ChatAttachmentError.invalidMIMEType }
+        // Photos are prepared down from up to the preparer's input limit.
+        let limit = isImage ? ImageAttachmentPreparer.maximumInputBytes : BigFileUploads.maximumBytes
+        guard let size = values.fileSize, size > 0, size <= limit else {
+            if isImage { throw ChatAttachmentError.invalidSize }
+            throw BigFileUploadError(failure: .tooLarge)
+        }
+        let fallbackName = (isImage ? "image" : "file")
+            + (type.preferredFilenameExtension.map { ".\($0)" } ?? "")
+        let name = name ?? (url.lastPathComponent.isEmpty ? fallbackName : url.lastPathComponent)
+        let mimeType = mimeType ?? type.preferredMIMEType
+            ?? UTType(filenameExtension: url.pathExtension)?.preferredMIMEType
+            ?? "application/octet-stream"
+        if !isImage, BigFileUploads.isBig(size) {
+            guard copiesBigFile else {
+                return DroppedFile(name: name, mimeType: mimeType, data: Data(), largeFile: url, byteCount: size)
+            }
+            // UIKit removes its file after this callback; keep a copy to read in pieces.
+            let folder = FileManager.default.temporaryDirectory
+                .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let copy = folder.appending(path: name)
+            try FileManager.default.copyItem(at: url, to: copy)
+            return DroppedFile(name: name, mimeType: mimeType, data: Data(), largeFile: copy, byteCount: size)
+        }
+        return DroppedFile(name: name, mimeType: mimeType, data: try Data(contentsOf: url))
     }
 }

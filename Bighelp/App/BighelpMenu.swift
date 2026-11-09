@@ -66,6 +66,8 @@ struct BighelpMenuDestinations {
     var onWorkflows: (() -> Void)? = nil
     /// Nerd Mode: the Hermes project folder chats run in.
     var folder: (name: String, open: () -> Void)?
+    /// Shares from other apps waiting to be sent, while any wait (`PendingShareListView`).
+    var sharedWithBighelp: (count: Int, open: () -> Void)? = nil
     /// Usage: plans, limits and what the agents used. None while no computer is connected.
     var onUsage: (() -> Void)? = nil
     var onSettings: () -> Void
@@ -361,8 +363,12 @@ struct BighelpMenu<Recent: View>: View {
 
     @ViewBuilder
     private var moreSection: some View {
-        if destinations.folder != nil || isVision {
+        if destinations.folder != nil || destinations.sharedWithBighelp != nil || isVision {
             Section("More") {
+                if let shared = destinations.sharedWithBighelp {
+                    row(String(localized: "Shared with bighelp"), detail: "\(shared.count)", symbol: "tray.and.arrow.down",
+                        id: "menu.shared-with-bighelp", isNew: true, action: shared.open)
+                }
                 #if os(visionOS)
                 row(String(localized: "Simple mode"), symbol: "figure.stand", id: "menu.simple-mode") {
                     SpatialSimpleMode.enter(spatialAvatar, openWindow: openWindow)

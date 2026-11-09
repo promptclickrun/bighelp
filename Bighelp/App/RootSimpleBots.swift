@@ -478,6 +478,7 @@ extension RootShellView {
                     openSession(summary)
                 }
             },
+            pendingShares: settingsPendingShareContext,
             makeAdvancedOptions: { makeAdvancedOptions(for: $0) }
         ))
     }

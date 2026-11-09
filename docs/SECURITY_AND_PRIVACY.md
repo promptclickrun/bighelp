@@ -403,6 +403,31 @@ explicitly excluded from device backups.
 Anyone who can unlock or compromise the device may be able to read this local
 content.
 
+### Share sheet
+
+bighelp's share sheet only saves. It has no sign-in, no Keychain group and no
+network code: what someone shares (text, links, photos, videos, files and an
+optional note) is copied into the app group container bighelp and its
+extensions already share (`PendingShareInbox`), at most 10 files and 512 MB per
+share and 16 shares or 1 GB in all. Its files can be read only while the device
+is unlocked (complete-unless-open protection, so a copy under way can finish),
+only by bighelp and its extensions, and are excluded from backups. A share is saved whole or not at all; anything that
+can't be read or is over a limit is named and nothing is saved.
+
+Nothing leaves the device until the person opens bighelp, picks the agent and
+chat, and taps Send there: the share goes into that chat's message box, and the
+usual AI data agreement, computer and attachment checks apply. bighelp deletes a
+share from the device only once Hermes takes the message that carries it, or when
+the person deletes it (☰ › Shared with bighelp, or Settings in Bots mode, lists
+every waiting share). Before a message carrying a share goes, bighelp saves that
+it's being sent; if it can't, the message isn't sent. Once Hermes takes it, the
+share is marked spent first, so it's never offered again even if deleting it has
+to wait. A message still waiting for its connection or refused keeps the share as
+not sent; one sent without Hermes answering keeps it, marked so that bighelp says
+it may already have arrived and asks before it's sent again. bighelp never
+deletes a waiting share by itself, and a full inbox refuses the next share
+instead.
+
 ## 6. Cloud retention
 
 The current Cloudflare deployment stores notification delivery metadata but no

@@ -414,6 +414,93 @@ struct PendingShareInboxTests {
         #expect(PendingShare.draft("Typed", adding: "  \n") == nil)
     }
 
+    @Test func onlyTheChatItNamesTakesItNeverANewChatsLocalCanvas() {
+        let newChat = PendingShareDestination(scope: "scope-a", agentID: "juno", sessionID: nil)
+        // A new chat shows a local canvas before Hermes makes the chat; it passes on only its text.
+        #expect(!newChat.isTaken(by: "local-draft:1234"))
+        #expect(!newChat.isTaken(by: "session-9"), "Not until Hermes has made the chat")
+        let made = newChat.bound(to: "session-9")
+        #expect(made.isTaken(by: "session-9"))
+        #expect(!made.isTaken(by: "session-8"))
+        #expect(!PendingShareDestination(scope: "s", agentID: "a", sessionID: "local-draft:1").isTaken(by: "local-draft:1"))
+    }
+
+    @Test func aMessageCarriesTheShareWhileItHoldsAnyOfIt() throws {
+        let draft = try inbox.begin()
+        try draft.addText("First line of the article\nSecond line")
+        try draft.addLink("https://example.com/p")
+        let share = try draft.commit(note: "Thoughts?")
+        #expect(share.isCarried(byText: "Thoughts?\n\nFirst line of the article\nSecond line", attachmentIDs: [],
+                                landedIDs: ["a-1"]))
+        // Edited, but a line of it is still there.
+        #expect(share.isCarried(byText: "Shorter: Second line", attachmentIDs: [], landedIDs: []))
+        // Its words gone, one of its files still there.
+        #expect(share.isCarried(byText: "Something else", attachmentIDs: ["a-1", "b-2"], landedIDs: ["a-1"]))
+        #expect(!share.isCarried(byText: "Something else", attachmentIDs: ["b-2"], landedIDs: ["a-1"]))
+        #expect(!share.isCarried(byText: "", attachmentIDs: [], landedIDs: []))
+    }
+
+    @Test func theMessageCarryingAShareIsRememberedUntilHermesTakesIt() throws {
+        let draft = try inbox.begin()
+        try draft.addText("On its way")
+        let share = try draft.commit(note: "")
+        let placement = PendingSharePlacement(
+            destination: .init(scope: "scope-a", agentID: "juno", sessionID: "chat-1"),
+            agentName: "Juno", placedAt: Date(timeIntervalSince1970: 1_800_000_100))
+        try inbox.place(share.id, placement)
+        func recovery() -> PendingSharePlacement.Recovery? {
+            guard case .share(_, let placement)? = inbox.entries().first else { return nil }
+            return placement?.recovery
+        }
+        #expect(recovery() == .notSent)
+
+        func mark(_ state: PendingShareSubmission.State) throws {
+            try inbox.recordSubmission(share.id, PendingShareSubmission(
+                conversationID: "chat-1", messageID: "chat-1-human-4", state: state,
+                at: Date(timeIntervalSince1970: 1_800_000_200)))
+        }
+        // Waiting in the chat for its connection: in memory only, so a relaunch means it wasn't sent.
+        try mark(.staged)
+        #expect(recovery() == .notSent)
+        // Handed to Hermes, or ended unconfirmed: it may have arrived. A relaunch warns, never re-adds.
+        try mark(.sending)
+        #expect(recovery() == .maybeSent)
+        let reopened = PendingShareInbox(root: inbox.root, limits: Self.smallLimits)
+        guard case .share(_, let saved)? = reopened.entries().first else {
+            Issue.record("The share should still be saved")
+            return
+        }
+        #expect(saved?.submission?.messageID == "chat-1-human-4")
+        try mark(.unconfirmed)
+        #expect(recovery() == .maybeSent)
+        // Back in its message box.
+        try inbox.recordSubmission(share.id, nil)
+        #expect(recovery() == .notSent)
+
+        #expect(try inbox.remove(share.id))
+        #expect(throws: PendingShareError.gone) { try mark(.sending) }
+    }
+
+    @Test func aFullInboxEmptiesThroughDeleteAndTakesTheNextShare() throws {
+        var saved: [PendingShare] = []
+        for index in 0..<2 {
+            let draft = try inbox.begin()
+            try draft.addText("Put off \(index)")
+            saved.append(try draft.commit(note: ""))
+        }
+        let refused = try inbox.begin()
+        try refused.addText("Refused while full")
+        #expect(throws: PendingShareError.inboxFull(shares: 2)) { _ = try refused.commit(note: "") }
+        refused.rollback()
+
+        // The list in bighelp deletes one; the next share saves.
+        #expect(try inbox.remove(saved[0].id))
+        let next = try inbox.begin()
+        try next.addText("Now it fits")
+        _ = try next.commit(note: "")
+        #expect(shares.count == 2)
+    }
+
     @Test func aDestinationIsNeverMovedToAnotherComputerAgentOrChat() {
         let destination = PendingShareDestination(scope: "scope-a", agentID: "juno", sessionID: "chat-1")
         #expect(destination.problem(currentScope: "scope-a", agentIDs: ["juno"], sessionIDs: ["chat-1"]) == nil)

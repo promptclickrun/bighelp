@@ -129,7 +129,20 @@ struct PendingShareInbox: Sendable {
         }
     }
 
-    /// Deletes a share for good: sent from its chat, or deleted by the person. The folder leaves in
+    /// Records the message a share left its message box in (or nil when it's back there, or out
+    /// of it unsent), so a relaunch can tell "wasn't sent" from "may have been sent". Throws `gone`
+    /// when the share was sent or deleted meanwhile.
+    func recordSubmission(_ id: String, _ submission: PendingShareSubmission?) throws {
+        guard PendingShare.isValidID(id) else { throw PendingShareError.gone }
+        try withInboxLock {
+            guard FileManager.default.fileExists(atPath: folder(id).appendingPathComponent("share.json").path),
+                  var placement = readPlacement(id) else { throw PendingShareError.gone }
+            placement.submission = submission
+            try Self.write(try JSONEncoder().encode(placement), to: folder(id).appendingPathComponent("placement.json"))
+        }
+    }
+
+    /// Deletes a share for good: Hermes took the message carrying it, or the person deleted it. The folder leaves in
     /// one rename first, so a share is never left half deleted. False when it was gone already.
     @discardableResult
     func remove(_ id: String) throws -> Bool {

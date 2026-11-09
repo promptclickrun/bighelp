@@ -187,6 +187,9 @@ extension ChatModel {
             []
         }
         var localHumanID: String?
+        // A share that left the box with this message and wasn't confirmed or put back by the end
+        // may have reached Hermes: it stays saved, marked so (`ChatShareEvent.unconfirmed`).
+        defer { if let localHumanID { shareMessageUnconfirmed(localHumanID) } }
         if !isBotModeConversation {
             appendItem(takeStagedItem(of: outgoing) ?? humanItem(content: message, attachments: attachments))
             if let item = items.last {
@@ -197,6 +200,9 @@ extension ChatModel {
         }
         // A staged message left the box when it was staged; the box holds the next one now.
         if restoresDraft, outgoing.stagedItem == nil {
+            if let localHumanID {
+                sharesLeaveBox(as: localHumanID, message: message, attachments: orderedAttachments, staged: false)
+            }
             draft = ""
             replyDraft = nil
             draftAttachments = []
@@ -274,7 +280,8 @@ extension ChatModel {
                 // not an invented accepted human row beside that server turn.
                 // A card's answer isn't composer text: drop its row, keep the draft.
                 if restoresDraft {
-                    putBackInBox(message, attachments: attachments, orderedAttachments: orderedAttachments)
+                    putBackInBox(message, attachments: attachments, orderedAttachments: orderedAttachments,
+                                 returning: localHumanID)
                 }
                 if let localHumanID {
                     removeItem(id: localHumanID)
@@ -286,6 +293,12 @@ extension ChatModel {
         }
 
         if let localHumanID { ChatPerformanceProbe.sendHandedOff(localHumanID) }
+        // A share in this message is known to have arrived once Hermes admits it, not when its turn ends.
+        let admissionWatch = localHumanID.flatMap { sharesInMessages[$0] == nil ? nil : nativeConversationClient }
+        if let admissionWatch, let rowID = localHumanID {
+            admissionWatch.onSharesAdmitted = { [weak self] in self?.shareMessageDelivered(rowID) }
+        }
+        defer { admissionWatch?.onSharesAdmitted = nil }
         do {
             let response = try await sendAwaitingClient {
                 try await sendThroughClient(
@@ -296,6 +309,8 @@ extension ChatModel {
                     timedRow: localHumanID
                 )
             }
+            // Hermes took it.
+            if let localHumanID { shareMessageDelivered(localHumanID) }
             guard isCurrentOwner(generation) else { return }
             try appendValidated(response.items)
             for item in response.items where item.role == .assistant {
@@ -493,6 +508,7 @@ extension ChatModel {
             ? beginOwnerGeneration()
             : priorGeneration
         let human = takeStagedItem(of: outgoing) ?? humanItem(content: message, attachments: attachments)
+        defer { shareMessageUnconfirmed(human.id) }
 
         pendingMidSessionSubmissions.append(PendingMidSessionSubmission(
             id: human.id,
@@ -502,6 +518,7 @@ extension ChatModel {
         appendItem(human)
         appendProjectedMessage(human)
         if restoresDraft, outgoing.stagedItem == nil {
+            sharesLeaveBox(as: human.id, message: message, attachments: orderedAttachments, staged: false)
             draft = ""
             replyDraft = nil
             draftAttachments = []
@@ -519,6 +536,8 @@ extension ChatModel {
                     self?.acceptStreamingDraft(item, ownerGeneration: submissionGeneration)
                 }
             )
+            // Hermes took it, as a steer, a queued message or a new turn.
+            shareMessageDelivered(human.id)
             guard pendingMidSessionBehavior(for: human.id) == behavior else { return }
             switch outcome {
             case .accepted:
@@ -804,7 +823,7 @@ extension ChatModel {
         orderedAttachments: [ChatDraftAttachment], restoresDraft: Bool = true
     ) {
         if restoresDraft, draft.isEmpty, orderedDraftAttachments.isEmpty {
-            putBackInBox(message, attachments: attachments, orderedAttachments: orderedAttachments)
+            putBackInBox(message, attachments: attachments, orderedAttachments: orderedAttachments, returning: humanID)
         }
         // The protected journal retains A even if a newer composer B prevents
         // restoration. Only A's optimistic presentation is removed.
@@ -838,7 +857,8 @@ extension ChatModel {
         removeItem(id: human.id)
         removeProjectedMessage(id: human.id)
         if restoresDraft {
-            putBackInBox(message, attachments: attachments, orderedAttachments: attachments.map(ChatDraftAttachment.attachment))
+            putBackInBox(message, attachments: attachments, orderedAttachments: attachments.map(ChatDraftAttachment.attachment),
+                         returning: human.id)
         }
         persistSession()
     }

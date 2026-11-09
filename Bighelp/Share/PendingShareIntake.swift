@@ -10,14 +10,11 @@ struct PendingShareIntake: ViewModifier {
 
     func body(content: Content) -> some View {
         content.task(id: appState.pendingShare?.id) {
+            guard !model.isBotMode else { return }
             let isOnTop = appState.path.last == .chat(conversationID: model.conversationID)
-            guard let handoff = appState.takePendingShare(
-                conversationID: model.conversationID, memberIDs: model.memberIDs, isOnTop: isOnTop,
-                isNewChat: isOnTop && model.transcriptEntries.isEmpty) else { return }
-            center.hold(handoff.share.id, by: model)
-            let placement = await model.placeShare(handoff.share, from: handoff.inbox) { [center] id in
-                center.settled(id)
-            }
+            guard let handoff = appState.takePendingShare(conversationID: model.conversationID,
+                                                          isOnTop: isOnTop) else { return }
+            let placement = await model.placeShare(handoff.share, from: handoff.inbox, tracker: center)
             if placement == .interrupted { center.release(handoff.share.id) }
         }
     }

@@ -46,6 +46,8 @@ extension ChatModel {
     /// No persistence callback may publish retired data into a replacement owner.
     /// The original unresolved intent remains in its original SessionRecord.
     func invalidateReferenceOwnership() {
+        // Its shares are let go, not deleted: they wait to be sent on the computer in use.
+        retireShares()
         referenceOwnerRetired = true
         referenceOwner = nil
         persistenceCheckpointTask?.cancel()
@@ -175,6 +177,10 @@ extension ChatModel {
         }
         guard ownsReferenceDraft(frozen, remainsOwned: remainsOwned) else { return .superseded }
         referenceSendInFlight = true
+        // The box keeps the message until Hermes takes it; a share in it goes with that message.
+        let messageID = submission.message.messageID
+        sharesLeaveBox(as: messageID, message: frozen.canonicalText, attachments: orderedDraftAttachments, staged: false)
+        defer { shareMessageUnconfirmed(messageID) }
         if let selectedBehavior {
             pendingMidSessionSubmissions.append(.init(id: submission.message.messageID,
                 behavior: selectedBehavior))
@@ -224,6 +230,7 @@ extension ChatModel {
                     return .indeterminate
                 }
                 failureMessage = "The reference message was rejected. Your draft is unchanged."
+                sharesReturnToBox(from: [messageID])
                 return .rejected
             }
             failureMessage = "Delivery is unconfirmed. Your exact reference message is retained; refresh history to reconcile it."
@@ -297,6 +304,7 @@ extension ChatModel {
 
     private func finishReferenceAcceptance(_ submission: ReferenceCanonicalSubmission) {
         guard referenceSubmission?.submissionID == submission.submissionID else { return }
+        shareMessageDelivered(submission.message.messageID)
         if !items.contains(where: {
             $0.id == submission.message.messageID || $0.metadata.platformMessageID == submission.message.messageID
         }) {

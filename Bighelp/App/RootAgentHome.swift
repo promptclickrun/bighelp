@@ -907,6 +907,7 @@ extension RootShellView {
             folder: settings.nerdModeEnabled
                 ? (name: activeHermesWorkspaceName, open: { afterClosingHomeSheets { presentHermesWorkspaces() } })
                 : nil,
+            sharedWithBighelp: pendingSharesMenuRow,
             onUsage: usage.isAvailable ? { afterClosingHomeSheets { showUsage() } } : nil,
             onSettings: { afterClosingHomeSheets { openSettingsPage() } },
             places: settings.appLayout.menuPlaces,
@@ -917,8 +918,11 @@ extension RootShellView {
         )
     }
 
-    /// Something new in Feed, Ideas or Goals while ☰ is the only way there: a dot on ☰.
-    var menuHasUnread: Bool { !boardUnreadTabs.subtracting(barTabs).isEmpty }
+    /// Something new in Feed, Ideas or Goals while ☰ is the only way there, or a share waiting to be
+    /// sent: a dot on ☰.
+    var menuHasUnread: Bool {
+        !boardUnreadTabs.subtracting(barTabs).isEmpty || PendingShareCenter.shared.waitingCount > 0
+    }
 
 }
 

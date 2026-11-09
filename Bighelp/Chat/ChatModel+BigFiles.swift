@@ -44,6 +44,8 @@ extension ChatModel {
             bigFileSends.append(human)
         }
         if Data(outgoingDraftText.utf8) == Data(message.utf8), orderedDraftAttachments == orderedAttachments {
+            // Its shares wait with it while its files go up, kept until Hermes takes it.
+            sharesLeaveBox(as: human.id, message: message, attachments: orderedAttachments, staged: false)
             draft = ""
             replyDraft = nil
             draftAttachments = []
@@ -107,6 +109,7 @@ extension ChatModel {
     /// the computer has each file now.
     func bigFileMessageAccepted(rowID: String, text: String, files: [ChatBigFile]) {
         guard !text.isEmpty, let index = bigFileSends.firstIndex(where: { $0.id == rowID }) else { return }
+        shareMessageDelivered(rowID)
         // It leaves the waiting row and joins the transcript in one step, so it never shows twice.
         let sent = bigFileSends.remove(at: index).sent(as: text).ordered(takeTranscriptOrder())
         appendItem(sent)
@@ -122,6 +125,8 @@ extension ChatModel {
     /// The host drops a staged upload nobody finishes after a day.
     func removeBigFileSend(rowID: String, files: [ChatBigFile]) {
         bigFileSends.removeAll { $0.id == rowID }
+        // A share it carried stays saved, to send another way.
+        shareMessageRemoved(rowID)
         for file in files {
             BigFileUploadBoard.shared.finish(file.id)
             BigFileStore.remove(file)

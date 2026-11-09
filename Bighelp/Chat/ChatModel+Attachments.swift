@@ -239,6 +239,9 @@ extension ChatModel {
         appendItem(human)
         appendProjectedMessage(human)
         persistSession()
+        // The box keeps its text until Hermes takes the pages; a share in it goes with this message.
+        sharesLeaveBox(as: human.id, message: message, attachments: orderedAttachments, staged: false)
+        defer { shareMessageUnconfirmed(human.id) }
 
         defer {
             isPDFDraftSendInFlight = false
@@ -256,6 +259,7 @@ extension ChatModel {
                   native.currentPDFAttachmentTarget == target else {
                 removeItem(id: human.id)
                 removeProjectedMessage(id: human.id)
+                sharesReturnToBox(from: [human.id])
                 failureMessage = "The Hermes session changed before sending. Remove and re-add the PDF pages; your message text is unchanged."
                 return
             }
@@ -271,6 +275,7 @@ extension ChatModel {
                     self?.acceptStreamingDraft(item, ownerGeneration: submissionGeneration)
                 }
             )
+            shareMessageDelivered(human.id)
             guard nativeConversationClient === native,
                   native.currentPDFAttachmentTarget == target,
                   receipt.pdfAttachments.allSatisfy({ $0.target == target }) else {

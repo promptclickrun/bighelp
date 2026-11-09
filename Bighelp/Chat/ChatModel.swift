@@ -80,7 +80,6 @@ final class ChatModel {
             } else {
                 persistSession(draftOnly: true)
             }
-            releaseHeldSharesIfBoxIsEmpty()
         }
     }
     /// The draft as Send, the placeholder and the mention list need it. It changes only when one
@@ -100,19 +99,16 @@ final class ChatModel {
     /// Ordinary files/images and PDF-page selections in the exact order the
     /// user added them. `draftAttachments` remains the ordinary-file view used
     /// by existing clients and persisted reference drafts.
-    var orderedDraftAttachments: [ChatDraftAttachment] = [] {
-        didSet { releaseHeldSharesIfBoxIsEmpty() }
-    }
+    var orderedDraftAttachments: [ChatDraftAttachment] = []
     /// Photos or files still being read in; Send waits for them.
-    var draftAttachmentImport: DraftAttachmentImportProgress? {
-        didSet { releaseHeldSharesIfBoxIsEmpty() }
-    }
+    var draftAttachmentImport: DraftAttachmentImportProgress?
     /// Ones that didn't attach, with why and a way to try again; Send waits for these too.
-    var draftAttachmentFailures: [DraftAttachmentFailure] = [] {
-        didSet { releaseHeldSharesIfBoxIsEmpty() }
-    }
-    /// Shares from other apps this message box holds (`placeShare`), until they leave it.
-    @ObservationIgnored var heldShares: [ChatHeldShare] = []
+    var draftAttachmentFailures: [DraftAttachmentFailure] = []
+    /// Shares from other apps in this chat (`placeShare`): in the message box, or on their way in a
+    /// message. Each step is told to `shareTracker`; only Hermes taking the message deletes one.
+    @ObservationIgnored var sharesInBox: [ChatHeldShare] = []
+    @ObservationIgnored var sharesInMessages: [String: [ChatHeldShare]] = [:]
+    @ObservationIgnored weak var shareTracker: (any ChatShareTracking)?
     var pdfAttachmentReceipts: [DirectHermesPDFAttachmentReceipt] = []
     var isPDFDraftSendInFlight = false
     var referenceSelections: [ReferenceDraftSelection] = []

@@ -236,19 +236,16 @@ final class AppState {
         pendingShare = share
     }
 
-    /// The share, if this chat is the one it's for: on top, and the chat picked (or, for a new
-    /// chat, a new chat with that agent alone), within `pendingComposerLifetime`.
-    func takePendingShare(conversationID: String, memberIDs: [String], isOnTop: Bool, isNewChat: Bool,
-                          now: Date = .now) -> PendingShareHandoff? {
+    /// The share, if this chat is the one it's for: on top, and the very chat its destination names
+    /// (a new chat's only once Hermes has made it, never its local canvas), within
+    /// `pendingComposerLifetime`.
+    func takePendingShare(conversationID: String, isOnTop: Bool, now: Date = .now) -> PendingShareHandoff? {
         guard let share = pendingShare else { return nil }
         guard now.timeIntervalSince(share.since) <= Self.pendingComposerLifetime else {
             dropPendingShare()
             return nil
         }
-        guard isOnTop else { return nil }
-        let fits = share.destination.sessionID.map { $0 == conversationID }
-            ?? (isNewChat && memberIDs == [share.destination.agentID])
-        guard fits else { return nil }
+        guard isOnTop, share.destination.isTaken(by: conversationID) else { return nil }
         pendingShare = nil
         return share
     }

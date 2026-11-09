@@ -57,6 +57,16 @@ struct PendingShare: Codable, Equatable, Identifiable, Sendable {
         return draft.isEmpty ? block : draft + "\n\n" + block
     }
 
+    /// Whether a message leaving the box still holds any of this share: one of the files it became
+    /// there (`landedIDs`), or a line of its words. One that holds none was taken out by the person.
+    func isCarried(byText message: String, attachmentIDs: Set<String>, landedIDs: Set<String>) -> Bool {
+        if !landedIDs.isDisjoint(with: attachmentIDs) { return true }
+        return composerText.split(whereSeparator: \.isNewline).contains { line in
+            let words = line.trimmingCharacters(in: .whitespaces)
+            return !words.isEmpty && message.contains(words)
+        }
+    }
+
     static func hasWords(_ text: String) -> Bool {
         text.unicodeScalars.contains { !CharacterSet.whitespacesAndNewlines.contains($0) }
     }
@@ -73,10 +83,45 @@ struct PendingShare: Codable, Equatable, Identifiable, Sendable {
 /// Where the person chose to send a share, so a share they put in a chat and didn't send says so
 /// when bighelp opens again.
 struct PendingSharePlacement: Codable, Equatable, Sendable {
-    let destination: PendingShareDestination
+    /// What bighelp can say about it after a relaunch.
+    enum Recovery: Equatable, Sendable {
+        /// Never handed to Hermes: still in a message box, or waiting in a chat in memory.
+        case notSent
+        /// Handed to Hermes in a message whose answer never came: check that chat before sending again.
+        case maybeSent
+    }
+
+    var destination: PendingShareDestination
     /// The agent's name when it was chosen, for "You put this in a chat with Juno".
     let agentName: String
     let placedAt: Date
+    /// The message it left its message box in, until Hermes takes that message.
+    var submission: PendingShareSubmission? = nil
+
+    var recovery: Recovery {
+        switch submission?.state {
+        case nil, .staged?: .notSent
+        case .sending?, .unconfirmed?: .maybeSent
+        }
+    }
+}
+
+/// The message carrying a share, by its row in the chat.
+struct PendingShareSubmission: Codable, Equatable, Sendable {
+    enum State: String, Codable, Sendable {
+        /// Waiting in the chat for its connection. Such messages live only in memory, so after a
+        /// relaunch it was never sent.
+        case staged
+        /// Handed to Hermes; its answer hasn't come.
+        case sending
+        /// Its send ended without Hermes confirming it.
+        case unconfirmed
+    }
+
+    let conversationID: String
+    let messageID: String
+    let state: State
+    let at: Date
 }
 
 /// A chat on one computer: its agent, and the chat or a new one.
@@ -91,8 +136,22 @@ struct PendingShareDestination: Codable, Equatable, Hashable, Sendable {
     /// The computer's cache scope (`WorkspaceOwner.cacheScopeID`), never its address.
     let scope: String
     let agentID: String
-    /// Nil for a new chat.
+    /// Nil for a new chat until Hermes has made it (`bound(to:)`).
     let sessionID: String?
+
+    static let localCanvasPrefix = "local-draft:"
+
+    /// Only the chat it names takes it: a new chat once Hermes has made it, never the local canvas a
+    /// new chat shows first, which passes on only its text.
+    func isTaken(by conversationID: String) -> Bool {
+        guard let sessionID, !conversationID.hasPrefix(Self.localCanvasPrefix) else { return false }
+        return sessionID == conversationID
+    }
+
+    /// The new chat Hermes made for it.
+    func bound(to sessionID: String) -> PendingShareDestination {
+        PendingShareDestination(scope: scope, agentID: agentID, sessionID: sessionID)
+    }
 
     /// Why it can't be used as it is now. A share never moves to another computer, agent or chat by
     /// itself: the person picks again.

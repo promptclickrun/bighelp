@@ -161,6 +161,9 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
     @ObservationIgnored var bigFileHost: (any BigFileUploadHost)?
     /// Once, when Hermes takes the prompt now being submitted (`streaming` or `queued`).
     @ObservationIgnored var onSubmissionAdmitted: (@MainActor () -> Void)?
+    /// Runs once Hermes admits the prompt in flight, so a share it carries is known to have arrived
+    /// long before its turn ends (`ChatModel.shareMessageDelivered`).
+    @ObservationIgnored var onSharesAdmitted: (@MainActor () -> Void)?
     /// Says who is sending before each new turn (hosts several people share).
     @ObservationIgnored var speakerNote: (any ChatSpeakerNoting)?
     /// Who the host last took a note for, in which stored session, on which connection (`generation`).

@@ -9,11 +9,38 @@ extension RootShellView {
             isBlocked: presentsFirstRunOnboarding || hostRegistry?.isWorkspaceReady != true
                 || hostRegistry?.isSetupPresented == true || isUnifiedSettingsPresented,
             usesDemoData: usesWorkspaceFixtures,
+            context: pendingShareContext)
+    }
+
+    /// The computer in use, its agents and chats, for a share's review wherever it shows.
+    var pendingShareContext: PendingShareReviewContext {
+        PendingShareReviewContext(
             computerName: hostRegistry?.selectedHost?.name,
             scope: currentWorkspaceOwner?.cacheScopeID,
             agents: agents.profiles,
             chats: { shareableChats(for: $0) },
-            open: { share, destination, name in openPendingShare(share, at: destination, agentName: name) })
+            open: { share, destination, name in openPendingShare(share, at: destination, agentName: name) },
+            openChat: { id in
+                guard let record = sessionCatalog.session(id: id) else { return }
+                appState.chatOpenedFromList = true
+                openSession(record.summary)
+            })
+    }
+
+    /// The same, from inside Bots mode's Settings: a chat opens once Settings has closed.
+    var settingsPendingShareContext: PendingShareReviewContext {
+        let context = pendingShareContext
+        return PendingShareReviewContext(
+            computerName: context.computerName, scope: context.scope, agents: context.agents, chats: context.chats,
+            open: { share, destination, name in leaveSettings { context.open(share, destination, name) } },
+            openChat: { id in leaveSettings { context.openChat(id) } })
+    }
+
+    /// ☰ › Shared with bighelp, while any share waits: every one, put off ones too.
+    var pendingSharesMenuRow: (count: Int, open: () -> Void)? {
+        let center = PendingShareCenter.shared
+        guard center.waitingCount > 0 else { return nil }
+        return (center.waitingCount, { afterClosingHomeSheets { center.showList() } })
     }
 
     /// An agent's own chats on this computer, newest first: no group chats or scheduled runs.
@@ -47,14 +74,32 @@ extension RootShellView {
                 actionErrorMessage = String(localized: "That chat isn't available now. Your share is still saved.")
                 return
             }
-            appState.handOff(PendingShareHandoff(share: share, inbox: inbox, destination: destination, since: .now,
-                                                 onDropped: { center.release($0) }))
             if let record {
+                appState.handOff(PendingShareHandoff(share: share, inbox: inbox, destination: destination,
+                                                     since: .now, onDropped: { center.release($0) }))
                 appState.chatOpenedFromList = true
                 openSession(record.summary)
-            } else {
-                startNewChat(explicitAgentID: destination.agentID)
+                return
             }
+            // A new chat shows a local canvas first and passes only its text on to the chat Hermes
+            // makes, so the share goes straight to that chat, named in its placement.
+            startNewChat(explicitAgentID: destination.agentID, opened: { sessionID in
+                Task { @MainActor in
+                    do {
+                        try await center.bind(share.id, to: sessionID)
+                    } catch {
+                        center.release(share.id)
+                        return
+                    }
+                    guard currentWorkspaceOwner?.cacheScopeID == destination.scope else {
+                        center.release(share.id)
+                        return
+                    }
+                    appState.handOff(PendingShareHandoff(share: share, inbox: inbox,
+                                                         destination: destination.bound(to: sessionID),
+                                                         since: .now, onDropped: { center.release($0) }))
+                }
+            })
         }
     }
 }

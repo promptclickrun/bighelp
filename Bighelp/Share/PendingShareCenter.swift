@@ -2,14 +2,14 @@ import Foundation
 import Observation
 
 /// The shares other apps saved for bighelp (`PendingShareInbox`), as the app sees them: which to
-/// offer for review, which a chat's message box holds now, and which were sent or deleted.
+/// offer for review, which a chat holds now, and where each one is on its way.
 ///
-/// A share leaves the inbox only when its chat's message box empties after holding it (it was
-/// sent, or the person removed it there: `ChatModel.placeShare`) or when the person deletes it.
-/// Until then it survives closing bighelp, a crash and a relaunch.
+/// A share leaves the inbox only when Hermes takes the message carrying it (`ChatShareEvent.delivered`)
+/// or the person deletes it. Each other step a chat reports is written to its placement at once, so
+/// after closing bighelp or a crash it's offered again, saying whether it may have been sent.
 @MainActor
 @Observable
-final class PendingShareCenter {
+final class PendingShareCenter: ChatShareTracking {
     static let shared: PendingShareCenter = {
         let center = PendingShareCenter(inbox: PendingShareInbox.shared())
         #if DEBUG
@@ -24,7 +24,10 @@ final class PendingShareCenter {
 
     let inbox: PendingShareInbox?
     private(set) var entries: [PendingShareInbox.Entry] = []
-    /// Closed with Not now: offered again on the next launch, or when another share arrives.
+    /// Every share waiting, put off ones too (☰ › Shared with bighelp, or Bots mode's Settings).
+    var isListShown = false
+    /// Put off with Not now, taken out of a chat's message box, or unconfirmed: in the list, and
+    /// offered on their own again only when another share arrives.
     private var deferred: Set<String> = []
     private var handedOff: [String: Date] = [:]
     /// After Open, the rest wait until bighelp next comes to the front, so the next review doesn't
@@ -58,7 +61,7 @@ final class PendingShareCenter {
         if read != entries { entries = read }
     }
 
-    /// The share to review now: not put off, not in a chat's message box, not on its way to one.
+    /// The share to review on its own now: not put off, not in a chat, not on its way to one.
     func next(now: Date = .now) -> PendingShareInbox.Entry? {
         guard !isPaused else { return nil }
         return entries.first { entry in
@@ -71,7 +74,11 @@ final class PendingShareCenter {
 
     func isHeld(_ id: String) -> Bool { holders[id]?.model != nil }
 
+    func isDeferred(_ id: String) -> Bool { deferred.contains(id) }
+
     func later(_ id: String) { deferred.insert(id) }
+
+    func showList() { isListShown = true }
 
     /// Records where the person put the share, before any chat opens: a share they leave there
     /// unsent says so after a relaunch.
@@ -82,36 +89,94 @@ final class PendingShareCenter {
         let id = share.id
         try await Task.detached(priority: .userInitiated) { try inbox.place(id, placement) }.value
         handedOff[id] = now
+        deferred.remove(id)
         isPaused = true
-        entries = entries.map { entry in
-            guard entry.id == id, case .share(let share, _) = entry else { return entry }
-            return .share(share, placement: placement)
+        update(id) { _ in placement }
+    }
+
+    /// The new chat Hermes made for a share: its placement names that chat from now on.
+    func bind(_ id: String, to sessionID: String) async throws {
+        guard let inbox, case .share(_, let placement?)? = entries.first(where: { $0.id == id }) else {
+            throw PendingShareError.gone
         }
+        var bound = placement
+        bound.destination = placement.destination.bound(to: sessionID)
+        let saved = bound
+        try await Task.detached(priority: .userInitiated) { try inbox.place(id, saved) }.value
+        handedOff[id] = .now
+        update(id) { _ in saved }
     }
 
-    /// A chat's message box took the share.
-    func hold(_ id: String, by model: ChatModel) {
-        holders[id] = WeakHolder(model: model)
-        handedOff[id] = nil
-    }
-
-    /// The chat couldn't take it after all; it's offered again.
+    /// No chat took it after all; it's offered again.
     func release(_ id: String) {
         holders[id] = nil
         handedOff[id] = nil
         isPaused = false
     }
 
-    /// Its chat's message box emptied after holding it: sent, or removed by the person there.
-    func settled(_ id: String) {
-        holders[id] = nil
-        handedOff[id] = nil
-        Task { try? await remove(id) }
-    }
-
     /// The person deleted it.
     func delete(_ id: String) async throws {
-        try await remove(id)
+        guard let inbox else { return }
+        try await Task.detached(priority: .userInitiated) { _ = try inbox.remove(id) }.value
+        holders[id] = nil
+        forget(id)
+    }
+
+    // MARK: - ChatShareTracking
+
+    func share(_ id: String, in model: ChatModel, _ event: ChatShareEvent) {
+        switch event {
+        case .inBox:
+            holders[id] = WeakHolder(model: model)
+            handedOff[id] = nil
+            record(id, nil)
+        case .staged(let messageID):
+            holders[id] = WeakHolder(model: model)
+            record(id, .init(conversationID: model.conversationID, messageID: messageID, state: .staged, at: .now))
+        case .sending(let messageID):
+            holders[id] = WeakHolder(model: model)
+            record(id, .init(conversationID: model.conversationID, messageID: messageID, state: .sending, at: .now))
+        case .unconfirmed(let messageID):
+            // In the list, saying it may have arrived; never offered as unsent.
+            holders[id] = nil
+            deferred.insert(id)
+            record(id, .init(conversationID: model.conversationID, messageID: messageID, state: .unconfirmed, at: .now))
+        case .delivered:
+            holders[id] = nil
+            try? inbox?.remove(id)
+            forget(id)
+        case .removed:
+            holders[id] = nil
+            deferred.insert(id)
+            record(id, nil)
+        case .retired:
+            holders[id] = nil
+            record(id, nil)
+        }
+    }
+
+    /// Written at once, on this thread: the message it describes may go out right after, and a
+    /// relaunch must find what's true.
+    private func record(_ id: String, _ submission: PendingShareSubmission?) {
+        try? inbox?.recordSubmission(id, submission)
+        update(id) { placement in
+            var placement = placement
+            placement?.submission = submission
+            return placement
+        }
+    }
+
+    private func update(_ id: String, _ change: (PendingSharePlacement?) -> PendingSharePlacement?) {
+        entries = entries.map { entry in
+            guard entry.id == id, case .share(let share, let placement) = entry else { return entry }
+            return .share(share, placement: change(placement))
+        }
+    }
+
+    private func forget(_ id: String) {
+        entries.removeAll { $0.id == id }
+        deferred.remove(id)
+        handedOff[id] = nil
     }
 
     #if DEBUG
@@ -127,11 +192,4 @@ final class PendingShareCenter {
         _ = try? draft.commit(note: "Can you sum this up?")
     }
     #endif
-
-    private func remove(_ id: String) async throws {
-        guard let inbox else { return }
-        try await Task.detached(priority: .userInitiated) { _ = try inbox.remove(id) }.value
-        entries.removeAll { $0.id == id }
-        deferred.remove(id)
-    }
 }

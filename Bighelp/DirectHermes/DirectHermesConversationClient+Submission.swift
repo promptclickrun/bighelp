@@ -44,8 +44,11 @@ extension DirectHermesConversationClient {
 
     func takeSubmissionAdmitted() {
         let admitted = onSubmissionAdmitted
+        let shares = onSharesAdmitted
         onSubmissionAdmitted = nil
+        onSharesAdmitted = nil
         admitted?()
+        shares?()
     }
 
     func submit(message: String, conversationID: String,

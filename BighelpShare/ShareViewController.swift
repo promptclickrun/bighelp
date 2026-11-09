@@ -10,10 +10,9 @@ final class ShareViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
-        let context = extensionContext
         Task { @MainActor [weak self] in
-            let input = await ShareInputReader.read(from: context)
             guard let self else { return }
+            let input = await ShareInputReader.read(from: self.extensionContext)
             let model = ShareModel(input: input)
             self.model = model
             let root = ShareView(

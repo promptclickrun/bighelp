@@ -50,7 +50,7 @@ struct ShareCache {
     /// The one that was used last, so a repeat share starts where the last one ended.
     static var lastAgent: String? {
         get { defaults?.string(forKey: "bighelp.share.last-agent") }
-        nonmutating set { defaults?.set(newValue, forKey: "bighelp.share.last-agent") }
+        set { defaults?.set(newValue, forKey: "bighelp.share.last-agent") }
     }
 
     private static func key(_ agent: String) -> String {

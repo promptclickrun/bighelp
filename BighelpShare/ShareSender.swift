@@ -24,8 +24,8 @@ final class ShareSender {
     /// The same ceiling the app applies to an ordinary attachment (8 MB each, 24 MB a
     /// batch, carried inline). Anything larger is the app's chunked uploader's job, and
     /// that does not run in an extension.
-    static let maximumItemBytes = 8 * 1_024 * 1_024
-    static let maximumBatchBytes = 24 * 1_024 * 1_024
+    nonisolated static let maximumItemBytes = 8 * 1_024 * 1_024
+    nonisolated static let maximumBatchBytes = 24 * 1_024 * 1_024
     /// The session source the app writes, so a shared chat is an ordinary bighelp chat.
     static let sessionSource = "bighelp"
 

@@ -14,8 +14,9 @@ struct ShareInput {
 ///
 /// Everything an extension receives has to fit in its own memory, so this refuses
 /// anything the app would have handed to its chunked uploader instead of half-loading it.
+@MainActor
 enum ShareInputReader {
-    static let maximumItems = 4
+    nonisolated static let maximumItems = 4
 
     static func read(from context: NSExtensionContext?) async -> ShareInput {
         guard let items = context?.inputItems as? [NSExtensionItem] else { return ShareInput() }

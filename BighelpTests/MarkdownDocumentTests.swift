@@ -157,6 +157,16 @@ struct MarkdownDocumentTests {
         #expect(ChatToolDetailFormatter.format("Command completed successfully") == "Command completed successfully")
     }
 
+    /// Code that prints one number or word gives output that is a JSON
+    /// fragment. Writing a fragment back raised an Objective-C exception that
+    /// `try?` can't catch, so unfolding the tool call ended the app.
+    @Test func toolDetailsKeepJSONFragmentsAsTheyAre() {
+        for fragment in ["84.5\n", "42", "true", "null", #""done""#] {
+            #expect(ChatToolDetailFormatter.format(fragment) == fragment)
+            #expect(!ChatToolDetailPreview(fragment).text.isEmpty)
+        }
+    }
+
     @Test func largeToolPreviewBoundsLayoutAndPreservesCompleteUnicodeContent() {
         let original = String(repeating: "👩🏽‍💻 file.swift: verified result\n", count: 5_000)
         let preview = ChatToolDetailPreview(original)

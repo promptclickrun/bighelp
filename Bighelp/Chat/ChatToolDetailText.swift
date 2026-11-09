@@ -2,10 +2,14 @@ import SwiftUI
 import UIKit
 
 enum ChatToolDetailFormatter {
+    /// Pretty-prints a JSON object or array; any other text comes back as it was.
     nonisolated static func format(_ value: String) -> String {
         guard
             let data = value.data(using: .utf8),
             let object = try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed),
+            // A fragment (`84.5`, what code printed) makes the write below raise an
+            // Objective-C exception, which `try?` doesn't catch.
+            JSONSerialization.isValidJSONObject(object),
             let formatted = try? JSONSerialization.data(
                 withJSONObject: object,
                 options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]

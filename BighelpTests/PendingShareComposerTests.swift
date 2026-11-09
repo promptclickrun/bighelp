@@ -357,9 +357,11 @@ struct PendingShareComposerTests {
         #expect(await model.placeShare(share, from: inbox, tracker: center) == .placed)
 
         // The share's folder can't be moved out: only the spent mark takes.
-        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: inbox.root.path)
+        let root = inbox.root.path
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: root)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root) }
         await model.send()
-        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: inbox.root.path)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root)
         #expect(center.entries.isEmpty && center.next() == nil)
         #expect(FileManager.default.fileExists(atPath: inbox.folder(share.id).path))
 

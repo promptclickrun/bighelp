@@ -240,9 +240,13 @@ struct PendingShareLedgerTests {
         try inbox.recordSubmission(first.id, submission)
 
         // The share can't be moved out (its folder's parent is read-only): the mark still takes.
-        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: inbox.root.path)
+        let root = inbox.root.path
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: root)
+        var restored = false
+        defer { if !restored { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root) } }
         let gone = try inbox.markDelivered(first.id, submission)
-        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: inbox.root.path)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root)
+        restored = true
         #expect(!gone)
         #expect(inbox.entries().isEmpty)
         // A fresh start never offers it either.

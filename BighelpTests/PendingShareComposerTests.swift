@@ -541,6 +541,43 @@ struct PendingShareComposerTests {
         #expect(placement(a.id)?.submission?.id != placement(b.id)?.submission?.id)
     }
 
+    @Test func aDraftBackFromItsJournalAfterARelaunchStillCarriesItsShare() async throws {
+        let share = try save(text: "Shared words")
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = { DemoRepository<[String: ChatDraftJournal.Entry]>(directory: directory, name: "chat-drafts", seed: [:]) }
+        let firstCenter = await center()
+        let first = ChatModel(conversationID: "chat-1", client: ConversationFixtureClient(), initialItems: [])
+        #expect(await first.placeShare(share, from: inbox, tracker: firstCenter) == .placed)
+        first.draft = "Typed first\n\n" + first.draft
+        let journal = ChatDraftJournal(repository: repository())
+        journal.write(first.draft, over: "", for: "chat-1")
+        journal.flush()
+
+        // bighelp opens again: the draft comes back from its journal, and Not now puts the review off.
+        let relaunched = PendingShareCenter(inbox: PendingShareInbox(root: inbox.root))
+        await relaunched.refresh()
+        let draft = ChatDraftJournal(repository: repository()).openingDraft(
+            for: SessionRecord(id: "chat-1", kind: .direct, agentIDs: ["default"], title: "Chat", draft: ""))
+        #expect(draft == "Typed first\n\nShared words")
+        #expect(relaunched.next()?.id == share.id)
+        relaunched.later(share.id)
+
+        // The chat opens with it (`PendingShareIntake`), before any Send.
+        let model = ChatModel(conversationID: "chat-1", client: ConversationFixtureClient(), initialItems: [],
+                              initialDraft: draft)
+        model.shareTracker = relaunched
+        model.restoreSharesInBox(scope: "scope-b")
+        #expect(!model.holdsShare(share.id), "Never on another computer")
+        model.restoreSharesInBox(scope: "scope-a")
+        #expect(model.holdsShare(share.id) && relaunched.isHeld(share.id))
+
+        await model.send()
+        #expect(!savedIDs.contains(share.id), "The message carrying its words settled it")
+        #expect(relaunched.entries.isEmpty)
+    }
+
     @Test func aRefusedMessageIsBackInTheBoxOnceAndGoesOnceLater() async throws {
         for carriesShare in [true, false] {
             let words = "Refused words \(carriesShare)"

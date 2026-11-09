@@ -176,6 +176,17 @@ final class PendingShareCenter: ChatShareTracking {
         }
     }
 
+    /// Read from the inbox itself, so a chat that opens before the first `refresh` finds them too.
+    func sharesPlaced(in conversationID: String, scope: String) -> [PendingShare] {
+        guard let inbox else { return [] }
+        return inbox.entries().compactMap { entry in
+            guard case .share(let share, let placement?) = entry, placement.submission == nil,
+                  placement.destination.scope == scope, placement.destination.isTaken(by: conversationID),
+                  !spent.contains(share.id), !isHeld(share.id) else { return nil }
+            return share
+        }
+    }
+
     func messageDelivered(conversationID: String, messageID: String) {
         guard let inbox else { return }
         for id in inbox.markDelivered(conversationID: conversationID, messageID: messageID, at: .now) {

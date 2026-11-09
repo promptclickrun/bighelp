@@ -9,6 +9,9 @@ protocol ChatShareTracking: AnyObject {
     func apply(_ effects: [PendingShareLedger.Effect], from model: ChatModel) throws
     /// Hermes' history shows this message arrived (a reference message's receipt, read after a relaunch).
     func messageDelivered(conversationID: String, messageID: String)
+    /// Shares whose saved copies say the person put them in this chat on computer `scope`, and that
+    /// no message took yet: their words may be in the chat's saved draft.
+    func sharesPlaced(in conversationID: String, scope: String) -> [PendingShare]
 }
 
 extension ChatModel {
@@ -82,6 +85,18 @@ extension ChatModel {
         }
         applyShareEffects(shareLedger.finishPlacing(share.id))
         return .placed
+    }
+
+    /// The chat opened again after a relaunch, its draft back from where it was saved: a share the
+    /// person put here whose words that draft still holds is in the box again, before any Send, so
+    /// the message carrying it settles it. Its files were only in memory and don't come back.
+    func restoreSharesInBox(scope: String?) {
+        guard let scope, let shareTracker, !referenceOwnerRetired else { return }
+        for share in shareTracker.sharesPlaced(in: conversationID, scope: scope) {
+            guard share.isCarried(byText: draft, attachmentIDs: [], landedIDs: []),
+                  shareLedger.beginPlacing(share) else { continue }
+            applyShareEffects(shareLedger.finishPlacing(share.id))
+        }
     }
 
     func holdsShare(_ id: String) -> Bool { shareLedgerStorage?.holds(id) == true }

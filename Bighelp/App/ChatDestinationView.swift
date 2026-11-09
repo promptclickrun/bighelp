@@ -736,7 +736,7 @@ struct ChatDestinationView: View {
             }
         }
         .modifier(ProjectChangesRefreshTrigger(model: model) { projectChanges.requestRefresh() })
-        .modifier(PendingShareIntake(model: model, appState: appState))
+        .modifier(PendingShareIntake(model: model, appState: appState, scope: voiceComputer))
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             projectChanges.requestRefresh()

@@ -3,6 +3,19 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.77
+
+### New
+
+- **Share from other apps:** in another app, tap Share and choose bighelp. You can share a link, text, photos, a video or a file, and add a note. Then open bighelp, choose the agent and the chat, look at the message, and send it. A shared item stays on your iPhone or iPad until the message with it goes to the agent, or until you delete it in ☰ › Shared with bighelp.
+- **Code in a notebook cell:** when you open a step where an agent ran Python or a shell command, the code shows with line numbers and colors, and its output shows below it in the same card. You can copy the code or the output, or open the cell full screen.
+- **Live work between agents:** when an agent sends work to another agent, the "Waiting on" line shows when the other agent works and when it answers. Tap the line to see that work as it happens. The other agent's chat shows that it is working. This needs bighelp plugin 3.51.0 and Hermes 0.23.
+
+### Fixed
+
+- **Steps with code:** the app no longer closes when you open a step whose code printed only one number or one word.
+- **Big files through a proxy:** a file over 8 MB now goes through a proxy that takes only 1 MB in each request. This needs bighelp plugin 3.50.0 or later. You can now remove a big file that did not go.
+
 ## 2.6.76
 
 ### New

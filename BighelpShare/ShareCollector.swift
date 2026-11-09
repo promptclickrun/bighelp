@@ -39,7 +39,7 @@ enum ShareCollector {
 
     @MainActor
     static func collect(_ provider: NSItemProvider, into draft: PendingShareDraft,
-                        cancel: ShareCancellation) async -> Outcome {
+                        cancel: PendingShareCancellation) async -> Outcome {
         let name = provider.suggestedName
         switch kind(of: provider) {
         case .text: return await text(provider, into: draft, cancel: cancel)
@@ -55,7 +55,7 @@ enum ShareCollector {
 
     @MainActor
     private static func link(_ provider: NSItemProvider, into draft: PendingShareDraft,
-                             cancel: ShareCancellation) async -> Outcome {
+                             cancel: PendingShareCancellation) async -> Outcome {
         var outcome = Outcome(kind: .link, title: String(localized: "Link"), detail: "")
         let result: Result<URL, Failure> = await deadline(cancel) { finish in
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
@@ -78,7 +78,7 @@ enum ShareCollector {
 
     @MainActor
     private static func text(_ provider: NSItemProvider, into draft: PendingShareDraft,
-                             cancel: ShareCancellation) async -> Outcome {
+                             cancel: PendingShareCancellation) async -> Outcome {
         var outcome = Outcome(kind: .text, title: String(localized: "Text"), detail: "")
         let types = provider.registeredTypeIdentifiers.compactMap { UTType($0) }
         guard let type = SharedItemTypes.textType(types) else {
@@ -142,7 +142,7 @@ enum ShareCollector {
 
     @MainActor
     private static func file(_ provider: NSItemProvider, into draft: PendingShareDraft,
-                             cancel: ShareCancellation) async -> Outcome {
+                             cancel: PendingShareCancellation) async -> Outcome {
         let types = provider.registeredTypeIdentifiers.compactMap { UTType($0) }
         guard let type = SharedItemTypes.fileType(types) else {
             return Outcome(kind: .file, title: provider.suggestedName ?? String(localized: "File"), detail: "",
@@ -178,7 +178,7 @@ enum ShareCollector {
     /// A file the other app named by its address, which may be outside this extension's sandbox.
     @MainActor
     private static func sharedFile(_ url: URL, suggestedName: String?, into draft: PendingShareDraft,
-                                   cancel: ShareCancellation) async -> Outcome {
+                                   cancel: PendingShareCancellation) async -> Outcome {
         let type = UTType(filenameExtension: url.pathExtension) ?? .data
         let kind: PendingShare.File.Kind = type.conforms(to: .image) ? .image : .file
         let name = suggestedName ?? url.lastPathComponent
@@ -191,7 +191,7 @@ enum ShareCollector {
     }
 
     private static func add(_ url: URL, suggestedName: String, type: UTType, kind: PendingShare.File.Kind,
-                            into draft: PendingShareDraft, cancel: ShareCancellation) -> Result<PendingShare.File, Failure> {
+                            into draft: PendingShareDraft, cancel: PendingShareCancellation) -> Result<PendingShare.File, Failure> {
         do {
             return .success(try draft.addFile(
                 copying: url, suggestedName: suggestedName, kind: kind, typeIdentifier: type.identifier,
@@ -225,78 +225,15 @@ enum ShareCollector {
 
     // MARK: - Waiting
 
-    /// Waits for `start`'s callback, the item's deadline, or Cancel, whichever comes first. A late
-    /// callback is ignored, and a copy still under way stops at its next megabyte.
+    /// Waits for `start`'s callback, the item's deadline, or Cancel, whichever comes first
+    /// (`PendingShareWait`). A late callback is ignored, and a copy still under way stops at its
+    /// next megabyte.
     @MainActor
     private static func deadline<T: Sendable>(
-        _ cancel: ShareCancellation,
-        _ start: @escaping @MainActor (_ finish: @escaping @Sendable (Result<T, Failure>) -> Void) -> Void
+        _ cancel: PendingShareCancellation,
+        _ start: (_ finish: @escaping @Sendable (Result<T, Failure>) -> Void) -> Void
     ) async -> Result<T, Failure> {
-        let once = ShareOnce<Result<T, Failure>>()
-        return await withCheckedContinuation { continuation in
-            once.arm(continuation)
-            let timer = Task {
-                try? await Task.sleep(for: itemDeadline)
-                once.finish(.failure(.timedOut))
-            }
-            cancel.onCancel { once.finish(.failure(.share(.cancelled))) }
-            start { result in
-                timer.cancel()
-                once.finish(result)
-            }
-        }
-    }
-}
-
-/// Cancel, seen by every item and by a copy between megabytes.
-final class ShareCancellation: @unchecked Sendable {
-    private let lock = NSLock()
-    private var cancelled = false
-    private var handlers: [@Sendable () -> Void] = []
-
-    var isCancelled: Bool { lock.withLock { cancelled } }
-
-    func cancel() {
-        let handlers = lock.withLock { () -> [@Sendable () -> Void] in
-            guard !cancelled else { return [] }
-            cancelled = true
-            defer { self.handlers = [] }
-            return self.handlers
-        }
-        handlers.forEach { $0() }
-    }
-
-    func onCancel(_ handler: @escaping @Sendable () -> Void) {
-        let runsNow = lock.withLock { () -> Bool in
-            if cancelled { return true }
-            handlers.append(handler)
-            return false
-        }
-        if runsNow { handler() }
-    }
-}
-
-/// A continuation resumed once, by whichever answer comes first.
-private final class ShareOnce<T: Sendable>: @unchecked Sendable {
-    private let lock = NSLock()
-    private var continuation: CheckedContinuation<T, Never>?
-    private var early: T?
-
-    func arm(_ continuation: CheckedContinuation<T, Never>) {
-        let ready = lock.withLock { () -> T? in
-            if let early { return early }
-            self.continuation = continuation
-            return nil
-        }
-        if let ready { continuation.resume(returning: ready) }
-    }
-
-    func finish(_ value: T) {
-        let waiting = lock.withLock { () -> CheckedContinuation<T, Never>? in
-            defer { continuation = nil }
-            if continuation == nil, early == nil { early = value }
-            return continuation
-        }
-        waiting?.resume(returning: value)
+        await PendingShareWait.first(deadline: itemDeadline, timedOut: Failure.timedOut,
+                                     cancelled: Failure.share(.cancelled), cancellation: cancel, start)
     }
 }

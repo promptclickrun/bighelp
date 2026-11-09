@@ -350,6 +350,60 @@ struct PendingShareInboxTests {
         }
     }
 
+    @Test func longNamesThatClashStillGetNamesOfTheirOwn() async throws {
+        // Over 180 characters, the same name twice, or names alike in their first 180: each number
+        // keeps its room, so the search for a free name always ends. It once looped for good,
+        // holding the share's lock so Cancel couldn't stop it; run off this task, so a loop like
+        // that fails here instead of hanging the run.
+        let long = String(repeating: "x", count: 300) + ".pdf"
+        let alike = String(repeating: "x", count: 290) + "y.pdf"
+        let named: Result<[String], PendingShareError> = await PendingShareWait.first(
+            deadline: .seconds(10), timedOut: .cancelled, cancelled: .cancelled, cancellation: .init()) { finish in
+            DispatchQueue.global().async {
+                var taken: Set<String> = []
+                var names: [String] = []
+                for suggested in [long, long, alike] {
+                    let name = PendingShare.fileName(suggested: suggested, kind: .file, preferredExtension: nil,
+                                                     taken: taken)
+                    taken.insert(name)
+                    names.append(name)
+                }
+                finish(.success(names))
+            }
+        }
+        let names = try named.get()
+        #expect(Set(names).count == 3)
+        for name in names {
+            #expect(name.count <= 180 && name.hasSuffix(".pdf") && PendingShare.isValidFileName(name))
+        }
+        #expect(names[1].hasSuffix(" 2.pdf") && names[2].hasSuffix(" 3.pdf"))
+
+        // Through a share being saved, where the name is picked under its lock.
+        var limits = Self.smallLimits
+        limits.files = 10
+        let roomy = PendingShareInbox(root: inbox.root, limits: limits)
+        let draft = try roomy.begin()
+        let sources = try (0..<4).map { _ in try source("x.pdf", 4) }
+        let added: Result<[String], PendingShareError> = await PendingShareWait.first(
+            deadline: .seconds(10), timedOut: .cancelled, cancelled: .cancelled, cancellation: .init()) { finish in
+            DispatchQueue.global().async {
+                do {
+                    finish(.success(try sources.map {
+                        try draft.addFile(copying: $0, suggestedName: long, kind: .file, typeIdentifier: "com.adobe.pdf",
+                                          mimeType: "application/pdf", preferredExtension: "pdf").name
+                    }))
+                } catch {
+                    finish(.failure(error as? PendingShareError ?? .storageUnavailable))
+                }
+            }
+        }
+        let addedNames = try added.get()
+        #expect(Set(addedNames).count == 4)
+        let saved = try draft.commit(note: "")
+        #expect(roomy.entries() == [.share(saved, placement: nil)])
+        #expect(saved.files.map(\.name) == addedNames)
+    }
+
     // MARK: - Into the message box
 
     @Test func theMessageBoxGetsTheWordsOnceBelowWhatWasTyped() {

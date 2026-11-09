@@ -186,16 +186,19 @@ extension PendingShare {
         if stem.isEmpty { stem = kind == .image ? "Shared picture" : "Shared file" }
 
         let suffix = ext.isEmpty ? "" : "." + ext
-        func bounded(_ stem: String) -> String {
-            let room = 180 - suffix.count
+        // The number and the extension keep their room; only the stem is shortened, so each number
+        // gives a name of its own and the search ends.
+        func named(_ number: Int?) -> String {
+            let tail = (number.map { " \($0)" } ?? "") + suffix
+            let room = max(1, 180 - tail.count)
             let kept = stem.count > room ? String(stem.prefix(room)).trimmingCharacters(in: .whitespaces) : stem
-            return (kept.isEmpty ? "Shared" : kept) + suffix
+            return (kept.isEmpty ? "Shared" : kept) + tail
         }
         let lowered = Set(taken.map { $0.lowercased() })
-        var candidate = bounded(stem)
+        var candidate = named(nil)
         var number = 2
         while lowered.contains(candidate.lowercased()) {
-            candidate = bounded(stem + " \(number)")
+            candidate = named(number)
             number += 1
         }
         return candidate

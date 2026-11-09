@@ -30,7 +30,7 @@ final class ShareModel: ObservableObject {
 
     private let inbox: PendingShareInbox?
     private var draft: PendingShareDraft?
-    private let cancellation = ShareCancellation()
+    private let cancellation = PendingShareCancellation()
     private var reading: Task<Void, Never>?
 
     init(inbox: PendingShareInbox? = PendingShareInbox.shared()) {

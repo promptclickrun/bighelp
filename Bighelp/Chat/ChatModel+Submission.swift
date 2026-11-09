@@ -187,9 +187,9 @@ extension ChatModel {
             []
         }
         var localHumanID: String?
-        // A share that left the box with this message and wasn't confirmed or put back by the end
-        // may have reached Hermes: it stays saved, marked so (`ChatShareEvent.unconfirmed`).
-        defer { if let localHumanID { shareMessageUnconfirmed(localHumanID) } }
+        // A share this message carries that no outcome below settled may have reached Hermes: it
+        // stays saved, marked so, and known by its message's id for a later answer.
+        defer { if let localHumanID { shareMessageUnknown(row: localHumanID) } }
         if !isBotModeConversation {
             appendItem(takeStagedItem(of: outgoing) ?? humanItem(content: message, attachments: attachments))
             if let item = items.last {
@@ -201,7 +201,7 @@ extension ChatModel {
         // A staged message left the box when it was staged; the box holds the next one now.
         if restoresDraft, outgoing.stagedItem == nil {
             if let localHumanID {
-                sharesLeaveBox(as: localHumanID, message: message, attachments: orderedAttachments, staged: false)
+                sharesLeaveBox(as: localHumanID, message: message, attachments: orderedAttachments)
             }
             draft = ""
             replyDraft = nil
@@ -292,25 +292,33 @@ extension ChatModel {
             return
         }
 
-        if let localHumanID { ChatPerformanceProbe.sendHandedOff(localHumanID) }
-        // A share in this message is known to have arrived once Hermes admits it, not when its turn ends.
-        let admissionWatch = localHumanID.flatMap { sharesInMessages[$0] == nil ? nil : nativeConversationClient }
-        if let admissionWatch, let rowID = localHumanID {
-            admissionWatch.onSharesAdmitted = { [weak self] in self?.shareMessageDelivered(rowID) }
+        // Where its shares are going is saved before anything goes; if it can't be, nothing goes.
+        let shareDispatch = localHumanID.map { dispatchShares($0) } ?? ShareDispatch.noShares
+        if shareDispatch == .unsaved, let localHumanID {
+            putShareMessageBack(localHumanID, message: message, attachments: attachments,
+                                orderedAttachments: orderedAttachments)
+            failureMessage = Self.unsavedShareMessage
+            hasLocallyPendingPrimaryTurn = false
+            isSending = false
+            flushPersistence()
+            return
         }
-        defer { admissionWatch?.onSharesAdmitted = nil }
+        if let localHumanID { ChatPerformanceProbe.sendHandedOff(localHumanID) }
         do {
-            let response = try await sendAwaitingClient {
-                try await sendThroughClient(
-                    message,
-                    attachments: attachments,
-                    slashSelection: slashSelection,
-                    ownerGeneration: generation,
-                    timedRow: localHumanID
-                )
+            // The client binds the share message's id to its journal entry for this message, and
+            // admits it as soon as Hermes admits that entry, long before the turn ends.
+            let response = try await PendingShareCorrelation.$submission.withValue(shareDispatch.id) {
+                try await sendAwaitingClient {
+                    try await sendThroughClient(
+                        message,
+                        attachments: attachments,
+                        slashSelection: slashSelection,
+                        ownerGeneration: generation,
+                        timedRow: localHumanID
+                    )
+                }
             }
-            // Hermes took it.
-            if let localHumanID { shareMessageDelivered(localHumanID) }
+            if let id = shareDispatch.id { shareMessageAdmitted(id) }
             guard isCurrentOwner(generation) else { return }
             try appendValidated(response.items)
             for item in response.items where item.role == .assistant {
@@ -339,7 +347,10 @@ extension ChatModel {
                 failureMessage = goalCommandFailureMessage(error)
                 retryRequest = nil
             } else if error is DirectHermesConversationClient.RejectedCommand {
-                if restoresDraft, draft.isEmpty { draft = message }
+                if let localHumanID, carriesShares(localHumanID) {
+                    putBackInBox(message, attachments: attachments, orderedAttachments: orderedAttachments,
+                                 returning: localHumanID)
+                } else if restoresDraft, draft.isEmpty { draft = message }
                 if let localHumanID {
                     removeItem(id: localHumanID)
                     removeProjectedMessage(id: localHumanID)
@@ -349,6 +360,7 @@ extension ChatModel {
                 retryRequest = nil
             } else if let failed = error as? DirectHermesConversationClient.FailedCommand {
                 // It ran, maybe in part, so it isn't put back in the box or retried.
+                if let localHumanID { shareMessageAdmitted(row: localHumanID) }
                 failureMessage = ["This command didn't finish.", failed.reason.sentence]
                     .compactMap(\.self).joined(separator: " ")
                 retryRequest = nil
@@ -370,10 +382,19 @@ extension ChatModel {
                 // Nothing was sent: say why, instead of a delivery failure.
                 failureMessage = reason
                 retryRequest = .send(message, attachments)
+                if let localHumanID, carriesShares(localHumanID) {
+                    putShareMessageBack(localHumanID, message: message, attachments: attachments,
+                                        orderedAttachments: orderedAttachments)
+                }
             } else {
                 failureMessage = "Message could not be delivered. "
                     + (HermesRefusalMessage.sentence(in: error) ?? "Try again.")
                 retryRequest = .send(message, attachments)
+                if let localHumanID, carriesShares(localHumanID) {
+                    putShareMessageBack(localHumanID, message: message, attachments: attachments,
+                                        orderedAttachments: orderedAttachments)
+                    failureMessage = "Message could not be delivered. It's back in the message box."
+                }
             }
         }
 
@@ -504,11 +525,27 @@ extension ChatModel {
         let priorGeneration = ownerGeneration
         let native = nativeConversationClient
         let existingNativeSubmissionIDs = Set(native?.journal.unresolved.map(\.id) ?? [])
+        let human = takeStagedItem(of: outgoing) ?? humanItem(content: message, attachments: attachments)
+        // A share this message carries that no outcome below settled may have reached Hermes.
+        defer { shareMessageUnknown(row: human.id) }
+        // Its shares go with it, and where is saved before anything changes; if it can't be, nothing goes.
+        if restoresDraft, outgoing.stagedItem == nil {
+            sharesLeaveBox(as: human.id, message: message, attachments: orderedAttachments)
+        }
+        let shareDispatch = dispatchShares(human.id)
+        if shareDispatch == .unsaved {
+            if outgoing.stagedItem != nil {
+                putBackInBox(message, attachments: attachments, orderedAttachments: orderedAttachments,
+                             returning: human.id)
+            } else {
+                sharesReturnToBox(from: [human.id])
+            }
+            failureMessage = Self.unsavedShareMessage
+            return
+        }
         let submissionGeneration = behavior == .interruptAndSend
             ? beginOwnerGeneration()
             : priorGeneration
-        let human = takeStagedItem(of: outgoing) ?? humanItem(content: message, attachments: attachments)
-        defer { shareMessageUnconfirmed(human.id) }
 
         pendingMidSessionSubmissions.append(PendingMidSessionSubmission(
             id: human.id,
@@ -518,7 +555,6 @@ extension ChatModel {
         appendItem(human)
         appendProjectedMessage(human)
         if restoresDraft, outgoing.stagedItem == nil {
-            sharesLeaveBox(as: human.id, message: message, attachments: orderedAttachments, staged: false)
             draft = ""
             replyDraft = nil
             draftAttachments = []
@@ -527,17 +563,19 @@ extension ChatModel {
         persistSession()
 
         do {
-            let outcome = try await midSessionClient.sendMidSession(
-                message: message,
-                attachments: attachments,
-                conversationID: conversationID,
-                behavior: behavior,
-                onDraft: { [weak self] item in
-                    self?.acceptStreamingDraft(item, ownerGeneration: submissionGeneration)
-                }
-            )
+            let outcome = try await PendingShareCorrelation.$submission.withValue(shareDispatch.id) {
+                try await midSessionClient.sendMidSession(
+                    message: message,
+                    attachments: attachments,
+                    conversationID: conversationID,
+                    behavior: behavior,
+                    onDraft: { [weak self] item in
+                        self?.acceptStreamingDraft(item, ownerGeneration: submissionGeneration)
+                    }
+                )
+            }
             // Hermes took it, as a steer, a queued message or a new turn.
-            shareMessageDelivered(human.id)
+            if let id = shareDispatch.id { shareMessageAdmitted(id) }
             guard pendingMidSessionBehavior(for: human.id) == behavior else { return }
             switch outcome {
             case .accepted:
@@ -822,8 +860,13 @@ extension ChatModel {
         humanID: String?, message: String, attachments: [ChatAttachment],
         orderedAttachments: [ChatDraftAttachment], restoresDraft: Bool = true
     ) {
+        let bearsShares = humanID.map { carriesShares($0) } ?? false
         if restoresDraft, draft.isEmpty, orderedDraftAttachments.isEmpty {
             putBackInBox(message, attachments: attachments, orderedAttachments: orderedAttachments, returning: humanID)
+        } else if let humanID {
+            // Hermes definitely didn't take it, though it isn't back in the box: its shares are
+            // kept, not sent, and offered again. Never left as "may have arrived".
+            shareMessageRefused(row: humanID)
         }
         // The protected journal retains A even if a newer composer B prevents
         // restoration. Only A's optimistic presentation is removed.
@@ -832,7 +875,10 @@ extension ChatModel {
             removeProjectedMessage(id: humanID)
             nativeConversationClient?.retainVisibleState()
         }
-        if refusal.code == 4090, !refusal.reachedSessionLimit {
+        if refusal.code == 4090, !refusal.reachedSessionLimit, bearsShares {
+            // A branch would send it without its shared items, so it doesn't go on there by itself.
+            failureMessage = "This chat is open in another Hermes process, so bighelp didn't send this. Send it in another chat; your shared items are kept."
+        } else if refusal.code == 4090, !refusal.reachedSessionLimit {
             // Another Hermes process holds this chat (a leftover connection, or a job Hermes
             // runs in it). Retrying meets the same refusal, so it goes on in a branch.
             branchContinuation = ChatBranchContinuation(

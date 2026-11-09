@@ -42,13 +42,18 @@ extension DirectHermesConversationClient {
                                 commandSelection: selection)
     }
 
-    func takeSubmissionAdmitted() {
+    /// Hermes admitted journal entry `entry`.
+    func takeSubmissionAdmitted(_ entry: UUID) {
         let admitted = onSubmissionAdmitted
-        let shares = onSharesAdmitted
         onSubmissionAdmitted = nil
-        onSharesAdmitted = nil
         admitted?()
-        shares?()
+        admitShares(of: entry)
+    }
+
+    /// The shares bound to this entry, and only those, arrived.
+    func admitShares(of entry: UUID) {
+        guard let submission = shareCorrelations.admit(entry: entry) else { return }
+        model?.shareMessageAdmitted(submission)
     }
 
     func submit(message: String, conversationID: String,
@@ -161,6 +166,7 @@ extension DirectHermesConversationClient {
                                 sender: .agent(id: self.profile, snapshot: .init(name: "Hermes")),
                                 content: .message(output), metadata: .init(source: "Direct Hermes", delivery: "Received"))
                             self.model?.acceptExternal([row])
+                            self.admitShares(of: submission.id)
                             self.admitted = true
                             self.terminalSeen = true
                             self.completeSubmissionIfReady()
@@ -174,7 +180,7 @@ extension DirectHermesConversationClient {
                             ChatPerformanceProbe.promptUnattributed(submission.id)
                             self.promptSentAt = nil
                             self.admitted = true
-                            self.takeSubmissionAdmitted()
+                            self.takeSubmissionAdmitted(submission.id)
                             if self.returnsVoiceReply {
                                 self.queuedVoiceAwaitingTurn = self.submissionTurns.isEmpty
                                 self.selectPendingTurn()
@@ -185,7 +191,7 @@ extension DirectHermesConversationClient {
                             }
                         } else if ["streaming", "ok"].contains(response["status"]?.string ?? "") {
                             // A message waiting outside the transcript joins it first, so it's the one bound.
-                            self.takeSubmissionAdmitted()
+                            self.takeSubmissionAdmitted(submission.id)
                             if !command || expandedToPrompt, let row = response["user_row_id"]?.integer {
                                 self.model?.bindNewestUnsavedMessage(role: .human, toRow: row, from: self)
                             }
@@ -397,6 +403,7 @@ extension DirectHermesConversationClient {
             // This journal protects uncertain delivery, not agent consumption.
             // A validated receipt transfers queue ownership to Hermes. Retiring
             // our receipt never resends text or claims the steer was consumed.
+            admitShares(of: entry.id)
             retireSubmission(entry.id)
             status = behavior == .steer ? "Steer accepted by Hermes" : "Queued on Hermes"
             return .accepted
@@ -424,6 +431,8 @@ extension DirectHermesConversationClient {
         next.unresolved.append(entry)
         try drafts.save(next, scope: scope)
         journal = next
+        // The send that records this entry names the shares its message carries, if any.
+        shareCorrelations.bind(entry: entry.id, to: PendingShareCorrelation.submission)
         if let model { projection.retainVisible(items: model.items, activities: model.activityLedger.allEvents) }
         projection.reserveOrder(model?.items.compactMap(\.metadata.sourceOrder).max() ?? 0)
         return entry
@@ -471,6 +480,8 @@ extension DirectHermesConversationClient {
             throw DirectHermesWorkspaceError.reviewRequired
         }
         let current = journal.unresolved[index]
+        // Definitely not admitted: nothing may settle its shares any more.
+        shareCorrelations.drop(entry: current.id)
         var next = journal
         next.unresolved[index] = .init(id: current.id, text: current.composerText ?? current.text,
             method: current.method, createdAt: current.createdAt, composerText: current.composerText,
@@ -480,6 +491,8 @@ extension DirectHermesConversationClient {
     }
 
     func retireSubmission(_ id: UUID) {
+        // Admitted entries settled their shares already; any other way out of the journal doesn't.
+        shareCorrelations.drop(entry: id)
         var next = journal
         next.unresolved.removeAll { $0.id == id }
         do { try drafts.save(next, scope: scope); journal = next }

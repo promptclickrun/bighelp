@@ -79,6 +79,8 @@ extension ChatModel {
         }
         draftAttachments.removeAll { $0.id == id }
         orderedDraftAttachments.removeAll { $0.sourceAttachmentID == id || $0.id == id }
+        // The person took it out: a share whose last part it was is out of this chat, kept.
+        reviewSharesInBox()
     }
 
     func removeOrderedDraftAttachment(id: String) {
@@ -239,9 +241,10 @@ extension ChatModel {
         appendItem(human)
         appendProjectedMessage(human)
         persistSession()
-        // The box keeps its text until Hermes takes the pages; a share in it goes with this message.
-        sharesLeaveBox(as: human.id, message: message, attachments: orderedAttachments, staged: false)
-        defer { shareMessageUnconfirmed(human.id) }
+        // The box keeps its text until Hermes takes the pages; a share in it goes with this message,
+        // and one no outcome below settled may have reached Hermes.
+        sharesLeaveBox(as: human.id, message: message, attachments: orderedAttachments)
+        defer { shareMessageUnknown(row: human.id) }
 
         defer {
             isPDFDraftSendInFlight = false
@@ -265,17 +268,28 @@ extension ChatModel {
             }
         }
 
+        // Where its shares are going is saved before the pages go; if it can't be, nothing goes.
+        let shareDispatch = dispatchShares(human.id)
+        if shareDispatch == .unsaved {
+            removeItem(id: human.id)
+            removeProjectedMessage(id: human.id)
+            sharesReturnToBox(from: [human.id])
+            failureMessage = Self.unsavedShareMessage
+            return
+        }
         do {
-            let receipt = try await native.sendDraftAttachments(
-                message: message,
-                draftAttachments: orderedAttachments,
-                conversationID: conversationID,
-                queued: midSessionBehavior == .queued,
-                onDraft: { [weak self] item in
-                    self?.acceptStreamingDraft(item, ownerGeneration: submissionGeneration)
-                }
-            )
-            shareMessageDelivered(human.id)
+            let receipt = try await PendingShareCorrelation.$submission.withValue(shareDispatch.id) {
+                try await native.sendDraftAttachments(
+                    message: message,
+                    draftAttachments: orderedAttachments,
+                    conversationID: conversationID,
+                    queued: midSessionBehavior == .queued,
+                    onDraft: { [weak self] item in
+                        self?.acceptStreamingDraft(item, ownerGeneration: submissionGeneration)
+                    }
+                )
+            }
+            if let id = shareDispatch.id { shareMessageAdmitted(id) }
             guard nativeConversationClient === native,
                   native.currentPDFAttachmentTarget == target,
                   receipt.pdfAttachments.allSatisfy({ $0.target == target }) else {

@@ -4,9 +4,11 @@ import Observation
 /// The shares other apps saved for bighelp (`PendingShareInbox`), as the app sees them: which to
 /// offer for review, which a chat holds now, and where each one is on its way.
 ///
-/// A share leaves the inbox only when Hermes takes the message carrying it (`ChatShareEvent.delivered`)
-/// or the person deletes it. Each other step a chat reports is written to its placement at once, so
-/// after closing bighelp or a crash it's offered again, saying whether it may have been sent.
+/// A share leaves the inbox only when Hermes takes the message carrying it
+/// (`PendingShareLedger.Effect.accepted`, marked spent before it's deleted) or the person deletes it.
+/// Each other step a chat's ledger reports is saved to its placement, a step to sending before the
+/// message may go, so after closing bighelp or a crash it's offered again, saying whether it may
+/// have been sent.
 @MainActor
 @Observable
 final class PendingShareCenter: ChatShareTracking {
@@ -34,6 +36,8 @@ final class PendingShareCenter: ChatShareTracking {
     /// cover the chat the person just picked.
     private var isPaused = false
     @ObservationIgnored private var holders: [String: WeakHolder] = [:]
+    /// Hermes took these; their saved copies are on their way out and never listed again.
+    @ObservationIgnored private var spent: Set<String> = []
 
     private struct WeakHolder {
         weak var model: ChatModel?
@@ -48,10 +52,19 @@ final class PendingShareCenter: ChatShareTracking {
     func refresh() async {
         isPaused = false
         guard let inbox else { return }
-        let read = await Task.detached(priority: .utility) { () -> [PendingShareInbox.Entry] in
+        let spent = spent
+        let (entries, left) = await Task.detached(priority: .utility) { () -> ([PendingShareInbox.Entry], [String]) in
             inbox.removeAbandonedStaging()
-            return inbox.entries()
+            // Delivered shares whose deletion didn't go through before.
+            let left = inbox.removeDelivered()
+            for id in spent where FileManager.default.fileExists(atPath: inbox.folder(id).path) {
+                _ = try? inbox.remove(id)
+            }
+            return (inbox.entries(), left)
         }.value
+        self.spent = self.spent.filter { FileManager.default.fileExists(atPath: inbox.folder($0).path) }
+            .union(left)
+        let read = entries.filter { !self.spent.contains($0.id) }
         let known = Set(entries.map(\.id))
         if read.contains(where: { !known.contains($0.id) }) { deferred.removeAll() }
         let ids = Set(read.map(\.id))
@@ -72,7 +85,8 @@ final class PendingShareCenter: ChatShareTracking {
 
     var waitingCount: Int { entries.count }
 
-    func isHeld(_ id: String) -> Bool { holders[id]?.model != nil }
+    /// In a chat's message box, or on its way in a message from there. Asks the chat itself.
+    func isHeld(_ id: String) -> Bool { holders[id]?.model?.holdsShare(id) == true }
 
     func isDeferred(_ id: String) -> Bool { deferred.contains(id) }
 
@@ -124,39 +138,61 @@ final class PendingShareCenter: ChatShareTracking {
 
     // MARK: - ChatShareTracking
 
-    func share(_ id: String, in model: ChatModel, _ event: ChatShareEvent) {
-        switch event {
-        case .inBox:
-            holders[id] = WeakHolder(model: model)
-            handedOff[id] = nil
-            record(id, nil)
-        case .staged(let messageID):
-            holders[id] = WeakHolder(model: model)
-            record(id, .init(conversationID: model.conversationID, messageID: messageID, state: .staged, at: .now))
-        case .sending(let messageID):
-            holders[id] = WeakHolder(model: model)
-            record(id, .init(conversationID: model.conversationID, messageID: messageID, state: .sending, at: .now))
-        case .unconfirmed(let messageID):
-            // In the list, saying it may have arrived; never offered as unsent.
-            holders[id] = nil
-            deferred.insert(id)
-            record(id, .init(conversationID: model.conversationID, messageID: messageID, state: .unconfirmed, at: .now))
-        case .delivered:
-            holders[id] = nil
-            try? inbox?.remove(id)
-            forget(id)
-        case .removed:
-            holders[id] = nil
-            deferred.insert(id)
-            record(id, nil)
-        case .retired:
-            holders[id] = nil
-            record(id, nil)
+    func apply(_ effects: [PendingShareLedger.Effect], from model: ChatModel) throws {
+        for effect in effects {
+            switch effect {
+            case .inBox(let id):
+                holders[id] = WeakHolder(model: model)
+                handedOff[id] = nil
+                record(id, nil)
+            case .submission(let id, let submission):
+                holders[id] = WeakHolder(model: model)
+                if submission.state == .sending {
+                    // The message goes to Hermes only once this is saved.
+                    guard let inbox else { throw PendingShareError.storageUnavailable }
+                    try inbox.recordSubmission(id, submission)
+                    update(id) { placement in
+                        var placement = placement
+                        placement?.submission = submission
+                        return placement
+                    }
+                } else {
+                    record(id, submission)
+                }
+                // In the list, saying it may have arrived; never offered as unsent.
+                if submission.state == .unconfirmed {
+                    holders[id] = nil
+                    deferred.insert(id)
+                }
+            case .accepted(let id, let submission):
+                holders[id] = nil
+                delivered(id, submission)
+            case .released(let id, let reason):
+                holders[id] = nil
+                record(id, nil)
+                if reason != .retired { deferred.insert(id) }
+            }
         }
     }
 
-    /// Written at once, on this thread: the message it describes may go out right after, and a
-    /// relaunch must find what's true.
+    func messageDelivered(conversationID: String, messageID: String) {
+        guard let inbox else { return }
+        for id in inbox.markDelivered(conversationID: conversationID, messageID: messageID, at: .now) {
+            forget(id)
+        }
+    }
+
+    /// Spent: never listed again in this run whatever the disk says, marked spent on disk so a
+    /// fresh start never lists it either, and deleted now or on a later refresh.
+    private func delivered(_ id: String, _ submission: PendingShareSubmission) {
+        spent.insert(id)
+        forget(id)
+        guard let inbox else { return }
+        if (try? inbox.markDelivered(id, submission)) == true { spent.remove(id) }
+    }
+
+    /// Best effort: a step that isn't saved leaves the last saved one, which a relaunch reads as
+    /// no more sent than it was.
     private func record(_ id: String, _ submission: PendingShareSubmission?) {
         try? inbox?.recordSubmission(id, submission)
         update(id) { placement in

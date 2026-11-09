@@ -131,7 +131,7 @@ extension DirectHermesConversationClient {
                 guard ["queued", "streaming"].contains(accepted.object?["status"]?.string ?? "") else {
                     throw DirectHermesError.invalidResponse
                 }
-                takeSubmissionAdmitted()
+                takeSubmissionAdmitted(entry.id)
                 retireSubmission(entry.id)
                 status = "PDF pages, files, and message accepted by Hermes"
                 response = ConversationResponse(items: [])

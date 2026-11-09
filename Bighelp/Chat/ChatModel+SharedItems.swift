@@ -1,38 +1,14 @@
 import Foundation
 import UniformTypeIdentifiers
 
-/// A share from another app in this chat (`ChatModel.placeShare`).
-struct ChatHeldShare: Equatable {
-    let share: PendingShare
-    /// The draft attachments its files became in this message box.
-    var landedIDs: Set<String> = []
-
-    var id: String { share.id }
-}
-
-/// A step on a share's way through a chat, for its `ChatShareTracking`. Only `delivered` lets its
-/// saved copy go; every other step keeps it.
-enum ChatShareEvent: Equatable {
-    /// In the message box; nothing sent.
-    case inBox
-    /// Waiting in the chat for its connection (`stageComposerMessage`). Those messages live only in
-    /// memory, so it hasn't gone anywhere yet.
-    case staged(messageID: String)
-    /// Handed to Hermes in this message.
-    case sending(messageID: String)
-    /// That send ended without Hermes confirming it: it may have arrived.
-    case unconfirmed(messageID: String)
-    /// Hermes took the message.
-    case delivered
-    /// Out of the chat unsent: the person took it out of the message box, or removed its waiting message.
-    case removed
-    /// The chat closed for another computer or account before it went.
-    case retired
-}
-
+/// Saves each step a chat's shares take (`PendingShareLedger.Effect`), and finds shares a chat no
+/// longer knows by the message they went in.
 @MainActor
 protocol ChatShareTracking: AnyObject {
-    func share(_ id: String, in model: ChatModel, _ event: ChatShareEvent)
+    /// Throws when a `.sending` step can't be saved: that message must not go to Hermes.
+    func apply(_ effects: [PendingShareLedger.Effect], from model: ChatModel) throws
+    /// Hermes' history shows this message arrived (a reference message's receipt, read after a relaunch).
+    func messageDelivered(conversationID: String, messageID: String)
 }
 
 extension ChatModel {
@@ -44,16 +20,36 @@ extension ChatModel {
         case interrupted
     }
 
+    /// Whether a message about to go carries shares, and if so the id the client's journal entry
+    /// for it binds to (`PendingShareCorrelation`).
+    enum ShareDispatch: Equatable {
+        case noShares
+        case sending(UUID)
+        /// Where its shares are going couldn't be saved: it must not go.
+        case unsaved
+
+        var id: UUID? {
+            if case .sending(let id) = self { return id }
+            return nil
+        }
+    }
+
+    static let unsavedShareMessage = String(localized: "bighelp couldn't save where your shared items are going, so nothing was sent. Your message is back in the message box.")
+
+    var shareLedger: PendingShareLedger {
+        get { shareLedgerStorage ?? PendingShareLedger(conversationID: conversationID) }
+        set { shareLedgerStorage = newValue }
+    }
+
     /// Puts a share in the message box: its words below anything typed, its files through the same
     /// path as Add and a drop (prepared, kept as a big file, or "didn't attach" with why and Try
     /// again). Nothing is sent: the person reviews it and taps Send, and the chat's own rules apply.
     func placeShare(_ share: PendingShare, from inbox: PendingShareInbox,
                     tracker: any ChatShareTracking) async -> SharePlacement {
-        guard !holdsShare(share.id) else { return .alreadyHere }
         shareTracker = tracker
+        guard shareLedger.beginPlacing(share) else { return .alreadyHere }
         if let updated = PendingShare.draft(draft, adding: share.composerText) { draft = updated }
 
-        let landed = ShareLanding()
         let loaders = share.files.enumerated().map { index, file in
             DraftAttachmentLoader(draftNamed: file.name) { @MainActor [weak self] in
                 let url = inbox.fileURL(file, in: share)
@@ -65,7 +61,8 @@ extension ChatModel {
                 // The same ID each time, so a share added again after a relaunch never attaches twice.
                 let attachment = try await ComposerAttachmentDrop.draftAttachment(
                     from: read, id: "attachment_share_\(share.id)_\(index)", into: self)
-                landed.ids[index] = attachment.sourceAttachmentID
+                // Here and on every Try again: a big file is a new copy each time.
+                self?.shareLedger.fileLanded(shareID: share.id, index: index, attachmentID: attachment.sourceAttachmentID)
                 return attachment
             }
         }
@@ -75,95 +72,137 @@ extension ChatModel {
 
         let present = Set(orderedDraftAttachments.map(\.sourceAttachmentID))
         let failed = Set(draftAttachmentFailures.map(\.name))
+        let landed = shareLedger.placing[share.id]?.files ?? [:]
         let accounted = share.files.indices.allSatisfy { index in
-            landed.ids[index].map(present.contains) == true || failed.contains(share.files[index].name)
+            landed[index].map(present.contains) == true || failed.contains(share.files[index].name)
         }
-        guard accounted, !referenceOwnerRetired, !holdsShare(share.id) else { return .interrupted }
-        sharesInBox.append(ChatHeldShare(share: share, landedIDs: Set(landed.ids.values)))
-        tracker.share(share.id, in: self, .inBox)
+        guard accounted, !referenceOwnerRetired else {
+            shareLedger.cancelPlacing(share.id)
+            return .interrupted
+        }
+        applyShareEffects(shareLedger.finishPlacing(share.id))
         return .placed
     }
 
-    func holdsShare(_ id: String) -> Bool {
-        sharesInBox.contains { $0.id == id } || sharesInMessages.values.contains { $0.contains { $0.id == id } }
+    func holdsShare(_ id: String) -> Bool { shareLedgerStorage?.holds(id) == true }
+
+    func carriesShares(_ messageID: String) -> Bool { shareLedgerStorage?.message(row: messageID) != nil }
+
+    // MARK: - The box
+
+    /// After the person changed the box (took a file or a failed file out, or edited its text and
+    /// paused): a share it holds nothing of now is out of this chat, kept and listed. Not while
+    /// files are still being read in, since a retry or an import clears the box for a moment.
+    func reviewSharesInBox() {
+        guard shareLedgerStorage?.inBox.isEmpty == false, draftAttachmentImport == nil,
+              !isReplacingReferenceDraft else { return }
+        applyShareEffects(shareLedger.reviewBox(
+            text: draft, attachmentIDs: Set(orderedDraftAttachments.map(\.sourceAttachmentID)),
+            failedNames: Set(draftAttachmentFailures.map(\.name))))
+    }
+
+    func scheduleShareBoxReview() {
+        shareBoxReview?.cancel()
+        let delay = shareBoxReviewDelay
+        shareBoxReview = Task { [weak self] in
+            do { try await Task.sleep(for: delay) } catch { return }
+            self?.reviewSharesInBox()
+        }
     }
 
     // MARK: - Its way out
 
-    /// The box left as message `messageID`: sent, or `staged` to wait for the connection. A share
-    /// goes with it while the message still holds any of it; one it holds nothing of was taken out
-    /// by the person, and stays saved.
-    func sharesLeaveBox(as messageID: String, message: String, attachments: [ChatDraftAttachment], staged: Bool) {
-        guard !sharesInBox.isEmpty else { return }
-        let attachmentIDs = Set(attachments.map(\.sourceAttachmentID))
-        let leaving = sharesInBox
-        sharesInBox = []
-        for held in leaving {
-            if held.share.isCarried(byText: message, attachmentIDs: attachmentIDs, landedIDs: held.landedIDs) {
-                sharesInMessages[messageID, default: []].append(held)
-                report(held.id, staged ? .staged(messageID: messageID) : .sending(messageID: messageID))
-            } else {
-                report(held.id, .removed)
-            }
+    /// The box left as message `messageID`: sent, staged, or waiting on its files. A share goes
+    /// with it while the message still holds any of it; one it holds nothing of stays saved.
+    func sharesLeaveBox(as messageID: String, message: String, attachments: [ChatDraftAttachment]) {
+        guard shareLedgerStorage?.inBox.isEmpty == false else { return }
+        applyShareEffects(shareLedger.leaveBox(as: messageID, text: message,
+                                               attachmentIDs: Set(attachments.map(\.sourceAttachmentID)), now: .now))
+    }
+
+    /// Right before message `messageID` goes to Hermes: saves that its shares are being sent. When
+    /// that can't be saved, the caller puts the message back in the box instead of sending it.
+    func dispatchShares(_ messageID: String) -> ShareDispatch {
+        let effects = shareLedger.dispatch(messageID, now: .now)
+        guard !effects.isEmpty, let id = shareLedger.message(row: messageID)?.id else { return .noShares }
+        guard let shareTracker else { return .unsaved }
+        do {
+            try shareTracker.apply(effects, from: self)
+            return .sending(id)
+        } catch {
+            return .unsaved
         }
     }
 
-    /// A staged message goes to Hermes now, under `newID` when it takes a new row.
-    func shareMessageSending(_ messageID: String, as newID: String? = nil) {
-        guard let held = sharesInMessages.removeValue(forKey: messageID) else { return }
-        let id = newID ?? messageID
-        sharesInMessages[id, default: []] += held
-        for share in held { report(share.id, .sending(messageID: id)) }
+    /// A staged message took a new row as it went.
+    func shareMessageRenamed(_ messageID: String, to newID: String) {
+        shareLedger.rename(messageID, to: newID)
     }
 
-    /// Hermes took the message: its shares' saved copies can go.
-    func shareMessageDelivered(_ messageID: String) {
-        guard let held = sharesInMessages.removeValue(forKey: messageID) else { return }
-        for share in held { report(share.id, .delivered) }
+    /// Hermes took the message: from the client's journal entry it was recorded as (it admits only
+    /// that entry), or the send that returned.
+    func shareMessageAdmitted(_ id: UUID) {
+        applyShareEffects(shareLedger.admitted(id, now: .now))
     }
 
-    /// Its send ended without Hermes confirming it. Nothing once it was delivered or went back in the box.
-    func shareMessageUnconfirmed(_ messageID: String) {
-        guard let held = sharesInMessages.removeValue(forKey: messageID) else { return }
-        for share in held { report(share.id, .unconfirmed(messageID: messageID)) }
+    /// Hermes took the message with this row: a send that returned, or its history (a reference's
+    /// receipt). One this chat doesn't know (bighelp opened again since) is found by its saved row.
+    func shareMessageAdmitted(row messageID: String) {
+        let effects = shareLedger.admitted(row: messageID, now: .now)
+        if effects.isEmpty {
+            shareTracker?.messageDelivered(conversationID: conversationID, messageID: messageID)
+        } else {
+            applyShareEffects(effects)
+        }
     }
 
-    /// The person removed the message while it waited (a big file that didn't go).
-    func shareMessageRemoved(_ messageID: String) {
-        guard let held = sharesInMessages.removeValue(forKey: messageID) else { return }
-        for share in held { report(share.id, .removed) }
+    /// Hermes definitely didn't take it, and it isn't back in the box: kept, not sent.
+    func shareMessageRefused(row messageID: String) {
+        applyShareEffects(shareLedger.refused(row: messageID))
+    }
+
+    /// Its send ended without an answer either way. Nothing once it was settled.
+    func shareMessageUnknown(row messageID: String) {
+        applyShareEffects(shareLedger.unknown(row: messageID, now: .now))
+    }
+
+    /// Its files didn't go, and it waits in the chat for Try again.
+    func shareMessageWaits(row messageID: String) {
+        applyShareEffects(shareLedger.waits(row: messageID, now: .now))
+    }
+
+    /// The person removed it while it waited.
+    func shareMessageRemoved(row messageID: String) {
+        applyShareEffects(shareLedger.removed(row: messageID))
     }
 
     /// Messages going back in the box unsent (`putBackInBox`): their shares are in the box again.
     func sharesReturnToBox(from messageIDs: [String]) {
-        for messageID in messageIDs {
-            guard let held = sharesInMessages.removeValue(forKey: messageID) else { continue }
-            sharesInBox += held
-            for share in held { report(share.id, .inBox) }
-        }
+        applyShareEffects(shareLedger.returnToBox(messageIDs))
     }
 
     /// The chat closes for another computer or account (`invalidateReferenceOwnership`). Nothing is
     /// deleted: a share not yet with Hermes is offered again, and one being sent may have arrived.
     func retireShares() {
-        let inBox = sharesInBox
-        let inMessages = sharesInMessages
-        sharesInBox = []
-        sharesInMessages = [:]
-        for held in inBox { report(held.id, .retired) }
-        for (messageID, held) in inMessages {
-            let isStaged = stagedSends.contains { $0.id == messageID }
-            for share in held { report(share.id, isStaged ? .retired : .unconfirmed(messageID: messageID)) }
-        }
+        shareBoxReview?.cancel()
+        guard shareLedgerStorage != nil else { return }
+        applyShareEffects(shareLedger.retire(now: .now))
     }
 
-    private func report(_ id: String, _ event: ChatShareEvent) {
-        shareTracker?.share(id, in: self, event)
+    /// A share-carrying message that definitely didn't go goes back in the box with its shares,
+    /// rather than to Try again, which would send it without them.
+    func putShareMessageBack(_ humanID: String, message: String, attachments: [ChatAttachment],
+                             orderedAttachments: [ChatDraftAttachment]) {
+        removeItem(id: humanID)
+        removeProjectedMessage(id: humanID)
+        nativeConversationClient?.retainVisibleState()
+        putBackInBox(message, attachments: attachments, orderedAttachments: orderedAttachments, returning: humanID)
+        retryRequest = nil
     }
-}
 
-/// Which draft attachment each of a share's files became.
-@MainActor
-private final class ShareLanding {
-    var ids: [Int: String] = [:]
+    private func applyShareEffects(_ effects: [PendingShareLedger.Effect]) {
+        guard !effects.isEmpty else { return }
+        // Only `.sending` steps must be saved (`dispatchShares`); the others are saved as they can be.
+        try? shareTracker?.apply(effects, from: self)
+    }
 }

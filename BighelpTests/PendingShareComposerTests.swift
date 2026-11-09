@@ -83,10 +83,15 @@ struct PendingShareComposerTests {
         #expect(attachment.fileName == "Made-up notes.txt" && attachment.mimeType == "text/plain")
         #expect(attachment.data == Data("synthetic notes".utf8))
         #expect(attachment.id == "attachment_share_\(share.id)_0")
-        // Taking the file out leaves it saved: only a send that carries it lets it go.
+        // Taking the file out and erasing the words: out of this chat, kept, and free to open again.
+        model.shareBoxReviewDelay = .milliseconds(10)
         model.removeDraftAttachment(id: attachment.id)
+        #expect(model.holdsShare(share.id), "Its words are still there")
         model.draft = ""
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(!model.holdsShare(share.id) && !center.isHeld(share.id))
         #expect(savedIDs == [share.id])
+        #expect(center.entries.map(\.id) == [share.id], "Listed, to open in any chat")
     }
 
     @Test func retryingTheOnlyFileThatDidntAttachStillFindsIt() async throws {
@@ -162,23 +167,20 @@ struct PendingShareComposerTests {
         #expect(placement(share.id)?.recovery == .notSent)
     }
 
-    @Test func aSendHermesDidntConfirmKeepsTheShareAndSaysItMayHaveArrived() async throws {
-        let share = try save(text: "Maybe sent")
+    @Test func aSendThatDefinitelyFailedPutsItBackInTheBoxWithItsShare() async throws {
+        let share = try save(text: "Not delivered")
         let center = await center()
         let model = ChatModel(conversationID: "chat-1", client: ConversationFixtureClient(shouldFail: true),
                               initialItems: [])
         #expect(await model.placeShare(share, from: inbox, tracker: center) == .placed)
 
         await model.send()
-        #expect(model.failureMessage != nil)
-        #expect(savedIDs == [share.id], "Never deleted on a send that didn't confirm")
-        let saved = try #require(placement(share.id))
-        #expect(saved.submission?.state == .unconfirmed)
-        #expect(saved.submission?.conversationID == "chat-1")
-        #expect(saved.recovery == .maybeSent)
-        // Not offered as unsent: only the list shows it, saying it may have arrived.
-        #expect(center.next() == nil)
-        #expect(center.entries.map(\.id) == [share.id])
+        // Not Try again, which would send it without its share: back in the box with it.
+        #expect(model.failureMessage != nil && model.retryRequest == nil)
+        #expect(model.draft == "Not delivered")
+        #expect(model.holdsShare(share.id))
+        #expect(placement(share.id)?.submission == nil && placement(share.id)?.recovery == .notSent)
+        #expect(savedIDs == [share.id])
     }
 
     @Test func aMessagePutBackInTheBoxTakesItsShareWithIt() async throws {
@@ -327,4 +329,276 @@ struct PendingShareComposerTests {
         await center.refresh()
         #expect(center.waitingCount == ids.count)
     }
+
+    // MARK: - Second review: one lifecycle per message
+
+    @Test func aSendingMarkThatCantBeSavedSendsNothing() async throws {
+        let share = try save(text: "Must not go unsaved")
+        let center = await center()
+        let client = ShareCountingClient()
+        let model = ChatModel(conversationID: "chat-1", client: client, initialItems: [])
+        #expect(await model.placeShare(share, from: inbox, tracker: center) == .placed)
+
+        // Its placement can't be written any more.
+        let placementFile = inbox.folder(share.id).appendingPathComponent("placement.json")
+        try FileManager.default.removeItem(at: placementFile)
+        try FileManager.default.createDirectory(at: placementFile, withIntermediateDirectories: false)
+        await model.send()
+        #expect(client.sent.isEmpty, "Nothing reached the computer")
+        #expect(model.failureMessage == ChatModel.unsavedShareMessage)
+        #expect(model.draft == "Must not go unsaved" && model.holdsShare(share.id))
+        #expect(!model.items.contains { $0.role == .human })
+    }
+
+    @Test func aDeliveredShareWhoseDeletionFailsIsNeverOfferedAgain() async throws {
+        let share = try save(text: "Delivered once")
+        let center = await center()
+        let model = ChatModel(conversationID: "chat-1", client: ConversationFixtureClient(), initialItems: [])
+        #expect(await model.placeShare(share, from: inbox, tracker: center) == .placed)
+
+        // The share's folder can't be moved out: only the spent mark takes.
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: inbox.root.path)
+        await model.send()
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: inbox.root.path)
+        #expect(center.entries.isEmpty && center.next() == nil)
+        #expect(FileManager.default.fileExists(atPath: inbox.folder(share.id).path))
+
+        // A fresh start never lists it, and its refresh finishes deleting it.
+        let relaunched = PendingShareCenter(inbox: PendingShareInbox(root: inbox.root))
+        await relaunched.refresh()
+        #expect(relaunched.entries.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: inbox.folder(share.id).path))
+    }
+
+    @Test func onlyTheJournalEntryAMessageWasRecordedAsSettlesItsShare() async throws {
+        // Two messages, each carrying a share: B is admitted first, A is refused; then the other way.
+        for refusesFirst in [false, true] {
+            let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let client = try DirectHermesConversationClient(rpc: ShareGateRPC(), hostIdentity: "host",
+                profile: "default", runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch",
+                drafts: .init(root: root))
+            let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+            client.model = model
+            let center = await center()
+            let a = try save(text: "Share A \(refusesFirst)")
+            let b = try save(text: "Share B \(refusesFirst)")
+            #expect(await model.placeShare(a, from: inbox, tracker: center) == .placed)
+            model.sharesLeaveBox(as: "row-a", message: "Share A \(refusesFirst)", attachments: [])
+            let aID = try #require(model.dispatchShares("row-a").id)
+            model.draft = ""
+            #expect(await model.placeShare(b, from: inbox, tracker: center) == .placed)
+            model.sharesLeaveBox(as: "row-b", message: "Share B \(refusesFirst)", attachments: [])
+            let bID = try #require(model.dispatchShares("row-b").id)
+            let entryA = try PendingShareCorrelation.$submission.withValue(aID) {
+                try client.recordSubmission("Share A", method: "prompt.submit")
+            }
+            let entryB = try PendingShareCorrelation.$submission.withValue(bID) {
+                try client.recordSubmission("Share B", method: "prompt.submit")
+            }
+            let unrelated = try client.recordSubmission("No share", method: "prompt.submit")
+
+            if refusesFirst { try client.retainRejectedSubmission(entryA, code: 4007) }
+            client.takeSubmissionAdmitted(unrelated.id)
+            #expect(savedIDs.contains(a.id) && savedIDs.contains(b.id), "Another entry's admission settles nothing")
+            client.takeSubmissionAdmitted(entryB.id)
+            #expect(!savedIDs.contains(b.id))
+            #expect(savedIDs.contains(a.id), "B's admission never spends A")
+            if !refusesFirst { try client.retainRejectedSubmission(entryA, code: 4007) }
+            client.admitShares(of: entryA.id)
+            #expect(savedIDs.contains(a.id), "A refused: nothing can spend it")
+        }
+    }
+
+    @Test func hermesAdmittingTheMessageSpendsItsShareBeforeTheTurnEnds() async throws {
+        let share = try save(text: "Admitted early")
+        let center = await center()
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let rpc = ShareGateRPC()
+        let client = try DirectHermesConversationClient(rpc: rpc, hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch", drafts: .init(root: root))
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        try await client.recover(epoch: "epoch")
+        defer { client.suspend() }
+        #expect(await model.placeShare(share, from: inbox, tracker: center) == .placed)
+
+        let sending = Task { await model.send() }
+        defer { sending.cancel() }
+        for _ in 0..<500 where !savedIDs.isEmpty { try await Task.sleep(for: .milliseconds(2)) }
+        #expect(rpc.submits == ["Admitted early"])
+        #expect(savedIDs.isEmpty, "Spent on admission; the turn hasn't ended")
+    }
+
+    @Test func aRefusalWithNewerWordsInTheBoxIsNotSentNotMaybe() async throws {
+        let share = try save(text: "Refused words")
+        let center = await center()
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let rpc = ShareGateRPC()
+        rpc.holdsSubmit = true
+        let client = try DirectHermesConversationClient(rpc: rpc, hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch", drafts: .init(root: root))
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        try await client.recover(epoch: "epoch")
+        defer { client.suspend() }
+        #expect(await model.placeShare(share, from: inbox, tracker: center) == .placed)
+
+        let sending = Task { await model.send() }
+        for _ in 0..<500 where !rpc.isHoldingSubmit { try await Task.sleep(for: .milliseconds(2)) }
+        model.draft = "Newer words typed meanwhile"
+        rpc.releaseSubmit(throwing: DirectHermesError.rpcRejected(code: 4007))
+        await sending.value
+
+        #expect(model.draft == "Newer words typed meanwhile", "The newer words are left alone")
+        #expect(!model.holdsShare(share.id))
+        #expect(placement(share.id)?.submission == nil, "Definitely not sent, not 'may have arrived'")
+        #expect(placement(share.id)?.recovery == .notSent)
+        #expect(center.entries.map(\.id) == [share.id])
+    }
+
+    @Test func anotherHermesHoldingTheChatDoesntSendTheShareOnInABranch() async throws {
+        let share = try save(text: "Held elsewhere")
+        let center = await center()
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let rpc = ShareGateRPC()
+        rpc.refusal = DirectHermesError.rpcRejected(code: 4090)
+        let client = try DirectHermesConversationClient(rpc: rpc, hostIdentity: "host", profile: "default",
+            runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch", drafts: .init(root: root))
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        try await client.recover(epoch: "epoch")
+        defer { client.suspend() }
+        #expect(await model.placeShare(share, from: inbox, tracker: center) == .placed)
+
+        await model.send()
+        #expect(model.branchContinuation == nil, "A branch would send it without its shared items")
+        #expect(model.draft == "Held elsewhere" && model.holdsShare(share.id))
+        #expect(placement(share.id)?.recovery == .notSent)
+    }
+
+    @Test func aLostReceiptThenItsHistorySpendsTheShareOnceHereOrAfterARelaunch() async throws {
+        for relaunches in [false, true] {
+            let share = try save(text: "Reference \(relaunches)")
+            let center = await center()
+            let model = ChatModel(conversationID: "chat-1", client: ConversationFixtureClient(), initialItems: [])
+            #expect(await model.placeShare(share, from: inbox, tracker: center) == .placed)
+            model.sharesLeaveBox(as: "ref-message-\(relaunches)", message: "Reference \(relaunches)", attachments: [])
+            model.draft = ""
+            #expect(model.dispatchShares("ref-message-\(relaunches)").id != nil)
+            // The receipt was lost: it may have arrived, and isn't put back to be sent again.
+            model.shareMessageUnknown(row: "ref-message-\(relaunches)")
+            #expect(placement(share.id)?.submission?.state == .unconfirmed)
+            #expect(model.draft.isEmpty)
+
+            // Later its history shows it arrived (`finishReferenceAcceptance`).
+            if relaunches {
+                let reopened = ChatModel(conversationID: "chat-1", client: ConversationFixtureClient(), initialItems: [])
+                let freshCenter = PendingShareCenter(inbox: PendingShareInbox(root: inbox.root))
+                await freshCenter.refresh()
+                reopened.shareTracker = freshCenter
+                reopened.shareMessageAdmitted(row: "ref-message-\(relaunches)")
+            } else {
+                model.shareMessageAdmitted(row: "ref-message-\(relaunches)")
+            }
+            #expect(!savedIDs.contains(share.id))
+        }
+    }
+
+    @Test func aFileThatOnlyAttachesOnTryAgainGoesWithItsMessageOnce() async throws {
+        let share = try save(files: [notes])
+        let center = await center()
+        let client = ShareCountingClient()
+        client.supportedAttachmentKinds = [.image]
+        let model = ChatModel(conversationID: "chat-1", client: client, initialItems: [])
+        #expect(await model.placeShare(share, from: inbox, tracker: center) == .placed)
+        #expect(model.draftAttachmentFailures.count == 1, "Files aren't taken yet")
+
+        client.supportedAttachmentKinds = [.image, .file]
+        await model.retryFailedDraftAttachments()
+        #expect(model.draftAttachmentFailures.isEmpty && model.draftAttachments.count == 1)
+        await model.send()
+        #expect(client.sent.count == 1)
+        #expect(savedIDs.isEmpty, "It went with the message, and settled once")
+    }
+
+    @Test func sharesStagedSeparatelyGoInMessagesOfTheirOwn() async throws {
+        let a = try save(text: "First while offline")
+        let b = try save(text: "Second while offline")
+        let center = await center()
+        let model = ChatModel(conversationID: "chat-1", client: NativeWorkspaceUnavailableClient(), initialItems: [])
+        #expect(await model.placeShare(a, from: inbox, tracker: center) == .placed)
+        await model.send()
+        #expect(await model.placeShare(b, from: inbox, tracker: center) == .placed)
+        await model.send()
+        let messages = model.shareLedger.messages
+        #expect(messages.count == 2 && Set(messages.map(\.id)).count == 2)
+        #expect(placement(a.id)?.submission?.id != placement(b.id)?.submission?.id)
+    }
+}
+
+/// Counts what reached the computer, and takes the kinds of attachment a test says.
+private final class ShareCountingClient: AttachmentConversationClient {
+    var supportedAttachmentKinds: Set<ChatAttachment.Kind> = [.image, .file]
+    private(set) var sent: [String] = []
+
+    func send(message: String, conversationID: String) async throws -> ConversationResponse {
+        sent.append(message)
+        return ConversationResponse(items: [])
+    }
+
+    func send(message: String, attachments: [ChatAttachment], conversationID: String,
+              onDraft: @escaping (TimelineItem) -> Void) async throws -> ConversationResponse {
+        sent.append(message)
+        return ConversationResponse(items: [])
+    }
+
+    func perform(action: QuickAction, conversationID: String) async throws -> ConversationResponse {
+        ConversationResponse(items: [])
+    }
+}
+
+/// A computer that answers a prompt with `streaming` and never ends the turn, refuses it, or holds
+/// its answer until the test gives one.
+@MainActor
+private final class ShareGateRPC: DirectHermesRPC {
+    var onEvent: ((DirectHermesEvent) -> Void)?
+    var refusal: DirectHermesError?
+    var holdsSubmit = false
+    private(set) var submits: [String] = []
+    private var held: CheckedContinuation<BighelpJSONValue, any Error>?
+    var isHoldingSubmit: Bool { held != nil }
+
+    func releaseSubmit(throwing error: any Error) {
+        held?.resume(throwing: error)
+        held = nil
+    }
+
+    func request(_ method: String, params: [String: BighelpJSONValue]) async throws -> BighelpJSONValue {
+        switch method {
+        case "session.events.since":
+            return .object(["epoch": .string("epoch"), "latest_seq": .integer(0), "truncated": .boolean(false),
+                            "events": .array([]), "count": .integer(0)])
+        case "session.activate":
+            return .object(["session_id": .string("runtime"), "stored_session_id": .string("saved"),
+                            "running": .boolean(false), "messages": .array([])])
+        case "prompt.submit":
+            if case .string(let text) = params["text"] { submits.append(text) }
+            if let refusal { throw refusal }
+            if holdsSubmit { return try await withCheckedThrowingContinuation { held = $0 } }
+            return .object(["status": .string("streaming"), "user_row_id": .integer(40 + submits.count)])
+        case "subagent.list":
+            return .object(["subagents": .array([])])
+        case "session.control.read":
+            return .object(["control": .object(["goal": .null, "loop": .null, "heartbeat": .null,
+                                                "revision": .string("fixture"), "updated_at": .integer(0)])])
+        default:
+            throw DirectHermesError.invalidResponse
+        }
+    }
+
+    func disconnect() async {}
 }

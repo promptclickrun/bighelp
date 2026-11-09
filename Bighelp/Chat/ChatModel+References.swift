@@ -177,10 +177,7 @@ extension ChatModel {
         }
         guard ownsReferenceDraft(frozen, remainsOwned: remainsOwned) else { return .superseded }
         referenceSendInFlight = true
-        // The box keeps the message until Hermes takes it; a share in it goes with that message.
         let messageID = submission.message.messageID
-        sharesLeaveBox(as: messageID, message: frozen.canonicalText, attachments: orderedDraftAttachments, staged: false)
-        defer { shareMessageUnconfirmed(messageID) }
         if let selectedBehavior {
             pendingMidSessionSubmissions.append(.init(id: submission.message.messageID,
                 behavior: selectedBehavior))
@@ -213,8 +210,22 @@ extension ChatModel {
             hasLocallyPendingPrimaryTurn = true
             hasExternallyOwnedPrimaryTurn = true
         }
+        // The box keeps the message until Hermes takes it; a share in it goes with that message, saved
+        // as being sent before it goes. If that can't be saved, nothing goes, as for a refusal.
+        sharesLeaveBox(as: messageID, message: frozen.canonicalText, attachments: orderedDraftAttachments)
+        if dispatchShares(messageID) == .unsaved {
+            referenceSubmission = nil
+            if startsPrimaryTurn, isCurrentOwner(submissionGeneration) { isSending = false }
+            try? persistReferenceStateNow()
+            sharesReturnToBox(from: [messageID])
+            failureMessage = Self.unsavedShareMessage
+            return .unavailable
+        }
+        // One no outcome below settled may have reached Hermes; its history can still say so.
+        defer { shareMessageUnknown(row: messageID) }
         do {
             try await canonicalClient.submitReference(submission, remainsOwned: liveOwnership)
+            shareMessageAdmitted(row: messageID)
         } catch {
             guard liveOwnership() else { return .superseded }
             // Only the guarded socket may prove rejection. Generic network,
@@ -304,7 +315,8 @@ extension ChatModel {
 
     private func finishReferenceAcceptance(_ submission: ReferenceCanonicalSubmission) {
         guard referenceSubmission?.submissionID == submission.submissionID else { return }
-        shareMessageDelivered(submission.message.messageID)
+        // Its history or receipt says Hermes has it: here, or found by its row after a relaunch.
+        shareMessageAdmitted(row: submission.message.messageID)
         if !items.contains(where: {
             $0.id == submission.message.messageID || $0.metadata.platformMessageID == submission.message.messageID
         }) {

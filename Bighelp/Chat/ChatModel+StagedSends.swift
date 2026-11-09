@@ -72,7 +72,7 @@ extension ChatModel {
                 || !outgoing.orderedAttachments.isEmpty else { return }
         let item = humanItem(content: outgoing.message, attachments: outgoing.attachments)
         // A share in the box waits with it, still saved: a waiting message lives only in memory.
-        sharesLeaveBox(as: item.id, message: outgoing.message, attachments: outgoing.orderedAttachments, staged: true)
+        sharesLeaveBox(as: item.id, message: outgoing.message, attachments: outgoing.orderedAttachments)
         stagedSends.append(ChatStagedSend(item: item, outgoing: outgoing.staged(as: item),
                                           midSessionBehavior: midSessionBehavior))
         ChatPerformanceProbe.sendRow(item.id, staged: true, in: self)
@@ -93,10 +93,9 @@ extension ChatModel {
         stagedSends.remove(at: index)
         guard itemIndexByID[item.id] == nil else {
             let renamed = humanItem(content: outgoing.message, attachments: outgoing.attachments)
-            shareMessageSending(item.id, as: renamed.id)
+            shareMessageRenamed(item.id, to: renamed.id)
             return renamed
         }
-        shareMessageSending(item.id)
         return item.ordered(takeTranscriptOrder())
     }
 

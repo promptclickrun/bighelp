@@ -81,7 +81,10 @@ struct PendingShareInbox: Sendable {
         var shares: [(Date, Entry)] = []
         for name in names where PendingShare.isValidID(name) {
             if let share = readShare(name) {
-                shares.append((share.createdAt, .share(share, placement: readPlacement(name))))
+                let placement = readPlacement(name)
+                // Hermes has it: only its deletion is left (`removeDelivered`).
+                guard placement?.submission?.state != .accepted else { continue }
+                shares.append((share.createdAt, .share(share, placement: placement)))
             } else {
                 shares.append((.distantPast, .unreadable(id: name)))
             }
@@ -140,6 +143,46 @@ struct PendingShareInbox: Sendable {
             placement.submission = submission
             try Self.write(try JSONEncoder().encode(placement), to: folder(id).appendingPathComponent("placement.json"))
         }
+    }
+
+    /// Hermes took the message carrying the share: it's marked spent first, so even if deleting it
+    /// fails it is never listed or sent again, then deleted. True once it's gone; false when only
+    /// the mark took, for `removeDelivered` to finish. Throws when neither could be done.
+    @discardableResult
+    func markDelivered(_ id: String, _ submission: PendingShareSubmission) throws -> Bool {
+        guard PendingShare.isValidID(id), FileManager.default.fileExists(atPath: folder(id).path) else { return true }
+        let marked = (try? recordSubmission(id, submission.with(.accepted, at: submission.at))) != nil
+        do {
+            try remove(id)
+            return true
+        } catch {
+            guard marked else { throw error }
+            return false
+        }
+    }
+
+    /// The message a share went in, found again by its chat and row (a reference message's history
+    /// read after a relaunch): marked delivered as above. The shares it settled.
+    func markDelivered(conversationID: String, messageID: String, at date: Date) -> [String] {
+        var settled: [String] = []
+        for case .share(let share, let placement?) in entries() {
+            guard let submission = placement.submission, submission.conversationID == conversationID,
+                  submission.messageID == messageID, submission.state == .sending || submission.state == .unconfirmed
+            else { continue }
+            if (try? markDelivered(share.id, submission.with(.accepted, at: date))) != nil { settled.append(share.id) }
+        }
+        return settled
+    }
+
+    /// Deletes shares marked delivered whose deletion didn't go through before. The ones still left.
+    @discardableResult
+    func removeDelivered() -> [String] {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
+        var left: [String] = []
+        for name in names where PendingShare.isValidID(name) && readPlacement(name)?.submission?.state == .accepted {
+            if (try? remove(name)) == nil { left.append(name) }
+        }
+        return left
     }
 
     /// Deletes a share for good: Hermes took the message carrying it, or the person deleted it. The folder leaves in

@@ -80,6 +80,7 @@ final class ChatModel {
             } else {
                 persistSession(draftOnly: true)
             }
+            if shareLedgerStorage?.inBox.isEmpty == false { scheduleShareBoxReview() }
         }
     }
     /// The draft as Send, the placeholder and the mention list need it. It changes only when one
@@ -104,11 +105,14 @@ final class ChatModel {
     var draftAttachmentImport: DraftAttachmentImportProgress?
     /// Ones that didn't attach, with why and a way to try again; Send waits for these too.
     var draftAttachmentFailures: [DraftAttachmentFailure] = []
-    /// Shares from other apps in this chat (`placeShare`): in the message box, or on their way in a
-    /// message. Each step is told to `shareTracker`; only Hermes taking the message deletes one.
-    @ObservationIgnored var sharesInBox: [ChatHeldShare] = []
-    @ObservationIgnored var sharesInMessages: [String: [ChatHeldShare]] = [:]
+    /// Shares from other apps in this chat, from its message box to Hermes (`shareLedger`). Each
+    /// step is saved through `shareTracker`; only Hermes taking a message spends a share.
+    @ObservationIgnored var shareLedgerStorage: PendingShareLedger?
     @ObservationIgnored weak var shareTracker: (any ChatShareTracking)?
+    /// A pause after the person last changed the box's text, before it's checked for shares it no
+    /// longer holds (`reviewSharesInBox`).
+    @ObservationIgnored var shareBoxReview: Task<Void, Never>?
+    @ObservationIgnored var shareBoxReviewDelay: Duration = .milliseconds(800)
     var pdfAttachmentReceipts: [DirectHermesPDFAttachmentReceipt] = []
     var isPDFDraftSendInFlight = false
     var referenceSelections: [ReferenceDraftSelection] = []

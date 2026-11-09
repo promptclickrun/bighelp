@@ -454,9 +454,10 @@ struct PendingShareInboxTests {
         }
         #expect(recovery() == .notSent)
 
+        let messageID = UUID()
         func mark(_ state: PendingShareSubmission.State) throws {
             try inbox.recordSubmission(share.id, PendingShareSubmission(
-                conversationID: "chat-1", messageID: "chat-1-human-4", state: state,
+                id: messageID, conversationID: "chat-1", messageID: "chat-1-human-4", state: state,
                 at: Date(timeIntervalSince1970: 1_800_000_200)))
         }
         // Waiting in the chat for its connection: in memory only, so a relaunch means it wasn't sent.

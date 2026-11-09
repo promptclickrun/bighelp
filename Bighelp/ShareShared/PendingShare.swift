@@ -101,27 +101,35 @@ struct PendingSharePlacement: Codable, Equatable, Sendable {
     var recovery: Recovery {
         switch submission?.state {
         case nil, .staged?: .notSent
-        case .sending?, .unconfirmed?: .maybeSent
+        case .sending?, .unconfirmed?, .accepted?: .maybeSent
         }
     }
 }
 
-/// The message carrying a share, by its row in the chat.
+/// The message carrying a share: its own id, made when it left the message box and never reused,
+/// and its row in the chat.
 struct PendingShareSubmission: Codable, Equatable, Sendable {
     enum State: String, Codable, Sendable {
-        /// Waiting in the chat for its connection. Such messages live only in memory, so after a
-        /// relaunch it was never sent.
+        /// Waiting in the chat (for its connection, or to try its files again). Such messages live
+        /// only in memory, so after a relaunch it was never sent.
         case staged
-        /// Handed to Hermes; its answer hasn't come.
+        /// Handed to Hermes; its answer hasn't come. Saved before the message goes.
         case sending
-        /// Its send ended without Hermes confirming it.
+        /// Its send ended without Hermes confirming it either way.
         case unconfirmed
+        /// Hermes took it. The share is spent: never listed again, and deleted as soon as it can be.
+        case accepted
     }
 
+    let id: UUID
     let conversationID: String
     let messageID: String
     let state: State
     let at: Date
+
+    func with(_ state: State, at date: Date) -> PendingShareSubmission {
+        PendingShareSubmission(id: id, conversationID: conversationID, messageID: messageID, state: state, at: date)
+    }
 }
 
 /// A chat on one computer: its agent, and the chat or a new one.

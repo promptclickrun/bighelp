@@ -24,9 +24,20 @@ struct AgentTodayItem: Identifiable, Equatable, Sendable {
     let endedAt: Date?
     /// One line from the host: a finished subagent's summary, or why it failed.
     let detail: String?
+    /// A `message_agent` message: the agent it went to, as the host names it, and where it is with that
+    /// agent. Hermes runs its wait as a background command; this is what that command is for.
+    var message: Message?
+
+    struct Message: Equatable, Sendable {
+        let agentID: String
+        let agentName: String
+        /// Nil when the agent asked has no receipt for it (an older plugin, a receipt Hermes cleaned up).
+        let state: AgentDelivery.State?
+        let toolName: String?
+    }
 
     init(id: String, kind: Kind, title: String, state: State, startedAt: Date? = nil, endedAt: Date? = nil,
-         detail: String? = nil) {
+         detail: String? = nil, message: Message? = nil) {
         self.id = id
         self.kind = kind
         self.title = title
@@ -34,6 +45,7 @@ struct AgentTodayItem: Identifiable, Equatable, Sendable {
         self.startedAt = startedAt
         self.endedAt = endedAt
         self.detail = detail
+        self.message = message
     }
 
     /// Leniently: a row this build can't read is left out, never the whole list. An unknown state
@@ -47,7 +59,17 @@ struct AgentTodayItem: Identifiable, Equatable, Sendable {
                   state: row["state"]?.string.flatMap(State.init(rawValue:)) ?? .unknown,
                   startedAt: row["startedAt"]?.number.flatMap(Self.date),
                   endedAt: row["endedAt"]?.number.flatMap(Self.date),
-                  detail: row["detail"]?.string.flatMap { Self.oneLine($0, limit: Self.maximumDetailLength) })
+                  detail: row["detail"]?.string.flatMap { Self.oneLine($0, limit: Self.maximumDetailLength) },
+                  message: Self.message(row))
+    }
+
+    private static func message(_ row: [String: BighelpJSONValue]) -> Message? {
+        guard let agent = row["agentId"]?.string, AgentTalkIdentity.isProfileID(agent) else { return nil }
+        let name = row["agentName"]?.string.flatMap { oneLine($0, limit: 80) } ?? agent
+        let delivery = row["delivery"]?.object
+        let tool = delivery?["tool"]?.string.flatMap { ChatToolNames.plainName($0) == nil ? nil : $0 }
+        return Message(agentID: agent, agentName: name,
+                       state: delivery?["state"]?.string.flatMap(AgentDelivery.State.init(rawValue:)), toolName: tool)
     }
 
     /// The host's list, running first, then newest first; duplicates and unreadable rows left out.

@@ -24,7 +24,10 @@ extension ChatModel {
         return true
     }
 
-    private func show(_ commands: [ChatBackgroundCommand]) {
+    private func show(_ listed: [ChatBackgroundCommand]) {
+        // A `message_agent` call's own waiter is the message to that agent, which the agent-talk rail shows.
+        let messages = Set(ledgerReading.agentTalkCalls.compactMap { $0.agentTalkReply?.processID })
+        let commands = listed.filter { !messages.contains($0.id) }
         if commands != backgroundCommands { backgroundCommands = commands }
         let running = commands.count(where: \.isRunning)
         if running != runningBackgroundCommands { runningBackgroundCommands = running }

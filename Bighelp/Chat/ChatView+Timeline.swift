@@ -182,7 +182,8 @@ extension ChatView {
             Color.clear.frame(height: BighelpTokens.space4)
         case .agentTalk(let talk):
             ChatAgentTalkRail(talk: talk, chatAgentID: model.agentID, senderResolver: senderResolver,
-                              live: model.agentTalkLive.activities, loadSteps: model.agentTalkStepsLoader)
+                              live: model.agentTalkLive.activities, loadSteps: model.agentTalkStepsLoader,
+                              access: model.agentTalkRunAccess, onDisclosureChange: beginDisclosureReview)
         case .earlierMessage(let item):
             // Not one of this chat's own messages: Try again couldn't reach it.
             TimelineItemView(item: item, onApprovalTap: onApprovalTap,

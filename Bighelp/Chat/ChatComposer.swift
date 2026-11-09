@@ -652,7 +652,7 @@ struct ChatComposer: View, Equatable {
     }
 
     private func stop() {
-        if !model.isSending, model.otherProcessRun != nil {
+        if !model.isSending || model.followsGatewayTurn, model.otherProcessRun != nil {
             Task { await model.stopOtherProcessRun() }
             return
         }
@@ -885,7 +885,8 @@ private struct ComposerPrimaryAction: View, Equatable {
                                                       isTurnActive: model.isSending || model.otherProcessRun != nil,
                                                       hasAttachments: model.hasDraftAttachmentActivity),
             isBusy: model.isStopping || model.hasExclusiveMidSessionSubmission,
-            canSend: model.canSend, canStop: model.canStop || (!model.isSending && model.otherProcessRun?.canStop == true),
+            canSend: model.canSend, canStop: model.canStop || ((!model.isSending || model.followsGatewayTurn)
+                && model.otherProcessRun?.canStop == true),
             onVoice: onVoice, onSend: onSend, onStop: onStop,
             defaultMidSessionBehavior: model.isMidSessionTurnLive ? model.defaultMidSessionBehavior : nil,
             onMidSessionSend: onMidSessionSend,

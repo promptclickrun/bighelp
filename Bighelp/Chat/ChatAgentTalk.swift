@@ -186,6 +186,8 @@ struct AgentTalkReply: Equatable, Sendable {
     let sessionID: String?
     /// `message_agent`'s background delivery, whose notice carries the answer.
     var processID: String?
+    /// The ID Hermes 0.23 keeps the message under with the agent asked (`AgentDelivery`).
+    var deliveryID: String?
 
     static func parse(_ call: AgentTalkCall, result: String?, lifecycle: ChatActivityLifecycle) -> AgentTalkReply? {
         guard let result, !result.isEmpty else {
@@ -199,7 +201,10 @@ struct AgentTalkReply: Equatable, Sendable {
                 return AgentTalkReply(outcome: .failed, text: nil, sessionID: nil)
             }
             let process = (object?["process_id"] as? String).flatMap { AgentTalkIdentity.isSessionID($0) ? $0 : nil }
-            return AgentTalkReply(outcome: .queued, text: nil, sessionID: nil, processID: process)
+            let delivery = (object?["delivery_id"] as? String).flatMap {
+                DirectHermesAgentTalkReader.isDeliveryID($0) ? $0 : nil
+            }
+            return AgentTalkReply(outcome: .queued, text: nil, sessionID: nil, processID: process, deliveryID: delivery)
         case .chat, .peer:
             let output = object.map { ($0["output"] as? String) ?? "" } ?? result
             let exitCode = (object?["exit_code"] as? NSNumber)?.intValue ?? 0
@@ -259,6 +264,9 @@ struct AgentTalkIncomingMessage: Equatable, Sendable {
 /// background process and, when it ends, adds its notice to the chat:
 /// "[IMPORTANT: Background process proc_… exited (exit code 0).\nCommand: …
 /// bot_mode_dm.py --run-delivery … hermes -p havok chat …\nOutput:\n<reply>]".
+/// On Hermes 0.23 the output is the waiter's JSON instead: `{"outcome", "reply", "status", "delivery_id"}`.
+/// Only a `settled` one is an answer. The waiter gives up after about half an hour while the agent still
+/// works (`queued`, `claimed`): that notice answers nothing, and the delivery says what became of it.
 struct AgentTalkDelivery: Equatable, Sendable {
     /// Matches the `process_id` the `message_agent` call returned.
     let processID: String
@@ -267,6 +275,10 @@ struct AgentTalkDelivery: Equatable, Sendable {
     let succeeded: Bool
     /// The other agent's words.
     let reply: String?
+    /// Hermes 0.23's ID for the message (`AgentDelivery`).
+    var deliveryID: String?
+    /// The waiter stopped waiting before the agent finished: no answer yet.
+    var isStillOut = false
 
     static func parse(_ text: String) -> AgentTalkDelivery? {
         guard text.hasPrefix("[IMPORTANT: Background process "), text.contains("--run-delivery"),
@@ -283,15 +295,32 @@ struct AgentTalkDelivery: Equatable, Sendable {
         if let relayed = output.firstMatch(of: /^Reply from @[A-Za-z0-9_.\/@-]{1,128}(?: on [^\n:]{1,64})?:\s*/) {
             output = String(output[relayed.range.upperBound...])
         }
+        let target = Self.target(of: command)
+        let header0 = header.2 == "0"
+        if let waiter = AgentTalkCall.jsonObject(output), waiter["outcome"] is String || waiter["delivery_id"] is String {
+            let status = (waiter["status"] as? String)?.lowercased()
+            let delivery = (waiter["delivery_id"] as? String).flatMap {
+                DirectHermesAgentTalkReader.isDeliveryID($0) ? $0 : nil
+            }
+            let reply = (waiter["reply"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let settled = status == "settled"
+            return AgentTalkDelivery(
+                processID: String(header.1), targetID: target, succeeded: header0 && settled,
+                reply: settled ? reply.flatMap { $0.isEmpty ? nil : AgentTalkIncomingMessage.parse($0)?.body ?? $0 } : nil,
+                deliveryID: delivery, isStillOut: header0 && (status == "queued" || status == "claimed"))
+        }
         output = AgentTalkIncomingMessage.parse(output)?.body ?? output
-        let target = AgentTalkShellWords.commands(in: command)?.lazy.compactMap { words -> String? in
+        let succeeded = header0
+        return AgentTalkDelivery(processID: String(header.1), targetID: target, succeeded: succeeded,
+                                 reply: succeeded && !output.isEmpty ? output : nil)
+    }
+
+    private static func target(of command: String) -> String? {
+        AgentTalkShellWords.commands(in: command)?.lazy.compactMap { words -> String? in
             guard let start = words.firstIndex(where: { $0.split(separator: "/").last == "hermes" }) else { return nil }
             return AgentTalkCall.parse(toolName: "terminal", arguments: Self.terminalArguments(
                 Array(words[start...])))?.targetID
         }.first
-        let succeeded = header.2 == "0"
-        return AgentTalkDelivery(processID: String(header.1), targetID: target, succeeded: succeeded,
-                                 reply: succeeded && !output.isEmpty ? output : nil)
     }
 
     private static func terminalArguments(_ words: [String]) -> String? {

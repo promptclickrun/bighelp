@@ -42,6 +42,13 @@ extension DirectHermesConversationClient {
         onAdmittedActivity?(change, projection.turnID, false)
     }
 
+    /// A frame of a turn the agent's gateway runs in this chat (Hermes 0.23), as the plugin relays it. It goes
+    /// the way this chat's own frames do, as a turn this device didn't send. The gateway numbers its frames
+    /// apart from this socket, so they carry no sequence here.
+    func receiveObserved(type: String, payload: [String: BighelpJSONValue]) {
+        receive(DirectHermesEvent(type: type, sessionID: runtimeID, payload: payload, sequence: nil))
+    }
+
     func receive(_ event: DirectHermesEvent) {
         if event.type == "session.reclaimed" {
             receiveReclaim(event)

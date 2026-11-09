@@ -189,6 +189,10 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     /// Whether another Hermes process is running a chat now, and stopping that run (plugin, `native-chat-activity-v1`).
     case chatActivity = "chat.activity"
     case chatStop = "chat.stop"
+    /// A turn another process (the agent's gateway) runs in a chat, frame by frame (plugin, `native-chat-live-v1`).
+    case chatLive = "chat.live"
+    /// `message_agent` messages as the agents asked keep them (plugin, `native-agent-deliveries-v1`).
+    case agentDeliveries = "agents.deliveries"
     /// What each agent's Bot Chat is doing, in one read (plugin, `native-agents-activity-v1`).
     case agentsActivity = "agents.activity"
     /// One agent's subagents, background commands and scheduled task runs today (plugin, `native-agents-today-v1`).

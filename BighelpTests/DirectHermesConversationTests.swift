@@ -3511,7 +3511,7 @@ struct NativeMidSessionTests {
     var tailFails = true
 }
 
-@MainActor private final class DirectTestRPC: DirectHermesRPC {
+@MainActor final class DirectTestRPC: DirectHermesRPC {
     var onEvent: ((DirectHermesEvent) -> Void)?
     var result: BighelpJSONValue?
     var handler: (@MainActor (String, [String: BighelpJSONValue]) async throws -> BighelpJSONValue)?

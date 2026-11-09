@@ -25,7 +25,13 @@ struct DirectHermesHistoryRow: Equatable, Sendable {
     let raw: [String: BighelpJSONValue]
 
     var isVisible: Bool {
-        displayKind != "hidden" && displayKind != "internal_notification"
+        switch displayKind {
+        case "hidden": false
+        // Hermes 0.23 saves another agent's `message_agent` message as an internal notification. It is still
+        // that agent writing in, and the chat shows it as one (`AgentTalkIncomingMessage`).
+        case "internal_notification": role == "user" && AgentTalkIncomingMessage.parse(text) != nil
+        default: true
+        }
     }
 
     /// `display_metadata.reply_expected`: false when the message wasn't addressed to the agent.

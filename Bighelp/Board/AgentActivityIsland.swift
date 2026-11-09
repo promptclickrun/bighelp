@@ -22,12 +22,37 @@ extension EnvironmentValues {
     }
 }
 
+/// Where the app may widen the hardware island into a stage of its own.
+enum AgentIslandAvailability {
+    /// Only on a phone laid out the ordinary way, where the island is across the top edge.
+    ///
+    /// The Duo's cameras and status sit in a column on its trailing edge, so the top of the
+    /// screen has no island to cover. Drawing one there also reserved space at the top, which
+    /// moved every screen and — because the app reads its posture from the measured size — came
+    /// back round as a posture change: the stage shook the whole UI open. `BighelpStripTabs`
+    /// carries the agent on those screens instead.
+    static func isShown(isPhone: Bool, posture: BighelpScreenPosture) -> Bool {
+        isPhone && posture == .standard
+    }
+}
+
 enum DynamicIslandGeometry {
     /// The hardware island's frame in window points, when this phone has one.
     @MainActor
     static func frame(in window: UIWindow?) -> CGRect? {
         guard UIDevice.current.userInterfaceIdiom == .phone, let window,
               window.windowScene?.interfaceOrientation.isPortrait != false else { return nil }
+        // No island of our own on the iPhone Duo: its camera and status sit in a column on the
+        // trailing edge, so there is nothing across the top to cover. Reserving top space there
+        // moved every screen — and because the posture this app lays itself out by comes from
+        // the measured size, the reservation fed back into the posture: the whole UI shook while
+        // the stage was open. The strip carries the agent instead (see `BighelpStripTabs`).
+        // A window that hasn't settled reports neither size class: wait for it rather than guess.
+        guard let horizontal = Self.sizeClass(window.traitCollection.horizontalSizeClass),
+              let vertical = Self.sizeClass(window.traitCollection.verticalSizeClass) else { return nil }
+        let posture = BighelpScreenPosture.classify(isPhone: true, horizontal: horizontal, vertical: vertical,
+                                                    size: window.bounds.size)
+        guard AgentIslandAvailability.isShown(isPhone: true, posture: posture) else { return nil }
         let top = window.safeAreaInsets.top
         // Notch phones report 44–50 pt; island phones 54 pt and up.
         guard top >= 54 else { return nil }
@@ -35,6 +60,16 @@ enum DynamicIslandGeometry {
         let height: CGFloat = 37
         let y: CGFloat = top >= 62 ? 14 : 11
         return CGRect(x: (window.bounds.width - width) / 2, y: y, width: width, height: height)
+    }
+
+    /// UIKit's size classes, as the posture's own answer takes them: `UserInterfaceSizeClass` is
+    /// layout's, and a window that hasn't settled yet reports neither.
+    private static func sizeClass(_ sizeClass: UIUserInterfaceSizeClass) -> UserInterfaceSizeClass? {
+        switch sizeClass {
+        case .compact: .compact
+        case .regular: .regular
+        default: nil
+        }
     }
 }
 

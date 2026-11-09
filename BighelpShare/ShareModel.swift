@@ -156,7 +156,7 @@ final class ShareModel: ObservableObject {
     }
 
     private static func isResumable(source: String, id: String) -> Bool {
-        if [Self.sessionSource, "desktop", "tui", "cli"].contains(source) { return true }
+        if [ShareSender.sessionSource, "desktop", "tui", "cli"].contains(source) { return true }
         // Hermes rewrites a Bot Chat's stored source to "local"; only its own rows are ours.
         return source == "local" && id.hasPrefix("local-")
     }

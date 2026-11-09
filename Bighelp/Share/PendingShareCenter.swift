@@ -99,6 +99,7 @@ final class PendingShareCenter {
     func release(_ id: String) {
         holders[id] = nil
         handedOff[id] = nil
+        isPaused = false
     }
 
     /// Its chat's message box emptied after holding it: sent, or removed by the person there.

@@ -35,16 +35,21 @@ extension RootShellView {
             do {
                 try await center.place(share, at: destination, agentName: agentName)
             } catch {
-                actionErrorMessage = String(localized: "bighelp couldn't open this share. It's still saved. Try again.")
+                actionErrorMessage = String(localized: "bighelp couldn't open this share. Try again.")
+                await center.refresh()
                 return
             }
-            guard currentWorkspaceOwner?.cacheScopeID == destination.scope else {
+            // Never another chat or computer than the one picked: if it's gone now, the share waits.
+            let record = destination.sessionID.flatMap { sessionCatalog.session(id: $0) }
+            guard currentWorkspaceOwner?.cacheScopeID == destination.scope,
+                  destination.sessionID == nil || record != nil else {
                 center.release(share.id)
+                actionErrorMessage = String(localized: "That chat isn't available now. Your share is still saved.")
                 return
             }
             appState.handOff(PendingShareHandoff(share: share, inbox: inbox, destination: destination, since: .now,
                                                  onDropped: { center.release($0) }))
-            if let sessionID = destination.sessionID, let record = sessionCatalog.session(id: sessionID) {
+            if let record {
                 appState.chatOpenedFromList = true
                 openSession(record.summary)
             } else {

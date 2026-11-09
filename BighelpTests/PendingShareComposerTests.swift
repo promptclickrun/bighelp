@@ -189,6 +189,8 @@ struct PendingShareComposerTests {
         #expect(center.next(now: now) == nil)
         #expect(center.next(now: now.addingTimeInterval(PendingShareCenter.handOffLifetime + 1)) != nil,
                 "Offered again when no chat took them")
+        center.release(first.id)
+        #expect(center.next(now: now)?.id == first.id, "A chat that couldn't take it gives it back at once")
         guard case .share(_, let placement)? = inbox.entries().first(where: { $0.id == first.id }) else {
             Issue.record("The share should still be saved")
             return

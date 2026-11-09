@@ -128,6 +128,7 @@ change in both repos.
 | `Bighelp/Agents/`, `Board/`, `Companion/` | Agents, Feed/Ideas/Goals, the avatar kit renderer |
 | `Bighelp/Kanban/` | Kanban on Hermes' Kanban plugin: board model, lanes, cards, Vision Pro window and pinch-drag |
 | `Bighelp/Code/` | Code mode (Settings › Modes › Code mode): its home (`CodeHomeView`), the message box's chips (project, new worktree or local, branch), `CodeLauncher`, Changes and Ship |
+| `BighelpShare/`, `Bighelp/ShareShared/`, `Bighelp/Share/` | The share sheet (#922): the extension saves what's shared into the app group (`PendingShareInbox`, Foundation only and shared with the app), and the app's review puts it in the message box of the chat the person picks (`PendingShareCenter`, `ChatModel.placeShare`) |
 | `Bighelp/Connectors/` | Settings › Connections (`AppsHubView`): Hermes' connectors as Native App Connections (the inline connect cards in chat, `connection.request`, `ConnectorCardStore`; `ConnectorAppsModel`) and Composio Apps (`Composio/`, [docs/COMPOSIO_APPS.md](docs/COMPOSIO_APPS.md)) |
 | `Bighelp/HTMLApps/` | Agents' HTML apps: the `html_app` card, the full-screen page and its `window.bighelp` bridge, the plugin's `html-apps` routes, the demo's sample apps |
 | `Bighelp/BotScreen/` | Bot Screen: an agent's Linux screen (Hermes `display.*`) and the computer's own desktop (`ComputerScreen.swift`, the plugin's VNC bridge) in its profile's Computer tab, a native RFB client (`RFB/`, with VNC passwords) and the full-screen viewer with take control and hand back |
@@ -355,6 +356,13 @@ change in both repos.
   item's read-out from `agents/today/detail` (`native-agents-today-detail-v1`, `AgentTodayDetail`). In a chat, a
   helper's late `subagent.*` events update the row of the turn that started it (`subagentTurnIDs`), and a helper
   left running doesn't hold its finished turn open: the turn folds as Settings › Chat › Agent's work says.
+- **The share sheet only saves:** iOS supports `NSExtensionContext.open` only in Today and iMessage extensions,
+  so the share sheet can't open bighelp, and it holds no sign-in. It copies the share into the app group whole or
+  not at all (`PendingShareDraft`: a staging folder under a lock file, moved into place in one rename) and says to
+  open bighelp. There `PendingShareReview` offers it, the person picks an agent and chat on the computer in use,
+  and the chat takes it into its message box through the drop path (`ComposerAttachmentDrop.draftAttachment`).
+  Send works as for anything typed there. The saved copy goes once the box empties after holding it, or when the
+  person deletes it; never by itself. `PendingShareInboxTests` run under any Swift (no UIKit).
 - **Plugin routes:**
   - Each route is a `WorkspaceOperation` case plus a `Route(path:feature:isMutation:maximumResponseBytes:)` in
     `DirectHermesNativeContext.swift`.

@@ -28,6 +28,18 @@ struct ChatActivityDisclosureTests {
         #expect(!store.isExpanded(tool), "Full does not open individual tool details")
     }
 
+    /// Keep reasoning open (Settings › Chat) decides only until the reader does.
+    @Test func aReasoningChoiceIsOnlyWhatTheReaderChose() {
+        let store = ChatActivityDisclosureStore()
+        store.configure(style: .full)
+        let thoughts = [reasoning("r1", turnID: "turn", lifecycle: .succeeded), reasoning("r2", turnID: "turn")]
+        #expect(store.reasoningChoice(thoughts) == nil, "Full and running thinking are not the reader's choice")
+        store.setExpanded(false, reasoning: [thoughts[0]])
+        #expect(store.reasoningChoice(thoughts) == false, "A choice on any entry holds as more thinking arrives")
+        store.setExpanded(true, reasoning: thoughts)
+        #expect(store.reasoningChoice(thoughts) == true)
+    }
+
     @Test func fullKeepsTheReadersChoicesAndOtherStylesStartClosed() {
         let store = ChatActivityDisclosureStore()
         store.configure(style: .full)

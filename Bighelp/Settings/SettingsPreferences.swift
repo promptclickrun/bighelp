@@ -308,6 +308,38 @@ enum ChatWorkStyle: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Where a one-to-one chat shows its agent's reasoning (Settings › Chat › Reasoning shows, #943).
+/// Show reasoning still decides whether a chat shows any. Saved on this device (`@AppStorage`);
+/// the chat reads it directly. Group chats keep reasoning in the steps.
+enum ChatReasoningPlacement: String, CaseIterable, Identifiable, Sendable {
+    /// One outlined message above the turn's work, so the steps hold only tool calls.
+    case ownMessage
+    /// Rows between the tool calls, inside the turn's work.
+    case steps
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .ownMessage: String(localized: "As its own message")
+        case .steps: String(localized: "In the steps")
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .ownMessage: String(localized: "Your agent's thinking is a message above its work.")
+        case .steps: String(localized: "Your agent's thinking sits between its tool calls.")
+        }
+    }
+
+    static let storageKey = "bighelp.chat.reasoning-placement"
+    static let defaultPlacement = ChatReasoningPlacement.ownMessage
+    /// Settings › Chat › Keep reasoning open: finished reasoning keeps its words in view.
+    static let staysOpenKey = "bighelp.chat.reasoning-stays-open"
+    static let staysOpenByDefault = true
+}
+
 /// Which home bighelp shows: the everyday agent chat, or Code mode's coding
 /// sessions (Settings › Code mode; ☰ switches between them).
 enum BighelpExperience: String, CaseIterable, Identifiable, Sendable {

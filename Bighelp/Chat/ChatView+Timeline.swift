@@ -58,7 +58,7 @@ extension ChatView {
             transcriptRevision: model.transcriptRevision, ledgerRevision: model.activityLedgerRevision,
             disclosureRevision: model.activityDisclosures.revision, isSending: model.isSending,
             isBotMode: model.isBotMode, foldsCompletedTurns: foldCompletedTurns,
-            visibility: model.activityVisibility, workStyle: workStyleInUse)
+            visibility: model.activityVisibility, workStyle: workStyleInUse, reasoning: reasoningPlacementInUse)
         return model.transcriptCanvas.canvas(for: key) {
             ChatPerformanceProbe.measure("chat.projection") {
                 model.transcriptCanvas.buildCanvas(from: model.transcriptEntries,
@@ -360,7 +360,8 @@ extension ChatView {
             isBotMode: model.isBotMode,
             foldsCompletedTurns: foldCompletedTurns,
             interimReplies: .following(model.activityVisibility),
-            workStyle: workStyleInUse)
+            workStyle: workStyleInUse,
+            reasoning: reasoningPlacementInUse)
     }
     @ViewBuilder
     private func transcriptRow(_ row: ChatTurnDisplayRow) -> some View {
@@ -387,6 +388,9 @@ extension ChatView {
                 onDisclosureChange: beginDisclosureReview
             )
             .id(row.id)
+        case .reasoning(let message):
+            ChatReasoningMessageView(message: message, onDisclosureChange: beginDisclosureReview)
+                .id(row.id)
         }
     }
     @ViewBuilder

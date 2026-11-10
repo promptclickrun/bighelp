@@ -208,6 +208,7 @@ struct ChatView: View {
     /// The bottom of the chat's safe area (the keyboard's top while it shows), in the window.
     @State private var safeBottomInWindow: CGFloat = 0
     @AppStorage(ChatLayoutPreferences.densityKey) var chatDensity: ChatDensity = .comfortable
+    @AppStorage(ChatReasoningPlacement.storageKey) var reasoningPlacement = ChatReasoningPlacement.defaultPlacement
     @AppStorage(ChatLayoutPreferences.agentMessageStyleKey) var chatAgentStyle: ChatAgentMessageStyle = .bubble
     @AppStorage(ChatLayoutPreferences.showsSessionTitleKey)
     private var showsSessionTitle = ChatLayoutPreferences.showsSessionTitleByDefault
@@ -297,6 +298,11 @@ struct ChatView: View {
 
     var workStyleInUse: ChatWorkStyle? {
         model.isBotMode ? nil : workStyle
+    }
+
+    /// A group chat's turns hold several agents' thinking, so it stays in each one's steps.
+    var reasoningPlacementInUse: ChatReasoningPlacement {
+        model.isBotMode ? .steps : reasoningPlacement
     }
 
     var body: some View {

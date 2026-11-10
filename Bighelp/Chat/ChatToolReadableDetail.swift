@@ -6,8 +6,8 @@ import os
 /// wall of escaped JSON. Lists become lines; search results become titles
 /// and addresses. Text that isn't JSON is already readable and isn't parsed.
 ///
-/// The original value stays the truth: the row still copies it whole and
-/// opens it in the full reader.
+/// `ChatToolBlock` lays the items out as one block. The original value stays
+/// the truth: Show raw opens it whole in the full reader.
 struct ChatToolReadableDetail: Equatable, Sendable {
     enum Item: Equatable, Sendable {
         /// A short value on one line.

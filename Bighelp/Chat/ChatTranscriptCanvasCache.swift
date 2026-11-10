@@ -21,6 +21,7 @@ final class ChatTranscriptCanvasCache {
         let foldsCompletedTurns: Bool
         let visibility: ChatActivityVisibility
         let workStyle: ChatWorkStyle?
+        var reasoning = ChatReasoningPlacement.steps
     }
 
     struct Canvas {
@@ -39,6 +40,8 @@ final class ChatTranscriptCanvasCache {
         let interimReplies: ChatInterimReplyPlacement
         /// The chat's `ChatWorkStyle`; nil in a group chat.
         let workStyle: ChatWorkStyle?
+        /// Where each turn's thinking goes (Settings › Chat › Reasoning shows).
+        var reasoning = ChatReasoningPlacement.steps
     }
 
     private var key: Key?
@@ -101,6 +104,7 @@ final class ChatTranscriptCanvasCache {
         let foldsCompletedTurns: Bool
         let interimReplies: ChatInterimReplyPlacement
         let workStyle: ChatWorkStyle?
+        let reasoning: ChatReasoningPlacement
         let durableCardIDs: Set<String>
 
         init(_ display: DisplayContext, durableCardIDs: Set<String>) {
@@ -109,6 +113,7 @@ final class ChatTranscriptCanvasCache {
             foldsCompletedTurns = display.foldsCompletedTurns
             interimReplies = display.interimReplies
             workStyle = display.workStyle
+            reasoning = display.reasoning
             self.durableCardIDs = durableCardIDs
         }
     }
@@ -245,7 +250,7 @@ final class ChatTranscriptCanvasCache {
                 ChatCardTranscriptProjection.removingSupersededLiveCards(from: transcript),
                 isSending: context.isSending, isBotMode: context.isBotMode, activityEvents: activityEvents),
             isSending: context.isSending, enabled: context.foldsCompletedTurns, activityEvents: activityEvents,
-            interimReplies: context.interimReplies, style: context.workStyle)
+            interimReplies: context.interimReplies, style: context.workStyle, reasoning: context.reasoning)
         let rows = ChatCanvasTranscriptProjection.rows(from: displayRows, disclosures: disclosures,
                                                         isSending: context.isSending,
                                                         readsAgentMessages: readsAgentMessages)
@@ -302,6 +307,6 @@ final class ChatTranscriptCanvasCache {
         return ChatCompletedTurnProjection.rows(
             ofTurn: marked[...], endOrder: turn.nextQuestionOrder, isActive: inFlight,
             enabled: context.foldsCompletedTurns, ledger: ledger.folds, interimReplies: context.interimReplies,
-            style: context.workStyle)
+            style: context.workStyle, reasoning: context.reasoning)
     }
 }

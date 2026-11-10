@@ -522,9 +522,9 @@ enum ConversationFixtures {
     }
 
     /// `-test-tool-folders`: tool folders in plain words. A finished turn
-    /// (three folders with narration between them, 2m 14s from the question
-    /// to the answer) folds into "Worked for 2m 14s · 7 steps" with the answer
-    /// below it. Then a turn still running: a finished folder ("Checked your
+    /// (three folders with thinking and narration between them, 2m 14s from
+    /// the question to the answer) folds into what it did, with "2m 14s · 7
+    /// steps" under it and the answer below. Then a turn still running: a finished folder ("Checked your
     /// calendars"), a note, and a live folder checking GitHub with its calls
     /// listed under it. Made-up repo, files and results.
     static var toolFoldersPreview: SessionRecord {
@@ -535,9 +535,16 @@ enum ConversationFixtures {
             TimelineItem(id: id, role: .human, sender: .user(snapshot: .init(name: "You")), content: .message(text),
                          metadata: .init(timestamp: start.addingTimeInterval(seconds), sourceOrder: order))
         }
-        func reply(_ id: String, _ text: String, _ order: Int, at seconds: TimeInterval) -> TimelineItem {
+        func reply(_ id: String, _ text: String, _ order: Int, at seconds: TimeInterval,
+                   duration: Int? = nil) -> TimelineItem {
             TimelineItem(id: id, role: .assistant, sender: agent, content: .message(text),
-                         metadata: .init(timestamp: start.addingTimeInterval(seconds), sourceOrder: order))
+                         metadata: .init(timestamp: start.addingTimeInterval(seconds), sourceOrder: order,
+                                         turnDurationMilliseconds: duration))
+        }
+        func thought(_ id: String, _ turn: String, _ text: String, _ order: Int, ms: Int) -> ChatActivityEvent {
+            ChatActivityEvent(eventID: id, sessionID: sessionID, turnID: turn, kind: .reasoning,
+                              lifecycle: .succeeded, title: "Reasoning", summary: nil, detail: text,
+                              occurredAt: order, durationMilliseconds: ms, sourceOrder: order)
         }
         func tool(_ id: String, _ turn: String, _ name: String, _ arguments: [String: Any], _ order: Int,
                   result: Any? = nil, ms: Int? = nil, running: Bool = false) -> ChatActivityEvent {
@@ -558,13 +565,15 @@ enum ConversationFixtures {
                   at: 31),
             reply("folders-note-2", "Tests pass. Next I'm writing up what I found.", 90, at: 118),
             reply("folders-answer", "The weather app builds and all 42 tests pass. Setup needs Node 22; "
-                  + "I put the steps and two flaky-test notes in **SUMMARY.md**.", 110, at: 134),
+                  + "I put the steps and two flaky-test notes in **SUMMARY.md**.", 110, at: 134, duration: 134_000),
             human("folders-q2", "Thanks! Am I free Thursday afternoon, and are the open GitHub issues triaged?", 120,
                   at: 300),
             reply("folders-note-3", "You're free after 3 PM on Thursday. Now checking the GitHub issues.", 140,
                   at: 318),
         ]
         let activity = [
+            thought("folders-r1", "folders-turn-1", "**Finding the setup steps**\nThe README should say which Node "
+                    + "version the app needs. I'll search for the setup guide first, then read it.", 15, ms: 4_000),
             tool("folders-t1", "folders-turn-1", "web_search", ["query": "weather app setup node"], 20,
                  result: ["success": true, "data": ["web": [
                     ["title": "Weather App setup guide", "url": "https://docs.example.com/weather-app/setup",
@@ -574,6 +583,8 @@ enum ConversationFixtures {
             tool("folders-t2", "folders-turn-1", "web_extract",
                  ["urls": ["https://docs.example.com/weather-app/setup"]], 30,
                  result: ["content": "Setup\n1. Install Node 22.\n2. npm install\n3. npm test"], ms: 2_400),
+            thought("folders-r2", "folders-turn-1", "**Running the tests**\nThe guide says Node 22, then npm install "
+                    + "and npm test. I'll clone the repo and run them in that order.", 45, ms: 5_000),
             tool("folders-t3", "folders-turn-1", "terminal",
                  ["command": "git clone https://github.com/example/weather-app.git", "timeout": 120], 50,
                  result: command("Cloning into 'weather-app'...\nremote: Enumerating objects: 214, done.\n"
@@ -584,12 +595,16 @@ enum ConversationFixtures {
                  result: command("> weather-app@1.4.0 test\n> vitest run\n\n ✓ forecast.test.ts (18)\n"
                                  + " ✓ units.test.ts (12)\n ✓ cache.test.ts (12)\n\n Test Files  3 passed (3)\n"
                                  + "      Tests  42 passed (42)\n   Duration  3.84s"), ms: 6_300),
+            thought("folders-r3", "folders-turn-1", "**Writing it up**\nAll 42 tests pass. Two notes are worth "
+                    + "keeping: the flaky cache test and the metric default.", 75, ms: 3_000),
             tool("folders-t6", "folders-turn-1", "read_file", ["path": "weather-app/notes.md"], 80,
                  result: ["content": "# Notes\n- cache.test.ts is flaky on slow networks\n- units default to metric",
                           "total_lines": 3], ms: 300),
             tool("folders-t7", "folders-turn-1", "write_file",
                  ["path": "weather-app/SUMMARY.md", "content": "# Summary\nBuilds on Node 22. 42 tests pass."], 100,
                  result: ["success": true, "bytes_written": 58], ms: 200),
+            thought("folders-r4", "folders-turn-2", "**Checking Thursday**\nThe calendar lists Thursday's events. "
+                    + "After that I'll look at the open issues.", 125, ms: 2_000),
             tool("folders-t8", "folders-turn-2", "mcp_google_calendar_list_events",
                  ["calendar": "primary", "date": "2026-10-08"], 130,
                  result: ["events": [

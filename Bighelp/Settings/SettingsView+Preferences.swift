@@ -268,6 +268,13 @@ extension SettingsView {
             }
             .accessibilityIdentifier("settings.chat.work-style")
 
+            ChatReasoningSettingRows(placementLabel: { placement in
+                settingLabel(String(localized: "Reasoning shows"), detail: placement.detail)
+            }, staysOpenLabel: {
+                settingLabel(String(localized: "Keep reasoning open"),
+                             detail: String(localized: "Show its words without a tap."))
+            })
+
             #if !targetEnvironment(macCatalyst) // A Mac has no haptics.
             Toggle(isOn: $settings.responseHapticsEnabled) {
                 settingLabel(
@@ -452,6 +459,29 @@ private struct SessionTitleToggle<Label: View>: View {
 
     var body: some View {
         Toggle(isOn: $showsSessionTitle) { label }
+    }
+}
+
+/// Settings › Chat: where a chat shows its agent's reasoning, and whether its words stay in
+/// view (#943). Saved on this device only (`@AppStorage`); chats read both directly.
+private struct ChatReasoningSettingRows<PlacementLabel: View, StaysOpenLabel: View>: View {
+    @AppStorage(ChatReasoningPlacement.storageKey) private var placement = ChatReasoningPlacement.defaultPlacement
+    @AppStorage(ChatReasoningPlacement.staysOpenKey) private var staysOpen = ChatReasoningPlacement.staysOpenByDefault
+    @ViewBuilder let placementLabel: (ChatReasoningPlacement) -> PlacementLabel
+    @ViewBuilder let staysOpenLabel: StaysOpenLabel
+
+    var body: some View {
+        Picker(selection: $placement) {
+            ForEach(ChatReasoningPlacement.allCases) { choice in
+                Text(choice.title).tag(choice)
+            }
+        } label: {
+            placementLabel(placement)
+        }
+        .accessibilityIdentifier("settings.chat.reasoning-placement")
+
+        Toggle(isOn: $staysOpen) { staysOpenLabel }
+        .accessibilityIdentifier("settings.chat.reasoning-stays-open")
     }
 }
 

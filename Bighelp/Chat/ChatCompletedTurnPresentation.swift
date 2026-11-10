@@ -9,8 +9,8 @@ struct ChatCompletedTurn: Identifiable {
     let elapsedSeconds: TimeInterval?
     /// The tool calls and helper agents the turn ran, shown or hidden.
     var stepCount = 0
-    /// What the turn did ("Searched the web, read 2 files"), for a turn
-    /// without a recorded time. Nil when it has one.
+    /// What the turn did in plain words ("Searched the web, read 2 files"): the fold's own
+    /// line (#943). Nil for a turn that ran no steps, which says how long it worked instead.
     var summary: String?
     /// How the chat draws it: a line (Full), a card (Card) or a receipt under the answer (Minimal).
     var style: ChatWorkStyle = .full
@@ -27,6 +27,15 @@ struct ChatCompletedTurn: Identifiable {
     /// did. Never a bare "Done".
     var label: String { BighelpActivitySummary.label(for: phase) }
 
+    /// The small line under the summary: the turn's real time and its steps ("2m 14s · 7 steps").
+    var receipt: String? {
+        guard summary != nil else { return nil }
+        var parts: [String] = []
+        if case .done(let elapsed) = phase, let elapsed { parts.append(ChatWorkReceipt.time(elapsed)) }
+        if stepCount > 0 { parts.append(stepCount == 1 ? "1 step" : "\(stepCount) steps") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     var phase: BighelpActivityPhase {
         if let elapsedSeconds, elapsedSeconds.isFinite, (0..<31_536_000).contains(elapsedSeconds) {
             return .done(elapsed: elapsedSeconds)
@@ -40,14 +49,27 @@ enum ChatTurnDisplayRow: Identifiable {
     case completed(ChatCompletedTurn)
     /// Card and Minimal: the work of the turn being answered, as one block.
     case liveWork(ChatLiveWork)
+    /// The turn's reasoning as a message of its own, above its work.
+    case reasoning(ChatReasoningMessage)
 
     var id: String {
         switch self {
         case .entry(let entry): entry.id
         case .completed(let turn): turn.id
         case .liveWork(let work): work.id
+        case .reasoning(let message): message.id
         }
     }
+}
+
+/// A turn's reasoning as one message above its work (`ChatReasoningPlacement.ownMessage`): every
+/// thought of the turn in order, taken out of the steps, which then hold only tool calls.
+struct ChatReasoningMessage: Identifiable, Equatable {
+    /// Named for the turn's question, so it stays the same row as thinking arrives.
+    let id: String
+    let events: [ChatActivityEvent]
+
+    var isRunning: Bool { events.contains { $0.lifecycle == .running } }
 }
 
 /// The running turn's work as one block (`ChatWorkStyle.gathersLiveWork`): its tool calls, thinking and
@@ -99,19 +121,20 @@ enum ChatCompletedTurnProjection {
     }
 
     /// `enabled`: Fold finished turns. `style`: the chat's `ChatWorkStyle`; nil in a group chat, whose
-    /// running turns stay in place and whose folds are lines.
+    /// running turns stay in place and whose folds are lines. `reasoning`: where each turn's thinking goes.
     static func rows(
         from entries: [ChatTranscriptEntry],
         isSending: Bool,
         enabled: Bool,
         activityEvents: [ChatActivityEvent] = [],
         interimReplies: ChatInterimReplyPlacement = .inline,
-        style: ChatWorkStyle? = nil
+        style: ChatWorkStyle? = nil,
+        reasoning: ChatReasoningPlacement = .steps
     ) -> [ChatTurnDisplayRow] {
         let ledger = Ledger(enabled || style?.gathersLiveWork == true ? activityEvents : [])
         return ChatTranscriptTurn.split(entries).flatMap { turn in
             rows(ofTurn: entries[turn.range], endOrder: turn.nextQuestionOrder, isActive: turn.isLast && isSending,
-                 enabled: enabled, ledger: ledger, interimReplies: interimReplies, style: style)
+                 enabled: enabled, ledger: ledger, interimReplies: interimReplies, style: style, reasoning: reasoning)
         }
     }
 
@@ -124,7 +147,8 @@ enum ChatCompletedTurnProjection {
         enabled: Bool,
         ledger: Ledger,
         interimReplies: ChatInterimReplyPlacement,
-        style: ChatWorkStyle? = nil
+        style: ChatWorkStyle? = nil,
+        reasoning: ChatReasoningPlacement = .steps
     ) -> [ChatTurnDisplayRow] {
         // Incremental activity updates can leave a terminal reasoning marker
         // in the cached transcript after its content has been settled away.
@@ -140,7 +164,6 @@ enum ChatCompletedTurnProjection {
                 return .activity(ChatActivityTurn(id: turn.id, events: events))
             }
         }
-        guard enabled || style?.gathersLiveWork == true else { return presentableEntries.map(ChatTurnDisplayRow.entry) }
         var rows: [ChatTurnDisplayRow] = []
         var work = presentableEntries[...]
         var startedAt: Date?
@@ -153,18 +176,44 @@ enum ChatCompletedTurnProjection {
         }
         // A turn with no question of its own (the chat's first, or one Hermes ran) is only ever the last.
         let anchorID = rows.first?.id ?? "turn"
-        rows += fold(Array(work), isActive: isActive, startedAt: startedAt, startOrder: startOrder,
+        // The turn's time is read from all of its work, its thinking too.
+        let timed = Array(work)
+        var steps = timed
+        if reasoning == .ownMessage {
+            let thoughts = takeReasoning(from: &steps)
+            if !thoughts.isEmpty {
+                rows.append(.reasoning(ChatReasoningMessage(id: "reasoning:\(anchorID)", events: thoughts)))
+            }
+        }
+        guard enabled || style?.gathersLiveWork == true else { return rows + steps.map(ChatTurnDisplayRow.entry) }
+        rows += fold(steps, timed: timed, isActive: isActive, startedAt: startedAt, startOrder: startOrder,
                      endOrder: endOrder, ledger: ledger, interimReplies: interimReplies,
                      foldsFinished: enabled, style: style, anchorID: anchorID)
         return rows
     }
 
+    /// Takes every thought out of `work`, in order, and drops the entries that held nothing else.
+    private static func takeReasoning(from work: inout [ChatTranscriptEntry]) -> [ChatActivityEvent] {
+        var thoughts: [ChatActivityEvent] = []
+        work = work.compactMap { entry in
+            guard case .activity(let turn) = entry, turn.events.contains(where: { $0.kind == .reasoning }) else {
+                return entry
+            }
+            thoughts += turn.events.filter { $0.kind == .reasoning }
+            let rest = turn.events.filter { $0.kind != .reasoning }
+            return rest.isEmpty ? nil : .activity(ChatActivityTurn(id: turn.id, events: rest))
+        }
+        return thoughts
+    }
+
+    /// `timed`: the turn's work with its thinking, which `work` may no longer hold.
     private static func fold(
-        _ work: [ChatTranscriptEntry], isActive: Bool, startedAt: Date?, startOrder: Int?, endOrder: Int?,
+        _ work: [ChatTranscriptEntry], timed: [ChatTranscriptEntry], isActive: Bool, startedAt: Date?,
+        startOrder: Int?, endOrder: Int?,
         ledger: Ledger, interimReplies: ChatInterimReplyPlacement, foldsFinished: Bool, style: ChatWorkStyle?,
         anchorID: String
     ) -> [ChatTurnDisplayRow] {
-        let hasUnsettledContent = work.contains { entry in
+        let hasUnsettledContent = timed.contains { entry in
             switch entry {
             case .message(let item): item.metadata.delivery == "Streaming"
             case .activity(let turn): turn.events.contains { $0.lifecycle == .running && $0.kind != .subagent }
@@ -249,7 +298,7 @@ enum ChatCompletedTurnProjection {
                             at: foldPosition)
             return turnRows
         }
-        let elapsed = elapsed(work, startedAt: startedAt, startOrder: startOrder, endOrder: endOrder,
+        let elapsed = elapsed(timed, startedAt: startedAt, startOrder: startOrder, endOrder: endOrder,
                               timedReasoning: ledger.timedReasoning)
         let style = style ?? .full
         // Minimal's receipt goes under the answer; the others sit where the work began.
@@ -258,8 +307,7 @@ enum ChatCompletedTurnProjection {
             entries: folded,
             elapsedSeconds: elapsed,
             stepCount: steps.count,
-            // Only a turn without a real time needs the words.
-            summary: elapsed == nil ? ChatToolSummary.summary(of: steps) : nil,
+            summary: ChatToolSummary.summary(of: steps),
             style: style
         )), at: style == .minimal ? turnRows.count : foldPosition)
         return turnRows
@@ -394,10 +442,13 @@ struct ChatCompletedTurnView<Content: View>: View {
         }
     }
 
+    /// What the turn did, with its time and steps on a small line under it; a turn with no
+    /// steps to name keeps "Worked for 12s".
     private func header(_ expansion: Binding<Bool>) -> some View {
         BighelpActivityRow(
-            phase: turn.phase,
-            stepCount: turn.stepCount,
+            phase: turn.summary.map(BighelpActivityPhase.finished) ?? turn.phase,
+            stepCount: turn.summary == nil ? turn.stepCount : nil,
+            receipt: turn.receipt,
             detailsBelow: true,
             isExpanded: expansion,
             onDisclosureChange: onDisclosureChange,
@@ -470,6 +521,10 @@ struct ChatWorkReceipt: View {
     /// "18s" from the turn's real time, else what it did: a receipt, so shorter than "Worked for 18s".
     static func label(for turn: ChatCompletedTurn) -> String {
         guard case .done(let elapsed) = turn.phase, let elapsed else { return BighelpActivitySummary.label(for: turn.phase) }
+        return time(elapsed)
+    }
+
+    static func time(_ elapsed: TimeInterval) -> String {
         let seconds = Int(elapsed.rounded())
         if seconds < 1 { return "Under 1s" }
         if seconds < 60 { return "\(seconds)s" }
@@ -515,6 +570,8 @@ struct ChatFoldedSteps: View {
                 case .liveWork:
                     // Not made here: a running helper has no work style, so its steps stay open.
                     EmptyView()
+                case .reasoning(let message):
+                    ChatReasoningMessageView(message: message, onDisclosureChange: {})
                 }
             }
         }

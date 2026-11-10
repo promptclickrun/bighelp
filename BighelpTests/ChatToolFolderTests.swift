@@ -176,6 +176,9 @@ struct ChatToolFolderTests {
         #expect(fold.elapsedSeconds == 134)
         #expect(fold.label == "Worked for 2m 14s")
         #expect(fold.stepCount == 3)
+        // The fold's own line says what the turn did; its time and steps go under it (#943).
+        #expect(fold.summary == "Searched the web, read a web page, ran tests")
+        #expect(fold.receipt == "2m 14s · 3 steps")
         // Inside, the folders and the narration are as they were.
         #expect(fold.expandedEntries.map(\.id) == entries[1...3].map(\.id))
     }
@@ -193,6 +196,7 @@ struct ChatToolFolderTests {
         #expect(fold.label == "Searched the web, read a.md")
         #expect(fold.label != "Done")
         #expect(BighelpActivitySummary.label(for: fold.phase) == fold.label)
+        #expect(fold.receipt == "2 steps")
     }
 
     /// History from Hermes folds the same way: its saved timestamps give the

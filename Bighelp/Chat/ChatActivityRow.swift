@@ -2,9 +2,10 @@ import SwiftUI
 import UIKit
 
 /// One tool call or helper agent inside an unfolded work trail, as a step
-/// line hanging from the trail's rail. A tool call unfolds its full details
-/// (arguments, result) in place; code it ran unfolds as a notebook cell
-/// (`ChatToolCodeCellView`). Each one is its own recycled timeline row.
+/// line hanging from the trail's rail. A tool call unfolds in place as one
+/// block (`ChatToolBlockView`: what it asked for, then what came back); code
+/// it ran unfolds as a notebook cell (`ChatToolCodeCellView`). Each one is
+/// its own recycled timeline row.
 struct ChatActivityRow: View {
     let event: ChatActivityEvent
     let onDisclosureChange: () -> Void
@@ -97,7 +98,7 @@ struct ChatActivityRow: View {
     private var toolDetails: some View {
         // Code a tool ran shows as a cell in place of its input and result.
         let codeCell = event.contentReference == nil ? ChatToolCodeCell.make(for: event) : nil
-        let sections = detailSections(showsCodeCell: codeCell != nil)
+        let block = ChatToolBlock(event: event, showsCodeCell: codeCell != nil)
         if let reference = event.contentReference {
             Text("Preview — complete content is stored on Hermes.")
                 .font(.bighelp(.caption))
@@ -108,82 +109,15 @@ struct ChatActivityRow: View {
             ChatToolCodeCellView(cell: codeCell, event: event, identifier: "chat.activity.\(event.eventID).code-cell",
                                  onDisclosureChange: onDisclosureChange)
         }
-        if sections.isEmpty, codeCell == nil {
+        if !block.isEmpty {
+            ChatToolBlockView(block: block, event: event, identifier: "chat.activity.\(event.eventID)",
+                              showsActions: codeCell == nil)
+        } else if codeCell == nil {
             Text("Hermes did not provide additional details for this call.")
                 .bighelpFont(.metadata)
                 .foregroundStyle(theme.tertiaryText)
                 .fixedSize(horizontal: false, vertical: true)
-        } else if !sections.isEmpty {
-            VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                ForEach(sections, id: \.label) { section in
-                    VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                        HStack {
-                            Text(section.label)
-                                .bighelpFont(.metadata, weight: .semibold)
-                                .foregroundStyle(theme.secondaryText)
-                            Spacer(minLength: BighelpTokens.space8)
-                            if event.contentReference == nil {
-                                Button {
-                                    UIPasteboard.general.string = section.value
-                                    BighelpHaptics.success()
-                                } label: {
-                                    Image(systemName: "doc.on.doc")
-                                        .bighelpFont(.metadata)
-                                        .foregroundStyle(theme.tertiaryText)
-                                        .frame(
-                                            minWidth: BighelpTokens.hitTarget,
-                                            minHeight: BighelpTokens.hitTarget
-                                        )
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("Copy \(section.label.lowercased())")
-                            }
-                        }
-                        ChatToolReadableSection(label: section.label, value: section.value,
-                                                identifier: "chat.activity.\(event.eventID).\(section.label.lowercased())",
-                                                isCanonicalPreview: event.contentReference != nil)
-                            .foregroundStyle(theme.secondaryText)
-                            .padding(BighelpTokens.space12)
-                            .background(
-                                theme.raisedSurface,
-                                in: .rect(cornerRadius: BighelpTokens.radius12)
-                            )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: BighelpTokens.radius12)
-                                    .stroke(theme.border, lineWidth: BighelpTokens.hairline)
-                            }
-                            .accessibilityElement(children: .contain)
-                            .accessibilityIdentifier(
-                                "chat.activity.\(event.eventID).\(section.label.lowercased())"
-                            )
-                    }
-                }
-            }
         }
-    }
-
-    private func detailSections(showsCodeCell: Bool) -> [(label: String, value: String)] {
-        var sections: [(String, String)] = []
-        if let summary = nonempty(event.summary) {
-            sections.append(("Summary", summary))
-        }
-        if !showsCodeCell, let arguments = nonempty(event.arguments) {
-            sections.append(("Input", arguments))
-        }
-        if !showsCodeCell, let result = nonempty(event.result) {
-            sections.append(("Result", result))
-        }
-        if let detail = nonempty(event.detail), detail != event.summary, detail != event.result {
-            sections.append(("Details", detail))
-        }
-        return sections
-    }
-
-    private func nonempty(_ value: String?) -> String? {
-        guard let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return nil
-        }
-        return value
     }
 
     @BighelpThemeReader private var theme: BighelpTheme
@@ -192,16 +126,19 @@ struct ChatActivityRow: View {
 /// Back-to-back thinking as one row, named by the model's newest heading
 /// ("Reading the PDF"); without one, "Thinking" while it runs, then "Thought
 /// for 6s". The agent's thinking text unfolds under it; it's open while the
-/// agent thinks unless the reader chose otherwise.
+/// agent thinks, and after that too with Settings › Chat › Keep reasoning open,
+/// unless the reader chose otherwise.
 struct ChatThinkingRow: View {
     let events: [ChatActivityEvent]
     let onDisclosureChange: () -> Void
 
     @Environment(\.chatActivityDisclosureStore) private var disclosures
+    @AppStorage(ChatReasoningPlacement.staysOpenKey) private var staysOpen = ChatReasoningPlacement.staysOpenByDefault
     @State private var localExpanded: Bool?
 
     private var isExpanded: Bool {
-        disclosures?.isExpanded(reasoning: events) ?? localExpanded ?? events.contains { $0.lifecycle == .running }
+        guard let disclosures else { return localExpanded ?? (staysOpen || events.contains { $0.lifecycle == .running }) }
+        return disclosures.reasoningChoice(events) ?? (staysOpen || disclosures.isExpanded(reasoning: events))
     }
 
     var body: some View {

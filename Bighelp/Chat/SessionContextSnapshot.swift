@@ -227,7 +227,53 @@ struct SessionContextTokenRow: Identifiable, Equatable, Sendable {
     let value: String
 }
 
+/// The context window's line on the chat's Model settings sheet: how full it is, in plain words.
+struct SessionContextWindowLine: Equatable {
+    /// 0 to 1 of the window in use.
+    let fraction: Double
+    /// "34% used", or "Compacting…" while Hermes compacts.
+    let value: String
+    let caption: String
+    /// Drawn in the warning color.
+    let isAlmostFull: Bool
+    let isCompacting: Bool
+}
+
 enum SessionContextPresentation {
+    /// From here the window reads as almost full.
+    static let almostFullPercent = 85
+
+    /// Nil when Hermes reported no window size: there's nothing true to draw. `showsTokens` is Nerd
+    /// Mode, where the token counts take the plain words' place.
+    static func windowLine(for snapshot: SessionContextSnapshot, showsTokens: Bool) -> SessionContextWindowLine? {
+        guard snapshot.contextMax > 0 else { return nil }
+        let percent = max(0, min(100, snapshot.contextPercent))
+        let isAlmostFull = percent >= almostFullPercent
+        if snapshot.isCompacting {
+            return SessionContextWindowLine(
+                fraction: Double(percent) / 100, value: String(localized: "Compacting…"),
+                caption: String(localized: "Making room in this chat."), isAlmostFull: false, isCompacting: true)
+        }
+        let compacted: String? = switch snapshot.compressions {
+        case ..<1: nil
+        case 1: String(localized: "Compacted once")
+        default: String(localized: "Compacted \(snapshot.compressions) times")
+        }
+        let caption: String
+        if showsTokens {
+            let tokens = String(localized: "\(exactCount(snapshot.contextUsed)) of \(exactCount(snapshot.contextMax)) tokens")
+            caption = [tokens, compacted].compactMap { $0 }.joined(separator: " · ")
+        } else if isAlmostFull {
+            caption = String(localized: "Almost full. Hermes compacts the chat to make room.")
+        } else {
+            let room = percent < 60 ? String(localized: "Plenty of room left") : String(localized: "Filling up")
+            caption = [room, compacted].compactMap { $0 }.joined(separator: " · ")
+        }
+        return SessionContextWindowLine(
+            fraction: Double(percent) / 100, value: String(localized: "\(percent)% used"), caption: caption,
+            isAlmostFull: isAlmostFull, isCompacting: false)
+    }
+
     static func compactUsage(for snapshot: SessionContextSnapshot) -> String {
         "\(compactCount(snapshot.contextUsed)) / \(compactCount(snapshot.contextMax)) (\(snapshot.contextPercent)%)"
     }

@@ -41,6 +41,38 @@ final class ChatContextWindowUITests: BighelpUITestCase {
         }
     }
 
+    /// Model settings shows how full the context window is, under Thinking: plain words for
+    /// everyone, and with Nerd Mode the token counts and a tap through to the Context page.
+    @MainActor
+    func testModelSettingsShowsTheContextWindow() {
+        for nerdMode in [false, true] {
+            let app = launch(appearance: nerdMode ? "dark" : "light",
+                             extra: ["-loopdy.settings.nerd-mode", nerdMode ? "YES" : "NO"])
+            let chip = app.buttons["chat.composer.model"].firstMatch
+            XCTAssertTrue(chip.waitForExistence(timeout: 10))
+            chip.tap()
+            let row = app.descendants(matching: .any)["chat.model-settings.context"].firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 10), "Model settings has the context window")
+            let thinking = app.descendants(matching: .any)["chat.thinking"].firstMatch
+            XCTAssertTrue(thinking.exists)
+            XCTAssertLessThan(thinking.frame.maxY, row.frame.minY + 1, "It sits below the Thinking control")
+            let value = row.value as? String ?? ""
+            XCTAssertTrue(value.hasPrefix("25% used"), value)
+            XCTAssertEqual(value.contains("tokens"), nerdMode, "Token counts are for Nerd Mode: \(value)")
+            evidence("model-settings-\(nerdMode ? "nerd" : "plain")")
+
+            if nerdMode {
+                row.tap()
+                XCTAssertTrue(app.descendants(matching: .any)["chat.session-context-breakdown"].firstMatch
+                    .waitForExistence(timeout: 10), "The Context page opens")
+                evidence("model-settings-context-page")
+            } else {
+                XCTAssertFalse(row.elementType == .button, "Without Nerd Mode it's a line to read, not a button")
+            }
+            app.terminate()
+        }
+    }
+
     /// Native menu rows can expose their title instead of their identifier.
     @MainActor
     private func menuButton(_ identifier: String, _ title: String, in app: XCUIApplication,

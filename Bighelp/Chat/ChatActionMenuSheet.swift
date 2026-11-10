@@ -18,6 +18,9 @@ struct ChatActionMenuSheet: View {
     /// Auto TTS: the same switch as Settings › Voice › Use TTS on every response.
     var autoSpeakReplies: Binding<Bool>? = nil
     var onNativeSessionControls: (() -> Void)? = nil
+    /// For the Model settings sheet this menu opens. Read when that sheet shows, so the chat's
+    /// screen doesn't redraw each time Hermes reports the window.
+    var contextWindow: () -> ChatContextWindow? = { nil }
 
     @State private var page: ChatActionMenuPage = .main
     @Environment(\.dismiss) private var dismiss
@@ -121,7 +124,7 @@ struct ChatActionMenuSheet: View {
         }
         .bighelpSheet(isPresented: $isModelPickerPresented) {
             if let controls = runtimeControls {
-                ChatModelSettingsSheet(controls: controls) {
+                ChatModelSettingsSheet(controls: controls, contextWindow: contextWindow()) {
                     isModelPickerPresented = false
                     page = .main
                 }

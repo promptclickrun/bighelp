@@ -866,6 +866,7 @@ struct ChatView: View {
                     ChatModelSettingsSheet(
                         controls: controls,
                         isAllocating: model.isAwaitingAuthoritativeSessionAllocation,
+                        contextWindow: model.contextWindow,
                         startsOnAllModels: sessionControlsStartOnAllModels,
                         onDone: { isSessionControlsPresented = false }
                     )
@@ -899,6 +900,7 @@ struct ChatView: View {
             ChatModelSettingsMacPopover(
                 controls: controls,
                 size: sessionControlsSize,
+                contextWindow: model.contextWindow,
                 startsOnAllModels: sessionControlsStartOnAllModels,
                 onDone: { isSessionControlsPresented = false }
             )

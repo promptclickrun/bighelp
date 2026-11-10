@@ -509,8 +509,10 @@ Compacting (⋯ › Usage › Compact, or Hermes on its own when the context fil
 message box: a chip whose four-step bar moves once a second (still with Reduce Motion), then Compacted with the tokens
 before and after for two seconds before it shrinks away. Hermes' own status starts and ends it.
 
-Model settings (`ChatModelSettingsSheet`) is a short sheet: the chat's model, the Thinking control and, when the
-model has it, Fast Mode. The model chip in the message box opens it (the provider's mark and a chevron, before the
+Model settings (`ChatModelSettingsSheet`) is a short sheet: the chat's model, the Thinking control, how full the
+context window is and, when the model has it, Fast Mode. The context window is one meter with plain words
+("34% used", "Plenty of room left"), in the warning color from 85%, and it shows only once Hermes reports the
+window. Nerd Mode swaps the words for the token counts and makes the line open the Context page. The model chip in the message box opens it (the provider's mark and a chevron, before the
 microphone), and so do ⋯ › Model & speed and Change beside a chat's model. Every choice is sent as it's made; there
 is no Apply, and a refused choice falls back with the reason on top. The model row opens All models
 (`ChatAllModelsView`): search, Starred, then one folding section per provider with its plan, a star on every model

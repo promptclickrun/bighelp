@@ -643,6 +643,41 @@ struct ChatModelTests {
         #expect(ChatSessionTitlePresentation.verticalOffset == -4)
     }
 
+    /// Model settings says how full the window is in plain words; Nerd Mode gets the token counts.
+    @Test func contextWindowLineIsPlainWordsAndTokensOnlyInNerdMode() throws {
+        func snapshot(_ percent: Int, compressions: Int = 0, compacting: Bool = false, max: Int = 200_000) -> SessionContextSnapshot {
+            SessionContextSnapshot(sessionId: "s", model: "m", contextUsed: max * percent / 100, contextMax: max,
+                                   contextPercent: percent, compressions: compressions, isCompacting: compacting,
+                                   updatedAt: 1)
+        }
+        func line(_ snapshot: SessionContextSnapshot, tokens: Bool = false) throws -> SessionContextWindowLine {
+            try #require(SessionContextPresentation.windowLine(for: snapshot, showsTokens: tokens))
+        }
+
+        let roomy = try line(snapshot(34, compressions: 1))
+        #expect(roomy.value == "34% used")
+        #expect(roomy.caption == "Plenty of room left · Compacted once")
+        #expect(roomy.fraction == 0.34)
+        #expect(!roomy.isAlmostFull)
+        #expect(try line(snapshot(70, compressions: 3)).caption == "Filling up · Compacted 3 times")
+
+        let full = try line(snapshot(91, compressions: 2))
+        #expect(full.isAlmostFull)
+        #expect(full.caption == "Almost full. Hermes compacts the chat to make room.")
+
+        let compacting = try line(snapshot(91, compacting: true))
+        #expect(compacting.value == "Compacting…")
+        #expect(compacting.isCompacting && !compacting.isAlmostFull)
+
+        // Nerd Mode: the numbers, in every state but compacting.
+        #expect(try line(snapshot(34, compressions: 1), tokens: true).caption == "68,000 of 200,000 tokens · Compacted once")
+        #expect(try line(snapshot(91), tokens: true).caption == "182,000 of 200,000 tokens")
+
+        // A percent outside 0 to 100 never draws past the bar, and no window size draws nothing.
+        #expect(try line(snapshot(140)).fraction == 1)
+        #expect(SessionContextPresentation.windowLine(for: snapshot(10, max: 0), showsTokens: false) == nil)
+    }
+
     @Test func sessionContextPresentationShowsRemainingAndUsedWindow() {
         let snapshot = SessionContextSnapshot(
             sessionId: "session-context-0002",

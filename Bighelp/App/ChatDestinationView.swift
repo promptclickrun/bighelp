@@ -659,7 +659,8 @@ struct ChatDestinationView: View {
                     requestsNativeControlsAfterMenu = true
                     #endif
                     attachmentFlow.isActionMenuPresented = false
-                }
+                },
+                contextWindow: { model.contextWindow }
             )
             #if !targetEnvironment(macCatalyst)
             .photosPicker(

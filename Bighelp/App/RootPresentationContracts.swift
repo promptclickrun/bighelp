@@ -9,11 +9,10 @@ struct ChatHeaderActions {
 }
 
 struct ChatAttachmentFlowState: Equatable {
-    var isActionMenuPresented = false
     var composerFocusRequest = 0
 
+    /// Something was added to the message: the message box takes the keyboard again.
     mutating func completeSuccessfulImport() {
-        isActionMenuPresented = false
         composerFocusRequest &+= 1
     }
 }

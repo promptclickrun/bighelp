@@ -74,7 +74,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         } else {
         // Attach a photo the way a person does: + › Photo › pick the first image.
         app.buttons["chat.attachment"].tap()
-        let photo = app.buttons["chat.action.photo"]
+        let photo = app.buttons["Photo Library"]
         if photo.waitForExistence(timeout: 5), photo.isEnabled {
             photo.tap()
             let image = app.images.matching(NSPredicate(format: "identifier BEGINSWITH %@ OR label CONTAINS %@", "PXGGridLayout", "Photo")).firstMatch
@@ -1315,14 +1315,14 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         guard composer.exists else { capture("native-production-create", app); return }
         XCTAssertTrue(app.otherElements["chat.header-surface"].waitForExistence(timeout: 5))
         app.buttons["chat.attachment"].tap()
-        let fileAction = app.buttons["chat.action.file"]
+        let fileAction = app.buttons["Files"]
         XCTAssertTrue(fileAction.waitForExistence(timeout: 5))
         XCTAssertTrue(fileAction.isEnabled)
-        XCTAssertTrue(app.buttons["chat.action.photo"].isEnabled)
+        XCTAssertTrue(app.buttons["Photo Library"].isEnabled)
         #if targetEnvironment(simulator)
-        XCTAssertFalse(app.buttons["chat.action.camera"].isEnabled)
+        XCTAssertFalse(app.buttons["Camera"].isEnabled)
         #else
-        XCTAssertTrue(app.buttons["chat.action.camera"].isEnabled)
+        XCTAssertTrue(app.buttons["Camera"].isEnabled)
         #endif
         XCTAssertFalse(app.staticTexts["chat.attachments.images-unavailable"].exists)
         capture("native-production-attachments", app)
@@ -1444,16 +1444,13 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             }
         }
         if ProcessInfo.processInfo.environment["NATIVE_PROBE_VERIFY_CONTROLS"] == "1" {
-            app.buttons["chat.attachment"].tap()
-            let controls = app.buttons["chat.composer.menu.native-session-controls"]
-            let drawer = app.collectionViews["chat.action-drawer.v3"]
-            XCTAssertTrue(drawer.waitForExistence(timeout: 5))
-            for _ in 0..<8 where !controls.exists || !controls.isHittable { drawer.swipeUp() }
+            // Chat info › Session (Nerd Mode): the plus menu only adds things to a message.
+            XCTAssertTrue(openChatInfo(in: app))
+            let controls = app.buttons["chat.session-info.controls"]
             XCTAssertTrue(controls.waitForExistence(timeout: 5))
-            XCTAssertTrue(controls.isHittable)
             controls.tap()
             XCTAssertTrue(app.navigationBars["Session controls"].waitForExistence(timeout: 5),
-                          "Session controls must open on the first tap after menu dismissal.")
+                          "Session controls must open from Chat info.")
             XCTAssertTrue(app.staticTexts["Status"].waitForExistence(timeout: 20),
                           "The real stock session status must decode and render.")
             XCTAssertFalse(app.descendants(matching: .any)["chat.native-session-controls.error"].exists)

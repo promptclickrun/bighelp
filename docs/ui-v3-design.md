@@ -24,7 +24,7 @@ The current visual authority is the [iOS 27 native presentation contract](IOS27_
 ## Ownership and boundaries
 
 - Parent: settings/version persistence, environment plumbing, theme picker, tests, fixture, integration, native builds, source review and GitHub.
-- Chat owner: ChatView, ChatActionMenuSheet, SessionStatusRailView.
+- Chat owner: ChatView, ChatAttachmentMenu, SessionStatusRailView.
 - Message owner: MessageViews presentation only.
 - Shell owner: side panel and shared shell/voice/list styling.
 - Parent branch depends on unmerged PR69 at 58d9b06; no silent merge of that work.

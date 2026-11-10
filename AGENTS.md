@@ -103,6 +103,10 @@ change in both repos.
 - **No AI spending by default.**
   - Feed, Ideas and Goals start empty, with no default scheduled jobs.
   - Content appears only after the user asks their agent for it.
+- **The plus button only adds to a message.** Its menu (`ChatAttachmentMenu`, `ChatActionMenuAction`) is Camera,
+  Scan Document, Photo Library, Files and Drawing (Apple's canvas, `ChatDrawingSheet`; Add attaches a picture).
+  Never put a setting or a way to another screen there: the model chip, the voice button, New chat and Settings
+  hold those.
 - **Protect the chat.** The accepted chat behavior is a contract: [docs/CHAT_INTERACTION_CONTRACT.md](docs/CHAT_INTERACTION_CONTRACT.md).
   New looks must not break scrolling, drafts, streaming, keyboard control or history.
 - **Reproduce first, then fix the root cause.**
@@ -278,8 +282,8 @@ change in both repos.
   Default Voice sets an agent's. Anything that opens voice for an agent reads its effective mode. Voices and
   models are picked from lists (`VoiceOptions`; ElevenLabs from the account, speech plugins from the plugin's
   `voice-catalog`), with a typed Other only where a provider takes any value.
-- **Auto TTS** (`ChatReplyReader`): Settings › Voice › Use TTS on every response and the chat's + menu are one
-  switch. A chat reads a reply once its turn ends, never what it held when it opened, and stops on a new
+- **Auto TTS** (`ChatReplyReader`): Settings › Voice › Use TTS on every response. A chat reads a reply once its
+  turn ends, never what it held when it opened, and stops on a new
   message, voice mode or leaving the chat.
 - **Browser sign-ins stay signed in:** a Nous Portal sign-in's access token lasts 15 minutes and its refresh
   token rotates. The saved sign-in keeps its refresh token until a renewal succeeds; only a 401 from

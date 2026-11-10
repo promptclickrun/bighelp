@@ -13,12 +13,6 @@ struct ChatDestinationView: View {
     /// Briefly after the chat opens or the app returns (a Dynamic Island or
     /// notification tap), a question or approval waiting on you opens focused.
     @State private var attentionAutoOpenUntil: Date?
-    @State private var isNativeSessionControlsPresented = false
-    #if targetEnvironment(macCatalyst)
-    @State var pendingMacPanelRequest: BighelpMacChatPanelRequest?
-    #else
-    @State private var requestsNativeControlsAfterMenu = false
-    #endif
     @State private var responseHaptics = ResponseHapticsController()
     @State private var replyReader = ChatReplyReader()
     @State private var isHapticsSurfaceVisible = false
@@ -31,6 +25,7 @@ struct ChatDestinationView: View {
     @State var isFilePickerPresented = false
     @State var isCameraPickerPresented = false
     @State var isDocumentScannerPresented = false
+    @State var isDrawingPresented = false
     @State var documentScanResult: Result<ChatAttachment, Error>?
     @State var documentScanMembers: [String] = []
     @State var photoSelections: [PhotosPickerItem] = []
@@ -63,7 +58,6 @@ struct ChatDestinationView: View {
     let onNewChat: () -> Void
     /// Settings › AI providers (a failed turn's Fix sign-in).
     let onOpenProviderAccounts: () -> Void
-    let onStartSession: () -> Void
     let onNewBotChat: (() -> Void)?
     let onContinueInBranch: ((ChatBranchContinuation) -> Void)?
     let consumesSendOnOpen: ((String) -> Bool)?
@@ -116,7 +110,6 @@ struct ChatDestinationView: View {
         responseHapticsCoveredByRoot: Bool,
         onNewChat: @escaping () -> Void,
         onOpenProviderAccounts: @escaping () -> Void,
-        onStartSession: @escaping () -> Void,
         onNewBotChat: (() -> Void)? = nil,
         onContinueInBranch: ((ChatBranchContinuation) -> Void)? = nil,
         consumesSendOnOpen: ((String) -> Bool)? = nil,
@@ -148,7 +141,6 @@ struct ChatDestinationView: View {
         self.headerActions = ChatHeaderActions(newChat: onNewChat)
         self.onNewChat = onNewChat
         self.onOpenProviderAccounts = onOpenProviderAccounts
-        self.onStartSession = onStartSession
         self.onNewBotChat = onNewBotChat
         self.onContinueInBranch = onContinueInBranch
         self.consumesSendOnOpen = consumesSendOnOpen
@@ -184,9 +176,6 @@ struct ChatDestinationView: View {
             }
         }
         .onDisappear {
-            #if targetEnvironment(macCatalyst)
-            pendingMacPanelRequest = nil
-            #endif
             isHapticsSurfaceVisible = false
             // NavigationStack updates its path before the outgoing destination
             // finishes disappearing. Retain its prepared model until this
@@ -214,7 +203,7 @@ struct ChatDestinationView: View {
         return !responseHapticsCoveredByRoot
             && !isNativeAttentionPresented
             && voicePresentation == nil && !isPeopleAndChatPresented && !isProjectMovePresented
-            && !attachmentFlow.isActionMenuPresented && !isPhotoPickerPresented
+            && !isPhotoPickerPresented && !isDrawingPresented
             && !isFilePickerPresented && !isCameraPickerPresented && !isDocumentScannerPresented
             && !isProjectChangesPresented
             && attachmentErrorMessage == nil
@@ -238,7 +227,7 @@ struct ChatDestinationView: View {
             && !responseHapticsCoveredByRoot
             && !isPeopleAndChatPresented && !isSessionFilesPresented && !isProjectMovePresented
             && !isProjectChangesPresented
-            && !isNativeSessionControlsPresented && !attachmentFlow.isActionMenuPresented
+            && !isDrawingPresented
             && !isPhotoPickerPresented && !isFilePickerPresented
             && !isCameraPickerPresented && !isDocumentScannerPresented
     }
@@ -378,12 +367,7 @@ struct ChatDestinationView: View {
                 ? projectChanges.railSummary
                 : nil,
             composerFocusRequest: attachmentFlow.composerFocusRequest,
-            onAttachmentTap: {
-                #if targetEnvironment(macCatalyst)
-                pendingMacPanelRequest = nil
-                #endif
-                attachmentFlow.isActionMenuPresented = true
-            },
+            onAttachmentTap: performChatAction,
             onProjectChangesTap: {
                 withAnimation(.snappy(duration: 0.28)) {
                     isProjectChangesPresented = true
@@ -611,95 +595,7 @@ struct ChatDestinationView: View {
             }
             .interactiveDismissDisabled()
         }
-        .bighelpSheet(isPresented: $isNativeSessionControlsPresented) {
-            if let presentation = nativeSessionControls {
-                NavigationStack { NativeSessionControlsView(presentation: presentation) }
-                    .id(presentation.clientIdentity)
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-            }
-        }
-        .bighelpChatPanel(isPresented: $attachmentFlow.isActionMenuPresented, anchor: .attachments, onDismiss: {
-            #if targetEnvironment(macCatalyst)
-            attachmentPanelDidDismiss {
-                isNativeSessionControlsPresented = model.nativeConversationClient != nil
-            }
-            #else
-            if requestsNativeControlsAfterMenu {
-                requestsNativeControlsAfterMenu = false
-                isNativeSessionControlsPresented = model.nativeConversationClient != nil
-            }
-            #endif
-        }) {
-            ChatActionMenuSheet(
-                agentName: identity?.name ?? "your agent",
-                agentID: model.memberIDs.first ?? "default",
-                sessionID: model.conversationID,
-                currentModelName: model.runtimeControls?.modelDisplayName ?? "Session model",
-                isCameraAvailable: ChatCameraPicker.isAvailable,
-                agents: agents,
-                runtimeControls: model.runtimeControls,
-                slashCommandCatalog: { model.slashCommandCatalog },
-                skillsAndTools: skillsAndTools,
-                onSelect: performChatAction,
-                onChooseAgent: { agent in
-                    featureStore.reassignDirectChat(
-                        sessionID: model.conversationID,
-                        to: agent.id
-                    )
-                },
-                onSelectSlashCommand: model.selectSlashCommand,
-                allowsImages: model.supportedAttachmentKinds.contains(.image),
-                allowsFiles: model.supportedAttachmentKinds.contains(.file),
-                autoSpeakReplies: Bindable(settings).autoSpeakRepliesEnabled,
-                onNativeSessionControls: model.nativeConversationClient == nil ? nil : {
-                    #if targetEnvironment(macCatalyst)
-                    pendingMacPanelRequest = .nativeSessionControls
-                    #else
-                    requestsNativeControlsAfterMenu = true
-                    #endif
-                    attachmentFlow.isActionMenuPresented = false
-                },
-                contextWindow: { model.contextWindow }
-            )
-            #if !targetEnvironment(macCatalyst)
-            .photosPicker(
-                isPresented: $isPhotoPickerPresented,
-                selection: $photoSelections,
-                maxSelectionCount: max(0, 10 - model.draftAttachments.count),
-                matching: .images
-            )
-            .fileImporter(
-                isPresented: $isFilePickerPresented,
-                allowedContentTypes: [.item],
-                allowsMultipleSelection: true,
-                onCompletion: importFiles
-            )
-            .bighelpFullScreenCover(isPresented: $isDocumentScannerPresented, onDismiss: finishDocumentScan) {
-                ChatDocumentScanner { result in
-                    documentScanResult = result
-                    isDocumentScannerPresented = false
-                }
-                .ignoresSafeArea()
-            }
-            .bighelpFullScreenCover(isPresented: $isCameraPickerPresented) {
-                ChatCameraPicker(
-                    onCapture: { image in
-                        isCameraPickerPresented = false
-                        importCameraImage(image)
-                    },
-                    onCancel: { isCameraPickerPresented = false }
-                )
-                .ignoresSafeArea()
-            }
-            #endif
-            .presentationDetents([.fraction(0.72), .large])
-            .presentationDragIndicator(.visible)
-            .presentationCornerRadius(BighelpTokens.radius20)
-        }
-        // Native Mac panels need a stable presenter outside the transient
-        // popover; presenting from inside it leaves the first click pending.
-        #if targetEnvironment(macCatalyst)
+        // What the plus menu opens. They hang on the chat itself: the menu is gone by the time one shows.
         .photosPicker(
             isPresented: $isPhotoPickerPresented,
             selection: $photoSelections,
@@ -722,7 +618,24 @@ struct ChatDestinationView: View {
             )
             .ignoresSafeArea()
         }
+        #if !targetEnvironment(macCatalyst)
+        .bighelpFullScreenCover(isPresented: $isDocumentScannerPresented, onDismiss: finishDocumentScan) {
+            ChatDocumentScanner { result in
+                documentScanResult = result
+                isDocumentScannerPresented = false
+            }
+            .ignoresSafeArea()
+        }
         #endif
+        .bighelpSheet(isPresented: $isDrawingPresented) {
+            ChatDrawingSheet(
+                onAdd: { image in
+                    isDrawingPresented = false
+                    importDrawing(image)
+                },
+                onCancel: { isDrawingPresented = false }
+            )
+        }
         .navigationDestination(isPresented: compactProjectChangesPresentation) {
             ProjectChangesView(
                 store: projectChanges,

@@ -1,194 +1,88 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// What the plus button beside the message box can add to a message, in the order its menu
+/// shows them. Everything else the old "Add to chat" sheet held lives where people already look:
+/// the model chip and the voice button in the message box, New chat, and Settings.
 enum ChatActionMenuAction: String, CaseIterable, Identifiable, Sendable {
     case camera
+    case scanDocument
     case photo
     case file
-    case scanDocument
-    case voice
-    case startSession
-    case chooseAgent
-    case skillsAndTools
-    case changeModel
+    case drawing
 
     var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .camera: String(localized: "Camera")
+        case .scanDocument: String(localized: "Scan Document")
+        case .photo: String(localized: "Photo Library")
+        case .file: String(localized: "Files")
+        case .drawing: String(localized: "Drawing")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .camera: "camera"
+        case .scanDocument: "doc.viewfinder"
+        case .photo: "photo"
+        case .file: "folder"
+        case .drawing: "scribble"
+        }
+    }
 
     var accessibilityIdentifier: String {
         switch self {
         case .camera: "chat.action.camera"
+        case .scanDocument: "chat.action.scan-document"
         case .photo: "chat.action.photo"
         case .file: "chat.action.file"
-        case .scanDocument: "chat.action.scan-document"
-        case .voice: "chat.action.voice"
-        case .startSession: "chat.action.start-session"
-        case .chooseAgent: "chat.action.choose-agent"
-        case .skillsAndTools: "chat.action.skills-tools"
-        case .changeModel: "chat.action.change-model"
+        case .drawing: "chat.action.drawing"
         }
     }
 
-    var submenu: ChatActionMenuPage? {
+    /// The actions this device has at all. Drawing is Apple's canvas, on iPhone and iPad.
+    static var offered: [Self] {
+        allCases.filter { action in
+            switch action {
+            case .drawing: ChatDrawingSheet.isSupported
+            case .scanDocument: ChatDocumentScanner.isSupported
+            case .camera, .photo, .file: true
+            }
+        }
+    }
+
+    /// Whether the chat's connection takes what this adds: a picture for the camera, the library
+    /// and a drawing, a file for Files and a scan (a PDF).
+    func isAvailable(taking kinds: Set<ChatAttachment.Kind>, hasCamera: Bool) -> Bool {
         switch self {
-        case .chooseAgent: .agents
-        case .skillsAndTools: .skillsAndTools
-        case .changeModel: .modelAndReasoning
-        case .camera, .photo, .file, .scanDocument, .voice, .startSession: nil
+        case .camera: kinds.contains(.image) && hasCamera
+        case .photo, .drawing: kinds.contains(.image)
+        case .file, .scanDocument: kinds.contains(.file)
         }
     }
 }
 
-enum ChatActionMenuPage: Equatable, Sendable {
-    case main
-    case agents
-    case skillsAndTools
-    case modelAndReasoning
-}
+/// The plus button's menu. A native menu, so it opens at the button and closes on a pick.
+struct ChatAttachmentMenu<Label: View>: View {
+    let model: ChatModel
+    let perform: (ChatActionMenuAction) -> Void
+    @ViewBuilder let label: () -> Label
 
-enum ChatActionMenuLayout {
-    static let mediaActions: [ChatActionMenuAction] = [
-        .camera,
-        .photo,
-        .file,
-    ]
-    static let mediaColumnCount = 3
-    static let rowActions: [ChatActionMenuAction] = [
-        .scanDocument,
-        .voice,
-        .startSession,
-        .chooseAgent,
-        .skillsAndTools,
-        .changeModel,
-    ]
-    static let rootSurfaceRole: BighelpSurfaceRole = .sheet
-    static let usesColoredOutline = false
-
-    static func surfacePresentation(
-        isDarkMode: Bool
-    ) -> BighelpPickerSheetSurfacePresentation {
-        .resolve(isDarkMode: isDarkMode)
-    }
-}
-
-enum ChatActionMenuAvailability {
-    static func isEnabled(
-        _ action: ChatActionMenuAction,
-        hasRuntimeControls: Bool,
-        isTurnActive: Bool
-    ) -> Bool {
-        guard action == .changeModel else { return true }
-        return hasRuntimeControls
-            && !ChatRuntimeSelectionLockout.isLocked(isTurnActive: isTurnActive)
-    }
-}
-
-enum ChatPDFPagesAttachmentAvailability: Equatable, Sendable {
-    case available
-    case unavailable(reason: String)
-
-    var unavailableReason: String? {
-        switch self {
-        case .available: nil
-        case .unavailable(let reason): reason
+    var body: some View {
+        Menu {
+            let kinds = model.supportedAttachmentKinds
+            ForEach(ChatActionMenuAction.offered) { action in
+                Button(action.title, systemImage: action.symbol) { perform(action) }
+                    .disabled(!action.isAvailable(taking: kinds, hasCamera: ChatCameraPicker.isAvailable))
+            }
+        } label: {
+            label()
         }
-    }
-}
-
-struct ChatActionMenuAgentSelectionState: Equatable {
-    let page: ChatActionMenuPage
-    let errorMessage: String?
-}
-
-enum ChatActionMenuAgentSelectionTransition {
-    static func resolve(_ result: DirectChatAgentSelectionResult) -> ChatActionMenuAgentSelectionState {
-        switch result {
-        case .reassigned, .unchanged:
-            ChatActionMenuAgentSelectionState(page: .main, errorMessage: nil)
-        case .blockedByHistory:
-            ChatActionMenuAgentSelectionState(
-                page: .agents,
-                errorMessage: "This chat already has messages. Start a new chat to use a different agent."
-            )
-        case .unavailable:
-            ChatActionMenuAgentSelectionState(
-                page: .agents,
-                errorMessage: "This chat’s agent could not be changed. Try again."
-            )
-        }
-    }
-}
-
-enum ChatSkillsAndPluginsKind: Equatable {
-    case skill
-    case plugin
-
-    var slashCommandSource: SlashCommandSource {
-        switch self {
-        case .skill: .skill
-        case .plugin: .plugin
-        }
-    }
-}
-
-struct ChatSkillsAndPluginsEntry: Identifiable, Equatable {
-    let id: String
-    let kind: ChatSkillsAndPluginsKind
-    let name: String
-    let detail: String
-    let metadata: String
-    let isEnabled: Bool
-}
-
-struct ChatSkillsAndPluginsIndex {
-    let catalog: HermesSkillsAndToolsCatalog
-
-    func entries(query: String) -> [ChatSkillsAndPluginsEntry] {
-        let entries = catalog.skills.map { skill in
-            ChatSkillsAndPluginsEntry(
-                id: skill.id,
-                kind: .skill,
-                name: skill.name,
-                detail: skill.description,
-                metadata: skill.category,
-                isEnabled: skill.isEnabled
-            )
-        } + catalog.plugins.map { plugin in
-            ChatSkillsAndPluginsEntry(
-                id: plugin.id,
-                kind: .plugin,
-                name: plugin.name,
-                detail: plugin.description,
-                metadata: plugin.version.isEmpty ? plugin.kind : "\(plugin.kind) · \(plugin.version)",
-                isEnabled: plugin.isEnabled
-            )
-        }
-        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return entries }
-        return entries.filter { entry in
-            entry.id.localizedCaseInsensitiveContains(query)
-                || entry.name.localizedCaseInsensitiveContains(query)
-                || entry.detail.localizedCaseInsensitiveContains(query)
-                || entry.metadata.localizedCaseInsensitiveContains(query)
-        }
-    }
-}
-
-enum ChatCapabilitySlashCommandResolver {
-    static func command(
-        for entry: ChatSkillsAndPluginsEntry,
-        commands: [SlashCommandDescriptor]
-    ) -> SlashCommandDescriptor? {
-        let identities = Set([entry.id, entry.name].map(normalizedIdentity))
-        let matches = commands.filter { command in
-            guard command.source == entry.kind.slashCommandSource else { return false }
-            let commandIdentities = [command.name] + command.aliases
-            return commandIdentities.contains { identities.contains(normalizedIdentity($0)) }
-        }
-        return matches.count == 1 ? matches[0] : nil
-    }
-
-    private static func normalizedIdentity(_ value: String) -> String {
-        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        // Top to bottom as listed, also when the menu opens upward from the message box.
+        .menuOrder(.fixed)
     }
 }
 

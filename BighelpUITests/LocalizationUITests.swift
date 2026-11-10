@@ -99,7 +99,7 @@ final class LocalizationUITests: BighelpUITestCase {
             app.launch()
             let attachment = app.buttons["chat.attachment"]
             XCTAssertTrue(attachment.waitForExistence(timeout: 20))
-            XCTAssertEqual(attachment.label, language == "en" ? "Attachments and actions" : "附件与操作")
+            XCTAssertEqual(attachment.label, language == "en" ? "Add to message" : "添加到消息")
             capture("chat", language, appearance)
             let editor = app.textViews["chat.composer.text"]
             XCTAssertTrue(editor.waitForExistence(timeout: 5))
@@ -112,11 +112,10 @@ final class LocalizationUITests: BighelpUITestCase {
             XCTAssertEqual(send.label, language == "en" ? "Send message" : "发送消息")
             capture("composer-draft", language, appearance)
             attachment.tap()
-            let camera = app.buttons["chat.action.camera"]
-            XCTAssertTrue(camera.waitForExistence(timeout: 5))
-            XCTAssertTrue(camera.label.contains(language == "en" ? "Camera" : "相机"))
-            XCTAssertTrue(app.buttons["chat.action.voice"].label.contains(language == "en" ? "Voice mode" : "语音模式"))
-            XCTAssertTrue(app.buttons["chat.action.pdf-pages"].label.contains(language == "en" ? "PDF as pages" : "PDF 页面"))
+            // A menu's rows are named by their titles.
+            XCTAssertTrue(app.buttons[language == "en" ? "Camera" : "相机"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons[language == "en" ? "Photo Library" : "照片图库"].exists)
+            XCTAssertTrue(app.buttons[language == "en" ? "Drawing" : "绘图"].exists)
             capture("chat-actions", language, appearance)
             app.terminate()
         }

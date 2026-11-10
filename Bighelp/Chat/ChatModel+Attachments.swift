@@ -7,19 +7,6 @@ extension ChatModel {
         return native.currentPDFAttachmentTarget
     }
 
-    var pdfPagesAvailability: ChatPDFPagesAttachmentAvailability {
-        guard !isBotMode, nativeConversationClient != nil else {
-            return .unavailable(reason: String(localized: "PDF pages require a current native Hermes conversation."))
-        }
-        guard !isPDFDraftSendInFlight else {
-            return .unavailable(reason: String(localized: "Wait for the current PDF-page send to finish."))
-        }
-        guard pdfAttachmentTarget != nil else {
-            return .unavailable(reason: String(localized: "Reconnect this native conversation before adding PDF pages."))
-        }
-        return .available
-    }
-
     var hasStalePDFPageSelections: Bool {
         let current = pdfAttachmentTarget
         return orderedDraftAttachments.contains { value in

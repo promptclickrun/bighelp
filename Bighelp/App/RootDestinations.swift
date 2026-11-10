@@ -169,9 +169,6 @@ extension RootShellView {
                     || isHermesWorkspacePresented || actionErrorMessage != nil,
                 onNewChat: { startNewChat(explicitAgentID: nil) },
                 onOpenProviderAccounts: { openWorkspaceDestination(.keys) },
-                onStartSession: {
-                    startNewChat(explicitAgentID: model.memberIDs.first)
-                },
                 onNewBotChat: botChatRestart(conversationID),
                 onContinueInBranch: { continueInBranch(from: model, $0) },
                 consumesSendOnOpen: { appState.sendsDraftOnOpen.remove($0) != nil },

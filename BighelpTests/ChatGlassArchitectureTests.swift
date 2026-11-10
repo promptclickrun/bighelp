@@ -11,12 +11,10 @@ struct ChatGlassArchitectureTests {
 
     @Test func presentedChatSurfacesDoNotPaintOpaqueCanvasBackings() throws {
         let picker = try load("Bighelp/DesignSystem/BighelpModelPickerSheet.swift")
-        let actions = try load("Bighelp/Chat/ChatActionMenuSheet.swift")
         let settings = try load("Bighelp/Chat/ChatSessionSettingsView.swift")
         let references = try load("Bighelp/References/ReferenceHubDrawer.swift")
 
         #expect(!picker.contains("presentationBackground(theme.canvas)"))
-        #expect(!actions.contains(".background(theme.canvas)"))
         #expect(settings.contains(".scrollContentBackground(.hidden)"))
         #expect(!references.contains(".fill(theme.surface)"))
     }

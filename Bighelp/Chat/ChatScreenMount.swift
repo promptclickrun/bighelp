@@ -19,7 +19,6 @@ final class ChatScreenMount {
         if let old = mounted, old !== model { release(old) }
         mounted = model
         BighelpVisibleChats.shared.appeared(model, screen: screen)
-        ChatPDFPagesDraftRegistry.mount(model)
         model.nativeSessionResumeProgress.mount()
     }
 
@@ -31,7 +30,6 @@ final class ChatScreenMount {
 
     private func release(_ model: ChatModel) {
         BighelpVisibleChats.shared.disappeared(model, screen: screen)
-        ChatPDFPagesDraftRegistry.unmount(model)
         model.nativeSessionResumeProgress.unmount()
     }
 }

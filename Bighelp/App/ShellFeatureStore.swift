@@ -229,12 +229,36 @@ final class ShellFeatureStore {
     private var voiceSessionSequences: [String: Int] = [:]
     /// Makes a chat's live voice call, or says why it can't start there.
     private var liveVoiceFactory: ((SessionRecord, AgentProfile?, ChatModel) -> Result<LiveVoiceModel, LiveVoiceUnavailable>)?
+    /// Why a chat's live voice call can't start right now, without making one; nil when it can.
+    private var liveVoiceCheck: ((SessionRecord) -> LiveVoiceUnavailable?)?
     private weak var activeLiveVoice: LiveVoiceModel?
 
     func configureLiveVoiceFactory(
+        check: ((SessionRecord) -> LiveVoiceUnavailable?)? = nil,
         _ factory: @escaping (SessionRecord, AgentProfile?, ChatModel) -> Result<LiveVoiceModel, LiveVoiceUnavailable>
     ) {
+        liveVoiceCheck = check
         liveVoiceFactory = factory
+    }
+
+    /// Why live voice can't start in this chat right now; nil when it can, or when nothing here can
+    /// tell before the call is made (demo mode).
+    func liveVoiceUnavailable(in conversationID: String) -> LiveVoiceUnavailable? {
+        guard let liveVoiceCheck else { return nil }
+        guard let session = catalog.session(id: conversationID) else { return .chatOpening }
+        return liveVoiceCheck(session)
+    }
+
+    /// Returns once live voice can start in the chat, once what stops it won't pass by itself, or
+    /// after `limit`. A chat opened a moment ago (a cold Start voice chat) is still getting its
+    /// session on the computer; asked at once, voice said "This chat is still opening" about a
+    /// second before it could have started. The session isn't observable, so this looks again.
+    func waitForLiveVoice(in conversationID: String, limit: Duration = .seconds(10),
+                          step: Duration = .milliseconds(50)) async {
+        let deadline = ContinuousClock.now + limit
+        while liveVoiceUnavailable(in: conversationID)?.passesByItself == true, ContinuousClock.now < deadline {
+            do { try await Task.sleep(for: step) } catch { return }
+        }
     }
 
     func configureCanonicalSessionReentry(

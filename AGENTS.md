@@ -254,6 +254,12 @@ change in both repos.
   only while Device access › Location is usable, a coarse place (`LiveVoicePlace`: city, region, country from
   the last known fix under an hour old, else a city-level fresh fix; the offer waits about 1 s at most, raced
   with `DeviceLocationDeadline`, never a task group, which waits for every child). The brief keeps the phone's language until asked in words.
+- **Voice waits for the chat:** live voice needs the chat's session on this connection, and a chat opened a
+  moment ago (a cold Start voice chat, a tap right after opening) is still getting it. Every way of opening
+  voice in a chat goes through `ChatDestinationView.openVoice`, which waits under the starting cover
+  (`ShellFeatureStore.waitForLiveVoice`, 10 s at most) while the reason passes by itself
+  (`LiveVoiceUnavailable.passesByItself`: connecting, chat opening). Asked at once, it showed "This chat is
+  still opening" about a second before the call could start (#934).
 - **Live voice multitasks:** requests from the voice model never wait for each other. One runs as a turn in
   the chat when it's free; one made while the chat works runs at once as a Hermes background task for it
   (`ChatModel.runNativeVoiceRequest`, `prompt.background`) and answers the call on its own. Background tasks
@@ -893,6 +899,10 @@ sections can crash only on devices ("Thread stack size exceeded").
   unlocking, coming back and Reconnect open it (`NativeWorkspaceSelectionStore.reopenIfClosed`), because the
   wake's connection stays up and no new owner comes to trigger it (#628).
 - Shortcuts and widgets first check that the host answers, and reconnect once if it doesn't.
+- They wait only for what they need (`BighelpShortcutReadiness`). Ask an agent and the car start a chat, so
+  they go on once the connection can make one (`NativeWorkspaceRuntime.chatsOwner`: agents known, open chats
+  attached again) while the chat list and the other pages load behind them. Callers that read chats, tasks or
+  groups wait for everything. On a computer with many chats the list took longer than the answer (#934).
 - **Widgets never go empty for what the app doesn't know yet.** A launch before the host answers, a gateway
   switch, or bighelp woken in the background (a Shortcut, the Watch, Background App Refresh) has no agents,
   chats or screens yet. Widget writers keep the saved data then: `AgentDirectoryStore.knowsProfiles`, the

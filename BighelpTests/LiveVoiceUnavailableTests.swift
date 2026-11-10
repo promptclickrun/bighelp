@@ -25,6 +25,16 @@ struct LiveVoiceUnavailableTests {
         #expect(reason(direct: false) == .groupChat)
     }
 
+    /// Voice waits only for what comes by itself a moment after a chat opens.
+    @Test func onlyTheConnectionAndTheChatPassByThemselves() {
+        #expect(LiveVoiceUnavailable.connecting.passesByItself)
+        #expect(LiveVoiceUnavailable.chatOpening.passesByItself)
+        for reason in [LiveVoiceUnavailable.groupChat, .pluginNotInstalled, .pluginNotLoaded, .pluginUnreachable,
+                       .voiceNotOffered, .demo] {
+            #expect(!reason.passesByItself)
+        }
+    }
+
     @Test func onlyReasonsAStepCanFixOfferTryAgain() {
         #expect(LiveVoiceUnavailable.pluginNotLoaded.canTryAgain)
         #expect(LiveVoiceUnavailable.connecting.canTryAgain)

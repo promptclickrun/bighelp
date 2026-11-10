@@ -281,6 +281,41 @@ struct ChatDestinationView: View {
         )
     }
 
+    /// Opens voice here, in the bar over a Bots mode chat when `inBar`. Live voice needs the chat's
+    /// session on the computer, and a chat that opened a moment ago (a cold Start voice chat, a tap
+    /// right after opening) is still getting it. Voice waits for it under the starting cover; it
+    /// once asked at once and showed "This chat is still opening" a second before it could start.
+    func openVoice(inBar: Bool = false) async {
+        guard await waitForChatBeforeLiveVoice() else { return }
+        let presentation = makeVoice(agentVoice.mode)
+        if inBar {
+            withAnimation(.snappy(duration: 0.25)) { voiceBar = presentation }
+            // The cover's own end follows the full-screen voice; the bar ends it here.
+            VoiceLaunchState.shared.finish()
+        } else {
+            voicePresentation = presentation
+        }
+    }
+
+    /// False when the wait was cancelled (the person moved on), so nothing opens.
+    func waitForChatBeforeLiveVoice() async -> Bool {
+        guard agentVoice.mode == .codexLive,
+              featureStore.liveVoiceUnavailable(in: model.conversationID)?.passesByItself == true else { return true }
+        let launch = VoiceLaunchState.shared
+        // A Shortcut's start already shows the cover; a tap in the chat gets it for the wait.
+        let startedCover = !launch.isStarting
+        if startedCover {
+            let profile = voiceAgentID.flatMap { id in agents.profiles.first { $0.id == id } }
+            launch.begin(agent: profile.map { .init(id: $0.id, name: $0.name, imageURL: agents.avatarURL(for: $0)) })
+        }
+        await featureStore.waitForLiveVoice(in: model.conversationID)
+        guard !Task.isCancelled else {
+            if startedCover { launch.finish() }
+            return false
+        }
+        return true
+    }
+
     /// The voice bar over a Bots mode chat, under its header.
     @ViewBuilder
     private var voiceBarOverlay: some View {
@@ -355,12 +390,8 @@ struct ChatDestinationView: View {
                 }
             },
             onVoiceTap: {
-                let presentation = makeVoice(agentVoice.mode)
-                if homeChrome.isSimpleBots, model.memberIDs.count == 1 {
-                    withAnimation(.snappy(duration: 0.25)) { voiceBar = presentation }
-                } else {
-                    voicePresentation = presentation
-                }
+                let inBar = homeChrome.isSimpleBots && model.memberIDs.count == 1
+                Task { @MainActor in await openVoice(inBar: inBar) }
             },
             onApprovalTap: onOpenApproval,
             onPeopleTap: { isPeopleAndChatPresented = true },
@@ -774,7 +805,11 @@ struct ChatDestinationView: View {
             await model.send()
         }
         .task(id: appState.pendingVoiceConversationID) {
-            guard appState.consumeVoiceRequest(for: model.conversationID) else { return }
+            // The request stays until voice can open, so withdrawing it (another computer, another
+            // screen) cancels this wait.
+            guard appState.pendingVoiceConversationID == model.conversationID,
+                  await waitForChatBeforeLiveVoice(),
+                  appState.consumeVoiceRequest(for: model.conversationID) else { return }
             voicePresentation = makeVoice(agentVoice.mode)
         }
         .onChange(of: isCameraPickerPresented) { wasPresented, isPresented in

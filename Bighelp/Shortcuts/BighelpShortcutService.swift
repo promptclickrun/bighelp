@@ -494,7 +494,7 @@ final class BighelpShortcutService: @unchecked Sendable {
 
     func openChat(agentID: String?,
                   beforePresentation: @escaping @MainActor (String, String?) -> Void = { _, _ in }) async throws -> (BighelpShortcutWorkspace, BighelpShortcutVoiceResult) {
-        let workspace = try await liveWorkspace()
+        let workspace = try await liveWorkspace(needs: .chats)
         // A widget remembers the agent it last drew; if that agent is gone, use the default.
         let known = agentID.flatMap { id in workspace.agents.profiles.contains { $0.id == id } ? id : nil }
         let agent = try resolveAgent(explicitID: known, in: workspace)

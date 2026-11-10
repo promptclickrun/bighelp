@@ -90,9 +90,9 @@ final class NativeWorkspaceRuntime {
     private(set) var isSuspended = false
     /// The connection that can make and open chats now: its agents are known and its open chats are
     /// attached again. The chat list and the other pages may still be loading, which a chat started
-    /// outside the app (Ask an agent, the car) never needs. Nil from a suspend until a refresh on the
-    /// next connection gets that far.
-    @ObservationIgnored private(set) var chatsOwner: WorkspaceOwner?
+    /// outside the app (Ask an agent, the car, Start voice chat) never needs. Nil from a suspend until
+    /// a refresh on the next connection gets that far.
+    private(set) var chatsOwner: WorkspaceOwner?
     private var confirmedWidgetSessionOwner: WorkspaceOwner?
     private var unrecoveredActiveChatID: String?
     private(set) var errorMessage: String?

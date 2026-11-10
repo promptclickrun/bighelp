@@ -903,6 +903,9 @@ sections can crash only on devices ("Thread stack size exceeded").
   they go on once the connection can make one (`NativeWorkspaceRuntime.chatsOwner`: agents known, open chats
   attached again) while the chat list and the other pages load behind them. Callers that read chats, tasks or
   groups wait for everything. On a computer with many chats the list took longer than the answer (#934).
+- Links that start or open one agent's chat (voice, new chat, an agent's chat: `startsAChat`) open at the same
+  point (`acceptsChatStarts`). Other links still wait for the whole workspace. Coming back from the background,
+  the chat list held Start voice chat for seconds after the computer answered.
 - **Widgets never go empty for what the app doesn't know yet.** A launch before the host answers, a gateway
   switch, or bighelp woken in the background (a Shortcut, the Watch, Background App Refresh) has no agents,
   chats or screens yet. Widget writers keep the saved data then: `AgentDirectoryStore.knowsProfiles`, the

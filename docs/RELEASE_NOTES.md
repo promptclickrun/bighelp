@@ -3,6 +3,20 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.79
+
+### New
+
+- **Model settings:** a model button is in the message box, before the microphone. Tap it to see the model of the chat, the Thinking control and Fast Mode on one short sheet. The app sends each change immediately. There is no Apply button.
+- **Thinking control:** drag it sideways to set how hard the agent thinks. You feel a tick at each level, and the change goes to the agent when you lift your finger. You can also tap the track or the name of a level.
+- **Six looks for the Thinking control:** Noodle, Train of Thought, Clockwork, Meadow, Ink Bloom and Wide Awake. Go to Settings › Appearance › Thinking to try each one and select yours. The colors of a look change as the level goes up.
+- **All models:** in Model settings, tap the model. Each provider has a section that you can open and close. Tap the star of a model to keep it at the top. You can search all models.
+
+### Changed
+
+- **Smoother chats:** a long answer no longer makes the chat slow while it arrives or immediately after it arrives. The app now does the same small quantity of work for each new piece of an answer, also in a long chat and when the computer has many chats.
+- **Names:** "Model & reasoning" is now "Model settings", and a chat shows "Thinking" where it showed "Reasoning".
+
 ## 2.6.78
 
 ### Fixed

@@ -1465,6 +1465,38 @@ struct DirectHermesSessionCatalogClientTests {
         #expect(updates.payloads.first?["session_id"] == .string("taco-order"))
     }
 
+    /// Delete's only home is Archived Chats: a chat in the lists may still be live on Hermes, which
+    /// refuses to remove it, so the lists offer no Delete at all. An archived row is deleted by its
+    /// stored id (`session.delete`), and the row it was showing goes with it.
+    @Test func deletingAnArchivedChatRemovesTheStoredRowItShowed() async throws {
+        @MainActor final class Deletions { var targets: [(String, String)] = [] }
+        let deletions = Deletions()
+        var archived = try #require(Self.session(id: "taco-order").object)
+        archived["archived"] = .boolean(true)
+        archived["auto_archived"] = .integer(0)
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, payload in
+            switch operation {
+            case .profilesList: return Self.profiles()
+            case .sessionsList:
+                #expect(payload["archived"] == .string("only"))
+                return Self.ownershipPage([.object(archived)])
+            case .nativeSessionDelete:
+                let target = try #require(payload["session_id"]?.string)
+                deletions.targets.append((target, try #require(payload["profile"]?.string)))
+                return ["deleted": .string(target)]
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let client = Self.client(workspace)
+        #expect(client.canDeleteArchivedChats)
+        let chat = try #require(try await client.archivedChats().first)
+        try await client.deleteArchivedChat(chat)
+        #expect(deletions.targets.count == 1)
+        #expect(deletions.targets.first?.0 == "taco-order")
+        #expect(deletions.targets.first?.1 == "alpha")
+    }
+
     @Test func canonicalPinUsesRegistryIdentity() async throws {
         let workspace = try SessionWorkspaceStub()
         workspace.handler = { operation, payload in

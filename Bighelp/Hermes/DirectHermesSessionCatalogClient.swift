@@ -184,6 +184,9 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
 
     var canCreate: Bool { onCreationStateChange != nil && !retired }
     var canDeleteConversation: Bool { false }
+    /// Archived Chats deletes an archived chat's stored row even though the lists have no Delete: a chat
+    /// someone archived isn't the one they may be talking in, and Hermes refuses to remove a live one.
+    var canDeleteArchivedChats: Bool { true }
     var allowsLocalAgentReassignment: Bool { false }
 
     func coordinate(for visibleID: String) throws -> WorkspaceSessionCoordinate {
@@ -1368,6 +1371,17 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         try DirectHermesSessionValidation.coordinate(chat.profileID, maximum: 128)
         try DirectHermesSessionValidation.coordinate(chat.storedID)
         let response = try await sessionEdits.setArchived(chat.storedID, profile: chat.profileID, archived: false).response
+        guard response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
+    }
+
+    /// Deletes an archived chat's stored row and its transcripts. Hermes refuses while the chat is still
+    /// live on its gateway ("cannot delete an active session"); that sentence reaches the person, and a
+    /// row already gone counts as deleted. Nothing here re-lists the archived chat: the next
+    /// Archived Chats read is the proof, and a deleted row can't come back.
+    func deleteArchivedChat(_ chat: SessionArchivedChat) async throws {
+        try DirectHermesSessionValidation.coordinate(chat.profileID, maximum: 128)
+        try DirectHermesSessionValidation.coordinate(chat.storedID)
+        let response = try await sessionEdits.delete(chat.storedID, profile: chat.profileID)
         guard response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
     }
 

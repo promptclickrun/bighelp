@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Chats someone archived on this computer, every agent's, newest first, each with the app or channel it
 /// came from (iMessage, Telegram…). Restore brings one back to the lists; opening one restores it first.
+/// Delete removes one for good — the lists have no Delete of their own.
 @MainActor
 struct ArchivedChatsView: View {
     let catalog: SessionCatalogStore
@@ -11,6 +12,9 @@ struct ArchivedChatsView: View {
     @State private var chats: [SessionArchivedChat]?
     @State private var errorMessage: String?
     @State private var restoring: String?
+    @State private var deleting: String?
+    /// The row waiting on the Delete alert's confirmation.
+    @State private var pendingDelete: SessionArchivedChat?
     @BighelpThemeReader private var theme
 
     var body: some View {
@@ -38,6 +42,15 @@ struct ArchivedChatsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .refreshable { await load() }
+        .alert("Delete chat?", isPresented: Binding(get: { pendingDelete != nil },
+                                                   set: { if !$0 { pendingDelete = nil } }),
+               presenting: pendingDelete) { chat in
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) { Task { await delete(chat) } }
+                .accessibilityIdentifier("archived-chats.delete-confirm")
+        } message: { chat in
+            Text("Delete “\(chat.title)” permanently? This cannot be undone.")
+        }
         .accessibilityIdentifier("archived-chats")
     }
 
@@ -57,18 +70,35 @@ struct ArchivedChatsView: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: BighelpTokens.space8)
-                if restoring == chat.id { ProgressView() }
+                if restoring == chat.id || deleting == chat.id { ProgressView() }
             }
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .disabled(restoring != nil)
+        .disabled(restoring != nil || deleting != nil)
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button("Restore", systemImage: "tray.and.arrow.up") { Task { await restore(chat, opens: false) } }
                 .tint(.indigo)
+            if catalog.canDeleteArchivedChats {
+                Button(role: .destructive) {
+                    pendingDelete = chat
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+                .accessibilityIdentifier("archived-chats.swipe.delete.\(chat.id)")
+            }
         }
         .contextMenu {
             Button("Restore", systemImage: "tray.and.arrow.up") { Task { await restore(chat, opens: false) } }
+            if catalog.canDeleteArchivedChats {
+                Divider()
+                Button(role: .destructive) {
+                    pendingDelete = chat
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+                .accessibilityIdentifier("archived-chats.action.delete.\(chat.id)")
+            }
         }
         .accessibilityIdentifier("archived-chats.chat.\(chat.id)")
     }
@@ -87,6 +117,20 @@ struct ArchivedChatsView: View {
         } catch {
             errorMessage = "Archived chats couldn't be loaded. "
                 + (HermesRefusalMessage.sentence(in: error) ?? "Pull down to try again.")
+        }
+    }
+
+    private func delete(_ chat: SessionArchivedChat) async {
+        guard deleting == nil else { return }
+        deleting = chat.id
+        defer { deleting = nil }
+        do {
+            try await catalog.deleteArchivedChat(chat)
+            chats?.removeAll { $0.id == chat.id }
+        } catch is CancellationError {
+        } catch {
+            errorMessage = "\(chat.title) couldn't be deleted. "
+                + (HermesRefusalMessage.sentence(in: error) ?? "Try again.")
         }
     }
 

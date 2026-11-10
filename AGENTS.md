@@ -483,6 +483,13 @@ change in both repos.
   `native-workspace-files-agents-v1`) and read that agent's working folder with the same refusals. A bot's Files
   tab sends its ID (`DirectHermesManagedFilesClient(agentID:)`); the serving agent never names itself, so older
   plugins keep working for it, and other bots say to update the plugin.
+- **A chat's Files** (••• › Files, `ChatFolderBrowserView`, #944): the chat's working folder on the computer
+  as a tree, with a path field for any other folder. The folder is the session's own (`cwd`, from
+  `NativeWorkspaceSessionBridge.sessionFolder`), else Hermes' `/api/fs/default-cwd`, else home. Everything is
+  Hermes' own `/api/fs/*` as the chat's agent (`LiveHostFolders`), so it needs no plugin: `list` gives only
+  names, paths and which are folders; a picture comes whole from `read-data-url`, which has its own response
+  limit (`DirectHermesHTTP.responseLimit`). A group chat lists the files in its messages instead
+  (`ChatSessionFilesView`). Demo: `DemoHostFolders`.
 - **Phone tools** (Settings › Connections › Device access; contract in
   [docs/IPHONE_DEVICE_TOOLS.md](docs/IPHONE_DEVICE_TOOLS.md)): an agent's `iphone_*` call reaches the phone over the
   chat's device-tool channel. `DeviceToolCatalog` lists every operation and which are journaled; each capability with

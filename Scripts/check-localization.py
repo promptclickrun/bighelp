@@ -16,7 +16,7 @@ REQUIRED = {
     "Ideas", "Goals", "Files", "Agents", "Settings", "New chat", "Send message",
     "Stop response", "Message %@", "Ask %@", "Appearance", "Your name", "Done",
     "Nerd Mode", "Default model", "AI providers", "Help & feedback",
-    "Add", "Voice mode", "PDF as pages",
+    "Add", "Voice mode", "Drawing",
     "Document scanning requires a supported camera device.",
     "PDF pages require a current native Hermes conversation.",
     "hermes.example.com or 192.168.1.20",

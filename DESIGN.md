@@ -514,6 +514,15 @@ the tool calls, as before. Keep reasoning open (on by default) keeps finished re
 off, it closes to one line. A tap on the heading opens or closes it, and the reader's choice wins over the
 setting. Group chats keep reasoning in the steps.
 
+A chat's ••• › Files (`ChatFolderBrowserView`) shows the chat's working folder on the computer. A path field on
+top shows any other folder when Return is pressed (a full path, a `~` path, or a name inside the folder on
+show); beside it, the folder above and the working folder. Under a search field, the folder is a tree with
+folders first: a tap opens a folder in place, and its names are read then. Search finds names in every folder
+opened so far and says where each one is. Names that start with a dot stay behind one line under the tree
+("Show 12 hidden items"), or a search that starts with a dot. A tap on a file pushes it: Markdown rendered, other text as it is in
+monospace with Copy, a picture fitted to the page. Nothing here changes a file but the Markdown viewer's own
+Edit. A group chat's Files lists the files in its messages.
+
 A file in a chat opens in the native preview with Save and Share. A Markdown file opens rendered
 (`MarkdownMessageView`, as chat messages are), with a Preview and Raw switch under its name.
 

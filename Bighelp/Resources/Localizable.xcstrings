@@ -1787,6 +1787,23 @@
         }
       }
     },
+    "As its own message": {
+      "comment": "Simplified Chinese draft for reasoning as its own message (#943); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As its own message"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "作为单独的消息"
+          }
+        }
+      }
+    },
     "Ask %@": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -5958,6 +5975,23 @@
         }
       }
     },
+    "In the steps": {
+      "comment": "Simplified Chinese draft for reasoning as its own message (#943); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In the steps"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在步骤中"
+          }
+        }
+      }
+    },
     "Inbox": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -6328,6 +6362,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "在消息旁边保留可用的操作。"
+          }
+        }
+      }
+    },
+    "Keep reasoning open": {
+      "comment": "Simplified Chinese draft for reasoning as its own message (#943); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep reasoning open"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "保持推理展开"
           }
         }
       }
@@ -10151,6 +10202,40 @@
         }
       }
     },
+    "Reasoning shows": {
+      "comment": "Simplified Chinese draft for reasoning as its own message (#943); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reasoning shows"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "推理显示位置"
+          }
+        }
+      }
+    },
+    "Reasoning…": {
+      "comment": "Simplified Chinese draft for reasoning as its own message (#943); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reasoning…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "推理中…"
+          }
+        }
+      }
+    },
     "Receive proactive updates from your paired Hermes host.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -11844,6 +11929,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "显示聊天所属 Hermes 项目中新增和删除的文件。"
+          }
+        }
+      }
+    },
+    "Show its words without a tap.": {
+      "comment": "Simplified Chinese draft for reasoning as its own message (#943); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show its words without a tap."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无需轻点即可显示其内容。"
           }
         }
       }
@@ -15566,6 +15668,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "下次你给智能体发消息时，它会看到这些回应。"
+          }
+        }
+      }
+    },
+    "Your agent's thinking is a message above its work.": {
+      "comment": "Simplified Chinese draft for reasoning as its own message (#943); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your agent's thinking is a message above its work."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "智能体的思考显示为其工作上方的一条消息。"
+          }
+        }
+      }
+    },
+    "Your agent's thinking sits between its tool calls.": {
+      "comment": "Simplified Chinese draft for reasoning as its own message (#943); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your agent's thinking sits between its tool calls."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "智能体的思考显示在工具调用之间。"
           }
         }
       }

@@ -243,6 +243,10 @@ final class DirectHermesHTTP {
         if method == "GET", isSessionExportRoute(route) {
             return maximumSessionTransferBytes
         }
+        if method == "GET", route == "/api/fs/read-data-url" {
+            // A picture opened from a chat's Files comes whole, as base64.
+            return HostPictureFile.maximumResponseBytes
+        }
         let paths = query.filter { $0.name == "path" }
         guard method == "GET", paths.count == 1, let path = paths.first?.value else {
             return DirectHermesWire.maximumMessageBytes

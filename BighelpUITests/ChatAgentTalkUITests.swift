@@ -23,7 +23,8 @@ final class ChatAgentTalkUITests: BighelpUITestCase {
 
             let finished = rail(in: app, label: "4 messages with Mina Shah and Jordan Lee")
             reveal(finished, in: timeline)
-            let fold = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Worked for")).firstMatch
+            let fold = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "chat.completed-turn:"))
+                .firstMatch
             XCTAssertTrue(fold.exists)
             XCTAssertTrue(fold.label.contains("2 steps"), "Messages to agents aren't steps: \(fold.label)")
             XCTAssertLessThan(fold.frame.minY, finished.frame.minY, "The rail stays out of the fold, after it")

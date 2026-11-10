@@ -154,6 +154,12 @@ final class NativeWorkspaceSessionBridge: SessionCatalogClient {
         return try? box.value().coordinate(for: id)
     }
 
+    /// The folder this chat's session runs in on the computer, for its Files; nil when Hermes hasn't said.
+    func sessionFolder(for id: String) -> String? {
+        guard !retired, let owner = connections.owner, owner.authority == authority else { return nil }
+        return (try? box.value())?.folder(for: id)
+    }
+
     /// A retained stream is eligible for durable resume only within the same
     /// authenticated authority. Its visible ID keeps the original durable
     /// anchor while `storedID` may be a server-confirmed compaction successor.

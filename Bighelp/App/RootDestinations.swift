@@ -181,7 +181,8 @@ extension RootShellView {
                     forkSession(sourceID: conversationID, throughItemID: itemID)
                 },
                 appearanceAuthority: currentWorkspaceOwner?.authority,
-                hostFiles: codeFileLinks(sessionID: conversationID)
+                hostFiles: codeFileLinks(sessionID: conversationID),
+                chatFolders: { chatFolders(for: model) }
             )
             .environment(\.chatCardInteractions, cardInteractions(for: model))
             .environment(\.agentHomeChrome, homeChrome(forChat: conversationID))

@@ -43,12 +43,35 @@ struct IslandStage: View {
     }
 }
 
+/// One frame's symbols, each made ready to draw once.
+private final class IslandSymbols {
+    private struct Key: Hashable {
+        let name: String
+        let color: Color
+        let size: Double
+    }
+
+    private var ready: [Key: GraphicsContext.ResolvedText] = [:]
+
+    func resolved(_ name: String, color: Color, size: Double, in context: GraphicsContext) -> GraphicsContext.ResolvedText {
+        let key = Key(name: name, color: color, size: size)
+        if let kept = ready[key] { return kept }
+        let made = context.resolve(
+            Text(Image(systemName: name)).font(.system(size: size, weight: .semibold)).foregroundStyle(color))
+        ready[key] = made
+        return made
+    }
+}
+
 /// Where everything is at one moment. Pure math on time, so the scene is
 /// cheap to draw and identical for every frame at the same time.
 struct IslandScene {
     let kind: AgentActivityKind
     let size: CGSize
     let time: Double
+    /// This frame's symbols. A scene draws the same one several times (four speech bubbles while
+    /// the agent replies), and making a symbol ready costs far more than drawing it.
+    private let symbols = IslandSymbols()
 
     private var width: Double { size.width }
     private var height: Double { size.height }
@@ -154,8 +177,7 @@ struct IslandScene {
         layer.opacity = opacity
         layer.translateBy(x: point.x, y: point.y)
         layer.rotate(by: rotation)
-        layer.draw(Text(Image(systemName: name)).font(.system(size: size, weight: .semibold)).foregroundStyle(color),
-                   at: .zero)
+        layer.draw(symbols.resolved(name, color: color, size: size, in: context), at: .zero)
     }
 
     private func glyph(_ text: String, color: Color, size: Double, at point: CGPoint, opacity: Double,

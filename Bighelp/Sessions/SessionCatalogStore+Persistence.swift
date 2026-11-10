@@ -13,6 +13,19 @@ extension SessionCatalogStore {
         }
     }
 
+    /// Saves at once without holding the main thread for the encoding. For the moment a reply
+    /// lands: saving every chat there and then (`flushPersistence`) stalled the chat on screen just
+    /// as the answer finished, longer the more chats there are. Leaving the app still flushes.
+    func checkpointNow() {
+        cancelPersistenceCheckpoint()
+        guard hasUnsavedChanges, repository != nil else { return }
+        let id = UUID()
+        persistenceCheckpointID = id
+        persistenceCheckpointTask = Task { [weak self] in
+            await self?.writePersistenceCheckpoint(id: id)
+        }
+    }
+
     private func writePersistenceCheckpoint(id: UUID) async {
         guard persistenceCheckpointID == id, let repository else { return }
         guard repositoryAllowsWrites else { persistenceDidFail(); return }

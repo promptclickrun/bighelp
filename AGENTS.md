@@ -628,6 +628,20 @@ change in both repos.
     VoiceOver's label (`ChatMessageTextHost.accessibilityLabelSource`) are made when asked for.
   Measure with `-test-tool-stream -test-tool-stream-fast-tail` at the bottom of a `-test-long-chat`, and read the
   probe's `text.layout.*`, `message.parse` and `main_busy_ms`.
+- **A real computer sends about thirty events a second:** demo mode doesn't run the code a real host's events
+  go through, so measure a real answer too (the probe's `send` with `BIGHELP_PERF_SEND_TEXTS`). Work done for
+  each event must not grow with the number of chats, and nothing every message reads as it draws may change
+  with each event:
+  - A message's reactions read `ChatModel.reactionRowItemIDs`, never `items`: `items` changes with every piece,
+    and reading it drew every message on screen again each time. `replaceItem` writes the indexes only when
+    the ID changed, because a write to an observed property tells its readers even when it changes nothing.
+  - A chat's runtime liveness is reconciled only when it changes, the chat list keeps its records until the
+    catalog's `presentedRevision` moves, and a notification event asks for its observer before it reads the
+    Keychain.
+  - Values read many times a draw are worked out once: `WorkspaceAuthority.cacheScopeID`, the theme
+    (`BighelpTheme.resolve`), the model summary's reasoning options.
+  - A reply that lands is saved with `SessionCatalogStore.checkpointNow()`, which encodes off the main thread;
+    `flushPersistence` is for leaving the app or the chat.
 - **Kept chat rows:** a message row costs more than a 120 Hz frame to build, so the timeline keeps the 40 built
   rows nearest the screen by ID (`ChatTimelineBuiltRows`), never recycles a cell for another row, and builds the
   24 rows above while the chat is still. Cells host SwiftUI as a plain subview (`ChatTimelineCell`), not as their

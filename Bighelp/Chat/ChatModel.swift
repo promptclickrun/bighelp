@@ -270,6 +270,10 @@ final class ChatModel {
     var lastItemMutationWorkCount = 0
     var lastActivityMutationWorkCount = 0
     var itemIndexByID: [String: Int] = [:]
+    /// The messages that stand for each saved row Hermes can put a reaction on (usually one), kept
+    /// with `itemIndexByID`. A message's reactions read this, never `items`: `items` changes with
+    /// every piece of a streaming answer, and reading it there drew every message again each time.
+    var reactionRowItemIDs: [Int: [String]] = [:]
     var transcriptMessageIndexByID: [String: Int] = [:]
     var transcriptActivityIndexByEventID: [String: Int] = [:]
     var transcriptActivityPositionByEventID: [String: Int] = [:]

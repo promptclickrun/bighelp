@@ -29,6 +29,42 @@ private final class ObservationInvalidationCounter: @unchecked Sendable {
 
 @MainActor
 struct ChatModelTests {
+    /// Each piece of a streaming answer replaces its message under the same ID. The messages on
+    /// screen read their reactions as they draw, and a piece must not tell them to draw again:
+    /// on a real computer it did, about thirty times a second for every message.
+    @Test func aStreamedPieceLeavesEveryOtherMessagesReactionsAlone() {
+        let saved = TimelineItem(id: "stream-rows:row:41", role: .human, sender: .user(snapshot: .init(name: "You")),
+                                 content: .message("Hello"),
+                                 metadata: .init(source: "Hermes", delivery: "Saved", sourceOrder: 1))
+        let model = ChatModel(conversationID: "stream-rows", client: ControlledStreamingConversationClient(),
+                              initialItems: [saved])
+        func answer(_ text: String, id: String = "stream-rows:live") -> TimelineItem {
+            TimelineItem(id: id, role: .assistant, sender: .agent(id: "default", snapshot: .init(name: "Assistant")),
+                         content: .message(text), metadata: .init(delivery: "Streaming"))
+        }
+        func tellsTheSavedMessage(_ change: () -> Void) -> Bool {
+            let told = ToldBox()
+            withObservationTracking {
+                _ = model.nativeMessageReactionPresentation(for: saved)
+            } onChange: { told.value = true }
+            change()
+            return told.value
+        }
+        model.appendItem(answer("One"))
+        #expect(!tellsTheSavedMessage { model.replaceItem(at: 1, with: answer("One two")) })
+        #expect(model.nativeMessageReactionPresentation(for: saved).rowID == 41)
+        // The finished answer takes its saved row's ID: the rows changed, so the messages hear of it.
+        #expect(tellsTheSavedMessage { model.replaceItem(at: 1, with: answer("One two", id: "stream-rows:row:42")) })
+        #expect(model.nativeMessageReactionPresentation(for: model.items[1]).rowID == 42)
+        // Two messages for one saved row: neither takes a reaction, until one of them goes.
+        model.appendItem(answer("Again", id: "stream-rows:copy:row:42"))
+        #expect(model.nativeMessageReactionPresentation(for: model.items[1]).availability == .conflictingCanonicalRow)
+        model.removeItem(id: "stream-rows:copy:row:42")
+        #expect(model.nativeMessageReactionPresentation(for: model.items[1]).availability != .conflictingCanonicalRow)
+        #expect(model.nativeMessageReactionPresentation(for: answer("Gone", id: "stream-rows:row:99")).availability
+            == .foreignSession)
+    }
+
     @Test func responseHapticsFollowLiveGrowthWithoutReplayOrDuplicatePulses() async {
         let client = ControlledStreamingConversationClient()
         let model = ChatModel(conversationID: "haptic-stream", client: client, initialItems: [])
@@ -5359,6 +5395,11 @@ private final class ControlledDemoSleeper: DemoSleeper {
         continuation?.resume()
         continuation = nil
     }
+}
+
+/// Whether an observation's `onChange` ran. It runs where the change is made: here, the main actor.
+private final class ToldBox: @unchecked Sendable {
+    var value = false
 }
 
 @MainActor

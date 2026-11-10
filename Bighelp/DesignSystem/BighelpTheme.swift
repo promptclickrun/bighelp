@@ -1,4 +1,5 @@
 import Foundation
+import os
 import SwiftUI
 import UIKit
 
@@ -789,13 +790,42 @@ struct BighelpAppearanceContext: Equatable, Sendable {
 }
 
 extension BighelpTheme {
+    /// The last few themes worked out, by what they were made from. Every view that reads the theme
+    /// asks for it each time it draws (`BighelpThemeReader`), and a streaming answer draws many times
+    /// a second: working the colors out each time was a tenth of the chat's time on screen.
+    private static let resolved = OSAllocatedUnfairLock(initialState: [ResolvedTheme]())
+
+    private struct ResolvedTheme: Sendable {
+        let context: BighelpAppearanceContext
+        let dark: Bool
+        let increasedContrast: Bool
+        let theme: BighelpTheme
+    }
+
     static func resolve(
         appearance context: BighelpAppearanceContext,
         colorScheme: ColorScheme,
         contrast: ColorSchemeContrast
     ) -> BighelpTheme {
-        let definition = BighelpThemeRegistry.ember
         let dark = context.appearance == .dark || (context.appearance == .system && colorScheme == .dark)
+        let increasedContrast = contrast == .increased
+        let kept = resolved.withLock { entries in
+            entries.first { $0.dark == dark && $0.increasedContrast == increasedContrast && $0.context == context }
+        }
+        if let kept { return kept.theme }
+        let theme = makeTheme(appearance: context, dark: dark, contrast: contrast)
+        resolved.withLock { entries in
+            if entries.count >= 6 { entries.removeFirst() }
+            entries.append(ResolvedTheme(context: context, dark: dark, increasedContrast: increasedContrast,
+                                         theme: theme))
+        }
+        return theme
+    }
+
+    private static func makeTheme(
+        appearance context: BighelpAppearanceContext, dark: Bool, contrast: ColorSchemeContrast
+    ) -> BighelpTheme {
+        let definition = BighelpThemeRegistry.ember
         let selected = switch (dark, contrast) {
         case (false, .standard): definition.light
         case (false, .increased): definition.lightHighContrast

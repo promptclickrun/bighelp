@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import os
 
 /// Non-secret authority coordinates. Construct these only after the owning
 /// transport verifies authentication; a display label is never an authority.
@@ -18,42 +19,67 @@ struct WorkspaceAuthority: Codable, Hashable, Sendable {
     let deviceAuthorizationEpoch: Int?
     let hostAuthorizationEpoch: Int?
 
-    private var canonicalIdentity: Data {
+    /// A stable name for this authority's saved data: the SHA-256 of its fields. Worked out once,
+    /// when the authority is made: the chat reads it for every event of a streaming answer.
+    let cacheScopeID: String
+
+    private static func cacheScopeID(kind: Kind, endpointIdentity: String, principalID: String,
+                                     providerID: String?, hostID: String,
+                                     deviceAuthorizationEpoch: Int?, hostAuthorizationEpoch: Int?) -> String {
         let fields = [
             kind.rawValue, endpointIdentity, principalID, providerID ?? "", hostID,
             deviceAuthorizationEpoch.map(String.init) ?? "",
             hostAuthorizationEpoch.map(String.init) ?? "",
         ]
         let canonical = "workspace-authority-v1:" + fields.map { "\($0.utf8.count):\($0)" }.joined()
-        return Data(canonical.utf8)
-    }
-
-    var cacheScopeID: String {
-        SHA256.hash(data: canonicalIdentity).map { String(format: "%02x", $0) }.joined()
+        return SHA256.hash(data: Data(canonical.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.canonicalIdentity == rhs.canonicalIdentity
+        lhs.kind == rhs.kind && lhs.endpointIdentity == rhs.endpointIdentity
+            && lhs.principalID == rhs.principalID && lhs.providerID == rhs.providerID
+            && lhs.hostID == rhs.hostID
+            && lhs.deviceAuthorizationEpoch == rhs.deviceAuthorizationEpoch
+            && lhs.hostAuthorizationEpoch == rhs.hostAuthorizationEpoch
     }
 
     func hash(into hasher: inout Hasher) {
-        hasher.combine(canonicalIdentity)
+        hasher.combine(cacheScopeID)
+    }
+
+    /// The sign-in authorities made lately, by what they were made from. The connection's owner is
+    /// worked out from the saved sign-in each time it's read, many times a second while a chat
+    /// streams, and checking the address and hashing it each time showed in the chat's stalls.
+    private static let made = OSAllocatedUnfairLock(initialState: [[String?]: WorkspaceAuthority]())
+
+    private static func remembered(_ key: [String?], make: () throws -> Self) rethrows -> Self {
+        if let kept = made.withLock({ $0[key] }) { return kept }
+        let authority = try make()
+        made.withLock { kept in
+            if kept.count >= 32 { kept.removeAll() }
+            kept[key] = authority
+        }
+        return authority
     }
 
     static func direct(endpointIdentity: String, providerID: String, userID: String) throws -> Self {
-        let endpoint = try canonicalEndpoint(endpointIdentity)
-        return try Self(kind: .direct, endpointIdentity: endpoint, principalID: userID,
-                        providerID: providerID, hostID: endpoint,
-                        deviceAuthorizationEpoch: nil, hostAuthorizationEpoch: nil)
+        try remembered(["direct", endpointIdentity, providerID, userID]) {
+            let endpoint = try canonicalEndpoint(endpointIdentity)
+            return try Self(kind: .direct, endpointIdentity: endpoint, principalID: userID,
+                            providerID: providerID, hostID: endpoint,
+                            deviceAuthorizationEpoch: nil, hostAuthorizationEpoch: nil)
+        }
     }
 
     /// The dashboard grants shared host access without a person identity.
     /// A nil provider keeps this scope distinct from every provider login.
     static func dashboard(endpointIdentity: String) throws -> Self {
-        let endpoint = try canonicalEndpoint(endpointIdentity)
-        return try Self(kind: .direct, endpointIdentity: endpoint, principalID: "dashboard-session",
-                        providerID: nil, hostID: endpoint,
-                        deviceAuthorizationEpoch: nil, hostAuthorizationEpoch: nil)
+        try remembered(["dashboard", endpointIdentity, nil, nil]) {
+            let endpoint = try canonicalEndpoint(endpointIdentity)
+            return try Self(kind: .direct, endpointIdentity: endpoint, principalID: "dashboard-session",
+                            providerID: nil, hostID: endpoint,
+                            deviceAuthorizationEpoch: nil, hostAuthorizationEpoch: nil)
+        }
     }
 
     static func link(origin: String, deviceID: String, deviceAuthorizationEpoch: Int,
@@ -89,6 +115,10 @@ struct WorkspaceAuthority: Codable, Hashable, Sendable {
         self.hostID = hostID
         self.deviceAuthorizationEpoch = deviceAuthorizationEpoch
         self.hostAuthorizationEpoch = hostAuthorizationEpoch
+        cacheScopeID = Self.cacheScopeID(
+            kind: kind, endpointIdentity: endpointIdentity, principalID: principalID, providerID: providerID,
+            hostID: hostID, deviceAuthorizationEpoch: deviceAuthorizationEpoch,
+            hostAuthorizationEpoch: hostAuthorizationEpoch)
     }
 
     init(from decoder: any Decoder) throws {

@@ -5,6 +5,15 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct NativeHermesSessionForkTests {
+    /// Chat IDs saved on phones hold these keys, so their spelling must never change.
+    @Test func sessionKeysAreURLSafeBase64WithoutPadding() {
+        #expect(DirectHermesSessionIdentity.key("a") == "YQ")
+        #expect(DirectHermesSessionIdentity.key("ab") == "YWI")
+        #expect(DirectHermesSessionIdentity.key("??>") == "Pz8-")
+        #expect(DirectHermesSessionIdentity.key("???") == "Pz8_")
+        #expect(DirectHermesSessionIdentity.key("") == "")
+    }
+
     @Test func branchPagesCompleteHistoryAndUsesServerAssignedIdentity() async throws {
         let fixture = try NativeForkWorkspaceFixture(rowCount: 205, usesOfficialHistoryEnvelope: true)
         let appID = try DirectHermesSessionIdentity.appID(

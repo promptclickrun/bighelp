@@ -1427,7 +1427,7 @@ final class ShellFeatureStore {
                     for: session.id
                 )
                 self.draftJournal?.chatSaved(session.id)
-                if settledReply, !self.defersChatPresentation { catalog.flushPersistence() }
+                if settledReply, !self.defersChatPresentation { catalog.checkpointNow() }
                 if shouldSettle {
                     self.refreshDashboardAfterIncomingChange()
                 }

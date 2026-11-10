@@ -1314,7 +1314,7 @@ struct ShellFeatureStoreTests {
         #expect(harness.catalog.session(id: session.id)?.items.last?.id == final.messageID)
     }
 
-    @Test func shellExternalStreamingTailMutationIsBoundedAndSavesOnlyAtTerminalFlush() throws {
+    @Test func shellExternalStreamingTailMutationIsBoundedAndSavesOnlyAtTerminalFlush() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "ShellStreamingScale-\(UUID().uuidString)", directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -1370,6 +1370,8 @@ struct ShellFeatureStoreTests {
             metadata: .init(delivery: "Delivered")
         )], conversationID: session.id)
 
+        // The settled reply is saved at once, encoded off the main thread.
+        for _ in 0..<400 where catalog.repositorySaveCount == 0 { try await Task.sleep(for: .milliseconds(5)) }
         #expect(catalog.repositorySaveCount == 1)
         #expect(try repository.load().first?.items.last?.content == .message("Final"))
     }

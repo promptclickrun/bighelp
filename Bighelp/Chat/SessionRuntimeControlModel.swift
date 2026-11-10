@@ -135,21 +135,26 @@ final class SessionRuntimeControlModel {
     }
 
     var reasoningOptions: [RuntimeReasoningOption] {
-        reasoningPicker?.choices.compactMap { choice in
+        guard let reasoningPicker else { return [] }
+        // Asked once, not once for each level: the answer looks the chat up on its computer's list.
+        let unavailableReason = selectionSupport.reasoningUnavailableReason
+        return reasoningPicker.choices.compactMap { choice in
             guard !["show", "hide"].contains(choice.value) else { return nil }
             return RuntimeReasoningOption(
                 value: choice.value,
                 label: Self.reasoningLabel(for: choice.value, fallback: choice.label),
-                detail: selectionSupport.reasoningUnavailableReason ?? Self.reasoningDetail(for: choice.value),
+                detail: unavailableReason ?? Self.reasoningDetail(for: choice.value),
                 isCurrent: choice.value == currentReasoningValue
             )
-        } ?? []
+        }
     }
 
+    /// The chat's level by name. The chat screen reads it on every redraw (its ⋯ menu shows it),
+    /// so it never builds the options: those ask whether the chat can change its level at all.
     var currentReasoningLabel: String? {
         guard let currentReasoningValue else { return nil }
-        return reasoningOptions.first(where: { $0.value == currentReasoningValue })?.label
-            ?? Self.reasoningLabel(for: currentReasoningValue, fallback: currentReasoningValue)
+        let named = reasoningPicker?.choices.first { $0.value == currentReasoningValue }?.label
+        return Self.reasoningLabel(for: currentReasoningValue, fallback: named ?? currentReasoningValue)
     }
 
     var reasoningDisplayLabel: String {

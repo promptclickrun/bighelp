@@ -114,7 +114,8 @@ extension NativeWorkspaceSessionBridge {
         if let mapping = activeMappings[key], mapping.owner == owner,
            DirectHermesSessionValidation.same(mapping.runtimeID, runtimeID) {
             if let active = Self.liveness(from: event) {
-                try? box.value().reconcileRuntimeLiveness(runtimeID: runtimeID, isActive: active)
+                try? box.value().reconcileRuntimeLiveness(runtimeID: runtimeID, isActive: active,
+                                                          visibleID: mapping.visibleID)
                 onSessionLivenessChange?(owner, mapping.visibleID, active)
             }
             return
@@ -335,11 +336,15 @@ extension NativeWorkspaceSessionBridge {
                   self.connections.owner == owner,
                   var current = self.streams[record.id], current.owner == owner,
                   current.client === adapter else { return }
-            current.record.isActive = running
-            self.streams[record.id] = current
+            // Each piece of an answer says the chat is live; only a change is written.
+            if current.record.isActive != running {
+                current.record.isActive = running
+                self.streams[record.id] = current
+            }
             try? self.box.value().reconcileRuntimeLiveness(
                 runtimeID: adapter.runtimeID,
-                isActive: running
+                isActive: running,
+                visibleID: record.id
             )
             self.onSessionLivenessChange?(owner, record.id, running)
         }

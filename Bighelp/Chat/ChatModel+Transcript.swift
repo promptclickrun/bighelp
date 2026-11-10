@@ -531,6 +531,7 @@ extension ChatModel {
         if index == items.indices.last {
             items.removeLast()
             itemIndexByID[id] = nil
+            forgetReactionRow(of: id)
         } else {
             items.remove(at: index)
             rebuildItemIndexes()
@@ -545,20 +546,45 @@ extension ChatModel {
         }
         itemIndexByID[item.id] = items.count
         items.append(item)
+        noteReactionRow(of: item.id)
     }
 
     func replaceItem(at index: Int, with item: TimelineItem) {
         let previousID = items[index].id
         items[index] = item
-        if previousID != item.id { itemIndexByID[previousID] = nil }
+        // A streaming answer replaces its message with each piece, under the same ID. The indexes
+        // are observed, and a write always tells their readers (every message on screen), also
+        // when it changes nothing: write them only when the ID changed.
+        guard previousID != item.id else { return }
+        itemIndexByID[previousID] = nil
         itemIndexByID[item.id] = index
+        forgetReactionRow(of: previousID)
+        noteReactionRow(of: item.id)
     }
 
     func rebuildItemIndexes() {
         itemIndexByID.removeAll(keepingCapacity: true)
-        for (index, item) in items.enumerated() where itemIndexByID[item.id] == nil {
-            itemIndexByID[item.id] = index
+        var rows: [Int: [String]] = [:]
+        for (index, item) in items.enumerated() {
+            if itemIndexByID[item.id] == nil { itemIndexByID[item.id] = index }
+            if let rowID = NativeMessageReactionRowIdentity.rowID(from: item.id) {
+                rows[rowID, default: []].append(item.id)
+            }
         }
+        if rows != reactionRowItemIDs { reactionRowItemIDs = rows }
+    }
+
+    private func noteReactionRow(of itemID: String) {
+        guard let rowID = NativeMessageReactionRowIdentity.rowID(from: itemID) else { return }
+        reactionRowItemIDs[rowID, default: []].append(itemID)
+    }
+
+    private func forgetReactionRow(of itemID: String) {
+        guard let rowID = NativeMessageReactionRowIdentity.rowID(from: itemID),
+              var owners = reactionRowItemIDs[rowID],
+              let position = owners.firstIndex(of: itemID) else { return }
+        owners.remove(at: position)
+        reactionRowItemIDs[rowID] = owners.isEmpty ? nil : owners
     }
 
     func ordered(_ item: TimelineItem) -> TimelineItem {

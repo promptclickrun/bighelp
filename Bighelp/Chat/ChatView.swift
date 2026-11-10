@@ -167,11 +167,13 @@ struct ChatView: View {
     @State private var screenMount = ChatScreenMount()
 
     @State private var isSessionControlsPresented = false
+    /// Model settings opens on All models (a failed turn's Use another model).
+    @State private var sessionControlsStartOnAllModels = false
     @State private var isContextWindowPresented = false
-    /// Change in the context pop-up: open Model & reasoning once the pop-up is gone.
+    /// Change in the context pop-up: open Model settings once the pop-up is gone.
     @State private var opensModelControlsAfterContext = false
     #if targetEnvironment(macCatalyst)
-    /// The Mac's Model & reasoning pop-up hangs from what opened it: the ⋯
+    /// The Mac's Model settings pop-up hangs from what opened it: the ⋯
     /// button, or the message box for requests from elsewhere (the context
     /// window, chat Info, the agent's profile).
     private enum SessionControlsOrigin { case options, composer }
@@ -336,12 +338,20 @@ struct ChatView: View {
         .onChange(of: workStyleInUse) { _, style in
             model.activityDisclosures.configure(style: style)
         }
-        // The message box's model chip: every model is on the one Model & reasoning screen.
+        // A request from outside the chat screen to open Model settings.
         .onChange(of: allModelsRequest) { _, request in
             guard request > 0, let controls = model.runtimeControls else { return }
             guard !ChatRuntimeSelectionLockout.isLocked(isTurnActive: controls.isTurnActive) else {
                 return
             }
+            #if targetEnvironment(macCatalyst)
+            sessionControlsOrigin = .composer
+            #endif
+            openSessionControls(controls)
+        }
+        .onChange(of: model.modelSettingsRequest) { _, _ in
+            guard let controls = model.runtimeControls,
+                  !ChatRuntimeSelectionLockout.isLocked(isTurnActive: controls.isTurnActive) else { return }
             #if targetEnvironment(macCatalyst)
             sessionControlsOrigin = .composer
             #endif
@@ -358,7 +368,7 @@ struct ChatView: View {
                 #else
                 try? await Task.sleep(for: .milliseconds(450))
                 #endif
-                openSessionControls(controls)
+                openSessionControls(controls, allModels: model.sessionControlsOpenOnAllModels)
             }
         }
         .onChange(of: composerFocusRequest) { _, request in
@@ -840,9 +850,8 @@ struct ChatView: View {
         .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
     }
 
-    /// Model & reasoning, from the ⋯ menu. Anchored to whichever header shows
-    /// (the agent-home header has no small identity button). The Mac hangs it
-    /// from the ⋯ button itself (`macSessionControls`).
+    /// Model settings, from the ⋯ menu or the message box's model chip. A sheet on iPhone, iPad and
+    /// Vision Pro; the Mac hangs a pop-up from what opened it (`macSessionControls`).
     private var sessionControlsAnchor: some View {
         Color.clear
             .frame(width: 1, height: 1)
@@ -852,24 +861,25 @@ struct ChatView: View {
                 sessionControlsOrigin = .options
             }
             #else
-            .popover(isPresented: $isSessionControlsPresented, arrowEdge: .top) {
+            .bighelpSheet(isPresented: $isSessionControlsPresented) {
                 if let controls = model.runtimeControls {
-                    ChatSessionControlsPopover(
+                    ChatModelSettingsSheet(
                         controls: controls,
-                        usesWideLayout: horizontalSizeClass == .regular,
-                        onApplied: { isSessionControlsPresented = false }
+                        isAllocating: model.isAwaitingAuthoritativeSessionAllocation,
+                        startsOnAllModels: sessionControlsStartOnAllModels,
+                        onDone: { isSessionControlsPresented = false }
                     )
-                    .presentationCompactAdaptation(.popover)
                 }
             }
             #endif
             // Hermes takes a new model or level on the next turn, so a turn that
-            // starts closes the picker rather than promise a change mid-answer.
+            // starts closes the sheet rather than promise a change mid-answer.
             .onChange(of: model.runtimeControls?.isTurnActive) { _, active in
                 if active == true {
                     isSessionControlsPresented = false
                 }
             }
+            .allowsHitTesting(false)
             .accessibilityHidden(true)
     }
 
@@ -882,14 +892,15 @@ struct ChatView: View {
         )
     }
 
-    /// The Mac's Model & reasoning pop-up, hung from the ⋯ button or the message box.
+    /// The Mac's Model settings pop-up, hung from the ⋯ button or the message box.
     @ViewBuilder
     private var macSessionControls: some View {
         if let controls = model.runtimeControls {
-            ChatSessionControlsMacPopover(
+            ChatModelSettingsMacPopover(
                 controls: controls,
                 size: sessionControlsSize,
-                onApplied: { isSessionControlsPresented = false }
+                startsOnAllModels: sessionControlsStartOnAllModels,
+                onDone: { isSessionControlsPresented = false }
             )
             .presentationCompactAdaptation(.popover)
             .bighelpPopoverDismissal(isPresented: $isSessionControlsPresented)
@@ -903,7 +914,7 @@ struct ChatView: View {
             : screenHeight - composerHeight - bottomSafeArea
         let width: CGFloat = canvasWidth > 0 ? min(560, canvasWidth - 32) : 560
         // Leaves the arrow and a margin clear of the window's edge.
-        return CGSize(width: width, height: min(620, max(320, room - 48)))
+        return CGSize(width: min(width, 440), height: min(620, max(320, room - 48)))
     }
 
     /// A pop-up presented while a sheet is still closing is dropped. Waits for
@@ -1340,22 +1351,22 @@ struct ChatView: View {
     private var modelAndReasoningMenuItem: some View {
         if let accessory = sessionControlAccessory {
             Button(action: accessory.action) {
-                Text(dynamicTypeSize.isAccessibilitySize ? "Model" : "Model & reasoning")
+                Text(dynamicTypeSize.isAccessibilitySize ? "Model" : "Model settings")
                 if !dynamicTypeSize.isAccessibilitySize, let summary = modelSummary { Text(summary) }
                 Image(systemName: "slider.horizontal.3")
             }
-            .accessibilityLabel("Model & reasoning")
+            .accessibilityLabel("Model settings")
             .disabled(!accessory.isEnabled || model.isAwaitingAuthoritativeSessionAllocation)
             .accessibilityIdentifier(accessory.accessibilityIdentifier)
         } else if let controls = model.runtimeControls {
             Button {
                 openSessionControls(controls)
             } label: {
-                Text(dynamicTypeSize.isAccessibilitySize ? "Model" : "Model & reasoning")
+                Text(dynamicTypeSize.isAccessibilitySize ? "Model" : "Model settings")
                 if !dynamicTypeSize.isAccessibilitySize, let summary = modelSummary { Text(summary) }
                 Image(systemName: "slider.horizontal.3")
             }
-            .accessibilityLabel("Model & reasoning")
+            .accessibilityLabel("Model settings")
             .disabled(ChatRuntimeSelectionLockout.isLocked(isTurnActive: controls.isTurnActive)
                 || model.isAwaitingAuthoritativeSessionAllocation)
             .accessibilityIdentifier("chat.session-controls")
@@ -1449,7 +1460,7 @@ struct ChatView: View {
         isContextWindowPresented = false
     }
 
-    /// Change in the pop-up opens Model & reasoning once the pop-up is gone.
+    /// Change in the pop-up opens Model settings once the pop-up is gone.
     private func contextWindowDidClose() {
         guard opensModelControlsAfterContext else { return }
         opensModelControlsAfterContext = false
@@ -1524,9 +1535,10 @@ struct ChatView: View {
         )]
     }
 
-    private func openSessionControls(_ controls: SessionRuntimeControlModel) {
+    private func openSessionControls(_ controls: SessionRuntimeControlModel, allModels: Bool = false) {
         guard !model.isAwaitingAuthoritativeSessionAllocation else { return }
-        // The popover hangs below the header; the keyboard would cover its lower half.
+        sessionControlsStartOnAllModels = allModels
+        // The keyboard would cover the sheet's lower half.
         dismissKeyboard()
         isSessionControlsPresented = true
         Task { @MainActor in

@@ -486,6 +486,18 @@ import Testing
         }
     }
 
+    /// The scope ID names what the phone saved for a computer, so it must never change for one.
+    @Test func anAuthoritysSavedDataNameStaysTheSame() throws {
+        let authority = try WorkspaceAuthority.fixture(id: "demo")
+        #expect(authority.cacheScopeID == "509e86fe92220e8e89eed873c122969f005cb1d3cc327a985385cbdf6a653827")
+        let encoded = try JSONEncoder().encode(authority)
+        #expect(!String(decoding: encoded, as: UTF8.self).contains("cacheScopeID"))
+        let decoded = try JSONDecoder().decode(WorkspaceAuthority.self, from: encoded)
+        #expect(decoded == authority && decoded.cacheScopeID == authority.cacheScopeID)
+        #expect(decoded.hashValue == authority.hashValue)
+        #expect(try WorkspaceAuthority.fixture(id: "demo-2") != authority)
+    }
+
     @Test func dashboardScopeNeverClaimsAProviderUserOrChangesThePort() throws {
         let endpoint = try DirectHermesEndpoint(address: "https://hermes.example.ts.net:9119")
         let saved = DirectHermesSavedConnection(endpoint: endpoint, authentication: .dashboardSession(token: "fixture", automatic: true))

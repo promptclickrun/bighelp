@@ -811,8 +811,10 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
     }
 
     func receive(host: BighelpConfiguredHost, event: DirectHermesEvent) async {
-        guard (try? credentials(for: host)) != nil else { return }
-        await nativeEventObserver?(host, event)
+        // Every event of a streaming answer comes through here: ask for the observer first, because
+        // the credentials check reads the Keychain.
+        guard let nativeEventObserver, (try? credentials(for: host)) != nil else { return }
+        await nativeEventObserver(host, event)
     }
 
     /// The event coordinate comes from the BuzzKit/APNs payload, but authority is

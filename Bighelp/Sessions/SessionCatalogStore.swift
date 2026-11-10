@@ -19,9 +19,17 @@ final class SessionCatalogStore {
     static let summaryRetentionLimit = 500
 
     private(set) var records: [SessionRecord] = [] {
-        didSet { persistenceRevision &+= 1 }
+        didSet {
+            persistenceRevision &+= 1
+            presentedRevision &+= 1
+        }
     }
-    private var deferredPresentationRecords: [SessionRecord]?
+    private var deferredPresentationRecords: [SessionRecord]? {
+        didSet { presentedRevision &+= 1 }
+    }
+    /// Goes up whenever `presentedRecords` may have changed, so a screen that lists chats can
+    /// keep what it worked out from them until then.
+    @ObservationIgnored private(set) var presentedRevision = 0
 
     /// UI reads a stable snapshot during historical delivery. Routing, merge,
     /// authorization and persistence always use the current canonical records.

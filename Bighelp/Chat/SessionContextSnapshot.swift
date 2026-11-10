@@ -100,7 +100,7 @@ enum ChatSessionTitlePresentation {
 /// picker mid-turn promises something the runtime will not deliver. The chip
 /// stays visible and readable — only its selection affordance is withheld.
 enum ChatRuntimeSelectionLockout {
-    static let message = "Model and reasoning stay fixed until this turn finishes."
+    static let message = "The model and thinking level stay fixed until this turn finishes."
     static let accessibilityHint = "Unavailable while this turn is running."
 
     static func isLocked(isTurnActive: Bool) -> Bool {

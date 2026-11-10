@@ -36,6 +36,9 @@ change in both repos.
     in groups: You (one row), Agents (Default model, AI providers, Marketplace, Connections, Teamwork, Personalities), App
     (Modes, Appearance, Chat, Voice, Notifications), then System, Apple Watch, CarPlay and Help & feedback.
     Nerd Mode adds its Hermes section (Hermes tools) at the bottom.
+  - Appearance › Thinking (`ThinkingLookSettingsView`) picks the look of the Thinking control
+    (`BighelpThinkingLook`, kept on the device) that a chat's Model settings shows (`ChatModelSettingsSheet`,
+    from the model chip in the message box). Model settings sends each choice as it's made; there is no Apply.
   - Connections (`AppsHubView`) is everything agents can use: This device (Device access, every phone tool and
     iOS permission) first, then the apps, then the credential vault. Modes holds the mode switches, Appearance
     the companion pet, and Help & feedback the usage-sharing switch.
@@ -138,7 +141,7 @@ change in both repos.
 | `Bighelp/Spatial/` | Vision Pro: the agent in the room (`SpatialAvatarModel`, its volume and voice panel, its Settings section) |
 | `BighelpWatch/`, `BighelpWatchShared/`, `Bighelp/Watch/` | The Watch app, the Watch–iPhone wire (`WatchWire`), and the iPhone's `WatchRelay` that answers it |
 | `Bighelp/CarPlay/` | CarPlay's hands-free voice chat (`CarPlayVoiceSession`) and its scene |
-| `Bighelp/DesignSystem/` | `BighelpTheme`, `BighelpTokens`, glass surfaces, fonts, provider logos, `BighelpDeferredSection`, the Noodle brand and its motions (`Noodle/`) |
+| `Bighelp/DesignSystem/` | `BighelpTheme`, `BighelpTokens`, glass surfaces, fonts, provider logos, `BighelpDeferredSection`, the Noodle brand and its motions (`Noodle/`), the Thinking control and its looks (`ThinkingSlider/`) |
 | `Bighelp/Hosts/`, `Bighelp/LiveActivity/`, `Bighelp/Notifications/`, `Bighelp/Shortcuts/` | Host setup, Live Activities, notifications, App Intents |
 | `Bighelp/Telemetry/` | Usage and crash numbers (Settings › Help & feedback › Share usage and diagnostics): the client, MetricKit, the switch that also tells hosts |
 | `BighelpTests/` (Swift Testing), `BighelpUITests/` (XCUITest) | Tests. The UI test base class `BighelpUITestCase` is in `ReferenceHubUITests.swift` |
@@ -612,6 +615,33 @@ change in both repos.
   streaming answer. To reproduce by hand, run demo mode with `-test-tool-stream -test-tool-stream-fast-tail`
   and drag while the answer streams at a model's pace; the other fixtures are slower and pause during
   gestures, so they never showed this.
+- **A streamed piece costs its own size:** each piece of an answer comes as the whole answer again, so
+  anything done per piece must not grow with the answer. Three things did, and made long answers drop frames:
+  - SwiftUI proposes several widths while it sizes a row, and `UITextView.sizeThatFits` lays the whole text out
+    again on every call. A message on screen is measured through layouts of its own on the same text, one per
+    width (`ChatNativeMarkdownSideLayouts`), so each lays out only what was added; they're dropped once the text
+    is still. Never measure through the text view's own container: it is only as tall as the view, so a growing
+    answer's bubble stopped growing.
+  - `ChatNativeMarkdownRenderCache` keeps the blocks before the first one that changed and tells the text view
+    where the change starts (`unchangedPrefix`), so finished paragraphs aren't built or compared again.
+  - Nothing in a bubble's `body` may read the whole text: Copy's text (`ChatBubbleInteraction.copyText`) and
+    VoiceOver's label (`ChatMessageTextHost.accessibilityLabelSource`) are made when asked for.
+  Measure with `-test-tool-stream -test-tool-stream-fast-tail` at the bottom of a `-test-long-chat`, and read the
+  probe's `text.layout.*`, `message.parse` and `main_busy_ms`.
+- **A real computer sends about thirty events a second:** demo mode doesn't run the code a real host's events
+  go through, so measure a real answer too (the probe's `send` with `BIGHELP_PERF_SEND_TEXTS`). Work done for
+  each event must not grow with the number of chats, and nothing every message reads as it draws may change
+  with each event:
+  - A message's reactions read `ChatModel.reactionRowItemIDs`, never `items`: `items` changes with every piece,
+    and reading it drew every message on screen again each time. `replaceItem` writes the indexes only when
+    the ID changed, because a write to an observed property tells its readers even when it changes nothing.
+  - A chat's runtime liveness is reconciled only when it changes, the chat list keeps its records until the
+    catalog's `presentedRevision` moves, and a notification event asks for its observer before it reads the
+    Keychain.
+  - Values read many times a draw are worked out once: `WorkspaceAuthority.cacheScopeID`, the theme
+    (`BighelpTheme.resolve`), the model summary's reasoning options.
+  - A reply that lands is saved with `SessionCatalogStore.checkpointNow()`, which encodes off the main thread;
+    `flushPersistence` is for leaving the app or the chat.
 - **Kept chat rows:** a message row costs more than a 120 Hz frame to build, so the timeline keeps the 40 built
   rows nearest the screen by ID (`ChatTimelineBuiltRows`), never recycles a cell for another row, and builds the
   24 rows above while the chat is still. Cells host SwiftUI as a plain subview (`ChatTimelineCell`), not as their

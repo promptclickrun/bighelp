@@ -3,8 +3,9 @@ import Foundation
 extension ChatModel {
     func nativeMessageReactionPresentation(for item: TimelineItem) -> NativeMessageReactionPresentation {
         _ = nativeMessageReactionRevision
-        guard let retainedIndex = itemIndexByID[item.id], items.indices.contains(retainedIndex),
-              items[retainedIndex].id.utf8.elementsEqual(item.id.utf8) else {
+        // Nothing here may read `items`: every message on screen asks for this as it draws, and
+        // `items` changes with each piece of a streaming answer.
+        guard itemIndexByID[item.id] != nil else {
             return NativeMessageReactionPresentation(
                 rowID: nil, reactions: [], availability: .foreignSession,
                 isUpdating: false, errorMessage: nil
@@ -14,7 +15,7 @@ extension ChatModel {
               let rowID = NativeMessageReactionRowIdentity.rowID(from: item.id) else {
             return unsavedMessageReactionPresentation(for: item)
         }
-        let exactItemIDs = NativeMessageReactionRowIdentity.exactItemIDs(for: rowID, in: items)
+        let exactItemIDs = reactionRowItemIDs[rowID] ?? []
         guard exactItemIDs.count == 1, exactItemIDs[0].utf8.elementsEqual(item.id.utf8) else {
             return NativeMessageReactionPresentation(
                 rowID: rowID, reactions: [], availability: .conflictingCanonicalRow,
@@ -28,7 +29,7 @@ extension ChatModel {
         if let snapshot = nativeMessageReactionSnapshots[rowID] {
             reactions = snapshot.role == item.role ? snapshot.reactions : []
         } else {
-            reactions = items[retainedIndex].metadata.reactions ?? []
+            reactions = item.metadata.reactions ?? []
         }
         let availability: NativeMessageReactionAvailability
         if uncertainNativeMessageReactionRows.contains(rowID) {

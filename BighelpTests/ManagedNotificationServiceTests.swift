@@ -51,6 +51,21 @@ import UserNotifications
         #expect(fixture.transport.bootstrapAttempts == attempts)
     }
 
+    /// Each piece of a streaming answer is an event. With nobody listening, an event must not read
+    /// the saved identity (the Keychain, on a phone).
+    @Test func anEventNobodyListensForReadsNothing() async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        let event = DirectHermesEvent(type: "message.delta", sessionID: "runtime", payload: [:], sequence: nil)
+        let before = fixture.identityVault.loads
+        await fixture.service.receive(host: fixture.host, event: event)
+        #expect(fixture.identityVault.loads == before)
+        var heard = 0
+        fixture.service.nativeEventObserver = { _, _ in heard += 1 }
+        await fixture.service.receive(host: fixture.host, event: event)
+        #expect(heard == 1 && fixture.identityVault.loads > before)
+    }
+
     @Test func theComputersOwnRefusalNamesIt() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }
@@ -1765,7 +1780,8 @@ import UserNotifications
 
     @MainActor private final class MemoryIdentityVault: BighelpNotificationIdentityVault {
         var value: BighelpNotificationIdentityLoad = .none
-        func load() throws -> BighelpNotificationIdentityLoad { value }
+        private(set) var loads = 0
+        func load() throws -> BighelpNotificationIdentityLoad { loads += 1; return value }
         func save(_ record: BighelpNotificationIdentityRecord) throws { value = .current(record) }
         func delete() throws { value = .none }
     }

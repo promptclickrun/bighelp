@@ -61,15 +61,6 @@ struct DesignSystemTests {
         ).width == 88)
     }
 
-    @Test func sessionControlsUseAvailableHeightResponsively() {
-        #expect(
-            ChatSessionControlsPresentation.preferredHeight(isVerticallyCompact: true)
-                < ChatSessionControlsPresentation.preferredHeight(isVerticallyCompact: false)
-        )
-        #expect(ChatSessionControlsPresentation.preferredHeight(isVerticallyCompact: true) == 320)
-        #expect(ChatSessionControlsPresentation.preferredHeight(isVerticallyCompact: false) == 640)
-    }
-
     @Test func agentAttachmentActionsExposeExactlyOneSaveForAValidatedDestination() {
         #expect(ChatAttachmentActionPolicy.actions(for: .photosImage) == [.preview, .save])
         #expect(ChatAttachmentActionPolicy.actions(for: .photosVideo) == [.preview, .save])
@@ -244,10 +235,6 @@ struct DesignSystemTests {
         )
         #expect(
             BighelpPickerSheetSurfacePresentation.resolve(isDarkMode: true)
-                == .init(base: .canvas, opacity: 0.72)
-        )
-        #expect(
-            ChatSessionControlsPresentation.surfacePresentation(isDarkMode: true)
                 == .init(base: .canvas, opacity: 0.72)
         )
         #expect(!BighelpPickerSheetSurfacePresentation.usesColoredOutline)

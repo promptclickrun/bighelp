@@ -55,10 +55,22 @@ final class ChatNativeMarkdownRenderCache {
         }
     }
 
-    private var document: MarkdownDocument?
+    /// One block of the document as it was last drawn.
+    private struct Piece {
+        let block: MarkdownBlock
+        let spacingAfter: CGFloat
+        let length: Int
+    }
+
     private var styleKey: StyleKey?
     private var rendered: NSAttributedString?
+    private var pieces: [Piece] = []
     private var measurements: [(width: CGFloat, size: CGSize)] = []
+    /// Goes up each time `render` returns different text.
+    private(set) var revision = 0
+    /// How much of the text before the last change is in the text now, in UTF-16 units: where a
+    /// text view holding the text before can start replacing.
+    private(set) var unchangedPrefix = 0
 
     func measure(width: CGFloat, using measurement: (CGFloat) -> CGSize) -> CGSize {
         guard rendered != nil, width.isFinite, width > 0 else { return measurement(width) }
@@ -74,21 +86,47 @@ final class ChatNativeMarkdownRenderCache {
         return size
     }
 
+    /// A streamed answer changes in its last block, and each piece of it comes as the whole
+    /// answer again. The blocks before the first one that changed keep what they drew: building
+    /// every block again for each piece made a long answer cost more with every word.
     func render(document: MarkdownDocument, style: ChatNativeMarkdownStyle) -> NSAttributedString {
         let key = StyleKey(style)
-        if self.document == document, styleKey == key,
-           let rendered {
-            return rendered
+        let blocks = document.blocks
+        let reusable = styleKey == key && rendered != nil ? pieces : []
+        var kept = 0
+        while kept < min(reusable.count, blocks.count),
+              reusable[kept].spacingAfter == ChatNativeMarkdownAttributedBuilder.spacing(afterBlockAt: kept, in: document),
+              reusable[kept].block == blocks[kept] {
+            kept += 1
         }
-        let updated = NSMutableAttributedString(attributedString:
-            ChatNativeMarkdownAttributedBuilder.build(document: document, style: style))
-        if styleKey == key, let previous = rendered {
-            ChatMentionRendering.reuseAttachments(in: updated, from: previous)
+        if let rendered, kept == blocks.count, kept == reusable.count { return rendered }
+
+        // The kept blocks' text, without the line break after the last of them.
+        let prefix = reusable[..<kept].reduce(0) { $0 + $1.length } + max(kept - 1, 0)
+        let tail = NSMutableAttributedString(string: "")
+        var next = Array(reusable[..<kept])
+        for index in kept..<blocks.count {
+            if index > 0 { tail.append(NSAttributedString(string: "\n")) }
+            let spacing = ChatNativeMarkdownAttributedBuilder.spacing(afterBlockAt: index, in: document)
+            let start = tail.length
+            ChatNativeMarkdownAttributedBuilder.append(blocks[index], spacingAfter: spacing, style: style, to: tail)
+            next.append(Piece(block: blocks[index], spacingAfter: spacing, length: tail.length - start))
+        }
+        let updated: NSMutableAttributedString
+        if let previous = rendered, kept > 0 {
+            ChatMentionRendering.reuseAttachments(in: tail, from: previous)
+            updated = NSMutableAttributedString(attributedString: previous)
+            updated.replaceCharacters(in: NSRange(location: prefix, length: previous.length - prefix), with: tail)
+        } else {
+            if styleKey == key, let previous = rendered { ChatMentionRendering.reuseAttachments(in: tail, from: previous) }
+            updated = tail
         }
         let rendered = NSAttributedString(attributedString: updated)
-        self.document = document
-        self.styleKey = key
+        styleKey = key
         self.rendered = rendered
+        pieces = next
+        unchangedPrefix = kept > 0 ? prefix : 0
+        revision &+= 1
         measurements.removeAll(keepingCapacity: true)
         return rendered
     }
@@ -113,7 +151,9 @@ enum ChatNativeMarkdownAttributedBuilder {
         return result
     }
 
-    private static func spacing(afterBlockAt index: Int, in document: MarkdownDocument) -> CGFloat {
+    /// The space under a block depends on the block after it, so a block is drawn again when
+    /// the one after it first appears.
+    static func spacing(afterBlockAt index: Int, in document: MarkdownDocument) -> CGFloat {
         guard index < document.blocks.count - 1 else { return 0 }
         return ChatMarkdownLayoutPolicy.spacing(
             after: document.blocks[index],
@@ -121,7 +161,7 @@ enum ChatNativeMarkdownAttributedBuilder {
         )
     }
 
-    private static func append(
+    static func append(
         _ block: MarkdownBlock,
         spacingAfter: CGFloat,
         style: ChatNativeMarkdownStyle,

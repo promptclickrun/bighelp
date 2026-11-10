@@ -79,7 +79,11 @@ final class ChatMessageContentCache {
             document = MarkdownDocument(references.prose)
             citationLinks = role == .assistant && !isStreaming
                 ? ChatCitationLinks.resolve(in: references.prose) : [:]
-            cardProjection = ChatCardMessageProjection(source: references.prose, role: role, isStreaming: isStreaming)
+            // Most messages hold no card, and their parts come from the document just parsed.
+            cardProjection = role == .assistant
+                && ChatCardMessageProjection.mayHoldCard(references.prose, isStreaming: isStreaming)
+                ? ChatCardMessageProjection(source: references.prose, role: role, isStreaming: isStreaming)
+                : ChatCardMessageProjection(document: document)
             self.role = role
             self.isStreaming = isStreaming
             ChatPerformanceProbe.live("live.message-projection", 1)

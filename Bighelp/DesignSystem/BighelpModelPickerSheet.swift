@@ -124,7 +124,7 @@ struct BighelpPickerSheetSurfacePresentation: Equatable, Sendable {
 struct BighelpPickerSheetBackgroundModifier: ViewModifier {
     let usesNativePresentation: Bool
     let legacyTint: BighelpSurfaceTint
-    /// A page pushed inside another presentation (the Mac's Model & reasoning
+    /// A page pushed inside another presentation (the Mac's Model settings
     /// pop-up) draws its own surface and leaves that presentation's background alone.
     var isEmbedded = false
 
@@ -341,7 +341,7 @@ struct BighelpModelPickerSheet: View {
     let applyTitle: String
     /// Shown when nothing specific is chosen, e.g. an agent that uses the default model.
     let defaultModelTitle: String
-    /// Pushed inside another navigation stack (the Mac's Model & reasoning
+    /// Pushed inside another navigation stack (the Mac's Model settings
     /// pop-up) instead of presented as its own sheet.
     let isEmbedded: Bool
     /// Close replaces `dismiss`, which only pops an embedded page.

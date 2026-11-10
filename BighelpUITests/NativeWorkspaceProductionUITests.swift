@@ -630,11 +630,13 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         app.buttons["root.new-chat"].tap()
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 10)); composer.tap()
-        let controls = chatMenuItem("chat.session-controls", in: app)
+        let controls = app.buttons["chat.composer.model"].firstMatch
         XCTAssertTrue(controls.waitForExistence(timeout: 20))
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: controls)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 20), .completed)
         controls.tap()
+        let current = app.buttons["chat.model-settings.model"].firstMatch
+        XCTAssertTrue(current.waitForExistence(timeout: 20)); current.tap()
         let search = app.descendants(matching: .any)["chat.models.search"].firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 20)); search.tap(); app.typeText("gpt-5.5")
         let model = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@", "chat.models.row.", ":gpt-5.5")).firstMatch
@@ -652,14 +654,15 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
                            "Same-host reconnect must restore model controls without reopening the sheet.")
         }
         model.tap()
-        let apply = app.buttons["chat.session-controls.apply"]
-        XCTAssertTrue(apply.waitForExistence(timeout: 10)); apply.tap()
-        let applied = apply.waitForNonExistence(timeout: 30)
+        // A picked model goes back to the short sheet, with no Apply.
+        let applied = model.waitForNonExistence(timeout: 30)
         try? app.debugDescription.write(to: URL(fileURLWithPath: directory).appendingPathComponent("real-model-picker-tree.txt"), atomically: true, encoding: .utf8)
         capture("real-model-picker-after-apply", app)
-        XCTAssertTrue(applied, "Real session model selection must apply and close without an expired picker error.")
+        XCTAssertTrue(applied, "Real session model selection must apply without an expired picker error.")
+        XCTAssertTrue(current.waitForExistence(timeout: 10))
+        XCTAssertTrue(current.label.lowercased().contains("gpt-5.5"), current.label)
+        app.buttons["chat.model-settings.done"].firstMatch.tap()
         XCTAssertFalse(app.debugDescription.contains("That model choice expired"))
-        composer.tap()
         XCTAssertTrue(controls.waitForExistence(timeout: 10))
         XCTAssertTrue(controls.value.debugDescription.lowercased().contains("gpt-5.5"))
     }

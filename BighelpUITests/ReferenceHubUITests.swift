@@ -141,7 +141,7 @@ class BighelpUITestCase: XCTestCase {
             "chat.files": ["Files"], "chat.edit-current-agent": ["Edit agent"],
             "chat.new-bot-chat": ["New Bot Chat"], "chat.switch-agent": ["Switch agent"], "chat.compact": ["Compact"],
             "chat.file-changes": ["File changes"], "chat.options.usage": ["Usage"], "chat.options.advanced": ["Advanced"],
-            "chat.options.model-speed": ["Model & speed", "Model"], "chat.session-controls": ["Model & reasoning", "Model"],
+            "chat.options.model-speed": ["Model & speed", "Model"], "chat.session-controls": ["Model settings", "Model"],
             "chat.fast-mode": ["Fast Mode"], "chat.fast-mode.on": ["On"], "chat.fast-mode.off": ["Off"],
             "chat.context-window": ["Context window"], "chat.provider-usage": ["Usage"],
             "chat.options.display": ["Display"], "chat.visibility.reasoning": ["Show reasoning", "Reasoning"],

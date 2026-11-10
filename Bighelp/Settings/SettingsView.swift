@@ -224,6 +224,7 @@ struct SettingsView: View {
         case .you: settingsPage(title: String(localized: "You")) { localIdentity }
         case .chatLayout: ChatLayoutSettingsView()
         case .appLayout: AppLayoutSettingsView(settings: settings)
+        case .thinking: ThinkingLookSettingsView()
         case .apps: connectionsPage
         case .nativeAppConnections:
             if let apps = connectorApps?() {

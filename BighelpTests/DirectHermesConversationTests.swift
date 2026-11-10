@@ -3457,7 +3457,7 @@ struct NativeMidSessionTests {
         return (client, rpc)
     }
 
-    /// The chat's model sheet read "Reasoning: unknown" while the agent worked:
+    /// The chat's model sheet read "Thinking: unknown" while the agent worked:
     /// its own read waits for an idle chat, and the one made when the chat opened
     /// can fail before the chat is attached. Hermes reports the level in every
     /// `session.info`, including the one that starts the turn.
@@ -3483,7 +3483,7 @@ struct NativeMidSessionTests {
 
         #expect(controls.isTurnActive)
         #expect(messaging.openedCount == 1, "Nothing is read from the host while the agent is replying")
-        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Reasoning: High")
+        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Thinking: High")
     }
 
     private func makeClient(_ rpc: DirectTestRPC, root: URL) throws -> DirectHermesConversationClient {

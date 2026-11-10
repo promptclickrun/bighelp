@@ -214,9 +214,17 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         return result
     }
 
-    func reconcileRuntimeLiveness(runtimeID: String, isActive: Bool) throws {
+    /// `visibleID` is the chat the caller holds this runtime under. Every piece of a streamed
+    /// answer reports its chat live, so when that chat's own entry already says so there is
+    /// nothing to change: looking through every saved chat for each piece, and marking the list
+    /// changed, cost more the more chats a computer held.
+    func reconcileRuntimeLiveness(runtimeID: String, isActive: Bool, visibleID: String? = nil) throws {
         try requireOwner()
         try DirectHermesSessionValidation.coordinate(runtimeID)
+        if let visibleID, let binding = bindings[visibleID], binding.record.isActive == isActive,
+           binding.coordinate.runtimeSessionID.map({ DirectHermesSessionValidation.same($0, runtimeID) }) == true {
+            return
+        }
         let matches = bindings.keys.filter { id in
             bindings[id]?.coordinate.runtimeSessionID.map {
                 DirectHermesSessionValidation.same($0, runtimeID)

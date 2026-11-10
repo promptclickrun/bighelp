@@ -18,7 +18,7 @@ final class ModelConfirmationUITests: BighelpUITestCase {
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3",
                                "-test-model-confirmation", "-loopdy.demo.appearance", appearance]
         app.launch()
-        openPicker(in: app)
+        openModelSettings(in: app)
         evidence("model-picker-\(appearance)")
         selectModel(in: app, bySearch: bySearch)
         let approve = app.buttons["model-confirmation.approve"].firstMatch
@@ -34,43 +34,38 @@ final class ModelConfirmationUITests: BighelpUITestCase {
         XCTAssertTrue(approve.waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.buttons["chat.models.row.openai:gpt-5.6"].exists,
                       "Cancelling must leave the list usable, not stuck loading")
-        app.buttons["Cancel"].firstMatch.tap()
+        app.buttons["chat.model-settings.done"].firstMatch.tap()
 
         // Cancelling must not change the saved model, even after reopening.
-        openPicker(in: app)
+        openModelSettings(in: app)
         XCTAssertTrue(selected(in: app).label.contains("Hermes"), selected(in: app).label)
         selectModel(in: app, bySearch: bySearch)
         XCTAssertTrue(approve.waitForExistence(timeout: 8))
         approve.tap()
-        XCTAssertTrue(app.buttons["chat.session-controls.apply"].waitForNonExistence(timeout: 10),
-                      "Only an accepted approval closes the picker")
-        openPicker(in: app)
+        XCTAssertTrue(app.buttons["chat.models.row.openai:gpt-5.6"].waitForNonExistence(timeout: 10),
+                      "An accepted approval goes back to Model settings")
+        XCTAssertTrue(selected(in: app).waitForExistence(timeout: 5))
         XCTAssertTrue(selected(in: app).label.localizedCaseInsensitiveContains("GPT-5.6"), selected(in: app).label)
         app.terminate()
     }
 
-    /// The model the chat will use, on top of the sheet.
+    /// The chat's model, on top of Model settings.
     @MainActor
     private func selected(in app: XCUIApplication) -> XCUIElement {
-        app.descendants(matching: .any)["chat.models.selected"].firstMatch
+        app.buttons["chat.model-settings.model"].firstMatch
     }
 
-    @MainActor
-    private func openPicker(in app: XCUIApplication) {
-        openModelAndReasoning(in: app)
-        XCTAssertTrue(selected(in: app).waitForExistence(timeout: 8))
-    }
-
-    /// One screen: a provider's filter, or search, then the model, then Apply.
+    /// All models: unfold a provider, or search, then tap the model. There is no Apply.
     @MainActor
     private func selectModel(in app: XCUIApplication, bySearch: Bool) {
+        selected(in: app).tap()
         if bySearch {
             let search = app.descendants(matching: .any)["chat.models.search"].firstMatch
             XCTAssertTrue(search.waitForExistence(timeout: 8))
             search.tap()
             app.typeText("gpt-5.6")
         } else {
-            let provider = app.buttons["chat.models.filter.provider.openai"]
+            let provider = app.buttons["chat.models.section.openai"]
             XCTAssertTrue(provider.waitForExistence(timeout: 8))
             provider.tap()
         }
@@ -80,10 +75,6 @@ final class ModelConfirmationUITests: BighelpUITestCase {
         if bySearch {
             XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "Picking a model closes the keyboard")
         }
-        let apply = app.buttons["chat.session-controls.apply"]
-        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: apply)
-        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 5), .completed, "A new model waits for Apply")
-        apply.tap()
     }
 
     @MainActor

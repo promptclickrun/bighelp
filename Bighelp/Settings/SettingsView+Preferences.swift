@@ -3,7 +3,7 @@ import UIKit
 
 extension SettingsView {
     /// Settings › Appearance: colors, light and dark, and the rest of the look on one page, with
-    /// Chat layout, App layout and the companion pet a row each.
+    /// Chat layout, App layout, Thinking and the companion pet a row each.
     var appearancePage: some View {
         AppearanceStudioView(settings: settings) {
             settingsLink(to: .chatLayout) {
@@ -22,6 +22,14 @@ extension SettingsView {
             .buttonStyle(.plain)
             .accessibilityIdentifier("settings.appearance.app-layout")
             .driveTarget("settings.appearance.app-layout")
+            settingsLink(to: .thinking) {
+                AppearanceStudioRow(title: String(localized: "Thinking"),
+                                    detail: String(localized: "The look of the Thinking control"),
+                                    systemImage: "brain.head.profile")
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("settings.appearance.thinking")
+            .driveTarget("settings.appearance.thinking")
             if companionStore != nil {
                 settingsLink(to: .section(.companion)) {
                     AppearanceStudioRow(title: SettingsMenuSection.companion.title,

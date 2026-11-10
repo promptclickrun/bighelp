@@ -54,6 +54,25 @@ struct ChatCardMessageProjection: Equatable, Sendable {
         !cardIDs.isEmpty || segments.contains { if case .markdown = $0 { false } else { true } }
     }
 
+    /// A message already parsed, when `mayHoldCard` says its text has no card in it: the same
+    /// parts `init(source:role:isStreaming:)` gives, without parsing the text a second time.
+    init(document: MarkdownDocument) {
+        segments = Self.segments(for: document)
+        cardIDs = []
+    }
+
+    /// Whether an agent's message can hold a card: a card fence anywhere, or, while it still
+    /// arrives, a last line that may be the start of one.
+    static func mayHoldCard(_ source: String, isStreaming: Bool) -> Bool {
+        let opening = "```\(fenceLanguage)"
+        if ChatTextMarker.mayContain(opening, in: source) { return true }
+        guard isStreaming else { return false }
+        let lastLine = source.utf8.lastIndex(where: { $0 == 0x0A || $0 == 0x0D })
+            .map { source[source.utf8.index(after: $0)...] } ?? source[...]
+        let marker = lastLine.trimmingCharacters(in: .whitespaces)
+        return marker.count >= 3 && marker.count < opening.count && opening.hasPrefix(marker)
+    }
+
     /// `isStreaming`: the reply is still arriving, so an open card fence (or a
     /// half-typed fence marker at the very end) is a card on its way.
     init(source: String, role: TimelineRole, isStreaming: Bool = false) {

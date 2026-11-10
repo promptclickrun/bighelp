@@ -29,6 +29,42 @@ private final class ObservationInvalidationCounter: @unchecked Sendable {
 
 @MainActor
 struct ChatModelTests {
+    /// Each piece of a streaming answer replaces its message under the same ID. The messages on
+    /// screen read their reactions as they draw, and a piece must not tell them to draw again:
+    /// on a real computer it did, about thirty times a second for every message.
+    @Test func aStreamedPieceLeavesEveryOtherMessagesReactionsAlone() {
+        let saved = TimelineItem(id: "stream-rows:row:41", role: .human, sender: .user(snapshot: .init(name: "You")),
+                                 content: .message("Hello"),
+                                 metadata: .init(source: "Hermes", delivery: "Saved", sourceOrder: 1))
+        let model = ChatModel(conversationID: "stream-rows", client: ControlledStreamingConversationClient(),
+                              initialItems: [saved])
+        func answer(_ text: String, id: String = "stream-rows:live") -> TimelineItem {
+            TimelineItem(id: id, role: .assistant, sender: .agent(id: "default", snapshot: .init(name: "Assistant")),
+                         content: .message(text), metadata: .init(delivery: "Streaming"))
+        }
+        func tellsTheSavedMessage(_ change: () -> Void) -> Bool {
+            let told = ToldBox()
+            withObservationTracking {
+                _ = model.nativeMessageReactionPresentation(for: saved)
+            } onChange: { told.value = true }
+            change()
+            return told.value
+        }
+        model.appendItem(answer("One"))
+        #expect(!tellsTheSavedMessage { model.replaceItem(at: 1, with: answer("One two")) })
+        #expect(model.nativeMessageReactionPresentation(for: saved).rowID == 41)
+        // The finished answer takes its saved row's ID: the rows changed, so the messages hear of it.
+        #expect(tellsTheSavedMessage { model.replaceItem(at: 1, with: answer("One two", id: "stream-rows:row:42")) })
+        #expect(model.nativeMessageReactionPresentation(for: model.items[1]).rowID == 42)
+        // Two messages for one saved row: neither takes a reaction, until one of them goes.
+        model.appendItem(answer("Again", id: "stream-rows:copy:row:42"))
+        #expect(model.nativeMessageReactionPresentation(for: model.items[1]).availability == .conflictingCanonicalRow)
+        model.removeItem(id: "stream-rows:copy:row:42")
+        #expect(model.nativeMessageReactionPresentation(for: model.items[1]).availability != .conflictingCanonicalRow)
+        #expect(model.nativeMessageReactionPresentation(for: answer("Gone", id: "stream-rows:row:99")).availability
+            == .foreignSession)
+    }
+
     @Test func responseHapticsFollowLiveGrowthWithoutReplayOrDuplicatePulses() async {
         let client = ControlledStreamingConversationClient()
         let model = ChatModel(conversationID: "haptic-stream", client: client, initialItems: [])
@@ -1214,7 +1250,7 @@ struct ChatModelTests {
         controls.reconcileSessionRuntime(SessionRuntimeSnapshot(
             model: "Hermes-4-405B", provider: "nous", observedAt: Date()
         ))
-        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Reasoning: unknown")
+        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Thinking: unknown")
 
         controls.setTurnActive(true)
         await controls.loadSummaryIfNeeded()
@@ -1226,7 +1262,7 @@ struct ChatModelTests {
         #expect(messaging.opened.map(\.kind) == [.reasoning])
         let summary = ChatModelSummaryPresentation(controls: controls)
         #expect(summary.modelName == ModelNameCatalogStore.shared.displayName(for: "Hermes-4-405B"))
-        #expect(summary.reasoning == "Reasoning: High")
+        #expect(summary.reasoning == "Thinking: High")
         #expect(summary.providerID == "nous")
     }
 
@@ -1246,7 +1282,7 @@ struct ChatModelTests {
             now: { 1_788_000_000 }
         )
         controls.reconcileSessionReasoning("", observedAt: .distantPast)
-        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Reasoning: Auto")
+        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Thinking: Auto")
         controls.reconcileSessionReasoning("louder", observedAt: Date())
         #expect(controls.currentReasoningValue == "reset", "Unknown levels are ignored")
 
@@ -1257,7 +1293,7 @@ struct ChatModelTests {
 
         controls.setTurnActive(true)
         controls.reconcileSessionReasoning("medium", observedAt: Date())
-        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Reasoning: Medium")
+        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Thinking: Medium")
     }
 
     /// A new chat already knows its agent's defaults, so nothing is read.
@@ -1276,7 +1312,7 @@ struct ChatModelTests {
         await controls.loadSummaryIfNeeded()
         #expect(messaging.opened.isEmpty)
         let summary = ChatModelSummaryPresentation(controls: controls)
-        #expect(summary.reasoning == "Reasoning: Auto")
+        #expect(summary.reasoning == "Thinking: Auto")
         #expect(summary.providerID == "openai")
     }
 
@@ -5359,6 +5395,11 @@ private final class ControlledDemoSleeper: DemoSleeper {
         continuation?.resume()
         continuation = nil
     }
+}
+
+/// Whether an observation's `onChange` ran. It runs where the change is made: here, the main actor.
+private final class ToldBox: @unchecked Sendable {
+    var value = false
 }
 
 @MainActor

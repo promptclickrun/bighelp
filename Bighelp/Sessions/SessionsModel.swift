@@ -442,7 +442,20 @@ final class SessionsModel {
         session.hostedRoomID == nil
     }
 
+    /// One drawing of the list reads its records several times (the sections, the filters, the
+    /// empty state), and a chat that saves while an answer arrives draws the list again. Worked
+    /// out once for each change of the chats or the group chats, not once for each read: with
+    /// many chats the copies alone stalled the chat on screen at every save.
+    private struct SourceRecordsCache {
+        let revision: Int
+        let hostedRooms: [HermesBotModeRoomSummary]
+        let catalogIsAuthoritative: Bool
+        let records: [SessionRecord]
+    }
+    @ObservationIgnored private var sourceRecordsCache: SourceRecordsCache?
+
     private var sourceRecords: [SessionRecord] {
+        // Read every time, also on a cache hit: this is what tells the list to draw again.
         let catalogRecords = catalog?.presentedRecords ?? fixtureRecords
         // Read the observable store directly so a room catalog loaded by the
         // workspace refresh invalidates Chats even when its own sessions load
@@ -452,6 +465,10 @@ final class SessionsModel {
         } ?? hostedRoomSnapshot
         let catalogIsAuthoritative = fixtureHostedCatalogIsAuthoritative
             || hostedRoomStore.map { $0.catalogState == .loaded && !$0.isCatalogStale } == true
+        if let catalog, let cache = sourceRecordsCache, cache.revision == catalog.presentedRevision,
+           cache.catalogIsAuthoritative == catalogIsAuthoritative, cache.hostedRooms == hostedRooms {
+            return cache.records
+        }
         let activeRoomIDs = Set(hostedRooms.map { Data($0.roomID.utf8) })
         let currentRecords = catalogIsAuthoritative ? catalogRecords.filter { record in
             guard record.remoteSource == HostedRoomSessionProjection.remoteSource else { return true }
@@ -459,10 +476,15 @@ final class SessionsModel {
             return activeRoomIDs.contains(Data(roomID.utf8))
         } : catalogRecords
 
-        return HostedRoomSessionProjection.records(
+        let records = HostedRoomSessionProjection.records(
             catalogRecords: currentRecords,
             hostedRooms: hostedRooms
         )
+        if let catalog {
+            sourceRecordsCache = SourceRecordsCache(revision: catalog.presentedRevision, hostedRooms: hostedRooms,
+                                                    catalogIsAuthoritative: catalogIsAuthoritative, records: records)
+        }
+        return records
     }
 
     private func canManageConversation(id: String) -> Bool {

@@ -107,6 +107,34 @@ struct SessionsModelTests {
         #expect(model.filteredSections.flatMap(\.sessions).map(\.id) == [cached.id])
     }
 
+    /// The list keeps the records it worked out until the chats change. Every kind of change
+    /// must still reach it: a new chat, a renamed one, and the freeze while old messages arrive.
+    @Test func theListFollowsEveryChangeOfItsChats() {
+        let catalog = SessionCatalogStore(client: DeferredSessionsModelCatalogClient(),
+                                          records: [session(id: "first", title: "First")])
+        let model = SessionsModel(
+            catalog: catalog,
+            agents: AgentDirectoryStore(
+                client: EmptySessionsModelAgentDirectoryClient(),
+                defaults: UserDefaults(suiteName: "SessionsModelTests.\(UUID().uuidString)")!
+            )
+        )
+        func titles() -> [String] { model.filteredSections.flatMap(\.sessions).map(\.title).sorted() }
+        #expect(titles() == ["First"])
+        #expect(titles() == ["First"])
+
+        catalog.upsert(session(id: "second", title: "Second"))
+        #expect(titles() == ["First", "Second"])
+        catalog.upsert(session(id: "second", title: "Renamed"))
+        #expect(titles() == ["First", "Renamed"])
+
+        catalog.setPresentationDeferred(true)
+        catalog.upsert(session(id: "third", title: "Third"))
+        #expect(titles() == ["First", "Renamed"])
+        catalog.setPresentationDeferred(false)
+        #expect(titles() == ["First", "Renamed", "Third"])
+    }
+
     @Test func uncachedIdleSessionsUseFullProgressBeforeTheViewTaskStarts() {
         #expect(SessionsPresentation.loadingMode(loadState: .idle, hasSessions: false) == .fullScreen)
     }

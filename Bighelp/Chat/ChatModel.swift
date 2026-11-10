@@ -202,7 +202,15 @@ final class ChatModel {
     /// in a branch with the same history, where the message is sent (`continueInBranch`).
     var branchContinuation: ChatBranchContinuation?
     var isHydratingHistory = false
-    func requestSessionControls() { sessionControlsRequest += 1 }
+    func requestSessionControls(allModels: Bool = false) {
+        sessionControlsOpenOnAllModels = allModels
+        sessionControlsRequest += 1
+    }
+    /// The message box's model chip: nothing else is closing, so Model settings opens at once.
+    func requestModelSettings() {
+        sessionControlsOpenOnAllModels = false
+        modelSettingsRequest += 1
+    }
 
     /// Invalidates decorative live-only reactions when canonical history arrives.
     var companionHistoryRevision = 0
@@ -262,6 +270,10 @@ final class ChatModel {
     var lastItemMutationWorkCount = 0
     var lastActivityMutationWorkCount = 0
     var itemIndexByID: [String: Int] = [:]
+    /// The messages that stand for each saved row Hermes can put a reaction on (usually one), kept
+    /// with `itemIndexByID`. A message's reactions read this, never `items`: `items` changes with
+    /// every piece of a streaming answer, and reading it there drew every message again each time.
+    var reactionRowItemIDs: [Int: [String]] = [:]
     var transcriptMessageIndexByID: [String: Int] = [:]
     var transcriptActivityIndexByEventID: [String: Int] = [:]
     var transcriptActivityPositionByEventID: [String: Int] = [:]
@@ -314,9 +326,12 @@ final class ChatModel {
         }
     }
     private(set) var slashCommandCatalog: SlashCommandCatalogModel?
-    /// Bumped to ask the chat screen to open Model & reasoning, from places
+    /// Bumped to ask the chat screen to open Model settings, from places
     /// that show the current model (Info, the avatar's profile, the context pop-up).
     private(set) var sessionControlsRequest = 0
+    /// The request wants All models first (a failed turn's Use another model).
+    @ObservationIgnored private(set) var sessionControlsOpenOnAllModels = false
+    private(set) var modelSettingsRequest = 0
     var botModeRoomID: String?
     private let userIdentity: UserIdentity
     private let userIdentityStore: UserIdentityStore?

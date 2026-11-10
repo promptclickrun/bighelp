@@ -3,6 +3,14 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.81
+
+### Fixed
+
+- **Context page:** in Model settings, a tap on Context window now opens the Context page on a computer with a new Hermes. Before, the page showed "Context didn't load".
+- **Delete Agent:** after you delete an agent, the app closes the pages of that agent and goes back to the screen that you used before, for example the Bots home. Before, the app stayed on a page of the deleted agent.
+- **Delete Agent error:** the app no longer shows "The selected host or connection changed" when the computer deleted the agent. If the connection changes during the deletion, the app reads the agent list of the computer to see the result.
+
 ## 2.6.80
 
 ### New

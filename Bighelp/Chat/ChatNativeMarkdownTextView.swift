@@ -283,6 +283,7 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
                     textView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
                 }
             }
+            context.coordinator.sideLayoutsUsed(in: host)
             return ChatPerformanceProbe.measure("text.layout.side") { sideLayouts.size(width: width) }
         }
         return CGSize(width: width, height: ceil(measured.height))
@@ -312,10 +313,23 @@ struct NativeInlineSelectableMarkdownTextView: UIViewRepresentable {
         @MainActor
         func textChanged(in host: ChatMessageTextHost, isGrowing: Bool) {
             if isGrowing { host.growsInSteps = true }
+            scheduleRelease(of: host)
+        }
+
+        /// A width change (rotation, a resized window) measures finished text through side layouts
+        /// too. They go the same way, so a still message never keeps them.
+        @MainActor
+        func sideLayoutsUsed(in host: ChatMessageTextHost) {
+            if sideLayoutRelease == nil { scheduleRelease(of: host) }
+        }
+
+        @MainActor
+        private func scheduleRelease(of host: ChatMessageTextHost) {
             sideLayoutRelease?.cancel()
             let release = DispatchWorkItem { [weak self, weak host] in
                 MainActor.assumeIsolated {
                     self?.sideLayouts?.release()
+                    self?.sideLayoutRelease = nil
                     host?.growsInSteps = false
                 }
             }

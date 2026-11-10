@@ -71,10 +71,13 @@ struct BighelpThinkingControl: View {
                     .foregroundStyle(theme.primaryText)
                 Spacer(minLength: BighelpTokens.space8)
                 if let automatic { automaticButton(automatic) }
-                Text(verbatim: valueTitle(ladder))
-                    .bighelpFont(.label, weight: .semibold)
-                    .foregroundStyle(theme.primaryText)
-                    .lineLimit(1)
+                // While Auto is on, its filled button is the value.
+                if automatic?.isOn != true {
+                    Text(verbatim: valueTitle(ladder))
+                        .bighelpFont(.label, weight: .semibold)
+                        .foregroundStyle(theme.primaryText)
+                        .lineLimit(1)
+                }
             }
             // A look draws left to right and reads touches the same way, so its labels keep that
             // order too, in right-to-left languages as well.
@@ -112,7 +115,8 @@ struct BighelpThinkingControl: View {
 
     /// Hermes' automatic level, beside the value: filled while it's on.
     private func automaticButton(_ automatic: BighelpThinkingAutomatic) -> some View {
-        Button(action: automatic.select) {
+        // Auto that is already on has nothing to send: Hermes refuses a second one.
+        Button { if !automatic.isOn { automatic.select() } } label: {
             Text(verbatim: automatic.title)
                 .bighelpFont(.metadata, weight: .semibold)
                 .lineLimit(1)

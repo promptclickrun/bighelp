@@ -56,10 +56,16 @@ struct ChatStreamingTextTests {
     @Test func theTextViewTakesOnlyTheChangedEnd() throws {
         let cache = ChatNativeMarkdownRenderCache()
         let first = cache.render(document: MarkdownDocument("Done **here**.\n\nStill writing"), style: style())
-        let storage = EditRecordingTextStorage(attributedString: first)
+        let storage = EditRecordingTextStorage()
+        storage.setAttributedString(first)
         let updated = cache.render(document: MarkdownDocument("Done **here**.\n\nStill writing this."), style: style())
         ChatNativeTextStorageUpdater.apply(updated, previous: first, unchangedPrefix: cache.unchangedPrefix, to: storage)
-        #expect(storage.isEqual(to: updated))
+        // The same text and attributes as a storage given the whole answer at once (a text
+        // storage tidies attributes as it's edited, so compare two storages, not the source).
+        let whole = EditRecordingTextStorage()
+        whole.setAttributedString(updated)
+        #expect(storage.string == updated.string)
+        #expect(storage.isEqual(to: whole))
         let edit = try #require(storage.edits.last)
         #expect(storage.edits.count == 1)
         #expect(edit.location == ("Done here.\nStill writing" as NSString).length)

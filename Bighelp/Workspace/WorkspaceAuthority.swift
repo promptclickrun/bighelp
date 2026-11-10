@@ -35,12 +35,10 @@ struct WorkspaceAuthority: Codable, Hashable, Sendable {
         return SHA256.hash(data: Data(canonical.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
+    /// By bytes, never as text: Swift calls two spellings of one accented letter the same string,
+    /// and they are two different people. The scope ID is the hash of every field's bytes.
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.kind == rhs.kind && lhs.endpointIdentity == rhs.endpointIdentity
-            && lhs.principalID == rhs.principalID && lhs.providerID == rhs.providerID
-            && lhs.hostID == rhs.hostID
-            && lhs.deviceAuthorizationEpoch == rhs.deviceAuthorizationEpoch
-            && lhs.hostAuthorizationEpoch == rhs.hostAuthorizationEpoch
+        lhs.cacheScopeID == rhs.cacheScopeID
     }
 
     func hash(into hasher: inout Hasher) {
@@ -50,9 +48,11 @@ struct WorkspaceAuthority: Codable, Hashable, Sendable {
     /// The sign-in authorities made lately, by what they were made from. The connection's owner is
     /// worked out from the saved sign-in each time it's read, many times a second while a chat
     /// streams, and checking the address and hashing it each time showed in the chat's stalls.
-    private static let made = OSAllocatedUnfairLock(initialState: [[String?]: WorkspaceAuthority]())
+    private static let made = OSAllocatedUnfairLock(initialState: [[[UInt8]?]: WorkspaceAuthority]())
 
-    private static func remembered(_ key: [String?], make: () throws -> Self) rethrows -> Self {
+    private static func remembered(_ fields: [String?], make: () throws -> Self) rethrows -> Self {
+        // Keyed by bytes, as the authority itself is.
+        let key = fields.map { $0.map { Array($0.utf8) } }
         if let kept = made.withLock({ $0[key] }) { return kept }
         let authority = try make()
         made.withLock { kept in

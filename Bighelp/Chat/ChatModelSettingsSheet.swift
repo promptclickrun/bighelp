@@ -165,7 +165,10 @@ struct ChatModelSettingsSheet: View {
                 accessibilityIdentifier: "chat.thinking",
                 onCommit: send
             )
-        } else if thinking.isKnown || controls.errorMessage != nil {
+        } else if controls.errorMessage != nil, !thinking.isKnown {
+            // The levels didn't load: the notice below says why and has Retry.
+            EmptyView()
+        } else if thinking.isKnown {
             Text("This model has no thinking levels to choose.")
                 .bighelpFont(.metadata)
                 .foregroundStyle(theme.secondaryText)
@@ -237,6 +240,12 @@ struct ChatModelSettingsSheet: View {
         Task {
             await controls.selectModel(providerID: providerID, modelID: modelID)
             guard controls.errorMessage == nil, controls.pendingModelConfirmation == nil else { return }
+            // A model Hermes keeps for the next turn: back to the short sheet, which says so. A
+            // reload here would read the chat's present model and drop the note.
+            guard !controls.hasPendingSelection else {
+                showsAllModels = false
+                return
+            }
             await modelChanged()
         }
     }

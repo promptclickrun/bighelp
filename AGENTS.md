@@ -617,6 +617,11 @@ change in both repos.
   UIKit view under it, the box's text view too. Read them in a modifier of their own
   (`ProjectChangesRefreshTrigger`). `@Observable` skips a set to an equal value, but an in-place
   change (`removeAll`, `append`, `&+=`) always notifies, even when it changes nothing.
+- **New chat's sweep** (`ChatDissolveTransition`): the old chat goes line by line, bottom up, as the Thinking
+  look the person picked (`BighelpThinkingLook.selected`) rises through it; the new chat is live underneath.
+  The look runs in a view of its own on the window, outside any scene, so `ChatDissolveLookBand` hands it the
+  appearance and an active scene phase (without them it draws light, and stands still). New Bot Chat uses
+  the same blank canvas and sweep as New chat (`NewChatCoordinator.start(creating:)`).
 - **Streaming under a drag:** Hermes sends an answer a few words at a time, and each piece lays the whole answer
   out again, so each timeline update waits 50 ms after the last one's layout, and while the reader drags or the chat
   decelerates (`NativeChatTimeline` `applyPendingUpdate`, `isScrolling`); otherwise a drag got a few touch

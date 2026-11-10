@@ -4,6 +4,11 @@ extension BighelpThinkingLook {
     /// Settings › Appearance › Thinking. Kept on this device, for every computer; a saved name
     /// this build doesn't know reads as the default look.
     static let storageKey = "bighelp.appearance.thinking-look"
+
+    /// The look the person picked in Appearance › Thinking.
+    static var selected: BighelpThinkingLook {
+        UserDefaults.standard.string(forKey: storageKey).flatMap(BighelpThinkingLook.init(rawValue:)) ?? defaultLook
+    }
 }
 
 extension BighelpThinkingLevel {

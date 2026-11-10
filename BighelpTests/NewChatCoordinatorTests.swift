@@ -69,6 +69,62 @@ struct NewChatCoordinatorTests {
         #expect(catalog.session(id: presentationID) == nil)
     }
 
+    /// New Bot Chat: the computer makes the chat its own way (a rename, then the agent's next Bot
+    /// Chat), which took seconds with the old chat still on screen. The blank canvas shows first.
+    @Test func aChatTheComputerMakesItsOwnWayShowsTheBlankCanvasFirst() async throws {
+        let agents = AgentDirectoryStore(
+            client: AgentDirectoryFixtureClient(profiles: [.defaultFixture]),
+            profiles: [.defaultFixture]
+        )
+        let state = AppState()
+        let catalog = SessionCatalogStore(client: DeferredNewChatSessionCatalogClient())
+        var presented: [String] = []
+        let coordinator = NewChatCoordinator(appState: state, agents: agents, catalog: catalog, prepare: { _ in true })
+        var release: CheckedContinuation<Void, Never>?
+        var canvasWhenMakingBegan: AppRoute?
+
+        let start = Task {
+            try await coordinator.start(creating: { agent in
+                canvasWhenMakingBegan = state.path.last
+                await withCheckedContinuation { release = $0 }
+                return SessionRecord(id: "bot-chat-next", kind: .direct, agentIDs: [agent.id], title: "Bot Chat")
+            }, beforePresentation: { next, _ in presented.append(next) })
+        }
+        while release == nil { await Task.yield() }
+        guard case .chat(let blank)? = canvasWhenMakingBegan else {
+            Issue.record("No canvas was on screen while the computer made the chat")
+            release?.resume()
+            return
+        }
+        #expect(blank.hasPrefix("local-draft:"))
+        #expect(presented == [blank])
+
+        release?.resume()
+        #expect(try await start.value == .opened(sessionID: "bot-chat-next", agentID: "default"))
+        #expect(state.path == [.chat(conversationID: "bot-chat-next")])
+        #expect(presented == [blank, "bot-chat-next"])
+        #expect(catalog.session(id: blank) == nil, "The blank canvas is gone once the chat is there")
+    }
+
+    /// When the computer can't make it, nothing stays behind: the caller goes back to the chat it came from.
+    @Test func aFailedOwnWayChatLeavesNoBlankCanvasBehind() async throws {
+        let agents = AgentDirectoryStore(
+            client: AgentDirectoryFixtureClient(profiles: [.defaultFixture]),
+            profiles: [.defaultFixture]
+        )
+        let catalog = SessionCatalogStore(client: DeferredNewChatSessionCatalogClient())
+        var blank: String?
+        let coordinator = NewChatCoordinator(appState: AppState(), agents: agents, catalog: catalog, prepare: { route in
+            if case .chat(let id) = route { blank = id }
+            return true
+        })
+        await #expect(throws: NewChatAllocationError.unavailable) {
+            try await coordinator.start(creating: { _ in throw NewChatAllocationError.unavailable })
+        }
+        let id = try #require(blank)
+        #expect(catalog.session(id: id) == nil)
+    }
+
     @Test func failedNewChatAllocationRetainsLocalDraftForRetry() async throws {
         let client = DeferredNewChatSessionCatalogClient()
         let agents = AgentDirectoryStore(

@@ -483,6 +483,13 @@ change in both repos.
   `native-workspace-files-agents-v1`) and read that agent's working folder with the same refusals. A bot's Files
   tab sends its ID (`DirectHermesManagedFilesClient(agentID:)`); the serving agent never names itself, so older
   plugins keep working for it, and other bots say to update the plugin.
+- **Deleting an agent can lose its answer** (#949): Hermes stops an agent's own processes before it removes
+  it, which can take ten seconds, and the app's connection can change in that time. The lifecycle steps then
+  stop with "the host or connection changed" although the agent is gone. `AgentDeletionRecovery` waits for the
+  same computer and reads its agent list: gone is a success, still there is the error. After any deletion
+  `closeScreens(ofDeletedAgent:)` closes the agent's editor, profile and chats, and a bot's profile closes itself
+  once its bot is gone from a list the computer sent (`knowsProfiles`), so nobody is left on a page for an agent
+  that isn't there. The demo's list deletes too (`AgentDirectoryDeleting`).
 - **A chat's Files** (••• › Files, `ChatFolderBrowserView`, #944): the chat's working folder on the computer
   as a tree, with a path field for any other folder. The folder is the session's own (`cwd`, from
   `NativeWorkspaceSessionBridge.sessionFolder`), else Hermes' `/api/fs/default-cwd`, else home. Everything is

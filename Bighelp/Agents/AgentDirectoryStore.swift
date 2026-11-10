@@ -204,6 +204,16 @@ final class AgentDirectoryStore {
         try await load()
     }
 
+    /// The demo's Delete Agent: its list drops the agent, then reads itself again as a computer's
+    /// would. False where the list can't (a real computer, which deletes through Hermes).
+    func deleteFromOwnList(profileID: String) async throws -> Bool {
+        guard let deleting = client as? any AgentDirectoryDeleting else { return false }
+        try await deleting.delete(profileID: profileID)
+        removeProfilePreferences(profileID: profileID)
+        try await reloadAfterProfileLifecycleChange()
+        return true
+    }
+
     /// Preserve app-local selection and ordered pin intent across a verified
     /// Hermes profile rename. Identifier comparison is byte-exact.
     func remapProfilePreferences(from oldProfileID: String, to newProfileID: String) {

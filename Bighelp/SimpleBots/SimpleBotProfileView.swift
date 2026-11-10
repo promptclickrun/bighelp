@@ -146,6 +146,9 @@ struct SimpleBotProfileView: View {
         }
         .safeAreaInset(edge: .top, spacing: 0) { header }
         .background(theme.canvas.ignoresSafeArea())
+        // Deleted, here or on another device: back to where it opened from. Only once the agent
+        // list is the computer's own, so a reconnect's moment without one closes nothing.
+        .onChange(of: profile == nil && context.agents.knowsProfiles) { _, gone in if gone { dismiss() } }
         .modifier(BoardDashboardOverlays(model: dashboard, isActive: shownTab == .dashboard,
                                          botName: profile?.name ?? ""))
         .toolbar(.hidden, for: .navigationBar)

@@ -82,6 +82,7 @@ enum ChatCanvasRow: Identifiable, Equatable {
         switch (lhs, rhs) {
         case (.transcript(.entry(let a)), .transcript(.entry(let b))): a == b
         case (.transcript(.liveWork(let a)), .transcript(.liveWork(let b))): a == b
+        case (.transcript(.reasoning(let a)), .transcript(.reasoning(let b))): a == b
         case (.transcript(.completed(let a)), .transcript(.completed(let b))):
             a.id == b.id && a.entries == b.entries && a.elapsedSeconds == b.elapsedSeconds && a.stepCount == b.stepCount
                 && a.summary == b.summary && a.style == b.style
@@ -224,6 +225,8 @@ enum ChatCanvasTranscriptProjection {
                 if disclosures.isWorkExpanded(work.id) {
                     work.entries.forEach { append($0, inOpenedTurn: true) }
                 }
+            case .reasoning:
+                result.append(.transcript(row))
             }
         }
         return result
@@ -239,6 +242,8 @@ enum ChatCanvasTranscriptProjection {
                 return ChatLoaderID.workTrail(trail)
             case .transcript(.liveWork(let work)) where !work.isAnswering:
                 return work.id
+            case .transcript(.reasoning(let message)) where message.isRunning:
+                return message.id
             case .transcript(.entry(.activity(let turn))):
                 if !turn.events.isEmpty, turn.events.allSatisfy({ $0.kind == .reasoning }),
                    turn.events.contains(where: { $0.lifecycle == .running }) {
@@ -899,7 +904,7 @@ struct NativeChatTimeline<Content: View>: UIViewRepresentable {
             // An unfolded trail's steps must sit flush so their line is unbroken.
             switch row {
             case .bottom, .workTrailEnd, .workTrailHeader, .activityDetail, .transcript(.completed),
-                 .transcript(.entry(.activity)), .agentTalk:
+                 .transcript(.reasoning), .transcript(.entry(.activity)), .agentTalk:
                 cell.host(configuration.minSize(height: 0))
             default: cell.host(configuration)
             }

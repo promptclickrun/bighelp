@@ -122,12 +122,41 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
 
     /// Stock Hermes's read-only folder listing (it expands "~" and hides
     /// credential folders). Used to browse for a workspace folder.
-    func listFolder(path: String, owner expectedOwner: WorkspaceOwner) async throws -> BighelpJSONValue {
+    /// `profileID` lists as that agent sees the computer (a chat's Files); without it, as the serving agent.
+    func listFolder(path: String, profileID: String? = nil,
+                    owner expectedOwner: WorkspaceOwner) async throws -> BighelpJSONValue {
         try check(expectedOwner)
         guard !path.isEmpty, path.utf8.count <= 4_096 else { throw WorkspaceClientError.invalidRequest }
         let result = try await http.request(.init(
-            path: "/api/fs/list", method: .get, query: [.init(name: "path", value: path)],
+            path: "/api/fs/list", method: .get,
+            query: [.init(name: "path", value: path)] + (profileID.map { [.init(name: "profile", value: $0)] } ?? []),
             maximumResponseBytes: 4_194_304))
+        try check(expectedOwner)
+        return result
+    }
+
+    /// Stock Hermes's answer to "where does this agent work": its `terminal.cwd`, else its home
+    /// folder (`/api/fs/default-cwd`). An older Hermes has no such route; the caller falls back.
+    func defaultFolder(profileID: String, owner expectedOwner: WorkspaceOwner) async throws -> BighelpJSONValue {
+        try check(expectedOwner)
+        let result = try await http.request(.init(
+            path: "/api/fs/default-cwd", method: .get, query: [.init(name: "profile", value: profileID)],
+            maximumResponseBytes: 16_384))
+        try check(expectedOwner)
+        return result
+    }
+
+    /// Stock Hermes's whole-file read as a data URL (`/api/fs/read-data-url`), for a picture the
+    /// person opens in a chat's Files. Hermes checks the path and refuses files over its own limit;
+    /// the app takes at most `HostPictureFile.maximumResponseBytes`.
+    func readFileDataURL(path: String, profileID: String,
+                         owner expectedOwner: WorkspaceOwner) async throws -> BighelpJSONValue {
+        try check(expectedOwner)
+        guard !path.isEmpty, path.utf8.count <= 4_096 else { throw WorkspaceClientError.invalidRequest }
+        let result = try await http.request(.init(
+            path: "/api/fs/read-data-url", method: .get,
+            query: [.init(name: "path", value: path), .init(name: "profile", value: profileID)],
+            maximumResponseBytes: HostPictureFile.maximumResponseBytes))
         try check(expectedOwner)
         return result
     }

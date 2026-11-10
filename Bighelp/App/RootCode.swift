@@ -126,6 +126,22 @@ extension RootShellView {
         return canUseCodeMode ? DemoHostTextFiles.shared : nil
     }
 
+    /// A chat's Files: the folder its session works in on the computer, as its agent sees it,
+    /// or the demo's folders. Nil for a group chat and without a connection.
+    func chatFolders(for model: ChatModel) -> ChatFolderContext? {
+        guard !model.isBotMode, let profileID = model.memberIDs.first, model.memberIDs.count == 1 else { return nil }
+        guard let runtime = nativeRuntime else {
+            return usesWorkspaceFixtures
+                ? ChatFolderContext(folders: DemoHostFolders.shared, files: DemoHostFolders.shared) : nil
+        }
+        guard let client = workspaceConnections?.workspace as? DirectHermesWorkspaceClient,
+              let owner = currentWorkspaceOwner else { return nil }
+        return ChatFolderContext(
+            folders: LiveHostFolders(client: client, owner: owner, profileID: profileID,
+                                     sessionFolder: runtime.bridge.sessionFolder(for: model.conversationID)),
+            files: LiveHostTextFiles(client: client, owner: owner, profileID: profileID))
+    }
+
     /// A Code mode session's chat links Markdown paths to the viewer, inside its folder.
     func codeFileLinks(sessionID: String) -> HostFileLinkContext? {
         guard let session = codeHome?.sessions.first(where: { $0.id == sessionID }),

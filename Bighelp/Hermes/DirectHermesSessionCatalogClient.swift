@@ -192,6 +192,12 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         return hasOwnership(binding) ? binding.coordinate : removingLiveBinding(binding).coordinate
     }
 
+    /// The folder Hermes says this chat's session runs in; nil until Hermes has said.
+    func folder(for visibleID: String) -> String? {
+        guard let cwd = bindings[visibleID]?.cwd, !cwd.isEmpty else { return nil }
+        return cwd
+    }
+
     func activeSessionMappings() throws -> [DirectHermesActiveSessionMapping] {
         try requireOwner()
         var result: [DirectHermesActiveSessionMapping] = []

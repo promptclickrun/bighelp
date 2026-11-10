@@ -120,6 +120,7 @@ struct ChatCompletedTurnTests {
             case .entry(let entry): [entry.id]
             case .completed(let turn): turn.entries.map(\.id)
             case .liveWork(let work): work.entries.map(\.id)
+            case .reasoning(let message): [message.id]
             }
         }
         #expect(expanded == entries.map(\.id))
@@ -467,8 +468,100 @@ struct ChatCompletedTurnTests {
             case .entry(let entry): [entry.id]
             case .completed(let turn): turn.entries.map(\.id)
             case .liveWork(let work): work.entries.map(\.id)
+            case .reasoning(let message): [message.id]
             }
         }
+    }
+
+    // MARK: Reasoning as its own message (#943)
+
+    private func thought(_ id: String, running: Bool = false, order: Int? = nil) -> ChatActivityEvent {
+        ChatActivityEvent(eventID: id, sessionID: "session", turnID: "turn", kind: .reasoning,
+                          lifecycle: running ? .running : .succeeded, title: "Reasoning", summary: nil,
+                          detail: "Thought \(id)", occurredAt: 101, durationMilliseconds: 4_000, sourceOrder: order)
+    }
+
+    private func step(_ id: String, order: Int? = nil) -> ChatActivityEvent {
+        ChatActivityEvent(eventID: id, sessionID: "session", turnID: "turn", kind: .tool, lifecycle: .succeeded,
+                          title: "Tool", summary: nil, detail: nil, occurredAt: 102, toolCallID: "call-\(id)",
+                          toolName: "read_file", sourceOrder: order)
+    }
+
+    @Test func aTurnsReasoningBecomesOneMessageAboveItsWork() {
+        let entries: [ChatTranscriptEntry] = [
+            .message(message("user", time: 100, human: true, order: 1)),
+            .activity(ChatActivityTurn(id: "a1", events: [thought("r1", order: 2), step("t1", order: 3)])),
+            .activity(ChatActivityTurn(id: "a2", events: [thought("r2", order: 4)])),
+            .activity(ChatActivityTurn(id: "a3", events: [step("t2", order: 5)])),
+            .message(message("answer", time: 110, order: 6)),
+        ]
+        let rows = ChatCompletedTurnProjection.rows(from: entries, isSending: false, enabled: true,
+                                                    reasoning: .ownMessage)
+        #expect(rows.map(\.id) == ["message:user", "reasoning:message:user", "completed-turn:activity:a1",
+                                   "message:answer"])
+        guard case .reasoning(let message) = rows[1], case .completed(let fold) = rows[2] else {
+            Issue.record("Missing rows"); return
+        }
+        #expect(message.events.map(\.eventID) == ["r1", "r2"], "Every thought of the turn, in order")
+        #expect(!message.isRunning)
+        // The steps hold only tool calls, and an entry that was all thinking is gone.
+        #expect(fold.entries.map(\.id) == ["activity:a1", "activity:a3"])
+        #expect(fold.entries.allSatisfy { entry in
+            guard case .activity(let turn) = entry else { return false }
+            return turn.events.allSatisfy { $0.kind == .tool }
+        })
+        #expect(fold.stepCount == 2)
+        #expect(fold.elapsedSeconds == 10)
+
+        // In the steps, the same turn keeps its thinking inside the fold.
+        let inSteps = ChatCompletedTurnProjection.rows(from: entries, isSending: false, enabled: true)
+        #expect(inSteps.map(\.id) == ["message:user", "completed-turn:activity:a1", "message:answer"])
+    }
+
+    @Test func reasoningIsItsOwnMessageWhileTheTurnRunsAndWithoutFolding() {
+        let live: [ChatTranscriptEntry] = [
+            .message(message("user", time: 100, human: true, order: 1)),
+            .activity(ChatActivityTurn(id: "a1", events: [thought("r1", order: 2), step("t1", order: 3)])),
+            .activity(ChatActivityTurn(id: "a2", events: [thought("r2", running: true, order: 4)])),
+        ]
+        // Full: the running turn's steps stay in place, under the message.
+        let full = ChatCompletedTurnProjection.rows(from: live, isSending: true, enabled: true, style: .full,
+                                                    reasoning: .ownMessage)
+        #expect(full.map(\.id) == ["message:user", "reasoning:message:user", "activity:a1"])
+        guard case .reasoning(let message) = full[1] else { Issue.record("Missing message"); return }
+        #expect(message.isRunning)
+
+        // Card: the running turn's block holds only its steps.
+        let card = ChatCompletedTurnProjection.rows(from: live, isSending: true, enabled: true, style: .card,
+                                                    reasoning: .ownMessage)
+        #expect(card.map(\.id) == ["message:user", "reasoning:message:user", "live-work:message:user"])
+
+        // Fold finished turns off: still one message, then the steps as they are.
+        let open = ChatCompletedTurnProjection.rows(from: live, isSending: false, enabled: false,
+                                                    reasoning: .ownMessage)
+        #expect(open.map(\.id) == ["message:user", "reasoning:message:user", "activity:a1"])
+
+        // A turn that only thought is only the message.
+        let thinking: [ChatTranscriptEntry] = [live[0], live[2]]
+        let only = ChatCompletedTurnProjection.rows(from: thinking, isSending: true, enabled: true, style: .card,
+                                                    reasoning: .ownMessage)
+        #expect(only.map(\.id) == ["message:user", "reasoning:message:user"])
+    }
+
+    @Test func aReasoningMessageSaysReasoningThenHowLongItThought() {
+        let running = ChatReasoningMessage(id: "reasoning:q", events: [thought("r1"), thought("r2", running: true)])
+        #expect(running.title == "Reasoning…")
+        #expect(running.text == "Thought r1\n\nThought r2")
+        let finished = ChatReasoningMessage(id: "reasoning:q", events: [thought("r1"), thought("r2")])
+        #expect(finished.title == "Thought for 8s")
+
+        // While it thinks, a long thought shows its newest words, from a line's or word's start.
+        let long = "**Checking the tests**\n" + String(repeating: "alpha beta gamma ", count: 40) + "the end"
+        let newest = ChatReasoningMessage.newestWords(of: long)
+        #expect(newest.hasPrefix("…") && newest.hasSuffix("the end"))
+        #expect(newest.count <= ChatReasoningMessage.liveExcerptLength + 1)
+        #expect(!newest.dropFirst().hasPrefix("lpha") && !newest.dropFirst().hasPrefix("eta"))
+        #expect(ChatReasoningMessage.newestWords(of: "Short thought.") == "Short thought.")
     }
 
     @Test func finalActionsUseCompactUniformGlyphsWithoutShrinkingHitTargets() {

@@ -68,6 +68,9 @@ struct ChatDestinationView: View {
     let onForkMessage: ((String) -> Void)?
     /// Code mode sessions: Markdown paths in messages open the viewer.
     let hostFiles: HostFileLinkContext?
+    /// ••• › Files: the chat's working folder on the computer. Asked for when Files opens, so it
+    /// reads the connection there is then; nil (a group chat) lists the chat's own attachments.
+    let chatFolders: (() -> ChatFolderContext?)?
 
     private var nativeSessionControls: NativeSessionControlsPresentation? {
         guard let native = model.nativeConversationClient else { return nil }
@@ -118,7 +121,8 @@ struct ChatDestinationView: View {
         onOpenApproval: @escaping (ApprovalRequest) -> Void,
         onForkMessage: ((String) -> Void)?,
         appearanceAuthority: WorkspaceAuthority? = nil,
-        hostFiles: HostFileLinkContext? = nil
+        hostFiles: HostFileLinkContext? = nil,
+        chatFolders: (() -> ChatFolderContext?)? = nil
     ) {
         self.model = model
         self.appState = appState
@@ -138,6 +142,7 @@ struct ChatDestinationView: View {
         self.responseHapticsCoveredByRoot = responseHapticsCoveredByRoot
         self.appearanceAuthority = appearanceAuthority
         self.hostFiles = hostFiles
+        self.chatFolders = chatFolders
         self.headerActions = ChatHeaderActions(newChat: onNewChat)
         self.onNewChat = onNewChat
         self.onOpenProviderAccounts = onOpenProviderAccounts
@@ -560,7 +565,12 @@ struct ChatDestinationView: View {
                 })
         }
         .bighelpSheet(isPresented: $isSessionFilesPresented) {
-            ChatSessionFilesView(model: model)
+            if let folders = chatFolders?() {
+                ChatFolderBrowserView(context: folders)
+                    .bighelpSheetSize(.large)
+            } else {
+                ChatSessionFilesView(model: model)
+            }
         }
         .bighelpSheet(isPresented: $isProjectMovePresented) {
             if let projectMove {

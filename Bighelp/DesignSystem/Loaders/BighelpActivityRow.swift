@@ -213,6 +213,9 @@ struct BighelpActivityRow: View {
     var stepCount: Int?
     /// What the agent said about its thinking, shown first when unfolded.
     var note: String?
+    /// A small line under the label: a finished turn's time and steps ("2m 14s · 7 steps")
+    /// when the label says what the turn did.
+    var receipt: String?
     /// The caller draws the unfolded steps itself, under this row (the chat
     /// gives each step its own recycled row, inside `bighelpActivityRail()`).
     /// The header still unfolds and folds them.
@@ -228,7 +231,8 @@ struct BighelpActivityRow: View {
     @State private var localExpanded: Bool
 
     init(phase: BighelpActivityPhase, title: String? = nil, steps: [BighelpActivityStep] = [],
-         stepCount: Int? = nil, note: String? = nil, detailsBelow: Bool = false, isExpanded: Binding<Bool>,
+         stepCount: Int? = nil, note: String? = nil, receipt: String? = nil, detailsBelow: Bool = false,
+         isExpanded: Binding<Bool>,
          onDisclosureChange: @escaping () -> Void = {}, accessibilityIdentifier: String? = nil,
          loaderID: String? = nil, loaderMotion: BighelpNoodleMotion? = nil) {
         self.phase = phase
@@ -236,6 +240,7 @@ struct BighelpActivityRow: View {
         self.steps = steps
         self.stepCount = stepCount
         self.note = note
+        self.receipt = receipt
         self.detailsBelow = detailsBelow
         self.onDisclosureChange = onDisclosureChange
         self.accessibilityIdentifier = accessibilityIdentifier
@@ -300,28 +305,40 @@ struct BighelpActivityRow: View {
                 if let expansion { expansion.wrappedValue = next } else { localExpanded = next }
             }
         } label: {
-            HStack(spacing: BighelpTokens.space8) {
-                headerGlyph
-                Text(label)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .bighelpShimmer(isActive: playsLoader)
-                    .contentTransition(.opacity)
-                if let meta = BighelpActivitySummary.stepCountLabel(count) {
-                    Text(meta)
-                        .fontWeight(.regular)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: BighelpTokens.space8) {
+                    headerGlyph
+                    Text(label)
+                        // A turn's summary may need a second line; a live label never wraps.
+                        .lineLimit(receipt == nil ? 1 : 2)
+                        .multilineTextAlignment(.leading)
+                        .truncationMode(.tail)
+                        .bighelpShimmer(isActive: playsLoader)
+                        .contentTransition(.opacity)
+                    if let meta = BighelpActivitySummary.stepCountLabel(count) {
+                        Text(meta)
+                            .fontWeight(.regular)
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .foregroundStyle(theme.tertiaryText)
+                            .fixedSize()
+                    }
+                    if hasDetails {
+                        Image(systemName: "chevron.right")
+                            .font(.bighelp(.caption, weight: .bold))
+                            .foregroundStyle(theme.tertiaryText)
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    }
+                    Spacer(minLength: 0)
+                }
+                if let receipt {
+                    Text(receipt)
+                        .font(.bighelp(.caption))
                         .monospacedDigit()
                         .lineLimit(1)
                         .foregroundStyle(theme.tertiaryText)
-                        .fixedSize()
+                        .padding(.leading, glyphSide + BighelpTokens.space8)
                 }
-                if hasDetails {
-                    Image(systemName: "chevron.right")
-                        .font(.bighelp(.caption, weight: .bold))
-                        .foregroundStyle(theme.tertiaryText)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                }
-                Spacer(minLength: 0)
             }
             .font(.bighelp(.subheadline, weight: .medium))
             .foregroundStyle(headerColor)
@@ -337,7 +354,8 @@ struct BighelpActivityRow: View {
         }
         .buttonStyle(BighelpActivityHeaderPressStyle())
         .animation(.easeOut(duration: BighelpTokens.stateDuration), value: phase)
-        .accessibilityLabel([label, BighelpActivitySummary.stepCountLabel(count).map { String($0.dropFirst(2)) }]
+        .accessibilityLabel([label, BighelpActivitySummary.stepCountLabel(count).map { String($0.dropFirst(2)) },
+                             receipt?.replacingOccurrences(of: " · ", with: ", ")]
             .compactMap { $0 }.joined(separator: ", "))
         .accessibilityValue(hasDetails ? (isExpanded ? "Expanded" : "Collapsed") : "")
         .accessibilityHint(hasDetails ? disclosureHint : "")

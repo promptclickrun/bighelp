@@ -83,6 +83,13 @@ final class ChatWorkStylesUITests: BighelpUITestCase {
             for _ in 0..<4 where !(picker.exists && picker.isHittable) { app.swipeUp() }
             XCTAssertTrue(picker.waitForExistence(timeout: 5))
             XCTAssertTrue(picker.label.contains("Card"), picker.label)
+            // Where reasoning shows, and whether it stays open, are everyday settings too (#943).
+            let placement = app.buttons["settings.chat.reasoning-placement"].firstMatch
+            XCTAssertTrue(placement.waitForExistence(timeout: 5))
+            XCTAssertTrue(placement.label.contains("As its own message"), placement.label)
+            let staysOpen = app.switches["settings.chat.reasoning-stays-open"].firstMatch
+            XCTAssertTrue(staysOpen.exists)
+            XCTAssertEqual(staysOpen.value as? String, "1", "Keep reasoning open is on by default")
             save("work-style-picker-\(appearance)", app)
             picker.tap()
             let minimal = app.buttons["Minimal"].firstMatch
@@ -99,5 +106,10 @@ final class ChatWorkStylesUITests: BighelpUITestCase {
         shot.name = name
         shot.lifetime = .keepAlways
         add(shot)
+        // BIGHELP_TOOL_FOLDERS_EVIDENCE (TEST_RUNNER_…): a folder to save the screenshots in.
+        guard let folder = ProcessInfo.processInfo.environment["BIGHELP_TOOL_FOLDERS_EVIDENCE"] else { return }
+        try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+        try? app.screenshot().pngRepresentation.write(
+            to: URL(fileURLWithPath: folder).appendingPathComponent("styles-\(name).png"))
     }
 }

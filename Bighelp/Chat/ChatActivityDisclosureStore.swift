@@ -57,10 +57,15 @@ final class ChatActivityDisclosureStore {
     /// Back-to-back reasoning opens and closes as one row. A choice made on any
     /// entry holds as more thinking arrives; otherwise it's open while thinking, and always in Full.
     func isExpanded(reasoning events: [ChatActivityEvent]) -> Bool {
+        reasoningChoice(events) ?? (style == .full || events.contains { $0.lifecycle == .running })
+    }
+
+    /// What the reader chose for this reasoning; nil when they haven't, so the caller's own
+    /// rule decides (Settings › Chat › Keep reasoning open).
+    func reasoningChoice(_ events: [ChatActivityEvent]) -> Bool? {
         let choices = events.compactMap { eventChoices[key(for: $0)] }
         if choices.contains(true) { return true }
-        if choices.contains(false) { return false }
-        return style == .full || events.contains { $0.lifecycle == .running }
+        return choices.contains(false) ? false : nil
     }
 
     func setExpanded(_ expanded: Bool, reasoning events: [ChatActivityEvent]) {

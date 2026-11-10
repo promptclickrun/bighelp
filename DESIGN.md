@@ -485,8 +485,10 @@ hand them the work their roles cover, without being asked.
 
 An opened "Worked for…" fold shows its tools directly, never a "Called N tools" folder inside it.
 
-A tapped tool call unfolds what it took and gave back, readable: key facts as label and value, text with real
-line breaks. Code it ran (Hermes' `execute_code`, Python, and `terminal`, Shell) unfolds as one notebook cell
+A tapped tool call unfolds as one block (`ChatToolBlockView`): what the agent asked for on top, what came back
+under a line, never JSON. Short values share one line ("notes.md · Limit 200"), and text keeps its line breaks,
+cut short with View full. Copy and Show raw (Hermes' own input or result) sit under the block. There are no
+Summary, Input and Result boxes. Code it ran (Hermes' `execute_code`, Python, and `terminal`, Shell) unfolds as one notebook cell
 (`ChatToolCodeCellView`): the language with Copy and full screen, the code with line numbers and colors, folded
 after 10 lines behind Show all, then under a line in the same card what it printed, with a dot for how it ended
 (Output, or Exit code 1 in red) and its own Copy. View raw under the card opens Hermes' own input or result.
@@ -494,13 +496,32 @@ after 10 lines behind Show all, then under a line in the same card what it print
 Settings › Chat › Agent's work (`ChatWorkStyle`) picks how one-to-one chats show an agent's work; group chats
 keep their folders. **Card** (the default): while the agent works, one soft card says who's working, how long and
 how many steps, with its newest four steps under that, older ones fading out at the top (`ChatLiveWorkView`).
-While the answer streams it says what the agent did, still; when the turn ends it becomes a "Worked for 18s ·
-4 steps" card above the answer. **Minimal**: one line with the
+While the answer streams it says what the agent did, still; when the turn ends it becomes a card above the
+answer that says what the turn did ("Read 2 files, ran tests"), with "18s · 4 steps" on a small line under it.
+A turn with no steps to name says "Worked for 18s". **Minimal**: one line with the
 current step and the agent's newest note under it; when the turn ends, a small "18s · 4 steps" receipt sits under
 the answer (`ChatWorkReceipt`). **Full**: every note, tool call and thought shows in place and open as it
 happens, then folds under "Worked for…". A tap on the card, line or receipt lists every step under it, each its
 own row. The agent's notes between steps go with Show reasoning; Show reasoning (on by default) and Show tool
 calls decide what's in the work, and Fold finished turns (off) leaves finished work open in the chat.
+
+Settings › Chat › Reasoning shows (`ChatReasoningPlacement`) picks where a one-to-one chat puts its agent's
+thinking. **As its own message** (the default): one outlined message above the turn's work
+(`ChatReasoningMessageView`), so the steps hold only tool calls. It's outlined, never filled, so it doesn't read
+as the answer. While the agent thinks it says "Reasoning…" over the newest words; once the turn's thinking is
+done, "Thought for 12s" over all of it, cut at six lines with Show more. **In the steps**: thinking rows between
+the tool calls, as before. Keep reasoning open (on by default) keeps finished reasoning's words in view in both;
+off, it closes to one line. A tap on the heading opens or closes it, and the reader's choice wins over the
+setting. Group chats keep reasoning in the steps.
+
+A chat's ••• › Files (`ChatFolderBrowserView`) shows the chat's working folder on the computer. A path field on
+top shows any other folder when Return is pressed (a full path, a `~` path, or a name inside the folder on
+show); beside it, the folder above and the working folder. Under a search field, the folder is a tree with
+folders first: a tap opens a folder in place, and its names are read then. Search finds names in every folder
+opened so far and says where each one is. Names that start with a dot stay behind one line under the tree
+("Show 12 hidden items"), or a search that starts with a dot. A tap on a file pushes it: Markdown rendered, other text as it is in
+monospace with Copy, a picture fitted to the page. Nothing here changes a file but the Markdown viewer's own
+Edit. A group chat's Files lists the files in its messages.
 
 A file in a chat opens in the native preview with Save and Share. A Markdown file opens rendered
 (`MarkdownMessageView`, as chat messages are), with a Preview and Raw switch under its name.

@@ -3,50 +3,10 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
-#if targetEnvironment(macCatalyst)
-enum BighelpMacChatPanelRequest {
-    case action(ChatActionMenuAction)
-    case nativeSessionControls
-}
-#endif
-
 // Attachment work remains bound to the existing conversation and view state.
 extension ChatDestinationView {
-    #if targetEnvironment(macCatalyst)
-    @discardableResult
-    func queueMacPanelActionIfNeeded(_ action: ChatActionMenuAction) -> Bool {
-        guard attachmentFlow.isActionMenuPresented || pendingMacPanelRequest != nil else {
-            return false
-        }
-        pendingMacPanelRequest = .action(action)
-        attachmentFlow.isActionMenuPresented = false
-        return true
-    }
-
-    /// Finish the popover before starting the next native panel.
-    func attachmentPanelDidDismiss(
-        onNativeSessionControls: @MainActor () -> Void
-    ) {
-        guard let request = pendingMacPanelRequest else { return }
-        pendingMacPanelRequest = nil
-        switch request {
-        case .action(let action):
-            performChatAction(action)
-        case .nativeSessionControls:
-            onNativeSessionControls()
-        }
-    }
-    #endif
-
+    /// A pick in the plus menu (`ChatAttachmentMenu`).
     func performChatAction(_ action: ChatActionMenuAction) {
-        #if targetEnvironment(macCatalyst)
-        switch action {
-        case .camera, .photo, .file, .voice, .startSession:
-            if queueMacPanelActionIfNeeded(action) { return }
-        default:
-            break
-        }
-        #endif
         switch action {
             case .camera:
                 guard ChatCameraPicker.isAvailable else {
@@ -87,22 +47,30 @@ extension ChatDestinationView {
                 isPhotoPickerPresented = true
             case .file:
                 isFilePickerPresented = true
-            case .voice:
-                attachmentFlow.isActionMenuPresented = false
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(180))
-                    await openVoice()
+            case .drawing:
+                guard model.supportedAttachmentKinds.contains(.image), model.draftAttachments.count < 10 else {
+                    attachmentErrorMessage = "This message can't take another picture."
+                    return
                 }
-            case .startSession:
-                attachmentFlow.isActionMenuPresented = false
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(180))
-                    onStartSession()
-                }
-            case .chooseAgent, .skillsAndTools, .changeModel:
-                // These actions are owned by nested pages inside the drawer.
-                break
+                isDrawingPresented = true
             }
+    }
+
+    /// A drawing from the canvas, added to the message as a picture.
+    func importDrawing(_ image: UIImage) {
+        do {
+            guard let data = image.pngData() else { throw ChatAttachmentError.invalidSize }
+            let attachment = try ChatAttachmentPreparer().prepare(
+                id: Self.attachmentID(),
+                fileName: "drawing-\(UUID().uuidString.lowercased()).png",
+                mimeType: "image/png",
+                data: data
+            )
+            try model.addDraftAttachment(attachment)
+            attachmentFlow.completeSuccessfulImport()
+        } catch {
+            attachmentErrorMessage = attachmentErrorDescription(error)
+        }
     }
 
     func finishDocumentScan() {

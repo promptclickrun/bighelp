@@ -126,12 +126,10 @@ struct ForegroundAlertTests {
         #expect(!visible.isShowing(chat: reference("saved-p"), agent: "default"), "The one it left")
         #expect(!first.model.nativeSessionResumeProgress.isMounted)
         #expect(second.model.nativeSessionResumeProgress.isMounted)
-        #expect(ChatPDFPagesDraftRegistry.owns(second.model, sessionID: second.model.conversationID))
 
         mount.unmount()
         #expect(!visible.isShowing(chat: reference("saved-q"), agent: "default"))
         #expect(!second.model.nativeSessionResumeProgress.isMounted)
-        #expect(!ChatPDFPagesDraftRegistry.owns(second.model, sessionID: second.model.conversationID))
     }
 
     @Test func aChatStillOpeningIsKnownFromItsSavedRow() {

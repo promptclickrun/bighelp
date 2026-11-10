@@ -135,7 +135,7 @@ struct ChatView: View {
     let allModelsRequest: Int
     let projectChangesSummary: ProjectChangesRailSummary?
     let composerFocusRequest: Int
-    let onAttachmentTap: (() -> Void)?
+    let onAttachmentTap: ((ChatActionMenuAction) -> Void)?
     let onProjectChangesTap: () -> Void
     let onVoiceTap: () -> Void
     let onApprovalTap: (ApprovalRequest) -> Void
@@ -228,7 +228,7 @@ struct ChatView: View {
         allModelsRequest: Int = 0,
         projectChangesSummary: ProjectChangesRailSummary? = nil,
         composerFocusRequest: Int = 0,
-        onAttachmentTap: (() -> Void)? = nil,
+        onAttachmentTap: ((ChatActionMenuAction) -> Void)? = nil,
         onProjectChangesTap: @escaping () -> Void = {},
         onVoiceTap: @escaping () -> Void = {},
         onApprovalTap: @escaping (ApprovalRequest) -> Void = { _ in },
@@ -1571,11 +1571,11 @@ struct ChatView: View {
     }
 
 
-    private var attachmentAction: (() -> Void)? {
+    private var attachmentAction: ((ChatActionMenuAction) -> Void)? {
         guard let onAttachmentTap else { return nil }
-        return {
+        return { action in
             dismissKeyboard()
-            onAttachmentTap()
+            onAttachmentTap(action)
         }
     }
 

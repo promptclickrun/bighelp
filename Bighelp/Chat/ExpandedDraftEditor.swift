@@ -5,7 +5,7 @@ struct ExpandedDraftEditor: View {
     @Environment(\.bighelpUIV2Enabled) private var uiV2Enabled
     @Bindable var model: ChatModel
     let agentName: String
-    let onAttachmentTap: (() -> Void)?
+    let onAttachmentTap: ((ChatActionMenuAction) -> Void)?
     let onSend: () -> Void
     var referenceHub: ReferenceHubStore? = nil
     var referenceSkills: SkillsAndToolsStore? = nil
@@ -141,8 +141,8 @@ struct ExpandedDraftEditor: View {
     private var composerActions: some View {
         HStack(spacing: BighelpTokens.space8) {
             if onAttachmentTap != nil {
-                Button(action: openAttachments) {
-                    Image(systemName: "square.grid.2x2")
+                ChatAttachmentMenu(model: model, perform: openAttachments) {
+                    Image(systemName: "plus")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(theme.primaryText)
                         .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
@@ -285,7 +285,8 @@ struct ExpandedDraftEditor: View {
         dismiss()
     }
 
-    private func openAttachments() {
+    /// The pickers open from the chat, so the editor closes first.
+    private func openAttachments(_ action: ChatActionMenuAction) {
         guard !model.richDraftRecovery.hasUnexportedChanges else { return }
         guard let onAttachmentTap else { return }
         isEditorFocused = false
@@ -293,7 +294,7 @@ struct ExpandedDraftEditor: View {
         dismiss()
         Task { @MainActor in
             await Task.yield()
-            onAttachmentTap()
+            onAttachmentTap(action)
         }
     }
 

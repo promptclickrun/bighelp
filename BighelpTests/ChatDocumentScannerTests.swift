@@ -52,9 +52,8 @@ struct ChatDocumentScannerTests {
         #expect(!attached)
     }
 
-    @Test func scannerActionIsLocalAndNotASubmenuOrSend() {
-        #expect(ChatActionMenuAction.scanDocument.submenu == nil)
+    @Test func scannerIsOneRowOfThePlusMenu() {
         #expect(ChatActionMenuAction.scanDocument.accessibilityIdentifier == "chat.action.scan-document")
-        #expect(ChatActionMenuLayout.rowActions.filter { $0 == .scanDocument }.count == 1)
+        #expect(ChatActionMenuAction.allCases.filter { $0 == .scanDocument }.count == 1)
     }
 }

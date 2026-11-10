@@ -9,7 +9,7 @@ import UIKit
 /// callbacks stable for the same reason: github.com/pingdotgg/t3code, apps/mobile.)
 @MainActor
 final class ChatComposerActions {
-    var attachment: (() -> Void)?
+    var attachment: ((ChatActionMenuAction) -> Void)?
     var voice: () -> Void = {}
     var fittingRailVerticalDrag: (ChatRailScrollDirection) -> Void = { _ in }
     var dismissKeyboard: () -> Void = {}
@@ -25,7 +25,7 @@ struct ChatComposerHost: View {
     let model: ChatModel
     let agentName: String
     let sessionCatalog: SessionCatalogStore?
-    let onAttachmentTap: (() -> Void)?
+    let onAttachmentTap: ((ChatActionMenuAction) -> Void)?
     let onVoiceTap: () -> Void
     let onFittingRailVerticalDrag: (ChatRailScrollDirection) -> Void
     let draftFocus: Binding<Bool>
@@ -430,16 +430,17 @@ struct ChatComposer: View, Equatable {
         }
     }
 
-    /// The chat screen's attachment action as it is when tapped; nil while it has none.
-    private var attachmentTap: (() -> Void)? {
+    /// The chat screen's attachment action as it is when picked; nil while it has none.
+    private var attachmentTap: ((ChatActionMenuAction) -> Void)? {
         guard offersAttachments else { return nil }
-        return { [actions] in actions.attachment?() }
+        return { [actions] action in actions.attachment?(action) }
     }
 
+    /// The plus button: a menu of what can be added to the message (`ChatAttachmentMenu`).
     @ViewBuilder
     private var attachmentButton: some View {
         if let attachmentTap {
-            Button(action: attachmentTap) {
+            ChatAttachmentMenu(model: model, perform: attachmentTap) {
                 Image(systemName: "plus")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(theme.secondaryText)
@@ -450,11 +451,10 @@ struct ChatComposer: View, Equatable {
                     .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
                     .contentShape(.rect)
             }
-            .buttonStyle(.bighelpPress)
-            .accessibilityLabel("Attachments and actions")
-            .accessibilityHint("Choose camera, photo, file, voice, or chat actions.")
+            .buttonStyle(.plain)
+            .accessibilityLabel("Add to message")
+            .accessibilityHint("Choose the camera, a scan, a photo, a file or a drawing.")
             .accessibilityIdentifier("chat.attachment")
-            .bighelpChatPanelAnchor(.attachments)
             .disabled(model.isComposerAttachmentInputDisabled)
         }
     }

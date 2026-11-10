@@ -1073,6 +1073,23 @@
         }
       }
     },
+    "Add to message": {
+      "comment": "Simplified Chinese draft for the plus menu (#938); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add to message"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "添加到消息"
+          }
+        }
+      }
+    },
     "Add to the bottom bar": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -1834,23 +1851,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "助手"
-          }
-        }
-      }
-    },
-    "Attachments and actions": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Attachments and actions"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "附件与操作"
           }
         }
       }
@@ -3160,19 +3160,19 @@
         }
       }
     },
-    "Choose camera, photo, file, voice, or chat actions.": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "Choose the camera, a scan, a photo, a file or a drawing.": {
+      "comment": "Simplified Chinese draft for the plus menu (#938); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Choose camera, photo, file, voice, or chat actions."
+            "value": "Choose the camera, a scan, a photo, a file or a drawing."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "选择相机、照片、文件、语音或聊天操作。"
+            "value": "选择相机、扫描、照片、文件或绘图。"
           }
         }
       }
@@ -4509,6 +4509,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "将机器人和群聊拖到你想要的顺序，然后轻点“保存”。要在你的其他设备上也保留这个顺序，请更新这台电脑上的 bighelp 插件。"
+          }
+        }
+      }
+    },
+    "Drawing": {
+      "comment": "Simplified Chinese draft for the plus menu (#938); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drawing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "绘图"
           }
         }
       }
@@ -9201,23 +9218,6 @@
         }
       }
     },
-    "PDF as pages": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "PDF as pages"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "PDF 页面"
-          }
-        }
-      }
-    },
     "PDF pages require a current native Hermes conversation.": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -9469,6 +9469,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "照片"
+          }
+        }
+      }
+    },
+    "Photo Library": {
+      "comment": "Simplified Chinese draft for the plus menu (#938); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photo Library"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "照片图库"
           }
         }
       }
@@ -10927,6 +10944,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "正在保存…"
+          }
+        }
+      }
+    },
+    "Scan Document": {
+      "comment": "Simplified Chinese draft for the plus menu (#938); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan Document"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "扫描文稿"
           }
         }
       }

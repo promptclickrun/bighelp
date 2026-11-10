@@ -1,35 +1,8 @@
 import XCTest
 
-/// Settings › Voice and a chat's + menu on the demo data: Auto TTS (#650), Hold music (#651), the
+/// Settings › Voice on the demo data: Hold music (#651), the
 /// on-device Phonon voice (#649) and the Debug section. `BIGHELP_VOICE_EVIDENCE` saves screenshots there.
 final class VoiceSettingsUITests: BighelpUITestCase {
-    /// The + menu's Auto TTS and Settings › Voice › Use TTS on every response are one switch.
-    @MainActor
-    func testAutoTTSInThePlusMenuIsTheVoiceSetting() {
-        for appearance in ["light", "dark"] {
-            let app = launch(appearance)
-            let plus = app.buttons["chat.attachment"]
-            XCTAssertTrue(plus.waitForExistence(timeout: 15))
-            plus.tap()
-            let menuSwitch = app.switches["chat.action.auto-tts"]
-            for _ in 0..<4 where !(menuSwitch.exists && menuSwitch.isHittable) {
-                app.descendants(matching: .any)["chat.action-drawer.v3"].firstMatch.swipeUp()
-            }
-            XCTAssertTrue(menuSwitch.waitForExistence(timeout: 5))
-            let wasOn = isOn(menuSwitch)
-            menuSwitch.switches.firstMatch.tap()
-            XCTAssertNotEqual(isOn(menuSwitch), wasOn, "Auto TTS didn't change in the + menu")
-            save("plus-menu-auto-tts-\(appearance)", app)
-            app.buttons["chat.action-drawer.done"].tap()
-
-            openVoiceSettings(app)
-            let setting = app.switches["voice.settings.auto-tts"]
-            XCTAssertTrue(setting.waitForExistence(timeout: 5))
-            XCTAssertEqual(isOn(setting), !wasOn, "Settings › Voice shows another value than the + menu")
-            app.terminate()
-        }
-    }
-
     /// TTS voice mode lists Hold music, and every agent's providers start with this iPhone's Phonon,
     /// which downloads before it can be saved.
     @MainActor

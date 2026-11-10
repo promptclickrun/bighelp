@@ -205,15 +205,22 @@ struct BighelpApp: App {
             guard let expectedOwner = key.owner else { return true }
             return connections.owner == expectedOwner
         }
-        let resolveNativeWorkspace: @MainActor (BighelpShortcutWorkspaceKey) async throws -> BighelpShortcutWorkspace? = { key in
+        let resolveNativeWorkspace: @MainActor (BighelpShortcutWorkspaceKey, BighelpShortcutReadiness) async throws
+            -> BighelpShortcutWorkspace? = { key, needs in
             guard matchesNativeWorkspaceKey(key) else {
                 return nil
             }
-            // A runtime suspended in the background still reports ready.
-            if let runtime = nativeWorkspaces.current,
-               runtime.isReady, !runtime.isSuspended,
-               let owner = connections.owner,
-               key.owner == nil || key.owner == owner {
+            // Ready for what the caller needs, on the connection in use now. A caller that only starts a
+            // chat goes on while the chat list and the other pages still load.
+            let isReady: @MainActor () -> Bool = {
+                guard let runtime = nativeWorkspaces.current, let owner = connections.owner else { return false }
+                switch needs {
+                case .chats: return runtime.chatsOwner == owner
+                // A runtime suspended in the background still reports ready.
+                case .everything: return runtime.isReady && !runtime.isSuspended
+                }
+            }
+            if isReady(), let runtime = nativeWorkspaces.current, key.owner == nil || key.owner == connections.owner {
                 return BighelpShortcutWorkspace(runtime: runtime)
             }
 
@@ -224,11 +231,9 @@ struct BighelpApp: App {
                 isWanted: { matchesNativeWorkspaceKey(key) },
                 isConnecting: { hostRegistry.selectedWorkspace?.isConnecting == true },
                 isConnected: { hostRegistry.selectedWorkspace?.isConnected == true },
-                isReady: {
-                    guard let runtime = nativeWorkspaces.current else { return false }
-                    return runtime.isReady && !runtime.isSuspended && connections.owner != nil
-                },
-                synchronize: { await nativeWorkspaces.synchronize() }
+                isReady: isReady,
+                synchronize: { await nativeWorkspaces.synchronize() },
+                readyDuringSetup: needs == .chats
             ))
             guard ready, let runtime = nativeWorkspaces.current else { return nil }
             return BighelpShortcutWorkspace(runtime: runtime)
@@ -447,7 +452,8 @@ struct BighelpApp: App {
         }
         #endif
         let shortcuts = composition.shortcutService
-        BighelpCarPlayServices.workspace = { try await shortcuts.connectedWorkspace() }
+        // The car starts a chat and talks: it needs the agents, never the chat list.
+        BighelpCarPlayServices.workspace = { try await shortcuts.connectedWorkspace(needs: .chats) }
         BighelpCarPlayServices.useGateway = { try shortcuts.useGateway($0) }
         BighelpCarPlayServices.gateways = { shortcuts.availableGateways() }
         BighelpCarPlayServices.agents = { try await shortcuts.availableAgents(on: $0) }

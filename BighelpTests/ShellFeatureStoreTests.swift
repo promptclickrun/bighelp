@@ -2204,6 +2204,47 @@ struct ShellFeatureStoreTests {
         #expect(store.makeVoicePresentation(for: session.id, conversationMode: .turnBased).liveUnavailable == nil)
     }
 
+    /// A chat opened a moment ago (a cold Start voice chat) is still getting its session on the
+    /// computer. Voice waits for it; asked at once, it said "This chat is still opening".
+    @Test func liveVoiceWaitsForAChatThatIsStillOpening() async {
+        let session = record(id: "opening")
+        let (store, _) = makeStore(records: [session])
+        var reason: LiveVoiceUnavailable? = .chatOpening
+        let live = liveVoice(for: session)
+        store.configureLiveVoiceFactory(check: { _ in reason }) { _, _, _ in reason.map { .failure($0) } ?? .success(live) }
+        #expect(store.liveVoiceUnavailable(in: session.id) == .chatOpening)
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(40))
+            reason = nil
+        }
+        await store.waitForLiveVoice(in: session.id, limit: .seconds(5), step: .milliseconds(5))
+        #expect(store.liveVoiceUnavailable(in: session.id) == nil)
+        #expect(store.makeVoicePresentation(for: session.id, conversationMode: .codexLive).liveModel === live)
+    }
+
+    /// What won't pass by itself (no plugin) is said at once, and a chat that never opens is given up on.
+    @Test func liveVoiceDoesNotWaitForWhatWillNotPass() async {
+        let session = record(id: "stuck")
+        let (store, _) = makeStore(records: [session])
+        var reason: LiveVoiceUnavailable = .pluginNotInstalled
+        store.configureLiveVoiceFactory(check: { _ in reason }) { _, _, _ in .failure(reason) }
+
+        var started = ContinuousClock.now
+        await store.waitForLiveVoice(in: session.id, limit: .seconds(5), step: .milliseconds(5))
+        #expect(ContinuousClock.now - started < .seconds(1))
+
+        reason = .chatOpening
+        started = ContinuousClock.now
+        await store.waitForLiveVoice(in: session.id, limit: .milliseconds(80), step: .milliseconds(5))
+        #expect(ContinuousClock.now - started < .seconds(2))
+        #expect(store.makeVoicePresentation(for: session.id, conversationMode: .codexLive).liveUnavailable == .chatOpening)
+
+        // Demo mode has no check: nothing to wait for.
+        store.configureLiveVoiceFactory { _, _, _ in .failure(.demo) }
+        #expect(store.liveVoiceUnavailable(in: session.id) == nil)
+    }
+
     /// "Use TTS voice mode" opens a new turn-based presentation over the failed live one.
     @Test func switchingFromLiveToTurnBasedVoiceBringsTheHoldMusicBack() async {
         let session = record(id: "switch-hold")

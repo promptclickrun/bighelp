@@ -204,6 +204,16 @@ struct BighelpShortcutWorkspace {
     }
 }
 
+/// How much of the host's workspace a caller needs before it goes on.
+enum BighelpShortcutReadiness: Hashable, Sendable {
+    /// The connection can make and open a chat: the agents are known. The chat list and the other
+    /// pages may still be loading. Ask an agent and the car start here: on a computer with many
+    /// chats, the list alone took longer than the answer.
+    case chats
+    /// Everything the app loads when it connects, for callers that read the chats, tasks or groups.
+    case everything
+}
+
 struct BighelpShortcutWorkspaceKey: Equatable, Sendable {
     let hostID: UUID?
     let registryGeneration: UUID
@@ -220,15 +230,18 @@ struct BighelpShortcutWorkspaceKey: Equatable, Sendable {
 final class BighelpShortcutService: @unchecked Sendable {
     private let fallbackWorkspace: BighelpShortcutWorkspace
     private let prepareConnection: @MainActor () async throws -> Void
-    private var workspaceResolver: (@MainActor (BighelpShortcutWorkspaceKey) async throws -> BighelpShortcutWorkspace?)?
+    private var workspaceResolver: (@MainActor (BighelpShortcutWorkspaceKey, BighelpShortcutReadiness) async throws
+        -> BighelpShortcutWorkspace?)?
     private var nativeWorkspaceKey: (@MainActor () -> BighelpShortcutWorkspaceKey?)?
     private var reconnectHost: (@MainActor () async -> Void)?
-    private var liveCheck: (key: BighelpShortcutWorkspaceKey?, task: Task<BighelpShortcutWorkspace, Error>)?
-    private var preparation: (
+    // One flight for each readiness: a caller that needs only chats never waits on one that waits for everything.
+    private var liveChecks: [BighelpShortcutReadiness: (key: BighelpShortcutWorkspaceKey?,
+                                                        task: Task<BighelpShortcutWorkspace, Error>)] = [:]
+    private var preparations: [BighelpShortcutReadiness: (
         id: UUID,
         key: BighelpShortcutWorkspaceKey?,
         task: Task<BighelpShortcutWorkspace, Error>
-    )?
+    )] = [:]
     /// Host features outside the workspace stores (Feed, Kanban, the host's
     /// name). The app binds them; until then they're unavailable.
     var hostServices = BighelpShortcutHostServices()
@@ -268,14 +281,15 @@ final class BighelpShortcutService: @unchecked Sendable {
     /// intent using an old workspace.
     func bindNativeWorkspace(
         key: @escaping @MainActor () -> BighelpShortcutWorkspaceKey?,
-        resolve: @escaping @MainActor (BighelpShortcutWorkspaceKey) async throws -> BighelpShortcutWorkspace?,
+        resolve: @escaping @MainActor (BighelpShortcutWorkspaceKey, BighelpShortcutReadiness) async throws
+            -> BighelpShortcutWorkspace?,
         reconnect: (@MainActor () async -> Void)? = nil
     ) {
         self.nativeWorkspaceKey = key
         self.workspaceResolver = resolve
         self.reconnectHost = reconnect
-        preparation?.task.cancel()
-        preparation = nil
+        preparations.values.forEach { $0.task.cancel() }
+        preparations.removeAll()
     }
 
     /// The agents on the gateway in use, marked with it, so a Shortcut keeps that gateway.
@@ -299,10 +313,10 @@ final class BighelpShortcutService: @unchecked Sendable {
     /// Another gateway was picked: checks on the old one must not be shared with, or fail,
     /// what runs on the new one.
     func forgetWorkspaceChecks() {
-        liveCheck?.task.cancel()
-        liveCheck = nil
-        preparation?.task.cancel()
-        preparation = nil
+        liveChecks.values.forEach { $0.task.cancel() }
+        liveChecks.removeAll()
+        preparations.values.forEach { $0.task.cancel() }
+        preparations.removeAll()
     }
 
     func availableModels(agentID: String?) async throws -> [BighelpShortcutModel] {
@@ -335,7 +349,8 @@ final class BighelpShortcutService: @unchecked Sendable {
             if backgroundTask != .invalid { UIApplication.shared.endBackgroundTask(backgroundTask) }
         }
         try Task.checkCancellation()
-        let workspace = try await liveWorkspace()
+        // A new chat needs the connection and the agents, never the chat list.
+        let workspace = try await liveWorkspace(needs: .chats)
         // Past the AI-data agreement (`liveWorkspace` refuses before it), so this run counts.
         Telemetry.featureUsed(.shortcutRun)
         let agent = try resolveAgent(explicitID: request.agentID, in: workspace)
@@ -464,8 +479,8 @@ final class BighelpShortcutService: @unchecked Sendable {
 
     /// A host that answers, for the agent in the room on Vision Pro. Reconnects
     /// once if the socket went quiet, like every other outside entry point.
-    func connectedWorkspace() async throws -> BighelpShortcutWorkspace {
-        try await liveWorkspace()
+    func connectedWorkspace(needs: BighelpShortcutReadiness = .everything) async throws -> BighelpShortcutWorkspace {
+        try await liveWorkspace(needs: needs)
     }
 
     /// A new chat started from outside the app (a widget or link). The app
@@ -479,7 +494,7 @@ final class BighelpShortcutService: @unchecked Sendable {
 
     func openChat(agentID: String?,
                   beforePresentation: @escaping @MainActor (String, String?) -> Void = { _, _ in }) async throws -> (BighelpShortcutWorkspace, BighelpShortcutVoiceResult) {
-        let workspace = try await liveWorkspace()
+        let workspace = try await liveWorkspace(needs: .chats)
         // A widget remembers the agent it last drew; if that agent is gone, use the default.
         let known = agentID.flatMap { id in workspace.agents.profiles.contains { $0.id == id } ? id : nil }
         let agent = try resolveAgent(explicitID: known, in: workspace)
@@ -507,18 +522,18 @@ final class BighelpShortcutService: @unchecked Sendable {
     /// and try again before anything is sent.
     /// Simultaneous entity queries share one check, so their directory loads
     /// never supersede (and cancel) each other.
-    func liveWorkspace() async throws -> BighelpShortcutWorkspace {
+    func liveWorkspace(needs: BighelpShortcutReadiness = .everything) async throws -> BighelpShortcutWorkspace {
         // Shortcuts, the Watch, CarPlay and the agent in the room share nothing before the agreement.
         guard AIDataConsent.isAgreed() else { throw BighelpShortcutServiceError.aiDataNotAgreed }
         let requestedKey = nativeWorkspaceKey?()
-        if let liveCheck {
+        if let liveCheck = liveChecks[needs] {
             if Self.keysCanShare(liveCheck.key, requestedKey) { return try await liveCheck.task.value }
             // The host changed underneath: stop the old check, never reuse it.
             liveCheck.task.cancel()
-            self.liveCheck = nil
+            liveChecks[needs] = nil
         }
         let check = Task { @MainActor in
-            let workspace = try await self.prepareForUse()
+            let workspace = try await self.prepareForUse(needs: needs)
             do {
                 try await workspace.agents.load()
                 return workspace
@@ -526,19 +541,19 @@ final class BighelpShortcutService: @unchecked Sendable {
                 guard let reconnectHost = self.reconnectHost else { throw error }
                 await reconnectHost()
                 try Task.checkCancellation()
-                let reconnected = try await self.prepareForUse()
+                let reconnected = try await self.prepareForUse(needs: needs)
                 try await reconnected.agents.load()
                 return reconnected
             }
         }
-        liveCheck = (requestedKey, check)
-        defer { if liveCheck?.task == check { liveCheck = nil } }
+        liveChecks[needs] = (requestedKey, check)
+        defer { if liveChecks[needs]?.task == check { liveChecks[needs] = nil } }
         return try await check.value
     }
 
     /// Shortcuts may run before a scene exists, and can resolve agent and model
     /// entities concurrently. Share readiness and directory loading across them.
-    private func prepareForUse() async throws -> BighelpShortcutWorkspace {
+    private func prepareForUse(needs: BighelpShortcutReadiness) async throws -> BighelpShortcutWorkspace {
         try Task.checkCancellation()
         let requestedKey = nativeWorkspaceKey?()
         let flight: (
@@ -546,10 +561,10 @@ final class BighelpShortcutService: @unchecked Sendable {
             key: BighelpShortcutWorkspaceKey?,
             task: Task<BighelpShortcutWorkspace, Error>
         )
-        if let preparation {
+        if let preparation = preparations[needs] {
             guard Self.keysCanShare(preparation.key, requestedKey) else {
                 preparation.task.cancel()
-                self.preparation = nil
+                preparations[needs] = nil
                 throw BighelpShortcutServiceError.connectionUnavailable
             }
             flight = preparation
@@ -561,7 +576,7 @@ final class BighelpShortcutService: @unchecked Sendable {
             flight = (UUID(), requestedKey, Task { @MainActor in
                 if let requestedKey {
                     guard let workspaceResolver,
-                          let workspace = try await workspaceResolver(requestedKey) else {
+                          let workspace = try await workspaceResolver(requestedKey, needs) else {
                         throw BighelpShortcutServiceError.connectionUnavailable
                     }
                     guard let currentKey = nativeWorkspaceKey?(),
@@ -575,10 +590,10 @@ final class BighelpShortcutService: @unchecked Sendable {
                 try await fallbackWorkspace.agents.load()
                 return fallbackWorkspace
             })
-            preparation = flight
+            preparations[needs] = flight
         }
         defer {
-            if preparation?.id == flight.id { preparation = nil }
+            if preparations[needs]?.id == flight.id { preparations[needs] = nil }
         }
         let workspace = try await flight.task.value
         try Task.checkCancellation()

@@ -72,6 +72,10 @@ enum LiveVoiceUnavailable: String, Error, Equatable, Sendable {
         }
     }
 
+    /// The connection and the chat's session come by themselves a moment after a chat opens, so voice
+    /// waits for them (`ShellFeatureStore.waitForLiveVoice`) before it says it can't start.
+    var passesByItself: Bool { self == .connecting || self == .chatOpening }
+
     /// Trying again helps once the computer or the chat is ready, or after a step on the computer.
     var canTryAgain: Bool { self != .groupChat && self != .demo }
 }

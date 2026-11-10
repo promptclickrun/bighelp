@@ -153,7 +153,7 @@ struct BighelpShortcutServiceTests {
         let key = BighelpShortcutWorkspaceKey(
             hostID: UUID(), registryGeneration: UUID(), owner: nil
         )
-        harness.service.bindNativeWorkspace(key: { nativeRoute ? key : nil }) { _ in
+        harness.service.bindNativeWorkspace(key: { nativeRoute ? key : nil }) { _, _ in
             resolverCalls += 1
             return nativeWorkspace
         }
@@ -204,7 +204,7 @@ struct BighelpShortcutServiceTests {
         )
         let key = BighelpShortcutWorkspaceKey(hostID: UUID(), registryGeneration: UUID(), owner: nil)
         var reconnects = 0
-        harness.service.bindNativeWorkspace(key: { key }, resolve: { _ in workspace }, reconnect: { reconnects += 1 })
+        harness.service.bindNativeWorkspace(key: { key }, resolve: { _, _ in workspace }, reconnect: { reconnects += 1 })
 
         #expect(try await harness.service.availableAgents().map(\.id) == ["native-only"])
         #expect(reconnects == 1)
@@ -214,10 +214,40 @@ struct BighelpShortcutServiceTests {
 
         // Without a way to reconnect, the honest error still surfaces.
         client.failuresBeforeSuccess = 1
-        harness.service.bindNativeWorkspace(key: { key }, resolve: { _ in workspace })
+        harness.service.bindNativeWorkspace(key: { key }, resolve: { _, _ in workspace })
         await #expect(throws: WorkspaceClientError.transportUnavailable) {
             try await harness.service.availableAgents()
         }
+    }
+
+    /// Ask an agent starts a chat: it goes on once the connection can make one, and never waits
+    /// behind a caller that needs the whole workspace (the chat list took longer than the answer).
+    @Test func askAnAgentNeedsOnlyChatsAndDoesNotWaitForTheWholeWorkspace() async throws {
+        let harness = try await ShortcutServiceHarness(prepareConnection: {})
+        let workspace = BighelpShortcutWorkspace(
+            appState: harness.state, agents: harness.agents, runtimeDefaults: harness.runtimeDefaults,
+            catalog: harness.catalog, featureStore: harness.featureStore, newChatCoordinator: harness.newChat
+        )
+        let key = BighelpShortcutWorkspaceKey(hostID: UUID(), registryGeneration: UUID(), owner: nil)
+        var asked: [BighelpShortcutReadiness] = []
+        var wholeWorkspaceIsLoaded = false
+        harness.service.bindNativeWorkspace(key: { key }) { _, needs in
+            asked.append(needs)
+            // The whole workspace is still loading; chats are ready.
+            while needs == .everything, !wholeWorkspaceIsLoaded { try await Task.sleep(for: .milliseconds(5)) }
+            return workspace
+        }
+
+        let listing = Task { @MainActor in try await harness.service.availableAgents() }
+        while asked.isEmpty { await Task.yield() }
+        let result = try await harness.service.send(.init(
+            message: "Start now", agentID: nil, model: nil, reasoning: nil, attachments: [], waitForResponse: false))
+        #expect(result.delivery == .queued)
+        #expect(asked == [.everything, .chats])
+        #expect(!wholeWorkspaceIsLoaded, "The send went out while the whole workspace was still loading")
+
+        wholeWorkspaceIsLoaded = true
+        #expect(try await listing.value.count == 2)
     }
 
     @Test func nativeShortcutPreparationRejectsHostSwitchWithoutLinkFallback() async throws {
@@ -233,7 +263,7 @@ struct BighelpShortcutServiceTests {
         )
         var requestedKey = firstKey
         var resolverStarted = false
-        harness.service.bindNativeWorkspace(key: { requestedKey }) { _ in
+        harness.service.bindNativeWorkspace(key: { requestedKey }) { _, _ in
             resolverStarted = true
             try await Task.sleep(for: .seconds(60))
             return nil
@@ -278,7 +308,7 @@ struct BighelpShortcutServiceTests {
             featureStore: harness.featureStore,
             newChatCoordinator: harness.newChat
         )
-        harness.service.bindNativeWorkspace(key: { currentKey }) { _ in
+        harness.service.bindNativeWorkspace(key: { currentKey }) { _, _ in
             currentKey = BighelpShortcutWorkspaceKey(
                 hostID: hostID,
                 registryGeneration: registryGeneration,

@@ -88,6 +88,11 @@ final class NativeWorkspaceRuntime {
     private(set) var isRefreshing = false
     private(set) var isReady = false
     private(set) var isSuspended = false
+    /// The connection that can make and open chats now: its agents are known and its open chats are
+    /// attached again. The chat list and the other pages may still be loading, which a chat started
+    /// outside the app (Ask an agent, the car, Start voice chat) never needs. Nil from a suspend until
+    /// a refresh on the next connection gets that far.
+    private(set) var chatsOwner: WorkspaceOwner?
     private var confirmedWidgetSessionOwner: WorkspaceOwner?
     private var unrecoveredActiveChatID: String?
     private(set) var errorMessage: String?
@@ -431,15 +436,25 @@ final class NativeWorkspaceRuntime {
         // Sessions is the initial root tab. Prepare its stable model before
         // mounting the shell; ShellFeatureStore is not an observable store.
         _ = features.prepareSessions()
-        features.configureLiveVoiceFactory { [weak connections, weak bridge] session, agent, chat in
+        // What a call needs on this connection: the computer, its plugin's list and the chat's session.
+        typealias VoiceGround = (owner: WorkspaceOwner?, workspace: DirectHermesWorkspaceClient?,
+                                 coordinate: WorkspaceSessionCoordinate?)
+        let voiceGround: (SessionRecord) -> VoiceGround = { [weak connections, weak bridge] session in
             let owner = connections?.owner.flatMap { $0.authority == authority ? $0 : nil }
             let workspace = owner == nil ? nil : connections?.workspace
             let coordinate = bridge?.currentCoordinate(for: session.id).flatMap { $0.owner == owner ? $0 : nil }
-            if let reason = LiveVoiceUnavailable.reason(
-                connected: workspace != nil, features: workspace?.nativeContext?.features,
-                plugin: owner.map { pluginStates.state(for: $0) } ?? .unknown,
-                isDirectChat: session.kind == .direct, chatReady: coordinate?.storedSessionID != nil
-            ) { return .failure(reason) }
+            return (owner, workspace, coordinate)
+        }
+        let voiceCheck: (SessionRecord, VoiceGround) -> LiveVoiceUnavailable? = { session, ground in
+            LiveVoiceUnavailable.reason(
+                connected: ground.workspace != nil, features: ground.workspace?.nativeContext?.features,
+                plugin: ground.owner.map { pluginStates.state(for: $0) } ?? .unknown,
+                isDirectChat: session.kind == .direct, chatReady: ground.coordinate?.storedSessionID != nil
+            )
+        }
+        features.configureLiveVoiceFactory(check: { voiceCheck($0, voiceGround($0)) }) { [weak connections] session, agent, chat in
+            let (owner, workspace, coordinate) = voiceGround(session)
+            if let reason = voiceCheck(session, (owner, workspace, coordinate)) { return .failure(reason) }
             guard let connections, let owner, let workspace, let coordinate,
                   let stored = coordinate.storedSessionID else { return .failure(.connecting) }
             let voiceOwner = LiveVoiceOwner(hostID: authority.cacheScopeID,
@@ -879,6 +894,7 @@ final class NativeWorkspaceRuntime {
                 return record.id
             }
             isReady = true
+            chatsOwner = owner
             try await refreshSessionsForBootstrap(owner: owner, request: request)
             try require(owner, request: request)
             isSuspended = false
@@ -969,6 +985,7 @@ final class NativeWorkspaceRuntime {
     func suspend() {
         widgetPublisher?.publishNow()
         isSuspended = true
+        chatsOwner = nil
         confirmedWidgetSessionOwner = nil
         refreshFlight.cancel()
         activeSessionsFlight.cancel()

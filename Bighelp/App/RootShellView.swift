@@ -361,9 +361,8 @@ struct RootShellView: View {
                                   settings: settings, usesDemoFixtures: usesDemoFixtures))
         .modifier(BighelpShortcutParameterUpdates(agents: agents, scheduledTasks: featureStore.scheduledTasks,
                                                   rooms: botModeRooms, catalog: sessionCatalog))
-        .onChange(of: acceptsIncomingLinks) { _, ready in
-            if ready { openPendingIncomingChatIfNeeded() }
-        }
+        .modifier(PendingLinkRetry(acceptsLinks: acceptsIncomingLinks, acceptsChatStarts: acceptsChatStarts,
+                                   retry: openPendingIncomingChatIfNeeded))
         .onChange(of: BighelpExternalSessionOpenCenter.shared.pending, initial: true) { _, open in
             if let open { openExternalSession(open) }
         }
@@ -1566,7 +1565,7 @@ struct RootShellView: View {
         // Opened while the app starts or comes back, a link found no workspace
         // ("host unavailable") or opened its chat under an alert. It waits for
         // a host that answers instead; the latest one wins.
-        if route.opensWorkspaceContent, !acceptsIncomingLinks {
+        if route.opensWorkspaceContent, !(route.startsAChat ? acceptsChatStarts : acceptsIncomingLinks) {
             pendingIncomingURL = url
             return
         }
@@ -1875,7 +1874,23 @@ struct RootShellView: View {
         return nativeRuntime.isReady && !nativeRuntime.isSuspended
     }
 
+    /// Voice, a new chat and an agent's chat need a connection that can make and open a chat, never
+    /// the chat list. Coming back from the background, the list held Start voice chat for seconds
+    /// after the computer answered (#934).
+    private var acceptsChatStarts: Bool {
+        if acceptsIncomingLinks { return true }
+        guard let hostRegistry, hostRegistry.isWorkspaceReady, hostRegistry.selectedHostID != nil,
+              let nativeRuntime, let owner = workspaceConnections?.owner else { return false }
+        return nativeRuntime.chatsOwner == owner
+    }
+
     private func openPendingIncomingChatIfNeeded() {
+        // A link that only starts a chat goes first; handling it again holds it if it came too soon.
+        if !acceptsIncomingLinks, acceptsChatStarts, let url = pendingIncomingURL,
+           BighelpIncomingURLRoute.parse(url)?.startsAChat == true {
+            pendingIncomingURL = nil
+            handleIncomingURL(url)
+        }
         guard acceptsIncomingLinks else { return }
         if let url = pendingIncomingURL {
             pendingIncomingURL = nil
@@ -2103,6 +2118,28 @@ private extension BighelpIncomingURLRoute {
         // the host before even switching tabs made these links feel broken.
         case .agent, .agents, .scheduledTasks, .scheduledTask, .sessions, .settings, .usage: false
         }
+    }
+
+    /// Routes that start or open one agent's chat, and read nothing from the chat list.
+    var startsAChat: Bool {
+        switch self {
+        case .voice, .newChat, .agentChat: true
+        default: false
+        }
+    }
+}
+
+/// A link that waited for the computer opens once the workspace can take it. Its own modifier keeps
+/// RootShellView's body small enough to type-check.
+private struct PendingLinkRetry: ViewModifier {
+    let acceptsLinks: Bool
+    let acceptsChatStarts: Bool
+    let retry: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: acceptsLinks) { _, ready in if ready { retry() } }
+            .onChange(of: acceptsChatStarts) { _, ready in if ready { retry() } }
     }
 }
 

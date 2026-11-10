@@ -112,12 +112,14 @@ struct ChatFolderBrowserView: View {
     @ViewBuilder
     private var rows: some View {
         let rows = model.rows
-        if model.root == nil, model.isLoading {
+        if model.root == nil, model.isLoading || model.rootMessage == nil {
+            // Also a first read that was cut short: the page reads again when it comes back.
             status { ProgressView() }
         } else if rows.isEmpty, model.root != nil {
             status {
-                Text(!model.search.isEmpty ? "No names match in the folders you opened."
-                     : model.hiddenCount > 0 ? "This folder has only hidden items." : "This folder is empty.")
+                Text(!model.search.isEmpty ? String(localized: "No names match in the folders you opened.")
+                     : model.hiddenCount > 0 ? String(localized: "This folder has only hidden items.")
+                     : String(localized: "This folder is empty."))
                     .font(.bighelp(.footnote))
                     .foregroundStyle(theme.secondaryText)
                     .accessibilityIdentifier("chat.files.empty")
@@ -148,8 +150,9 @@ struct ChatFolderBrowserView: View {
         Button {
             model.showsHidden.toggle()
         } label: {
-            Text(model.showsHidden ? "Hide hidden items"
-                 : model.hiddenCount == 1 ? "Show 1 hidden item" : "Show \(model.hiddenCount) hidden items")
+            Text(model.showsHidden ? String(localized: "Hide hidden items")
+                 : model.hiddenCount == 1 ? String(localized: "Show 1 hidden item")
+                 : String(localized: "Show \(model.hiddenCount) hidden items"))
                 .font(.bighelp(.footnote, weight: .semibold))
                 .foregroundStyle(theme.secondaryText)
                 .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget, alignment: .leading)

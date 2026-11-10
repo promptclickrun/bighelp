@@ -128,6 +128,17 @@ struct ChatFolderBrowserTests {
         #expect(model.isAtWorkingFolder)
     }
 
+    /// A session's folder can be gone (a removed worktree): Files opens home instead of nothing.
+    @Test func aWorkingFolderThatIsGoneOpensHome() async {
+        let access = Counting()
+        access.working = "/Users/demo/Projects/removed-worktree"
+        let model = ChatFolderBrowserModel(access: access)
+        await model.start()
+        #expect(model.root == "/Users/demo" && model.rootMessage == nil)
+        #expect(model.isAtWorkingFolder)
+        #expect(names(model) == ["Documents", "Projects"])
+    }
+
     @Test func hermesListingIsReadLeniently() throws {
         let entries = try LiveHostFolders.entries(.object(["entries": .array([
             .object(["name": .string("b.txt"), "path": .string("/w/b.txt"), "isDirectory": .boolean(false),

@@ -24,7 +24,8 @@ struct HostFolderEntry: Identifiable, Hashable, Sendable {
 
 /// A picture on the Hermes computer, read whole to show in a chat's Files.
 enum HostPictureFile {
-    /// Hermes sends a picture as a base64 data URL. This allows one of about 9 MB.
+    /// Hermes sends a picture as a base64 data URL, a third bigger than the picture. This allows
+    /// a picture of about 8 MB; a bigger one says it can't show here.
     static let maximumResponseBytes = 12 * 1_024 * 1_024
 
     /// The bytes inside a `data:<type>;base64,<bytes>` URL.
@@ -193,6 +194,11 @@ final class ChatFolderBrowserModel {
         let folder = await access.workingFolder()
         workingFolder = folder
         await open(folder)
+        // The session's folder can be gone (a removed worktree): home is always there.
+        if root == nil, rootMessage != nil, folder != "~" {
+            workingFolder = "~"
+            await open("~")
+        }
     }
 
     func openWorkingFolder() async {
@@ -260,15 +266,15 @@ final class ChatFolderBrowserModel {
         loading.insert(entry.path)
         folderMessages[entry.path] = nil
         let current = request
-        defer { loading.remove(entry.path) }
+        // Another folder may go on show while this one is read: then its tree is not this one's to touch.
+        defer { if current == request { loading.remove(entry.path) } }
         do {
             let entries = try await access.list(entry.path)
-            // Another folder went on show while this one was read.
             guard current == request else { return }
             children[entry.path] = entries
             revision += 1
         } catch is CancellationError {
-            expanded.remove(entry.path)
+            if current == request { expanded.remove(entry.path) }
         } catch {
             guard current == request else { return }
             folderMessages[entry.path] = Self.message(for: error)

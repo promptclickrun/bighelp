@@ -21,8 +21,9 @@ extension ChatReasoningMessage {
     /// The end of the thinking so far, which is what's new: from a line's start when one is
     /// near, else a word's, so it never opens in the middle of either.
     static func newestWords(of text: String) -> String {
-        guard text.count > liveExcerptLength else { return text }
+        // From the end, so a long thought costs the same on every new word.
         let tail = text.suffix(liveExcerptLength)
+        guard tail.startIndex != text.startIndex else { return text }
         let half = tail.index(tail.startIndex, offsetBy: liveExcerptLength / 2)
         let start = tail[..<half].firstIndex(where: \.isNewline)
             ?? tail.firstIndex(where: \.isWhitespace) ?? tail.startIndex
@@ -65,13 +66,13 @@ struct ChatReasoningMessageView: View {
         let text = message.text
         let showsWords = text != nil && isExpanded
         // Show more's own touch height already spaces it from the outline.
-        let endsWithButton = text.map { showsAll || isLong($0) } == true
+        let hasMore = showsWords && text.map { showsAll || isLong($0) } == true
         VStack(alignment: .leading, spacing: 0) {
             heading(opens: text != nil)
-            if let text, showsWords { words(text) }
+            if let text, showsWords { words(text, hasMore: hasMore) }
         }
         .padding(.horizontal, showsWords ? BighelpTokens.space12 : BighelpTokens.space4)
-        .padding(.bottom, showsWords ? (endsWithButton ? BighelpTokens.space4 : BighelpTokens.space12) : 0)
+        .padding(.bottom, showsWords ? (hasMore ? BighelpTokens.space4 : BighelpTokens.space12) : 0)
         .overlay {
             if showsWords {
                 RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous)
@@ -133,7 +134,7 @@ struct ChatReasoningMessageView: View {
     }
 
     @ViewBuilder
-    private func words(_ text: String) -> some View {
+    private func words(_ text: String, hasMore: Bool) -> some View {
         // While it thinks, the newest words are the news; Show more brings all of them.
         let shown = message.isRunning && !showsAll ? ChatReasoningMessage.newestWords(of: text) : text
         Text(BighelpActivitySummary.note(shown))
@@ -145,8 +146,8 @@ struct ChatReasoningMessageView: View {
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityIdentifier("chat.\(message.id).words")
-        if showsAll || isLong(text) {
-            Button(showsAll ? "Show less" : "Show more") {
+        if hasMore {
+            Button(showsAll ? String(localized: "Show less") : String(localized: "Show more")) {
                 onDisclosureChange()
                 let next = !showsAll
                 if let disclosures { disclosures.setWorkExpanded(next, id: showsAllID) } else { localShowsAll = next }
@@ -163,7 +164,8 @@ struct ChatReasoningMessageView: View {
     /// More than the folded lines hold, by the same estimate the timeline sizes rows with.
     private func isLong(_ text: String) -> Bool {
         let columns: CGFloat = horizontalSizeClass == .regular ? 80 : 40
-        return text.count > ChatReasoningMessage.liveExcerptLength
+        // The byte count is free; only a short text is worth walking.
+        return text.utf8.count > ChatReasoningMessage.liveExcerptLength
             || ChatCanvasTranscriptProjection.wrappedLineCount(text, columns: columns)
                 > CGFloat(ChatReasoningMessage.foldedLineCount)
     }

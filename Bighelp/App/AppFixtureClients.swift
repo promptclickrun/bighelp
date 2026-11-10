@@ -198,7 +198,13 @@ final class DemoSessionControlMessaging: SessionRuntimeControlConfirming, Sessio
 }
 
 @MainActor
-final class DemoAgentDirectoryClient: AgentDirectoryClient, AgentListPlacementWriting {
+final class DemoAgentDirectoryClient: AgentDirectoryClient, AgentListPlacementWriting, AgentDirectoryDeleting {
+    func delete(profileID: String) async throws {
+        var profiles = try repository.load()
+        profiles.removeAll { $0.id == profileID }
+        try repository.save(profiles)
+    }
+
     func setPlacement(_ placement: AgentListPlacement, profileID: String) async throws {
         var profiles = try repository.load()
         guard let index = profiles.firstIndex(where: { $0.id == profileID }) else {

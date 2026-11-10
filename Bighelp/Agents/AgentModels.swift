@@ -173,6 +173,13 @@ protocol AgentDirectoryClient {
     func petSheet(_ pet: PetdexPet) async throws -> Data
 }
 
+/// An agent list that removes an agent itself: the demo's. A real computer deletes an agent
+/// through Hermes' profile lifecycle (`NativeWorkspaceLifecycleCoordinator.deleteAgent`).
+@MainActor
+protocol AgentDirectoryDeleting {
+    func delete(profileID: String) async throws
+}
+
 extension AgentDirectoryClient {
     func resetForAccountBoundary() {}
     func petGallery() async throws -> [PetdexPet] { throw PetdexError.unsupported }

@@ -907,6 +907,7 @@
 		70B5BD8457E458400211F63D /* BighelpVoiceSessionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00DF0766AB2AE7BC5A0FD831 /* BighelpVoiceSessionClient.swift */; };
 		70D0995374462B4034B9D7B2 /* VisionReadabilityUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42F14F3ADF32EDBDB727499F /* VisionReadabilityUITests.swift */; };
 		70E1B64353DF6CE7F82E9FB6 /* LandingScreenUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 130FF53809B8390E95869DC2 /* LandingScreenUITests.swift */; };
+		710DB29162247B6F99F4308C /* DirectHermesContextBreakdownTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FBA20053C60D44A1CEB6548 /* DirectHermesContextBreakdownTests.swift */; };
 		7129683E2C3177283098D05A /* KanbanSpatialDrag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58DFB0DDBF1AAC78CB27C0B4 /* KanbanSpatialDrag.swift */; };
 		719EC59E1F93DDA181DDA543 /* BighelpNotificationFailureCodeRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C3E8C5DDDF1A1E017CD806F /* BighelpNotificationFailureCodeRow.swift */; };
 		71AC61DE998FB7401AC4BB87 /* CoreFilesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EAE7EEEA88381EBA1C8AFAB /* CoreFilesTests.swift */; };
@@ -1092,6 +1093,7 @@
 		866A3D87C3251AB40763D685 /* AllHostsHostUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 183FAAC3B2B524A603A53FB5 /* AllHostsHostUITests.swift */; };
 		866AFD99DE5B38B15F18B704 /* GenerativeUIFormWireModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E4C7708B565263D5891089A /* GenerativeUIFormWireModels.swift */; };
 		866E2720BD255D07B22ECF2F /* WorkspaceManagementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4444FC61A3E484D6C1F188 /* WorkspaceManagementTests.swift */; };
+		86828616C0652504329CA63E /* AgentDeletionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD268648AC84425AD755C76C /* AgentDeletionUITests.swift */; };
 		86ED398D440A6A5D23CAD0B9 /* UsageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D04DCAF7F90EF8190BB0B2A2 /* UsageStore.swift */; };
 		879E33489356FF40A206B326 /* CapabilitiesManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12D93519128F8E3A35F264D0 /* CapabilitiesManagementView.swift */; };
 		879F26B5861D37C7F19A5099 /* SubagentCanvasTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9853597BF6721C1FFA38C43 /* SubagentCanvasTests.swift */; };
@@ -1717,6 +1719,7 @@
 		D298D910DEC65761AE8B3AF0 /* BighelpAppearanceChoices.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2C274F8CDDC43A089AC6DB9 /* BighelpAppearanceChoices.swift */; };
 		D2B7B05A842B3CECA43F14C0 /* CredentialVaultTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F74C06EE0964D1605B304CC8 /* CredentialVaultTests.swift */; };
 		D2C62A26D889E650BD2ECBE4 /* LiveVoiceFailureRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 930BE7C3699C14551E96C567 /* LiveVoiceFailureRecoveryTests.swift */; };
+		D2D71C234C96117943F2D469 /* AgentDeletionRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 714E3361C218749FF650354B /* AgentDeletionRecoveryTests.swift */; };
 		D2E25B9FBDB0B6256712C8F8 /* ChatToolDetailStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88A2C123996D7D03A29F3318 /* ChatToolDetailStyle.swift */; };
 		D31E9FE7924F1E0019E0E2B0 /* AgentTodayDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7854C8ABE2067EF6C0779F70 /* AgentTodayDetail.swift */; };
 		D32ACAE26E7CC87E58A3F314 /* BighelpSkeleton.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB83B642C9FCC3341B0169D4 /* BighelpSkeleton.swift */; };
@@ -3112,6 +3115,7 @@
 		70A4F50A300E3A75FFA38290 /* DeviceAccessCardUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceAccessCardUITests.swift; sourceTree = "<group>"; };
 		70F41C7DEF199504BEC6D9A4 /* VisionFirstRunConsentUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionFirstRunConsentUITests.swift; sourceTree = "<group>"; };
 		70FA79D8173E1F90C3B949A5 /* UsageLimitsComputers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageLimitsComputers.swift; sourceTree = "<group>"; };
+		714E3361C218749FF650354B /* AgentDeletionRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentDeletionRecoveryTests.swift; sourceTree = "<group>"; };
 		715C40661A639E5F3DD91B31 /* AgentVoiceChoices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentVoiceChoices.swift; sourceTree = "<group>"; };
 		717F9482B56B0893621311C6 /* BighelpBrand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpBrand.swift; sourceTree = "<group>"; };
 		718F4BBB915B1955A6CE39AF /* VoicePresentationContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoicePresentationContainer.swift; sourceTree = "<group>"; };
@@ -3505,6 +3509,7 @@
 		9EFF30AB0E3CE7D1E90D7DFD /* BighelpPluginUpdateClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpPluginUpdateClient.swift; sourceTree = "<group>"; };
 		9F37A3435A5BA30BBD8998B0 /* ComposioAppsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposioAppsTests.swift; sourceTree = "<group>"; };
 		9F825A925559FC87FEB69271 /* HTMLAppsHostUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLAppsHostUITests.swift; sourceTree = "<group>"; };
+		9FBA20053C60D44A1CEB6548 /* DirectHermesContextBreakdownTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesContextBreakdownTests.swift; sourceTree = "<group>"; };
 		A0003AA20865E5C603817C0C /* ScheduledTasksStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledTasksStoreTests.swift; sourceTree = "<group>"; };
 		A004480D232CF549915BBCB7 /* DirectHermesVoiceMediaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesVoiceMediaTests.swift; sourceTree = "<group>"; };
 		A01085590690393D7B1FF73F /* UsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageView.swift; sourceTree = "<group>"; };
@@ -3984,6 +3989,7 @@
 		DCBD2E0BB6F99B59C52C7F0D /* ComputerScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComputerScreen.swift; sourceTree = "<group>"; };
 		DCDD1E43E08DF3D62FA823F8 /* traversal.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = traversal.zip; sourceTree = "<group>"; };
 		DD20CC0928EC99781BB8C9E2 /* GitHubConnectionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubConnectionStore.swift; sourceTree = "<group>"; };
+		DD268648AC84425AD755C76C /* AgentDeletionUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentDeletionUITests.swift; sourceTree = "<group>"; };
 		DD3AB6858B9FA111E6A2DC37 /* BighelpCardTemplateStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpCardTemplateStore.swift; sourceTree = "<group>"; };
 		DD8825F6F0864661B1721671 /* BighelpCardMapSnapshots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpCardMapSnapshots.swift; sourceTree = "<group>"; };
 		DDD30D26F79A0E05511ADF5A /* BighelpCardEnvelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpCardEnvelope.swift; sourceTree = "<group>"; };
@@ -5453,6 +5459,7 @@
 				DC5B91C5A272DC8DA6E437DE /* AgentBoardTests.swift */,
 				BE52D2EAC2696C43D3604E89 /* AgentCompanionAvatarTests.swift */,
 				F7BD55E8AB53686D7E461DCC /* AgentDefaultsClientBehaviorTests.swift */,
+				714E3361C218749FF650354B /* AgentDeletionRecoveryTests.swift */,
 				61CF8425B2257FC6AF3EF723 /* AgentDirectoryStoreTests.swift */,
 				A3E97CB7C5A90AB58A055674 /* AgentDriveTests.swift */,
 				C820C988D3FE3D2A125EA670 /* AgentDuplicateModelTests.swift */,
@@ -5670,6 +5677,7 @@
 				541C1936295439780A54F92C /* DirectHermesCatalogListConcurrencyTests.swift */,
 				C2DF42FA63155EFDF4DFC2E1 /* DirectHermesCatalogListScaleTests.swift */,
 				9DAFE6F3BD557D5146BDC5F4 /* DirectHermesConditionalOwnershipTests.swift */,
+				9FBA20053C60D44A1CEB6548 /* DirectHermesContextBreakdownTests.swift */,
 				2B10DEC8B562E19003B75CF1 /* DirectHermesConversationTests.swift */,
 				392D42FE59349A7C53F56B62 /* DirectHermesDashboardDataSourceTests.swift */,
 				E0042C72BAF1336AB1578750 /* DirectHermesEndpointTests.swift */,
@@ -6038,6 +6046,7 @@
 			isa = PBXGroup;
 			children = (
 				C216615614428B4C59CE9A0C /* AgentAppearanceUITests.swift */,
+				DD268648AC84425AD755C76C /* AgentDeletionUITests.swift */,
 				2E871FD3BCF7788448CADCFA /* AgentDriveUITests.swift */,
 				52FF8BDE2009ECF11CD36CD3 /* AgentFilesUITests.swift */,
 				2DA1AB00CBFD4C4778E695C2 /* AgentOpenRealHostUITests.swift */,
@@ -9157,6 +9166,7 @@
 				B9A9975B875DC065472E8F68 /* AgentBoardTests.swift in Sources */,
 				424685DD6558A079DBF15041 /* AgentCompanionAvatarTests.swift in Sources */,
 				1891CD972C2089AA32A6E909 /* AgentDefaultsClientBehaviorTests.swift in Sources */,
+				D2D71C234C96117943F2D469 /* AgentDeletionRecoveryTests.swift in Sources */,
 				7A09D8A9BC85A10B3643B0D8 /* AgentDirectoryStoreTests.swift in Sources */,
 				23CD8E3911F54E1B02F06DD9 /* AgentDriveTests.swift in Sources */,
 				86488E882EBF9207D86677FF /* AgentDuplicateModelTests.swift in Sources */,
@@ -9373,6 +9383,7 @@
 				55DB922548B977820F373FFD /* DirectHermesCatalogListConcurrencyTests.swift in Sources */,
 				A2B49C82086A465040181B7F /* DirectHermesCatalogListScaleTests.swift in Sources */,
 				6F8A35FECC89173E916B5899 /* DirectHermesConditionalOwnershipTests.swift in Sources */,
+				710DB29162247B6F99F4308C /* DirectHermesContextBreakdownTests.swift in Sources */,
 				478ACCE672B8A0E2E29C7C62 /* DirectHermesConversationTests.swift in Sources */,
 				0593399801553A76FE279FDC /* DirectHermesDashboardDataSourceTests.swift in Sources */,
 				01C35068F36A28908A363564 /* DirectHermesEndpointTests.swift in Sources */,
@@ -9645,6 +9656,7 @@
 			files = (
 				819BF2446A7EAD503D22B283 /* AIDataConsentGateUITests.swift in Sources */,
 				706C3E1DB960EA624CC55242 /* AgentAppearanceUITests.swift in Sources */,
+				86828616C0652504329CA63E /* AgentDeletionUITests.swift in Sources */,
 				26B7B2AAD3AA95DE5A380187 /* AgentDriveUITests.swift in Sources */,
 				318652A995356C5CD2CB24C9 /* AgentFilesUITests.swift in Sources */,
 				E9DC964BFA209B91F0642406 /* AgentOpenRealHostUITests.swift in Sources */,

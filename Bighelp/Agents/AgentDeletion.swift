@@ -11,6 +11,63 @@ extension EnvironmentValues {
     @Entry var agentDeletion: AgentDeletionAction? = nil
 }
 
+/// What to do when Delete Agent ends in an error that doesn't say whether Hermes deleted the agent.
+/// Hermes stops an agent's own processes before it removes it, which takes up to ten seconds and
+/// can drop the app's connection. The answer is then lost, or the app's own follow-up steps find a
+/// new connection and stop ("The selected host or connection changed"), while the agent is gone
+/// on the computer. The agent list on the connection there is now says what happened.
+enum AgentDeletionRecovery {
+    /// The request may have reached Hermes: a connection that changed or dropped, or an answer
+    /// that never came. A refusal (the agent is in a group chat, it's the default) is not one.
+    static func leavesOutcomeOpen(_ error: any Error) -> Bool {
+        switch error {
+        case HermesProfileLifecycleError.ownerChanged, HermesProfileLifecycleError.outcomeUnknown,
+             HermesProfileLifecycleError.reviewChanged,
+             NativeWorkspaceLifecycleError.ownerChanged, NativeWorkspaceLifecycleError.sharedStateMismatch,
+             WorkspaceClientError.ownerChanged, WorkspaceClientError.outcomeUnknown,
+             DirectHermesError.notConnected, DirectHermesError.connectionFailed,
+             DirectHermesError.disconnected, DirectHermesError.timedOut:
+            true
+        case WorkspaceClientError.unavailable(.notConnected):
+            true
+        default:
+            false
+        }
+    }
+
+    /// The computer the agent was on, as the app sees it now.
+    struct Host {
+        /// Still the computer and sign-in the deletion was sent to.
+        var isSameComputer: @MainActor () -> Bool
+        /// Connected, with its workspace ready to be read.
+        var isReady: @MainActor () -> Bool
+        /// Reads the agent list again from the computer; throws when it can't.
+        var reloadAgents: @MainActor () async throws -> Void
+        var hasAgent: @MainActor () -> Bool
+    }
+
+    /// True once the computer's own agent list no longer has the agent. False when it still has
+    /// it, when another computer is in use, or when the computer didn't come back in `timeout`.
+    @MainActor static func confirmsDeleted(
+        _ host: Host, timeout: Duration = .seconds(20), step: Duration = .milliseconds(250)
+    ) async -> Bool {
+        let deadline = ContinuousClock.now + timeout
+        while host.isSameComputer() {
+            if host.isReady(), (try? await host.reloadAgents()) != nil {
+                return host.isSameComputer() && !host.hasAgent()
+            }
+            guard ContinuousClock.now < deadline, (try? await Task.sleep(for: step)) != nil else { return false }
+        }
+        return false
+    }
+}
+
+/// The deleted agent's chats, noted while the deletion runs so their screens can close after it.
+@MainActor
+final class AgentDeletionRetiredChats {
+    var ids = Set<String>()
+}
+
 enum AgentDeletionPresentation {
     /// Hermes never deletes its default profile.
     static func canDelete(_ agent: AgentProfile) -> Bool {

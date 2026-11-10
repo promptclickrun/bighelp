@@ -104,4 +104,76 @@ final class ChatContextWindowUITests: BighelpUITestCase {
         try? shot.pngRepresentation.write(
             to: URL(fileURLWithPath: folder).appendingPathComponent("chat-context-window-\(name).png"))
     }
+
+    /// The Context page on a real Hermes host (a probe file naming an open host, and
+    /// BIGHELP_BOT_CHAT_AGENT, an agent of its own on a model cleared for tests). A live chat's
+    /// answer carries parts the demo's doesn't (Hermes 0.23 adds `context_files`), which the page
+    /// once refused as "Context didn't load". Sends one short message in that agent's chat, and only
+    /// when its model has the word in BIGHELP_HOST_MODEL_WORD. Skipped without the probe.
+    @MainActor
+    func testContextPageLoadsOnARealHost() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let probePath = environment["BIGHELP_SIGNIN_PROBE"], let agent = environment["BIGHELP_BOT_CHAT_AGENT"] else {
+            throw XCTSkip("Needs BIGHELP_SIGNIN_PROBE and BIGHELP_BOT_CHAT_AGENT")
+        }
+        let probe = try JSONDecoder().decode([String: String].self,
+                                             from: Data(contentsOf: URL(fileURLWithPath: probePath)))
+        let app = makeApp()
+        app.launch()
+        try onboardOpenHost(app, address: try XCTUnwrap(probe["address"]))
+        openRootTab("tab.agents", in: app)
+        let row = app.buttons["agent.\(agent)"].firstMatch
+        if !row.waitForExistence(timeout: 20) {
+            let search = app.descendants(matching: .any).matching(identifier: "agents.search").firstMatch
+            XCTAssertTrue(search.waitForExistence(timeout: 10))
+            search.tap()
+            app.typeText(agent + "\n")
+        }
+        XCTAssertTrue(row.waitForExistence(timeout: 30), "agent.\(agent) on Agents")
+        row.tap()
+        let composer = app.textViews["chat.composer.text"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 45), "Its chat opens")
+
+        // Only a model cleared for tests gets a message.
+        let chip = app.buttons["chat.composer.model"].firstMatch
+        XCTAssertTrue(chip.waitForExistence(timeout: 20))
+        // The chip's value names the model ("GPT 6 Luna, Medium").
+        let model = chip.value as? String ?? ""
+        guard let wanted = environment["BIGHELP_HOST_MODEL_WORD"]?.lowercased(), model.lowercased().contains(wanted) else {
+            throw XCTSkip("The chat's model is \"\(model)\"; set BIGHELP_HOST_MODEL_WORD to a word of the model to use")
+        }
+        composer.tap()
+        composer.typeText("Reply with only the word plum in capital letters.")
+        let send = app.buttons["chat.send"]
+        let ready = Date().addingTimeInterval(30)
+        while !send.isEnabled, Date() < ready { Thread.sleep(forTimeInterval: 0.3) }
+        // The chat may hold an earlier run's answer: wait for one more.
+        let replies = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "PLUM"))
+        let before = replies.count
+        send.tap()
+        let answered = Date().addingTimeInterval(120)
+        while replies.count <= before, Date() < answered { Thread.sleep(forTimeInterval: 1) }
+        XCTAssertGreaterThan(replies.count, before, "The agent answers")
+
+        // The turn's usage arrives as it ends, a moment after its words.
+        let context = app.descendants(matching: .any)["chat.model-settings.context"].firstMatch
+        for attempt in 0..<4 where !context.exists {
+            Thread.sleep(forTimeInterval: 6)
+            chip.tap()
+            if context.waitForExistence(timeout: 10) { break }
+            evidence("host-model-settings-try-\(attempt)")
+            let done = app.buttons["chat.model-settings.done"].firstMatch
+            if done.exists { done.tap() }
+        }
+        XCTAssertTrue(context.exists, "Model settings has the context window after a turn")
+        context.tap()
+        let page = app.descendants(matching: .any)["chat.session-context-breakdown"].firstMatch
+        let failed = app.staticTexts["Context didn't load"]
+        let deadline = Date().addingTimeInterval(30)
+        while !page.exists, !failed.exists, Date() < deadline { Thread.sleep(forTimeInterval: 0.5) }
+        evidence("host-context-page")
+        XCTAssertFalse(failed.exists, "The Context page must read a live chat's answer")
+        XCTAssertTrue(page.exists, "The Context page shows the chat's context")
+        app.terminate()
+    }
 }

@@ -378,21 +378,24 @@ private struct ChatContextPage: View {
     let load: @MainActor () async throws -> DirectHermesContextBreakdown
     let onDone: () -> Void
     @State private var breakdown: DirectHermesContextBreakdown?
-    @State private var didFail = false
+    /// Why the page didn't load, in plain words. An answer the app can't read is not a computer
+    /// that didn't answer, and saying so sent people to check a connection that was fine (#947).
+    @State private var failure: String?
     @State private var attempt = 0
 
     var body: some View {
         Group {
             if let breakdown {
                 SessionContextBreakdownView(breakdown: breakdown)
-            } else if didFail {
+            } else if let failure {
                 ContentUnavailableView {
                     Label("Context didn't load", systemImage: "exclamationmark.triangle")
                 } description: {
-                    Text("Your computer didn't answer. Try again.")
+                    Text(failure)
+                        .accessibilityIdentifier("chat.model-settings.context.failure")
                 } actions: {
                     Button("Try Again") {
-                        didFail = false
+                        self.failure = nil
                         attempt += 1
                     }
                     .accessibilityIdentifier("chat.model-settings.context.retry")
@@ -409,8 +412,10 @@ private struct ChatContextPage: View {
             do {
                 breakdown = try await load()
             } catch is CancellationError {
+            } catch DirectHermesError.invalidResponse {
+                failure = String(localized: "Your computer answered in a way this version of bighelp can't read. Update bighelp, then try again.")
             } catch {
-                didFail = true
+                failure = String(localized: "Your computer didn't answer. Try again.")
             }
         }
     }

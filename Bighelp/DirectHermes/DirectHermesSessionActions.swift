@@ -50,6 +50,40 @@ struct DirectHermesContextBreakdown: Equatable, Sendable {
     let model: String
 }
 
+extension DirectHermesContextBreakdown {
+    /// The most rows the Context page lists.
+    static let maximumCategories = 256
+
+    /// Hermes' `session.context_breakdown` answer, read leniently: Hermes adds to it over time
+    /// (0.23 sends `context_files` for a live chat, and the page refused the whole answer as
+    /// "Context didn't load", #947). A part the app doesn't know is left alone, a row it can't
+    /// read hides only itself, and a missing total is worked out from what is there.
+    init(hermes value: BighelpJSONValue) throws {
+        guard let object = value.object else { throw DirectHermesError.invalidResponse }
+        func count(_ key: String, in row: [String: BighelpJSONValue]) -> Int? {
+            guard let value = row[key]?.integer, value >= 0 else { return nil }
+            return value
+        }
+        let categories = (object["categories"]?.array ?? []).prefix(Self.maximumCategories)
+            .compactMap { value -> Category? in
+                guard let row = value.object, let id = row["id"]?.string, !id.isEmpty,
+                      let tokens = count("tokens", in: row) else { return nil }
+                return Category(id: id, label: row["label"]?.string ?? id, tokens: tokens,
+                                color: row["color"]?.string ?? "")
+            }
+        let maximum = count("context_max", in: object) ?? 0
+        let used = count("context_used", in: object) ?? 0
+        self.init(categories: categories, contextMax: maximum,
+                  contextPercent: count("context_percent", in: object)
+                      ?? (maximum > 0 ? min(100, Int((Double(used) / Double(maximum) * 100).rounded())) : 0),
+                  contextUsed: used,
+                  estimatedTotal: count("estimated_total", in: object) ?? categories.reduce(0) { $0 + $1.tokens },
+                  contextEstimated: object["context_estimated"]?.boolean ?? false,
+                  contextSource: object["context_source"]?.string ?? "",
+                  model: object["model"]?.string ?? "")
+    }
+}
+
 struct DirectHermesSessionHistory: Equatable, Sendable {
     let count: Int
     let messages: [BighelpJSONValue]
@@ -909,27 +943,7 @@ final class DirectHermesSessionActions {
     }
 
     private static func decodeContextBreakdown(_ value: BighelpJSONValue) throws -> DirectHermesContextBreakdown {
-        let object = try object(value)
-        let keys: Set<String> = ["categories", "context_max", "context_percent", "context_used",
-            "estimated_total", "context_estimated", "context_source", "model"]
-        guard Set(object.keys) == keys, let values = object["categories"]?.array,
-              values.count <= 256, let estimated = object["context_estimated"]?.boolean,
-              let source = object["context_source"]?.string,
-              let model = object["model"]?.string else { throw DirectHermesError.invalidResponse }
-        let categories = try values.map { value -> DirectHermesContextBreakdown.Category in
-            guard let row = value.object, Set(row.keys) == ["color", "id", "label", "tokens"],
-                  let id = row["id"]?.string,
-                  let label = row["label"]?.string,
-                  let color = row["color"]?.string else { throw DirectHermesError.invalidResponse }
-            return .init(id: id, label: label,
-                tokens: try requiredNonnegativeInteger("tokens", in: row), color: color)
-        }
-        return DirectHermesContextBreakdown(categories: categories,
-            contextMax: try requiredNonnegativeInteger("context_max", in: object),
-            contextPercent: try requiredNonnegativeInteger("context_percent", in: object),
-            contextUsed: try requiredNonnegativeInteger("context_used", in: object),
-            estimatedTotal: try requiredNonnegativeInteger("estimated_total", in: object),
-            contextEstimated: estimated, contextSource: source, model: model)
+        try DirectHermesContextBreakdown(hermes: value)
     }
 
     private static func decodeControlSnapshot(_ object: [String: BighelpJSONValue]) throws -> DirectHermesSessionControlSnapshot {

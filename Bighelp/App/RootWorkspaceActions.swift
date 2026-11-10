@@ -335,20 +335,33 @@ extension RootShellView {
     }
 
     var agentDeletionAction: AgentDeletionAction? {
+        if usesWorkspaceFixtures, nativeRuntime == nil {
+            // The demo has no computer: the agent leaves its own list, and its screens close the same way.
+            return AgentDeletionAction { profileID in
+                guard try await agents.deleteFromOwnList(profileID: profileID) else {
+                    throw WorkspaceClientError.unavailable(.notConnected)
+                }
+                closeScreens(ofDeletedAgent: profileID, chats: [])
+            }
+        }
         guard nativeRuntime != nil, workspaceConnections != nil, currentWorkspaceOwner != nil else { return nil }
         return AgentDeletionAction { profileID in try await deleteAgentProfile(profileID) }
     }
 
+    /// Deletes the agent on the computer, then takes the person back to where they were before
+    /// its screens: its editor closes, and its profile and chats leave the navigation (#949).
     func deleteAgentProfile(_ profileID: String) async throws {
         guard let connections = workspaceConnections, let owner = currentWorkspaceOwner,
               connections.owner == owner, let runtime = nativeRuntime else {
             throw WorkspaceClientError.unavailable(.notConnected)
         }
+        let retired = AgentDeletionRetiredChats()
         let coordinator = try NativeWorkspaceLifecycleCoordinator(
             owner: owner, connections: connections, catalog: sessionCatalog, agents: agents, bridge: runtime.bridge,
             adoptedSession: { _ in throw CancellationError() },
             retiredProfile: { _, retiredSessionIDs in
                 guard currentWorkspaceOwner == owner else { throw WorkspaceClientError.ownerChanged }
+                retired.ids.formUnion(retiredSessionIDs)
                 if let active = appState.activeConversationID, retiredSessionIDs.contains(active) {
                     sessionRestoreTask?.cancel()
                     sessionRestoreTask = nil
@@ -369,7 +382,36 @@ extension RootShellView {
                     appState.openSessions()
                 }
             })
-        try await coordinator.deleteAgent(profileID: profileID)
+        do {
+            try await coordinator.deleteAgent(profileID: profileID)
+        } catch let error where AgentDeletionRecovery.leavesOutcomeOpen(error) {
+            // Hermes takes up to ten seconds to stop an agent before it removes it, and the
+            // connection can change in that time. The agent list there is now says what happened.
+            let signIn = owner.signIn
+            let deleted = await AgentDeletionRecovery.confirmsDeleted(.init(
+                isSameComputer: { currentWorkspaceOwner?.signIn == signIn },
+                isReady: { nativeRuntime.map { $0.isReady && !$0.isSuspended && !$0.isRefreshing } ?? false },
+                reloadAgents: { try await agents.reloadAfterProfileLifecycleChange() },
+                hasAgent: { agents.profiles.contains { $0.id.utf8.elementsEqual(profileID.utf8) } }))
+            guard deleted else { throw error }
+            agents.removeProfilePreferences(profileID: profileID)
+            nativeRuntime?.bridge.invalidateCatalogAfterProfileChange()
+        }
+        closeScreens(ofDeletedAgent: profileID, chats: retired.ids)
+    }
+
+    /// The deleted agent's editor, profile and chats leave the screen, so the person lands where
+    /// they were before them (Bots mode's home, the Agents list) instead of on a page for an agent
+    /// that isn't there.
+    func closeScreens(ofDeletedAgent profileID: String, chats: Set<String>) {
+        if workspaceProfileEditor?.editingAgentID == profileID { workspaceProfileEditor = nil }
+        appState.path.removeAll { route in
+            switch route {
+            case .simpleBotProfile(let agentID, _): agentID == profileID
+            case .chat(let conversationID): chats.contains(conversationID)
+            default: false
+            }
+        }
     }
 
     func openLifecycleDestination(_ destination: WorkspaceDestination, reattaching: Bool) -> Bool {

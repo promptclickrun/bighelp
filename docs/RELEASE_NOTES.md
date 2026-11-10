@@ -14,7 +14,7 @@ short sentences, one instruction in each step, and the active voice.
 
 ### Changed
 
-- **Smoother chats:** a long answer no longer makes the chat slow while it arrives. The app now does the same small quantity of work for each new piece of an answer, also in a long chat.
+- **Smoother chats:** a long answer no longer makes the chat slow while it arrives or immediately after it arrives. The app now does the same small quantity of work for each new piece of an answer, also in a long chat and when the computer has many chats.
 - **Names:** "Model & reasoning" is now "Model settings", and a chat shows "Thinking" where it showed "Reasoning".
 
 ## 2.6.78

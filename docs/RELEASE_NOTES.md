@@ -3,6 +3,27 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.80
+
+### New
+
+- **Files on your computer:** in a chat, tap ••• and choose Files. The page shows the folder where the chat works on your computer. Tap a folder to open it. Tap a text file or a picture to see it. To see a different folder, type its path at the top. Search finds names in the folders that you opened.
+- **Reasoning as its own message:** the reasoning of an agent now shows as one outlined message above its work. It says "Reasoning…" while the agent thinks, then "Thought for 12s". To put reasoning back between the steps, go to Settings › Chat › Reasoning shows. To close finished reasoning to one line, turn off Keep reasoning open.
+- **Drawing:** in a chat, tap + and choose Drawing. Draw with your finger or Apple Pencil, then tap Add. The drawing goes into your message as a picture. Drawing is on iPhone and iPad.
+- **Context window in Model settings:** below the Thinking control, a bar shows how full the context window of the chat is.
+
+### Changed
+
+- **Tool calls:** an open tool call is now one block. The request is at the top and the answer is below it. Copy and Show raw are below the block.
+- **Finished turns:** a finished turn now says what the agent did, for example "Read 2 files, ran tests". The time and the number of steps are on a small line below it.
+- **The + menu is shorter:** it has Camera, Scan Document, Photo Library, Files and Drawing.
+- **New Bot Chat:** the empty chat shows immediately. The old chat goes away with the look that you selected for the Thinking control.
+
+### Fixed
+
+- **Ask an agent from Shortcuts:** when bighelp is closed, the shortcut sends your message sooner.
+- **Voice from a shortcut or CarPlay:** a voice chat that you start while bighelp is closed now opens. Before, it showed "This chat is still opening" or said that live voice was unavailable.
+
 ## 2.6.79
 
 ### New

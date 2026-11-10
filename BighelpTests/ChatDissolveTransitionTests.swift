@@ -1,3 +1,4 @@
+import SwiftUI
 import Testing
 import UIKit
 @testable import Bighelp
@@ -21,6 +22,7 @@ struct ChatDissolveTransitionTests {
         #expect(overlay.accessibilityElementsHidden)
         #expect(overlay.subviews.count <= ChatDissolveTransition.maximumBands,
                 "Work stays bounded even with a huge scroll extent")
+        #expect(transition.band == nil, "No look was handed over, so the lines go by themselves")
         #expect(scroll.contentOffset == offset)
         #expect(scroll.contentSize == contentSize)
         #expect(content.superview === scroll, "The live transcript was not replaced or split")
@@ -53,6 +55,33 @@ struct ChatDissolveTransitionTests {
         transition.register(conversationID: "new", scrollView: { nil })
         transition.present(nextID: "next", replacing: "new", reduceMotion: false)
         #expect(transition.overlay == nil)
+    }
+
+    /// The picked Thinking look's track rides on top of the lines, from the bottom of the chat up.
+    @Test func thePickedLookRisesThroughTheChat() async throws {
+        let (window, scroll) = try await mountedChat(lines: [500, 900])
+        defer { window.isHidden = true }
+        let transition = ChatDissolveTransition()
+        transition.register(conversationID: "old",
+                            look: { AnyView(ChatDissolveLookBand(look: .inkBloom, accent: .orange)) },
+                            scrollView: { scroll })
+        transition.present(nextID: "new", replacing: "old", reduceMotion: false)
+        let overlay = try #require(transition.overlay)
+        let band = try #require(transition.band)
+        #expect(band.superview === overlay)
+        #expect(overlay.subviews.last === band, "On top of the lines it sweeps away")
+        #expect(band.frame.maxY == overlay.bounds.height, "It starts at the bottom of the chat")
+        let rise = try #require(band.layer.animation(forKey: "rise") as? CABasicAnimation)
+        #expect((rise.toValue as? CGFloat ?? .infinity) < (rise.fromValue as? CGFloat ?? 0))
+        #expect(!band.isUserInteractionEnabled)
+
+        transition.cancel()
+        #expect(transition.band == nil)
+        #expect(band.superview == nil || overlay.superview == nil)
+
+        // Reduce Motion: no sweep at all.
+        transition.present(nextID: "new", replacing: "old", reduceMotion: true)
+        #expect(transition.overlay == nil && transition.band == nil)
     }
 
     @Test func theBottomLineGoesFirst() async throws {

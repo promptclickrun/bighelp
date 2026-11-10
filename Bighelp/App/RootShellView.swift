@@ -1419,7 +1419,7 @@ struct RootShellView: View {
         chatDissolve.present(nextID: nextID, replacing: previousID, reduceMotion: reduceMotion)
     }
 
-    private func runNewChatStart(retry: @escaping @MainActor () -> Void,
+    func runNewChatStart(retry: @escaping @MainActor () -> Void,
                                  _ start: @escaping @MainActor () async throws -> Void) {
         guard !isStartingNewChat else { return }
         let operationID = UUID()

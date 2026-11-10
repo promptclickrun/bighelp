@@ -349,25 +349,49 @@ extension RootShellView {
 
     /// This chat › New Bot Chat: the open Bot Chat becomes a regular chat named for
     /// now, and the agent's new Bot Chat opens in its place, a fresh start when a
-    /// long one has filled its context.
+    /// long one has filled its context. The blank chat shows at once, the way New chat's does
+    /// (`NewChatCoordinator`); the rename and the computer making the next Bot Chat happen behind it.
+    /// They once came first, and the old chat sat there for seconds with no sign of anything (#940).
     func startNewBotChat(_ record: SessionRecord) {
         guard let agentID = record.agentIDs.first else { return }
-        let fromList = appState.chatOpenedFromList
         let origin = appState.path
         let signIn = currentWorkspaceOwner?.signIn
-        Task { @MainActor in
+        runNewChatStart(retry: { startNewBotChat(record) }) {
             do {
-                try await sessionCatalog.renameSession(id: record.id, title: SessionRecord.retiredBotChatTitle(at: .now))
+                _ = try await newChatCoordinator.start(explicitAgentID: agentID, creating: { _ in
+                    try await sessionCatalog.renameSession(id: record.id,
+                                                           title: SessionRecord.retiredBotChatTitle(at: .now))
+                    return try await nextBotChat(for: agentID, signedInAs: signIn)
+                }, beforePresentation: presentNewChatDissolve)
             } catch is CancellationError {
-                return
+                throw CancellationError()
             } catch {
-                actionErrorMessage = "bighelp couldn't start a new Bot Chat. "
-                    + (HermesRefusalMessage.sentence(in: error) ?? "Check the connection and try again.")
-                return
+                // Nothing was made: back to the Bot Chat the person was in, which says why.
+                if currentWorkspaceOwner?.signIn == signIn, sessionCatalog.session(id: record.id) != nil {
+                    var instant = Transaction()
+                    instant.disablesAnimations = true
+                    withTransaction(instant) { appState.path = origin }
+                }
+                throw error
             }
-            guard appState.path == origin, currentWorkspaceOwner?.signIn == signIn else { return }
-            openCanonicalAgentChat(agentID, fromList: fromList, dissolvesOutgoing: true)
         }
+    }
+
+    /// The agent's Bot Chat as the computer has it now (it makes one when the agent has none).
+    private func nextBotChat(for agentID: String, signedInAs signIn: WorkspaceSignIn?) async throws -> SessionRecord {
+        let id: String
+        if usesWorkspaceFixtures, workspaceConnections?.isDirectSelected != true {
+            id = try DemoSessionCatalogClient.canonicalID(profileID: agentID, records: sessionCatalog.records)
+        } else {
+            guard let owner = currentWorkspaceOwner, owner.signIn == signIn, let connections = workspaceConnections else {
+                throw WorkspaceClientError.ownerChanged
+            }
+            id = try await connections.openCanonicalSession(agentID, owner)
+        }
+        guard let made = sessionCatalog.session(id: id), made.kind == .direct, made.agentIDs == [agentID] else {
+            throw WorkspaceClientError.invalidResponse
+        }
+        return made
     }
 
     /// A 1:1 chat from the New chat picker; that agent becomes the home agent.

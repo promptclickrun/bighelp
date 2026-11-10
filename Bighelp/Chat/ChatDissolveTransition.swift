@@ -4,25 +4,31 @@ import UIKit
 
 /// Disposable viewport imagery; this never owns chat data or submission readiness.
 ///
-/// New Chat dissolves the outgoing chat line by line, from the bottom up: each line takes
-/// the tint, blurs and fades where it is, while the new chat is already live underneath.
+/// New Chat sweeps the outgoing chat away with the Thinking look the person picked: the look's
+/// own running track rises from the bottom of the chat to the top, and each line softens and
+/// fades as the track passes it, while the new chat is already live underneath.
 @MainActor
 final class ChatDissolveTransition {
     /// Bounds the work whatever the viewport shows.
     nonisolated static let maximumBands = 40
-    /// How long one line takes, and how long the wave takes to reach the top line.
+    /// How long one line takes to go, and how long the look takes to rise to the top line.
     nonisolated static let lineDuration: CFTimeInterval = 0.44
-    nonisolated static let waveDuration: CFTimeInterval = 0.4
+    nonisolated static let waveDuration: CFTimeInterval = 0.7
 
     private(set) var overlay: UIView?
-    private var source: (id: String, tint: UIColor, backdrop: UIColor?, scrollView: @MainActor () -> UIScrollView?)?
+    /// The look's track on its way up, on top of the lines.
+    private(set) var band: UIView?
+    private var bandHost: UIHostingController<AnyView>?
+    private var source: (id: String, backdrop: UIColor?, look: (@MainActor () -> AnyView)?,
+                         scrollView: @MainActor () -> UIScrollView?)?
     private var destinationID: String?
 
     /// `backdrop` is the page behind the chat, when it's a plain color: each line covers the new
     /// chat until it has gone, so the new chat shows line by line instead of through the old one.
-    func register(conversationID: String, tint: UIColor = .systemRed, backdrop: UIColor? = nil,
+    /// `look` draws the picked Thinking look's track; without one the lines go by themselves.
+    func register(conversationID: String, backdrop: UIColor? = nil, look: (@MainActor () -> AnyView)? = nil,
                   scrollView: @escaping @MainActor () -> UIScrollView?) {
-        source = (conversationID, tint, backdrop, scrollView)
+        source = (conversationID, backdrop, look, scrollView)
     }
 
     func present(nextID: String, replacing previousID: String?, reduceMotion: Bool) {
@@ -47,8 +53,8 @@ final class ChatDissolveTransition {
                                      afterScreenUpdates: false)
         }
         guard captured, let pixels = image.cgImage,
-              let art = ChatDissolveArt(snapshot: pixels, size: viewport.size, tint: source.tint,
-                                        bandLimit: Self.maximumBands), !art.bands.isEmpty else { return }
+              let art = ChatDissolveArt(snapshot: pixels, size: viewport.size, bandLimit: Self.maximumBands),
+              !art.bands.isEmpty else { return }
         let overlay = UIView(frame: scrollView.convert(viewport, to: window))
         overlay.isUserInteractionEnabled = false
         overlay.accessibilityElementsHidden = true
@@ -65,16 +71,15 @@ final class ChatDissolveTransition {
             }
         }
         let start = CACurrentMediaTime()
-        let last = art.bands.count - 1
-        let spread = min(Self.waveDuration, 0.03 * Double(last))
-        for (index, band) in art.bands.enumerated() {
+        for band in art.bands {
             let strip = UIView(frame: CGRect(x: 0, y: band.lowerBound, width: viewport.width,
                                              height: band.upperBound - band.lowerBound))
             strip.backgroundColor = source.backdrop
             let slice = CGRect(x: 0, y: band.lowerBound / viewport.height, width: 1,
                                height: (band.upperBound - band.lowerBound) / viewport.height)
-            // Bottom line first.
-            let begin = start + (last == 0 ? 0 : spread * Double(last - index) / Double(last))
+            // Bottom line first: a line goes as the look, rising from the bottom, reaches it.
+            let middle = (band.lowerBound + band.upperBound) / 2
+            let begin = start + Self.waveDuration * Double(1 - middle / viewport.height)
             for stage in Stage.allCases {
                 let layer = CALayer()
                 layer.frame = strip.bounds
@@ -86,7 +91,41 @@ final class ChatDissolveTransition {
             strip.layer.add(Stage.fade(begin: begin), forKey: "dissolve")
             overlay.addSubview(strip)
         }
+        if let look = source.look { addBand(look(), to: overlay, size: viewport.size, start: start) }
         CATransaction.commit()
+    }
+
+    /// The picked look's track, rising through the chat at the pace the lines go.
+    private func addBand(_ look: AnyView, to overlay: UIView, size: CGSize, start: CFTimeInterval) {
+        let host = UIHostingController(rootView: look)
+        host.view.backgroundColor = .clear
+        host.view.isUserInteractionEnabled = false
+        let height = ThinkingSliderMetrics.height, inset = BighelpTokens.space16
+        host.view.frame = CGRect(x: inset, y: size.height - height, width: max(0, size.width - inset * 2), height: height)
+        overlay.addSubview(host.view)
+        bandHost = host
+        band = host.view
+
+        let rise = CABasicAnimation(keyPath: "position.y")
+        rise.fromValue = size.height - height / 2
+        rise.toValue = height / 2
+        rise.beginTime = start
+        rise.duration = Self.waveDuration
+        rise.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        rise.fillMode = .both
+        rise.isRemovedOnCompletion = false
+        host.view.layer.add(rise, forKey: "rise")
+
+        // In as it starts, out with the last line.
+        let fade = CAKeyframeAnimation(keyPath: "opacity")
+        let total = Self.waveDuration + Self.lineDuration
+        fade.keyTimes = [0, NSNumber(value: 0.12 / total), NSNumber(value: Self.waveDuration / total), 1]
+        fade.values = [0, 1, 1, 0]
+        fade.beginTime = start
+        fade.duration = total
+        fade.fillMode = .both
+        fade.isRemovedOnCompletion = false
+        host.view.layer.add(fade, forKey: "fade")
     }
 
     func reconcile(conversationID: String?) {
@@ -97,22 +136,23 @@ final class ChatDissolveTransition {
     func cancel() {
         let previous = overlay
         overlay = nil
+        band = nil
+        bandHost = nil
         destinationID = nil
         previous?.subviews.forEach { $0.layer.removeAllAnimations() }
         previous?.removeFromSuperview()
     }
 
-    /// What a line shows on its way out: itself, tinted, softened, then blurred. Each
+    /// What a line shows on its way out: itself, softened, then blurred, in its own colors. Each
     /// cross-fades into the next while the whole line fades.
     enum Stage: CaseIterable {
-        case sharp, tinted, softened, blurred
+        case sharp, softened, blurred
 
         func animation(begin: CFTimeInterval) -> CAAnimation {
             let (times, values): ([NSNumber], [NSNumber]) = switch self {
-            case .sharp: ([0, 0.3, 1], [1, 0, 0])
-            case .tinted: ([0, 0.3, 0.55, 1], [0, 1, 0, 0])
-            case .softened: ([0, 0.25, 0.5, 0.75, 1], [0, 0, 1, 0, 0])
-            case .blurred: ([0, 0.45, 0.75, 1], [0, 0, 1, 1])
+            case .sharp: ([0, 0.35, 1], [1, 0, 0])
+            case .softened: ([0, 0.35, 0.7, 1], [0, 1, 0, 0])
+            case .blurred: ([0, 0.4, 0.75, 1], [0, 0, 1, 1])
             }
             return Self.keyframes(times, values, begin: begin)
         }
@@ -140,14 +180,13 @@ final class ChatDissolveTransition {
 /// The outgoing viewport's pictures for the dissolve, and where its lines are.
 struct ChatDissolveArt {
     let sharp: CGImage
-    let tinted: CGImage
     let softened: CGImage
     let blurred: CGImage
     /// Lines in points, top to bottom, together covering the viewport.
     let bands: [Range<CGFloat>]
 
     /// `snapshot` is the viewport drawn over nothing, so empty space is clear.
-    init?(snapshot: CGImage, size: CGSize, tint: UIColor, bandLimit: Int) {
+    init?(snapshot: CGImage, size: CGSize, bandLimit: Int) {
         // One pixel a point is plenty to find the lines and to blur.
         let width = max(1, Int(size.width.rounded(.up))), height = max(1, Int(size.height.rounded(.up)))
         guard let small = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
@@ -165,20 +204,10 @@ struct ChatDissolveArt {
         bands = ChatDissolveBands.lines(rows: rows, limit: bandLimit).map {
             CGFloat($0.lowerBound) * scale..<CGFloat($0.upperBound) * scale
         }
-        Self.tint(small, rect: whole, color: tint)
-        let full = UIGraphicsImageRendererFormat()
-        full.scale = 1
-        let tintedFull = UIGraphicsImageRenderer(size: CGSize(width: snapshot.width, height: snapshot.height),
-                                                 format: full).image { context in
-            let rect = CGRect(x: 0, y: 0, width: snapshot.width, height: snapshot.height)
-            UIImage(cgImage: snapshot).draw(in: rect)
-            Self.tint(context.cgContext, rect: rect, color: tint)
-        }
-        guard let smallTinted = small.makeImage(), let tinted = tintedFull.cgImage,
-              let softened = Self.blur(smallTinted, radius: 2),
-              let blurred = Self.blur(smallTinted, radius: 6) else { return nil }
+        guard let smallCopy = small.makeImage(),
+              let softened = Self.blur(smallCopy, radius: 2),
+              let blurred = Self.blur(smallCopy, radius: 6) else { return nil }
         sharp = snapshot
-        self.tinted = tinted
         self.softened = softened
         self.blurred = blurred
     }
@@ -186,18 +215,11 @@ struct ChatDissolveArt {
     func image(_ stage: ChatDissolveTransition.Stage) -> CGImage {
         switch stage {
         case .sharp: sharp
-        case .tinted: tinted
         case .softened: softened
         case .blurred: blurred
         }
     }
 
-    /// Colors what's drawn, keeping some of its own color so text in a bubble stays readable.
-    private static func tint(_ context: CGContext, rect: CGRect, color: UIColor) {
-        context.setBlendMode(.sourceAtop)
-        context.setFillColor(color.withAlphaComponent(0.8).cgColor)
-        context.fill(rect)
-    }
 
     private static func blur(_ image: CGImage, radius: Int) -> CGImage? {
         guard let format = vImage_CGImageFormat(cgImage: image),
@@ -292,5 +314,20 @@ struct ChatDissolveLifetime: ViewModifier {
             .onChange(of: signIn) { _, _ in transition.cancel() }
             .onChange(of: scenePhase) { _, phase in if phase == .background { transition.cancel() } }
             .onDisappear { transition.cancel() }
+    }
+}
+
+/// The picked Thinking look's own track for the dissolve, thinking harder as it rises. It runs in a
+/// view of its own on the window, so what the track reads from its surroundings is handed to it.
+struct ChatDissolveLookBand: View {
+    let look: BighelpThinkingLook
+    let accent: Color
+    @State private var level = 0.2
+
+    var body: some View {
+        ThinkingSliderTrack(look: look, level: level, followsFinger: false, accent: accent)
+            // A view outside any scene reads as in the background, which holds the track still.
+            .environment(\.scenePhase, .active)
+            .onAppear { level = 1 }
     }
 }

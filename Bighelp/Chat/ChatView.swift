@@ -100,6 +100,7 @@ struct ChatView: View {
     @Environment(\.companionAgentScope) private var companionAgentScope
     @Environment(\.agentHomeChrome) var homeChrome
     @Environment(\.chatDissolveTransition) private var chatDissolve
+    @Environment(\.appAppearance) private var appAppearance
     @Environment(\.teamCallAction) private var teamCallAction
     private enum SessionTitleDialog {
         case rename
@@ -477,8 +478,11 @@ struct ChatView: View {
     }
 
     private func registerChatDissolve() {
-        chatDissolve?.register(conversationID: model.conversationID, tint: UIColor(theme.danger),
-                               backdrop: UIColor(theme.canvas),
+        let appearance = appAppearance, accent = theme.action
+        chatDissolve?.register(conversationID: model.conversationID, backdrop: UIColor(theme.canvas),
+                               // The look as it is when the chat goes, in this chat's colors.
+                               look: { AnyView(ChatDissolveLookBand(look: .selected, accent: accent)
+                                   .environment(\.appAppearance, appearance)) },
                                scrollView: { [weak timelineController] in timelineController?.scrollView })
     }
 

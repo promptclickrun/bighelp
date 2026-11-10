@@ -36,7 +36,12 @@ final class NewChatCoordinator {
         pendingPresentationDraft = nil
     }
 
-    func start(explicitAgentID: String? = nil,
+    /// How the computer makes the chat, when it isn't a plain new one (an agent's next Bot Chat).
+    typealias Creation = @MainActor (AgentProfile) async throws -> SessionRecord
+
+    /// `creating` makes the chat on the computer in place of a plain new one. Either way the blank
+    /// canvas shows first, before any round trip.
+    func start(explicitAgentID: String? = nil, creating: Creation? = nil,
                beforePresentation: @escaping @MainActor (String, String?) -> Void = { _, _ in }) async throws -> NewChatOutcome {
         if let inFlightStart {
             return try await inFlightStart.task.value
@@ -44,7 +49,8 @@ final class NewChatCoordinator {
 
         let startID = UUID()
         let task = Task { @MainActor [self] in
-            try await performStart(explicitAgentID: explicitAgentID, beforePresentation: beforePresentation)
+            try await performStart(explicitAgentID: explicitAgentID, creating: creating,
+                                   beforePresentation: beforePresentation)
         }
         inFlightStart = InFlightStart(id: startID, task: task)
         defer {
@@ -55,7 +61,7 @@ final class NewChatCoordinator {
         return try await task.value
     }
 
-    private func performStart(explicitAgentID: String?,
+    private func performStart(explicitAgentID: String?, creating: Creation?,
                               beforePresentation: @escaping @MainActor (String, String?) -> Void) async throws -> NewChatOutcome {
         // Link may be reconnecting while the shell is already usable. Resolve
         // an active/default agent from the last known directory immediately so
@@ -65,7 +71,7 @@ final class NewChatCoordinator {
         // cache remains a hard failure: Hermes must always receive an explicit
         // agent ID for a new session.
         if let cachedAgent = agents.resolvedAgent(explicitID: explicitAgentID) {
-            return try await openSession(for: cachedAgent, beforePresentation: beforePresentation)
+            return try await openSession(for: cachedAgent, creating: creating, beforePresentation: beforePresentation)
         }
 
         try await agents.load()
@@ -73,10 +79,10 @@ final class NewChatCoordinator {
             return .needsAgentSelection
         }
 
-        return try await openSession(for: agent, beforePresentation: beforePresentation)
+        return try await openSession(for: agent, creating: creating, beforePresentation: beforePresentation)
     }
 
-    private func openSession(for agent: AgentProfile,
+    private func openSession(for agent: AgentProfile, creating: Creation?,
                              beforePresentation: @MainActor (String, String?) -> Void) async throws -> NewChatOutcome {
         let presentation = localPresentationDraft(for: agent)
         let presentationRoute = AppRoute.chat(conversationID: presentation.id)
@@ -91,7 +97,18 @@ final class NewChatCoordinator {
         // never sent to Hermes; the durable session below remains authoritative.
         present(presentation.id, beforePresentation: beforePresentation)
 
-        let session = try await catalog.createDirect(agentID: agent.id)
+        let session: SessionRecord
+        do {
+            if let creating { session = try await creating(agent) } else { session = try await catalog.createDirect(agentID: agent.id) }
+        } catch {
+            // A chat the computer makes its own way has nothing to retry from a blank canvas: the
+            // caller goes back to where it was.
+            if creating != nil {
+                catalog.discardLocalPresentationDraft(id: presentation.id)
+                if pendingPresentationDraft?.id == presentation.id { pendingPresentationDraft = nil }
+            }
+            throw error
+        }
         let presentationRecord = catalog.session(id: presentation.id)
         let draft = presentationRecord?.draft ?? ""
         if let referenceState = presentationRecord?.referenceState {
@@ -137,7 +154,8 @@ final class NewChatCoordinator {
             pendingPresentationDraft = nil
         }
 
-        if let hermesWorkspaces {
+        // A Bot Chat is made by the agent's own gateway, where Hermes puts it; it isn't moved.
+        if creating == nil, let hermesWorkspaces {
             if hermesWorkspaces.catalogAgentID != agent.id || hermesWorkspaces.catalog == nil {
                 await hermesWorkspaces.load(agentID: agent.id)
             }

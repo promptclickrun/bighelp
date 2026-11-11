@@ -138,6 +138,13 @@ struct ChatComposer: View, Equatable {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
+            ComposerBlueprintTray(model: model) {
+                model.convertBlueprintToPlainText()
+                draftFocus.wrappedValue = true
+            }
+            .padding(.horizontal, BighelpTokens.space4)
+            .frame(maxWidth: horizontalSizeClass == .regular ? ChatCanvasLayout.regularLaneMaximumWidth : .infinity)
+
             DraftAttachmentRail(model: model)
                 .padding(.horizontal, BighelpTokens.space4)
                 .frame(maxWidth: horizontalSizeClass == .regular ? ChatCanvasLayout.regularLaneMaximumWidth : .infinity)
@@ -151,6 +158,7 @@ struct ChatComposer: View, Equatable {
                 VStack(spacing: BighelpTokens.space4) {
                     if showsExpandRail {
                         ComposerExpandRail(action: openExpandedEditor)
+                            .modifier(BlueprintHiddenEditorModifier(model: model))
                             // Centered over the field, not the + button beside it.
                             .padding(.leading, offersAttachments ? BighelpTokens.hitTarget + BighelpTokens.space8 : 0)
                             .frame(maxWidth: horizontalSizeClass == .regular ? ChatCanvasLayout.regularLaneMaximumWidth : .infinity)
@@ -479,8 +487,15 @@ struct ChatComposer: View, Equatable {
     }
 
     private var composerInput: some View {
-        regularDraftInput
-            .id("chat.composer.editor")
+        ZStack(alignment: .leading) {
+            regularDraftInput
+                .id("chat.composer.editor")
+                .modifier(BlueprintHiddenEditorModifier(model: model))
+            ComposerBlueprintChipField(model: model) {
+                model.convertBlueprintToPlainText()
+                draftFocus.wrappedValue = true
+            }
+        }
     }
 
     @ViewBuilder

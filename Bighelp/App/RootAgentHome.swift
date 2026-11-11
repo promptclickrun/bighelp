@@ -95,7 +95,7 @@ extension RootShellView {
     }
 
     /// A chat's header chrome. The Chat tab's own chat (not one opened from a list, and not a Code
-    /// session) also carries the Unified Mode Toggle.
+    /// session) also carries the Header mode switcher.
     func homeChrome(forChat id: String) -> AgentHomeChrome {
         var chrome = homeChrome
         if chrome.isEnabled, settings.currentMode == .chat, !fleetModeOn, !appState.chatOpenedFromList,
@@ -293,9 +293,9 @@ extension RootShellView {
         startNewChat(explicitAgentID: homeAgent?.id)
     }
 
-    /// A filled-in blueprint: a new chat that sends it straight away.
-    func sendToAgent(_ text: String) {
-        appState.leaveComposerText(text, sends: true)
+    /// A blueprint: a new chat with it in the message box, its blanks as chips. Nothing is sent.
+    func useBlueprint(_ text: String) {
+        appState.leaveComposerText(text, fillsBlanks: true)
         startNewChat(explicitAgentID: homeAgent?.id)
     }
 
@@ -500,7 +500,7 @@ extension RootShellView {
             onProfile: { profileAgentID = agent.id },
             onSwitchAgent: { isAgentSwitcherPresented = true },
             onAsk: askAgent,
-            onSend: sendToAgent,
+            onBlueprint: useBlueprint,
             onMenu: { isHomeDrawerPresented.toggle() },
             onNewChat: { startHomeChat(with: agent.id) },
             onPickAgents: { presentNewChatPicker(seed: agent.id) },
@@ -804,6 +804,22 @@ extension RootShellView {
             .task(id: usageWidgetKey) { await followUsageWidget() }
             .task(id: workflowsWidgetKey) { await followWorkflowsWidget() }
             .environment(\.providerUsage, providerUsage)
+            .bighelpSheet(isPresented: $isNeedsYouPresented) {
+                NeedsYouDeckView(context: needsYouDeckContext)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                    .bighelpSheetSize(.standard)
+            }
+            .environment(\.needsYouDeckContext, needsYouDeckContext)
+            #if DEBUG
+            .task {
+                guard !didPresentDemoNeedsYou,
+                      ProcessInfo.processInfo.arguments.contains("-demo-needs-you") else { return }
+                didPresentDemoNeedsYou = true
+                await needsYouDeckContext.refresh()
+                isNeedsYouPresented = true
+            }
+            #endif
             .task(id: hostReactionsKey) { await syncHostReactions(hostReactionsKey) }
             // Widgets show the home agent's Feed and Goals in the app's colors.
             .onChange(of: agentBoard.items, initial: true) { _, _ in BighelpWidgetExtras.shared.update(board: agentBoard) }
@@ -937,15 +953,17 @@ extension RootShellView {
             places: settings.appLayout.menuPlaces,
             onBoard: { tab in afterClosingHomeSheets { openBoard(tab) } },
             unread: boardUnreadTabs,
+            needsYou: menuNeedsYou,
             code: settings.experience == .code ? codeMenu : nil,
             experience: experienceSwitch
         )
     }
 
-    /// Something new in Feed, Ideas or Goals while ☰ is the only way there, or a share waiting to be
-    /// sent: a dot on ☰.
+    /// Something new in Feed, Ideas or Goals while ☰ is the only way there, a share waiting to be
+    /// sent, or something waiting in Needs you: a dot on ☰.
     var menuHasUnread: Bool {
         !boardUnreadTabs.subtracting(barTabs).isEmpty || PendingShareCenter.shared.waitingCount > 0
+            || menuNeedsYou != nil
     }
 
 }

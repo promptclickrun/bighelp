@@ -837,6 +837,11 @@ final class AgentBoardStore {
         if !isRefresh { state = .loading }
         do {
             var loaded = try await client.items(agentID: agentID)
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-demo-empty-boards") {
+                loaded = []
+            }
+            #endif
             guard generation == self.generation, self.agentID == agentID else { return }
             // What the person already saw stays read while the computer catches up.
             if let pending = pendingReads[agentID], !pending.isEmpty {

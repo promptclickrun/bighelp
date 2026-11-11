@@ -319,7 +319,7 @@ struct CodeBatchChatView: View {
         switch reply.status {
         case .needsYou(let ask):
             if let pending = model.prompt(of: reply.member.id) {
-                DirectHermesPromptResponseView(client: pending.client, prompt: pending.prompt, inline: true)
+                DirectHermesPromptResponseView(client: pending.client, prompt: pending.prompt)
             } else {
                 CodePill(text: ask, tint: theme.warning, systemImage: "hand.raised")
             }

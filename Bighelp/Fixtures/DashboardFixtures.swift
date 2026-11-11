@@ -52,20 +52,66 @@ struct DashboardFixtureSource: DashboardDataSource {
                     status: "Confirmed"
                 )
             ],
-            attentionItems: [
-                DashboardAttentionItem(
-                    id: "attention-payment",
-                    title: "Approve Northstar Studio payment",
-                    detail: "$2,480 is due Friday to keep the project on schedule.",
-                    urgency: .important
-                ),
-                DashboardAttentionItem(
-                    id: "attention-calendar",
-                    title: "Review tomorrow's focus plan",
-                    detail: "Two overlapping meetings need a decision.",
-                    urgency: .needsReview
-                )
-            ],
+            attentionItems: ProcessInfo.processInfo.arguments.contains("-demo-needs-you")
+                ? [
+                    DashboardAttentionItem(
+                        id: "attention-payment",
+                        title: "Allow Avery to push 2 commits to remote?",
+                        detail: "git push origin feat/q4-tax-export · Pushes branch to GitHub without opening a PR.",
+                        urgency: .important,
+                        approvalID: "approval-demo-1",
+                        sessionID: "demo-finance",
+                        agentID: "finance",
+                        interaction: .approval(
+                            DashboardApprovalRequest(
+                                eventID: "attention-payment",
+                                approvalID: "approval-demo-1",
+                                allowedDecisions: [.once, .session, .deny],
+                                expiresAt: .distantFuture
+                            )
+                        ),
+                        createdAt: Date()
+                    ),
+                    DashboardAttentionItem(
+                        id: "attention-calendar",
+                        title: "Found 3 nonstop Tokyo flights under $780. Which fare should I hold?",
+                        detail: "Holding a fare is free for 24 hours; nothing is charged.",
+                        urgency: .needsReview,
+                        sessionID: "demo-travel",
+                        agentID: "travel",
+                        interaction: .clarification(
+                            DashboardClarificationRequest(
+                                eventID: "attention-calendar",
+                                requestID: "clarify-demo-1",
+                                sessionID: "demo-travel",
+                                question: "Found 3 nonstop Tokyo flights under $780. Which fare should I hold?",
+                                choices: [
+                                    "JAL Economy Main · $640",
+                                    "ANA Economy Flex · $715",
+                                    "Keep watching prices",
+                                ],
+                                allowsCustomResponse: true,
+                                isMultiSelect: false,
+                                expiresAt: .distantFuture
+                            )
+                        ),
+                        createdAt: Date()
+                    ),
+                ]
+                : [
+                    DashboardAttentionItem(
+                        id: "attention-payment",
+                        title: "Approve Northstar Studio payment",
+                        detail: "$2,480 is due Friday to keep the project on schedule.",
+                        urgency: .important
+                    ),
+                    DashboardAttentionItem(
+                        id: "attention-calendar",
+                        title: "Review tomorrow's focus plan",
+                        detail: "Two overlapping meetings need a decision.",
+                        urgency: .needsReview
+                    ),
+                ],
             completedItems: [
                 DashboardCompletion(
                     id: "completed-weekly-brief",

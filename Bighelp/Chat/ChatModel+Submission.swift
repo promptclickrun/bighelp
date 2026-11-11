@@ -46,6 +46,10 @@ extension ChatModel {
         // (or queues) through sendMidSession, which has its own checks.
         guard permitsOrdinaryComposerSend,
               isBotMode || isMidSessionTurnLive || directTransportIsReady || stagesComposerMessage else { return }
+        if let blueprintDraft {
+            guard blueprintDraft.isComplete else { return }
+            convertBlueprintToPlainText()
+        }
         ChatPerformanceProbe.sendTapped(self)
         // iOS starts a Live Activity only while bighelp is in front, and a turn with a file starts after
         // the file is up, often after the person left: the card starts now and the turn joins it.

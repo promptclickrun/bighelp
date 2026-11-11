@@ -1,6 +1,6 @@
 import XCTest
 
-/// Settings › Modes › Unified Mode Toggle: Bots, Chat and Code in a pill at the top of each
+/// Settings › Modes › Header mode switcher: Bots, Chat and Code in a pill at the top of each
 /// home, on the demo data, in light and dark. Off out of the box.
 /// TEST_RUNNER_BIGHELP_MODE_PILL_EVIDENCE=<folder> saves the screenshots there.
 final class UnifiedModeToggleUITests: BighelpUITestCase {

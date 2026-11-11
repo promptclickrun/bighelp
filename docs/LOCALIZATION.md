@@ -30,8 +30,9 @@ The second stage (#527) adds:
 - The Settings pages these lead to: Experience, Assistants, Notifications (topics,
   "Agents messaging each other", channels, workflows, Quiet Hours, test and turn-off),
   Chat (with Nerd Mode's sections), and Appearance with Chat layout and App layout.
-- The modes after their 2.6.11 rename: Bots, Chat and Code, the Unified Mode Toggle,
-  and the mode edge swipes.
+- The modes after their 2.6.11 rename: Bots, Chat and Code, Settings › Modes (its picker and the
+  Header mode switcher), and the mode edge swipes.
+- Needs you and a blueprint's chips in the message box.
 
 The Chinese text is an AI-assisted draft and remains `needs_review` in
 the catalog. It has not received professional or fluent-speaker approval. Screenshots

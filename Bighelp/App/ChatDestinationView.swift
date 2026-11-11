@@ -3,6 +3,12 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+/// What restarts the hand-over of a board's text to the message box (`AppState.leaveComposerText`).
+private struct PendingComposerText: Equatable {
+    let conversationID: String
+    let text: String?
+}
+
 @MainActor
 struct ChatDestinationView: View {
     let model: ChatModel
@@ -704,29 +710,39 @@ struct ChatDestinationView: View {
             guard !selections.isEmpty else { return }
             Task { await importPhotos(selections) }
         }
-        .task(id: appState.pendingComposerText) {
+        // By chat as well as text: a new chat's blank canvas hands this view to the chat Hermes made,
+        // and that chat takes the text then.
+        .task(id: PendingComposerText(conversationID: model.conversationID, text: appState.pendingComposerText)) {
             // Only the chat on top takes the board's text: a new chat, or, from a bot's Dashboard,
             // that bot's own chat, history and all.
             let isOnTop = appState.path.last == .chat(conversationID: model.conversationID)
+            if model.isAwaitingAuthoritativeSessionAllocation {
+                // The blank canvas shows the text at once, however long the computer takes, but
+                // doesn't take it: the canvas goes when the chat arrives, and its draft doesn't
+                // always get across in time.
+                guard isOnTop, model.draft.isEmpty, let shown = appState.showComposerText() else { return }
+                if !(shown.fillsBlanks && model.beginBlueprintDraft(shown.text)) { model.draft = shown.text }
+                return
+            }
             let isNamedBotChat = isOnTop && appState.pendingComposerAgentID.map { model.memberIDs == [$0] } == true
             guard let pending = appState.takeComposerText(isNewChat: isOnTop && model.transcriptEntries.isEmpty,
                                                           isNamedBotChat: isNamedBotChat) else { return }
-            // Something typed already stays: the text goes below it, and the two are never sent.
+            if pending.wasShown, !model.draft.isEmpty {
+                // It came across from the canvas, with whatever the person changed there. Its chips
+                // came too (`prepareNewChat`), unless the text is still as the blueprint wrote it.
+                if pending.fillsBlanks, model.blueprintDraft == nil, model.draft == pending.text {
+                    model.beginBlueprintDraft(pending.text)
+                }
+                return
+            }
+            // Something typed already stays: the text goes below it.
             guard model.draft.isEmpty else {
                 model.draft += "\n\n" + pending.text
                 return
             }
-            let text = pending.text
-            model.draft = text
-            guard pending.sends else { return }
-            // A new chat connects a moment after it opens; send once it can, and leave the
-            // text in the message box if it never does.
-            for _ in 0..<60 where !model.canSend {
-                try? await Task.sleep(for: .milliseconds(250))
-                if Task.isCancelled { return }
-            }
-            guard model.canSend, model.draft == text else { return }
-            await model.send()
+            // A blueprint's blanks show as chips; anything else, or one with no blanks, is plain text.
+            if pending.fillsBlanks, model.beginBlueprintDraft(pending.text) { return }
+            model.draft = pending.text
         }
         .task(id: appState.pendingVoiceConversationID) {
             // The request stays until voice can open, so withdrawing it (another computer, another

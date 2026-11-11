@@ -141,11 +141,6 @@ struct BoardDashboardTests {
         #expect(!deck.blueprints.isEmpty)
     }
 
-    @Test func useSkipsTheFillInPageWhenThereIsNothingToFill() {
-        #expect(BoardBlueprint(id: "x", text: "Post a morning brief to my Feed.", goalCategory: nil).needsFilling == false)
-        #expect(BoardBlueprint(id: "y", text: "Track [habit] for [30] days.", goalCategory: nil).needsFilling)
-    }
-
     // MARK: Following the shell's connection
 
     @Test func theDashboardReadsItsBotWithoutMovingTheShellsBoard() async {

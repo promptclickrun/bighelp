@@ -262,7 +262,6 @@ struct BoardDashboardView: View {
     let shellBoardKey: @MainActor () -> RootShellView.AgentBoardClientKey
     let configureShellBoard: @MainActor (RootShellView.AgentBoardClientKey) async -> Void
 
-    @State private var filling: BoardBlueprint?
     @Environment(\.scenePhase) private var scenePhase
     @BighelpThemeReader private var theme
 
@@ -335,7 +334,6 @@ struct BoardDashboardView: View {
         }) { shown in
             sheetContent(shown)
         }
-        .blueprintFill($filling, context: context)
     }
 
     private func open(_ item: AgentBoardItem) {
@@ -372,10 +370,8 @@ struct BoardDashboardView: View {
                 .presentationDragIndicator(.visible)
                 .bighelpSheetSize(.standard)
         case .blueprints(let kind):
-            BoardBlueprintsSheet(kind: kind, agentName: context.agentName,
-                                 blueprints: BoardBlueprintCatalog.shared.blueprints(for: kind),
-                                 onSend: { text in after { context.onSend(text) } },
-                                 onEdit: { text in after { context.onAsk(text) } })
+            BoardBlueprintsSheet(kind: kind, blueprints: BoardBlueprintCatalog.shared.blueprints(for: kind),
+                                 onPick: { text in after { context.onBlueprint(text) } })
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .bighelpSheetSize(.standard)
@@ -398,14 +394,10 @@ struct BoardDashboardView: View {
         model.sheet = nil
     }
 
-    /// As tapping a blueprint on its page: [blanks] first, then the message box; nothing is sent.
+    /// As tapping a blueprint on its page: it goes to the message box; nothing is sent.
     private func use(_ blueprint: BoardBlueprint) {
-        if blueprint.needsFilling {
-            filling = blueprint
-        } else {
-            TemplateUsage.shared.recordUse(blueprint.id)
-            context.onAsk(blueprint.text)
-        }
+        TemplateUsage.shared.recordUse(blueprint.id)
+        context.onBlueprint(blueprint.text)
     }
 
     /// The same board, for a page in the sheet: going to the chat closes the sheet first.
@@ -415,7 +407,7 @@ struct BoardDashboardView: View {
             activity: context.activity, store: context.store,
             onProfile: { model.sheet = nil }, onSwitchAgent: {},
             onAsk: { text in after { context.onAsk(text) } },
-            onSend: { text in after { context.onSend(text) } },
+            onBlueprint: { text in after { context.onBlueprint(text) } },
             onMenu: {}, onNewChat: { after { context.onNewChat() } }, onPickAgents: {},
             tools: [], onBack: { model.sheet = nil })
     }

@@ -413,13 +413,13 @@ struct AgentBoardTests {
     @Test func dashboardTextGoesOnlyToItsBotAndNeverLingers() {
         let state = AppState()
         let now = Date()
-        state.leaveComposerText("Run this", sends: true, agentID: "kai", now: now)
+        state.leaveComposerText("Track [habit]", fillsBlanks: true, agentID: "kai", now: now)
         #expect(state.takeComposerText(isNewChat: true, isNamedBotChat: false, now: now) == nil,
                 "Another new chat doesn't take a bot's text")
         state.leaveComposerText("About the post", now: now)
         let taken = state.takeComposerText(isNewChat: true, isNamedBotChat: false, now: now)
         #expect(taken?.text == "About the post")
-        #expect(taken?.sends == false, "The earlier Send doesn't stick to new text")
+        #expect(taken?.fillsBlanks == false, "The earlier blueprint doesn't stick to new text")
         state.leaveComposerText("Too late", agentID: "kai", now: now)
         #expect(state.takeComposerText(isNewChat: false, isNamedBotChat: true,
                                        now: now.addingTimeInterval(AppState.pendingComposerLifetime + 1)) == nil)

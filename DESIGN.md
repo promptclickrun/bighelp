@@ -285,9 +285,10 @@ newest posts as tiles two to a row, then Earlier as rows in a card. **Ideas** ha
 over a tall newest idea with **Let's do it** beside two short ones, then the rest as tiles. A tile opens the item
 on a tap and its menu on a long press (`Menu(primaryAction:)`; a ⋯ on the Mac). Buttons and chips on the blocks
 take the person's color (`theme.action`).
-**Blueprints** (beside the page title, and in the empty state) are the 45 starter prompts from
-bighelp.app/quick-start, bundled (`BoardBlueprints.json`), 15 per page in five topics. A tap opens a new chat
-with that agent and the prompt in the message box to fill in its [brackets]; nothing runs until Send.
+**Blueprints** (beside the page title; an empty Feed or Ideas shows three as starters) are the 45 starter
+prompts from bighelp.app/quick-start, bundled (`BoardBlueprints.json`), 15 per page in five topics. A tap opens a
+new chat with that agent and the prompt in the message box, each of its [brackets] a chip to fill in (dashed
+until filled, a row over the box for the one in hand); Send waits for them, and nothing runs until Send.
 Every template picker (Blueprints, Agents' Browse all, New Bot's Templates) is one list by topic: the search row,
 topic chips under it (All, My Templates when there are some, then each topic that has templates, with its icon), a
 section per topic with its icon and count, and Sort in the top bar (For you; Newest and Most used rank everything

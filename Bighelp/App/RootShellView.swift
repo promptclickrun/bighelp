@@ -138,6 +138,8 @@ struct RootShellView: View {
     /// The connected computer's Workflows (☰ › Workflows), when its plugin has them.
     @State var workflowsStore: WorkflowsStore?
     @State var workflowsAvailability = WorkflowsAvailability()
+    @State var isNeedsYouPresented = false
+    @State var didPresentDemoNeedsYou = false
     #if os(visionOS)
     @Environment(\.openWindow) var openWindow
     #endif
@@ -627,7 +629,7 @@ struct RootShellView: View {
             }
     }
 
-    /// The Unified Mode Toggle in the root bar, in place of the brand: on the Chat tab's list (when it
+    /// The Header mode switcher in the root bar, in place of the brand: on the Chat tab's list (when it
     /// opens on a list, or on all hosts) and on Code's home. The Chat tab's own chat and Bots' home
     /// draw their own headers with it.
     var barModeSwitch: BighelpModeSwitch? {
@@ -657,7 +659,7 @@ struct RootShellView: View {
             // a chat closed, it was sometimes dropped mid-switch, and Agents had no ☰.
             ToolbarItem(placement: .topBarLeading) { rootMenuButton }
             if let barModeSwitch {
-                // The Unified Mode Toggle takes the bar's middle on the Chat list; hosts stay in ☰.
+                // The Header mode switcher takes the bar's middle on the Chat list; hosts stay in ☰.
                 ToolbarItem(placement: .principal) { BighelpModePill(modeSwitch: barModeSwitch) }
             } else {
                 // Ember lives only in chrome: the brand bar on root screens.
@@ -723,7 +725,9 @@ struct RootShellView: View {
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .navigationDestination(for: AppRoute.self) { route in
             // Pushed screens don't reliably inherit values set below the stack.
-            routeDestination(route).environment(\.providerUsage, providerUsage)
+            routeDestination(route)
+                .environment(\.providerUsage, providerUsage)
+                .environment(\.needsYouDeckContext, needsYouDeckContext)
                 // The root is hidden under a pushed screen and can't present; the top screen does.
                 .modifier(OpenErrorPresentation(root: self))
         }

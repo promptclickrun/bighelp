@@ -311,26 +311,27 @@ final class AllHostsHostUITests: BighelpUITestCase {
         save("fleet-6-secure-saved", app)
 
         send("question test", composer: composer, in: app)
-        let attention = app.navigationBars["Needs attention"]
+        let attention = app.descendants(matching: .any)["needs-you.deck"].firstMatch
         XCTAssertTrue(attention.waitForExistence(timeout: 30), "The agent's question pops up on the other host's chat")
         save("fleet-7-question", app)
         // Answer it, so the turn ends before the next round.
         // The question is both in the pop-up and in the chat behind it; answer the one on top.
-        func tapVisible(_ query: XCUIElementQuery) {
-            let deadline = Date().addingTimeInterval(10)
+        func tapVisible(_ query: XCUIElementQuery, required: Bool = true, wait: TimeInterval = 10) {
+            let deadline = Date().addingTimeInterval(wait)
             while Date() < deadline {
                 if let visible = query.allElementsBoundByIndex.last(where: { $0.isHittable && $0.isEnabled }) {
                     return visible.tap()
                 }
                 Thread.sleep(forTimeInterval: 0.3)
             }
-            XCTFail("Nothing to tap for \(query)")
+            if required { XCTFail("Nothing to tap for \(query)") }
         }
         tapVisible(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Alpha")))
-        tapVisible(app.buttons.matching(NSPredicate(format: "label == %@", "Done")))
+        // One tap on a choice answers a single question; Done shows only when more is needed.
+        tapVisible(app.buttons.matching(NSPredicate(format: "label == %@", "Done")), required: false, wait: 3)
         let answered = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "Question fixture answered")).firstMatch
         XCTAssertTrue(answered.waitForExistence(timeout: 30), "The agent got the answer")
-        if attention.exists { attention.buttons["Later"].tap() }
+        if attention.exists { app.buttons["needs-you.later"].tap() }
 
         // Over to the other host's agent and back, then ask again.
         swipeBackFromLeadingEdge(in: app)

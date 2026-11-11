@@ -249,8 +249,3 @@ struct DashboardTemplateDeck: Equatable {
     mutating func advance() { if !isFinished { position += 1 } }
     mutating func back() { if position > 0 { position -= 1 } }
 }
-
-extension BoardBlueprint {
-    /// No [blanks]: Use puts it straight in the message box, without the fill-in page.
-    var needsFilling: Bool { !BlueprintAdLib(text).blanks.isEmpty }
-}

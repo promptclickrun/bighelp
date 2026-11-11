@@ -56,6 +56,9 @@ final class ChatModel {
             }
             let shape = ChatDraftShape(draft)
             if shape != draftShape { draftShape = shape }
+            // The chips are the draft: once the box holds anything else (sent, cleared, replaced),
+            // they go, so they never outlive their message or write over other text.
+            if let blueprintDraft, blueprintDraft.filledText != draft { self.blueprintDraft = nil }
             if !isReplacingReferenceDraft, !oldValue.utf8.elementsEqual(draft.utf8) {
                 referenceCanonicalSource = nil
                 referenceDraftID = nil
@@ -93,6 +96,61 @@ final class ChatModel {
             guard oldValue != replyDraft, !isReplacingReferenceDraft else { return }
             persistSession()
         }
+    }
+    /// A blueprint in the message box with its `[blanks]` as chips (`ChatBlueprintDraft`). `draft`
+    /// always holds its text as filled in so far; changing the draft any other way ends it.
+    private(set) var blueprintDraft: ChatBlueprintDraft?
+
+    /// Puts a blueprint in the message box with its blanks as chips. False when it has none.
+    @discardableResult
+    func beginBlueprintDraft(_ source: String) -> Bool {
+        guard let next = ChatBlueprintDraft(source: source) else { return false }
+        setBlueprintDraft(next)
+        return true
+    }
+
+    /// Takes over a blueprint from the blank canvas this chat replaces, when it holds the same text.
+    func adoptBlueprintDraft(_ blueprint: ChatBlueprintDraft) {
+        guard blueprintDraft == nil, blueprint.filledText == draft else { return }
+        blueprintDraft = blueprint
+    }
+
+    func updateBlueprintBlank(_ blankID: Int, value: String) {
+        guard var current = blueprintDraft else { return }
+        current.setValue(value, for: blankID)
+        setBlueprintDraft(current)
+    }
+
+    /// A choice picked for a blank: fills it and moves to the next empty one.
+    func pickBlueprintOption(_ option: String, for blankID: Int) {
+        guard var current = blueprintDraft else { return }
+        current.setValue(option, for: blankID)
+        current.advanceToNextBlank(preferringUnfilled: true)
+        setBlueprintDraft(current)
+    }
+
+    func focusBlueprintBlank(_ blankID: Int) {
+        guard var current = blueprintDraft, current.blanks.contains(where: { $0.id == blankID }) else { return }
+        current.activeBlankID = blankID
+        blueprintDraft = current
+    }
+
+    func advanceBlueprintBlank(preferringUnfilled: Bool = false) {
+        guard var current = blueprintDraft else { return }
+        current.advanceToNextBlank(preferringUnfilled: preferringUnfilled)
+        blueprintDraft = current
+    }
+
+    /// Back to plain text: the message as filled in so far, in the ordinary message box.
+    func convertBlueprintToPlainText() {
+        blueprintDraft = nil
+    }
+
+    /// The blueprint first, then its text: the draft's own check sees the two agree.
+    private func setBlueprintDraft(_ next: ChatBlueprintDraft) {
+        blueprintDraft = next
+        let text = next.filledText
+        if draft != text { draft = text }
     }
     var slashCommandLoadTrigger: Bool { draft.hasPrefix("/") }
     var items: [TimelineItem]
@@ -548,6 +606,7 @@ final class ChatModel {
         // message settles it first. Only a stop on its way does.
         guard botModeRoom?.nativeRetryJournal == nil, !isBotModeStopInFlight else { return false }
         guard !richDraftRecovery.hasUnexportedChanges else { return false }
+        if let blueprintDraft, !blueprintDraft.isComplete { return false }
         let hasText = draftShape.hasText
         let attachmentsSupported = orderedDraftAttachments.isEmpty || (!isBotMode && orderedDraftAttachments.allSatisfy { value in
             if let selection = value.pdfSelection { return pdfAttachmentTarget == selection.target }
@@ -579,6 +638,7 @@ final class ChatModel {
             if native.hasPendingSubmissionForReason { return "a message is still being sent" }
         }
         if isAwaitingAuthoritativeSessionAllocation { return "starting the chat on the host" }
+        if let blueprintDraft, !blueprintDraft.isComplete { return "fill in the blueprint blanks" }
         if richDraftRecovery.hasUnexportedChanges { return "saving the draft" }
         if referenceSubmission != nil || referenceSendInFlight { return "a message is still being sent" }
         if draftAttachmentImport != nil { return "attachments are still being added" }

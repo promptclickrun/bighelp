@@ -56,6 +56,7 @@ final class SessionCatalogStore {
 
     let client: any SessionCatalogClient
     var canDeleteConversation: Bool { client.canDeleteConversation }
+    var canDeleteArchivedChats: Bool { client.canDeleteArchivedChats }
     private let forkClient: any SessionForkClient
     private let nativeFork: (@MainActor (SessionRecord, String) async throws -> SessionRecord)?
     private let defaultActivityVisibility: @MainActor () -> ChatActivityVisibility
@@ -442,6 +443,12 @@ final class SessionCatalogStore {
         return records.first {
             $0.agentIDs == [chat.profileID] && $0.remoteStoredID.map { DirectHermesIdentity.matches($0, chat.storedID) } == true
         }
+    }
+
+    /// Deletes one archived chat for good. It isn't in the lists, so there is no row to retract here:
+    /// Archived Chats drops the row it was showing once Hermes confirms.
+    func deleteArchivedChat(_ chat: SessionArchivedChat) async throws {
+        try await client.deleteArchivedChat(chat)
     }
 
     func archiveSession(id: String) async throws {

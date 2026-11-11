@@ -1465,6 +1465,76 @@ struct DirectHermesSessionCatalogClientTests {
         #expect(updates.payloads.first?["session_id"] == .string("taco-order"))
     }
 
+    /// Delete's only home is Archived Chats: a chat in the lists may still be live on Hermes, which
+    /// refuses to remove it, so the lists offer no Delete at all. An archived row is deleted by its
+    /// stored id (`session.delete`), and the row it was showing goes with it.
+    @Test func deletingAnArchivedChatRemovesTheStoredRowItShowed() async throws {
+        @MainActor final class Deletions { var targets: [(String, String)] = [] }
+        let deletions = Deletions()
+        var archived = try #require(Self.session(id: "taco-order").object)
+        archived["archived"] = .boolean(true)
+        archived["auto_archived"] = .integer(0)
+        let workspace = try SessionWorkspaceStub()
+        workspace.hasSocketEdits = true
+        workspace.handler = { operation, payload in
+            switch operation {
+            case .profilesList: return Self.profiles()
+            case .sessionsList:
+                #expect(payload["archived"] == .string("only"))
+                return Self.ownershipPage([.object(archived)])
+            case .nativeSessionDelete:
+                let target = try #require(payload["session_id"]?.string)
+                deletions.targets.append((target, try #require(payload["profile"]?.string)))
+                return ["deleted": .string(target)]
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let client = Self.client(workspace)
+        #expect(client.canDeleteArchivedChats)
+        let chat = try #require(try await client.archivedChats().first)
+        try await client.deleteArchivedChat(chat)
+        #expect(deletions.targets.count == 1)
+        #expect(deletions.targets.first?.0 == "taco-order")
+        #expect(deletions.targets.first?.1 == "alpha")
+    }
+
+    /// A chat archived on another device can still be known here. Once deleted, nothing on this
+    /// phone may point at it, or a later tap tries to open a chat that's gone.
+    @Test func deletingAnArchivedChatForgetsItsLocalCopy() async throws {
+        let row = Self.session(id: "taco-order")
+        let workspace = try SessionWorkspaceStub()
+        workspace.hasSocketEdits = true
+        workspace.handler = { operation, payload in
+            switch operation {
+            case .profilesList: return Self.profiles()
+            case .sessionsList: return Self.ownershipPage([row])
+            case .nativeSessionDelete: return ["deleted": try #require(payload["session_id"])]
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let client = Self.client(workspace)
+        let record = try #require(try await client.list().first)
+        _ = try client.coordinate(for: record.id)
+
+        try await client.deleteArchivedChat(SessionArchivedChat(profileID: "alpha", storedID: "taco-order", title: "Chat",
+                                                                source: nil, preview: nil, lastActive: nil))
+        #expect(throws: WorkspaceClientError.invalidRequest) { _ = try client.coordinate(for: record.id) }
+    }
+
+    @Test(arguments: [("telegram", "Still open in Telegram. Close it there, then try again."),
+                      ("bighelp", "Still open. Try again in a moment.")])
+    func aChatStillOpenSaysWhatToDo(source: String, expected: String) {
+        let refusal = WorkspaceClientError.rejected(code: "4023", message: HermesRefusalMessage("cannot delete an active session"))
+        #expect(ArchivedChatDeleteRefusal.message(for: refusal, source: source) == expected)
+    }
+
+    @Test func anyOtherRefusalKeepsHermesWords() {
+        let refusal = DirectHermesError.rpcRejected(code: 5036, message: HermesRefusalMessage("delete failed: disk full"))
+        #expect(ArchivedChatDeleteRefusal.message(for: refusal, source: "telegram")
+                    == "Couldn't delete this chat. Hermes said: delete failed: disk full")
+        #expect(ArchivedChatDeleteRefusal.message(for: CancellationError(), source: nil) == "Couldn't delete this chat. Try again.")
+    }
+
     @Test func canonicalPinUsesRegistryIdentity() async throws {
         let workspace = try SessionWorkspaceStub()
         workspace.handler = { operation, payload in

@@ -326,7 +326,8 @@ change in both repos.
   there is one, else the marks kept on the device (`SimpleBotsReadState`). The Chats list's Draft reads the draft
   journal without observing it (`ChatDraftJournal.pendingDraft`).
 - **Archived:** the catalog lists `archived=include` and keeps rows Hermes' idle sweep archived
-  (`auto_archived`); deliberately archived chats live in Archived Chats (`archivedChats`, Restore).
+  (`auto_archived`); deliberately archived chats live in Archived Chats (`archivedChats`), with Restore and, the
+  lists having none, Delete. Hermes refuses to delete a chat still open somewhere; the row says so in plain words.
 - **Send never waits for the connection:** while a chat has no working connection (back from the background, a
   computer still connecting, a chat still opening or rereading what Hermes saved: `lacksConnection`), or a turn it
   just started isn't live yet, Send, the message box and Stop stay on. A message sent then waits at the bottom of

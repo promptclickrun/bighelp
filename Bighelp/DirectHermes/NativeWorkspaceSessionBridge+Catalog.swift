@@ -204,6 +204,14 @@ extension NativeWorkspaceSessionBridge {
         try await box.value().restoreArchivedChat(chat)
     }
 
+    func deleteArchivedChat(_ chat: SessionArchivedChat) async throws {
+        try await box.value().deleteArchivedChat(chat)
+        // Tapped later, its alerts would try to open a chat that's gone.
+        await BighelpVisibleChats.removeDelivered(
+            chats: [ManagedNotificationValidation.sessionReference(profile: chat.profileID, session: chat.storedID)],
+            conversations: [])
+    }
+
     func refreshMetadata(_ record: SessionRecord) async throws -> SessionRecord? {
         try await prepare(record, catalog: box.value())
     }

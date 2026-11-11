@@ -5,6 +5,7 @@ import OSLog
 /// Owns the sole stream registry, creation journal and lifecycle. Extensions preserve this shared actor boundary.
 final class NativeWorkspaceSessionBridge: SessionCatalogClient {
     var canDeleteConversation: Bool { false }
+    var canDeleteArchivedChats: Bool { true }
     var allowsLocalAgentReassignment: Bool { false }
     /// The runtime installs the catalog sink after constructing the bridge.
     /// Every callback carries the exact owner that opened the stream so a

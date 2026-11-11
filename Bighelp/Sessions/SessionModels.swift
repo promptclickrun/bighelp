@@ -607,6 +607,10 @@ protocol SessionCatalogClient {
     /// Chats someone archived, every agent's, newest first.
     func archivedChats() async throws -> [SessionArchivedChat]
     func restoreArchivedChat(_ chat: SessionArchivedChat) async throws
+    /// Deletes one archived chat's stored row. A chat in the lists has no Delete (Hermes refuses to
+    /// remove one that may still be running), an archived one is the end of the line.
+    func deleteArchivedChat(_ chat: SessionArchivedChat) async throws
+    var canDeleteArchivedChats: Bool { get }
     var allowsLocalAgentReassignment: Bool { get }
     func list() async throws -> [SessionRecord]
     func refreshMetadata(_ record: SessionRecord) async throws -> SessionRecord?
@@ -644,8 +648,13 @@ extension SessionCatalogClient {
     /// Clients without that operation keep the existing catalog-refresh behavior.
     func refreshMetadata(_ record: SessionRecord) async throws -> SessionRecord? { nil }
 
+    var canDeleteArchivedChats: Bool { false }
+
     func archivedChats() async throws -> [SessionArchivedChat] { [] }
     func restoreArchivedChat(_ chat: SessionArchivedChat) async throws {
+        throw WorkspaceClientError.unavailable(.unsupportedOperation)
+    }
+    func deleteArchivedChat(_ chat: SessionArchivedChat) async throws {
         throw WorkspaceClientError.unavailable(.unsupportedOperation)
     }
 

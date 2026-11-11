@@ -184,6 +184,9 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
 
     var canCreate: Bool { onCreationStateChange != nil && !retired }
     var canDeleteConversation: Bool { false }
+    /// Archived Chats deletes an archived chat's stored row even though the lists have no Delete: a chat
+    /// someone archived isn't the one they may be talking in, and Hermes refuses to remove a live one.
+    var canDeleteArchivedChats: Bool { true }
     var allowsLocalAgentReassignment: Bool { false }
 
     func coordinate(for visibleID: String) throws -> WorkspaceSessionCoordinate {
@@ -1371,6 +1374,25 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         guard response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
     }
 
+    /// Deletes an archived chat's stored row and its transcripts. Hermes refuses while the chat is still
+    /// live on its gateway ("cannot delete an active session"); that sentence reaches the person, and a
+    /// row already gone counts as deleted. Nothing here re-lists the archived chat: the next
+    /// Archived Chats read is the proof, and a deleted row can't come back.
+    func deleteArchivedChat(_ chat: SessionArchivedChat) async throws {
+        try DirectHermesSessionValidation.coordinate(chat.profileID, maximum: 128)
+        try DirectHermesSessionValidation.coordinate(chat.storedID)
+        let response = try await sessionEdits.delete(chat.storedID, profile: chat.profileID)
+        guard response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
+        let stored = DirectHermesSessionIdentity.key(chat.storedID)
+        let profile = DirectHermesSessionIdentity.key(chat.profileID)
+        // A chat archived on another device can still be known here.
+        for (id, binding) in bindings
+        where DirectHermesSessionIdentity.key(binding.coordinate.profileID) == profile && identityKeys(binding).contains(stored) {
+            forgetLocalCopy(of: id)
+        }
+        archivedKeys.remove(stored)
+    }
+
     /// Archived by someone (in bighelp, Hermes Desktop, the CLI…), not by Hermes' idle sweep, which marks
     /// its own `auto_archived`. A Hermes without that mark: every archive counts as deliberate.
     static func isDeliberatelyArchived(_ row: [String: BighelpJSONValue]) -> Bool {
@@ -1438,14 +1460,19 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
               response["already_absent"] == nil || response["already_absent"]?.boolean != nil else {
             throw WorkspaceClientError.invalidResponse
         }
-        setBinding(nil, for: record.id)
-        historyWindows[record.id] = nil
-        historyProjections[record.id] = nil
-        historyCacheOrder.removeAll { $0 == record.id }
-        historyCacheBytes[record.id] = nil
-        hydrationTokens[record.id] = nil
+        forgetLocalCopy(of: record.id)
         return .init(owner: owner, profileID: binding.coordinate.profileID, rowID: catalog.rowID,
                      alreadyAbsent: response["already_absent"]?.boolean == true)
+    }
+
+    /// Drops what this client holds for a chat Hermes no longer has.
+    private func forgetLocalCopy(of id: String) {
+        setBinding(nil, for: id)
+        historyWindows[id] = nil
+        historyProjections[id] = nil
+        historyCacheOrder.removeAll { $0 == id }
+        historyCacheBytes[id] = nil
+        hydrationTokens[id] = nil
     }
 
     private func perform(_ operation: WorkspaceOperation, _ payload: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] {

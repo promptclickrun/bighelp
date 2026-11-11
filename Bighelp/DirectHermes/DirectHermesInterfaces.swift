@@ -325,15 +325,20 @@ struct HermesRefusalMessage: Equatable, Sendable {
     /// "Hermes said: …", or nil when Hermes gave no words.
     var sentence: String? { text.map { "Hermes said: \($0)" } }
 
-    /// The sentence for a refusal from either layer, for alerts that otherwise say only
-    /// what failed. Nil for any other failure.
-    static func sentence(in error: any Error) -> String? {
+    /// The refusal from either layer. Nil for any other failure.
+    static func refusal(in error: any Error) -> HermesRefusalMessage? {
         switch error {
         case WorkspaceClientError.rejected(_, let message), DirectHermesError.rpcRejected(_, let message):
-            message.sentence
+            message
         default:
             nil
         }
+    }
+
+    /// The sentence for a refusal from either layer, for alerts that otherwise say only
+    /// what failed. Nil for any other failure.
+    static func sentence(in error: any Error) -> String? {
+        refusal(in: error)?.sentence
     }
 }
 

@@ -126,6 +126,29 @@ struct BoardBlueprintCatalog: Sendable {
         groups(for: .goal).flatMap(\.blueprints).filter { $0.goalCategory == category }
     }
 
+    /// Three distinct-topic starter blueprints for an empty board (`2A`), preferring ones with
+    /// fill-in `[blanks]` so the person sees interactive slots right away.
+    func starterBlueprints(for kind: AgentBoardItem.Kind, limit: Int = 3) -> [BoardBlueprint] {
+        let all = blueprints(for: kind)
+        guard !all.isEmpty else { return [] }
+        let withBlanks = all.filter { !BlueprintAdLib($0.text).blanks.isEmpty }
+        var picked: [BoardBlueprint] = []
+        var usedCategories = Set<TemplateCategory>()
+
+        for candidate in withBlanks where picked.count < limit {
+            if usedCategories.insert(candidate.category).inserted {
+                picked.append(candidate)
+            }
+        }
+        for candidate in withBlanks where picked.count < limit && !picked.contains(candidate) {
+            picked.append(candidate)
+        }
+        for candidate in all where picked.count < limit && !picked.contains(candidate) {
+            picked.append(candidate)
+        }
+        return picked
+    }
+
     var count: Int { pages.values.map(\.count).reduce(0, +) }
 
     private struct File: Decodable {
@@ -279,6 +302,16 @@ struct BoardBlueprintsSheet: View {
                                 row(blueprint, showsCategory: section.category == nil, showsSource: offersOfficialOnly)
                             }
                             .bighelpPlainButtonStyle()
+                            .contextMenu {
+                                if !BlueprintAdLib(blueprint.text).blanks.isEmpty {
+                                    Button("Fill blanks in message box", systemImage: "character.cursor.ibeam") {
+                                        TemplateUsage.shared.recordUse(blueprint.id)
+                                        let text = blueprint.text
+                                        dismiss()
+                                        onEdit(text)
+                                    }
+                                }
+                            }
                             .listRowBackground(theme.surface)
                             .accessibilityIdentifier("board.blueprint.\(blueprint.id)")
                         }
@@ -378,14 +411,17 @@ struct BoardBlueprintsSheet: View {
         .contentShape(.rect)
     }
 
-    /// [Placeholders] in the action color, so it's clear what to fill in.
+    /// [Placeholders] as tinted inline slot highlights, so it's clear what to fill in.
     static func highlighted(_ text: String, placeholder: Color) -> AttributedString {
         var result = AttributedString()
         var rest = Substring(text)
         while let open = rest.firstIndex(of: "["), let close = rest[open...].firstIndex(of: "]") {
             result += AttributedString(String(rest[..<open]))
-            var slot = AttributedString(String(rest[open...close]))
+            let rawSlot = rest[rest.index(after: open)..<close].trimmingCharacters(in: .whitespaces)
+            var slot = AttributedString(rawSlot.isEmpty ? String(rest[open...close]) : "[\(rawSlot)]")
             slot.foregroundColor = placeholder
+            slot.backgroundColor = placeholder.opacity(0.15)
+            slot.inlinePresentationIntent = .stronglyEmphasized
             result += slot
             rest = rest[rest.index(after: close)...]
         }
@@ -394,6 +430,58 @@ struct BoardBlueprintsSheet: View {
     }
 
     @BighelpThemeReader private var theme
+}
+
+/// A 1-tap starter card on an empty board (`2A`): shows the Blueprint with its fill-in slots
+/// highlighted in the person's action color, and opens directly into `ChatComposer` chip mode (`2B`).
+struct BlueprintStarterCardView: View {
+    let blueprint: BoardBlueprint
+    let action: () -> Void
+
+    @BighelpThemeReader private var theme
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    var body: some View {
+        let blankCount = BlueprintAdLib(blueprint.text).blanks.count
+        let slotDetail = blankCount == 0
+            ? String(localized: "Ready to send")
+            : (blankCount == 1 ? String(localized: "1 fill-in chip") : String(localized: "\(blankCount) fill-in chips"))
+        let shape = RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous)
+
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: BighelpTokens.space8 - 2) {
+                Text(BoardBlueprintsSheet.highlighted(blueprint.text, placeholder: theme.action))
+                    .font(.bighelp(.subheadline))
+                    .foregroundStyle(theme.primaryText)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(spacing: BighelpTokens.space4) {
+                    Text(verbatim: "\(blueprint.category.title) · \(slotDetail)")
+                        .font(.bighelp(.caption, weight: .semibold))
+                        .foregroundStyle(theme.secondaryText)
+                    Spacer(minLength: 0)
+                    Image(systemName: "arrow.up.right")
+                        .font(.bighelp(.caption2, weight: .bold))
+                        .foregroundStyle(theme.action)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(.horizontal, BighelpTokens.space16 - 2)
+            .padding(.vertical, BighelpTokens.space12)
+            .background(shape.fill(theme.surface))
+            .overlay {
+                shape.strokeBorder(
+                    contrast == .increased ? theme.primaryText : theme.border,
+                    lineWidth: contrast == .increased ? 1.5 : BighelpTokens.hairline
+                )
+            }
+            .contentShape(shape)
+        }
+        .buttonStyle(.bighelpTilePress)
+        .accessibilityIdentifier("board.starter.\(blueprint.id)")
+    }
 }
 
 /// Search, bighelp-only, topic and order for blueprints.

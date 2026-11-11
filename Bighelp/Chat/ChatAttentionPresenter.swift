@@ -119,7 +119,12 @@ private struct ChatAttentionPresenter: ViewModifier {
                 }
             }
             .bighelpSheet(isPresented: $isPresented) {
-                if let client { DirectHermesAttentionView(client: client) }
+                if let client {
+                    DirectHermesAttentionView(client: client, agentName: agentName())
+                        .presentationDetents([.medium, .large])
+                        .presentationDragIndicator(.visible)
+                        .bighelpSheetSize(.standard)
+                }
             }
             .onChange(of: prompts.map(\.attentionKey), initial: true) { _, _ in popUpNewArrivals() }
             .onChange(of: canPopUp) { _, _ in popUpNewArrivals() }

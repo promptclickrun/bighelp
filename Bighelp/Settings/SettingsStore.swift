@@ -282,6 +282,36 @@ final class SettingsStore {
         }
     }
 
+    /// Settings › Modes: chooses the primary home mode directly, turning on Code mode when Code is picked.
+    func selectHomeMode(_ mode: BighelpMode) {
+        let changed = mode != currentMode
+        switch mode {
+        case .bots:
+            simpleBotsEnabled = true
+        case .chat:
+            simpleBotsEnabled = false
+            startExperience = .bighelp
+            experience = .bighelp
+        case .code:
+            simpleBotsEnabled = false
+            codeModeEnabled = true
+            startExperience = .code
+            experience = .code
+        }
+        if changed {
+            Telemetry.featureUsed(.modeSwitched)
+        }
+    }
+
+    /// Settings › Modes: keeps multi-computer roster visibility aligned across Bots and Chat/Code.
+    var allComputersTogether: Bool {
+        get { simpleBotsEnabled ? simpleBotsMultiGateway : allHostsMode }
+        set {
+            allHostsMode = newValue
+            simpleBotsMultiGateway = newValue
+        }
+    }
+
     var preferredBrowser: ChatBrowserPreference {
         didSet { defaults.set(preferredBrowser.rawValue, forKey: Keys.preferredBrowser) }
     }

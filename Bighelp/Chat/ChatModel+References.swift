@@ -57,6 +57,7 @@ extension ChatModel {
         hasDirtyPersistence = false
         hasDirtyContent = false
         isReplacingReferenceDraft = true
+        blueprintDraft = nil
         draft = ""
         replyDraft = nil
         draftAttachments = []
@@ -110,6 +111,7 @@ extension ChatModel {
             return false
         }
         guard !richDraftRecovery.hasUnexportedChanges else { return false }
+        guard blueprintDraft?.isComplete != false else { return false }
         guard !referenceOwnerRetired, referenceSubmission == nil, !referenceSendInFlight,
               referenceSelections.isEmpty, !ReferenceCodec.decode(draft).hasValidAppendix else {
             failureMessage = "References must be verified before sending. A pending reference message must be reconciled, not retried."

@@ -120,6 +120,7 @@ private struct DirectHermesControlsView: View {
 
 struct DirectHermesAttentionView: View {
     let client: DirectHermesConversationClient
+    var agentName: String? = nil
     @Environment(\.dismiss) private var dismiss
 
     /// Changes when the chat gets a new connection or the list empties or fills.
@@ -130,35 +131,7 @@ struct DirectHermesAttentionView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                // The connection closed while bighelp was away. Hermes sends
-                // what's still waiting again once it's back.
-                if client.prompts.isEmpty, let status = HostConnectionStatus(chat: .reconnecting) {
-                    Section {
-                        HStack(spacing: BighelpTokens.space12) {
-                            BighelpConnectionIndicator(phase: status.phase)
-                            Text(status.label)
-                        }
-                        .accessibilityElement(children: .combine)
-                        .accessibilityIdentifier("direct-hermes.attention.reconnecting")
-                    }
-                }
-                ForEach(client.prompts) { prompt in
-                    DirectHermesPromptResponseView(client: client, prompt: prompt)
-                }
-                Section {} footer: {
-                    Text("Later keeps it waiting. Answer any time from the bar at the top of the chat.")
-                }
-            }
-            .navigationTitle("Needs attention")
-            // "Later", not "Done": the card's own Done is what answers.
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Later") { dismiss() }.keyboardShortcut(.cancelAction).bighelpToolbarText() } }
-            .onChange(of: client.prompts.map(\.id)) { _, promptIDs in
-                // Answered, here or elsewhere. A dropped connection also empties
-                // the list, but then the chat isn't live and this stays open.
-                if promptIDs.isEmpty, client.hasAuthoritativeEventCoverage { dismiss() }
-            }
+        NeedsYouDeckView(focusedClient: client, focusedAgentName: agentName)
             .task(id: Waiting(client: ObjectIdentifier(client), isEmpty: client.prompts.isEmpty,
                               isLive: client.hasAuthoritativeEventCoverage)) {
                 // Back online with nothing resent: it was answered or expired while away.
@@ -167,7 +140,6 @@ struct DirectHermesAttentionView: View {
                 guard !Task.isCancelled, client.prompts.isEmpty else { return }
                 dismiss()
             }
-        }
     }
 }
 

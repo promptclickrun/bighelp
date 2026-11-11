@@ -1036,6 +1036,11 @@ final class ShellFeatureStore {
         return draftJournal?.pendingDraft(for: id).map(SessionRecord.holdsDraft)
     }
 
+    /// Every chat the app holds open, for what waits on the person across them (`NeedsYouDeckView`).
+    var allPreparedChatModels: [ChatModel] {
+        Array(chatModels.values)
+    }
+
     func flushChatPersistence() {
         chatModels.values.forEach { $0.flushPersistence() }
         catalog.flushPersistence()

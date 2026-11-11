@@ -3,6 +3,11 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+private struct PendingComposerDeliveryKey: Equatable {
+    let conversationID: String
+    let pendingText: String?
+}
+
 @MainActor
 struct ChatDestinationView: View {
     let model: ChatModel
@@ -704,7 +709,10 @@ struct ChatDestinationView: View {
             guard !selections.isEmpty else { return }
             Task { await importPhotos(selections) }
         }
-        .task(id: appState.pendingComposerText) {
+        .task(id: PendingComposerDeliveryKey(conversationID: model.conversationID,
+                                             pendingText: appState.pendingComposerText)) {
+            // Wait for the allocated session; `local-draft:` is immediately replaced by NewChatCoordinator.
+            guard !model.isAwaitingAuthoritativeSessionAllocation else { return }
             // Only the chat on top takes the board's text: a new chat, or, from a bot's Dashboard,
             // that bot's own chat, history and all.
             let isOnTop = appState.path.last == .chat(conversationID: model.conversationID)
@@ -717,6 +725,9 @@ struct ChatDestinationView: View {
                 return
             }
             let text = pending.text
+            if !pending.sends, model.beginBlueprintDraft(text) {
+                return
+            }
             model.draft = text
             guard pending.sends else { return }
             // A new chat connects a moment after it opens; send once it can, and leave the

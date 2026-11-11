@@ -804,6 +804,22 @@ extension RootShellView {
             .task(id: usageWidgetKey) { await followUsageWidget() }
             .task(id: workflowsWidgetKey) { await followWorkflowsWidget() }
             .environment(\.providerUsage, providerUsage)
+            .bighelpSheet(isPresented: $isNeedsYouPresented) {
+                NeedsYouDeckView(context: needsYouDeckContext)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                    .bighelpSheetSize(.standard)
+            }
+            .environment(\.needsYouDeckContext, needsYouDeckContext)
+            #if DEBUG
+            .task {
+                guard !didPresentDemoNeedsYou,
+                      ProcessInfo.processInfo.arguments.contains("-demo-needs-you") else { return }
+                didPresentDemoNeedsYou = true
+                await needsYouDeckContext.refresh()
+                isNeedsYouPresented = true
+            }
+            #endif
             .task(id: hostReactionsKey) { await syncHostReactions(hostReactionsKey) }
             // Widgets show the home agent's Feed and Goals in the app's colors.
             .onChange(of: agentBoard.items, initial: true) { _, _ in BighelpWidgetExtras.shared.update(board: agentBoard) }
@@ -937,15 +953,17 @@ extension RootShellView {
             places: settings.appLayout.menuPlaces,
             onBoard: { tab in afterClosingHomeSheets { openBoard(tab) } },
             unread: boardUnreadTabs,
+            needsYou: menuNeedsYou,
             code: settings.experience == .code ? codeMenu : nil,
             experience: experienceSwitch
         )
     }
 
-    /// Something new in Feed, Ideas or Goals while ☰ is the only way there, or a share waiting to be
-    /// sent: a dot on ☰.
+    /// Something new in Feed, Ideas or Goals while ☰ is the only way there, a share waiting to be
+    /// sent, or something waiting in Needs you: a dot on ☰.
     var menuHasUnread: Bool {
         !boardUnreadTabs.subtracting(barTabs).isEmpty || PendingShareCenter.shared.waitingCount > 0
+            || menuNeedsYou != nil
     }
 
 }

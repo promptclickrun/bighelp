@@ -78,6 +78,8 @@ struct BighelpMenuDestinations {
     var onBoard: ((AppTab) -> Void)? = nil
     /// Feed, Ideas and Goals with something new, for a dot on their rows.
     var unread: Set<AppTab> = []
+    /// Items across chats, agents or workflows waiting on the person (`NeedsYouDeckView`); nil when 0.
+    var needsYou: (count: Int, open: () -> Void)? = nil
     /// Code mode's own places, listed instead of the everyday ones while it's the home.
     var code: Code? = nil
     /// Settings › Code mode on: the switch between Chat and Code mode, on top.
@@ -137,6 +139,16 @@ struct BighelpMenu<Recent: View>: View {
 
     private var mainSection: some View {
         Section {
+            if let needsYou = destinations.needsYou, needsYou.count > 0 {
+                row(
+                    String(localized: "Needs you"),
+                    detail: needsYou.count == 1 ? String(localized: "1 waiting") : String(localized: "\(needsYou.count) waiting"),
+                    symbol: "hand.raised.fill",
+                    id: "menu.needs-you",
+                    isNew: true,
+                    action: needsYou.open
+                )
+            }
             if let code = destinations.code {
                 codeRows(code)
             } else {

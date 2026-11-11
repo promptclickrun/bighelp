@@ -138,6 +138,8 @@ struct RootShellView: View {
     /// The connected computer's Workflows (☰ › Workflows), when its plugin has them.
     @State var workflowsStore: WorkflowsStore?
     @State var workflowsAvailability = WorkflowsAvailability()
+    @State var isNeedsYouPresented = false
+    @State var didPresentDemoNeedsYou = false
     #if os(visionOS)
     @Environment(\.openWindow) var openWindow
     #endif
@@ -723,7 +725,9 @@ struct RootShellView: View {
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .navigationDestination(for: AppRoute.self) { route in
             // Pushed screens don't reliably inherit values set below the stack.
-            routeDestination(route).environment(\.providerUsage, providerUsage)
+            routeDestination(route)
+                .environment(\.providerUsage, providerUsage)
+                .environment(\.needsYouDeckContext, needsYouDeckContext)
                 // The root is hidden under a pushed screen and can't present; the top screen does.
                 .modifier(OpenErrorPresentation(root: self))
         }

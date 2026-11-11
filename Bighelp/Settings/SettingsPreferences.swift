@@ -373,6 +373,22 @@ enum BighelpMode: String, CaseIterable, Identifiable, Sendable {
         case .code: String(localized: "Code")
         }
     }
+
+    var shortDetail: String {
+        switch self {
+        case .bots: String(localized: "Calm home, just your bots")
+        case .chat: String(localized: "Chats, Feed, Ideas & Goals")
+        case .code: String(localized: "Worktrees, diffs & PRs")
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .bots: "bubble.left.and.bubble.right.fill"
+        case .chat: "square.grid.2x2.fill"
+        case .code: "chevron.left.forwardslash.chevron.right"
+        }
+    }
 }
 
 /// The Unified Mode Toggle in a home's header: the modes on offer, the one showing, and the switch.

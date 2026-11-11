@@ -94,6 +94,50 @@ final class ChatModel {
             persistSession()
         }
     }
+    /// An active Blueprint with `[placeholder]` blanks being filled via inline chips (`ChatBlueprintDraft`).
+    var blueprintDraft: ChatBlueprintDraft?
+
+    @discardableResult
+    func beginBlueprintDraft(_ source: String) -> Bool {
+        guard let next = ChatBlueprintDraft(source: source) else { return false }
+        blueprintDraft = next
+        draft = next.filledText
+        return true
+    }
+
+    func updateBlueprintBlank(_ blankID: Int, value: String) {
+        guard var current = blueprintDraft else { return }
+        current.setValue(value, for: blankID)
+        blueprintDraft = current
+        draft = current.filledText
+    }
+
+    func pickBlueprintSuggestion(_ suggestion: String, for blankID: Int) {
+        guard var current = blueprintDraft else { return }
+        current.setValue(suggestion, for: blankID)
+        current.advanceToNextBlank(preferringUnfilled: true)
+        blueprintDraft = current
+        draft = current.filledText
+    }
+
+    func focusBlueprintBlank(_ blankID: Int) {
+        guard var current = blueprintDraft, current.blanks.contains(where: { $0.id == blankID }) else { return }
+        current.activeBlankID = blankID
+        blueprintDraft = current
+    }
+
+    func advanceBlueprintBlank(preferringUnfilled: Bool = false) {
+        guard var current = blueprintDraft else { return }
+        current.advanceToNextBlank(preferringUnfilled: preferringUnfilled)
+        blueprintDraft = current
+    }
+
+    func convertBlueprintToPlainText() {
+        guard let current = blueprintDraft else { return }
+        let resolved = current.filledText
+        blueprintDraft = nil
+        draft = resolved
+    }
     var slashCommandLoadTrigger: Bool { draft.hasPrefix("/") }
     var items: [TimelineItem]
     var draftAttachments: [ChatAttachment] = []
@@ -548,6 +592,7 @@ final class ChatModel {
         // message settles it first. Only a stop on its way does.
         guard botModeRoom?.nativeRetryJournal == nil, !isBotModeStopInFlight else { return false }
         guard !richDraftRecovery.hasUnexportedChanges else { return false }
+        if let blueprintDraft, !blueprintDraft.isComplete { return false }
         let hasText = draftShape.hasText
         let attachmentsSupported = orderedDraftAttachments.isEmpty || (!isBotMode && orderedDraftAttachments.allSatisfy { value in
             if let selection = value.pdfSelection { return pdfAttachmentTarget == selection.target }
@@ -579,6 +624,7 @@ final class ChatModel {
             if native.hasPendingSubmissionForReason { return "a message is still being sent" }
         }
         if isAwaitingAuthoritativeSessionAllocation { return "starting the chat on the host" }
+        if let blueprintDraft, !blueprintDraft.isComplete { return "fill in the blueprint blanks" }
         if richDraftRecovery.hasUnexportedChanges { return "saving the draft" }
         if referenceSubmission != nil || referenceSendInFlight { return "a message is still being sent" }
         if draftAttachmentImport != nil { return "attachments are still being added" }

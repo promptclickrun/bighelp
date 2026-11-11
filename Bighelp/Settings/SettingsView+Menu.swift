@@ -57,6 +57,7 @@ extension SettingsView {
     /// The homes in use, as the Modes row says them.
     private var modesDetail: String {
         if settings.simpleBotsEnabled { return String(localized: "Bots mode") }
+        if settings.currentMode == .code { return String(localized: "Code") }
         return settings.codeModeEnabled ? String(localized: "Chat and Code") : String(localized: "Chat")
     }
 

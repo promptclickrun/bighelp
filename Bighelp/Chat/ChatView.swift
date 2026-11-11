@@ -632,6 +632,9 @@ struct ChatView: View {
                     }
                     // The messages stop at the fold: the timeline keeps clear of all of this.
                     .frame(minHeight: laptopDeckHeight)
+                    // The Skills and commands list takes the room under the header before the spacer
+                    // does. Offered an equal share, a long list showed about two rows.
+                    .layoutPriority((referenceHub ?? fallbackReferenceHub).isPresented && laptopDeckHeight == 0 ? 1 : 0)
                     #if !os(visionOS)
                     // The same soft blur under the message box and the tab bar.
                     .background {

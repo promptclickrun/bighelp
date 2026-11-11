@@ -3,6 +3,24 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.83
+
+### New
+
+- **Needs you:** one sheet shows each approval, question and workflow sign-off that waits on you. Each one has a tab, and you answer it there. The menu shows a Needs you row only while something waits. A question in a chat opens the same sheet.
+- **Read before you approve:** a long command, or the file of a workflow sign-off, opens in full before Approve works. Tap Show all.
+- **Starters on an empty Feed or Ideas page:** the page shows three starter blueprints. Tap one to put it in the message box.
+- **Blueprints in the message box:** each blank of a blueprint is now a chip in your message. Tap a chip and type its value, or select one of its choices. Send stays off until each blank has a value. To change the full text, tap the pencil.
+
+### Changed
+
+- **Settings › Modes:** one picker sets the home that bighelp opens in: Bots, Chat or Code. Code mode has its own switch. You can keep Code mode on with a Chat home, or turn it off.
+- **Blueprints:** a blueprint from each page now goes to the message box. The separate fill-in page is gone.
+
+### Fixed
+
+- **Text for a new chat:** tap Ask, Discuss or a blueprint on Feed, Ideas or Goals. The new chat now always has the text in its message box. Before, the message box was sometimes empty.
+
 ## 2.6.82
 
 ### New

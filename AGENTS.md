@@ -683,6 +683,11 @@ change in both repos.
   belongs in that context. Rows off screen hold their loaders still (`bighelpLoaderMotionOverride`). SwiftUI
   updates a hosted row on its own renderer thread while the row animates, so a closure it calls there (an
   environment transform) must not be made on the main actor: it traps (`hostedEnvironment(from:)`).
+- **A spacer takes half the room:** in a `VStack`, a `Spacer` and a view with a height range share the free
+  height equally. The chat's Skills and commands list got half the room over the message box and showed two
+  rows; the list's container takes `layoutPriority(1)` while it shows (`ChatView`).
+- **White pages in dark mode:** a page that stays white (the Drawing sheet) draws its own buttons in fixed
+  colors and pins `PKToolPicker` to the light style. A navigation bar's buttons follow the app's appearance.
 - **Type-checker timeouts:** very large `body`s (`RootShellView`, `BighelpApp`) time out the type checker. Pull
   pieces out into functions or named `ViewModifier`s.
 - **Text styling:** styled text in the composer must pass attributes and theme colors. Plain `String` replacements

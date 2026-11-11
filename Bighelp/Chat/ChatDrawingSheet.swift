@@ -24,31 +24,50 @@ struct ChatDrawingSheet: View {
     @State private var hasStrokes = false
 
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            HStack {
+                Button("Cancel", action: onCancel)
+                    .buttonStyle(PaperButtonStyle(isProminent: false))
+                    .accessibilityIdentifier("chat.drawing.cancel")
+                Spacer()
+                Button("Add") {
+                    if let image = canvas.picture() { onAdd(image) } else { onCancel() }
+                }
+                .buttonStyle(PaperButtonStyle(isProminent: true))
+                .disabled(!hasStrokes)
+                .accessibilityIdentifier("chat.drawing.add")
+            }
+            .padding(.horizontal, BighelpTokens.space16)
+            .padding(.vertical, BighelpTokens.space12)
             ChatDrawingCanvas(box: canvas, hasStrokes: $hasStrokes)
                 .ignoresSafeArea(edges: .bottom)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel", action: onCancel)
-                            .accessibilityIdentifier("chat.drawing.cancel")
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Add") {
-                            if let image = canvas.picture() { onAdd(image) } else { onCancel() }
-                        }
-                        .disabled(!hasStrokes)
-                        .accessibilityIdentifier("chat.drawing.add")
-                    }
-                }
         }
-        // The page is paper in both appearances, so the picture is what was drawn.
-        .preferredColorScheme(.light)
+        .background(Color.white)
+        .presentationBackground(Color.white)
         .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
         // A stroke that starts near the top must draw, not pull the sheet down.
         .interactiveDismissDisabled()
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("chat.drawing")
+    }
+
+    /// The page is white paper in both appearances, so the picture is what was drawn. Its buttons
+    /// have their own fixed colors: a navigation bar's follow the app's appearance, and in dark
+    /// mode they were white words on the white page.
+    private struct PaperButtonStyle: ButtonStyle {
+        let isProminent: Bool
+        @Environment(\.isEnabled) private var isEnabled
+
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label
+                .font(.bighelp(.body).weight(.semibold))
+                .foregroundStyle(isProminent ? Color.white : Color.black)
+                .padding(.horizontal, BighelpTokens.space16)
+                .frame(minWidth: BighelpTokens.hitTarget, minHeight: BighelpTokens.hitTarget)
+                .background(isProminent ? Color.black : Color(white: 0.92), in: .capsule)
+                .opacity(isEnabled ? (configuration.isPressed ? 0.6 : 1) : 0.3)
+                .contentShape(.capsule)
+        }
     }
     #else
     var body: some View { EmptyView() }
@@ -95,6 +114,10 @@ private struct ChatDrawingCanvas: UIViewRepresentable {
         view.accessibilityIdentifier = "chat.drawing.canvas"
         box.view = view
         let picker = context.coordinator.picker
+        // The palette and its colors go by the white page too. Left to dark mode, the picker
+        // takes its black as white.
+        picker.overrideUserInterfaceStyle = .light
+        picker.colorUserInterfaceStyle = .light
         picker.addObserver(view)
         picker.setVisible(true, forFirstResponder: view)
         // The picker shows for the first responder, which a view becomes only once it's in a window.

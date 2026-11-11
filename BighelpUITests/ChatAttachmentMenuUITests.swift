@@ -63,6 +63,53 @@ final class ChatAttachmentMenuUITests: BighelpUITestCase {
         XCTAssertTrue(app.staticTexts["1 photo"].firstMatch.waitForExistence(timeout: 5), "Still one picture")
     }
 
+    /// The page is white paper in dark mode too, so its buttons and its ink must stay dark.
+    @MainActor
+    func testTheDrawingPageReadsInDarkMode() throws {
+        let app = launch(appearance: "dark")
+        app.buttons["chat.attachment"].firstMatch.tap()
+        let drawing = app.buttons["Drawing"].firstMatch
+        XCTAssertTrue(drawing.waitForExistence(timeout: 5))
+        drawing.tap()
+        let canvas = app.descendants(matching: .any)["chat.drawing.canvas"].firstMatch
+        XCTAssertTrue(canvas.waitForExistence(timeout: 8))
+        let cancel = app.buttons["chat.drawing.cancel"].firstMatch
+        XCTAssertGreaterThan(try darkShare(of: cancel.screenshot().image), 0.02, "Cancel's words are dark on the page")
+
+        let blank = try darkShare(of: canvas.screenshot().image, band: 0.35...0.65)
+        canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5))
+            .press(forDuration: 0.1, thenDragTo: canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)))
+        let add = app.buttons["chat.drawing.add"].firstMatch
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: add)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 5), .completed)
+        evidence("drawing-dark", app)
+        XCTAssertGreaterThan(try darkShare(of: canvas.screenshot().image, band: 0.35...0.65), blank + 0.001,
+                             "The stroke shows on the white page")
+        XCTAssertGreaterThan(try darkShare(of: add.screenshot().image), 0.02, "Add reads on the page")
+        let palette = try darkShare(of: XCUIScreen.main.screenshot().image, band: 0.86...0.97)
+        XCTAssertLessThan(palette, 0.5, "The tool palette is light, like the page")
+    }
+
+    /// The share of dark pixels, in a band of the picture's height.
+    private func darkShare(of image: UIImage, band: ClosedRange<Double> = 0...1) throws -> Double {
+        let source = try XCTUnwrap(image.cgImage)
+        let width = source.width, height = source.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let context = try XCTUnwrap(CGContext(data: &pixels, width: width, height: height, bitsPerComponent: 8,
+                                              bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let rows = Int(Double(height) * band.lowerBound)..<max(Int(Double(height) * band.upperBound), 1)
+        var dark = 0
+        for row in rows {
+            for column in 0..<width {
+                let at = (row * width + column) * 4
+                if Int(pixels[at]) + Int(pixels[at + 1]) + Int(pixels[at + 2]) < 300 { dark += 1 }
+            }
+        }
+        return Double(dark) / Double(rows.count * width)
+    }
+
     @MainActor
     private func launch(appearance: String) -> XCUIApplication {
         let app = makeApp()

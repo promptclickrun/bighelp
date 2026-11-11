@@ -256,6 +256,41 @@ final class ReferenceHubUITests: BighelpUITestCase {
         try exerciseDrawer(appearance: "light", largeText: false)
     }
 
+    /// A lone slash lists every command, and the list shows them: it once kept to two rows.
+    @MainActor
+    func testTheCommandListTakesTheRoomAboveTheMessageBox() throws {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", "dark"]
+        app.launch()
+        let menu = app.buttons["home.drawer.open"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        menu.tap()
+        app.buttons["menu.new-chat"].tap()
+        let editor = app.textViews["chat.composer.text"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        editor.tap()
+        editor.typeText("/")
+        let drawer = app.otherElements["reference-hub.drawer"]
+        XCTAssertTrue(drawer.waitForExistence(timeout: 5))
+        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "reference-hub.command."))
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 5))
+        let evidence = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        evidence.name = "reference-hub-command-list-height"
+        evidence.lifetime = .keepAlways
+        add(evidence)
+        let note = XCTAttachment(string: "drawer \(drawer.frame) editor \(editor.frame) keyboard \(app.keyboards.firstMatch.exists ? app.keyboards.firstMatch.frame : .zero) rows \(rows.count)")
+        note.name = "reference-hub-command-list-frames"
+        note.lifetime = .keepAlways
+        add(note)
+        XCTAssertGreaterThanOrEqual(rows.count, 5)
+        XCTAssertLessThanOrEqual(editor.frame.maxY, app.keyboards.firstMatch.frame.minY, "The message box stays over the keyboard")
+        for index in 0..<rows.count {
+            let row = rows.element(boundBy: index)
+            XCTAssertGreaterThanOrEqual(row.frame.minY, drawer.frame.minY, "Row \(index) is inside the list")
+            XCTAssertLessThanOrEqual(row.frame.maxY, drawer.frame.maxY + 1, "Row \(index) shows whole")
+        }
+    }
+
     @MainActor
     func testDarkLargeTextDrawerPreservesKeyboardAndDraft() throws {
         try exerciseDrawer(appearance: "dark", largeText: true)

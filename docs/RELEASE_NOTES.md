@@ -3,6 +3,17 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.82
+
+### New
+
+- **Delete an archived chat:** in Archived Chats, each chat has a More button with Restore and Delete. Delete asks you first, then removes the chat and its history from your computer. If the chat is still open in a different app, the row tells you.
+
+### Fixed
+
+- **Skills and commands list:** when you type a slash in a chat, the list now uses the room above the message box. Before, it showed approximately two rows.
+- **Drawing in dark mode:** the Cancel and Add buttons are now easy to read on the white page. The tool palette is light, and black stays black.
+
 ## 2.6.81
 
 ### Fixed

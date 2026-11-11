@@ -1383,6 +1383,14 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         try DirectHermesSessionValidation.coordinate(chat.storedID)
         let response = try await sessionEdits.delete(chat.storedID, profile: chat.profileID)
         guard response["ok"]?.boolean == true else { throw WorkspaceClientError.invalidResponse }
+        let stored = DirectHermesSessionIdentity.key(chat.storedID)
+        let profile = DirectHermesSessionIdentity.key(chat.profileID)
+        // A chat archived on another device can still be known here.
+        for (id, binding) in bindings
+        where DirectHermesSessionIdentity.key(binding.coordinate.profileID) == profile && identityKeys(binding).contains(stored) {
+            forgetLocalCopy(of: id)
+        }
+        archivedKeys.remove(stored)
     }
 
     /// Archived by someone (in bighelp, Hermes Desktop, the CLI…), not by Hermes' idle sweep, which marks
@@ -1452,14 +1460,19 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
               response["already_absent"] == nil || response["already_absent"]?.boolean != nil else {
             throw WorkspaceClientError.invalidResponse
         }
-        setBinding(nil, for: record.id)
-        historyWindows[record.id] = nil
-        historyProjections[record.id] = nil
-        historyCacheOrder.removeAll { $0 == record.id }
-        historyCacheBytes[record.id] = nil
-        hydrationTokens[record.id] = nil
+        forgetLocalCopy(of: record.id)
         return .init(owner: owner, profileID: binding.coordinate.profileID, rowID: catalog.rowID,
                      alreadyAbsent: response["already_absent"]?.boolean == true)
+    }
+
+    /// Drops what this client holds for a chat Hermes no longer has.
+    private func forgetLocalCopy(of id: String) {
+        setBinding(nil, for: id)
+        historyWindows[id] = nil
+        historyProjections[id] = nil
+        historyCacheOrder.removeAll { $0 == id }
+        historyCacheBytes[id] = nil
+        hydrationTokens[id] = nil
     }
 
     private func perform(_ operation: WorkspaceOperation, _ payload: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] {

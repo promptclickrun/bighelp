@@ -58,6 +58,23 @@ struct NativeWorkspaceSessionBridgeTests {
         #expect(try bridge.profileSessionOwnership(profileID: "sage").isEmpty)
     }
 
+    /// The bridge is the catalog client a real host uses, so Archived Chats offers Delete only if it says so.
+    @Test func archivedChatsOfferDeleteOnARealHost() throws {
+        let suite = "bridge-archived-delete-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let root = FileManager.default.temporaryDirectory.appending(path: suite)
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: root)
+        }
+        let hosts = BighelpHostRegistry(root: root.appending(path: "hosts"), keychainService: suite,
+                                        independentRoot: root.appending(path: "independent"), defaults: defaults)
+        let bridge = try NativeWorkspaceSessionBridge(connections: WorkspaceConnectionStore(hosts: hosts),
+                                                      authority: WorkspaceAuthority.fixture(id: "bridge-archived"),
+                                                      directory: root.appending(path: "sessions"))
+        #expect(SessionCatalogStore(client: bridge).canDeleteArchivedChats)
+    }
+
     /// Each connection restores the saved creation records. One it refuses (2.6.30 saved such a Bot Chat
     /// record) was thrown and stopped every chat on that computer; now only that record goes.
     @Test func aSavedCreationRecordTheConnectionRefusesIsLeftOut() throws {

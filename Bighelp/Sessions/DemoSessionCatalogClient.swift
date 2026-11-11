@@ -3,6 +3,9 @@ import Foundation
 @MainActor
 final class DemoSessionCatalogClient: SessionCatalogClient {
     private var records: [SessionRecord]
+    private var archived = DemoSessionCatalogClient.archivedFixtures
+
+    var canDeleteArchivedChats: Bool { true }
 
     init(records: [SessionRecord] = DemoSessionCatalogClient.fixtureRecords) {
         self.records = records
@@ -20,6 +23,20 @@ final class DemoSessionCatalogClient: SessionCatalogClient {
 
     func list() async throws -> [SessionRecord] {
         records
+    }
+
+    func archivedChats() async throws -> [SessionArchivedChat] { archived }
+
+    func restoreArchivedChat(_ chat: SessionArchivedChat) async throws {
+        archived.removeAll { $0.id == chat.id }
+    }
+
+    /// The Telegram row is still open on its gateway, so Hermes refuses it.
+    func deleteArchivedChat(_ chat: SessionArchivedChat) async throws {
+        guard chat.storedID != "demo-archived-garage" else {
+            throw WorkspaceClientError.rejected(code: "4023", message: HermesRefusalMessage("cannot delete an active session"))
+        }
+        archived.removeAll { $0.id == chat.id }
     }
 
     func create(kind: SessionKind, agentIDs: [String]) async throws -> SessionRecord {
@@ -98,6 +115,15 @@ final class DemoSessionCatalogClient: SessionCatalogClient {
             throw SessionCatalogError.invalidSession
         }
     }
+
+    static let archivedFixtures: [SessionArchivedChat] = [
+        .init(profileID: "travel", storedID: "demo-archived-lisbon", title: "Packing list for the Lisbon trip",
+              source: "imessage", preview: nil, lastActive: Date(timeIntervalSinceNow: -86_400)),
+        .init(profileID: "finance", storedID: "demo-archived-garage", title: "Fix the garage door opener",
+              source: "telegram", preview: nil, lastActive: Date(timeIntervalSinceNow: -259_200)),
+        .init(profileID: "travel", storedID: "demo-archived-book-club", title: "Book club notes",
+              source: "bighelp", preview: nil, lastActive: Date(timeIntervalSinceNow: -691_200)),
+    ]
 
     static let fixtureRecords: [SessionRecord] = [
         longTranscriptFixture,

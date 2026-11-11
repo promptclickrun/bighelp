@@ -56,6 +56,9 @@ final class ChatModel {
             }
             let shape = ChatDraftShape(draft)
             if shape != draftShape { draftShape = shape }
+            // The chips are the draft: once the box holds anything else (sent, cleared, replaced),
+            // they go, so they never outlive their message or write over other text.
+            if let blueprintDraft, blueprintDraft.filledText != draft { self.blueprintDraft = nil }
             if !isReplacingReferenceDraft, !oldValue.utf8.elementsEqual(draft.utf8) {
                 referenceCanonicalSource = nil
                 referenceDraftID = nil
@@ -94,30 +97,36 @@ final class ChatModel {
             persistSession()
         }
     }
-    /// An active Blueprint with `[placeholder]` blanks being filled via inline chips (`ChatBlueprintDraft`).
-    var blueprintDraft: ChatBlueprintDraft?
+    /// A blueprint in the message box with its `[blanks]` as chips (`ChatBlueprintDraft`). `draft`
+    /// always holds its text as filled in so far; changing the draft any other way ends it.
+    private(set) var blueprintDraft: ChatBlueprintDraft?
 
+    /// Puts a blueprint in the message box with its blanks as chips. False when it has none.
     @discardableResult
     func beginBlueprintDraft(_ source: String) -> Bool {
         guard let next = ChatBlueprintDraft(source: source) else { return false }
-        blueprintDraft = next
-        draft = next.filledText
+        setBlueprintDraft(next)
         return true
+    }
+
+    /// Takes over a blueprint from the blank canvas this chat replaces, when it holds the same text.
+    func adoptBlueprintDraft(_ blueprint: ChatBlueprintDraft) {
+        guard blueprintDraft == nil, blueprint.filledText == draft else { return }
+        blueprintDraft = blueprint
     }
 
     func updateBlueprintBlank(_ blankID: Int, value: String) {
         guard var current = blueprintDraft else { return }
         current.setValue(value, for: blankID)
-        blueprintDraft = current
-        draft = current.filledText
+        setBlueprintDraft(current)
     }
 
-    func pickBlueprintSuggestion(_ suggestion: String, for blankID: Int) {
+    /// A choice picked for a blank: fills it and moves to the next empty one.
+    func pickBlueprintOption(_ option: String, for blankID: Int) {
         guard var current = blueprintDraft else { return }
-        current.setValue(suggestion, for: blankID)
+        current.setValue(option, for: blankID)
         current.advanceToNextBlank(preferringUnfilled: true)
-        blueprintDraft = current
-        draft = current.filledText
+        setBlueprintDraft(current)
     }
 
     func focusBlueprintBlank(_ blankID: Int) {
@@ -132,11 +141,16 @@ final class ChatModel {
         blueprintDraft = current
     }
 
+    /// Back to plain text: the message as filled in so far, in the ordinary message box.
     func convertBlueprintToPlainText() {
-        guard let current = blueprintDraft else { return }
-        let resolved = current.filledText
         blueprintDraft = nil
-        draft = resolved
+    }
+
+    /// The blueprint first, then its text: the draft's own check sees the two agree.
+    private func setBlueprintDraft(_ next: ChatBlueprintDraft) {
+        blueprintDraft = next
+        let text = next.filledText
+        if draft != text { draft = text }
     }
     var slashCommandLoadTrigger: Bool { draft.hasPrefix("/") }
     var items: [TimelineItem]

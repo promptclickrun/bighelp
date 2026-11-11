@@ -126,8 +126,7 @@ struct BoardBlueprintCatalog: Sendable {
         groups(for: .goal).flatMap(\.blueprints).filter { $0.goalCategory == category }
     }
 
-    /// Three distinct-topic starter blueprints for an empty board (`2A`), preferring ones with
-    /// fill-in `[blanks]` so the person sees interactive slots right away.
+    /// A few starters for an empty board: ones with `[blanks]` first, on different topics.
     func starterBlueprints(for kind: AgentBoardItem.Kind, limit: Int = 3) -> [BoardBlueprint] {
         let all = blueprints(for: kind)
         guard !all.isEmpty else { return [] }
@@ -264,14 +263,12 @@ struct BoardBlueprintsButton: View {
     @BighelpThemeReader private var theme
 }
 
-/// One board's blueprints by topic: search, topic chips and Sort. A pick opens its fill-in page.
+/// One board's blueprints by topic: search, topic chips and Sort. A pick goes to the message box,
+/// its blanks as chips to fill in (`ChatBlueprintDraft`).
 struct BoardBlueprintsSheet: View {
     let kind: AgentBoardItem.Kind
-    let agentName: String
     let blueprints: [BoardBlueprint]
-    let onSend: (String) -> Void
-    let onEdit: (String) -> Void
-    @State private var filling: BoardBlueprint?
+    let onPick: (String) -> Void
     @State private var search = ""
     @State private var filter = TemplateTopicFilter.all
     @State private var order = TemplateOrder.forYou
@@ -290,28 +287,17 @@ struct BoardBlueprintsSheet: View {
                         .bighelpListSearchRow()
                     TemplateTopicChips(filters: listing.filters, selection: $filter, identifier: "board.blueprints")
                         .templateChipsRow()
-                } footer: {
-                    Text("Pick one, fill in the blanks, and send it to \(agentName). Nothing runs until you send it.")
-                        .font(.bighelp(.footnote))
-                        .foregroundStyle(theme.secondaryText)
                 }
                 ForEach(listing.sections) { section in
                     Section {
                         ForEach(section.items) { blueprint in
-                            Button { filling = blueprint } label: {
+                            Button {
+                                TemplateUsage.shared.recordUse(blueprint.id)
+                                onPick(blueprint.text)
+                            } label: {
                                 row(blueprint, showsCategory: section.category == nil, showsSource: offersOfficialOnly)
                             }
                             .bighelpPlainButtonStyle()
-                            .contextMenu {
-                                if !BlueprintAdLib(blueprint.text).blanks.isEmpty {
-                                    Button("Fill blanks in message box", systemImage: "character.cursor.ibeam") {
-                                        TemplateUsage.shared.recordUse(blueprint.id)
-                                        let text = blueprint.text
-                                        dismiss()
-                                        onEdit(text)
-                                    }
-                                }
-                            }
                             .listRowBackground(theme.surface)
                             .accessibilityIdentifier("board.blueprint.\(blueprint.id)")
                         }
@@ -346,11 +332,6 @@ struct BoardBlueprintsSheet: View {
             .animation(.snappy, value: filter)
             .animation(.snappy, value: order)
             .animation(.snappy, value: officialOnly)
-            .navigationDestination(item: $filling) { blueprint in
-                BlueprintFillView(blueprint: blueprint, agentName: agentName,
-                                  onSend: { TemplateUsage.shared.recordUse(blueprint.id); onSend($0) },
-                                  onEdit: { TemplateUsage.shared.recordUse(blueprint.id); onEdit($0) })
-            }
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -432,8 +413,8 @@ struct BoardBlueprintsSheet: View {
     @BighelpThemeReader private var theme
 }
 
-/// A 1-tap starter card on an empty board (`2A`): shows the Blueprint with its fill-in slots
-/// highlighted in the person's action color, and opens directly into `ChatComposer` chip mode (`2B`).
+/// A starter on an empty board: a blueprint with its blanks marked. A tap puts it in the message
+/// box, the blanks as chips (`ChatBlueprintDraft`).
 struct BlueprintStarterCardView: View {
     let blueprint: BoardBlueprint
     let action: () -> Void
@@ -442,10 +423,6 @@ struct BlueprintStarterCardView: View {
     @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
-        let blankCount = BlueprintAdLib(blueprint.text).blanks.count
-        let slotDetail = blankCount == 0
-            ? String(localized: "Ready to send")
-            : (blankCount == 1 ? String(localized: "1 fill-in chip") : String(localized: "\(blankCount) fill-in chips"))
         let shape = RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous)
 
         Button(action: action) {
@@ -458,7 +435,7 @@ struct BlueprintStarterCardView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 HStack(spacing: BighelpTokens.space4) {
-                    Text(verbatim: "\(blueprint.category.title) · \(slotDetail)")
+                    Text(blueprint.category.title)
                         .font(.bighelp(.caption, weight: .semibold))
                         .foregroundStyle(theme.secondaryText)
                     Spacer(minLength: 0)
@@ -530,140 +507,12 @@ enum BlueprintBrowsing {
     }
 }
 
-/// Fill in a blueprint's blanks, then send it to the agent in a new chat, or take it to the
-/// message box to change more first.
-struct BlueprintFillView: View {
-    let blueprint: BoardBlueprint
-    let agentName: String
-    let onSend: (String) -> Void
-    let onEdit: (String) -> Void
-    @State private var values: [Int: String]
-    private let adLib: BlueprintAdLib
-
-    init(blueprint: BoardBlueprint, agentName: String,
-         onSend: @escaping (String) -> Void, onEdit: @escaping (String) -> Void) {
-        self.blueprint = blueprint
-        self.agentName = agentName
-        self.onSend = onSend
-        self.onEdit = onEdit
-        let adLib = BlueprintAdLib(blueprint.text)
-        self.adLib = adLib
-        _values = State(initialValue: adLib.initialValues)
-    }
-
-    var body: some View {
-        Form {
-            Section {
-                Text(preview)
-                    .font(.bighelp(.body))
-                    .foregroundStyle(theme.primaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("board.blueprint.fill.preview")
-            } header: {
-                Text("What \(agentName) will get").font(.bighelp(.caption).weight(.semibold))
-            }
-            if !adLib.blanks.isEmpty {
-                Section {
-                    ForEach(adLib.blanks) { blank in field(blank) }
-                } header: {
-                    Text("Fill in the blanks").font(.bighelp(.caption).weight(.semibold))
-                }
-            }
-            Section {
-                Button {
-                    onSend(adLib.filled(values))
-                } label: {
-                    Label("Send to agent", systemImage: "paperplane.fill")
-                        .font(.bighelp(.body).weight(.semibold))
-                        .foregroundStyle(theme.actionForeground)
-                        .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(theme.action)
-                .disabled(!adLib.isComplete(values))
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets())
-                .accessibilityIdentifier("board.blueprint.fill.send")
-                Button("Edit in message box") { onEdit(adLib.filled(values)) }
-                    .font(.bighelp(.subheadline))
-                    .frame(maxWidth: .infinity)
-                    .listRowBackground(Color.clear)
-                    .accessibilityIdentifier("board.blueprint.fill.edit")
-            }
-        }
-        .scrollContentBackground(.hidden)
-        .background(theme.canvas.ignoresSafeArea())
-        .navigationTitle("Blueprint")
-        .navigationBarTitleDisplayMode(.inline)
-        .accessibilityIdentifier("board.blueprint.fill")
-    }
-
-    /// The prompt as it stands, with what's filled in shown in the action color.
-    private var preview: AttributedString {
-        var result = AttributedString()
-        for piece in adLib.pieces {
-            switch piece {
-            case .text(let text):
-                result += AttributedString(text)
-            case .blank(let id):
-                var slot = AttributedString(BlueprintAdLib.value(values[id]) ?? "[\(adLib.blanks[id].hint)]")
-                slot.foregroundColor = theme.action
-                result += slot
-            }
-        }
-        return result
-    }
-
-    @ViewBuilder
-    private func field(_ blank: BlueprintAdLib.Blank) -> some View {
-        let binding = Binding(get: { values[blank.id] ?? "" }, set: { values[blank.id] = $0 })
-        if blank.isChoice {
-            Picker(blank.options.joined(separator: " or ").capitalizedFirst, selection: binding) {
-                ForEach(blank.options, id: \.self) { Text($0).tag($0) }
-            }
-            .font(.bighelp(.body))
-            .accessibilityIdentifier("board.blueprint.fill.blank.\(blank.id)")
-        } else {
-            TextField(blank.hint.capitalizedFirst, text: binding,
-                      prompt: Text(blank.hint.capitalizedFirst).bighelpFieldHint(theme))
-                .font(.bighelp(.body))
-                .keyboardType(blank.isNumber ? .numbersAndPunctuation : .default)
-                .submitLabel(.done)
-                .accessibilityIdentifier("board.blueprint.fill.blank.\(blank.id)")
-        }
-    }
-
-    @BighelpThemeReader private var theme
-}
-
-private extension String {
-    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
-}
-
 extension View {
-    /// Presents a board's blueprints. A pick opens its fill-in page; Send to agent starts a new
-    /// chat that sends it, Edit leaves it in the message box. Either happens once the sheet is
-    /// gone (a push under a closing sheet gets dropped).
+    /// Presents a board's blueprints. A pick goes to the message box once the sheet is gone (a push
+    /// under a closing sheet gets dropped).
     func boardBlueprints(isPresented: Binding<Bool>, kind: AgentBoardItem.Kind,
                          context: AgentBoardContext) -> some View {
         modifier(BoardBlueprintsPresenter(isPresented: isPresented, kind: kind, context: context))
-    }
-
-    /// One blueprint's fill-in page on its own, for Goals' category menus.
-    func blueprintFill(_ blueprint: Binding<BoardBlueprint?>, context: AgentBoardContext) -> some View {
-        modifier(BlueprintFillPresenter(blueprint: blueprint, context: context))
-    }
-}
-
-/// What the fill-in page asked for, carried out once its sheet has closed.
-enum BlueprintOutcome: Equatable {
-    case send(String), edit(String)
-
-    @MainActor func perform(in context: AgentBoardContext) {
-        switch self {
-        case .send(let text): context.onSend(text)
-        case .edit(let text): context.onAsk(text)
-        }
     }
 }
 
@@ -671,57 +520,22 @@ private struct BoardBlueprintsPresenter: ViewModifier {
     @Binding var isPresented: Bool
     let kind: AgentBoardItem.Kind
     let context: AgentBoardContext
-    @State private var outcome: BlueprintOutcome?
+    @State private var picked: String?
 
     func body(content: Content) -> some View {
         content.bighelpSheet(isPresented: $isPresented, onDismiss: {
-            guard let outcome else { return }
-            self.outcome = nil
-            outcome.perform(in: context)
+            guard let picked else { return }
+            self.picked = nil
+            context.onBlueprint(picked)
         }) {
-            BoardBlueprintsSheet(kind: kind, agentName: context.agentName,
-                                 blueprints: BoardBlueprintCatalog.shared.blueprints(for: kind),
-                                 onSend: { finish(.send($0)) }, onEdit: { finish(.edit($0)) })
+            BoardBlueprintsSheet(kind: kind, blueprints: BoardBlueprintCatalog.shared.blueprints(for: kind),
+                                 onPick: { text in
+                                     picked = text
+                                     isPresented = false
+                                 })
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
             .bighelpSheetSize(.standard)
         }
-    }
-
-    private func finish(_ outcome: BlueprintOutcome) {
-        self.outcome = outcome
-        isPresented = false
-    }
-}
-
-private struct BlueprintFillPresenter: ViewModifier {
-    @Binding var blueprint: BoardBlueprint?
-    let context: AgentBoardContext
-    @State private var outcome: BlueprintOutcome?
-
-    func body(content: Content) -> some View {
-        content.bighelpSheet(item: $blueprint, onDismiss: {
-            guard let outcome else { return }
-            self.outcome = nil
-            outcome.perform(in: context)
-        }) { picked in
-            NavigationStack {
-                BlueprintFillView(blueprint: picked, agentName: context.agentName,
-                                  onSend: { TemplateUsage.shared.recordUse(picked.id); finish(.send($0)) },
-                                  onEdit: { TemplateUsage.shared.recordUse(picked.id); finish(.edit($0)) })
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Cancel") { blueprint = nil }
-                        }
-                    }
-            }
-            .presentationDetents([.large])
-            .bighelpSheetSize(.standard)
-        }
-    }
-
-    private func finish(_ outcome: BlueprintOutcome) {
-        self.outcome = outcome
-        blueprint = nil
     }
 }

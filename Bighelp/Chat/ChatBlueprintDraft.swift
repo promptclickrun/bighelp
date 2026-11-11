@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// An active Blueprint with `[placeholder]` blanks being filled inline inside `ChatComposer`.
-/// Keeps `ChatComposer.==` untouched so ordinary chats pay zero redraw cost.
+/// A blueprint in the message box with its `[blanks]` as chips to fill in. Its views read
+/// `ChatModel.blueprintDraft` themselves, so `ChatComposer.==` and ordinary chats are untouched.
 struct ChatBlueprintDraft: Equatable {
     enum Token: Identifiable, Equatable {
         case word(id: Int, text: String)
@@ -76,53 +76,6 @@ struct ChatBlueprintDraft: Equatable {
         activeBlankID = blanks[(start + 1) % blanks.count].id
     }
 
-    static func suggestions(for blank: BlueprintAdLib.Blank) -> [String] {
-        if blank.isChoice { return blank.options }
-        if blank.isNumber {
-            var seen = Set<String>()
-            let numbers = [blank.hint, "3", "5", "10", "20"].filter {
-                !$0.isEmpty && seen.insert($0).inserted
-            }
-            return Array(numbers.prefix(4))
-        }
-        let lower = blank.hint.lowercased()
-        if lower.contains("brand") || lower.contains("product") || lower.contains("company") {
-            return ["bighelp", "Hermes Agent", "My product"]
-        }
-        if lower.contains("competitor") {
-            return ["Linear", "Cursor", "Notion"]
-        }
-        if lower.contains("website") {
-            return ["bighelp.app", "example.com", "docs site"]
-        }
-        if lower.contains("channel") {
-            return ["YouTube", "Newsletter", "Tech blog"]
-        }
-        if lower.contains("niche") || lower.contains("industry") {
-            return ["AI & dev tools", "iOS apps", "Product design"]
-        }
-        if lower.contains("city") || lower.contains("location") {
-            return ["Austin", "San Francisco", "New York"]
-        }
-        if lower.contains("stock") || lower.contains("ticker") {
-            return ["AAPL, NVDA, MSFT", "Semiconductors", "S&P 500 leaders"]
-        }
-        if lower.contains("topic") || lower.contains("subject") {
-            return ["Swift 6", "On-device AI", "Agent workflows"]
-        }
-        if lower.contains("name") {
-            return ["Alex", "Sam", "Jordan"]
-        }
-        if lower.contains("date") {
-            return ["next Friday", "May 15", "in two weeks"]
-        }
-        if lower.contains("monday") || lower.contains("morning") || lower.contains("am")
-            || lower.contains("pm") || lower.contains("time") {
-            return ["Monday 8am", "Weekday 7:30am", "Friday 4pm"]
-        }
-        return []
-    }
-
     /// Breaks prose around blanks into word chunks while attaching adjacent punctuation
     /// (`$`, `'s`, `.`, `,`) directly to its blank so chips never leave stray gaps like `Feed .`.
     private static func tokenize(adLib: BlueprintAdLib) -> [Token] {
@@ -179,7 +132,8 @@ struct ChatBlueprintDraft: Equatable {
     }
 }
 
-/// Quick-fill rail above `ChatComposer` when a Blueprint with `[blanks]` is active (`2B`).
+/// Over the message box while a blueprint is being filled in: the blank in hand, its choices if
+/// the blueprint wrote any ("[videos / posts]"), or a field to type it.
 struct ComposerBlueprintTray: View, Equatable {
     let model: ChatModel
     let onSwitchToPlainText: () -> Void
@@ -195,13 +149,19 @@ struct ComposerBlueprintTray: View, Equatable {
     var body: some View {
         if let draft = model.blueprintDraft {
             let blank = draft.activeBlank
-            let presets = ChatBlueprintDraft.suggestions(for: blank)
+            let choices = blank.isChoice ? blank.options : []
             let currentValue = draft.value(for: blank.id)
             let shape = RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous)
 
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                 HStack(spacing: BighelpTokens.space8) {
-                    Text("Blank \(draft.activeIndex + 1) of \(draft.blanks.count) · \(blank.hint)")
+                    Group {
+                        if draft.blanks.count > 1 {
+                            Text("\(draft.activeIndex + 1) of \(draft.blanks.count) · \(blank.hint)")
+                        } else {
+                            Text(verbatim: blank.hint)
+                        }
+                    }
                         .font(.bighelp(.caption, weight: .bold))
                         .foregroundStyle(theme.primaryText)
                         .lineLimit(1)
@@ -214,14 +174,14 @@ struct ComposerBlueprintTray: View, Equatable {
                             model.advanceBlueprintBlank()
                         } label: {
                             HStack(spacing: 3) {
-                                Text("Next blank")
+                                Text("Next")
                                 Image(systemName: "arrow.right")
                                     .font(.bighelp(.caption2, weight: .bold))
                             }
                             .font(.bighelp(.caption, weight: .semibold))
                             .foregroundStyle(theme.action)
-                            .padding(.vertical, 4)
                             .padding(.horizontal, 6)
+                            .frame(minHeight: BighelpTokens.hitTarget)
                             .contentShape(.rect)
                         }
                         .bighelpPlainButtonStyle()
@@ -237,44 +197,45 @@ struct ComposerBlueprintTray: View, Equatable {
                             .foregroundStyle(theme.secondaryText)
                             .frame(width: 28, height: 28)
                             .background(theme.secondaryText.opacity(0.12), in: .circle)
-                            .contentShape(.circle)
+                            .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                            .contentShape(.rect)
                     }
                     .bighelpPlainButtonStyle(.circle)
-                    .bighelpIconLabel("Edit full message text")
+                    .bighelpIconLabel("Edit as text")
                     .accessibilityIdentifier("chat.blueprint.plain-text")
                 }
 
-                if !presets.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach(presets, id: \.self) { preset in
-                                let isSelected = currentValue == preset
-                                Button {
-                                    BighelpHaptics.tap()
-                                    model.pickBlueprintSuggestion(preset, for: blank.id)
-                                } label: {
-                                    Text(preset)
-                                        .font(.bighelp(.caption, weight: .semibold))
-                                        .foregroundStyle(isSelected ? theme.actionForeground : theme.primaryText)
-                                        .padding(.horizontal, BighelpTokens.space12)
-                                        .padding(.vertical, 6)
-                                        .background(
-                                            Capsule().fill(isSelected ? theme.action : theme.canvas)
-                                        )
-                                        .overlay {
-                                            if !isSelected {
-                                                Capsule().strokeBorder(
-                                                    contrast == .increased ? theme.primaryText : theme.border,
-                                                    lineWidth: BighelpTokens.hairline
-                                                )
-                                            }
+                if !choices.isEmpty {
+                    // Wraps: a choice is never off the edge at a large text size.
+                    BighelpFlowLayout(spacing: 6, lineSpacing: 0) {
+                        ForEach(choices, id: \.self) { choice in
+                            let isSelected = currentValue == choice
+                            Button {
+                                BighelpHaptics.tap()
+                                model.pickBlueprintOption(choice, for: blank.id)
+                            } label: {
+                                Text(choice)
+                                    .font(.bighelp(.caption, weight: .semibold))
+                                    .foregroundStyle(isSelected ? theme.actionForeground : theme.primaryText)
+                                    .padding(.horizontal, BighelpTokens.space12)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        Capsule().fill(isSelected ? theme.action : theme.canvas)
+                                    )
+                                    .overlay {
+                                        if !isSelected {
+                                            Capsule().strokeBorder(
+                                                contrast == .increased ? theme.primaryText : theme.border,
+                                                lineWidth: BighelpTokens.hairline
+                                            )
                                         }
-                                        .contentShape(Capsule())
-                                }
-                                .bighelpPlainButtonStyle(.capsule)
-                                .accessibilityAddTraits(isSelected ? .isSelected : [])
-                                .accessibilityIdentifier("chat.blueprint.preset.\(preset)")
+                                    }
+                                    .frame(minHeight: BighelpTokens.hitTarget)
+                                    .contentShape(.rect)
                             }
+                            .bighelpPlainButtonStyle(.capsule)
+                            .accessibilityAddTraits(isSelected ? .isSelected : [])
+                            .accessibilityIdentifier("chat.blueprint.choice.\(choice)")
                         }
                     }
                 }
@@ -315,9 +276,11 @@ struct ComposerBlueprintTray: View, Equatable {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.bighelp(.footnote))
                                     .foregroundStyle(theme.tertiaryText)
+                                    .frame(width: BighelpTokens.hitTarget, height: 28)
+                                    .contentShape(.rect)
                             }
                             .bighelpPlainButtonStyle(.circle)
-                            .accessibilityLabel("Clear blank")
+                            .accessibilityLabel("Clear")
                         }
                     }
                     .padding(.horizontal, BighelpTokens.space12)
@@ -357,7 +320,7 @@ struct BlueprintHiddenEditorModifier: ViewModifier {
     }
 }
 
-/// Flowing inline sentence with tappable dashed (`+ my brand`) and filled (`Feed`) chips inside `ChatComposer`.
+/// The blueprint in the message box: its words, with each blank a chip (dashed until filled).
 struct ComposerBlueprintChipField: View, Equatable {
     let model: ChatModel
     let onEditPlainText: () -> Void

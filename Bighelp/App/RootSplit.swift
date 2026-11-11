@@ -107,7 +107,7 @@ extension RootShellView {
         }
     }
 
-    /// ☰ and the brand (or the Unified Mode Toggle) move from the page's bar to the list's.
+    /// ☰ and the brand (or the Header mode switcher) move from the page's bar to the list's.
     @ToolbarContentBuilder
     private var splitColumnToolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) { rootMenuButton }

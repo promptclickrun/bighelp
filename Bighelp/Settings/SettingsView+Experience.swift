@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// Settings › Modes: one honest 3-way Home Experience selector (Bots, Chat, Code) matching
-/// first-run onboarding, plus the header mode switcher and multi-computer roster switch.
+/// Settings › Modes: the home a launch opens in (Bots, Chat or Code), Code mode's own switch, and
+/// the switcher that puts the modes at the top of each home.
 extension SettingsView {
     @ViewBuilder
     var experienceSection: some View {
         Section {
-            HomeExperienceModeCards(selected: settings.currentMode) { mode in
+            HomeExperienceModeCards(selected: settings.homeMode) { mode in
                 withAnimation(.snappy(duration: BighelpTokens.stateDuration)) {
                     settings.selectHomeMode(mode)
                 }
@@ -19,6 +19,17 @@ extension SettingsView {
         }
 
         Section {
+            // Code can stay on beside a Chat or Bots home: ☰ and the switcher reach it.
+            Toggle(isOn: Binding(get: { settings.codeModeEnabled }, set: { settings.setCodeMode($0) })) {
+                HStack(spacing: BighelpTokens.space12) {
+                    BighelpIconTile(systemName: "chevron.left.forwardslash.chevron.right")
+                    settingLabel(String(localized: "Code mode"), detail: String(localized: "Fire off coding sessions against your projects."))
+                }
+                .padding(.horizontal, BighelpMenuRowLayout.labelInset)
+            }
+            .bighelpMacSettingsRowInsets()
+            .accessibilityIdentifier("settings.code-mode")
+
             Toggle(isOn: $settings.unifiedModeToggleEnabled) {
                 HStack(spacing: BighelpTokens.space12) {
                     BighelpIconTile(systemName: "capsule.lefthalf.filled")
@@ -30,40 +41,11 @@ extension SettingsView {
             .bighelpMacSettingsRowInsets()
             .accessibilityIdentifier("settings.unified-mode-toggle")
 
-            Toggle(isOn: $settings.allComputersTogether) {
-                HStack(spacing: BighelpTokens.space12) {
-                    BighelpIconTile(systemName: "desktopcomputer")
-                    settingLabel(String(localized: "All computers together"),
-                                 detail: allComputersDetail)
-                }
-                .padding(.horizontal, BighelpMenuRowLayout.labelInset)
-            }
-            .bighelpMacSettingsRowInsets()
-            .accessibilityIdentifier("settings.all-computers")
-
             if (settings.simpleBotsEnabled || settings.codeModeEnabled), BighelpChatSwitcher.isOffered(screen: screen) {
                 chatSwitcherToggle
             }
-        } footer: {
-            Text(modesFooterText)
-                .bighelpFont(.metadata)
         }
         .listRowBackground(theme.surface)
-    }
-
-    private var allComputersDetail: String {
-        let names = (hostRegistry?.hosts.map(\.name) ?? []).filter { !$0.isEmpty }
-        if names.count >= 2 {
-            return String(localized: "One roster across \(names.prefix(2).joined(separator: " & "))\(names.count > 2 ? " and more" : "").")
-        }
-        return String(localized: "One roster of bots and chats across your computers.")
-    }
-
-    private var modesFooterText: String {
-        if settings.unifiedModeToggleEnabled {
-            return String(localized: "Switch modes any time from the top of each home, with edge swipes, or with ⌃⌘1–3 on Mac.")
-        }
-        return String(localized: "Switch modes any time here, from ☰, with edge swipes, or with ⌃⌘1–3 on Mac.")
     }
 
     /// The Duo folded, and iPad and Mac in landscape: the bots or sessions beside a chat.

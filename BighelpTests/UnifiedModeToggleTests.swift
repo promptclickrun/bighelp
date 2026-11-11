@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Bighelp
 
-/// Bots, Chat and Code: the Unified Mode Toggle, the mode swipes and ⌃⌘1–⌃⌘3 all switch through
+/// Bots, Chat and Code: the Header mode switcher, the mode swipes and ⌃⌘1–⌃⌘3 all switch through
 /// `SettingsStore.switchMode`, so these check the modes it offers and where each choice lands.
 @MainActor
 struct UnifiedModeToggleTests {

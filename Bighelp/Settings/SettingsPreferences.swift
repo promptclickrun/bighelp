@@ -357,7 +357,7 @@ enum BighelpExperience: String, CaseIterable, Identifiable, Sendable {
 }
 
 /// The three ways bighelp opens: Bots mode (`simpleBotsEnabled`), Chat, and Code
-/// (`experience`, once Settings › Code mode is on). The Unified Mode Toggle and the
+/// (`experience`, once Settings › Code mode is on). The Header mode switcher and the
 /// mode edge swipes switch between them.
 enum BighelpMode: String, CaseIterable, Identifiable, Sendable {
     case bots
@@ -391,7 +391,7 @@ enum BighelpMode: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// The Unified Mode Toggle in a home's header: the modes on offer, the one showing, and the switch.
+/// The Header mode switcher in a home's header: the modes on offer, the one showing, and the switch.
 struct BighelpModeSwitch {
     let modes: [BighelpMode]
     let current: BighelpMode

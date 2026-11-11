@@ -22,7 +22,7 @@ struct BighelpMenuCommands: Commands {
             Button(actions?.isSidebarOpen == true ? "Hide Sidebar" : "Show Sidebar") { actions?.toggleSidebar() }
                 .keyboardShortcut("s", modifiers: [.command, .control])
                 .disabled(actions == nil)
-            // The Unified Mode Toggle's modes. ⌘1–⌘5 are the tabs, so these add Control.
+            // The Header mode switcher's modes. ⌘1–⌘5 are the tabs, so these add Control.
             if let modeSwitch = actions?.modeSwitch {
                 Divider()
                 ForEach(Array(modeSwitch.modes.enumerated()), id: \.element) { index, mode in
@@ -65,7 +65,7 @@ struct BighelpShellActions {
     /// ☰: the Mac's sidebar.
     let isSidebarOpen: Bool
     let toggleSidebar: @MainActor () -> Void
-    /// Bots, Chat and Code (⌃⌘1–⌃⌘3) while the Unified Mode Toggle is on.
+    /// Bots, Chat and Code (⌃⌘1–⌃⌘3) while the Header mode switcher is on.
     var modeSwitch: BighelpModeSwitch? = nil
     /// The bottom bar's tabs (Mac ⌘1–⌘5), while the bar shows.
     var selectTab: (@MainActor (AppTab) -> Void)? = nil

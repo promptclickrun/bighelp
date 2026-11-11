@@ -61,11 +61,29 @@ change in both repos.
     a `BighelpSearchField` as the first row under the title (`bighelpListSearchRow()`), filter chips below
     it; never `.searchable` on a screen with the bar (iOS 26 puts it along the bottom, on the bar).
   - Never show "bighelp account" or "Link" wording. That pairing system is retired.
-  - Code mode is a second home, not a second app: Settings turns it on and picks the mode a launch opens in
-    (`settings.codeModeEnabled`, `startExperience`); ☰ gets a mode switch on top and Code's places while it's the
-    home (`AppTab.code`, `appState.homeTab`). Chat stays the out-of-box home.
-  - The modes are Bots, Chat and Code (`BighelpMode`; `settings.switchMode`). Settings › Modes ›
-    Unified Mode Toggle (`unifiedModeToggleEnabled`, off by default) puts them in one pill
+  - Needs you (`NeedsYouDeckView`) is the one place a waiting approval, question or workflow sign-off is
+    answered outside its own card: a chat's prompts open it (`ChatAttentionPresenter`), and ☰ has its row
+    only while something waits. Each entry is read from where it lives (`RootShellView.needsYouEntries`):
+    prompts on open chats' connections, the Dashboard's list for chats that aren't open, one entry per
+    prompt ID (`DashboardAttentionItem.promptID`; Hermes' prompts reach the app both ways), and
+    `WorkflowsStore.waiting`. A bot whose chat isn't open gets only an Open chat row. A long command or
+    sign-off file opens in full before Approve works. Prompts answer through `DirectHermesPromptResponseView`
+    (its `deck` look), the same code as the card in the chat.
+  - A blueprint is filled in in the message box, nowhere else: a pick anywhere (a board's Blueprints, an
+    empty board's starters, a bot's Dashboard) leaves it for the chat with `fillsBlanks`
+    (`AppState.leaveComposerText`), and its [blanks] show as chips (`ChatBlueprintDraft`,
+    `ChatModel.blueprintDraft`). Brackets in any other text are just text. The chips are the draft: when
+    the draft becomes anything else, they go. A blank offers only the choices its blueprint wrote.
+  - Text a board leaves for a new chat (Ask, Discuss, a blueprint) is shown by the chat's blank canvas
+    (`showComposerText`) and taken by the chat Hermes makes (`takeComposerText`). The canvas is thrown
+    away when that chat arrives, and its draft doesn't always get across in time: text only the canvas
+    took was lost about every other time.
+  - Code mode is a second home, not a second app: ☰ gets a mode switch on top and Code's places while it's
+    the home (`AppTab.code`, `appState.homeTab`). Chat stays the out-of-box home.
+  - The modes are Bots, Chat and Code (`BighelpMode`; `settings.switchMode`). Settings › Modes has one picker
+    for the home a launch opens in (`settings.homeMode`, `selectHomeMode`; picking Code turns Code mode on)
+    and Code mode's own switch (`setCodeMode`), so Code can stay on beside a Chat or Bots home, or go off.
+    Its Header mode switcher (`unifiedModeToggleEnabled`, off by default) puts the modes in one pill
     (`BighelpModePill`) at the top of each home: the Chat tab's own chat or its list, Code's home and Bots'
     home (where Search and Filter by Gateway move to a row under it). ☰ drops its Chat and Code switch
     then. Edge swipes can switch modes too (Next mode, Bots, Chat, Code), also from Bots mode; on the

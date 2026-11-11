@@ -11,10 +11,10 @@ struct AgentBoardContext {
     let store: AgentBoardStore
     let onProfile: () -> Void
     let onSwitchAgent: () -> Void
-    /// Opens a chat with this agent with the text ready to send.
+    /// Opens a chat with this agent with the text in its message box.
     let onAsk: (String) -> Void
-    /// Opens a new chat with this agent and sends the text.
-    let onSend: (String) -> Void
+    /// Opens a chat with this agent with a blueprint in its message box, its blanks as chips.
+    let onBlueprint: (String) -> Void
     /// The Chat tab's header controls, so every board has ☰, New chat and ⋯ too.
     let onMenu: () -> Void
     let onNewChat: () -> Void
@@ -326,18 +326,18 @@ private struct BoardUndoBar: View {
     @BighelpThemeReader private var theme
 }
 
-/// "Tell your agent what you want here": starter blueprints with visible fill-in slots (`2A`),
-/// plus a direct Ask button so nothing runs until the person asks.
+/// An empty board: a few starter blueprints to pick from, and Ask. Nothing runs until the person asks.
 private struct BoardEmptyState: View {
     let kind: AgentBoardItem.Kind
     let symbol: String
     let title: String
     let message: String
+    /// Shown, and what Ask starts from, only when there are no starters to show.
     let example: String
     let agentName: String
     let onAsk: (String) -> Void
+    let onBlueprint: (String) -> Void
     let identifier: String
-    var onBlueprints: (() -> Void)?
 
     var body: some View {
         let starters = BoardBlueprintCatalog.shared.starterBlueprints(for: kind, limit: 3)
@@ -359,7 +359,7 @@ private struct BoardEmptyState: View {
                     ForEach(starters) { blueprint in
                         BlueprintStarterCardView(blueprint: blueprint) {
                             TemplateUsage.shared.recordUse(blueprint.id)
-                            onAsk(blueprint.text)
+                            onBlueprint(blueprint.text)
                         }
                     }
                 }
@@ -371,24 +371,19 @@ private struct BoardEmptyState: View {
                     .boardBlock(BighelpBlockColor.pastel(for: identifier), padding: BighelpTokens.space16)
             }
 
-            HStack(spacing: BighelpTokens.space8) {
-                Button {
-                    onAsk(example)
-                } label: {
-                    Label("Ask \(agentName)", systemImage: "bubble.left.and.text.bubble.right")
-                        .font(.bighelp(.subheadline).weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
-                }
-                .bighelpProminentButtonStyle()
-                .buttonBorderShape(.capsule)
-                .tint(theme.action)
-                .foregroundStyle(theme.actionForeground)
-                .accessibilityIdentifier(identifier + ".ask")
-
-                if let onBlueprints {
-                    BoardBlueprintsButton(action: onBlueprints)
-                }
+            Button {
+                // With starters on screen the example isn't: Ask opens an empty message box.
+                onAsk(starters.isEmpty ? example : "")
+            } label: {
+                Label("Ask \(agentName)", systemImage: "bubble.left.and.text.bubble.right")
+                    .font(.bighelp(.subheadline).weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
             }
+            .bighelpProminentButtonStyle()
+            .buttonBorderShape(.capsule)
+            .tint(theme.action)
+            .foregroundStyle(theme.actionForeground)
+            .accessibilityIdentifier(identifier + ".ask")
         }
         .frame(maxWidth: 520)
         .frame(maxWidth: .infinity)
@@ -541,11 +536,11 @@ struct AgentFeedView: View {
                 BoardEmptyState(
                     kind: .feed,
                     symbol: "newspaper",
-                    title: "Nothing runs until you ask \(context.agentName)",
-                    message: "Pick a starter blueprint below to fill in its blanks, or describe what you'd like posted.",
+                    title: "Your feed is quiet",
+                    message: "Pick a starter, or ask \(context.agentName) for what you want.",
                     example: "Every evening, post the top three AI stories to my feed.",
-                    agentName: context.agentName, onAsk: context.onAsk, identifier: "board.feed.empty",
-                    onBlueprints: nil)
+                    agentName: context.agentName, onAsk: context.onAsk, onBlueprint: context.onBlueprint,
+                    identifier: "board.feed.empty")
                     .boardRow()
             }
             if !fresh.isEmpty {
@@ -863,10 +858,10 @@ struct AgentIdeasView: View {
                     kind: .idea,
                     symbol: "lightbulb",
                     title: "No ideas yet",
-                    message: "Pick a starter blueprint below or ask \(context.agentName) to suggest things it could take off your plate.",
+                    message: "Pick a starter, or ask \(context.agentName) for ideas.",
                     example: "Look through my week and suggest a few things you could take off my plate.",
-                    agentName: context.agentName, onAsk: context.onAsk, identifier: "board.ideas.empty",
-                    onBlueprints: nil)
+                    agentName: context.agentName, onAsk: context.onAsk, onBlueprint: context.onBlueprint,
+                    identifier: "board.ideas.empty")
                     .boardRow()
             }
             if sections.count > 1 || (sections.count == 1 && ideas.contains { Self.key($0).isEmpty }) {

@@ -57,7 +57,6 @@ extension ChatModel {
         hasDirtyPersistence = false
         hasDirtyContent = false
         isReplacingReferenceDraft = true
-        blueprintDraft = nil
         draft = ""
         replyDraft = nil
         draftAttachments = []

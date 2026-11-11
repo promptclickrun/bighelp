@@ -51,8 +51,8 @@ final class AppState {
     /// The open chat's agent and text when the app left, while that chat had sent nothing.
     /// Hermes saves a chat only on its first message, so it can be gone on return.
     var suspendedChat: SuspendedChat?
-    /// A blueprint's Send to agent: the next new chat sends `pendingComposerText` once it can.
-    var pendingComposerSends = false
+    /// `pendingComposerText` is a blueprint: its `[blanks]` show as chips to fill in (`ChatBlueprintDraft`).
+    var pendingComposerFillsBlanks = false
     /// The bot whose own chat may take `pendingComposerText` even though it has history: a bot's
     /// Dashboard opens that bot's Bot Chat, never a new one. Only an empty message box takes it.
     var pendingComposerAgentID: String?
@@ -259,34 +259,51 @@ final class AppState {
     /// When `pendingComposerText` was left. A chat that opens much later (its open failed, or the
     /// person went elsewhere) doesn't take it.
     private var pendingComposerSince: Date?
+    /// A new chat's blank canvas is showing `pendingComposerText` (`showComposerText`).
+    private var pendingComposerShown = false
     static let pendingComposerLifetime: TimeInterval = 30
 
     /// Leaves text for the next chat's message box. Each request replaces the last one whole, so
-    /// an earlier bot or Send never sticks to new text.
-    func leaveComposerText(_ text: String, sends: Bool = false, agentID: String? = nil, now: Date = .now) {
+    /// an earlier bot or blueprint never sticks to new text. Only a blueprint sets `fillsBlanks`:
+    /// brackets in anything else (a post's title, text the person typed) are just text.
+    func leaveComposerText(_ text: String, fillsBlanks: Bool = false, agentID: String? = nil, now: Date = .now) {
         pendingComposerText = text
-        pendingComposerSends = sends
+        pendingComposerFillsBlanks = fillsBlanks
+        pendingComposerShown = false
         pendingComposerAgentID = agentID
         pendingComposerSince = now
     }
 
+    /// The text for a new chat's blank canvas to show while Hermes makes the chat: read, not taken.
+    /// The canvas is thrown away when the chat arrives and its draft doesn't always get across in
+    /// time, so the text stays here for that chat to take.
+    func showComposerText(now: Date = .now) -> (text: String, fillsBlanks: Bool)? {
+        guard pendingComposerAgentID == nil, let text = pendingComposerText, let since = pendingComposerSince,
+              now.timeIntervalSince(since) <= Self.pendingComposerLifetime else { return nil }
+        pendingComposerShown = true
+        return (text, pendingComposerFillsBlanks)
+    }
+
     /// The text, if this chat should take it: a new chat on top, or the named bot's own chat on top.
+    /// `wasShown`: a blank canvas already showed it, so this chat may hold it (and what the person
+    /// changed) from the canvas's draft.
     func takeComposerText(isNewChat: Bool, isNamedBotChat: Bool,
-                          now: Date = .now) -> (text: String, sends: Bool)? {
+                          now: Date = .now) -> (text: String, fillsBlanks: Bool, wasShown: Bool)? {
         guard let text = pendingComposerText else { return nil }
         guard let since = pendingComposerSince, now.timeIntervalSince(since) <= Self.pendingComposerLifetime else {
             clearComposerText()
             return nil
         }
         guard pendingComposerAgentID == nil ? isNewChat : isNamedBotChat else { return nil }
-        let sends = pendingComposerSends
+        let taken = (text, pendingComposerFillsBlanks, pendingComposerShown)
         clearComposerText()
-        return (text, sends)
+        return taken
     }
 
     private func clearComposerText() {
         pendingComposerText = nil
-        pendingComposerSends = false
+        pendingComposerFillsBlanks = false
+        pendingComposerShown = false
         pendingComposerAgentID = nil
         pendingComposerSince = nil
     }

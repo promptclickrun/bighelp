@@ -8,7 +8,6 @@ struct AgentGoalsView: View {
     let context: AgentBoardContext
     @State private var showsDone = false
     @State private var showsBlueprints = false
-    @State private var fillingBlueprint: BoardBlueprint?
 
     /// One row of the Tracking or Done card: a category's heading or a goal.
     private struct CardEntry: Identifiable {
@@ -68,7 +67,6 @@ struct AgentGoalsView: View {
             }
         }
         .boardBlueprints(isPresented: $showsBlueprints, kind: .goal, context: context)
-        .blueprintFill($fillingBlueprint, context: context)
     }
 
     /// A bordered card a row at a time: headings and goals, each goal swiping on its own.
@@ -181,7 +179,10 @@ struct AgentGoalsView: View {
                 Menu {
                     Section("Start from a blueprint") {
                         ForEach(blueprints) { blueprint in
-                            Button(blueprint.text) { fillingBlueprint = blueprint }
+                            Button(blueprint.text) {
+                                TemplateUsage.shared.recordUse(blueprint.id)
+                                context.onBlueprint(blueprint.text)
+                            }
                         }
                     }
                 } label: {

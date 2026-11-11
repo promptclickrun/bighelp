@@ -95,7 +95,7 @@ extension RootShellView {
     }
 
     /// A chat's header chrome. The Chat tab's own chat (not one opened from a list, and not a Code
-    /// session) also carries the Unified Mode Toggle.
+    /// session) also carries the Header mode switcher.
     func homeChrome(forChat id: String) -> AgentHomeChrome {
         var chrome = homeChrome
         if chrome.isEnabled, settings.currentMode == .chat, !fleetModeOn, !appState.chatOpenedFromList,
@@ -293,9 +293,9 @@ extension RootShellView {
         startNewChat(explicitAgentID: homeAgent?.id)
     }
 
-    /// A filled-in blueprint: a new chat that sends it straight away.
-    func sendToAgent(_ text: String) {
-        appState.leaveComposerText(text, sends: true)
+    /// A blueprint: a new chat with it in the message box, its blanks as chips. Nothing is sent.
+    func useBlueprint(_ text: String) {
+        appState.leaveComposerText(text, fillsBlanks: true)
         startNewChat(explicitAgentID: homeAgent?.id)
     }
 
@@ -500,7 +500,7 @@ extension RootShellView {
             onProfile: { profileAgentID = agent.id },
             onSwitchAgent: { isAgentSwitcherPresented = true },
             onAsk: askAgent,
-            onSend: sendToAgent,
+            onBlueprint: useBlueprint,
             onMenu: { isHomeDrawerPresented.toggle() },
             onNewChat: { startHomeChat(with: agent.id) },
             onPickAgents: { presentNewChatPicker(seed: agent.id) },

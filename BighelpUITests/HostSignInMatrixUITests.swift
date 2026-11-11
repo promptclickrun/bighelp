@@ -200,15 +200,15 @@ final class HostSignInMatrixUITests: BighelpUITestCase {
         let app = try beginSetup(mode: "tools")
         let composer = try openFirstChat(app)
         send("question test", composer: composer, in: app)
-        let popup = app.navigationBars["Needs attention"]
+        let popup = app.descendants(matching: .any)["needs-you.deck"].firstMatch
         XCTAssertTrue(popup.waitForExistence(timeout: 30), "The agent's question pops up by itself")
-        popup.buttons["Later"].tap()
+        app.buttons["needs-you.later"].tap()
         XCTAssertTrue(app.buttons["direct-hermes.attention"].waitForExistence(timeout: 5), "Later leaves it waiting")
         XCUIDevice.shared.press(.home)
         XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
         sleep(9) // past the chat-open window: only the return opens it
         app.activate()
-        XCTAssertTrue(app.navigationBars["Needs attention"].waitForExistence(timeout: 10), "The question opens focused")
+        XCTAssertTrue(popup.waitForExistence(timeout: 10), "The question opens focused")
         XCTAssertFalse(app.keyboards.firstMatch.exists, "No keyboard over it")
         save("tools-5-question-focused", app)
     }

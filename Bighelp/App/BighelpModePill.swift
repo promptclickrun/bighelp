@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Settings › Modes › Unified Mode Toggle: Bots, Chat and Code in one compact pill at the top
+/// Settings › Modes › Header mode switcher: Bots, Chat and Code in one compact pill at the top
 /// of each home, as tall as the header's glass buttons. The mode showing sits in a darker capsule.
 struct BighelpModePill: View {
     let modeSwitch: BighelpModeSwitch

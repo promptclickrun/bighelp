@@ -23,7 +23,7 @@ struct SimpleBotsContext {
     /// Which bots are working or need you, kept current while the home shows.
     var activity: BotChatActivityStore? = nil
     var activitySource: BotChatActivitySource? = nil
-    /// The Unified Mode Toggle (Settings › Modes); nil while it's off.
+    /// The Header mode switcher (Settings › Modes); nil while it's off.
     var modeSwitch: BighelpModeSwitch? = nil
     /// The sections, and group chats' pins and hides (`FleetStore`); nil leaves sections out.
     var fleet: FleetStore? = nil
@@ -668,7 +668,7 @@ struct SimpleBotsHomeView: View {
         }
     }
 
-    /// With the Unified Mode Toggle: you, the mode pill and New on one row; Search (and Filter by
+    /// With the Header mode switcher: you, the mode pill and New on one row; Search (and Filter by
     /// Gateway, to its right) on the row under it, so the pill keeps the middle to itself.
     private func modeHeader(_ modeSwitch: BighelpModeSwitch) -> some View {
         VStack(spacing: BighelpTokens.space12) {

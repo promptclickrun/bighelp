@@ -237,7 +237,7 @@ final class SettingsStore {
         return isBotsMode ? botsMode : action
     }
 
-    /// Settings › Modes › Unified Mode Toggle: Bots, Chat and Code in a pill at the top of each
+    /// Settings › Modes › Header mode switcher: Bots, Chat and Code in a pill at the top of each
     /// home. Off by default; ☰ keeps its Chat and Code switch while it's off.
     var unifiedModeToggleEnabled: Bool {
         didSet { defaults.set(unifiedModeToggleEnabled, forKey: Keys.unifiedModeToggle) }
@@ -282,7 +282,15 @@ final class SettingsStore {
         }
     }
 
-    /// Settings › Modes: chooses the primary home mode directly, turning on Code mode when Code is picked.
+    /// The home a launch opens in, which Settings › Modes' picker shows. Bots mode is its own switch;
+    /// between Chat and Code it's `startExperience`, not the home showing now (☰ and the pill switch that).
+    var homeMode: BighelpMode {
+        if simpleBotsEnabled { return .bots }
+        return codeModeEnabled && startExperience == .code ? .code : .chat
+    }
+
+    /// Settings › Modes' picker: makes `mode` the home, now and at each launch. Picking Code turns
+    /// Code mode on; picking Chat or Bots leaves it as it is (its own switch turns it off).
     func selectHomeMode(_ mode: BighelpMode) {
         let changed = mode != currentMode
         switch mode {
@@ -298,18 +306,13 @@ final class SettingsStore {
             startExperience = .code
             experience = .code
         }
-        if changed {
-            Telemetry.featureUsed(.modeSwitched)
-        }
+        if changed { Telemetry.featureUsed(.modeSwitched) }
     }
 
-    /// Settings › Modes: keeps multi-computer roster visibility aligned across Bots and Chat/Code.
-    var allComputersTogether: Bool {
-        get { simpleBotsEnabled ? simpleBotsMultiGateway : allHostsMode }
-        set {
-            allHostsMode = newValue
-            simpleBotsMultiGateway = newValue
-        }
+    /// Settings › Modes › Code mode. Off while Code is the home goes back to Chat, now and at launch.
+    func setCodeMode(_ isOn: Bool) {
+        codeModeEnabled = isOn
+        if !isOn { startExperience = .bighelp }
     }
 
     var preferredBrowser: ChatBrowserPreference {

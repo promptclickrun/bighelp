@@ -357,8 +357,8 @@ extension RootShellView {
                 shellBoard: agentBoard,
                 shellBoardKey: { agentBoardClientKey },
                 configureShellBoard: { await configureAgentBoard($0) },
-                onAsk: { id, text in askSimpleBot(id, text, sends: false) },
-                onSend: { id, text in askSimpleBot(id, text, sends: true) })
+                onAsk: { id, text in askSimpleBot(id, text, fillsBlanks: false) },
+                onBlueprint: { id, text in askSimpleBot(id, text, fillsBlanks: true) })
         )
     }
 
@@ -381,8 +381,8 @@ extension RootShellView {
 
     /// The bot's own chat with the text in its message box (a Dashboard's Ask, Do it or template).
     /// It's the Bot Chat, history and all; only an empty message box takes the text.
-    func askSimpleBot(_ agentID: String, _ text: String, sends: Bool) {
-        appState.leaveComposerText(text, sends: sends, agentID: agentID)
+    func askSimpleBot(_ agentID: String, _ text: String, fillsBlanks: Bool) {
+        appState.leaveComposerText(text, fillsBlanks: fillsBlanks, agentID: agentID)
         openSimpleBotChat(agentID)
     }
 

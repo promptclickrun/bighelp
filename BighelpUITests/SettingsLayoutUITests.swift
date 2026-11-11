@@ -20,7 +20,7 @@ final class SettingsLayoutUITests: BighelpUITestCase {
             XCTAssertTrue(app.buttons["settings.mode.chat"].exists, "Chat mode is under Modes")
             XCTAssertTrue(app.buttons["settings.mode.code"].exists, "Code mode is under Modes")
             XCTAssertTrue(app.switches["settings.unified-mode-toggle"].exists, "Header mode switcher is under Modes")
-            XCTAssertTrue(app.switches["settings.all-computers"].exists, "All computers switch is under Modes")
+            XCTAssertTrue(app.switches["settings.code-mode"].exists, "Code mode keeps its own switch")
             save("02-modes-\(appearance)", app)
             app.navigationBars.buttons.firstMatch.tap()
 

@@ -629,7 +629,7 @@ struct RootShellView: View {
             }
     }
 
-    /// The Unified Mode Toggle in the root bar, in place of the brand: on the Chat tab's list (when it
+    /// The Header mode switcher in the root bar, in place of the brand: on the Chat tab's list (when it
     /// opens on a list, or on all hosts) and on Code's home. The Chat tab's own chat and Bots' home
     /// draw their own headers with it.
     var barModeSwitch: BighelpModeSwitch? {
@@ -659,7 +659,7 @@ struct RootShellView: View {
             // a chat closed, it was sometimes dropped mid-switch, and Agents had no ☰.
             ToolbarItem(placement: .topBarLeading) { rootMenuButton }
             if let barModeSwitch {
-                // The Unified Mode Toggle takes the bar's middle on the Chat list; hosts stay in ☰.
+                // The Header mode switcher takes the bar's middle on the Chat list; hosts stay in ☰.
                 ToolbarItem(placement: .principal) { BighelpModePill(modeSwitch: barModeSwitch) }
             } else {
                 // Ember lives only in chrome: the brand bar on root screens.

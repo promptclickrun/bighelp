@@ -258,7 +258,7 @@ final class LocalizationUITests: BighelpUITestCase {
         }
     }
 
-    /// The Unified Mode Toggle's pill on Bots mode's home: Bots, Chat and Code (#528).
+    /// The Header mode switcher's pill on Bots mode's home: Bots, Chat and Code (#528).
     func testModePillInBothLanguagesAndAppearances() {
         for (language, appearance) in variants {
             let say = { (english: String, chinese: String) in language == "en" ? english : chinese }

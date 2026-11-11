@@ -281,8 +281,7 @@ extension ChatView {
             if let directHermesClient {
                 DirectHermesPromptResponseView(
                     client: directHermesClient,
-                    prompt: prompt,
-                    inline: true
+                    prompt: prompt
                 )
             }
         case .connector(let card):

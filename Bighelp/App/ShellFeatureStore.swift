@@ -534,6 +534,14 @@ final class ShellFeatureStore {
         } else {
             model = chatModel(for: session, isExplicitlyNewChat: true)
         }
+        // A blueprint being filled in on the blank canvas keeps its chips in the chat that takes
+        // the canvas's place: the draft came across as text, and the chips are only in memory.
+        if model.blueprintDraft == nil,
+           let blueprint = chatModels.values.lazy
+               .compactMap({ $0.isAwaitingAuthoritativeSessionAllocation ? $0.blueprintDraft : nil })
+               .first(where: { $0.filledText == model.draft }) {
+            model.adoptBlueprintDraft(blueprint)
+        }
         // Native creation already established the exact stream. Retain that
         // verified preparation so Force Refresh does not require a fake reopen.
         if navigationWorkspaceOwner?() != nil,

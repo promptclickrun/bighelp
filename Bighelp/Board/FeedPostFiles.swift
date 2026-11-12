@@ -299,7 +299,7 @@ struct FeedPostDetailSheet: View {
         }
         Button {
             dismiss()
-            context.onAsk("About “\(item.title)”: ")
+            context.onAsk(item.chatCard.block)
         } label: {
             Label("Discuss", systemImage: "bubble.left")
                 .font(.bighelp(.body).weight(.semibold))

@@ -291,6 +291,7 @@ extension ChatModel {
                orderedDraftAttachments == orderedAttachments {
                 draft = ""
                 replyDraft = nil
+                boardCardDraft = nil
                 draftAttachments = []
                 orderedDraftAttachments = []
             }

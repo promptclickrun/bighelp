@@ -456,7 +456,9 @@ private struct DriveDockComposer: View {
 
     /// A reply quote or references go out only through the chat's own box, which knows how to send
     /// them; here Send waits for Return to chat.
-    private var sends: Bool { chat.canSend && chat.replyDraft == nil && chat.referenceSelections.isEmpty }
+    private var sends: Bool {
+        chat.canSend && chat.replyDraft == nil && chat.boardCardDraft == nil && chat.referenceSelections.isEmpty
+    }
 
     var body: some View {
         HStack(spacing: 8) {

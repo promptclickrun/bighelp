@@ -79,6 +79,7 @@ extension ChatModel {
         failureMessage = nil
         draft = ""
         replyDraft = nil
+        boardCardDraft = nil
         draftAttachments = []
         orderedDraftAttachments = []
         drainStagedSendsIfNeeded()

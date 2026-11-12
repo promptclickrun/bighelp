@@ -727,6 +727,15 @@ struct ChatDestinationView: View {
             let isNamedBotChat = isOnTop && appState.pendingComposerAgentID.map { model.memberIDs == [$0] } == true
             guard let pending = appState.takeComposerText(isNewChat: isOnTop && model.transcriptEntries.isEmpty,
                                                           isNamedBotChat: isNamedBotChat) else { return }
+            if pending.sendsAtOnce {
+                // Let's do it: a message of its own, whatever the box holds. If it can't go, it
+                // waits in an empty box for Send. Taking the text restarts this task, so the send
+                // runs on its own.
+                Task { [model] in
+                    if await !model.sendFromOutside(pending.text), model.draft.isEmpty { model.draft = pending.text }
+                }
+                return
+            }
             if pending.wasShown, !model.draft.isEmpty {
                 // It came across from the canvas, with whatever the person changed there. Its chips
                 // came too (`prepareNewChat`), unless the text is still as the blueprint wrote it.

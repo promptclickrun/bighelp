@@ -51,7 +51,14 @@ struct TimelineSenderResolver {
     func accessibilityDescription(for item: TimelineItem) -> String {
         let description: String
         if item.role == .human, case .message(let text) = item.content,
-           let reply = ChatReplyQuote.split(text) {
+           let attached = ChatBoardCard.split(text) {
+            // The card is read first, as it shows.
+            let card = attached.card
+            let words = Self.spokenSentFiles(ChatReplyQuote.split(attached.body)?.body ?? attached.body,
+                                             attachments: item.attachments)
+            description = [card.label + ": " + card.title, words].filter { !$0.isEmpty }.joined(separator: ". ")
+        } else if item.role == .human, case .message(let text) = item.content,
+                  let reply = ChatReplyQuote.split(text) {
             // The quote above the bubble speaks for itself.
             description = Self.spokenSentFiles(reply.body, attachments: item.attachments)
         } else if item.role == .human, case .message(let text) = item.content {

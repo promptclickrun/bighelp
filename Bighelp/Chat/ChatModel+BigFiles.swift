@@ -48,6 +48,7 @@ extension ChatModel {
             sharesLeaveBox(as: human.id, message: message, attachments: orderedAttachments)
             draft = ""
             replyDraft = nil
+            boardCardDraft = nil
             draftAttachments = []
             orderedDraftAttachments = []
         }

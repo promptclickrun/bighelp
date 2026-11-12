@@ -13,6 +13,8 @@ struct AgentBoardContext {
     let onSwitchAgent: () -> Void
     /// Opens a chat with this agent with the text in its message box.
     let onAsk: (String) -> Void
+    /// Opens a chat with this agent and sends the text there (Let's do it).
+    let onSend: (String) -> Void
     /// Opens a chat with this agent with a blueprint in its message box, its blanks as chips.
     let onBlueprint: (String) -> Void
     /// The Chat tab's header controls, so every board has ☰, New chat and ⋯ too.
@@ -194,10 +196,10 @@ enum BoardItemMenu {
                     }
                 }
             }
-            Button("Discuss", systemImage: "bubble.left") { context.onAsk("About “\(item.title)”: ") }
+            Button("Discuss", systemImage: "bubble.left") { context.onAsk(item.chatCard.block) }
         case .idea:
             Button("Start a chat about this", systemImage: "bubble.left") {
-                context.onAsk("About your idea “\(item.title)”: ")
+                context.onAsk(item.chatCard.block)
             }
             if store.supportsFeedback {
                 Button("Turn into a goal", systemImage: "target") { Task { await store.promote(item) } }
@@ -207,7 +209,7 @@ enum BoardItemMenu {
                    systemImage: item.isDone ? "arrow.uturn.backward" : "checkmark") {
                 Task { await store.setDone(item, !item.isDone) }
             }
-            Button("Discuss", systemImage: "bubble.left") { context.onAsk("About my goal “\(item.title)”: ") }
+            Button("Discuss", systemImage: "bubble.left") { context.onAsk(item.chatCard.block) }
         }
         if store.supportsFeedback {
             Button(item.read ? "Mark as unread" : "Mark as read",
@@ -831,11 +833,15 @@ struct BoardPictureView: View {
 // MARK: - Ideas
 
 /// Ideas: chips for its sections, then a bento of pastel tiles. The newest idea is the tall one
-/// with Let's do it; a tap on any idea opens it (`IdeaDetailSheet`).
+/// with Let's do it; a tap on any idea opens it (`IdeaDetailSheet`). Ideas the person said Let's
+/// do it to are listed under Completed at the end.
 struct AgentIdeasView: View {
     let context: AgentBoardContext
     @State private var selected: AgentBoardItem?
     @State private var showsBlueprints = false
+    @State private var hidesCompleted = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @BighelpThemeReader private var theme
     /// The chosen section chip; nil is All.
     @State private var section: String?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -894,6 +900,7 @@ struct AgentIdeasView: View {
                     IdeaTile(idea: idea, context: context) { selected = idea }
                 }
             }
+            completed(store.completedIdeas)
         }
         .boardBlueprints(isPresented: $showsBlueprints, kind: .idea, context: context)
         .bighelpSheet(item: $selected) { idea in
@@ -901,6 +908,41 @@ struct AgentIdeasView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .bighelpSheetSize(.standard)
+        }
+    }
+
+    /// "Completed · 2", then a card with a row for each, newest yes first. The heading folds it.
+    @ViewBuilder
+    private func completed(_ ideas: [AgentBoardItem]) -> some View {
+        if !ideas.isEmpty {
+            Button {
+                withAnimation(reduceMotion ? nil : .snappy) { hidesCompleted.toggle() }
+            } label: {
+                HStack(spacing: BighelpTokens.space8) {
+                    Text("Completed · \(ideas.count)")
+                        .font(.bighelp(.subheadline, weight: .semibold))
+                    Spacer(minLength: 0)
+                    Image(systemName: hidesCompleted ? "chevron.right" : "chevron.down")
+                        .font(.bighelp(.footnote, weight: .semibold))
+                        .accessibilityHidden(true)
+                }
+                .foregroundStyle(theme.secondaryText)
+                .frame(minHeight: BighelpTokens.hitTarget)
+                .contentShape(.rect)
+            }
+            .bighelpPlainButtonStyle()
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityValue(hidesCompleted ? "Hidden" : "Shown")
+            .accessibilityIdentifier("board.ideas.completed")
+            .boardRow(top: BighelpTokens.space12, bottom: BighelpTokens.space4)
+            if !hidesCompleted {
+                ForEach(ideas) { idea in
+                    CompletedIdeaRow(idea: idea) { selected = idea }
+                        .boardCardSegment(isFirst: idea.id == ideas.first?.id, isLast: idea.id == ideas.last?.id,
+                                          separatorInset: CompletedIdeaRow.textInset)
+                        .boardItemSwipe(idea, store: context.store)
+                }
+            }
         }
     }
 
@@ -933,6 +975,62 @@ struct AgentIdeasView: View {
             if !name.isEmpty, !names.contains(name) { names.append(name) }
         }
         return names
+    }
+}
+
+/// An idea the person said Let's do it to: a check, its title and when. A tap opens it.
+private struct CompletedIdeaRow: View {
+    let idea: AgentBoardItem
+    let onOpen: () -> Void
+
+    /// Where the row's text starts, for the hairline between rows.
+    static let textInset = BighelpTokens.space16 + 28 + BighelpTokens.space12
+
+    var body: some View {
+        Button(action: onOpen) {
+            HStack(spacing: BighelpTokens.space12) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 28, height: 28)
+                    .background(theme.success, in: .circle)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(idea.title)
+                        .font(.bighelp(.subheadline, weight: .semibold))
+                        .foregroundStyle(theme.primaryText)
+                        .multilineTextAlignment(.leading)
+                    Text(IdeaCompletion.label(idea.answeredAt))
+                        .font(.bighelp(.footnote))
+                        .foregroundStyle(theme.secondaryText)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, BighelpTokens.space16)
+            .padding(.vertical, BighelpTokens.space12)
+            .frame(minHeight: BighelpTokens.hitTarget)
+            .contentShape(.rect)
+        }
+        .bighelpPlainButtonStyle()
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Opens the idea")
+        .accessibilityIdentifier("board.ideas.completed.\(idea.id)")
+    }
+
+    @BighelpThemeReader private var theme
+}
+
+/// "Started today", "Started Monday": when the person said Let's do it.
+enum IdeaCompletion {
+    static func label(_ date: Date?, now: Date = .now, calendar: Calendar = .current) -> String {
+        guard let date else { return String(localized: "Completed") }
+        if calendar.isDateInToday(date) { return String(localized: "Started today") }
+        if calendar.isDateInYesterday(date) { return String(localized: "Started yesterday") }
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: date),
+                                           to: calendar.startOfDay(for: now)).day ?? .max
+        let day = days < 7 ? date.formatted(.dateTime.weekday(.wide))
+            : date.formatted(.dateTime.month(.abbreviated).day())
+        return String(localized: "Started \(day)")
     }
 }
 
@@ -1040,7 +1138,7 @@ private struct IdeaHeroTile: View {
         isAccepting = false
         guard outcome != .failed else { acceptFailed = true; return }
         acceptFailed = false
-        context.onAsk(idea.letsDoItMessage)
+        context.onSend(idea.letsDoItMessage)
     }
 }
 
@@ -1124,50 +1222,21 @@ struct IdeaDetailSheet: View {
                     .foregroundStyle(theme.primaryText)
                     .tint(theme.action)
                 VStack(spacing: BighelpTokens.space8) {
-                    Button {
-                        Task { await letsDoIt() }
-                    } label: {
-                        Group {
-                            if isAccepting {
-                                BighelpNoodleView(motion: .loader, size: 20, tint: theme.actionForeground)
-                            } else {
-                                Text(acceptFailed ? "Try again" : "Let's do it")
-                            }
-                        }
-                        .font(.bighelp(.body).weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
-                    }
-                    .bighelpProminentButtonStyle()
-                    .buttonBorderShape(.capsule)
-                    .tint(theme.action)
-                    .foregroundStyle(theme.actionForeground)
-                    .disabled(isAccepting)
-                    .accessibilityIdentifier("board.idea.accept")
-                    if acceptFailed {
-                        Text("Couldn't tell \(context.agentName) yet. Check the connection and try again.")
-                            .font(.bighelp(.footnote))
-                            .foregroundStyle(theme.secondaryText)
-                            .multilineTextAlignment(.center)
-                            .accessibilityIdentifier("board.idea.accept.failed")
-                    }
-                    if context.store.supportsFeedback {
-                        Button {
-                            dismiss()
-                            Task { await context.store.promote(idea) }
-                        } label: {
-                            Label("Make it a goal", systemImage: "target")
-                                .font(.bighelp(.body).weight(.semibold))
-                                .foregroundStyle(theme.primaryText)
-                                .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("board.idea.promote")
+                    if idea.isCompleted {
+                        // Said yes to already: the chat has it.
+                        Label(IdeaCompletion.label(idea.answeredAt), systemImage: "checkmark.circle.fill")
+                            .font(.bighelp(.body).weight(.semibold))
+                            .foregroundStyle(theme.success)
+                            .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
+                            .accessibilityIdentifier("board.idea.completed")
+                    } else {
+                        acceptButtons
                     }
                     Button {
                         dismiss()
                         Task { await context.store.hide(idea) }
                     } label: {
-                        Text("Not now")
+                        Text(idea.isCompleted ? "Remove" : "Not now")
                             .font(.bighelp(.body).weight(.semibold))
                             .foregroundStyle(theme.secondaryText)
                             .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
@@ -1199,15 +1268,59 @@ struct IdeaDetailSheet: View {
         #endif
     }
 
-    /// The yes is recorded when the person taps, by the idea's ID; the chat that opens
-    /// gets only the readable text. Older plugins skip straight to the chat, as before.
+    /// Let's do it, and Make it a goal.
+    @ViewBuilder
+    private var acceptButtons: some View {
+        Button {
+            Task { await letsDoIt() }
+        } label: {
+            Group {
+                if isAccepting {
+                    BighelpNoodleView(motion: .loader, size: 20, tint: theme.actionForeground)
+                } else {
+                    Text(acceptFailed ? "Try again" : "Let's do it")
+                }
+            }
+            .font(.bighelp(.body).weight(.semibold))
+            .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
+        }
+        .bighelpProminentButtonStyle()
+        .buttonBorderShape(.capsule)
+        .tint(theme.action)
+        .foregroundStyle(theme.actionForeground)
+        .disabled(isAccepting)
+        .accessibilityIdentifier("board.idea.accept")
+        if acceptFailed {
+            Text("Couldn't tell \(context.agentName) yet. Check the connection and try again.")
+                .font(.bighelp(.footnote))
+                .foregroundStyle(theme.secondaryText)
+                .multilineTextAlignment(.center)
+                .accessibilityIdentifier("board.idea.accept.failed")
+        }
+        if context.store.supportsFeedback {
+            Button {
+                dismiss()
+                Task { await context.store.promote(idea) }
+            } label: {
+                Label("Make it a goal", systemImage: "target")
+                    .font(.bighelp(.body).weight(.semibold))
+                    .foregroundStyle(theme.primaryText)
+                    .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("board.idea.promote")
+        }
+    }
+
+    /// The yes is recorded when the person taps, by the idea's ID; then "Let's do it!" goes to
+    /// the chat with the idea as a card. Older plugins skip straight to the chat, as before.
     private func letsDoIt() async {
         isAccepting = true
         let outcome = await context.store.accept(idea)
         isAccepting = false
         guard outcome != .failed else { acceptFailed = true; return }
         dismiss()
-        context.onAsk(idea.letsDoItMessage)
+        context.onSend(idea.letsDoItMessage)
     }
 
     @BighelpThemeReader private var theme

@@ -59,6 +59,7 @@ extension ChatModel {
         isReplacingReferenceDraft = true
         draft = ""
         replyDraft = nil
+        boardCardDraft = nil
         draftAttachments = []
         orderedDraftAttachments = []
         referenceSelections = []

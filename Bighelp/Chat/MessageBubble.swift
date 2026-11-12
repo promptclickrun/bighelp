@@ -61,6 +61,8 @@ final class ChatMessageContentCache {
         let source: String
         /// The message a person's message answers, drawn above it instead of its quote line.
         let reply: ChatReplyQuote?
+        /// The idea, post or goal a person's message carries, drawn in its bubble.
+        let boardCard: ChatBoardCard?
         let references: ReferenceDecodedMessage
         let document: MarkdownDocument
         let citationLinks: [Int: URL]
@@ -73,9 +75,12 @@ final class ChatMessageContentCache {
 
         init(_ source: String, role: TimelineRole, isStreaming: Bool = false) {
             self.source = source
-            let reply = role == .human ? ChatReplyQuote.split(source) : nil
+            let card = role == .human ? ChatBoardCard.split(source) : nil
+            boardCard = card?.card
+            let afterCard = card?.body ?? source
+            let reply = role == .human ? ChatReplyQuote.split(afterCard) : nil
             self.reply = reply?.quote
-            references = ReferenceCodec.decode(reply?.body ?? source)
+            references = ReferenceCodec.decode(reply?.body ?? afterCard)
             document = MarkdownDocument(references.prose)
             citationLinks = role == .assistant && !isStreaming
                 ? ChatCitationLinks.resolve(in: references.prose) : [:]
@@ -198,6 +203,10 @@ struct MessageBubble: View {
             if let reply = projection.reply {
                 ChatReplyQuoteView(quote: reply, agentName: replyAgentName, alignsTrailing: role == .human)
             }
+            if !uiV3Enabled, let card = projection.boardCard {
+                ChatBoardCardView(card: card)
+                    .frame(maxWidth: ChatBubbleLayoutMetrics.maximumAbsoluteWidth)
+            }
             messageInteractionSurface(
                 ChatBubbleWidthLayout(
                     maximumWidthFraction: uiV3Enabled
@@ -208,10 +217,11 @@ struct MessageBubble: View {
                         )
                         : presentation.maximumWidthFraction,
                     contentFitsWidth: uiV3Enabled
-                        ? !projection.cardProjection.hasRichContent
+                        ? !projection.cardProjection.hasRichContent && projection.boardCard == nil
                         : presentation.contentFitsWidth
                 ) {
                     messageContent(
+                        boardCard: projection.boardCard,
                         cardProjection: projection.cardProjection,
                         document: document,
                         citationLinks: projection.citationLinks,
@@ -453,6 +463,7 @@ struct MessageBubble: View {
 
     @ViewBuilder
     private func messageContent(
+        boardCard: ChatBoardCard?,
         cardProjection: ChatCardMessageProjection,
         document: MarkdownDocument,
         citationLinks: [Int: URL],
@@ -490,71 +501,94 @@ struct MessageBubble: View {
                     .padding(.vertical, BighelpTokens.space4)
                 }
             }
+        } else if uiV3Enabled, let boardCard {
+            // A person's message with an idea, post or goal: the card above their words, in the
+            // bubble. A message's text never changes, so it never moves between these branches.
+            VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+                ChatBoardCardView(card: boardCard)
+                    .padding(.horizontal, -BighelpTokens.space8)
+                    .padding(.top, -BighelpTokens.space4)
+                if !document.blocks.isEmpty {
+                    messageText(document: document, interaction: interaction, citationLinks: citationLinks)
+                }
+            }
+            .modifier(BighelpV3MessageSurface(role: role, theme: theme,
+                                              increasedContrast: colorSchemeContrast == .increased))
         } else if uiV3Enabled {
             // One text view for both looks: becoming interim restyles it in place.
-            NativeInlineSelectableMarkdownTextView(
-                document: document,
-                speakerName: speakerName,
-                proseLineSpacing: role == .human ? 2 : isInterimReply ? 4 : 5,
-                primaryText: isInterimReply ? theme.secondaryText : nativePrimaryText,
-                secondaryText: role == .human ? nativePrimaryText.opacity(0.82)
-                    : isInterimReply ? theme.tertiaryText : theme.secondaryText,
-                accent: role == .human ? nativePrimaryText : theme.action,
-                codeBackground: role == .human
-                    ? nativePrimaryText.opacity(0.14)
-                    : theme.primaryText.opacity(0.07),
-                openURL: openURL,
-                theme: theme,
-                copyActionLabel: copyActionLabel,
-                onCopy: { copyMessage(interaction) },
-                onSelect: { isSelectingText = true },
-                onFork: onFork,
-                reactions: reactionActions,
-                onReply: onReply,
-                onShare: { isSharing = true },
-                textScale: (isInterimReply ? ChatInterimReplyStyle.textScale : 1) * chatTextSize.scale,
-                mentionIdentities: mentionIdentities,
-                menuAnchor: menuAnchor,
-                bubbleShape: bubbleShape,
-                citationLinks: citationLinks
-            )
-            .modifier(BighelpV3MessageSurface(
-                role: role,
-                theme: theme,
-                increasedContrast: colorSchemeContrast == .increased,
-                isInterim: isInterimReply
-            ))
+            messageText(document: document, interaction: interaction, citationLinks: citationLinks)
+                .modifier(BighelpV3MessageSurface(
+                    role: role,
+                    theme: theme,
+                    increasedContrast: colorSchemeContrast == .increased,
+                    isInterim: isInterimReply
+                ))
         } else {
-            switch presentation.chrome {
-            case .accentBubble:
-                MarkdownMessageView(
-                    document: document,
-                    proseLineSpacing: presentation.proseLineSpacing
-                )
-                    .foregroundStyle(isPendingSubmission ? theme.secondaryText : theme.primaryText)
-                    .multilineTextAlignment(.leading)
-                    .padding(.horizontal, BighelpTokens.space16)
-                    .padding(.vertical, BighelpTokens.space12)
-                    .bighelpSurface(.selected)
-            case .openProse where isInterimReply:
-                MarkdownMessageView(
-                    document: document,
-                    proseLineSpacing: presentation.proseLineSpacing
-                )
-                    .font(.bighelp(.subheadline))
-                    .foregroundStyle(theme.secondaryText)
-                    .multilineTextAlignment(.leading)
-                    .modifier(ChatInterimReplyStyle(theme: theme))
-            case .openProse:
-                MarkdownMessageView(
-                    document: document,
-                    proseLineSpacing: presentation.proseLineSpacing
-                )
-                    .foregroundStyle(isPendingSubmission ? theme.secondaryText : theme.primaryText)
-                    .multilineTextAlignment(.leading)
-                    .padding(.horizontal, BighelpTokens.space4)
-                    .padding(.vertical, BighelpTokens.space4)
-            }
+            legacyContent(document: document, presentation: presentation)
+        }
+    }
+
+    private func messageText(document: MarkdownDocument, interaction: ChatBubbleInteraction,
+                             citationLinks: [Int: URL]) -> some View {
+        NativeInlineSelectableMarkdownTextView(
+            document: document,
+            speakerName: speakerName,
+            proseLineSpacing: role == .human ? 2 : isInterimReply ? 4 : 5,
+            primaryText: isInterimReply ? theme.secondaryText : nativePrimaryText,
+            secondaryText: role == .human ? nativePrimaryText.opacity(0.82)
+                : isInterimReply ? theme.tertiaryText : theme.secondaryText,
+            accent: role == .human ? nativePrimaryText : theme.action,
+            codeBackground: role == .human
+                ? nativePrimaryText.opacity(0.14)
+                : theme.primaryText.opacity(0.07),
+            openURL: openURL,
+            theme: theme,
+            copyActionLabel: copyActionLabel,
+            onCopy: { copyMessage(interaction) },
+            onSelect: { isSelectingText = true },
+            onFork: onFork,
+            reactions: reactionActions,
+            onReply: onReply,
+            onShare: { isSharing = true },
+            textScale: (isInterimReply ? ChatInterimReplyStyle.textScale : 1) * chatTextSize.scale,
+            mentionIdentities: mentionIdentities,
+            menuAnchor: menuAnchor,
+            bubbleShape: bubbleShape,
+            citationLinks: citationLinks
+        )
+    }
+
+    @ViewBuilder
+    private func legacyContent(document: MarkdownDocument, presentation: ChatMessagePresentation) -> some View {
+        switch presentation.chrome {
+        case .accentBubble:
+            MarkdownMessageView(
+                document: document,
+                proseLineSpacing: presentation.proseLineSpacing
+            )
+                .foregroundStyle(isPendingSubmission ? theme.secondaryText : theme.primaryText)
+                .multilineTextAlignment(.leading)
+                .padding(.horizontal, BighelpTokens.space16)
+                .padding(.vertical, BighelpTokens.space12)
+                .bighelpSurface(.selected)
+        case .openProse where isInterimReply:
+            MarkdownMessageView(
+                document: document,
+                proseLineSpacing: presentation.proseLineSpacing
+            )
+                .font(.bighelp(.subheadline))
+                .foregroundStyle(theme.secondaryText)
+                .multilineTextAlignment(.leading)
+                .modifier(ChatInterimReplyStyle(theme: theme))
+        case .openProse:
+            MarkdownMessageView(
+                document: document,
+                proseLineSpacing: presentation.proseLineSpacing
+            )
+                .foregroundStyle(isPendingSubmission ? theme.secondaryText : theme.primaryText)
+                .multilineTextAlignment(.leading)
+                .padding(.horizontal, BighelpTokens.space4)
+                .padding(.vertical, BighelpTokens.space4)
         }
     }
 

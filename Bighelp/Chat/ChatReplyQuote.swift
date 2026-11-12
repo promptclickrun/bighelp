@@ -60,7 +60,7 @@ struct ChatReplyQuote: Equatable, Sendable {
         let words: String
         switch item.content {
         case .message(let text) where item.role == .human:
-            words = HermesUserMessageDisplay.preview(split(text)?.body ?? text, attachments: item.attachments)
+            words = HermesUserMessageDisplay.preview(text, attachments: item.attachments)
         case .message(let text):
             let prose = ReferenceCodec.decode(
                 DirectHermesGeneratedMediaClient.pendingFiles(text, role: item.role).text).prose
@@ -180,19 +180,21 @@ struct ChatReplyQuote: Equatable, Sendable {
 }
 
 extension ChatModel {
-    /// The composer's text as sent: a reply's quote line first. A command goes
-    /// out as typed, since a line before it would stop it from running.
+    /// The composer's text as sent: an idea, post or goal card first, then a reply's quote
+    /// line. A command goes out as typed, since a line before it would stop it from running.
     var outgoingDraftText: String {
-        guard let replyDraft, !draft.hasPrefix("/") else { return draft }
-        return replyDraft.prefixing(draft)
+        guard !draft.hasPrefix("/") else { return draft }
+        let replied = replyDraft?.prefixing(draft) ?? draft
+        return boardCardDraft?.prefixing(replied) ?? replied
     }
 
-    /// The draft as saved: the reply's quote line, then the text. A draft with
-    /// references keeps their exact bytes and saves without the reply.
+    /// The draft as saved: the card, the reply's quote line, then the text. A draft with
+    /// references keeps their exact bytes and saves without them.
     var persistedDraft: String {
         let canonical = canonicalReferenceDraft
-        guard let replyDraft, referenceSelections.isEmpty, referenceSubmission == nil else { return canonical }
-        return replyDraft.prefixing(canonical)
+        guard referenceSelections.isEmpty, referenceSubmission == nil else { return canonical }
+        let replied = replyDraft?.prefixing(canonical) ?? canonical
+        return boardCardDraft?.prefixing(replied) ?? replied
     }
 
     /// Long-press › Reply: the composer quotes this message until it's sent or cancelled.

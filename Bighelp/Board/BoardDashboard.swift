@@ -33,11 +33,12 @@ enum DashboardSwipe {
 
 /// What a swipe on a Dashboard card does. Right acts on the card, left puts it away.
 enum DashboardCardAction: Equatable, Sendable {
-    /// Feed, right: the bot's chat with the post in the message box. Nothing is sent.
+    /// Feed, right: the bot's chat with the post as a card in the message box. Nothing is sent.
     case ask
     /// Feed, left: the post's Clear (the host's dismiss), with Undo.
     case clear
-    /// Ideas, right: Let's do it. The host records the yes, the chat opens with it in the box.
+    /// Ideas, right: Let's do it. The host records the yes, and "Let's do it!" goes to the chat
+    /// with the idea as a card.
     case doIt
     /// Ideas, left: the idea's Not now (the host's dismiss; the plugin remembers it), with Undo.
     case notNow
@@ -78,7 +79,7 @@ enum DashboardCardAction: Equatable, Sendable {
     /// A short second line on the stamp, for the one swipe that leaves the page.
     var detail: String? {
         switch self {
-        // Let's do it opens the chat with the yes in the box; the stamp says where it goes.
+        // Let's do it sends the yes to the chat; the stamp says where it goes.
         case .doIt: String(localized: "To chat")
         default: nil
         }
@@ -127,7 +128,8 @@ enum DashboardPiles {
     /// bot touched last first. Put away for now (`hidden`: snoozed goals, cards taken to the
     /// chat) are left out.
     static func cards(_ kind: AgentBoardItem.Kind, items: [AgentBoardItem], hidden: Set<String>) -> [AgentBoardItem] {
-        let shown = items.filter { $0.kind == kind && !$0.dismissed && !hidden.contains($0.id) }
+        // An idea already said yes to waits under Completed, not on the pile.
+        let shown = items.filter { $0.kind == kind && !$0.dismissed && !$0.isCompleted && !hidden.contains($0.id) }
         switch kind {
         case .feed, .idea:
             return shown.sorted { $0.createdAt > $1.createdAt }

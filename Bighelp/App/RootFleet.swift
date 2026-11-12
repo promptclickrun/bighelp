@@ -249,7 +249,8 @@ extension RootShellView {
         FleetHomeView(fleet: fleet, onOpen: { openFleetAgent($0) }, onNewChat: { isFleetNewChatPresented = true },
                       onSetPinned: { setFleetPin($0, $1) }, onGroupAction: { performFleetGroupAction($0, $1) },
                       onOpenRoutines: { openFleet(.routines(profileID: $0.profileID), on: $0.hostID) },
-                      onNewAgent: { fleetGate(.newAgent) }, hostFilter: fleetFocusBinding)
+                      onNewAgent: { fleetGate(.newAgent) }, onOpenChat: { openFleetChat($0) },
+                      hostFilter: fleetFocusBinding)
     }
 
     var fleetFocusBinding: Binding<UUID?> {

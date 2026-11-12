@@ -39,7 +39,7 @@ final class SimpleBotsUITests: BighelpUITestCase {
             // Settings: the short sheet, with the way back to all of bighelp.
             app.buttons["simple-bots.settings"].tap()
             XCTAssertTrue(app.descendants(matching: .any)["simple-bots.settings"].waitForExistence(timeout: 5))
-            XCTAssertTrue(app.switches["simple-bots.settings.mode"].exists)
+            XCTAssertTrue(app.buttons["simple-bots.settings.modes"].exists, "Modes, as in All Settings")
             XCTAssertTrue(app.buttons["simple-bots.settings.approvals"].waitForExistence(timeout: 5),
                           "Approvals links to the primary bot's Advanced Options")
             save("simple-settings-\(appearance)", app)
@@ -703,14 +703,22 @@ final class SimpleBotsUITests: BighelpUITestCase {
                       "Expand shows above the box once the draft has three lines")
     }
 
+    /// Settings › Modes, the same page as All Settings', with Bots picked; picking Chat leaves Bots mode.
     @MainActor
     func testTurningSimpleBotModeOffComesBackToBighelp() throws {
         let app = launch(appearance: "light")
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
         app.buttons["simple-bots.settings"].tap()
-        let mode = app.switches["simple-bots.settings.mode"]
-        XCTAssertTrue(mode.waitForExistence(timeout: 5))
-        mode.tap()
+        let modes = app.buttons["simple-bots.settings.modes"]
+        XCTAssertTrue(modes.waitForExistence(timeout: 5))
+        XCTAssertTrue(modes.label.contains("Bots mode"), modes.label)
+        modes.tap()
+        let bots = app.buttons["settings.mode.bots"]
+        XCTAssertTrue(bots.waitForExistence(timeout: 5))
+        XCTAssertTrue(bots.isSelected)
+        XCTAssertTrue(app.switches["settings.code-mode"].exists, "Code mode's switch, as in All Settings")
+        save("simple-settings-modes", app)
+        app.buttons["settings.mode.chat"].tap()
         // The full Settings takes over the sheet; close it.
         let done = app.buttons["settings.done"]
         if done.waitForExistence(timeout: 5) { done.tap() }

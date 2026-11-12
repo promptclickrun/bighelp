@@ -536,6 +536,8 @@ struct SettingsView: View {
             settingsDone(destination(for: .chat))
         case .apps:
             settingsDone(connectionsPage)
+        case .modes:
+            settingsDone(destination(for: .modes))
         }
     }
 

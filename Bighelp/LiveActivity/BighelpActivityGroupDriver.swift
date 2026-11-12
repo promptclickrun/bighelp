@@ -154,6 +154,7 @@ final class BighelpActivityGroupDriver: BighelpLiveActivityDriving {
             var state = BighelpActivitySession.aggregate(Array(visible), timestamp: visible.map(\.timestamp).max() ?? 1)
             state.activeCount = (state.activeCount ?? 0) + self.hiddenActiveCount
             state.activeRows = Array(Set(state.activeRows ?? []).union(self.hiddenActiveKeys)).sorted()
+            BighelpActivitySession.fitSealed(&state)
             if state.phase.isTerminal && (state.activeCount ?? 0) > 0 {
                 state = .init(phase: .thinking, currentAction: "", progress: 0, completedSteps: 0,
                     activeSubagentCount: 0, latestTool: nil, timestamp: state.timestamp,

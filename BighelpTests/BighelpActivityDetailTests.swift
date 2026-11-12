@@ -65,8 +65,13 @@ struct BighelpActivityDetailTests {
         let rows = (0..<6).map { BighelpActivitySession(id: "row-\($0)", phase: .thinking, timestamp: 100) }.map { row in
             var row = row; row.sealed = String(repeating: "s", count: 1_000); return row
         }
-        let rewritten = BighelpActivitySession.aggregate(rows, timestamp: 100)
+        var rewritten = BighelpActivitySession.aggregate(rows, timestamp: 100)
         #expect(rewritten.sessions?.map { $0.sealed != nil } == [true, true, false, false, false])
+        #expect(try JSONEncoder().encode(rewritten).count < 4_000)
+        // The driver adds the rows the card doesn't show; detail gives way to them.
+        rewritten.activeRows = (0..<64).map { String(format: "%016d", $0) }
+        BighelpActivitySession.fitSealed(&rewritten)
+        #expect(rewritten.sessions?.map { $0.sealed != nil } == [true, false, false, false, false])
         #expect(try JSONEncoder().encode(rewritten).count < 4_000)
     }
 

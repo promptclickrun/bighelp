@@ -148,11 +148,19 @@ final class BighelpManagedLiveActivityRegistrar: BighelpLiveActivityRegistering 
         // key only this phone and this computer hold. It goes over the phone's own connection to the
         // computer, never through the notification service. An older plugin has no such route, and the
         // card then shows its plain status: nothing here may fail the registration.
-        if groupID != nil, let key = BighelpActivityCardKey.wireKey(rowID: owner.opaqueSessionID) {
-            let path = "/enrollments/\(grant.grantId)/live-activities/\(owner.relayActivityID)/card-key"
-            Task { @MainActor in
-                _ = try? await client.request(path, method: "PUT", body: ["version": .integer(1), "key": .string(key)],
-                                              isCurrent: { true })
+        guard groupID != nil else { return }
+        guard let key = BighelpActivityCardKey.wireKey(rowID: owner.opaqueSessionID) else {
+            BighelpLiveActivityLog.note(.cardKeyUnavailable)
+            return
+        }
+        let path = "/enrollments/\(grant.grantId)/live-activities/\(owner.relayActivityID)/card-key"
+        Task { @MainActor in
+            do {
+                _ = try await client.request(path, method: "PUT", body: ["version": .integer(1), "key": .string(key)],
+                                             isCurrent: { true })
+                BighelpLiveActivityLog.note(.cardKeySent)
+            } catch {
+                BighelpLiveActivityLog.failed(.cardKeyRefused, error)
             }
         }
     }

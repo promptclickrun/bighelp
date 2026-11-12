@@ -54,7 +54,7 @@ The service refusing a card's first registration for good (a 4xx other than 401,
 
 ## Diagnosing a card that disappeared
 
-`BighelpLiveActivityLog` writes fixed codes to the `app.loopdy.mobile` subsystem, category `LiveActivity`, never IDs, titles or text. Filter Console on that category. `card-started`, `card-request-disabled` and `card-request-failed` (with the system error's `domain` and `code`) cover the ActivityKit request. `card-ending`, `card-ended`, `card-dismissed`, `card-invalidated`, `finished-cards-dismissed`, `driver-retired`, `entry-repaired` and `entry-pruned` say why a card went. `registration-confirmed`, `registration-failed` (with `reason=http-<status>` or the error kind), `registration-refused-local-control`, `revocation-*` and `recovery-owner-failed` cover the service.
+`BighelpLiveActivityLog` writes fixed codes to the `app.loopdy.mobile` subsystem, category `LiveActivity`, never IDs, titles or text. Filter Console on that category. `card-started`, `card-request-disabled` and `card-request-failed` (with the system error's `domain` and `code`) cover the ActivityKit request. `card-ending`, `card-ended`, `card-dismissed`, `card-invalidated`, `finished-cards-dismissed`, `driver-retired`, `entry-repaired` and `entry-pruned` say why a card went. `card-key-sent`, `card-key-refused` (an older plugin has no such route) and `card-key-unavailable` (this device keeps no card key) say whether the card can get detail. `registration-confirmed`, `registration-failed` (with `reason=http-<status>` or the error kind), `registration-refused-local-control`, `revocation-*` and `recovery-owner-failed` cover the service.
 
 ## Chat widgets
 

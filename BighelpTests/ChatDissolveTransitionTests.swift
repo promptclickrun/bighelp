@@ -45,6 +45,29 @@ struct ChatDissolveTransitionTests {
         #expect(overlay.superview == nil)
     }
 
+    /// The sweep is over in about a second, and a computer can take seconds more to make the chat
+    /// (a Bot Chat comes from the agent's gateway). The blank canvas handing over to it is the same
+    /// New Chat: it must not sweep a second time.
+    @Test func theChatHermesMakesLaterDoesNotSweepTheBlankCanvasAgain() async throws {
+        let (window, scroll) = try await mountedChat()
+        defer { window.isHidden = true }
+        let transition = ChatDissolveTransition()
+        transition.register(conversationID: "old", scrollView: { scroll })
+        transition.present(nextID: "local-draft:new", replacing: "old", reduceMotion: false)
+        #expect(transition.overlay != nil)
+        // The sweep ends, as its animations do.
+        transition.cancel()
+        // The blank canvas is the chat on screen now, with its suggestions to sweep.
+        transition.register(conversationID: "local-draft:new", scrollView: { scroll })
+        transition.present(nextID: "authoritative", replacing: "local-draft:new", reduceMotion: false)
+        #expect(transition.overlay == nil, "One New Chat has one sweep")
+        // A New Chat from the chat Hermes made sweeps as usual.
+        transition.register(conversationID: "authoritative", scrollView: { scroll })
+        transition.present(nextID: "local-draft:next", replacing: "authoritative", reduceMotion: false)
+        #expect(transition.overlay != nil)
+        transition.cancel()
+    }
+
     @Test func reduceMotionAndMissingSnapshotDoNotGateTheNewChat() async throws {
         let (window, scroll) = try await mountedChat()
         defer { window.isHidden = true }

@@ -244,11 +244,14 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
     var hasDeferredReferenceState: Bool = false
     var isContentLoaded: Bool { localContentRevision == nil }
 
+    /// The ID of a new chat's blank canvas, shown until Hermes has made the chat; never sent to Hermes.
+    static let localPresentationDraftPrefix = "local-draft:"
+
     /// A presentation-only draft used while Hermes allocates the durable
     /// session. It has no remote coordinate and must never be sent or exposed
     /// as an authoritative chat summary.
     var isLocalPresentationDraft: Bool {
-        id.hasPrefix("local-draft:")
+        id.hasPrefix(Self.localPresentationDraftPrefix)
             && remoteStoredID == nil
             && remoteSource == nil
             && !hasAcceptedMessage

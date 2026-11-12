@@ -198,14 +198,15 @@ struct DirectHermesSessionControlClientTests {
         }
     }
 
-    /// A started chat that doesn't report its reasoning still lists the levels, on Auto;
-    /// choosing one needs the report, so nothing is changed.
+    /// A started chat that doesn't report its reasoning still lists the levels, on the one Hermes
+    /// says it uses; choosing one needs the report, so nothing is changed.
     @Test func aStartedChatMustReportItsReasoning() async throws {
         let fixture = try SessionControlWorkspace()
         fixture.reasoning = nil
         let client = fixture.client()
         let picker = try #require(try await client.openPicker(fixture.open(.reasoning)).choice)
-        #expect(picker.choices.first(where: \.isCurrent)?.value == "reset")
+        #expect(picker.choices.first(where: \.isCurrent)?.value == "medium")
+        #expect(!picker.choices.contains { $0.value == "reset" })
         let selection = try BighelpLinkPickerSelection(
             pickerID: picker.pickerID, sessionID: fixture.appID, kind: .reasoning,
             provider: nil, model: nil, value: "high", sentAt: 1_800_000_000, nativeCoordinate: picker.nativeCoordinate)
@@ -262,13 +263,21 @@ struct DirectHermesSessionControlClientTests {
         #expect(fixture.calls.contains { $0.operation == .configSet && $0.payload["key"] == .string("model") })
     }
 
-    @Test func reasoningOnAChatWhoseAgentCouldNotStartIsAutoAndStaysOnThatChat() async throws {
+    /// An existing chat's agent isn't built until its next message, so Hermes leaves the level
+    /// out; the picker shows the agent's configured level, never "Auto".
+    @Test func reasoningOnAChatNotBuiltYetShowsTheAgentsLevelAndStaysOnThatChat() async throws {
         let fixture = try SessionControlWorkspace()
         fixture.unstarted = true
+        // Nothing picked for this chat yet: Hermes falls back to the agent's level.
+        fixture.reasoning = nil
+        fixture.configuredReasoning = "high"
         let client = fixture.client()
         let picker = try #require(try await client.openPicker(fixture.open(.reasoning)).choice)
-        #expect(picker.choices.first?.value == "reset")
-        #expect(picker.choices.first?.isCurrent == true)
+        #expect(picker.choices.filter(\.isCurrent).map(\.value) == ["high"])
+        #expect(!picker.choices.contains { $0.value == "reset" })
+        let read = try #require(fixture.calls.first { $0.operation == .configGet })
+        #expect(read.payload == ["profile": .string("studio"), "session_id": .string("runtime-chat"),
+                                 "key": .string("reasoning")])
         let selection = try BighelpLinkPickerSelection(
             pickerID: picker.pickerID, sessionID: fixture.appID, kind: .reasoning,
             provider: nil, model: nil, value: "high", sentAt: 1_800_000_000, nativeCoordinate: picker.nativeCoordinate
@@ -278,14 +287,15 @@ struct DirectHermesSessionControlClientTests {
         #expect(write.payload["scope"] == .string("session"))
     }
 
-    @Test func explicitReasoningLevelsAreEditableAndAutomaticIsOnlyAReadRepresentation() async throws {
+    /// A built chat with no level set anywhere thinks at Hermes' default, and the picker says so.
+    /// "reset" is never a level to pick.
+    @Test func noLevelSetShowsHermesDefaultAndResetIsNeverPicked() async throws {
         let fixture = try SessionControlWorkspace()
         fixture.reasoning = ""
         let client = fixture.client()
         let picker = try #require(try await client.openPicker(fixture.open(.reasoning)).choice)
-        #expect(picker.choices.count == 9)
-        #expect(picker.choices.first?.value == "reset")
-        #expect(picker.choices.first?.isCurrent == true)
+        #expect(picker.choices.count == 8)
+        #expect(picker.choices.filter(\.isCurrent).map(\.value) == ["medium"])
         #expect(client.selectionSupport(sessionID: fixture.appID, agentID: "studio").reasoningUnavailableReason == nil)
         let selection = try BighelpLinkPickerSelection(
             pickerID: picker.pickerID, sessionID: fixture.appID, kind: .reasoning,
@@ -852,6 +862,8 @@ private final class SessionControlWorkspace: WorkspaceOperationPerforming {
     var running = false
     var models = ["old-model", "new-model"]
     var reasoning: String? = "medium"
+    /// The agent's `agent.reasoning_effort`; empty is none set.
+    var configuredReasoning = ""
     /// Hermes couldn't start the agent (its provider has no login): the chat reports
     /// `lazy` with no provider or reasoning until a model switch starts it.
     var unstarted = false
@@ -916,7 +928,8 @@ private final class SessionControlWorkspace: WorkspaceOperationPerforming {
         calls.append(Call(operation: operation, payload: payload))
         // The agent's own catalog is read for its profile alone, as Hermes allows.
         guard payload["session_id"] == .string("runtime-chat")
-            || (operation == .modelOptions && payload["session_id"] == nil) else { throw WorkspaceClientError.invalidRequest }
+            || (operation == .modelOptions && payload["session_id"] == nil)
+            || (operation == .configGet && payload["session_id"] == nil) else { throw WorkspaceClientError.invalidRequest }
         switch operation {
         case .sessionActivate:
             if yieldOnActivation { await Task.yield() }
@@ -955,8 +968,11 @@ private final class SessionControlWorkspace: WorkspaceOperationPerforming {
             if payload["key"] == .string("fast"), let fastValue {
                 return ["value": .string(FastMode(fastValue).value)]
             }
-            guard payload["key"] == .string("reasoning"), let reasoning else { throw WorkspaceClientError.invalidResponse }
-            return ["value": .string(reasoning), "display": .string("show")]
+            guard payload["key"] == .string("reasoning") else { throw WorkspaceClientError.invalidResponse }
+            // As Hermes resolves it: the chat's own level, else the agent's, else "medium".
+            let chat = payload["session_id"] == nil ? "" : (reasoning ?? "")
+            let value = chat.isEmpty ? (configuredReasoning.isEmpty ? "medium" : configuredReasoning) : chat
+            return ["value": .string(value), "display": .string("show")]
         case .configSet:
             if payload["key"] == .string("fast") {
                 guard payload["scope"] == .string("session"), let value = payload["value"]?.string else {

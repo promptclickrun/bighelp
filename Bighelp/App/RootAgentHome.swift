@@ -293,6 +293,12 @@ extension RootShellView {
         startNewChat(explicitAgentID: homeAgent?.id)
     }
 
+    /// Let's do it: a new chat with this agent, the message sent at once.
+    func sendToAgent(_ text: String) {
+        appState.leaveComposerText(text, sendsAtOnce: true)
+        startNewChat(explicitAgentID: homeAgent?.id)
+    }
+
     /// A blueprint: a new chat with it in the message box, its blanks as chips. Nothing is sent.
     func useBlueprint(_ text: String) {
         appState.leaveComposerText(text, fillsBlanks: true)
@@ -500,6 +506,7 @@ extension RootShellView {
             onProfile: { profileAgentID = agent.id },
             onSwitchAgent: { isAgentSwitcherPresented = true },
             onAsk: askAgent,
+            onSend: sendToAgent,
             onBlueprint: useBlueprint,
             onMenu: { isHomeDrawerPresented.toggle() },
             onNewChat: { startHomeChat(with: agent.id) },

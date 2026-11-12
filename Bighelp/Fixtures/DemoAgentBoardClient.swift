@@ -74,6 +74,12 @@ final class DemoAgentBoardClient: AgentBoardClient {
             throw WorkspaceClientError.invalidRequest
         }
         accepted[agentID, default: []].insert(itemID)
+        // As the plugin does: the idea now carries the yes, and when.
+        if let index = itemsByAgent[agentID]?.firstIndex(where: { $0.id == itemID }),
+           itemsByAgent[agentID]?[index].answer != "yes" {
+            itemsByAgent[agentID]?[index].answer = "yes"
+            itemsByAgent[agentID]?[index].answeredAt = .now
+        }
     }
 
     func picture(agentID: String, itemID: String, index: Int) async throws -> Data {

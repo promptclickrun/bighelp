@@ -54,7 +54,9 @@ enum HermesUserMessageDisplay {
     static func preview(_ raw: String, attachments: [ChatAttachment] = []) -> String {
         var photos = attachments.contains { $0.kind == .image }
         var files = !attachments.isEmpty
-        let shown = text(raw)
+        var shown = text(raw)
+        // An idea, post or goal the message carries shows as its card, not in the preview.
+        if let card = ChatBoardCard.split(shown) { shown = card.body.isEmpty ? card.card.title : card.body }
         let words = (ChatReplyQuote.split(shown)?.body ?? shown).components(separatedBy: "\n").filter { line in
             if line.hasPrefix("@image:") { photos = true; return false }
             if line.hasPrefix("@file:") { files = true; return false }

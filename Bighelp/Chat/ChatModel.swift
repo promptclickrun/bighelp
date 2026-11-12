@@ -50,6 +50,10 @@ final class ChatModel {
         didSet {
             // A sent reply put back after a failure, or a saved draft, comes
             // back as its quote line plus text: show the reply again.
+            if !isReplacingReferenceDraft, let card = ChatBoardCard.split(draft) {
+                draft = card.body
+                boardCardDraft = card.card
+            }
             if !isReplacingReferenceDraft, let reply = ChatReplyQuote.split(draft) {
                 draft = reply.body
                 replyDraft = reply.quote
@@ -94,6 +98,14 @@ final class ChatModel {
     var replyDraft: ChatReplyQuote? {
         didSet {
             guard oldValue != replyDraft, !isReplacingReferenceDraft else { return }
+            persistSession()
+        }
+    }
+    /// The idea, Feed post or goal the draft is about (Discuss). It is sent, and saved with the
+    /// draft, as a block before the text (`ChatBoardCard`).
+    var boardCardDraft: ChatBoardCard? {
+        didSet {
+            guard oldValue != boardCardDraft, !isReplacingReferenceDraft else { return }
             persistSession()
         }
     }
@@ -536,8 +548,11 @@ final class ChatModel {
         self.chosenActivityVisibility = chosenActivityVisibility
         activityVisibility = chosenActivityVisibility ?? initialActivityVisibility
         // A saved reply rides before an ordinary draft; reference drafts keep their exact bytes.
-        let savedReply = sourceSession?.referenceState == nil ? ChatReplyQuote.split(initialDraft) : nil
-        let initialDraft = savedReply?.body ?? initialDraft
+        let savedCard = sourceSession?.referenceState == nil ? ChatBoardCard.split(initialDraft) : nil
+        let draftAfterCard = savedCard?.body ?? initialDraft
+        boardCardDraft = savedCard?.card
+        let savedReply = sourceSession?.referenceState == nil ? ChatReplyQuote.split(draftAfterCard) : nil
+        let initialDraft = savedReply?.body ?? draftAfterCard
         replyDraft = savedReply?.quote
         let restoredReferences = ReferenceCanonicalState.restoredDraft(initialDraft,
             state: sourceSession?.referenceState)

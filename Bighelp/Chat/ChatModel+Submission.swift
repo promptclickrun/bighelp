@@ -139,6 +139,14 @@ extension ChatModel {
         return true
     }
 
+    /// A message from outside the box (Let's do it on an idea): it goes once the chat can take
+    /// it, as Send would (waiting out a chat that's still opening or connecting), and whatever is
+    /// in the message box stays there. False when it couldn't go.
+    func sendFromOutside(_ text: String) async -> Bool {
+        guard await waitForConnection(until: { acceptsCardReply(text) }) else { return false }
+        return await sendCardReply(text)
+    }
+
     func send(_ outgoing: ChatOutgoingMessage) async {
         let message = outgoing.message
         let slashSelection = outgoing.slashSelection
@@ -209,6 +217,7 @@ extension ChatModel {
             }
             draft = ""
             replyDraft = nil
+            boardCardDraft = nil
             draftAttachments = []
             orderedDraftAttachments = []
         }
@@ -565,6 +574,7 @@ extension ChatModel {
         if restoresDraft, outgoing.stagedItem == nil {
             draft = ""
             replyDraft = nil
+            boardCardDraft = nil
             draftAttachments = []
             orderedDraftAttachments = []
         }

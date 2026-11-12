@@ -98,19 +98,20 @@ final class BoardDashboardModel {
 
     /// A swipe (or its VoiceOver action, or the menu's) on a card.
     func swipe(_ item: AgentBoardItem, _ direction: DashboardSwipeDirection, botName: String,
-               onAsk: @escaping (String) -> Void) {
+               onAsk: @escaping (String) -> Void, onSend: @escaping (String) -> Void) {
         let action = DashboardCardAction.action(for: item.kind, direction)
         let message = action.undoMessage(for: item.title, botName: botName)
         switch action {
         case .ask:
             takenToChat.insert(item.id)
             undo = Undo(item: item, message: message, revert: .putBack)
-            onAsk("About “\(item.title)”: ")
+            onAsk(item.chatCard.block)
         case .clear, .notNow:
             undo = Undo(item: item, message: message, revert: .unhide)
             run(item) { await $0.store.dismiss(item) }
         case .doIt:
-            // Let's do it, as on Ideas: the host records the yes by the idea's ID before the chat opens.
+            // Let's do it, as on Ideas: the host records the yes by the idea's ID, then the chat
+            // gets "Let's do it!" with the idea. Sent, it can't be undone; the idea is Completed.
             inFlight.insert(item.id)
             Task { [weak self] in
                 guard let self else { return }
@@ -122,8 +123,8 @@ final class BoardDashboardModel {
                 }
                 guard isShown else { return }
                 takenToChat.insert(item.id)
-                undo = Undo(item: item, message: message, revert: .putBack)
-                onAsk(item.letsDoItMessage)
+                undo = Undo(item: item, message: message, revert: nil)
+                onSend(item.letsDoItMessage)
             }
         case .markDone:
             undo = Undo(item: item, message: message, revert: .unmarkDone)
@@ -407,6 +408,7 @@ struct BoardDashboardView: View {
             activity: context.activity, store: context.store,
             onProfile: { model.sheet = nil }, onSwitchAgent: {},
             onAsk: { text in after { context.onAsk(text) } },
+            onSend: { text in after { context.onSend(text) } },
             onBlueprint: { text in after { context.onBlueprint(text) } },
             onMenu: {}, onNewChat: { after { context.onNewChat() } }, onPickAgents: {},
             tools: [], onBack: { model.sheet = nil })
@@ -512,7 +514,7 @@ private struct DashboardSection: View {
         let right = DashboardCardAction.action(for: kind, .right)
         let left = DashboardCardAction.action(for: kind, .left)
         let swipe: (DashboardSwipeDirection) -> Void = { direction in
-            model.swipe(item, direction, botName: context.agentName, onAsk: context.onAsk)
+            model.swipe(item, direction, botName: context.agentName, onAsk: context.onAsk, onSend: context.onSend)
         }
         return DashboardSwipeCard(
             right: right.stamp(botName: context.agentName), left: left.stamp(botName: context.agentName),

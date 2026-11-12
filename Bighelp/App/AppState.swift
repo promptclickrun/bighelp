@@ -53,6 +53,9 @@ final class AppState {
     var suspendedChat: SuspendedChat?
     /// `pendingComposerText` is a blueprint: its `[blanks]` show as chips to fill in (`ChatBlueprintDraft`).
     var pendingComposerFillsBlanks = false
+    /// `pendingComposerText` is a message to send, not a draft (Let's do it): the chat that takes
+    /// it sends it and leaves its message box alone.
+    var pendingComposerSendsAtOnce = false
     /// The bot whose own chat may take `pendingComposerText` even though it has history: a bot's
     /// Dashboard opens that bot's Bot Chat, never a new one. Only an empty message box takes it.
     var pendingComposerAgentID: String?
@@ -266,9 +269,12 @@ final class AppState {
     /// Leaves text for the next chat's message box. Each request replaces the last one whole, so
     /// an earlier bot or blueprint never sticks to new text. Only a blueprint sets `fillsBlanks`:
     /// brackets in anything else (a post's title, text the person typed) are just text.
-    func leaveComposerText(_ text: String, fillsBlanks: Bool = false, agentID: String? = nil, now: Date = .now) {
+    /// `sendsAtOnce`: the chat sends the text as a message of its own (Let's do it).
+    func leaveComposerText(_ text: String, fillsBlanks: Bool = false, sendsAtOnce: Bool = false,
+                           agentID: String? = nil, now: Date = .now) {
         pendingComposerText = text
         pendingComposerFillsBlanks = fillsBlanks
+        pendingComposerSendsAtOnce = sendsAtOnce
         pendingComposerShown = false
         pendingComposerAgentID = agentID
         pendingComposerSince = now
@@ -278,8 +284,10 @@ final class AppState {
     /// The canvas is thrown away when the chat arrives and its draft doesn't always get across in
     /// time, so the text stays here for that chat to take.
     func showComposerText(now: Date = .now) -> (text: String, fillsBlanks: Bool)? {
-        guard pendingComposerAgentID == nil, let text = pendingComposerText, let since = pendingComposerSince,
-              now.timeIntervalSince(since) <= Self.pendingComposerLifetime else { return nil }
+        // A message to send isn't a draft: the canvas leaves it for the chat that sends it.
+        guard pendingComposerAgentID == nil, !pendingComposerSendsAtOnce, let text = pendingComposerText,
+              let since = pendingComposerSince, now.timeIntervalSince(since) <= Self.pendingComposerLifetime
+        else { return nil }
         pendingComposerShown = true
         return (text, pendingComposerFillsBlanks)
     }
@@ -287,15 +295,15 @@ final class AppState {
     /// The text, if this chat should take it: a new chat on top, or the named bot's own chat on top.
     /// `wasShown`: a blank canvas already showed it, so this chat may hold it (and what the person
     /// changed) from the canvas's draft.
-    func takeComposerText(isNewChat: Bool, isNamedBotChat: Bool,
-                          now: Date = .now) -> (text: String, fillsBlanks: Bool, wasShown: Bool)? {
+    func takeComposerText(isNewChat: Bool, isNamedBotChat: Bool, now: Date = .now)
+        -> (text: String, fillsBlanks: Bool, sendsAtOnce: Bool, wasShown: Bool)? {
         guard let text = pendingComposerText else { return nil }
         guard let since = pendingComposerSince, now.timeIntervalSince(since) <= Self.pendingComposerLifetime else {
             clearComposerText()
             return nil
         }
         guard pendingComposerAgentID == nil ? isNewChat : isNamedBotChat else { return nil }
-        let taken = (text, pendingComposerFillsBlanks, pendingComposerShown)
+        let taken = (text, pendingComposerFillsBlanks, pendingComposerSendsAtOnce, pendingComposerShown)
         clearComposerText()
         return taken
     }
@@ -303,6 +311,7 @@ final class AppState {
     private func clearComposerText() {
         pendingComposerText = nil
         pendingComposerFillsBlanks = false
+        pendingComposerSendsAtOnce = false
         pendingComposerShown = false
         pendingComposerAgentID = nil
         pendingComposerSince = nil

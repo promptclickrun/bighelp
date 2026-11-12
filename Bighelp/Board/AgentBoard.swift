@@ -174,6 +174,10 @@ struct AgentBoardItem: Identifiable, Equatable, Sendable {
     var dismissed: Bool
     /// A goal's category as the plugin stored it; empty for none (plugins before 3.5).
     var category: String
+    /// How the person answered an idea: "yes" for Let's do it, "goal", or "none".
+    var answer: String
+    /// When they answered; nil for plugins that don't say.
+    var answeredAt: Date?
     var createdAt: Date
     var updatedAt: Date
 
@@ -185,6 +189,8 @@ struct AgentBoardItem: Identifiable, Equatable, Sendable {
     var goalCategory: GoalCategory? {
         GoalCategory(stored: category) ?? (category.isEmpty ? GoalCategory.inferred(from: title, body, note) : nil)
     }
+    /// Let's do it was said to this idea (the plugin's `answer`); it shows under Completed.
+    var isCompleted: Bool { kind == .idea && answer == "yes" }
 
     var liked: Bool { rating == .up }
     var isDone: Bool { status == "done" }
@@ -195,11 +201,13 @@ struct AgentBoardItem: Identifiable, Equatable, Sendable {
     init(id: String, kind: Kind, title: String, body: String = "", icon: String = "", section: String = "",
          status: String = "", note: String = "", links: [Link] = [], pictures: [Picture] = [],
          files: [File] = [], source: String = "", rating: Rating = .none, reason: String = "", read: Bool = true,
-         dismissed: Bool = false, category: String = "", createdAt: Date = .now, updatedAt: Date? = nil) {
+         dismissed: Bool = false, category: String = "", answer: String = "none", answeredAt: Date? = nil,
+         createdAt: Date = .now, updatedAt: Date? = nil) {
         self.id = id; self.kind = kind; self.title = title; self.body = body; self.icon = icon
         self.section = section; self.status = status; self.note = note; self.links = links
         self.pictures = pictures; self.files = files; self.source = source; self.rating = rating; self.reason = reason
         self.read = read; self.dismissed = dismissed; self.category = category
+        self.answer = answer; self.answeredAt = answeredAt
         self.createdAt = createdAt; self.updatedAt = updatedAt ?? createdAt
     }
 
@@ -237,6 +245,8 @@ struct AgentBoardItem: Identifiable, Equatable, Sendable {
                   reason: object["reason"]?.string ?? "", read: object["read"]?.boolean ?? true,
                   dismissed: object["dismissed"]?.boolean ?? false,
                   category: object["category"]?.string ?? "",
+                  answer: object["answer"]?.string ?? "none",
+                  answeredAt: (object["answeredAt"]?.integer).flatMap { $0 > 0 ? date("answeredAt") : nil },
                   createdAt: date("createdAt"), updatedAt: date("updatedAt"))
     }
 }
@@ -484,10 +494,9 @@ struct AgentIdentityDocuments: Equatable, Sendable {
 }
 
 extension AgentBoardItem {
-    /// What Let's do it puts in the chat: the idea's title only. The host learns which idea from
-    /// `AgentBoardStore.accept`, so its ID never shows in the message box, the sent message or
-    /// the chat's history. Older plugins match this exact text to record the yes.
-    var letsDoItMessage: String { "Yes, go ahead with this idea: “\(title)”." }
+    /// What Let's do it sends: "Let's do it!" with the idea attached as a card. The host learns
+    /// which idea from `AgentBoardStore.accept`, so its ID never shows in the chat.
+    var letsDoItMessage: String { chatCard.prefixing("Let's do it!") }
 }
 
 // MARK: - Clients
@@ -771,7 +780,13 @@ final class AgentBoardStore {
     /// Just deleted, for Undo.
     private(set) var recentlyHidden: AgentBoardItem?
     var feed: [AgentBoardItem] { items.filter { $0.kind == .feed && !$0.dismissed } }
-    var ideas: [AgentBoardItem] { items.filter { $0.kind == .idea && !$0.dismissed } }
+    /// Ideas still waiting for an answer. Ones the person said Let's do it to are `completedIdeas`.
+    var ideas: [AgentBoardItem] { items.filter { $0.kind == .idea && !$0.dismissed && !$0.isCompleted } }
+    /// Ideas the person said Let's do it to, newest yes first.
+    var completedIdeas: [AgentBoardItem] {
+        items.filter { $0.isCompleted && !$0.dismissed }
+            .sorted { ($0.answeredAt ?? $0.updatedAt) > ($1.answeredAt ?? $1.updatedAt) }
+    }
     var goals: [AgentBoardItem] { items.filter { $0.kind == .goal && !$0.dismissed } }
 
     /// A new client (host, account or plugin change) drops everything shown so far.
@@ -981,9 +996,12 @@ final class AgentBoardStore {
     }
 
     /// Let's do it: tells the host which idea by its ID, before the chat opens. The ID goes
-    /// only here, never into the chat (`letsDoItMessage`). The idea stays on the board.
-    func accept(_ idea: AgentBoardItem) async -> AcceptOutcome {
-        guard let client, client.supportsAnswers else { return .notSupported }
+    /// only here, never into the chat (`letsDoItMessage`). The idea moves to Completed.
+    func accept(_ idea: AgentBoardItem, now: Date = .now) async -> AcceptOutcome {
+        guard let client, client.supportsAnswers else {
+            complete(idea.id, at: now)
+            return .notSupported
+        }
         guard idea.kind == .idea, let agentID, items.contains(where: { $0.id == idea.id && $0.kind == .idea }) else {
             return .failed
         }
@@ -991,12 +1009,22 @@ final class AgentBoardStore {
         do {
             try await client.accept(agentID: agentID, itemID: idea.id)
             // A yes recorded by a connection that's gone may belong to another computer.
-            return generation == self.generation ? .recorded : .failed
+            guard generation == self.generation else { return .failed }
+            complete(idea.id, at: now)
+            return .recorded
         } catch WorkspaceClientError.unavailable(.unsupportedOperation) {
+            complete(idea.id, at: now)
             return .notSupported
         } catch {
             return .failed
         }
+    }
+
+    /// Shows the idea under Completed at once, as the host now has it.
+    private func complete(_ id: String, at now: Date) {
+        guard let index = items.firstIndex(where: { $0.id == id && $0.kind == .idea }) else { return }
+        items[index].answer = "yes"
+        items[index].answeredAt = now
     }
 
     func setDone(_ item: AgentBoardItem, _ done: Bool) async {

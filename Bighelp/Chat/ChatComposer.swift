@@ -204,6 +204,7 @@ struct ChatComposer: View, Equatable {
         .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.sessionContext)
         .animation(reduceMotion ? nil : .snappy(duration: BighelpTokens.stateDuration), value: model.compaction)
         .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.replyDraft)
+        .animation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration), value: model.boardCardDraft)
         .modifier(ChatConnectionGrace(model: model))
         .onChange(of: model.taskDrawer) { _, tasks in
             if tasks == nil, presentedStatus == .tasks {
@@ -389,19 +390,30 @@ struct ChatComposer: View, Equatable {
         // undo state, keyboard ownership, and the exact draft owner.
         HStack(alignment: .center, spacing: BighelpTokens.space8) {
             attachmentButton
-            // Voice mode, Send and Stop sit inside the box, at its bottom as the draft grows.
-            HStack(alignment: .bottom, spacing: BighelpTokens.space4) {
-                composerInput
-                    .bighelpFont(.body)
-                    .foregroundStyle(theme.primaryText)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(height: usesCompactEditingLayout ? max(44, compactDraftLineHeight) : nil)
-                    .frame(minHeight: BighelpTokens.hitTarget)
-                    .submitLabel(.send)
-                    .disabled(model.isComposerInputDisabled)
-                    .onSubmit { send() }
-                ComposerModelChip(model: model).equatable()
-                primaryAction
+            // An idea, post or goal the draft is about sits in the box above the text. The text
+            // row keeps its place in the column whether or not one shows, so the editor stays.
+            VStack(spacing: BighelpTokens.space4) {
+                if let card = model.boardCardDraft {
+                    ChatBoardCardDraftView(card: card) { model.boardCardDraft = nil }
+                        // The box's own padding is for the text; the card reaches nearer its edge.
+                        .padding(.leading, BighelpTokens.space4 - ComposerFieldMetrics.leadingInset)
+                        .padding(.top, BighelpTokens.space4)
+                        .transition(.opacity)
+                }
+                // Voice mode, Send and Stop sit inside the box, at its bottom as the draft grows.
+                HStack(alignment: .bottom, spacing: BighelpTokens.space4) {
+                    composerInput
+                        .bighelpFont(.body)
+                        .foregroundStyle(theme.primaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(height: usesCompactEditingLayout ? max(44, compactDraftLineHeight) : nil)
+                        .frame(minHeight: BighelpTokens.hitTarget)
+                        .submitLabel(.send)
+                        .disabled(model.isComposerInputDisabled)
+                        .onSubmit { send() }
+                    ComposerModelChip(model: model).equatable()
+                    primaryAction
+                }
             }
             // iMessage-style field: a fixed-radius continuous shape reads as a
             // pill on one line and keeps square-ish corners as the draft grows,

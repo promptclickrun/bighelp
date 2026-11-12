@@ -78,6 +78,11 @@ change in both repos.
     (`showComposerText`) and taken by the chat Hermes makes (`takeComposerText`). The canvas is thrown
     away when that chat arrives, and its draft doesn't always get across in time: text only the canvas
     took was lost about every other time.
+  - An idea, Feed post or goal goes to a chat as a card (`ChatBoardCard`): a block before the person's
+    words in the message's own text, so the agent reads all of it and a reread draws it in their bubble.
+    Discuss puts it in the message box (`ChatModel.boardCardDraft`). Let's do it sends "Let's do it!"
+    with the idea at once (`leaveComposerText(sendsAtOnce:)`, `ChatModel.sendFromOutside`), never
+    touching the box, and the idea moves to Ideas › Completed (the plugin's `answer`, `answeredAt`).
   - Code mode is a second home, not a second app: ☰ gets a mode switch on top and Code's places while it's
     the home (`AppTab.code`, `appState.homeTab`). Chat stays the out-of-box home.
   - The modes are Bots, Chat and Code (`BighelpMode`; `settings.switchMode`). Settings › Modes has one picker

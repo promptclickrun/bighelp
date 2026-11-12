@@ -115,7 +115,7 @@ struct AgentBoardTests {
         #expect(store.goals.map(\.title) == ["Sleep by 11"])
     }
 
-    /// Let's do it tells the host which idea by its ID, and the chat gets only the readable text.
+    /// Let's do it tells the host which idea by its ID, and the chat gets only the readable card.
     @Test func letsDoItNamesTheIdeaByIDAndKeepsTheIDOutOfTheChat() async throws {
         let client = FakeBoardClient(items: [
             AgentBoardItem(id: "idea-7f3a91", kind: .idea, title: "Plan a trip"),
@@ -129,9 +129,12 @@ struct AgentBoardTests {
         #expect(await store.accept(idea) == .recorded)
         #expect(client.accepted.map(\.itemID) == ["idea-0c2e44"], "Exactly the tapped idea, not its same-title twin")
         #expect(client.accepted.map(\.agentID) == ["default"])
-        #expect(store.ideas.count == 2, "The idea stays on the board")
+        // It moves to Completed, with when.
+        #expect(store.ideas.map(\.id) == ["idea-7f3a91"])
+        #expect(store.completedIdeas.map(\.id) == ["idea-0c2e44"])
+        #expect(store.completedIdeas.first?.answeredAt != nil)
         let text = idea.letsDoItMessage
-        #expect(text == "Yes, go ahead with this idea: “Plan a trip”.")
+        #expect(ChatBoardCard.split(text)?.body == "Let's do it!")
         #expect(!text.contains(idea.id) && !text.contains("idea-"))
     }
 
@@ -140,13 +143,16 @@ struct AgentBoardTests {
         let store = AgentBoardStore()
         store.configure(client: client)
         await store.load(agentID: "default")
-        #expect(await store.accept(store.ideas[0]) == .notSupported)
+        let idea = store.ideas[0]
+        #expect(await store.accept(idea) == .notSupported)
         #expect(client.accepted.isEmpty)
+        // Completed here too, until the board loads again.
+        #expect(store.completedIdeas.map(\.id) == ["i"])
 
         // A plugin that stops listing the feature after the board loaded: still no error.
         client.supportsAnswers = true
         client.acceptError = WorkspaceClientError.unavailable(.unsupportedOperation)
-        #expect(await store.accept(store.ideas[0]) == .notSupported)
+        #expect(await store.accept(idea) == .notSupported)
 
         store.configure(client: nil)
         #expect(await store.accept(AgentBoardItem(id: "i", kind: .idea, title: "Plan a trip")) == .notSupported)
@@ -160,9 +166,32 @@ struct AgentBoardTests {
         store.configure(client: client)
         await store.load(agentID: "default")
         #expect(await store.accept(store.ideas[0]) == .failed)
+        #expect(store.completedIdeas.isEmpty, "Not completed until the host has it")
         client.acceptError = nil
         #expect(await store.accept(store.ideas[0]) == .recorded)
         #expect(client.accepted.map(\.itemID) == ["i"])
+    }
+
+    /// The host's answer puts an idea under Completed, newest yes first, with when.
+    @Test func ideasTheHostSaysYesToAreCompleted() async throws {
+        let item = { (id: String, answer: String, at: Int) -> BighelpJSONValue in
+            .object(["id": .string(id), "kind": .string("idea"), "title": .string(id),
+                     "answer": .string(answer), "answeredAt": .integer(at)])
+        }
+        let items = try [item("older", "yes", 100), item("newer", "yes", 200), item("open", "none", 0),
+                         item("goal", "goal", 300)].map(AgentBoardItem.init(json:))
+        let store = AgentBoardStore()
+        store.configure(client: FakeBoardClient(items: items))
+        await store.load(agentID: "default")
+        #expect(store.ideas.map(\.id).sorted() == ["goal", "open"])
+        #expect(store.completedIdeas.map(\.id) == ["newer", "older"])
+        #expect(store.completedIdeas.first?.answeredAt == Date(timeIntervalSince1970: 200))
+        // Plugins before answeredAt: still Completed, without a day.
+        let bare = try AgentBoardItem(json: .object(["id": .string("x"), "kind": .string("idea"),
+                                                     "title": .string("x"), "answer": .string("yes")]))
+        #expect(bare.isCompleted && bare.answeredAt == nil)
+        #expect(IdeaCompletion.label(nil) == "Completed")
+        #expect(IdeaCompletion.label(.now) == "Started today")
     }
 
     @Test func letsDoItIsNotRecordedAcrossAHostOrAgentChange() async {

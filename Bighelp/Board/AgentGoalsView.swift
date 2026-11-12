@@ -359,7 +359,7 @@ private struct GoalMoreMenu: View {
 
     var body: some View {
         Menu {
-            Button("Discuss", systemImage: "bubble.left") { context.onAsk("About my goal “\(goal.title)”: ") }
+            Button("Discuss", systemImage: "bubble.left") { context.onAsk(goal.chatCard.block) }
             Button(goal.isDone ? "Mark not done" : "Mark done", systemImage: "checkmark") {
                 Task { await context.store.setDone(goal, !goal.isDone) }
             }

@@ -59,6 +59,7 @@ extension ChatModel {
         }
         draft = ""
         replyDraft = nil
+        boardCardDraft = nil
         failureMessage = nil
         let outgoing = beginBotModeOutgoing(message)
         do {
@@ -958,6 +959,7 @@ extension ChatModel {
         if outgoingDraftText.utf8.elementsEqual(recovery.message.utf8) {
             draft = ""
             replyDraft = nil
+            boardCardDraft = nil
         }
         nativeBotModeSendRecovery = nil
     }

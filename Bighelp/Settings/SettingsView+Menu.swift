@@ -55,11 +55,6 @@ extension SettingsView {
     }
 
     /// The homes in use, as the Modes row says them.
-    private var modesDetail: String {
-        if settings.simpleBotsEnabled { return String(localized: "Bots mode") }
-        if settings.currentMode == .code { return String(localized: "Code") }
-        return settings.codeModeEnabled ? String(localized: "Chat and Code") : String(localized: "Chat")
-    }
 
     /// The agent Voice settings opens on (`VoiceSettingsView`), so the row says what that page shows.
     var voiceSettingsAgentID: String? {
@@ -79,7 +74,7 @@ extension SettingsView {
     func menuDetail(_ section: SettingsMenuSection) -> String {
         switch section {
         case .appearance: appearanceSummary
-        case .modes: modesDetail
+        case .modes: settings.modesSummary
         case .voice: voiceDetail
         default: section.detail
         }

@@ -143,6 +143,8 @@ struct FleetHomeView: View {
     var onOpenRoutines: ((FleetAgent) -> Void)? = nil
     /// New agent: asks which computer first.
     var onNewAgent: (() -> Void)? = nil
+    /// Opens one of the chats running now, on its computer. None hides Active Sessions.
+    var onOpenChat: ((FleetChat) -> Void)? = nil
     /// The computer every all-hosts list is narrowed to; nil shows every computer.
     @Binding var hostFilter: UUID?
     /// Hidden agents show, dimmed, so they can be shown again. For this visit only.
@@ -177,6 +179,20 @@ struct FleetHomeView: View {
                         .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
+                }
+            }
+            // As one computer's Chat list has them: the chats running now, on every computer shown.
+            let active = activeChats
+            if let onOpenChat, !active.isEmpty {
+                Section {
+                    ForEach(active) { chat in
+                        Button { onOpenChat(chat) } label: { FleetChatRow(chat: chat, fleet: fleet) }
+                            .buttonStyle(.plain)
+                            .listRowBackground(Color.clear)
+                            .accessibilityIdentifier("fleet.active.\(chat.title)")
+                    }
+                } header: {
+                    FleetActiveSessionsHeader()
                 }
             }
             ForEach(blocks(listed)) { block in
@@ -233,6 +249,11 @@ struct FleetHomeView: View {
                                    deletedSection: $deletedSection, onGroupAction: onGroupAction))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("fleet.home")
+    }
+
+    /// The chats running now, newest first; a search narrows them like the agents.
+    private var activeChats: [FleetChat] {
+        fleet.chats(on: hostFilter, matching: search).filter(\.isActive)
     }
 
     /// Pinned agents up top, like favorites, when nothing is filtered.
@@ -580,12 +601,25 @@ struct FleetChatsView: View {
                 .listRowInsets(EdgeInsets(top: 4, leading: BighelpTokens.space16, bottom: 8, trailing: BighelpTokens.space16))
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-            ForEach(chats) { chat in
-                Button { onOpen(chat) } label: { FleetChatRow(chat: chat, fleet: fleet) }
-                    .buttonStyle(.plain)
-                    .contextMenu { chatActions(chat) }
-                    .listRowBackground(Color.clear)
-                    .accessibilityIdentifier("fleet.chat.\(chat.title)")
+            // As on one gateway's list: chats running now on any computer first, under Active Sessions.
+            let active = chats.filter(\.isActive)
+            if active.isEmpty {
+                chatRows(chats)
+            } else {
+                Section {
+                    chatRows(active)
+                } header: {
+                    FleetActiveSessionsHeader()
+                }
+                let recent = chats.filter { !$0.isActive }
+                if !recent.isEmpty {
+                    Section {
+                        chatRows(recent)
+                    } header: {
+                        FleetSectionCaption(title: "Recent")
+                            .accessibilityIdentifier("fleet.sessions.section.recent")
+                    }
+                }
             }
             if !otherAppChats.isEmpty {
                 Section {
@@ -653,6 +687,16 @@ struct FleetChatsView: View {
     }
 
     private var visibleChats: [FleetChat] { fleet.chats(on: hostFilter, matching: search, filter: filter) }
+
+    private func chatRows(_ chats: [FleetChat]) -> some View {
+        ForEach(chats) { chat in
+            Button { onOpen(chat) } label: { FleetChatRow(chat: chat, fleet: fleet) }
+                .buttonStyle(.plain)
+                .contextMenu { chatActions(chat) }
+                .listRowBackground(Color.clear)
+                .accessibilityIdentifier("fleet.chat.\(chat.title)")
+        }
+    }
 
     @ViewBuilder
     private func chatActions(_ chat: FleetChat) -> some View {
@@ -764,6 +808,37 @@ struct FleetChatsView: View {
 }
 
 /// A chat in the all-hosts lists: who it's with, its host, title and when.
+/// A section caption as the Sessions list draws them: small, bold, spaced capitals.
+struct FleetSectionCaption: View {
+    let title: LocalizedStringKey
+    @ScaledMetric(relativeTo: .caption2) private var size: CGFloat = 11
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: size, weight: .bold))
+            .tracking(size * 0.08)
+            .textCase(.uppercase)
+            .foregroundStyle(theme.secondaryText)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// "Active Sessions" with the working loader, as on one computer's Sessions list.
+struct FleetActiveSessionsHeader: View {
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        HStack(spacing: BighelpTokens.space8) {
+            FleetSectionCaption(title: "Active Sessions")
+            BighelpThinkingOrb(scenario: .working, scale: .inline, tint: theme.action)
+                .accessibilityHidden(true)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("fleet.sessions.section.active")
+    }
+}
+
 struct FleetChatRow: View {
     let chat: FleetChat
     let fleet: FleetStore

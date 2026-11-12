@@ -81,6 +81,35 @@ final class SessionsParityUITests: BighelpUITestCase {
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 8), "Open opens it as a chat")
     }
 
+    /// As on one computer's list, chats running now come first under Active Sessions, from every
+    /// computer: the demo's other computer has a review running. The Chat tab's home (All agents)
+    /// lists them too.
+    @MainActor
+    func testAllSessionsListsActiveSessionsAcrossComputers() throws {
+        for appearance in ["light", "dark"] {
+            let app = launch(allHosts: true, extra: ["-loopdy.demo.appearance", appearance])
+            let menu = app.buttons["home.drawer.open"].firstMatch
+            XCTAssertTrue(menu.waitForExistence(timeout: 15))
+            XCTAssertTrue(app.descendants(matching: .any)["fleet.sessions.section.active"].waitForExistence(timeout: 8),
+                          "All agents shows Active Sessions")
+            let onHome = app.buttons["fleet.active.Pull request review"]
+            XCTAssertTrue(onHome.exists, "The other computer's running chat, on the home")
+            save("all-agents-active-\(appearance)", app)
+            menu.tap()
+            app.buttons["menu.chats"].firstMatch.tap()
+            XCTAssertTrue(app.navigationBars["All sessions"].waitForExistence(timeout: 8))
+            let active = app.descendants(matching: .any)["fleet.sessions.section.active"]
+            XCTAssertTrue(active.waitForExistence(timeout: 8), "Active Sessions shows with every computer")
+            let running = app.buttons["fleet.chat.Pull request review"]
+            XCTAssertTrue(running.exists, "The other computer's running chat is listed")
+            let recent = app.descendants(matching: .any)["fleet.sessions.section.recent"]
+            XCTAssertTrue(recent.exists)
+            XCTAssertLessThan(running.frame.minY, recent.frame.minY, "Running chats come before the rest")
+            save("all-sessions-active-\(appearance)", app)
+            app.terminate()
+        }
+    }
+
     @MainActor
     func testAllSessionsHasTagsFiltersAndAComputersOwnScreen() throws {
         let app = launch(allHosts: true)
@@ -91,7 +120,10 @@ final class SessionsParityUITests: BighelpUITestCase {
         XCTAssertTrue(app.navigationBars["All sessions"].waitForExistence(timeout: 8), "See all opens All sessions")
 
         let tagged = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Started in'"))
+        // Active Sessions comes first, so the chat brought in from Codex can sit below the fold.
+        if tagged.count == 0 { app.swipeUp() }
         XCTAssertGreaterThan(tagged.count, 0, "Rows say where each chat started")
+        app.swipeDown()
         let filters = app.buttons["fleet.chats.filters"]
         XCTAssertTrue(filters.exists, "The same filter menu as one computer")
         filters.tap()

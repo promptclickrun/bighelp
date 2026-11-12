@@ -291,6 +291,13 @@ final class SettingsStore {
 
     /// Settings › Modes' picker: makes `mode` the home, now and at each launch. Picking Code turns
     /// Code mode on; picking Chat or Bots leaves it as it is (its own switch turns it off).
+    /// Settings › Modes in one line: "Bots mode", "Code", "Chat and Code" or "Chat".
+    var modesSummary: String {
+        if simpleBotsEnabled { return String(localized: "Bots mode") }
+        if currentMode == .code { return String(localized: "Code") }
+        return codeModeEnabled ? String(localized: "Chat and Code") : String(localized: "Chat")
+    }
+
     func selectHomeMode(_ mode: BighelpMode) {
         let changed = mode != currentMode
         switch mode {

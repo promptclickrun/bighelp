@@ -152,6 +152,8 @@ struct SimpleBotsSettingsContext {
 
 enum SimpleBotsSettingsPage: Hashable {
     case you, appearance, notifications, apps, chat
+    /// Settings › Modes, the same page All Settings opens.
+    case modes
 }
 
 /// Bots mode's Settings: you, usage, apps, your primary bot's approvals (its Advanced Options)
@@ -449,16 +451,14 @@ struct SimpleBotsSettingsView: View {
 
     private var modeCard: some View {
         SimpleBotsCard {
-            Toggle(isOn: Binding(get: { context.settings.simpleBotsEnabled },
-                                 set: { context.settings.simpleBotsEnabled = $0 })) {
-                rowText(String(localized: "Bots mode"),
-                        detail: String(localized: "Turn off to see everything bighelp can do."))
+            // The home to open in and Code mode, as All Settings › Modes has them. Picking Chat or
+            // Code leaves Bots mode.
+            NavigationLink(value: SimpleBotsSettingsPage.modes) {
+                SimpleBotsRow(title: String(localized: "Modes"), value: context.settings.modesSummary)
             }
-            .tint(SimpleBotColor.green.color)
-            .padding(.horizontal, BighelpTokens.space20)
-            .padding(.vertical, BighelpTokens.space12)
-            .accessibilityIdentifier("simple-bots.settings.mode")
-            .driveTarget("simple-bots.settings.mode")
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("simple-bots.settings.modes")
+            .driveTarget("simple-bots.settings.modes")
             if let catalog = context.catalog {
                 SimpleBotsDivider()
                 NavigationLink {

@@ -95,7 +95,8 @@ change in both repos.
     Mac, ⌃⌘1–⌃⌘3.
   - Bots mode (Settings › Modes, `settings.simpleBotsEnabled`) is the one exception to ☰ and the bar:
     its home (`SimpleBotsHomeView`) takes the Chat tab's place with neither, and the person's circle opens its
-    short Settings (`SimpleBotsSettingsView`), whose All Settings row and Bots mode switch lead back.
+    short Settings (`SimpleBotsSettingsView`), whose All Settings row and Modes row (the same Modes page
+    as All Settings') lead back.
     Everything in it uses the same stores and chat; `Bighelp/SimpleBots/` holds its screens. It wins over the
     all-hosts view and Settings › Open on (`fleetModeOn` is off while it's on). Its Multi-gateway switch
     (`simpleBotsMultiGateway`) lists every gateway's bots (`SimpleBotsGateways`, one `SimpleBotsBot` model

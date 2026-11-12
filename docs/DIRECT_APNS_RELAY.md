@@ -216,7 +216,7 @@ egress check has used the time up), and at most 4 KiB of the answer is read.
 |---|---|
 | `apns-topic` | `APNS_TOPIC` (`app.loopdy.mobile`), or `<topic>.push-type.liveactivity` for a Live Activity |
 | `apns-push-type` | `alert`, `background` (wake) or `liveactivity` |
-| `apns-priority` | `10` for alerts, the test and Live Activities. `5` for wakes |
+| `apns-priority` | `10` for alerts, the test and Live Activities. `5` for wakes, and for a Live Activity update the host marks `quiet` (only a card's sealed detail changed), unless it is a question or ends the card |
 | `apns-expiration` | Now plus the TTL. 60 s for approvals, 300 s for questions, 900 s for other alerts, 21,600 s for wakes, 300 s for the test. A Live Activity update expires at its stale date, between 1 minute and 1 hour on |
 | `apns-id` | A version 8 UUID from the SHA-256 of the send key, so a retry carries the same ID |
 | `apns-collapse-id` | A digest of the event ID for alerts (43 characters), `bighelp-renew-sign-in` for wakes. None for Live Activities and the test |
@@ -257,6 +257,9 @@ Sealed alert (`alert`):
 - The sign-in wake (`background`) is `{"aps":{"content-available":1},"bighelp_wake":{"version":1,"type":"renew-sign-in","grantId":"..."},"bighelp_meta":{...}}`.
 - The test notification has BuzzKit's title and body, `loopdy_test`, `sound: default` and `mutable-content`.
 - A Live Activity update is `{"aps":{"timestamp":<s>,"event":"update"|"end","content-state":{...},"stale-date":<s>,"dismissal-date":<s>}}`.
+  A row in the shared card's `content-state.sessions` may carry `sealed`: detail the host encrypted for the phone
+  (at most 1,200 base64url characters). The Worker keeps it with the row and forwards it unread, in the order the
+  card shows its rows, while the content state stays under 3,600 bytes.
   `dismissal-date` is sent only at the end, 30 seconds on. All dates are Unix seconds. The content state is the same
   object BuzzKit gets, and it decodes in `LoopdySessionActivityAttributes.ContentState`. It carries no `bighelp_meta`.
 

@@ -1047,6 +1047,18 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   starts later joins the card as an update and takes that row's place; a row no turn takes goes after two minutes.
 - The Live Activity uses the app's palette and real host phases, never a guessed percentage. Titles stay in the
   phone's App Group; only opaque row IDs and bounded status reach the push service. Stale rows say Paused.
+- The card's first chat shows its work (#960, `BighelpActivityHeroView`): the step in progress, the last steps, a
+  timer that runs on the phone, the question that waits, the reply's first lines. All of it comes in the row's
+  `sealed` field (`BighelpActivityDetail`, plugin `card_detail.py`, sealed-card-v1): AES-256-GCM under a key for
+  that chat row, which the app gives the computer over its own connection (`BighelpActivityCardKey`, the
+  registrar's `card-key` PUT). The notification service and Apple carry bytes they can't read; never put new card
+  text in a plain field. The Live Activity extension opens it as it draws, with a secret in the keychain group
+  `app.loopdy.mobile.card` that only the app and that extension have (readable after first unlock, because the
+  card is drawn on a locked phone). A row that doesn't open draws the plain rows. The card is at most 160 points
+  tall, so the hero counts its lines (`heroCard`), fewer at larger text. Settings › Notifications › On the card
+  picks Status only, Steps, or Steps and text (`BighelpActivityDetailLevel`, in the App Group); Nerd Mode adds
+  context use and the model. The phone words steps from Hermes' tool names (`BighelpActivityStepWords`). A
+  registered card is drawn only from pushes (`writesLocally`), so the app never writes detail itself.
 - Direct push (`BighelpPushRegistrar`, docs/ARCHITECTURE.md › Direct push registration): a phone that already has a
   notification installation and permission gives the notification service its Apple push address at launch, with
   nothing shown, in addition to BuzzKit (which stays). A 404 means the Worker doesn't have the route yet: no error, ask

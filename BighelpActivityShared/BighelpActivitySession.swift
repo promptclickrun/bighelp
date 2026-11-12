@@ -9,6 +9,8 @@ struct BighelpActivitySession: Codable, Hashable, Sendable, Identifiable {
     var timestamp: Int
     var activeSubagentCount: Int = 0
     var latestTool: String? = nil
+    /// Detail only this phone can read (`BighelpActivityDetail`): the computer's bytes, kept as they came.
+    var sealed: String? = nil
 
     static func membershipKey(_ id: String) -> String { String(id.suffix(16)) }
 
@@ -29,8 +31,26 @@ struct BighelpActivitySession: Codable, Hashable, Sendable, Identifiable {
         let ordered = rows.sorted { ($0.priority, $0.id) < ($1.priority, $1.id) }
         let running = ordered.filter { !$0.phase.isTerminal }
         let phase: Phase = running.first?.phase ?? (rows.contains { $0.phase == .failed } ? .failed : .completed)
-        return .init(phase: phase, currentAction: "", progress: 0, completedSteps: 0, activeSubagentCount: 0,
+        var state = LoopdySessionActivityAttributes.ContentState(phase: phase, currentAction: "", progress: 0, completedSteps: 0, activeSubagentCount: 0,
                      latestTool: nil, timestamp: timestamp, sessions: Array(ordered.prefix(5)), activeCount: running.count, activeRows: running.map { membershipKey($0.id) }.sorted())
+        fitSealed(&state)
+        return state
+    }
+
+    /// ActivityKit takes 4 KB of state, as a push does. Sealed detail stays on the rows shown first
+    /// while the whole state fits, as the notification service does it; the rest draw their status.
+    /// Call it again after adding to a state (the driver's hidden rows).
+    static func fitSealed(_ state: inout LoopdySessionActivityAttributes.ContentState) {
+        guard var sessions = state.sessions, sessions.contains(where: { $0.sealed != nil }) else { return }
+        var bare = state
+        bare.sessions = sessions.map { var row = $0; row.sealed = nil; return row }
+        var size = (try? JSONEncoder().encode(bare).count) ?? 4_096
+        for index in sessions.indices {
+            guard let sealed = sessions[index].sealed else { continue }
+            let cost = sealed.utf8.count + 12
+            if size + cost <= 3_600 { size += cost } else { sessions[index].sealed = nil }
+        }
+        state.sessions = sessions
     }
 }
 

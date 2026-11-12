@@ -43,6 +43,7 @@ struct BighelpNotificationSettingsView: View {
     @State private var preferences: [BighelpBuzzKitPreference] = []
     @State private var runtime: BighelpNotificationRuntimeSnapshot
     @State private var liveActivitiesEnabled = false
+    @State private var cardDetail = BighelpActivityDetailLevel.current
     @State private var notificationSetup: HostNotificationSetupModel?
     @State private var isLoading = false
     @State private var isRefreshingRuntime = false
@@ -343,6 +344,14 @@ struct BighelpNotificationSettingsView: View {
         #endif
     }
 
+    private var cardDetailNote: String {
+        switch cardDetail {
+        case .statusOnly: "The card shows each chat's status, as before."
+        case .steps: "The card shows the step in progress, the last steps and a timer."
+        case .stepsAndText: "The card also shows what a step works on, a question that waits and the first lines of the answer. They are encrypted from your computer to this device."
+        }
+    }
+
     private var liveActivitiesSection: some View {
         Section("Live Activities") {
             HStack(alignment: .top, spacing: BighelpTokens.space12) {
@@ -369,6 +378,17 @@ struct BighelpNotificationSettingsView: View {
                 openAppSettings()
             }
             .accessibilityIdentifier("settings.notifications.live-activities-settings")
+
+            // What the card shows where others can see the phone. The computer seals the detail for
+            // this phone whatever the choice (BighelpActivityDetail).
+            Picker("On the card", selection: $cardDetail) {
+                ForEach(BighelpActivityDetailLevel.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            .onChange(of: cardDetail) { _, level in BighelpActivityDetailLevel.current = level }
+            .accessibilityIdentifier("settings.notifications.live-activities-detail")
+            Text(cardDetailNote)
+                .bighelpFont(.metadata)
+                .foregroundStyle(theme.secondaryText)
         }
         .listRowBackground(theme.surface)
     }

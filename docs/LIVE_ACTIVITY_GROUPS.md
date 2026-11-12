@@ -4,6 +4,28 @@ bighelp uses one ActivityKit card for the phone's active chats. The Lock Screen 
 
 The layout is inspired by [T3 Code's AgentActivity](https://github.com/pingdotgg/t3code/blob/d53873b6a4799e87afd63c8d288ef0089f5a3748/apps/mobile/src/widgets/AgentActivity.tsx): compact rows, attention first, a quiet compact island, and explicit overflow. bighelp uses its own SwiftUI views and colors.
 
+## The first chat in full
+
+When the first row carries detail that opens, the card draws that chat in full (`BighelpActivityHeroView`) and the
+next two chats as rows under it. The detail is the row's `sealed` field: the computer encrypts it with a key for
+that chat row (AES-256-GCM, bound to the row's timestamp), and the notification service forwards the bytes unread.
+It holds the step in progress and what it works on, the last three steps, the model's latest words, a question or
+command that waits, the reply's first lines, helper goals, context use and the model's name. The format is
+sealed-card-v1 (`BighelpActivityDetail`; the plugin's `card_detail.py`; `BighelpTests/Fixtures/sealed-card-v1-vector.json`
+is shared by both).
+
+The app makes one random secret in a keychain group that only it and the Live Activity extension have, derives a
+key for each chat row from it, and sends that row key to the computer after the card's registration is confirmed
+(`PUT …/live-activities/<activity>/card-key`, over the app's own connection to the computer). The extension
+derives the same key from the row's ID when it draws. The service fits sealed detail to the rows in the order
+the card shows them and leaves it off rows that would pass Apple's 4 KB; the phone does the same when it rewrites
+the card. A row without detail, with detail that doesn't open, or with Settings › Notifications › On the card set
+to Status only, draws the rows described above. The timer counts on the phone from the turn's start time.
+
+An update that only has a new step is sent at APNs priority 5, because Apple limits priority 10 updates; the
+computer makes one update in every 30 seconds priority 10, and a question, an approval and the end of a turn
+always are.
+
 ## Why cards were intermittent
 
 Text-only turns did not emit a reasoning/tool activity, so they never reached the managed activity bridge. The bridge also awaited a host work snapshot before calling ActivityKit; leaving the app during that read could miss the foreground start window. After a failed start, an existing canonical entry only retried token registration. A new chat cancelled the previous chat's card before its replacement had started.
@@ -32,7 +54,7 @@ The service refusing a card's first registration for good (a 4xx other than 401,
 
 ## Diagnosing a card that disappeared
 
-`BighelpLiveActivityLog` writes fixed codes to the `app.loopdy.mobile` subsystem, category `LiveActivity`, never IDs, titles or text. Filter Console on that category. `card-started`, `card-request-disabled` and `card-request-failed` (with the system error's `domain` and `code`) cover the ActivityKit request. `card-ending`, `card-ended`, `card-dismissed`, `card-invalidated`, `finished-cards-dismissed`, `driver-retired`, `entry-repaired` and `entry-pruned` say why a card went. `registration-confirmed`, `registration-failed` (with `reason=http-<status>` or the error kind), `registration-refused-local-control`, `revocation-*` and `recovery-owner-failed` cover the service.
+`BighelpLiveActivityLog` writes fixed codes to the `app.loopdy.mobile` subsystem, category `LiveActivity`, never IDs, titles or text. Filter Console on that category. `card-started`, `card-request-disabled` and `card-request-failed` (with the system error's `domain` and `code`) cover the ActivityKit request. `card-ending`, `card-ended`, `card-dismissed`, `card-invalidated`, `finished-cards-dismissed`, `driver-retired`, `entry-repaired` and `entry-pruned` say why a card went. `card-key-sent`, `card-key-refused` (an older plugin has no such route) and `card-key-unavailable` (this device keeps no card key) say whether the card can get detail. `registration-confirmed`, `registration-failed` (with `reason=http-<status>` or the error kind), `registration-refused-local-control`, `revocation-*` and `recovery-owner-failed` cover the service.
 
 ## Chat widgets
 

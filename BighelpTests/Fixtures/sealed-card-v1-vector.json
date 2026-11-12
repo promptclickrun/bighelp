@@ -1,0 +1,35 @@
+{
+  "comment": "sealed-card-v1: AES-256-GCM, blob = nonce(12)+ciphertext+tag(16) in unpadded base64url, AAD = 'bighelp-card-v1|' + timestamp. Shared by the plugin's card_detail.py and the app's BighelpActivityDetail. Made-up data.",
+  "key": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+  "nonce": "ZGVmZ2hpamtsbW5v",
+  "timestamp": 1800000123,
+  "detail": {
+    "v": 1,
+    "b": 1800000000,
+    "s": 9,
+    "t": "execute_code",
+    "n": "price per lb",
+    "tr": [
+      {
+        "t": "web_extract",
+        "c": 6,
+        "n": "example.com"
+      },
+      {
+        "t": "web_search",
+        "c": 3,
+        "n": "protein powder prices"
+      }
+    ],
+    "say": "Comparing four brands now.",
+    "h": [
+      "Check shipping costs"
+    ],
+    "cu": 30300,
+    "cm": 272000,
+    "m": "sample-model-1",
+    "q": "Send the order for $47.00?",
+    "p": "Cheapest per lb is Northfield Whey at $9.40 — “four” brands compared."
+  },
+  "sealed": "ZGVmZ2hpamtsbW5vMzm8REPYbq4OUm_Y6lVa0WChayixXsRAl-GcZNnA0Gqu2nDzfCK3JpXRQmTfAaKqeDC4lEgjMViTn8v2jO7W_nuuhiL0Jhk_qRyMLmHmVMsJF3tRy-i85PPTWOZBMT4j5xL3Xhsoyl7fmPzpgH2a0gBo6HqgCdxHxlnj1KiUZKUS9uuIJ10wX6EvP2Dl5HzV_qKEZjE_prYIv0p9wPMlbrDTp8D2s5SSidg8144GwqDygu3KWN4irgpkdWbgrD2_6BUkuc17ECE2Fw5DKkiWbTJo8G31eCiJxTYy5NPHPck9BZjCjqdYX2OOZvPrOu2hMaRuxZTki6SygjoJUF-U_wRT5O8KB7b6n3z0vtrDZnXL_jlP-lwfAbxhanAbCGZJiI83CFpfi8RC9nSm0ZKuymphN4xnZiG1OPVMbvTqTl7FM7KUY3xjjeGsIUi2AkVGldI4E6dsz-KWptnpW9OnePr0uekMckrYwePdhj92y1QkvYZtvbGK1VlkmtlKqYrJAEJjaMKx-gPuzr8rT9W-IvFxGhvqvwrnjg"
+}

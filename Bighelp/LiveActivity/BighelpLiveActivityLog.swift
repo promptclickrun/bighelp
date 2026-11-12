@@ -27,6 +27,9 @@ enum BighelpLiveActivityLog {
         case revocationGone = "revocation-already-gone"
         case revocationFailed = "revocation-failed"
         case recoveryOwnerFailed = "recovery-owner-failed"
+        case cardKeySent = "card-key-sent"
+        case cardKeyRefused = "card-key-refused"
+        case cardKeyUnavailable = "card-key-unavailable"
     }
 
     private static let logger = Logger(subsystem: "app.loopdy.mobile", category: "LiveActivity")
@@ -56,6 +59,7 @@ enum BighelpLiveActivityLog {
         case is CancellationError: return "cancelled"
         case BighelpLinkAPIError.requestFailed(let status, _): return "http-\(status)"
         case is BighelpLinkAPIError: return "link-invalid"
+        case DirectHostNotificationError.rejected(let status, _): return "http-\(status)"
         case let registration as BighelpManagedLiveActivityRegistrar.RegistrationError: return "registration-\(registration)"
         default:
             let system = error as NSError

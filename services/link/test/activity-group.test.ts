@@ -51,6 +51,25 @@ describe("one Live Activity for several chats", () => {
     expect(new TextEncoder().encode(JSON.stringify(apns)).byteLength).toBeLessThan(4096);
   });
 
+  it("gives sealed detail to the rows the card shows first, and never passes Apple's limit", () => {
+    const appRow = (i: number) => `native-${i.toString(16).padStart(64, "0")}`;
+    const sealed = "s".repeat(1200);
+    const active = Array.from({ length: 64 }, (_, i) => ({
+      ...row(appRow(i), i === 9 ? "waiting" : "using_tool"), timestamp: 1792854000, activeSubagentCount: 99, sealed,
+    }));
+    const result = aggregateActivityRows(active, 1792854000);
+    expect(result.sessions[0]).toMatchObject({ id: appRow(9), sealed });
+    expect(result.sessions.filter((value) => value.sealed).length).toBeLessThan(5);
+    expect(result.sessions[4]).not.toHaveProperty("sealed");
+    const apns = { aps: { timestamp: 1792854000, event: "update", "stale-date": 1792854120,
+      "content-state": { ...result, groupId: `activity_${"g".repeat(43)}` } } };
+    expect(new TextEncoder().encode(JSON.stringify(apns)).byteLength).toBeLessThanOrEqual(4000);
+    // Rows without detail are what they were.
+    expect(aggregateActivityRows([row("a", "thinking")], 101).sessions[0]).not.toHaveProperty("sealed");
+    const five = aggregateActivityRows(Array.from({ length: 5 }, (_, i) => ({ ...row(appRow(i), "thinking"), sealed: "s".repeat(500) })), 101);
+    expect(five.sessions.every((value) => value.sealed)).toBe(true);
+  });
+
   it("ends only after every row is terminal", () => {
     expect(aggregateActivityRows([row("a", "completed"), row("b", "failed")], 101).phase).toBe("failed");
   });

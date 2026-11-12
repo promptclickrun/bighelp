@@ -1,5 +1,5 @@
 import { encodeSmallBase64URL as notificationBase64, decodeBase64URL, sha256Bytes as digest } from "./encoding.js";
-import { NATIVE_ROW_ID } from "./activity-group.js";
+import { NATIVE_ROW_ID, SEALED_DETAIL } from "./activity-group.js";
 import { privateJSON as response, readByteStream } from "./http-primitives.js";
 export { encodeSmallBase64URL as notificationBase64 } from "./encoding.js";
 import { DEVICE_AUTH_HEADERS, verifyDeviceRequest, type VerifiedDeviceRequest } from "./device-auth.js";
@@ -98,7 +98,7 @@ export interface NotificationEgressSnapshot {
 export interface ManagedNotificationStateBinding {
   sendNotificationActivityGroup(input: {
     ownerCoordinate: string; activityId: string; state: import("./activity-group.js").ActivityGroupRow;
-    authority: NotificationEgressSnapshot; externalId: string;
+    authority: NotificationEgressSnapshot; externalId: string; quiet?: boolean;
   }): Promise<import("./buzzkit.js").BuzzKitLiveActivityReceipt>;
   putNotificationAsset(input: NotificationAsset): Promise<NotificationAsset>;
   notificationAsset(input: { assetId: string; now: number }): Promise<NotificationAsset | null>;
@@ -1550,9 +1550,11 @@ export async function handleNotificationRequest(
       });
     }
     if (isActivity && parts.length === 4 && parts[3] === "updates" && request.method === "POST") {
+      // `sealed` (detail only the phone can read) and `quiet` (a new step alone: low priority) are optional.
       exact(body, [
         "version", "updateId", "sessionReference", "phase", "currentAction", "progress",
         "completedSteps", "activeSubagentCount", "latestTool", "timestamp", "expires",
+        ...["sealed", "quiet"].filter((key) => key in body),
       ]);
       if (body.version !== 2 || typeof body.updateId !== "string" || !BASE64URL_32.test(body.updateId)
           || typeof body.sessionReference !== "string" || !BASE64URL_32.test(body.sessionReference)
@@ -1560,6 +1562,8 @@ export async function handleNotificationRequest(
           || !usefulText(body.currentAction, 96) || !boundedInteger(body.progress, 0, 100)
           || !boundedInteger(body.completedSteps, 0, 999) || !boundedInteger(body.activeSubagentCount, 0, 99)
           || !(body.latestTool === null || usefulText(body.latestTool, 64))
+          || !(body.sealed === undefined || (typeof body.sealed === "string" && SEALED_DETAIL.test(body.sealed)))
+          || !(body.quiet === undefined || typeof body.quiet === "boolean")
           || !integer(body.timestamp) || !integer(body.expires) || body.expires <= body.timestamp) {
         return fail(400, "notification_activity_invalid");
       }
@@ -1590,7 +1594,9 @@ export async function handleNotificationRequest(
         const receipt = await notificationStateBinding(env, row.owner_coordinate).sendNotificationActivityGroup({
           ownerCoordinate: row.owner_coordinate, activityId: activity.activityId,
           state: { id: activity.rowId!, phase: String(body.phase), timestamp: Number(body.timestamp),
-            activeSubagentCount: Number(body.activeSubagentCount), latestTool: body.latestTool as string | null },
+            activeSubagentCount: Number(body.activeSubagentCount), latestTool: body.latestTool as string | null,
+            ...(typeof body.sealed === "string" ? { sealed: body.sealed } : {}) },
+          quiet: body.quiet === true && !terminal && body.phase !== "waiting",
           externalId,
           authority: { ownerKind: row.owner_kind, credentialId: row.credential_id,
             authorizationEpoch: row.authorization_epoch, now,

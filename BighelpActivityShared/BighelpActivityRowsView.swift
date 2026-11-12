@@ -9,6 +9,10 @@ struct BighelpActivityRowsView: View {
     var asOf = Date.now
     var snapshot: BighelpWidgetSnapshot = .empty
     var infos: [String: BighelpActivitySessionInfo] = BighelpActivitySessionInfo.load()
+    /// Details by row ID, for tests and previews. Nil opens each row's own sealed detail.
+    var details: [String: BighelpActivityDetail]? = nil
+    var level = BighelpActivityDetailLevel.current
+    var showsNerdLine = BighelpActivityDetailLevel.showsNerdLine
     @Environment(\.colorScheme) private var scheme
     @Environment(\.isLuminanceReduced) private var luminanceReduced
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -20,7 +24,47 @@ struct BighelpActivityRowsView: View {
     private var activeCount: Int { max(0, state.activeCount ?? ordered.filter { !$0.phase.isTerminal }.count) }
     private var attentionCount: Int { ordered.filter { $0.phase == .waiting && !stale($0) }.count }
 
+    /// The first chat and its detail, when the card may show one. Without it the card is the plain rows.
+    private var hero: (row: BighelpActivitySession, detail: BighelpActivityDetail)? {
+        guard level != .statusOnly, !typeSize.isAccessibilitySize, let row = ordered.first,
+              let detail = details.map({ $0[row.id] }) ?? row.openDetail() else { return nil }
+        return (row, detail)
+    }
+
     var body: some View {
+        if let hero { heroCard(hero.row, hero.detail) } else { plainRows }
+    }
+
+    /// One chat in full, the next ones as rows under it. The card is at most 160 points tall, so
+    /// the lines are counted: fewer at larger text, and each other chat takes one.
+    private func heroCard(_ row: BighelpActivitySession, _ detail: BighelpActivityDetail) -> some View {
+        let room = (maximumRows >= 5 ? 4 : 2) - (typeSize >= .xLarge ? 1 : 0)
+        // A question or a finished reply keeps two lines; the other chats take what is left.
+        let words = level == .stepsAndText && ((row.phase == .waiting && detail.question != nil) || (row.phase.isTerminal && detail.preview != nil))
+        let others = Array(ordered.dropFirst().prefix(max(0, min(2, maximumRows - 1, room - (words ? 2 : 1)))))
+        let more = max(0, activeCount - ([row] + others).filter { !$0.phase.isTerminal }.count)
+        let info = infos[row.id]
+        return VStack(alignment: .leading, spacing: 5) {
+            Link(destination: BighelpWidgetSnapshot.chatURL(row.id)) {
+                BighelpActivityHeroView(
+                    row: row, title: info?.title ?? "Chat",
+                    attributes: info?.attributes ?? LoopdySessionActivityAttributes(sessionID: row.id, sessionTitle: "Chat", agentID: "agent", agentName: "Your agent"),
+                    detail: detail, level: level, showsNerdLine: showsNerdLine, isStale: stale(row),
+                    lines: max(0, room - others.count - (more > 0 ? 1 : 0)),
+                    colors: BighelpActivityColors(snapshot: snapshot, scheme: scheme))
+            }
+            .buttonStyle(.plain)
+            ForEach(others) { other in
+                Link(destination: BighelpWidgetSnapshot.chatURL(other.id)) { rowContent(other) }.buttonStyle(.plain)
+            }
+            if more > 0 {
+                Text("+\(more) more active chats").font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+    }
+
+    private var plainRows: some View {
         VStack(alignment: .leading, spacing: 5) {
             if showsHeader && typeSize.isAccessibilitySize {
                 Text(isStale && activeCount > 0 ? "Updates paused" : activeCount == 0 ? "Chats finished" : "\(activeCount) active chats")

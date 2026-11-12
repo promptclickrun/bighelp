@@ -9,6 +9,8 @@ struct BighelpActivitySession: Codable, Hashable, Sendable, Identifiable {
     var timestamp: Int
     var activeSubagentCount: Int = 0
     var latestTool: String? = nil
+    /// Detail only this phone can read (`BighelpActivityDetail`): the computer's bytes, kept as they came.
+    var sealed: String? = nil
 
     static func membershipKey(_ id: String) -> String { String(id.suffix(16)) }
 
@@ -26,7 +28,13 @@ struct BighelpActivitySession: Codable, Hashable, Sendable, Identifiable {
                   activeSubagentCount: state.activeSubagentCount, latestTool: state.latestTool)
     }
     static func aggregate(_ rows: [Self], timestamp: Int) -> LoopdySessionActivityAttributes.ContentState {
-        let ordered = rows.sorted { ($0.priority, $0.id) < ($1.priority, $1.id) }
+        var ordered = rows.sorted { ($0.priority, $0.id) < ($1.priority, $1.id) }
+        // ActivityKit takes 4 KB of state, as a push does: detail stays on the rows shown first.
+        var room = 2_400
+        for index in ordered.indices {
+            guard let sealed = ordered[index].sealed else { continue }
+            if index < 5, sealed.utf8.count <= room { room -= sealed.utf8.count } else { ordered[index].sealed = nil }
+        }
         let running = ordered.filter { !$0.phase.isTerminal }
         let phase: Phase = running.first?.phase ?? (rows.contains { $0.phase == .failed } ? .failed : .completed)
         return .init(phase: phase, currentAction: "", progress: 0, completedSteps: 0, activeSubagentCount: 0,

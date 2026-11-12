@@ -6,5 +6,9 @@
 	<array>
 		<string>group.app.loopdy.mobile.buzzkit</string>
 	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)app.loopdy.mobile.card</string>
+	</array>
 </dict>
 </plist>

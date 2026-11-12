@@ -372,7 +372,11 @@ final class SettingsStore {
     /// Reveals host administration (files, gateways, plugins, logs, ...) in Settings.
     /// Off by default so everyday use stays a simple messaging app.
     var nerdModeEnabled: Bool {
-        didSet { defaults.set(nerdModeEnabled, forKey: Keys.nerdMode) }
+        didSet {
+            defaults.set(nerdModeEnabled, forKey: Keys.nerdMode)
+            // The Live Activity extension reads it: context use and the model's name on the card.
+            BighelpActivityDetailLevel.showsNerdLine = nerdModeEnabled
+        }
     }
 
     /// The all-hosts view: every agent on every host in one list.
@@ -577,6 +581,9 @@ final class SettingsStore {
         )
         appLayout = BighelpAppLayout(savedObject: defaults.object(forKey: Keys.appLayout))
         nerdModeEnabled = defaults.bool(forKey: Keys.nerdMode, default: false)
+        if defaults === UserDefaults.standard {
+            BighelpActivityDetailLevel.showsNerdLine = defaults.bool(forKey: Keys.nerdMode, default: false)
+        }
         allHostsMode = defaults.bool(forKey: Keys.allHostsMode, default: false)
         let codeMode = defaults.bool(forKey: Keys.codeMode, default: false)
         let start = defaults.string(forKey: Keys.startExperience).flatMap(BighelpExperience.init(rawValue:)) ?? .bighelp

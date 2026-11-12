@@ -706,6 +706,46 @@ describe("post-migration Link wake ownership", () => {
     expect(completed).toBe(false);
   });
 
+  it("takes sealed card detail without reading it, and refuses detail that is not bytes", async () => {
+    const hostKeys = await keys();
+    const grant = await insertLegacyGrant(hostKeys);
+    const activityId = "activity-sealed-detail";
+    const sessionReference = "a".repeat(43);
+    const rowId = `native-${"0f".repeat(32)}`;
+    const groupSends: Array<{ state: Record<string, unknown>; quiet?: boolean }> = [];
+    const targetEnv = targetEnvironment({
+      notificationActivity: async () => ({
+        activityId, grantId: grant.grantId, sessionReference, revision: 1, leaseExpires: NOW + 900,
+        status: "active", groupId: "fixture-physical-card", rowId, rowRevision: 1,
+      }),
+      beginNotificationActivityUpdate: async () => ({ status: "send" }),
+      completeNotificationActivityUpdate: async () => {},
+      sendNotificationActivityGroup: async (input: { state: Record<string, unknown>; quiet?: boolean }) => {
+        groupSends.push(input);
+        return { status: "accepted", deliveryId: "fixture" };
+      },
+    });
+    const update = {
+      version: 2, updateId: "d".repeat(43), sessionReference, phase: "using_tool",
+      currentAction: "Your agent is working", progress: 0, completedSteps: 0, activeSubagentCount: 0,
+      latestTool: null, timestamp: NOW, expires: NOW + 120,
+    };
+    const post = async (body: Record<string, unknown>) => handleLoopdyLinkRequest(await accountHostRequest(
+      hostKeys, grant.grantId, grant.hostKeyId, `/live-activities/${activityId}/updates`, "POST", body,
+    ), targetEnv);
+
+    expect((await post({ ...update, sealed: "s".repeat(600), quiet: true })).status).toBe(202);
+    expect(groupSends[0]).toMatchObject({ quiet: true, state: { id: rowId, phase: "using_tool", sealed: "s".repeat(600) } });
+    // A question is never quiet, whatever the host says.
+    expect((await post({ ...update, updateId: "e".repeat(43), phase: "waiting", sealed: "s".repeat(600), quiet: true })).status).toBe(202);
+    expect(groupSends[1]!.quiet).toBe(false);
+    for (const sealed of ["plain words with spaces", "s".repeat(1201), 7]) {
+      expect((await post({ ...update, updateId: "f".repeat(43), sealed })).status).toBe(400);
+    }
+    expect((await post({ ...update, updateId: "f".repeat(43), other: true })).status).toBe(400);
+    expect(groupSends).toHaveLength(2);
+  });
+
   it.each([
     ["revoked", "revoked", NOW + 900],
     ["lease-expired", "active", NOW + 900],

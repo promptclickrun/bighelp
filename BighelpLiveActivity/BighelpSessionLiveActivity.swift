@@ -96,6 +96,10 @@ struct BighelpSessionLiveActivity: Widget {
         let attention = !context.isStale && rows.contains { $0.phase == .waiting }
         let count = context.state.activeCount ?? rows.filter { !$0.phase.isTerminal }.count
         let symbol = context.isStale ? "pause.circle" : attention ? "questionmark.circle.fill" : count == 0 ? "checkmark.circle" : "circle.dashed"
+        // The first chat's agent and the step it is on, when its detail opens (BighelpActivityDetail).
+        let first = rows.first.flatMap { row in BighelpActivitySessionInfo.load()[row.id].map { (row, $0) } }
+        let step = BighelpActivityDetailLevel.current == .statusOnly || context.isStale || attention
+            ? nil : rows.first.flatMap { $0.phase.isTerminal ? nil : $0.openDetail()?.tool }.map(BighelpActivityPose.init(tool:))
         return DynamicIsland {
             DynamicIslandExpandedRegion(.leading) {
                 Text("bighelp").font(.system(.caption, design: .rounded, weight: .bold))
@@ -109,10 +113,20 @@ struct BighelpSessionLiveActivity: Widget {
                     .padding(.vertical, 4)
             }
         } compactLeading: {
-            Image(systemName: "bubble.left.and.bubble.right.fill").accessibilityLabel("bighelp")
+            if let (_, info) = first {
+                BighelpActivityAvatar(agentID: info.attributes.agentID, name: info.attributes.agentName, diameter: 24)
+                    .accessibilityHidden(false).accessibilityLabel(info.attributes.agentName)
+            } else {
+                Image(systemName: "bubble.left.and.bubble.right.fill").accessibilityLabel("bighelp")
+            }
         } compactTrailing: {
-            Image(systemName: symbol).foregroundStyle(attention ? .orange : .secondary)
-                .accessibilityLabel(context.isStale ? "Updates paused" : "\(count) active chats")
+            if let step {
+                Image(systemName: step.symbolName).foregroundStyle(step.tint)
+                    .contentTransition(.symbolEffect(.replace)).accessibilityLabel(step.label)
+            } else {
+                Image(systemName: symbol).foregroundStyle(attention ? .orange : .secondary)
+                    .accessibilityLabel(context.isStale ? "Updates paused" : "\(count) active chats")
+            }
         } minimal: {
             Image(systemName: symbol).foregroundStyle(attention ? .orange : .secondary)
         }

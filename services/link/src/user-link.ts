@@ -236,7 +236,7 @@ export class UserLink extends DurableObject<LinkEnv> {
 
   async sendNotificationActivityGroup(input: {
     ownerCoordinate: string; activityId: string; state: import("./activity-group.js").ActivityGroupRow;
-    authority: import("./notification-grants.js").NotificationEgressSnapshot; externalId: string;
+    authority: import("./notification-grants.js").NotificationEgressSnapshot; externalId: string; quiet?: boolean;
   }) {
     this.notificationState.authorizeNotificationEgress(input.authority);
     this.notificationState.updateActivityGroup(input.activityId, input.state, input.authority.credentialId);
@@ -280,6 +280,8 @@ export class UserLink extends DurableObject<LinkEnv> {
         live: {
           event, activityId: content.groupId, contentState: content, timestamp: now, staleDate: now + 120,
           ...(terminal ? { dismissalDate: now + 30 } : {}),
+          // A new step alone: Apple limits high-priority card updates, so these go at low priority.
+          ...(input.quiet === true && !terminal ? { priority: 5 as const } : {}),
         },
         authorize,
         sendViaBuzzKit: () => sendBuzzKitLiveActivity(this.env, {

@@ -17,6 +17,7 @@
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)app.loopdy.mobile.notification</string>
+		<string>$(AppIdentifierPrefix)app.loopdy.mobile.card</string>
 	</array>
 </dict>
 </plist>

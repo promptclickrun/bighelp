@@ -48,6 +48,9 @@
 	<string>https://github.com/apps/loopdy-references/installations/new</string>
 	<key>BighelpNotificationKeychainGroup</key>
 	<string>$(AppIdentifierPrefix)app.loopdy.mobile.notification</string>
+	<!-- The Live Activity's detail key, shared with the Live Activity extension only (BighelpActivityCardKey). -->
+	<key>BighelpCardKeychainGroup</key>
+	<string>$(AppIdentifierPrefix)app.loopdy.mobile.card</string>
     <!-- Mac updates (Sparkle, BighelpMacUpdater): offered, never installed silently. The feed and each
          update are signed with bighelp's EdDSA key. Only the Mac reads these. -->
     <key>SUFeedURL</key>

@@ -59,6 +59,8 @@ export interface LiveActivityMessage {
   timestamp: number;
   staleDate: number;
   dismissalDate?: number;
+  /** 10 when left out. 5 for an update that changes only a card's sealed detail. */
+  priority?: 5 | 10;
 }
 
 export interface ApnsRetryMessage {
@@ -275,7 +277,7 @@ export async function messageSpec(
 /** A Live Activity update as APNs wants it. Dates are Unix seconds. */
 export function liveActivitySpec(live: LiveActivityMessage, nowSeconds: number): DirectSpec | null {
   const spec: DirectSpec = {
-    kind: "liveactivity", eventType: "liveactivity", pushType: "liveactivity", priority: ALERT_PRIORITY,
+    kind: "liveactivity", eventType: "liveactivity", pushType: "liveactivity", priority: live.priority ?? ALERT_PRIORITY,
     // An update is worthless once the card is stale.
     ttlSeconds: Math.min(3_600, Math.max(60, live.staleDate - nowSeconds)),
     payload: {
@@ -688,7 +690,7 @@ export async function deliverLiveActivity(
 ): Promise<{ status: "accepted" | "duplicate"; deliveryId: string }> {
   const { env, ctx, owner, live } = input;
   const deadlineAt = Date.now() + DIRECT_DEADLINE_MS;
-  const info = { eventType: "liveactivity", priority: ALERT_PRIORITY } as const;
+  const info = { eventType: "liveactivity", priority: live.priority ?? ALERT_PRIORITY } as const;
   const route = await chooseRoute(env, ctx, owner, "liveactivity", "liveactivity", live.activityId);
   if (route.via === "buzzkit") return viaBuzzKit(env, ctx, info, input.sendViaBuzzKit, (value) => value.status);
   const nowSeconds = Math.floor(Date.now() / 1_000);

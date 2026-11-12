@@ -319,6 +319,7 @@ updates.
 | APNs token | System/app memory and Keychain-related state | Encrypted at rest in relay storage | Not required |
 | Alert title/body | Device after decryption | Encrypted payload | Created by the authorized source |
 | Live Activity state | ActivityKit | Bounded state, encrypted at rest but readable during relay delivery and by Apple | Created from agent activity |
+| Live Activity detail (steps, a waiting question, reply lines) | Device after decryption, in the Live Activity extension | Encrypted bytes for a key the relay never has | Created and encrypted by the authorized source |
 | Static Card document and embedded values | Local transcript cache | Not sent | Generated and validated on the authorized Hermes host |
 | Live Card source URL, response, and request metadata | Not accepted in build 3 | Not accepted in build 3 | Not accepted in build 3 |
 | Preferences | UserDefaults | Not uploaded as preferences | Not required |
@@ -529,6 +530,17 @@ This conclusion must be revisited if any of the following changes:
 The app supplies Live Activities with a sanitized projection. It maps tool names
 to generic categories, limits text, and excludes prompts, arguments, attachments,
 and complete model output.
+
+What the card shows beyond that (the step in progress and what it works on, the
+last steps, a question or command that waits, the first lines of the reply) comes
+as detail the Hermes host encrypts for one chat row's key: AES-256-GCM, bound to
+the update's time. The app derives that key from a secret in a keychain group
+shared only with its Live Activity extension and gives it to the host over its
+own connection, so the notification service and Apple forward bytes they cannot
+read. They still read each row's phase, time and helper count. Nothing signs the
+detail beyond the shared key: the notification service can delay or drop it, and
+cannot forge or read it. Settings › Notifications › On the card chooses how much
+of the detail is drawn; Status only draws none.
 
 The session title, agent name, and progress state can still be visible on the
 Lock Screen. Users who require shoulder-surfing protection should disable Live

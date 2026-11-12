@@ -89,10 +89,12 @@ async function fixture(mode: "off" | "on") {
     await runInDurableObject<UserLink, void>(stub, async (instance) => { await instance.registerNotificationActivity(input); });
     return { activity: input as NotificationActivity, authority };
   };
-  const send = (row: Awaited<ReturnType<typeof register>>, phase: string) =>
+  const send = (row: Awaited<ReturnType<typeof register>>, phase: string, more: { sealed?: string; quiet?: boolean } = {}) =>
     runInDurableObject<UserLink, unknown>(stub, async (instance) => instance.sendNotificationActivityGroup({
       ownerCoordinate, activityId: row.activity.activityId,
-      state: { id: row.activity.rowId!, phase, timestamp: now(), activeSubagentCount: 0 },
+      state: { id: row.activity.rowId!, phase, timestamp: now(), activeSubagentCount: 0,
+        ...(more.sealed ? { sealed: more.sealed } : {}) },
+      ...(more.quiet ? { quiet: true } : {}),
       externalId: "fixture-recipient", authority: { ...row.authority, activity: {
         activityId: row.activity.activityId, sessionReference: row.activity.sessionReference,
         leaseExpires: row.activity.leaseExpires,
@@ -123,6 +125,21 @@ describe("direct delivery of the shared chat Live Activity", () => {
     expect(aps).not.toHaveProperty("dismissal-date");
     expect(receipt).toMatchObject({ status: "accepted", deliveryId: call!.headers.get("apns-id") });
     expect(call!.headers.get("apns-id")).toBe(await apnsIdFor(`${f.credentialId}|liveactivity|${f.groupId}|${aps.timestamp}`));
+  });
+
+  it("forwards a row's sealed detail as it came, and a new step alone at low priority", async () => {
+    const f = await fixture("on");
+    await f.addTarget(f.groupId);
+    const a = await f.register(1);
+    await f.register(2);
+    const sealed = "c".repeat(600);
+    await f.send(a, "using_tool", { sealed });
+    expect(sent[0]!.headers.get("apns-priority")).toBe("10");
+    await f.send(a, "using_tool", { sealed: "d".repeat(600), quiet: true });
+    expect(sent[1]!.headers.get("apns-priority")).toBe("5");
+    const rows = sent[1]!.body.aps["content-state"].sessions as Array<{ id: string; sealed?: string }>;
+    expect(rows.find((row) => row.id === rowId(1))?.sealed).toBe("d".repeat(600));
+    expect(rows.find((row) => row.id === rowId(2))).not.toHaveProperty("sealed");
   });
 
   it("ends the card with a dismissal date only when no chat is left", async () => {

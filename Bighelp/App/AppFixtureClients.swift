@@ -110,7 +110,8 @@ final class DemoSessionControlMessaging: SessionRuntimeControlConfirming, Sessio
             picker.providers = picker.providers.map(DemoProviderPlans.adding)
             return .model(picker)
         case .reasoning:
-            let current = reasoning[request.sessionID] ?? "reset"
+            // As Hermes lists them: the level the chat uses is current, its agent's default until changed.
+            let current = reasoning[request.sessionID] ?? SessionRuntimeControlModel.hermesDefaultReasoning
             return .choice(try JSONDecoder().decode(
                 BighelpLinkChoicePicker.self,
                 from: Data(
@@ -123,7 +124,6 @@ final class DemoSessionControlMessaging: SessionRuntimeControlConfirming, Sessio
                       "kind": "reasoning",
                       "title": "Reasoning effort",
                       "choices": [
-                        {"value": "reset", "label": "Use default", "isCurrent": \(current == "reset")},
                         {"value": "low", "label": "Low", "isCurrent": \(current == "low")},
                         {"value": "medium", "label": "Medium", "isCurrent": \(current == "medium")},
                         {"value": "high", "label": "High", "isCurrent": \(current == "high")},

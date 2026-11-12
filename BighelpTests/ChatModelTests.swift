@@ -1316,10 +1316,10 @@ struct ChatModelTests {
             allowsAgentDefaults: false,
             now: { 1_788_000_000 }
         )
-        controls.reconcileSessionReasoning("", observedAt: .distantPast)
-        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Thinking: Auto")
+        controls.reconcileSessionReasoning("", observedAt: Date())
+        #expect(controls.currentReasoningValue == nil, "An empty level says nothing; never Auto")
         controls.reconcileSessionReasoning("louder", observedAt: Date())
-        #expect(controls.currentReasoningValue == "reset", "Unknown levels are ignored")
+        #expect(controls.currentReasoningValue == nil, "Unknown levels are ignored")
 
         await controls.loadReasoningPicker()
         #expect(controls.currentReasoningValue == "high")
@@ -1328,6 +1328,9 @@ struct ChatModelTests {
 
         controls.setTurnActive(true)
         controls.reconcileSessionReasoning("medium", observedAt: Date())
+        #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Thinking: Medium")
+        // A turn's info from an agent with no level set leaves the level read before in place.
+        controls.reconcileSessionReasoning("", observedAt: Date())
         #expect(ChatModelSummaryPresentation(controls: controls).reasoning == "Thinking: Medium")
     }
 
@@ -1347,7 +1350,7 @@ struct ChatModelTests {
         await controls.loadSummaryIfNeeded()
         #expect(messaging.opened.isEmpty)
         let summary = ChatModelSummaryPresentation(controls: controls)
-        #expect(summary.reasoning == "Thinking: Auto")
+        #expect(summary.reasoning == "Thinking: Medium", "No level set: Hermes' own default")
         #expect(summary.providerID == "openai")
     }
 

@@ -192,7 +192,6 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
                 currentProvider: state.provider, providers: state.providers, sentAt: timestamp
             ))
         case .reasoning:
-            // With no live session to ask, the levels still show, on Auto.
             let proof: Proof
             if coordinate.runtimeSessionID != nil {
                 do {
@@ -205,12 +204,20 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
             } else {
                 proof = Proof(reasoning: "", model: "", provider: "", fastMode: nil, isRunning: false)
             }
+            // Hermes leaves the level out until the chat's agent is built (an existing chat, until its
+            // next message) and when nothing sets one. Its `config.get reasoning` says the level the
+            // chat uses then: the chat's own, else the agent's configured default, else Hermes'.
+            var level = proof.reasoning
+            if level.isEmpty {
+                level = (try? await effectiveReasoning(sessionID: request.sessionID, coordinate: coordinate)) ?? ""
+            }
             providers = []
             var choices = try Self.reasoningValues.map { value in
                 try BighelpLinkChoice(value: value, label: AgentReasoningOption.option(for: value).title,
-                                     isCurrent: value == proof.reasoning)
+                                     isCurrent: value == level)
             }
-            if proof.reasoning.isEmpty {
+            // Only when the computer couldn't say at all.
+            if level.isEmpty {
                 choices.insert(try BighelpLinkChoice(value: "reset", label: "Auto", isCurrent: true), at: 0)
             }
             response = .choice(try BighelpLinkChoicePicker(
@@ -524,6 +531,19 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
         let tier = try DirectHermesAdministrationCodec.optionalString(info["service_tier"], maximum: 64)
         return Proof(reasoning: reasoning, model: model, provider: provider,
                      fastMode: tier.map(FastMode.init), isRunning: response["running"]?.boolean == true)
+    }
+
+    /// The level the chat uses, as Hermes resolves it (`config.get reasoning`). Without a live
+    /// session it is the agent's.
+    private func effectiveReasoning(sessionID: String, coordinate: WorkspaceSessionCoordinate) async throws -> String {
+        var payload: [String: BighelpJSONValue] = ["profile": .string(coordinate.profileID), "key": .string("reasoning")]
+        if let runtimeID = coordinate.runtimeSessionID { payload["session_id"] = .string(runtimeID) }
+        let response = try await perform(.configGet, payload: payload, sessionID: sessionID,
+                                         coordinate: coordinate, capability: .reasoningEdit)
+        guard let value = response["value"]?.string, Self.reasoningValues.contains(value) else {
+            throw WorkspaceClientError.invalidResponse
+        }
+        return value
     }
 
     private func perform(

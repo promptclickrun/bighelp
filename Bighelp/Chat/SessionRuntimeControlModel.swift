@@ -199,11 +199,11 @@ final class SessionRuntimeControlModel {
     /// Hermes reports the chat's reasoning in each `session.info`, including the
     /// one that starts a turn, so the level is known while the agent works even
     /// when the picker read (which waits for an idle chat) hasn't happened. An
-    /// empty value is Hermes' automatic choice. Replayed info is older than any
+    /// empty value says nothing (an agent not built yet, or no level set), so it
+    /// leaves the level the picker read in place. Replayed info is older than any
     /// read or choice made here, so it only fills in an unknown level.
     func reconcileSessionReasoning(_ value: String, observedAt: Date) {
-        let value = value.isEmpty ? "reset" : value
-        guard !isApplyingSelection, observedAt >= reasoningObservedAt,
+        guard !value.isEmpty, !isApplyingSelection, observedAt >= reasoningObservedAt,
               Self.reasoningValues.contains(value) else { return }
         reasoningObservedAt = observedAt
         currentReasoningValue = value
@@ -219,10 +219,9 @@ final class SessionRuntimeControlModel {
         }
 
         if reasoningPicker == nil, currentReasoningValue == nil {
-            // Hermes represents its automatic reasoning choice as `reset` in
-            // the session picker, while agent defaults persist an empty value.
+            // An agent with no level set thinks at Hermes' own default, as `config.get reasoning` says.
             currentReasoningValue = selection.reasoningEffort.isEmpty
-                ? "reset"
+                ? Self.hermesDefaultReasoning
                 : selection.reasoningEffort
         }
     }
@@ -759,6 +758,9 @@ final class SessionRuntimeControlModel {
         errorMessage = nil
         invalidateNativeModelPicker()
     }
+
+    /// The level Hermes uses when neither the chat nor the agent sets one.
+    static let hermesDefaultReasoning = "medium"
 
     private static let reasoningValues: Set<String> = [
         "reset", "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"

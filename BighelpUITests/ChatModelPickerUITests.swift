@@ -11,21 +11,21 @@ final class ChatModelPickerUITests: BighelpUITestCase {
             openModelSettings(in: app)
             let thinking = app.descendants(matching: .any)["chat.thinking"].firstMatch
             XCTAssertTrue(thinking.waitForExistence(timeout: 10))
-            XCTAssertEqual(thinking.value as? String, "Auto", "The demo chat starts on Hermes' automatic level")
+            XCTAssertEqual(thinking.value as? String, "Medium", "The demo chat starts on the level Hermes uses, never Auto")
             save("model-settings-\(appearance)", app)
 
-            // Drag along the track from its left end to the second of the demo's four levels.
+            // Drag along the track from its left end to the third of the demo's four levels.
             let start = thinking.coordinate(withNormalizedOffset: CGVector(dx: 0.07, dy: 0.5))
-            start.press(forDuration: 0.1, thenDragTo: thinking.coordinate(withNormalizedOffset: CGVector(dx: 0.38, dy: 0.5)))
-            XCTAssertEqual(thinking.value as? String, "Medium")
-            save("thinking-medium-\(appearance)", app)
+            start.press(forDuration: 0.1, thenDragTo: thinking.coordinate(withNormalizedOffset: CGVector(dx: 0.66, dy: 0.5)))
+            XCTAssertEqual(thinking.value as? String, "High")
+            save("thinking-high-\(appearance)", app)
 
             // It was sent when the finger lifted: closing and opening again shows the same level.
             app.buttons["chat.model-settings.done"].firstMatch.tap()
             XCTAssertTrue(thinking.waitForNonExistence(timeout: 5))
             openModelSettings(in: app)
             XCTAssertTrue(thinking.waitForExistence(timeout: 10))
-            XCTAssertEqual(thinking.value as? String, "Medium")
+            XCTAssertEqual(thinking.value as? String, "High")
             app.terminate()
         }
     }

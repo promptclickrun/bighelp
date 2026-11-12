@@ -3,6 +3,24 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.85
+
+### New
+
+- **Let's do it sends the idea:** tap Let's do it on an idea. The chat gets "Let's do it!" at once, with the idea as a card in your message. You do not have to send it yourself, and the text in your message box stays.
+- **Completed ideas:** after Let's do it, the idea moves to a Completed list at the bottom of Ideas, with the day you started it. Tap the heading to fold the list. The day needs bighelp plugin 3.53.0.
+- **Discuss with a card:** Discuss on a Feed post, a goal or an idea puts the item in the message box as a card. Type your question and send it. The agent gets the full post, goal or idea.
+- **Active Sessions on every computer:** when bighelp shows all your computers, All agents and All sessions show the chats that run now on each computer, under Active Sessions.
+
+### Changed
+
+- **The Thinking level:** Model settings and the model chip show the level that the chat really uses. When a chat has no level of its own, they show the level of its agent, or Medium. They no longer show Auto.
+- **Bots mode Settings:** the Bots mode switch is now a Modes row. It opens the same Modes page as All Settings.
+
+### Fixed
+
+- **New chat:** the sweep that clears the old chat plays one time. Before, it sometimes played again a few seconds later, when the computer was slow to make the chat.
+
 ## 2.6.84
 
 ### New

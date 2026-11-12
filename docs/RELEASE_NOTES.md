@@ -3,6 +3,16 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.84
+
+### New
+
+- **The Live Activity shows the work:** the first chat on the card now shows what its agent does. You see the step in progress, the last steps and a timer for the turn. The other chats stay as rows below it. This needs bighelp plugin 3.52.0 on your Hermes computer.
+- **Questions and answers on the card:** when an agent asks you a question, or a command waits for your approval, the card shows it. When the turn ends, the card shows the first lines of the answer.
+- **Encrypted on the way to you:** your computer encrypts these details for your iPhone or iPad. The notification service and Apple cannot read them.
+- **You select what the card shows:** go to Settings › Notifications › Live Activities › On the card. Select Status only, Steps, or Steps and text. Nerd Mode adds context use and the name of the model.
+- **Dynamic Island:** the small view shows the picture of the agent and the type of step.
+
 ## 2.6.83
 
 ### New

@@ -215,7 +215,7 @@ final class SessionCatalogStore {
     @discardableResult
     func createLocalPresentationDraft(agentID: String) -> SessionRecord {
         var record = SessionRecord(
-            id: "local-draft:\(UUID().uuidString.lowercased())",
+            id: SessionRecord.localPresentationDraftPrefix + UUID().uuidString.lowercased(),
             kind: .direct,
             agentIDs: [agentID],
             title: "New chat"

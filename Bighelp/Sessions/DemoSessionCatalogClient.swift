@@ -40,6 +40,12 @@ final class DemoSessionCatalogClient: SessionCatalogClient {
     }
 
     func create(kind: SessionKind, agentIDs: [String]) async throws -> SessionRecord {
+        #if DEBUG
+        // A real computer can take seconds to make a chat; the blank canvas shows meanwhile.
+        if ProcessInfo.processInfo.arguments.contains("-test-slow-new-chat") {
+            try await Task.sleep(for: .seconds(4))
+        }
+        #endif
         let record = SessionRecord(
             id: "session_\(UUID().uuidString.lowercased())",
             kind: kind,

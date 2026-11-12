@@ -38,6 +38,9 @@ final class ChatDissolveTransition {
             return
         }
         cancel()
+        // The same goes once the sweep has ended: the computer can take seconds to make the chat
+        // (a Bot Chat comes from the agent's gateway), and the blank canvas then swept again.
+        guard previousID?.hasPrefix(SessionRecord.localPresentationDraftPrefix) != true else { return }
         guard !reduceMotion, nextID != previousID, let source, source.id == previousID,
               let scrollView = source.scrollView(), let window = scrollView.window else { return }
         let viewport = scrollView.bounds.inset(by: scrollView.adjustedContentInset)

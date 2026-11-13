@@ -9,11 +9,20 @@ enum ChatsInboxFixture {
     /// Suggested: `-use-demo-fixtures -test-chats-inbox` shows `ChatsInboxFixture.view()` as the root.
     static let launchArgument = "-test-chats-inbox"
 
-    static func view(header: AnyView = AnyView(EmptyView())) -> some View {
+    static func view(header: AnyView = AnyView(sampleHeader)) -> some View {
         ChatsInboxView(context: context(header: header))
     }
 
-    static func context(header: AnyView = AnyView(EmptyView())) -> ChatsInboxContext {
+    /// The first tab's header at Chats, as the shell draws it over the list. Never an empty view:
+    /// the list's top inset then takes the whole screen, and only the search row shows, at the bottom.
+    private static var sampleHeader: some View {
+        HomeHeaderBar(context: HomeHeaderContext(
+            personName: "Sam Rivera", personImageURL: nil, onOpenSettings: {},
+            viewSwitch: HomeViewSwitch(current: .chats, select: { _ in }),
+            newItems: SimpleBotsNewItem.allCases))
+    }
+
+    static func context(header: AnyView = AnyView(sampleHeader)) -> ChatsInboxContext {
         let defaults = UserDefaults(suiteName: "bighelp.chats-inbox-fixture") ?? .standard
         let records = DemoSessionCatalogClient.fixtureRecords
         let catalog = SessionCatalogStore(client: DemoSessionCatalogClient(records: records), records: records,

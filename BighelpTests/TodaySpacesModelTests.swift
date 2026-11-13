@@ -122,7 +122,9 @@ struct TodaySpacesModelTests {
     @Test func aStoppedSpaceRunsAgainButNotTwiceInAMinute() async throws {
         let folder = Kit.folder()
         defer { try? FileManager.default.removeItem(at: folder) }
-        let model = TodaySpacesModel(computers: { [Kit.computer(client: Kit.demo())] }, current: { nil },
+        // One computer for the whole test: the model asks for its connection again at each call.
+        let demo = Kit.demo()
+        let model = TodaySpacesModel(computers: { [Kit.computer(client: demo)] }, current: { nil },
                                      cacheFolder: folder, clock: { Kit.now })
         await model.refresh()
         let garden = Self.id("scope-home", Kit.garden)

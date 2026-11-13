@@ -162,7 +162,8 @@ struct ChatsInboxRowLabel: View {
                         pin
                         tags
                         Spacer(minLength: BighelpTokens.space8)
-                        dateText
+                        // The title is cut, never the time.
+                        dateText.fixedSize()
                         unreadDot
                     }
                 }

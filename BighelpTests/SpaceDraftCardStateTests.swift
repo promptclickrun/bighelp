@@ -49,7 +49,8 @@ struct SpaceDraftCardStateTests {
         #expect(flow.size == .small)
         #expect(flow.canAdd)
 
-        let add = try #require(flow.beginAdd())
+        let addTicket = flow.beginAdd()
+        let add = try #require(addTicket)
         #expect(add.revision == 1)
         #expect(flow.phase == .adding)
         #expect(flow.beginAdd() == nil)
@@ -108,8 +109,10 @@ struct SpaceDraftCardStateTests {
 
     @Test func theBotChangingTheDraftReadsItAgain() throws {
         var flow = try Self.ready()
-        let add = try #require(flow.beginAdd())
-        #expect(flow.added(.failure(.draftChanged(revision: 3)), ticket: add))
+        let addTicket = flow.beginAdd()
+        let add = try #require(addTicket)
+        let addReread = flow.added(.failure(.draftChanged(revision: 3)), ticket: add)
+        #expect(addReread)
         #expect(flow.phase == .loading)
         #expect(flow.notice == .changed)
         #expect(flow.revision == 3)
@@ -129,7 +132,8 @@ struct SpaceDraftCardStateTests {
         #expect(loading.phase == .needsPluginUpdate)
 
         var adding = try Self.ready()
-        let add = try #require(adding.beginAdd())
+        let addTicket = adding.beginAdd()
+        let add = try #require(addTicket)
         adding.added(.failure(.needsPluginUpdate), ticket: add)
         #expect(adding.phase == .needsPluginUpdate)
         #expect(!adding.canAdd)
@@ -137,7 +141,8 @@ struct SpaceDraftCardStateTests {
 
     @Test func noAnswerKeepsAddAndSaysSo() throws {
         var flow = try Self.ready()
-        let add = try #require(flow.beginAdd())
+        let addTicket = flow.beginAdd()
+        let add = try #require(addTicket)
         flow.added(.failure(.unreachable), ticket: add)
         #expect(flow.phase == .ready)
         #expect(flow.notice == .unreachable)
@@ -149,7 +154,8 @@ struct SpaceDraftCardStateTests {
 
     @Test func aMissingScriptSaysToAskTheBot() throws {
         var flow = try Self.ready()
-        let add = try #require(flow.beginAdd())
+        let addTicket = flow.beginAdd()
+        let add = try #require(addTicket)
         flow.added(.failure(.scriptMissing), ticket: add)
         #expect(flow.phase == .ready)
         #expect(flow.notice == .scriptMissing)
@@ -157,16 +163,19 @@ struct SpaceDraftCardStateTests {
 
     @Test func alreadyLiveAtAddIsOnToday() throws {
         var flow = try Self.ready()
-        let add = try #require(flow.beginAdd())
+        let addTicket = flow.beginAdd()
+        let add = try #require(addTicket)
         flow.added(.failure(.notDraft), ticket: add)
         #expect(flow.phase == .onToday)
     }
 
     @Test func aLateAnswerForAnOlderRevisionIsIgnored() throws {
         var flow = try Self.ready()
-        let first = try #require(flow.beginAdd())
+        let firstTicket = flow.beginAdd()
+        let first = try #require(firstTicket)
         // The same Add answered twice: first "the bot changed it", then, late, a success for revision 1.
-        #expect(flow.added(.failure(.draftChanged(revision: 2)), ticket: first))
+        let firstReread = flow.added(.failure(.draftChanged(revision: 2)), ticket: first)
+        #expect(firstReread)
         let read = flow.beginLoad()
         #expect(!flow.added(.success(try Self.liveSpace(revision: 1)), ticket: first))
         #expect(flow.phase == .loading)
@@ -208,7 +217,8 @@ struct SpaceDraftCardStateTests {
         let read = flow.beginLoad()
         flow.loaded(.success(try Self.draftSpace(size: "small")), ticket: read)
         #expect(flow.size == .tall)
-        let add = try #require(flow.beginAdd())
+        let addTicket = flow.beginAdd()
+        let add = try #require(addTicket)
         #expect(add.revision == 1)
         flow.choose(.small)
         #expect(flow.size == .tall)
@@ -253,6 +263,6 @@ struct SpaceDraftCardStateTests {
         #expect(model.flow.phase == .onToday)
         #expect(calls.sent.map(\.revision) == [1, 2])
         #expect(calls.sent.map(\.size) == [.wide, .wide])
-        #expect(calls.sent.allSatisfy(\.hasPreview))
+        #expect(calls.sent.allSatisfy { $0.hasPreview })
     }
 }

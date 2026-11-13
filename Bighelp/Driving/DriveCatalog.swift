@@ -234,7 +234,9 @@ enum DriveCatalog {
             settings("settings.appearance.app-layout", String(localized: "App layout"),
                      String(localized: "What the bottom bar holds and the order of the menu."),
                      keywords: ["app layout", "bottom bar", "tab bar", "tabs", "menu order", "pin"],
-                     full: [section(.appearance), (String(localized: "App layout"), .appLayout, "settings.appearance.app-layout")]),
+                     // One home: delete with the old shell. Appearance has no App layout row any more, so
+                     // the page opens with nothing to tap.
+                     full: [section(.appearance), (String(localized: "App layout"), .appLayout, nil)]),
             settings("settings.appearance.thinking", String(localized: "Thinking"),
                      String(localized: "The look of the Thinking control that sets how hard an agent thinks."),
                      keywords: ["thinking", "reasoning", "thinking slider", "effort", "slider look"],

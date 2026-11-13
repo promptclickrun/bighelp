@@ -143,7 +143,7 @@ final class TodaySpacesModel {
         let list = sync()
         isRefreshing = true
         let reads = list.compactMap { computer in
-            stores[computer.scope].map { store in Task { await store.load(computer) } }
+            stores[computer.scope].map { store in Task<Void, Never> { await store.load(computer) } }
         }
         for read in reads { await read.value }
         isRefreshing = false

@@ -108,7 +108,7 @@ struct ChatsInboxProjectionTests {
             sessions: [talked], rooms: [room("crew"), room("fresh")], selectedHostID: Self.home))
 
         #expect(rows.map(\.id) == ["here/hermes-room:crew", "here/hermes-room:fresh"])
-        #expect(rows.allSatisfy(\.isGroup))
+        #expect(rows.allSatisfy { $0.isGroup })
         #expect(rows[1].memberIDs == ["mina", "otto"])
         #expect(!rows[1].canPin && !rows[1].canRename, "Group chats are managed in their own settings")
     }

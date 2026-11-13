@@ -102,13 +102,16 @@ final class TodayBoardsStore {
     static func entries(_ kind: AgentBoardItem.Kind, boards: [String: [AgentBoardItem]],
                         agentIDs: [String]? = nil) -> [TodayBoardsEntry] {
         let ids = agentIDs ?? Array(boards.keys)
-        return ids.flatMap { id in
-            (boards[id] ?? []).filter { item in
-                // Ideas answered with Let's do it are under Completed on the bot's own board, not here.
-                item.kind == kind && !item.dismissed && !item.isCompleted
-            }
-            .map { TodayBoardsEntry(agentID: id, item: $0) }
+        // In named steps: as one expression the Vision Pro build couldn't type-check it in time.
+        let entries: [TodayBoardsEntry] = ids.flatMap { id -> [TodayBoardsEntry] in
+            let items: [AgentBoardItem] = boards[id] ?? []
+            // Ideas answered with Let's do it are under Completed on the bot's own board, not here.
+            let shown = items.filter { $0.kind == kind && !$0.dismissed && !$0.isCompleted }
+            return shown.map { TodayBoardsEntry(agentID: id, item: $0) }
         }
-        .sorted { $0.item.createdAt != $1.item.createdAt ? $0.item.createdAt > $1.item.createdAt : $0.id < $1.id }
+        return entries.sorted { first, second in
+            if first.item.createdAt != second.item.createdAt { return first.item.createdAt > second.item.createdAt }
+            return first.id < second.id
+        }
     }
 }

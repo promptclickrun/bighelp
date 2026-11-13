@@ -113,17 +113,19 @@ final class SpacePanelRetryModel {
     private(set) var state: SpacePanelRetry = .idle
     @ObservationIgnored private var running: Task<Void, Never>?
 
-    func run(_ action: @escaping @MainActor () async throws(SpacesError) -> SpaceRefreshRun) {
+    /// The action throws `SpacesError`. Its type says plain `throws`: a view can't keep a typed-throws
+    /// closure before iOS 18 (the runtime has no type for it).
+    func run(_ action: @escaping @MainActor () async throws -> SpaceRefreshRun) {
         guard running == nil else { return }
         state = .running
         running = Task { [weak self] in
             let next: SpacePanelRetry
-            do throws(SpacesError) {
+            do {
                 // A paused routine ran nothing (`.paused`): the space it came back with says so.
                 _ = try await action()
                 next = .idle
             } catch {
-                next = SpacePanelRetry.after(error)
+                next = SpacePanelRetry.after(error as? SpacesError ?? .other(code: nil))
             }
             guard let self else { return }
             self.state = next
@@ -144,7 +146,7 @@ struct SpacePanelView: View {
     /// Opens the page. Nil for a space without one, and for a preview.
     var onOpen: (() -> Void)? = nil
     /// Try again on a stopped panel: Update now on its computer. Nil hides it.
-    var runNow: (@MainActor () async throws(SpacesError) -> SpaceRefreshRun)? = nil
+    var runNow: (@MainActor () async throws -> SpaceRefreshRun)? = nil
 
     @State private var retry = SpacePanelRetryModel()
     @State private var naturalCardHeight: CGFloat = 0

@@ -356,23 +356,7 @@ struct ProjectDetailView: View {
                     .accessibilityIdentifier("project.refresh")
             }
             #endif
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    if project?.isActive == false {
-                        Button("Make current", systemImage: "checkmark.circle") {
-                            Task { _ = await context.workspaces.select(id: projectID, agentID: context.agentID) }
-                        }
-                    }
-                    if context.isNerdMode {
-                        Button("Folders and Git", systemImage: "folder.badge.gearshape") { context.onManage() }
-                    }
-                    Button("Archive project", systemImage: "archivebox", role: .destructive) { isArchiving = true }
-                } label: {
-                    Image(systemName: "ellipsis")
-                }
-                .accessibilityLabel("Project options")
-                .accessibilityIdentifier("project.options")
-            }
+            projectOptions
         }
         .bighelpRefreshable { await refresh() }
         .task(id: projectID) {
@@ -396,6 +380,35 @@ struct ProjectDetailView: View {
     private func refresh() async {
         await context.store.refresh()
         await context.store.loadChats(projectID: projectID)
+    }
+
+    /// The project's own actions. From iOS 27 they sit in the system's overflow menu, so a bar has
+    /// one "⋯" — the system's own — and the Duo's column doesn't stack two of them.
+    @ToolbarContentBuilder
+    private var projectOptions: some ToolbarContent {
+        if #available(iOS 27.0, macCatalyst 27.0, visionOS 27.0, *) {
+            ToolbarOverflowMenu { projectOptionsMenu }
+        } else {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu { projectOptionsMenu } label: { Image(systemName: "ellipsis") }
+                    .accessibilityLabel("Project options")
+                    .accessibilityIdentifier("project.options")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var projectOptionsMenu: some View {
+        let project = context.workspaces.catalog?.workspaces.first { $0.id == projectID }
+        if project?.isActive == false {
+            Button("Make current", systemImage: "checkmark.circle") {
+                Task { _ = await context.workspaces.select(id: projectID, agentID: context.agentID) }
+            }
+        }
+        if context.isNerdMode {
+            Button("Folders and Git", systemImage: "folder.badge.gearshape") { context.onManage() }
+        }
+        Button("Archive project", systemImage: "archivebox", role: .destructive) { isArchiving = true }
     }
 
     private func header(_ project: HermesWorkspaceSummary, details: ProjectsStore.Details?) -> some View {

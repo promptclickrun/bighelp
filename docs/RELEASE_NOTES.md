@@ -3,6 +3,27 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.86
+
+### New
+
+- **Three places:** the first tab shows your Bots view or your Chats view. Today and Work are the other two tabs. The round New chat button is next to them. The circle in the header opens Settings.
+- **Chats:** one list shows every chat on every computer, newest first. Pinned chats stay at the top. When bighelp shows two or more computers, chips filter the list by computer or by unread. Settings › Your computers › Show every computer controls this, and it is on until you turn it off.
+- **New chat with a To row:** pick one bot to start a chat. Pick two to six bots to start a group chat. For one bot, a row below the message box starts a coding session. Pick a project, then set where it runs, the branch, the mode and Stage.
+- **Today panels:** Today is a grid of panels. A panel shows Feed, Ideas and Goals from your bots. Tap Edit to change the order and size of each panel, or to hide it. The Needs you card shows while a question, an approval or a sign-off waits. Tap it to answer in Needs you. The Activity screen is gone.
+- **Spaces:** in a chat, a bot can draft a live panel. Tap Add to Today to make it a space. A routine on your computer keeps the space current. Tap a space to open its page. Each space has a menu with Open, Update now and Delete. Spaces need bighelp plugin 3.54.0 on your Hermes computer.
+- **Work:** one list shows what your bots do. It has coding sessions, chats and background work, workflow runs, Kanban tasks and scheduled tasks. Four doors open Projects, Tasks, Workflows and Schedules.
+
+### Changed
+
+- **One Settings:** each person now gets the same Settings. The first screen has Your bots, This app and Your computers. Help & feedback and the Advanced options switch are last. Advanced options is the new name of Nerd Mode. Its pages are the last ones on the page that they belong to.
+- **Apps, Models, Voice and computers:** Apps & skills holds everything that bots can use. Models lists your providers and the default model of each bot. Voice has Live and Take turns. Each computer has one page, and Update every computer updates them all. The Hermes tools list is gone. Each page of it now opens from the screen that it belongs to.
+- **Chat, Notifications and Device access:** these Settings pages have named groups and short rows. The second line of a row shows its value. In Device access, an info button on each row shows the full description.
+- **No modes:** the Bots, Chat and Code modes are gone, and everyone gets the same home. The app keeps your saved settings. The app reads your old mode and layout settings one time and opens on the matching place. To change it, go to Settings › Chat › Opens on. The switch in the header changes the view for this run only. The chat screen, the model control in the message box, Model settings and the Default Model page of each bot do not change.
+- **Menu and sidebar:** iPhone has no menu now. iPad has a sidebar that slides in. The Mac and Vision Pro keep the sidebar.
+- **One bot page:** each bot has one page, from every screen that shows the bot. It has the tabs Dashboard, Info, Computer, Files and Media. Name, Role and Summary change in place. A chat now has a Back button, the bot and a ⋯ menu. Tap the bot to open its page.
+- **Pages that bots make:** a page that a bot made opens only a web link that you tap. This covers a space and an app in a chat. Before, such a page could open a link of bighelp or of another app with no tap.
+
 ## 2.6.85
 
 ### New

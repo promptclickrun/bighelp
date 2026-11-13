@@ -149,12 +149,22 @@ final class DuoLayoutUITests: BighelpUITestCase {
             let window = app.windows.firstMatch.frame
             XCTAssertGreaterThan(field.frame.minY, window.midY, "The message box sits under the fold")
             XCTAssertLessThan(field.frame.minY, window.midY + 120, "Just under it")
+            // The half under the fold is a desk: the agent's state and the two usual moves, under the
+            // message box, instead of an empty slab.
+            XCTAssertTrue(element("chat.laptop.deck", in: app).waitForExistence(timeout: 5),
+                          "The half under the fold carries the desk")
+            let newChat = element("chat.laptop.new-chat", in: app)
+            XCTAssertTrue(newChat.waitForExistence(timeout: 5), "New chat is in reach under the fold")
+            XCTAssertGreaterThan(newChat.frame.minY, field.frame.maxY, "The desk sits under the message box")
+            XCTAssertLessThan(newChat.frame.maxY, window.maxY, "and on screen")
             sleep(1)
             save("laptop-chat-\(appearance)", app)
             if appearance == "light" {
                 field.tap()
                 XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
                 XCTAssertGreaterThan(field.frame.minY, window.midY, "Typing, it rests on the keyboard, still under the fold")
+                XCTAssertFalse(element("chat.laptop.new-chat", in: app).exists,
+                               "Typing, the desk gets out of the way")
                 save("laptop-typing-light", app)
             }
             app.terminate()

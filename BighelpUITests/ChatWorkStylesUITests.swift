@@ -1,6 +1,6 @@
 import XCTest
 
-/// Settings › Chat › Agent's work in a Bots chat, on the demo tool stream (two notes, each before a tool,
+/// Settings › Chat › Shows as in a Bots chat, on the demo tool stream (two notes, each before a tool,
 /// then the answer). Card and Minimal gather the running turn into one block; Full keeps every step in
 /// place. When the turn ends the work folds: above the answer, or under it for Minimal.
 final class ChatWorkStylesUITests: BighelpUITestCase {
@@ -86,16 +86,16 @@ final class ChatWorkStylesUITests: BighelpUITestCase {
             // Where reasoning shows, and whether it stays open, are everyday settings too (#943).
             let placement = app.buttons["settings.chat.reasoning-placement"].firstMatch
             XCTAssertTrue(placement.waitForExistence(timeout: 5))
-            XCTAssertTrue(placement.label.contains("As its own message"), placement.label)
+            XCTAssertTrue(placement.label.contains("Above the work"), placement.label)
             let staysOpen = app.switches["settings.chat.reasoning-stays-open"].firstMatch
             XCTAssertTrue(staysOpen.exists)
-            XCTAssertEqual(staysOpen.value as? String, "1", "Keep reasoning open is on by default")
+            XCTAssertEqual(staysOpen.value as? String, "1", "Keep thinking open is on by default")
             save("work-style-picker-\(appearance)", app)
             picker.tap()
-            let minimal = app.buttons["Minimal"].firstMatch
+            let minimal = app.buttons["One line"].firstMatch
             XCTAssertTrue(minimal.waitForExistence(timeout: 5))
             minimal.tap()
-            XCTAssertTrue(picker.label.contains("Minimal"), picker.label)
+            XCTAssertTrue(picker.label.contains("One line"), picker.label)
             app.terminate()
         }
     }

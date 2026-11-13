@@ -128,20 +128,14 @@ extension SettingsView {
     }
 
     var workspace: some View {
-        Section("Chat list") {
+        Section("Advanced · Chat list") {
             Toggle(isOn: $settings.organizeChatsByProjects) {
-                settingLabel(
-                    String(localized: "Organize chats by project"),
-                    detail: String(localized: "Group chats by their Hermes project.")
-                )
+                settingTitle(String(localized: "Group by project"))
             }
             .accessibilityIdentifier("settings.organize-chats-by-projects")
 
             Toggle(isOn: $settings.showCronSessions) {
-                settingLabel(
-                    String(localized: "Show scheduled runs"),
-                    detail: String(localized: "Include scheduled task runs in Chats.")
-                )
+                settingTitle(String(localized: "Scheduled runs"))
             }
             .accessibilityIdentifier("settings.show-cron-sessions")
         }
@@ -200,7 +194,7 @@ extension SettingsView {
             .frame(minHeight: BighelpTokens.hitTarget)
             .accessibilityIdentifier("settings.right-edge-swipe")
         } header: {
-            Text("Edge Gestures")
+            Text("Advanced · Edge swipes")
         } footer: {
             Text("Start right at the edge of the screen.")
                 .bighelpFont(.metadata)
@@ -209,8 +203,9 @@ extension SettingsView {
         #endif
     }
 
-    /// Where bighelp opens when it starts, and with which agent (`BighelpLanding`).
-    private var landing: some View {
+    /// Where bighelp opens when it starts and with which bot (`BighelpLanding`), and what a tap
+    /// on a bot opens. Each row's second line is its value: the choices' own names say what they do.
+    private var opening: some View {
         let screen = settings.landingScreen ?? .lastChat
         let startAgentID = settings.startAgentID(scope: landingScope).flatMap { id in
             agents.contains { $0.id == id } ? id : nil
@@ -221,26 +216,33 @@ extension SettingsView {
                     Text(choice.title).tag(choice)
                 }
             } label: {
-                settingLabel(String(localized: "Open on"), detail: screen.detail)
+                settingTitle(String(localized: "Opens on"))
             }
             .accessibilityIdentifier("settings.landing.screen")
 
             if screen.offersStartAgent, let scope = landingScope, !agents.isEmpty {
                 Picker(selection: Binding(get: { startAgentID },
                                           set: { settings.setStartAgentID($0, scope: scope) })) {
-                    Text("Automatic").tag(String?.none)
+                    Text("Last bot used").tag(String?.none)
                     ForEach(agents) { agent in
                         Text(agent.name).tag(Optional(agent.id))
                     }
                 } label: {
-                    settingLabel(String(localized: "Start with"), detail: startAgentID == nil
-                                 ? String(localized: "The agent you used last.")
-                                 : String(localized: "On this computer."))
+                    settingTitle(String(localized: "Start with"))
                 }
                 .accessibilityIdentifier("settings.landing.agent")
             }
+
+            Picker(selection: $settings.botChatExperience) {
+                ForEach(BotChatExperience.allCases) { choice in
+                    Text(choice.title).tag(choice)
+                }
+            } label: {
+                settingTitle(String(localized: "A bot opens"))
+            }
+            .accessibilityIdentifier("settings.chat.bot-chat-experience")
         } header: {
-            Text("When bighelp opens")
+            Text("Opening")
         } footer: {
             Text("Links, widgets and notifications still open what they point to.")
                 .bighelpFont(.metadata)
@@ -248,75 +250,55 @@ extension SettingsView {
         .listRowBackground(theme.surface)
     }
 
-    private var chatBasics: some View {
-        Section {
-            Picker(selection: $settings.botChatExperience) {
-                ForEach(BotChatExperience.allCases) { choice in
-                    Text(choice.title).tag(choice)
-                }
-            } label: {
-                settingLabel(String(localized: "Bot chat experience"), detail: settings.botChatExperience.detail)
-            }
-            .accessibilityIdentifier("settings.chat.bot-chat-experience")
-
+    /// How a one-to-one chat shows what its bot does while it works.
+    private var botWork: some View {
+        Section("A bot's work") {
             Picker(selection: $settings.chatWorkStyle) {
                 ForEach(ChatWorkStyle.allCases) { style in
                     Text(style.title).tag(style)
                 }
             } label: {
-                settingLabel(String(localized: "Agent's work"), detail: settings.chatWorkStyle.detail)
+                settingTitle(String(localized: "Shows as"))
             }
             .accessibilityIdentifier("settings.chat.work-style")
 
-            ChatReasoningSettingRows(placementLabel: { placement in
-                settingLabel(String(localized: "Reasoning shows"), detail: placement.detail)
-            }, staysOpenLabel: {
-                settingLabel(String(localized: "Keep reasoning open"),
-                             detail: String(localized: "Show its words without a tap."))
-            })
+            ChatReasoningSettingRows {
+                settingTitle(String(localized: "Thinking"))
+            } staysOpenLabel: {
+                settingTitle(String(localized: "Keep thinking open"))
+            }
+
+            #if !targetEnvironment(macCatalyst) // The island is an iPhone's.
+            Toggle(isOn: $settings.agentIslandEnabled) {
+                settingTitle(String(localized: "Dynamic Island"))
+            }
+            .accessibilityIdentifier("settings.chat.agent-island")
+            #endif
+        }
+        .listRowBackground(theme.surface)
+    }
+
+    private var inChat: some View {
+        Section("In a chat") {
+            SessionTitleToggle {
+                settingTitle(String(localized: "Chat title"))
+            }
+            .accessibilityIdentifier("settings.chat.session-title")
+
+            Toggle(isOn: $settings.reactionsReachAgent) {
+                settingTitle(String(localized: "Bots see reactions"))
+            }
+            .accessibilityIdentifier("settings.chat.reactions-reach-agent")
 
             #if !targetEnvironment(macCatalyst) // A Mac has no haptics.
             Toggle(isOn: $settings.responseHapticsEnabled) {
-                settingLabel(
-                    String(localized: "Response haptics"),
-                    detail: String(localized: "A light tap as replies arrive.")
-                )
+                settingTitle(String(localized: "Haptics"))
             }
             .accessibilityIdentifier("settings.chat.response-haptics")
             #endif
 
-            Toggle(isOn: $settings.reactionsReachAgent) {
-                settingLabel(
-                    String(localized: "Agents see your reactions"),
-                    detail: String(localized: "Your agent sees them the next time you message it.")
-                )
-            }
-            .accessibilityIdentifier("settings.chat.reactions-reach-agent")
-
-            #if !targetEnvironment(macCatalyst) // The island is an iPhone's.
-            Toggle(isOn: $settings.agentIslandEnabled) {
-                settingLabel(
-                    String(localized: "Agent in the Dynamic Island"),
-                    detail: String(localized: "Watch your agent work at the top of the screen.")
-                )
-            }
-            .accessibilityIdentifier("settings.chat.agent-island")
-            #endif
-
-            SessionTitleToggle {
-                settingLabel(String(localized: "Session title"),
-                             detail: String(localized: "Show the chat's title under the agent's name."))
-            }
-            .accessibilityIdentifier("settings.chat.session-title")
-
-            ChatProjectToggle {
-                settingLabel(String(localized: "Projects in the chat list"),
-                             detail: String(localized: "Show which project each chat is in."))
-            }
-            .accessibilityIdentifier("settings.chat.chat-projects")
-
             ReturnSendsToggle {
-                settingLabel(String(localized: "Return sends"), detail: Self.returnSendsDetail)
+                settingLabel(String(localized: "Return sends"), detail: Self.returnSendsHint)
             }
             .accessibilityIdentifier("settings.chat.return-sends")
             .driveTarget("settings.chat.return-sends")
@@ -324,25 +306,40 @@ extension SettingsView {
         .listRowBackground(theme.surface)
     }
 
-    private static var returnSendsDetail: String {
+    /// The on-screen keyboard's Return always adds a line, so an iPhone or iPad says which
+    /// keyboard the switch is for. A Mac always has one.
+    private static var returnSendsHint: String {
         #if targetEnvironment(macCatalyst)
-        String(localized: "Shift-Return adds a line; Command-Return lets you pick how to send while your agent works.")
+        String(localized: "Shift-Return adds a line")
         #else
-        String(localized: "With a keyboard attached. Shift-Return adds a line; Command-Return lets you pick how to send while your agent works.")
+        String(localized: "With a keyboard attached")
         #endif
     }
 
-    /// Settings › Chat. Nerd Mode adds what chats show and how the chat list and
-    /// edge swipes behave; everyday toggles stay first.
+    private var chatList: some View {
+        Section("Chat list") {
+            ChatProjectToggle {
+                settingTitle(String(localized: "Project names"))
+            }
+            .accessibilityIdentifier("settings.chat.chat-projects")
+        }
+        .listRowBackground(theme.surface)
+    }
+
+    /// Settings › Chat: four named groups, then Nerd Mode's Advanced groups (what chats show,
+    /// sending, edge swipes and the chat list). Everyday controls are never only in those.
     var chatPage: some View {
         Form {
-            BighelpDeferredSection { landing }
-            BighelpDeferredSection { chatBasics }
+            BighelpDeferredSection { opening }
+            BighelpDeferredSection { botWork }
+            BighelpDeferredSection { inChat }
+            BighelpDeferredSection { chatList }
             if settings.nerdModeEnabled {
                 BighelpDeferredSection { chatDetailDefaults }
                 BighelpDeferredSection { advancedChat }
-                BighelpDeferredSection { workspace }
+                BighelpDeferredSection { sendingAndLinks }
                 BighelpDeferredSection { edgeGestures }
+                BighelpDeferredSection { workspace }
             }
         }
         .bighelpFormSurface()
@@ -354,100 +351,102 @@ extension SettingsView {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    /// How much of an agent's work chats show. Technical, so it appears
-    /// with Nerd Mode's Advanced section rather than the basics.
+    /// How much of a bot's work chats show. Technical, so it appears with Nerd Mode's
+    /// Advanced groups rather than the basics. A chat's own ••• menu overrides these for itself,
+    /// which is why they have a group of their own: the footer is true for all three.
     var chatDetailDefaults: some View {
         Section {
             Toggle(isOn: $settings.foldCompletedTurns) {
                 settingLabel(
                     String(localized: "Fold finished turns"),
-                    detail: String(localized: "Tuck finished work away; answers stay.")
+                    detail: String(localized: "Answers stay open")
                 )
             }
             .accessibilityIdentifier("settings.chat.fold-completed-turns")
 
             Toggle(isOn: $settings.showReasoningByDefault) {
-                settingLabel(
-                    String(localized: "Show reasoning"),
-                    detail: String(localized: "Thinking and notes between steps.")
-                )
+                settingTitle(String(localized: "Show thinking"))
             }
             .accessibilityIdentifier("settings.chat.show-reasoning")
 
             Toggle(isOn: $settings.showToolCallsByDefault) {
-                settingLabel(
-                    String(localized: "Show tool calls"),
-                    detail: String(localized: "Show the work trail.")
-                )
+                settingTitle(String(localized: "Show tool calls"))
             }
             .accessibilityIdentifier("settings.chat.show-tool-calls")
         } header: {
-            Text("Chat details")
+            Text("Advanced · A bot's work")
         } footer: {
-            Text("Every chat shows these unless you change it in that chat's ••• menu.")
+            Text("A chat can change these in its ••• menu.")
                 .bighelpFont(.metadata)
         }
         .listRowBackground(theme.surface)
     }
 
     var advancedChat: some View {
-        Group {
-            Section {
-
-                Toggle(isOn: $settings.autoSuggestionsEnabled) {
-                    settingLabel(
-                        String(localized: "Auto suggestions"),
-                        detail: String(localized: "Show prompts that help begin a conversation.")
-                    )
-                }
-
-                Toggle(isOn: $settings.messageActionsEnabled) {
-                    settingLabel(
-                        String(localized: "Message actions"),
-                        detail: String(localized: "Keep actions available alongside messages.")
-                    )
-                }
-
-                Toggle(isOn: $settings.inlineUIEnabled) {
-                    settingLabel(
-                        String(localized: "Inline UI"),
-                        detail: String(localized: "Show supported weather, task, budget, and approval cards.")
-                    )
-                }
-
-                Toggle(isOn: $settings.showProjectChanges) {
-                    settingLabel(
-                        String(localized: "Project changes"),
-                        detail: String(localized: "Show file additions and deletions for a chat’s Hermes Project.")
-                    )
-                }
-                .accessibilityIdentifier("settings.chat.show-project-changes")
-
-                let availableBrowsers = ChatBrowserPreference.available(canOpenURL: UIApplication.shared.canOpenURL)
-                Picker("Open links in", selection: Binding(
-                    get: { availableBrowsers.contains(settings.preferredBrowser) ? settings.preferredBrowser : .systemDefault },
-                    set: { settings.preferredBrowser = $0 }
-                )) {
-                    ForEach(availableBrowsers) { browser in
-                        Label(browser.title, systemImage: browser.systemImage).tag(browser)
-                    }
-                }
-                .accessibilityIdentifier("settings.chat.browser")
-
-                Picker("While an agent is working", selection: $settings.midSessionChatBehavior) {
-                    ForEach(MidSessionChatBehavior.allCases) { behavior in
-                        Text(behavior.title).tag(behavior)
-                    }
-                }
-                .accessibilityIdentifier("settings.chat.mid-session-behavior")
-            } header: {
-                Text("More chat options")
-            } footer: {
-                Text("Hold Send while an agent works to choose for just that message.")
-                    .bighelpFont(.metadata)
+        Section("Advanced · In a chat") {
+            Toggle(isOn: $settings.autoSuggestionsEnabled) {
+                settingLabel(
+                    String(localized: "Suggestions"),
+                    detail: String(localized: "Prompts to start a chat")
+                )
             }
-            .listRowBackground(theme.surface)
+
+            Toggle(isOn: $settings.messageActionsEnabled) {
+                settingLabel(
+                    String(localized: "Message actions"),
+                    detail: String(localized: "Actions beside each message")
+                )
+            }
+
+            Toggle(isOn: $settings.inlineUIEnabled) {
+                settingLabel(
+                    String(localized: "Cards"),
+                    detail: String(localized: "Weather, tasks, budgets and approvals")
+                )
+            }
+
+            Toggle(isOn: $settings.showProjectChanges) {
+                settingLabel(
+                    String(localized: "Project changes"),
+                    detail: String(localized: "Lines added and removed")
+                )
+            }
+            .accessibilityIdentifier("settings.chat.show-project-changes")
         }
+        .listRowBackground(theme.surface)
+    }
+
+    /// What Send does while a bot works, and where a web link opens.
+    var sendingAndLinks: some View {
+        Section {
+            Picker(selection: $settings.midSessionChatBehavior) {
+                ForEach(MidSessionChatBehavior.allCases) { behavior in
+                    Text(behavior.title).tag(behavior)
+                }
+            } label: {
+                settingTitle(String(localized: "While a bot works"))
+            }
+            .accessibilityIdentifier("settings.chat.mid-session-behavior")
+
+            let availableBrowsers = ChatBrowserPreference.available(canOpenURL: UIApplication.shared.canOpenURL)
+            Picker(selection: Binding(
+                get: { availableBrowsers.contains(settings.preferredBrowser) ? settings.preferredBrowser : .systemDefault },
+                set: { settings.preferredBrowser = $0 }
+            )) {
+                ForEach(availableBrowsers) { browser in
+                    Label(browser.title, systemImage: browser.systemImage).tag(browser)
+                }
+            } label: {
+                settingTitle(String(localized: "Open links in"))
+            }
+            .accessibilityIdentifier("settings.chat.browser")
+        } header: {
+            Text("Advanced · Sending and links")
+        } footer: {
+            Text("Hold Send while a bot works to choose for one message.")
+                .bighelpFont(.metadata)
+        }
+        .listRowBackground(theme.surface)
     }
 }
 
@@ -462,12 +461,12 @@ private struct SessionTitleToggle<Label: View>: View {
     }
 }
 
-/// Settings › Chat: where a chat shows its agent's reasoning, and whether its words stay in
+/// Settings › Chat: where a chat shows its bot's thinking, and whether its words stay in
 /// view (#943). Saved on this device only (`@AppStorage`); chats read both directly.
 private struct ChatReasoningSettingRows<PlacementLabel: View, StaysOpenLabel: View>: View {
     @AppStorage(ChatReasoningPlacement.storageKey) private var placement = ChatReasoningPlacement.defaultPlacement
     @AppStorage(ChatReasoningPlacement.staysOpenKey) private var staysOpen = ChatReasoningPlacement.staysOpenByDefault
-    @ViewBuilder let placementLabel: (ChatReasoningPlacement) -> PlacementLabel
+    @ViewBuilder let placementLabel: PlacementLabel
     @ViewBuilder let staysOpenLabel: StaysOpenLabel
 
     var body: some View {
@@ -476,7 +475,7 @@ private struct ChatReasoningSettingRows<PlacementLabel: View, StaysOpenLabel: Vi
                 Text(choice.title).tag(choice)
             }
         } label: {
-            placementLabel(placement)
+            placementLabel
         }
         .accessibilityIdentifier("settings.chat.reasoning-placement")
 

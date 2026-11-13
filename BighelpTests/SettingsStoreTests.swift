@@ -18,7 +18,7 @@ struct SettingsStoreTests {
         #expect(SettingsStore(defaults: defaults).systemManagesAllGateways)
     }
 
-    /// Agent's work starts on Card with reasoning shown; anyone who turned on an old Expand switch
+    /// Shows as starts on Card with reasoning shown; anyone who turned on an old Expand switch
     /// asked to see everything, which is Full.
     @Test func agentWorkStyleDefaultsToCardAndAnOldExpandChoiceBecomesFull() {
         let suiteName = #function

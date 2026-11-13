@@ -34,11 +34,11 @@ enum PermissionKind: String, CaseIterable, Identifiable, Sendable {
     var purpose: String {
         switch self {
         case .notification:
-            String(localized: "Receive proactive updates from your paired Hermes host.")
+            String(localized: "Receive proactive updates from your Hermes computer.")
         case .camera:
             String(localized: "Scan pairing codes, use Reflective Vision, and attach photos you choose to chats.")
         case .microphone:
-            String(localized: "Speak during a live voice conversation with your selected Hermes agent.")
+            String(localized: "Speak during a live voice conversation with your selected Hermes bot.")
         case .speech:
             String(localized: "Turn speech into words for live voice conversations.")
         }

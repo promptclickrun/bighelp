@@ -67,6 +67,9 @@ struct BighelpNotificationSettingsView: View {
     @State private var turnOffFailed = false
     @State private var turnOffFailure: BighelpNotificationSetupFailure?
     @State private var lastFailure: BighelpNotificationLastFailure?
+    // Read from storage, as the voice screens do: environment values set at the root don't always
+    // reach pushed Settings pages.
+    @AppStorage("loopdy.settings.nerd-mode") private var nerdModeEnabled = false
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
 
@@ -107,46 +110,22 @@ struct BighelpNotificationSettingsView: View {
     var body: some View {
         Form {
             notificationEnrollmentSection
-            notificationAuthorizationSection
-            #if !os(visionOS) && !targetEnvironment(macCatalyst)
-            liveActivitiesSection // Vision Pro and the Mac have no Live Activities.
-            #endif
-            if let sendTest {
-                Section("Test") {
-                    Button(isTesting ? "Sending Test…" : "Send Test Notification") {
-                        Task {
-                            guard isCurrent(), !isTesting else { return }
-                            let token = operationToken
-                            isTesting = true
-                            defer { if token == operationToken { isTesting = false } }
-                            do {
-                                let receipt = try await sendTest()
-                                guard isCurrent(), token == operationToken else { return }
-                                testMessage = receipt.state == .accepted
-                                    ? String(localized: "Test sent. Check your notifications.")
-                                    : String(localized: "Test failed. Try again.")
-                            } catch {
-                                guard isCurrent(), token == operationToken else { return }
-                                testMessage = String(localized: "Couldn't confirm the test. Check your notifications before retrying.")
-                            }
-                        }
-                    }
-                    .disabled(isTesting || !isCurrent())
-                    .accessibilityIdentifier("settings.notifications.send-test")
-                    if let testMessage { Text(testMessage).font(.bighelp(.footnote)) }
-                }
-            }
+            thisDeviceSection
             topicsSection
             BighelpChannelAlertsSection(loadChannels: channelAlertsSync.channels, apply: channelAlertsSync.apply)
             BighelpWorkflowAlertsSection(apply: { await hostRegistry?.notificationSetup?.applyAlertPreferences() })
             quietHoursSection
-            turnOffSection
-            Section("Advanced") {
-                DisclosureGroup("Provider details") {
-                    providerSection
+            // A setup problem is not advanced: its code and time show without Nerd Mode too.
+            if nerdModeEnabled || lastFailure != nil {
+                Section("Advanced") {
+                    DisclosureGroup("Provider details") {
+                        providerSection
+                    }
+                    .accessibilityIdentifier("settings.notifications.details")
                 }
-                .accessibilityIdentifier("settings.notifications.details")
+                .listRowBackground(theme.surface)
             }
+            turnOffSection
         }
         .bighelpFormSurface()
         .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
@@ -156,7 +135,7 @@ struct BighelpNotificationSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("settings.notifications")
         .confirmationDialog("Turn off notifications?", isPresented: $isConfirmingTurnOff, titleVisibility: .visible) {
-            Button("Turn Off Notifications", role: .destructive) {
+            Button("Turn off notifications", role: .destructive) {
                 Task { await runTurnOff() }
             }
             .accessibilityIdentifier("settings.notifications.turn-off.confirm")
@@ -231,7 +210,7 @@ struct BighelpNotificationSettingsView: View {
                     Button(role: .destructive) {
                         isConfirmingTurnOff = true
                     } label: {
-                        Text("Turn Off Notifications")
+                        Text("Turn off notifications")
                             .frame(minHeight: BighelpTokens.hitTarget)
                     }
                     // Every host and this device, so it doesn't wait on the
@@ -250,7 +229,9 @@ struct BighelpNotificationSettingsView: View {
                 }
             } footer: {
                 if turnOffStep == nil, turnOffMessage == nil || turnOffFailed {
-                    Text("Deletes this device's notification data everywhere, as if you never turned notifications on.")
+                    Text("Deletes this device's notification data everywhere.")
+                        .bighelpFont(.metadata)
+                        .foregroundStyle(theme.secondaryText)
                 }
             }
             .listRowBackground(theme.surface)
@@ -315,24 +296,66 @@ struct BighelpNotificationSettingsView: View {
         await reloadAll()
     }
 
-    private var notificationAuthorizationSection: some View {
-        Section(Self.systemNotificationsTitle) {
+    /// The system's permission, Live Activities and the card, the way into system settings, and the test.
+    private var thisDeviceSection: some View {
+        Section {
             PermissionRow(center: permissionCenter, kind: .notification)
-            if permissionCenter.status(for: .notification).authorization != .notDetermined {
-                Button("Open Notification Settings") {
+            #if !os(visionOS) && !targetEnvironment(macCatalyst)
+            // Vision Pro and the Mac have no Live Activities.
+            liveActivitiesRows
+            #endif
+            if Self.hasLiveActivities || permissionCenter.status(for: .notification).authorization != .notDetermined {
+                Button(Self.openSystemSettingsTitle) {
                     openAppSettings()
                 }
                 .accessibilityIdentifier("settings.notifications.open-system-settings")
+            }
+            if let sendTest {
+                Button(isTesting ? "Sending a test…" : "Send a test") {
+                    Task {
+                        guard isCurrent(), !isTesting else { return }
+                        let token = operationToken
+                        isTesting = true
+                        defer { if token == operationToken { isTesting = false } }
+                        do {
+                            let receipt = try await sendTest()
+                            guard isCurrent(), token == operationToken else { return }
+                            testMessage = receipt.state == .accepted
+                                ? String(localized: "Test sent. Check your notifications.")
+                                : String(localized: "Test failed. Try again.")
+                        } catch {
+                            guard isCurrent(), token == operationToken else { return }
+                            testMessage = String(localized: "Couldn't confirm the test. Check your notifications before retrying.")
+                        }
+                    }
+                }
+                .disabled(isTesting || !isCurrent())
+                .accessibilityIdentifier("settings.notifications.send-test")
+                if let testMessage { Text(testMessage).font(.bighelp(.footnote)) }
+            }
+        } header: {
+            Text("This device")
+        } footer: {
+            if Self.hasLiveActivities {
+                Text(cardDetailNote)
             }
         }
         .listRowBackground(theme.surface)
     }
 
-    private static var systemNotificationsTitle: String {
-        #if targetEnvironment(macCatalyst)
-        String(localized: "Mac notifications")
+    private static var hasLiveActivities: Bool {
+        #if !os(visionOS) && !targetEnvironment(macCatalyst)
+        true
         #else
-        String(localized: "iOS notifications")
+        false
+        #endif
+    }
+
+    private static var openSystemSettingsTitle: LocalizedStringKey {
+        #if targetEnvironment(macCatalyst)
+        "Open System Settings"
+        #else
+        "Open iOS Settings"
         #endif
     }
 
@@ -346,51 +369,41 @@ struct BighelpNotificationSettingsView: View {
 
     private var cardDetailNote: String {
         switch cardDetail {
-        case .statusOnly: "The card shows each chat's status, as before."
-        case .steps: "The card shows the step in progress, the last steps and a timer."
-        case .stepsAndText: "The card also shows what a step works on, a question that waits and the first lines of the answer. They are encrypted from your computer to this device."
+        case .statusOnly: String(localized: "The card shows each chat's status, as before.")
+        case .steps: String(localized: "The card shows the step in progress, the last steps and a timer.")
+        case .stepsAndText: String(localized: "The card also shows a step's work, a waiting question and the answer's first lines, encrypted from your computer to this device.")
         }
     }
 
-    private var liveActivitiesSection: some View {
-        Section("Live Activities") {
-            HStack(alignment: .top, spacing: BighelpTokens.space12) {
-                Image(systemName: "bolt.horizontal.circle")
-                    .foregroundStyle(liveActivitiesEnabled ? theme.success : theme.secondaryText)
-                    .frame(width: 28, height: 28)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                    Text("Live Activities")
-                        .bighelpFont(.body, weight: .semibold)
-                        .foregroundStyle(theme.primaryText)
-                    Text(liveActivitiesEnabled ? "Allowed by iOS" : "Off in iOS Settings")
-                        .bighelpFont(.metadata)
-                        .foregroundStyle(theme.secondaryText)
-                }
-                Spacer(minLength: BighelpTokens.space8)
+    @ViewBuilder
+    private var liveActivitiesRows: some View {
+        HStack(alignment: .top, spacing: BighelpTokens.space12) {
+            Image(systemName: "bolt.horizontal.circle")
+                .foregroundStyle(liveActivitiesEnabled ? theme.success : theme.secondaryText)
+                .frame(width: 28, height: 28)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                Text("Live Activities")
+                    .bighelpFont(.body, weight: .semibold)
+                    .foregroundStyle(theme.primaryText)
+                Text(liveActivitiesEnabled ? "Allowed by iOS" : "Off in iOS Settings")
+                    .bighelpFont(.metadata)
+                    .foregroundStyle(theme.secondaryText)
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Live Activities")
-            .accessibilityValue(liveActivitiesEnabled ? "Allowed by iOS" : "Off in iOS Settings")
-            .accessibilityIdentifier("settings.notifications.live-activities-status")
-
-            Button("Open Live Activities Settings") {
-                openAppSettings()
-            }
-            .accessibilityIdentifier("settings.notifications.live-activities-settings")
-
-            // What the card shows where others can see the phone. The computer seals the detail for
-            // this phone whatever the choice (BighelpActivityDetail).
-            Picker("On the card", selection: $cardDetail) {
-                ForEach(BighelpActivityDetailLevel.allCases, id: \.self) { Text($0.title).tag($0) }
-            }
-            .onChange(of: cardDetail) { _, level in BighelpActivityDetailLevel.current = level }
-            .accessibilityIdentifier("settings.notifications.live-activities-detail")
-            Text(cardDetailNote)
-                .bighelpFont(.metadata)
-                .foregroundStyle(theme.secondaryText)
+            Spacer(minLength: BighelpTokens.space8)
         }
-        .listRowBackground(theme.surface)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Live Activities")
+        .accessibilityValue(liveActivitiesEnabled ? "Allowed by iOS" : "Off in iOS Settings")
+        .accessibilityIdentifier("settings.notifications.live-activities-status")
+
+        // What the card shows where others can see the phone. The computer seals the detail for
+        // this phone whatever the choice (BighelpActivityDetail). Its note is the section's footer.
+        Picker("On the card", selection: $cardDetail) {
+            ForEach(BighelpActivityDetailLevel.allCases, id: \.self) { Text($0.title).tag($0) }
+        }
+        .onChange(of: cardDetail) { _, level in BighelpActivityDetailLevel.current = level }
+        .accessibilityIdentifier("settings.notifications.live-activities-detail")
     }
 
     private var providerSection: some View {
@@ -442,7 +455,7 @@ struct BighelpNotificationSettingsView: View {
 
     private var topicsSection: some View {
         Section {
-            ForEach(BighelpBuzzKitTopic.allCases, id: \.rawValue) { topic in
+            ForEach(Self.topicOrder, id: \.rawValue) { topic in
                 if topic == .scheduledTasksAndDeliveries, let preference = preference(for: topic) {
                     // One push topic, two switches: each a choice the computer applies.
                     kindToggle(.scheduledTasks, topic: preference)
@@ -452,14 +465,14 @@ struct BighelpNotificationSettingsView: View {
                         get: { self.preference(for: topic)?.enabled ?? false },
                         set: { enabled in set(topic, enabled: enabled) }
                     )) {
-                        topicLabel(preference: preference, topic: topic)
+                        topicLabel(topic)
                     }
                     .disabled(isLoading || savingTopicID != nil || !isCurrent())
                     .accessibilityValue(preference.enabled ? "On" : "Off")
                     .accessibilityIdentifier("settings.notifications.topic.\(topic.rawValue)")
                 } else {
                     HStack(alignment: .top, spacing: BighelpTokens.space12) {
-                        topicLabel(preference: nil, topic: topic)
+                        topicLabel(topic)
                         Spacer(minLength: BighelpTokens.space8)
                         Text(hasLoadedPreferences ? "Unavailable" : "Not loaded")
                             .bighelpFont(.metadata)
@@ -472,10 +485,10 @@ struct BighelpNotificationSettingsView: View {
 
             Toggle(isOn: $peerChatAlerts) {
                 VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                    Text("Agents messaging each other")
+                    Text("Bots messaging each other")
                         .bighelpFont(.body)
                         .foregroundStyle(theme.primaryText)
-                    Text("For example, an agent's answer to work another agent gave it. The alert shows the agent that wrote it. Questions and approvals still notify you.")
+                    Text("When one bot answers another")
                         .bighelpFont(.metadata)
                         .foregroundStyle(theme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -526,14 +539,19 @@ struct BighelpNotificationSettingsView: View {
             .disabled(isLoading || savingTopicID != nil || !runtime.mayLoadPreferences || !isCurrent())
             .accessibilityIdentifier("settings.notifications.reload-topics")
         } header: {
-            Text("Notify Me About")
+            Text("Notify me about")
         } footer: {
-            Text("Scheduled tasks, Deliveries and Group chats need bighelp plugin 3.49.0 or later on your computer. Before that, the first two switch together.")
+            Text("Questions and approvals follow their own switch.")
                 .bighelpFont(.metadata)
                 .foregroundStyle(theme.secondaryText)
         }
         .listRowBackground(theme.surface)
     }
+
+    /// The order people read the topics in; the service's own order (`allCases`) still checks its answers.
+    private static let topicOrder: [BighelpBuzzKitTopic] = [
+        .chatRepliesAndCompletions, .questionsAndApprovals, .scheduledTasksAndDeliveries, .subagentCompletions,
+    ]
 
     /// Scheduled tasks or Deliveries: on while the push topic they share is on and this switch is.
     private func kindToggle(_ kind: BighelpAlertKinds.Kind, topic: BighelpBuzzKitPreference) -> some View {
@@ -552,19 +570,18 @@ struct BighelpNotificationSettingsView: View {
         case .deliveries: String(localized: "Deliveries")
         case .groupChats: String(localized: "Group chats")
         }
-        let detail = switch kind {
-        case .scheduledTasks: String(localized: "When a scheduled task finishes or has a problem.")
-        case .deliveries: String(localized: "When an agent sends you a notification on its own, not as a reply.")
-        case .groupChats: String(localized: "Replies in group chats. Questions and approvals still notify you.")
-        }
+        // Only Deliveries needs a hint: its name alone doesn't say it isn't a reply.
+        let detail: String? = kind == .deliveries ? String(localized: "Alerts a bot sends by itself") : nil
         return VStack(alignment: .leading, spacing: BighelpTokens.space4) {
             Text(title)
                 .bighelpFont(.body)
                 .foregroundStyle(theme.primaryText)
-            Text(detail)
-                .bighelpFont(.metadata)
-                .foregroundStyle(theme.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
+            if let detail {
+                Text(detail)
+                    .bighelpFont(.metadata)
+                    .foregroundStyle(theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if isSaving {
                 Text("Saving…")
                     .bighelpFont(.metadata, weight: .semibold)
@@ -597,16 +614,9 @@ struct BighelpNotificationSettingsView: View {
     private var quietHoursSection: some View {
         Section {
             Toggle(isOn: $quietHours.enabled) {
-                VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                    Text("Quiet Hours")
-                        .bighelpFont(.body)
-                        .foregroundStyle(theme.primaryText)
-                    Text("No notifications at night or any time you pick.")
-                        .bighelpFont(.metadata)
-                        .foregroundStyle(theme.secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.vertical, BighelpTokens.space4)
+                Text("Quiet hours")
+                    .bighelpFont(.body)
+                    .foregroundStyle(theme.primaryText)
             }
             .accessibilityValue(quietHours.enabled ? "On" : "Off")
             .accessibilityIdentifier("settings.notifications.quiet-hours")
@@ -628,25 +638,21 @@ struct BighelpNotificationSettingsView: View {
                         .accessibilityIdentifier("settings.notifications.quiet-hours.note")
                 }
             }
+        } header: {
+            Text("Quiet hours")
         } footer: {
-            Text(quietHoursFooter)
+            // From and To already show the hours, so the footer doesn't repeat them.
+            if quietHours.enabled, quietHours.isEmpty {
+                Text("Pick a different start and end time.")
+                    .bighelpFont(.metadata)
+                    .foregroundStyle(theme.secondaryText)
+            } else {
+                Text("Replies still wait in the chat.")
+                    .bighelpFont(.metadata)
+                    .foregroundStyle(theme.secondaryText)
+            }
         }
         .listRowBackground(theme.surface)
-    }
-
-    private var quietHoursFooter: String {
-        guard quietHours.enabled else {
-            return String(localized: "Your computers send this device no notifications in these hours. Replies still wait in the chat.")
-        }
-        guard !quietHours.isEmpty else { return String(localized: "Pick a different start and end time.") }
-        let start = Self.clock(quietHours.startMinute), end = Self.clock(quietHours.endMinute)
-        return quietHours.crossesMidnight
-            ? String(localized: "From \(start) to \(end) the next day, your computers send this device no notifications. Replies still wait in the chat.")
-            : String(localized: "From \(start) to \(end), your computers send this device no notifications. Replies still wait in the chat.")
-    }
-
-    private static func clock(_ minute: Int) -> String {
-        Self.date(minute).formatted(date: .omitted, time: .shortened)
     }
 
     private static func date(_ minute: Int) -> Date {
@@ -673,21 +679,11 @@ struct BighelpNotificationSettingsView: View {
         quietHoursNote = result.note
     }
 
-    /// The notification service names its topics in English. In another language the app's own
-    /// words for the same topic show instead; in English the service's name still wins.
-    private func topicName(_ preference: BighelpBuzzKitPreference?, _ topic: BighelpBuzzKitTopic) -> String {
-        guard let name = preference?.name, Bundle.main.preferredLocalizations.first == "en" else {
-            return topic.fallbackName
-        }
-        return name
-    }
-
-    private func topicLabel(
-        preference: BighelpBuzzKitPreference?,
-        topic: BighelpBuzzKitTopic
-    ) -> some View {
+    /// The notification service names its topics in its own English; every language, English too,
+    /// shows the app's words for the same topic instead.
+    private func topicLabel(_ topic: BighelpBuzzKitTopic) -> some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-            Text(topicName(preference, topic))
+            Text(topic.displayName)
                 .bighelpFont(.body)
                 .foregroundStyle(theme.primaryText)
 
@@ -961,12 +957,13 @@ private enum BighelpNotificationSettingsError: Error {
 }
 
 private extension BighelpBuzzKitTopic {
-    var fallbackName: String {
+    var displayName: String {
         switch self {
-        case .chatRepliesAndCompletions: String(localized: "Chat replies and completions")
+        case .chatRepliesAndCompletions: String(localized: "Replies")
+        // Shows only while the topic isn't loaded; once it is, Scheduled tasks and Deliveries take its place.
         case .scheduledTasksAndDeliveries: String(localized: "Scheduled tasks and deliveries")
-        case .questionsAndApprovals: String(localized: "Questions and Approvals")
-        case .subagentCompletions: String(localized: "Subagent Completions")
+        case .questionsAndApprovals: String(localized: "Questions and approvals")
+        case .subagentCompletions: String(localized: "Helper results")
         }
     }
 
@@ -1243,10 +1240,12 @@ struct BighelpChannelAlertsSection: View {
                             Text(option.title)
                                 .bighelpFont(.body)
                                 .foregroundStyle(theme.primaryText)
-                            Text(detail(option))
-                                .bighelpFont(.metadata)
-                                .foregroundStyle(theme.secondaryText)
-                                .fixedSize(horizontal: false, vertical: true)
+                            if let detail = detail(option) {
+                                Text(detail)
+                                    .bighelpFont(.metadata)
+                                    .foregroundStyle(theme.secondaryText)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                         Spacer(minLength: BighelpTokens.space8)
                         Image(systemName: "checkmark")
@@ -1280,9 +1279,7 @@ struct BighelpChannelAlertsSection: View {
                         Text(known.isEmpty ? "Other channels" : "New channels")
                             .bighelpFont(.body)
                             .foregroundStyle(theme.primaryText)
-                        Text(known.isEmpty
-                             ? "Every channel but bighelp. Your channels show here once your computer reports them."
-                             : "Channels your agents start to use later.")
+                        Text(known.isEmpty ? "Every channel but bighelp" : "Channels your bots add later")
                             .bighelpFont(.metadata)
                             .foregroundStyle(theme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
@@ -1299,7 +1296,7 @@ struct BighelpChannelAlertsSection: View {
         } header: {
             Text("Channels")
         } footer: {
-            Text("Chats in bighelp always notify you. Questions and approvals follow their channel. A scheduled task follows where it delivers. Needs bighelp plugin 3.27.0 or later.")
+            Text("Chats in bighelp always notify you.")
                 .bighelpFont(.metadata)
                 .foregroundStyle(theme.secondaryText)
         }
@@ -1312,11 +1309,12 @@ struct BighelpChannelAlertsSection: View {
         }
     }
 
-    private func detail(_ option: BighelpChannelAlerts.Mode) -> String {
+    /// Only bighelp says it all in its name, so it has no second line.
+    private func detail(_ option: BighelpChannelAlerts.Mode) -> String? {
         switch option {
-        case .all: String(localized: "Chats on iMessage, Telegram, a terminal and every other channel notify you too.")
-        case .bighelp: String(localized: "Only chats in bighelp notify you.")
-        case .choose: String(localized: "Pick the channels that notify you.")
+        case .all: String(localized: "Every channel your bots use")
+        case .bighelp: nil
+        case .choose: String(localized: "Pick the channels")
         }
     }
 
@@ -1372,7 +1370,7 @@ private struct BighelpWorkflowAlertsSection: View {
         } header: {
             Text("Workflows")
         } footer: {
-            Text("A workflow's stages never notify you. Needs you also follows Questions and approvals; the others follow Chat replies. Needs bighelp plugin 3.7.0 or later.")
+            Text("A workflow's stages never notify you.")
                 .bighelpFont(.metadata)
                 .foregroundStyle(theme.secondaryText)
         }
@@ -1386,10 +1384,13 @@ private struct BighelpWorkflowAlertsSection: View {
                 Text(kind.title)
                     .bighelpFont(.body)
                     .foregroundStyle(theme.primaryText)
-                Text(kind.detail)
-                    .bighelpFont(.metadata)
-                    .foregroundStyle(theme.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
+                // Only Needs you gets a hint; the other titles say what they are.
+                if kind == .needsYou {
+                    Text("A run waits for you")
+                        .bighelpFont(.metadata)
+                        .foregroundStyle(theme.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .padding(.vertical, BighelpTokens.space4)
         }

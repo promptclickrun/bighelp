@@ -17,6 +17,9 @@ are historical (`docs/ui-v3-design.md`).
 - Preserve user-authored names, instructions, content and saved settings. Summarizing a row is not permission to truncate its stored data.
 - Keep consequences for credentials, recipients, spending, destructive changes and uncertain saves at the relevant decision. Simplification must not conceal them.
 - Aim for understanding setup and ordinary chat in roughly 30 seconds. This is a comprehension target, not a measured authentication-time promise.
+- A Settings row's title is the thing, in one to three words. Its second line is the control's value; a hint only when the title can't carry it, six words at most (`settingTitle`, `settingLabel`).
+- A section has a header, two to seven rows where it can, and one footer of one sentence. Longer detail goes behind a tap on the row (Device access's info button), never under it.
+- Advanced groups come last on the page they belong to, with headers that start "Advanced ·", and show only with Nerd Mode on.
 
 ## Visual language
 
@@ -149,14 +152,14 @@ phones with a Dynamic Island, the island names the work. In the app it grows int
 (`AgentActivityIsland` + `IslandStage`): the name and the work beside the camera, and underneath, the pet acting
 it out (chasing a brain while thinking, code streaming from its laptop, fixing a computer, painting, paper
 planes…). The status bar hides while it shows, and the app moves down (root `additionalSafeAreaInsets`) so nothing
-is covered. Tap for a compact pill, touch and hold to open the chat. Settings › Chat › Agent in the Dynamic Island
+is covered. Tap for a compact pill, touch and hold to open the chat. Settings › Chat › Dynamic Island
 turns it off. Outside the app, one Live Activity holds the active chats as compact rows: title, agent and a
 fixed status icon. Chats needing attention come first. Each row opens its own chat; extra chats show as a count.
 The expanded Dynamic Island shows three rows, while the compact island keeps a quiet work or attention symbol. Every phone chat uses this big-avatar header and keeps the tab bar under its message box (All
 agents' chats excepted). Every chat has ☰ in the top left, like the other root screens; a chat opened from the
 list, Agents, Feed or a task goes back to it with the edge swipe. A group chat's name opens its Group Settings (Chat Info for a group Hermes doesn't run). The line under
 the name says the agent's activity while it works, and otherwise the
-chat's title when Settings › Chat › Session title is on (off by default; never "New chat" or "Bot Chat"). iPad works the same way, with no always-open sidebar:
+chat's title when Settings › Chat › Chat title is on (off by default; never "New chat" or "Bot Chat"). iPad works the same way, with no always-open sidebar:
 ☰ slides the menu in from the leading edge, and chats use the width of the screen. The iPhone Duo follows how it's
 held (`BighelpScreenPosture`). Folded, the cover screen is wide and short, with the camera and status in a column on
 its trailing edge: the bar's places go down that column as iOS's own toolbar items (`BighelpStripTabs`), under the
@@ -413,9 +416,10 @@ Watch, Companion pet and Help. Don't add sections that compete with these; add t
 (Permissions' page, Device access, also holds Share usage and diagnostics, on by default).
 Settings › Default model leads with **Agent**: tap it for a rail of cards, one per agent (picture and name, the
 chosen one filled with the accent, `BighelpRailCard`), and the page shows and changes that agent's own default.
-Settings › Chat starts with **When bighelp opens**: Open on (Agents, Agents (multi), Last chat, Feed, Ideas, Goals,
-Kanban, Projects; Last chat, the agent's latest chat, until you pick) and Start with (Automatic, the agent you used
-last, or one of this computer's agents, kept per computer; Agents (multi) has none). It applies when the app starts,
+Settings › Chat reads in named groups: **Opening**, **A bot's work**, **In a chat** and **Chat list**, then Nerd Mode's
+Advanced groups. Opening has Opens on (Agents, Agents (multi), Last chat, Feed, Ideas, Goals,
+Kanban, Projects; Last chat, the agent's latest chat, until you pick), Start with (Last bot used, or one of this
+computer's agents, kept per computer; Agents (multi) has none) and A bot opens. It applies when the app starts,
 not when it comes back; a link, widget or notification that opens the app wins, and Kanban or Projects where the
 computer can't open them fall back to Last chat (`BighelpLanding`).
 **Marketplace** (Settings › Agents, and a row on each bot's profile for that bot) is for everyone: this week's
@@ -494,24 +498,24 @@ Summary, Input and Result boxes. Code it ran (Hermes' `execute_code`, Python, an
 after 10 lines behind Show all, then under a line in the same card what it printed, with a dot for how it ended
 (Output, or Exit code 1 in red) and its own Copy. View raw under the card opens Hermes' own input or result.
 
-Settings › Chat › Agent's work (`ChatWorkStyle`) picks how one-to-one chats show an agent's work; group chats
+Settings › Chat › Shows as (`ChatWorkStyle`) picks how one-to-one chats show an agent's work; group chats
 keep their folders. **Card** (the default): while the agent works, one soft card says who's working, how long and
 how many steps, with its newest four steps under that, older ones fading out at the top (`ChatLiveWorkView`).
 While the answer streams it says what the agent did, still; when the turn ends it becomes a card above the
 answer that says what the turn did ("Read 2 files, ran tests"), with "18s · 4 steps" on a small line under it.
-A turn with no steps to name says "Worked for 18s". **Minimal**: one line with the
+A turn with no steps to name says "Worked for 18s". **One line**: one line with the
 current step and the agent's newest note under it; when the turn ends, a small "18s · 4 steps" receipt sits under
-the answer (`ChatWorkReceipt`). **Full**: every note, tool call and thought shows in place and open as it
+the answer (`ChatWorkReceipt`). **Everything**: every note, tool call and thought shows in place and open as it
 happens, then folds under "Worked for…". A tap on the card, line or receipt lists every step under it, each its
-own row. The agent's notes between steps go with Show reasoning; Show reasoning (on by default) and Show tool
+own row. The agent's notes between steps go with Show thinking; Show thinking (on by default) and Show tool
 calls decide what's in the work, and Fold finished turns (off) leaves finished work open in the chat.
 
-Settings › Chat › Reasoning shows (`ChatReasoningPlacement`) picks where a one-to-one chat puts its agent's
-thinking. **As its own message** (the default): one outlined message above the turn's work
+Settings › Chat › Thinking (`ChatReasoningPlacement`) picks where a one-to-one chat puts its agent's
+thinking. **Above the work** (the default): one outlined message above the turn's work
 (`ChatReasoningMessageView`), so the steps hold only tool calls. It's outlined, never filled, so it doesn't read
 as the answer. While the agent thinks it says "Reasoning…" over the newest words; once the turn's thinking is
-done, "Thought for 12s" over all of it, cut at six lines with Show more. **In the steps**: thinking rows between
-the tool calls, as before. Keep reasoning open (on by default) keeps finished reasoning's words in view in both;
+done, "Thought for 12s" over all of it, cut at six lines with Show more. **Between steps**: thinking rows between
+the tool calls, as before. Keep thinking open (on by default) keeps finished reasoning's words in view in both;
 off, it closes to one line. A tap on the heading opens or closes it, and the reader's choice wins over the
 setting. Group chats keep reasoning in the steps.
 

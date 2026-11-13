@@ -196,7 +196,7 @@ struct DeviceAppearanceToolTests {
         #expect(DeviceToolChannelNote.noChat(enabled: [.appearance, .calendar]) != nil)
         #expect(DeviceToolChannelNote.failed(enabled: [.appearance], needsNewerPlugin: []) == nil)
         #expect(DeviceToolChannelNote.failed(enabled: [.appearance, .calendar], needsNewerPlugin: [])
-                == "Device access is not connected. Check the bighelp plugin on this host, then reopen the chat.")
+                == "Device access is not connected. Check the bighelp plugin on this computer, then reopen the chat.")
     }
 
     @Test func anOlderPluginNamesWhatNeedsTheUpdate() {
@@ -204,9 +204,9 @@ struct DeviceAppearanceToolTests {
         #expect(DeviceToolChannelNote.connected(needsNewerPlugin: [.location])
                 == "To share your location, update the bighelp plugin on this computer.")
         #expect(DeviceToolChannelNote.connected(needsNewerPlugin: [.appearance])
-                == "To let agents change how bighelp looks, update the bighelp plugin on this computer.")
+                == "To let bots change how bighelp looks, update the bighelp plugin on this computer.")
         #expect(DeviceToolChannelNote.failed(enabled: [.appearance, .location], needsNewerPlugin: [.appearance, .location])
-                == "To share your location and let agents change how bighelp looks, update the bighelp plugin on this computer.")
+                == "To share your location and let bots change how bighelp looks, update the bighelp plugin on this computer.")
     }
 }
 

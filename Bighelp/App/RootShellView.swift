@@ -1562,7 +1562,7 @@ struct RootShellView: View {
         // The way back from Shortcuts to a phone-tool call: not a screen to open.
         if DeviceToolHandoff.shared.handleCallback(url) { return }
         guard let route = BighelpIncomingURLRoute.parse(url) else { return }
-        // A link opening the app wins over Settings › Chat › Open on, and keeps the mode you were in.
+        // A link opening the app wins over Settings › Chat › Opens on, and keeps the mode you were in.
         didAutoOpenHomeChat = true
         settings.restoreAllHostsModeForOutsideOpen()
         if holdsLinkForItsComputer(url) { return }
@@ -1734,7 +1734,7 @@ struct RootShellView: View {
     /// Managed notifications and Live Activities verify a durable Hermes
     /// coordinate; resolve it through the visible catalog and open that row.
     func openExternalSession(_ open: BighelpExternalSessionOpen) {
-        // A notification opening the app wins over Settings › Chat › Open on, and keeps the mode
+        // A notification opening the app wins over Settings › Chat › Opens on, and keeps the mode
         // you were in: All hosts stays All hosts, so ☰ matches it.
         didAutoOpenHomeChat = true
         settings.restoreAllHostsModeForOutsideOpen()

@@ -98,7 +98,7 @@ change in both repos.
     short Settings (`SimpleBotsSettingsView`), whose All Settings row and Modes row (the same Modes page
     as All Settings') lead back.
     Everything in it uses the same stores and chat; `Bighelp/SimpleBots/` holds its screens. It wins over the
-    all-hosts view and Settings › Open on (`fleetModeOn` is off while it's on). Its Multi-gateway switch
+    all-hosts view and Settings › Chat › Opens on (`fleetModeOn` is off while it's on). Its Multi-gateway switch
     (`simpleBotsMultiGateway`) lists every gateway's bots (`SimpleBotsGateways`, one `SimpleBotsBot` model
     keyed by `FleetID`): the gateway in use live, the others from the all-hosts copies. Pins live on each
     bot's own gateway; the primary bot is kept on the device (`simpleBotsMultiPrimary`). Acting on another
@@ -393,7 +393,7 @@ change in both repos.
   3.47.0 takes 48 hours: then today and yesterday). Routines show only with ⋯ › Show routines. A tap opens the
   item's read-out from `agents/today/detail` (`native-agents-today-detail-v1`, `AgentTodayDetail`). In a chat, a
   helper's late `subagent.*` events update the row of the turn that started it (`subagentTurnIDs`), and a helper
-  left running doesn't hold its finished turn open: the turn folds as Settings › Chat › Agent's work says.
+  left running doesn't hold its finished turn open: the turn folds as Settings › Chat › Shows as says.
 - **The share sheet only saves:** iOS supports `NSExtensionContext.open` only in Today and iMessage extensions,
   so the share sheet can't open bighelp, and it holds no sign-in. It copies the share into the app group whole or
   not at all (`PendingShareDraft`: a staging folder under a lock file, moved into place in one rename) and says to

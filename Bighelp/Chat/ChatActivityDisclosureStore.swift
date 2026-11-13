@@ -61,7 +61,7 @@ final class ChatActivityDisclosureStore {
     }
 
     /// What the reader chose for this reasoning; nil when they haven't, so the caller's own
-    /// rule decides (Settings › Chat › Keep reasoning open).
+    /// rule decides (Settings › Chat › Keep thinking open).
     func reasoningChoice(_ events: [ChatActivityEvent]) -> Bool? {
         let choices = events.compactMap { eventChoices[key(for: $0)] }
         if choices.contains(true) { return true }

@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Bighelp
 
-/// Settings › Chat › Open on and Start with: the screen and agent a cold
+/// Settings › Chat › Opens on and Start with: the screen and agent a cold
 /// launch lands on, with today's start kept until someone picks.
 @MainActor
 struct BighelpLandingTests {
@@ -78,11 +78,11 @@ struct BighelpLandingTests {
         var now = Date(timeIntervalSince1970: 1_000)
         let settings = SettingsStore(defaults: defaults, now: { now })
         settings.applyLaunchLandingToAllHostsMode()
-        #expect(!settings.allHostsMode, "Open on Feed starts on one computer")
+        #expect(!settings.allHostsMode, "Opens on Feed starts on one computer")
         settings.restoreAllHostsModeForOutsideOpen()
         #expect(settings.allHostsMode, "The tapped alert opens in the mode you were in")
 
-        // Later in the same launch, Open on stands.
+        // Later in the same launch, Opens on stands.
         settings.applyLaunchLandingToAllHostsMode()
         settings.allHostsMode = false
         now.addTimeInterval(120)
@@ -189,7 +189,7 @@ struct BighelpLandingTests {
         #expect(standard.allHostsMode, "Nothing picked: the all-hosts switch stays as it was")
     }
 
-    /// Bots mode opens on its own home: Open on doesn't turn the all-hosts view on at launch.
+    /// Bots mode opens on its own home: Opens on doesn't turn the all-hosts view on at launch.
     @Test func simpleBotModeIgnoresOpenOn() {
         let saved = defaults()
         saved.set("all-agents", forKey: BighelpLanding.screenKey)

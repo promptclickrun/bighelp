@@ -83,7 +83,7 @@ struct BighelpQuietHoursSyncResult: Equatable, Sendable {
         guard !names.isEmpty else { return nil }
         let list = names.count < 3 ? names.joined(separator: " and ")
             : names.dropLast().joined(separator: ", ") + " and " + names[names.count - 1]
-        return "Quiet Hours needs a plugin update on \(list)."
+        return "Quiet hours needs a plugin update on \(list)."
     }
 }
 

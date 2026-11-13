@@ -65,7 +65,7 @@ struct AgentHomeChatHeader: View {
     let imageURL: URL?
     let activity: AgentActivityKind
     var status: String? = nil
-    /// The chat's title when Settings › Chat › Session title is on.
+    /// The chat's title when Settings › Chat › Chat title is on.
     var sessionTitle: String? = nil
     /// Group chats show their own identity control instead of one agent.
     let groupIdentity: AnyView?

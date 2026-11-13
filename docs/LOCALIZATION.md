@@ -28,7 +28,7 @@ The second stage (#527) adds:
   "N messages with …"), its sheet, the working and typing states, and the Teamwork
   switch with its line. In Bots mode the switch says bots in sentences of its own.
 - The Settings pages these lead to: Experience, Assistants, Notifications (topics,
-  "Agents messaging each other", channels, workflows, Quiet Hours, test and turn-off),
+  "Bots messaging each other", channels, workflows, Quiet hours, test and turn-off),
   Chat (with Nerd Mode's sections), and Appearance with Chat layout and App layout.
 - The modes after their 2.6.11 rename: Bots, Chat and Code, Settings › Modes (its picker and the
   Header mode switcher), and the mode edge swipes.
@@ -133,8 +133,8 @@ contents), the routine editor, the avatar studio, Archived Chats, Apps, Usage,
 Notifications › Advanced › Provider details and the notification setup's status
 and error messages, catalog template text, and chat tool phrases (so a running
 agent-talk line reads "Nova：searching the web…"). The notification service names
-its topics in English; English shows those names and other languages show the
-app's own words for the same topics. Onboarding mode-preview images still contain English
+its topics in English; every language, English too, shows the app's own words for
+those topics (Replies, Questions and approvals, Helper results). Onboarding mode-preview images still contain English
 demo text; localize those assets in a later screenshot pass. A translated menu
 entry does not imply its entire destination is translated.
 

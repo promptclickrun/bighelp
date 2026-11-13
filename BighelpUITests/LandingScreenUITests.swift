@@ -1,6 +1,6 @@
 import XCTest
 
-/// Settings › Chat › Open on: each choice is where a cold launch lands, and
+/// Settings › Chat › Opens on: each choice is where a cold launch lands, and
 /// Start with picks the agent. Demo data. Set BIGHELP_LANDING_EVIDENCE
 /// (TEST_RUNNER_BIGHELP_LANDING_EVIDENCE) to a folder to save the picker in
 /// light and dark.
@@ -25,7 +25,7 @@ final class LandingScreenUITests: BighelpUITestCase {
             ("projects", "projects.screen", nil),
             ("kanban", "kanban.screen", nil),
             ("agents", "agents.screen", nil),
-            ("last-chat", "agent.hero.avatar", nil),
+            ("last-chat", "chat.identity", nil),
             ("sessions", "sessions.screen", nil),
             ("all-agents", "fleet.home", nil),
         ]
@@ -55,14 +55,14 @@ final class LandingScreenUITests: BighelpUITestCase {
     func testPickedInSettingsOpensThereWithThatAgent() throws {
         let app = makeApp()
         launch(app, landing: nil, extra: ["-loopdy.home.opens-chat", "YES"])
-        let hero = app.buttons["agent.hero.name"].firstMatch
+        let hero = app.buttons["chat.identity"].firstMatch
         XCTAssertTrue(hero.waitForExistence(timeout: 25), "Nothing picked: today's start, the agent's chat")
         XCTAssertEqual(hero.label, "Avery Park", "The demo's default agent")
 
         openRootTab("tab.profile", in: app)
         settingsRow("settings.menu.chat", in: app).tap()
         let openOn = app.buttons["settings.landing.screen"].firstMatch
-        XCTAssertTrue(openOn.waitForExistence(timeout: 5), "Open on leads Settings › Chat")
+        XCTAssertTrue(openOn.waitForExistence(timeout: 5), "Opens on leads Settings › Chat")
         XCTAssertTrue(openOn.label.contains("Last chat"), "Shows today's start until you pick: \(openOn.label)")
         openOn.tap()
         let feed = app.buttons["Feed"].firstMatch
@@ -73,7 +73,7 @@ final class LandingScreenUITests: BighelpUITestCase {
 
         let startWith = app.buttons["settings.landing.agent"].firstMatch
         XCTAssertTrue(startWith.waitForExistence(timeout: 5))
-        XCTAssertTrue(startWith.label.contains("Automatic"), startWith.label)
+        XCTAssertTrue(startWith.label.contains("Last bot used"), startWith.label)
         startWith.tap()
         let mina = app.buttons["Mina Shah"].firstMatch
         XCTAssertTrue(mina.waitForExistence(timeout: 5))
@@ -95,7 +95,7 @@ final class LandingScreenUITests: BighelpUITestCase {
         XCTAssertTrue(element("board.feed", in: app).waitForExistence(timeout: 25), "Opens on Feed")
         XCTAssertTrue(app.buttons["tab.feed"].firstMatch.isSelected)
         app.buttons["tab.sessions"].firstMatch.tap()
-        let homeHero = app.buttons["agent.hero.name"].firstMatch
+        let homeHero = app.buttons["chat.identity"].firstMatch
         XCTAssertTrue(homeHero.waitForExistence(timeout: 10))
         XCTAssertEqual(homeHero.label, "Mina Shah", "Started with the picked agent")
     }
@@ -139,10 +139,10 @@ final class LandingScreenUITests: BighelpUITestCase {
             let startWith = app.buttons["settings.landing.agent"].firstMatch
             XCTAssertTrue(startWith.waitForExistence(timeout: 5))
             startWith.tap()
-            XCTAssertTrue(app.buttons["Automatic"].firstMatch.waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["Last bot used"].firstMatch.waitForExistence(timeout: 5))
             sleep(1)
             save(folder, "\(appearance)-3-start-with", app)
-            app.buttons["Automatic"].firstMatch.tap()
+            app.buttons["Last bot used"].firstMatch.tap()
             app.terminate()
         }
     }

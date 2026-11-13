@@ -1356,7 +1356,7 @@ import UserNotifications
         _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
         let result = await fixture.service.applyQuietHours()
         #expect(result.needsPluginUpdate == [fixture.host.name])
-        #expect(result.note == "Quiet Hours needs a plugin update on \(fixture.host.name).")
+        #expect(result.note == "Quiet hours needs a plugin update on \(fixture.host.name).")
         #expect(fixture.hostAPI.quietHoursPuts.isEmpty)
         #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.enabled == true,
                 "Notifications stay on without Quiet Hours")

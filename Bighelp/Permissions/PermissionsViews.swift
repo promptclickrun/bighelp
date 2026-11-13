@@ -3,58 +3,44 @@ import SwiftUI
 @MainActor
 struct PermissionsSettingsView: View {
     let center: PermissionCenter
+    /// The page's one info sheet: whichever row's info button was tapped last.
+    @State private var about: DeviceAccessAbout?
 
     var body: some View {
         Form {
-            HostPluginFeatureSection(feature: .deviceAccess)
+            HostPluginFeatureSection(feature: .deviceAccess, lead: center.deviceTools.scope == nil
+                ? Text("On until you turn it off. Connect a computer so its bots can use these.")
+                : Text("On until you turn it off. What a bot reads goes to your computer and its AI providers."))
             if let status = center.nativeDeviceToolStatus {
                 Section { Text(status).bighelpFont(.metadata).foregroundStyle(.secondary) }
             }
 
-            Section {
-                ForEach(DeviceToolCapability.allCases.filter { $0.sharesPersonalData && $0.isOfferedOnThisPlatform }) { kind in
-                    DeviceToolPermissionRow(permissions: center.deviceTools, kind: kind)
-                }
-            } header: {
-                Text("Shared with your host")
-            } footer: {
-                Text(center.deviceTools.scope == nil
-                     ? "Each switch is for this device and stays on until you turn it off. Connect a host so its agents can use them."
-                     : "Each switch is for this device and stays on until you turn it off. Any agent on your host can use it while you have its chat open, also for a short time after you leave bighelp. Requested data goes to that host and its AI provider.")
-            }
-            .listRowBackground(theme.surface)
+            toolSection(.yourData, header: "Your data",
+                        footer: "Bots can change and delete events, reminders and contacts without asking each time.")
+            toolSection(.whereYouAre, header: "Where you are")
+            toolSection(.onThisDevice, header: "On this device")
 
             Section {
-                AgentAppearancePermissionRow(permissions: center.deviceTools)
-                AgentNavigationPermissionRow(permissions: center.deviceTools)
+                AgentAppearancePermissionRow(permissions: center.deviceTools) { about = $0 }
+                AgentNavigationPermissionRow(permissions: center.deviceTools) { about = $0 }
+            } header: {
+                Text("bighelp itself")
             } footer: {
-                Text("Works only while you have the agent’s chat open. One switch for every host.")
+                Text("Only while that bot’s chat is open.")
                     .bighelpFont(.metadata)
             }
             .listRowBackground(theme.surface)
 
             Section {
                 ForEach(PermissionKind.allCases) { kind in
-                    PermissionRow(center: center, kind: kind)
+                    PermissionRow(center: center, kind: kind) { about = $0 }
                 }
             } header: {
-                Text("On this device")
+                Text(BighelpPlatform.isMac ? "macOS permissions" : "iOS permissions")
             } footer: {
                 Text(BighelpPlatform.isMac
-                     ? "bighelp asks macOS only after you choose Allow. Denied access must be changed in System Settings."
-                     : "bighelp asks iOS only after you choose Allow. Denied access must be changed in iOS Settings.")
-                    .bighelpFont(.metadata)
-            }
-            .listRowBackground(theme.surface)
-
-            Section {
-                LabeledContent("Photos you attach", value: "Picker Only")
-                    .accessibilityLabel("Photos you attach")
-                    .accessibilityValue("Attaching uses the iOS photo picker and needs no library access.")
-            } header: {
-                Text("Attaching photos")
-            } footer: {
-                Text("Photos you attach in chat use Apple’s private picker. Your agent reaches your library only when Photos is on above.")
+                     ? "bighelp asks macOS only after you choose Allow."
+                     : "bighelp asks iOS only after you choose Allow.")
                     .bighelpFont(.metadata)
             }
             .listRowBackground(theme.surface)
@@ -64,6 +50,7 @@ struct PermissionsSettingsView: View {
         .scrollContentBackground(.hidden)
         .background(theme.canvas.ignoresSafeArea())
         .driveScrolls()
+        .bighelpSheet(item: $about) { DeviceAccessAboutSheet(about: $0) }
         .navigationTitle("Device access")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("settings.permissions")
@@ -74,6 +61,100 @@ struct PermissionsSettingsView: View {
         }
     }
 
+    /// One group of switches that share the person's data; left out where this platform offers none of them.
+    @ViewBuilder
+    private func toolSection(_ section: DeviceToolCapability.AccessSection, header: LocalizedStringKey,
+                             footer: LocalizedStringKey? = nil) -> some View {
+        let kinds = DeviceToolCapability.allCases.filter {
+            $0.accessSection == section && $0.sharesPersonalData && $0.isOfferedOnThisPlatform
+        }
+        if !kinds.isEmpty {
+            Section {
+                ForEach(kinds) { kind in
+                    DeviceToolPermissionRow(permissions: center.deviceTools, kind: kind) { about = $0 }
+                }
+            } header: {
+                Text(header)
+            } footer: {
+                if let footer { Text(footer).bighelpFont(.metadata) }
+            }
+            .listRowBackground(theme.surface)
+        }
+    }
+
+    @BighelpThemeReader private var theme
+}
+
+/// What one Device access row's info button opens: the row's name and its longer description.
+struct DeviceAccessAbout: Identifiable {
+    let id: String
+    let title: String
+    let detail: String
+    /// A second paragraph: when a bot can use what the row shares.
+    var note: String? = nil
+}
+
+/// The trailing info button on a Device access row.
+@MainActor
+private struct DeviceAccessAboutButton: View {
+    let name: String
+    let identifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "info.circle")
+                .font(.bighelp(.body))
+                .foregroundStyle(theme.action)
+                .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                .contentShape(Rectangle())
+        }
+        .bighelpPointerButtonStyle(.borderless)
+        .bighelpIconLabel(String(localized: "About \(name)"))
+        .accessibilityIdentifier(identifier)
+    }
+
+    @BighelpThemeReader private var theme
+}
+
+@MainActor
+private struct DeviceAccessAboutSheet: View {
+    let about: DeviceAccessAbout
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: BighelpTokens.space12) {
+                    Text(about.detail)
+                        .bighelpFont(.body)
+                        .foregroundStyle(theme.primaryText)
+                    if let note = about.note {
+                        Text(note)
+                            .bighelpFont(.metadata)
+                            .foregroundStyle(theme.secondaryText)
+                    }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(BighelpTokens.space20)
+            }
+            .background(theme.canvas.ignoresSafeArea())
+            .navigationTitle(about.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .bighelpDefaultAction()
+                        .accessibilityIdentifier("permissions.about.done")
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .accessibilityIdentifier("permissions.about")
+        .bighelpSheetSize(.compact)
+    }
+
     @BighelpThemeReader private var theme
 }
 
@@ -81,36 +162,45 @@ struct PermissionsSettingsView: View {
 private struct DeviceToolPermissionRow: View {
     let permissions: DeviceToolPermissions
     let kind: DeviceToolCapability
+    let onAbout: (DeviceAccessAbout) -> Void
     @Environment(\.openURL) private var openURL
     /// Apple Health's sharing note, shown once before its switch first turns on.
     @State private var showsHealthSharing = false
     @State private var turnsOnAfterSharing = false
 
-    private var title: String { kind.title }
-    private var detail: String { kind.detail }
-
     var body: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-            Toggle(isOn: Binding(
-                get: { permissions.isEnabled(kind) },
-                set: { enabled in
-                    if enabled, kind == .health, !permissions.healthSharingAgreed { showsHealthSharing = true }
-                    else if enabled { Task { await permissions.setEnabled(true, for: kind) } }
-                    else { permissions.disable(kind) }
-                }
-            )) {
-                HStack(alignment: .top, spacing: BighelpTokens.space12) {
-                    DeviceToolIcon(kind: kind, size: 28)
-                    VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                        Text(title).bighelpFont(.body, weight: .semibold)
-                        Text(detail).bighelpFont(.metadata).foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: BighelpTokens.space8) {
+                Toggle(isOn: Binding(
+                    get: { permissions.isEnabled(kind) },
+                    set: { enabled in
+                        if enabled, kind == .health, !permissions.healthSharingAgreed { showsHealthSharing = true }
+                        else if enabled { Task { await permissions.setEnabled(true, for: kind) } }
+                        else { permissions.disable(kind) }
+                    }
+                )) {
+                    HStack(spacing: BighelpTokens.space12) {
+                        DeviceToolIcon(kind: kind, size: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(kind.title).bighelpFont(.body, weight: .semibold)
+                            if let hint = kind.hint {
+                                Text(hint).bighelpFont(.metadata).foregroundStyle(.secondary)
+                            }
+                        }
                     }
                 }
+                .disabled(!permissions.isEnabled(kind) && (permissions.requestInFlight != nil
+                    || permissions.status(for: kind) == .unavailable))
+                .accessibilityHint(Text(kind.detail))
+                .accessibilityIdentifier("permissions.device-tools.\(kind.rawValue)")
+
+                DeviceAccessAboutButton(name: kind.title, identifier: "permissions.device-tools.\(kind.rawValue).about") {
+                    // The page's opening line says where the data goes; when a bot can read it is here.
+                    onAbout(DeviceAccessAbout(
+                        id: "device-tools.\(kind.rawValue)", title: kind.title, detail: kind.detail,
+                        note: String(localized: "Any bot on your computer can use this while its chat is open, and for a short time after you leave bighelp.")))
+                }
             }
-            .disabled(!permissions.isEnabled(kind) && (permissions.requestInFlight != nil
-                || permissions.status(for: kind) == .unavailable))
-            .accessibilityIdentifier("permissions.device-tools.\(kind.rawValue)")
 
             if permissions.requestInFlight == kind {
                 ProgressView(BighelpPlatform.isMac ? "Waiting for macOS…" : "Waiting for iOS…").bighelpFont(.metadata)
@@ -120,10 +210,10 @@ private struct DeviceToolPermissionRow: View {
                 }
                 .accessibilityIdentifier("permissions.device-tools.\(kind.rawValue).settings")
             } else if kind == .health, permissions.isEnabled(kind) {
-                Text("Health decides which kinds of data bighelp can read; change them in the Health app under Sharing. An empty answer can mean no data or no access.")
+                Text("Choose which kinds bighelp can read in the Health app under Sharing; an empty answer can mean no data or no access.")
                     .bighelpFont(.metadata).foregroundStyle(.secondary)
             } else if kind == .location, permissions.isEnabled(kind) {
-                Text("Only while bighelp is open. \(BighelpPlatform.isMac ? "macOS" : "iOS") asks before sharing your exact spot; if you keep it approximate, your agent gets a rough area.")
+                Text("Only while bighelp is open, and only a rough area if you keep your location approximate.")
                     .bighelpFont(.metadata).foregroundStyle(.secondary)
             } else if permissions.scope != nil, permissions.status(for: kind) == .unavailable {
                 Text("Unavailable on this device.").bighelpFont(.metadata).foregroundStyle(.secondary)
@@ -149,21 +239,29 @@ private struct DeviceToolPermissionRow: View {
 @MainActor
 private struct AgentAppearancePermissionRow: View {
     let permissions: DeviceToolPermissions
+    let onAbout: (DeviceAccessAbout) -> Void
+
+    private var title: String { String(localized: "Change how bighelp looks") }
+    private var detail: String {
+        String(localized: "When you ask, your bot can switch light or dark mode and change your chat color. You can change it back in Appearance.")
+    }
 
     var body: some View {
-        Toggle(isOn: Binding(
-            get: { permissions.appearanceAllowed },
-            set: { permissions.setAppearanceAllowed($0) }
-        )) {
-            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                Text("Let agents change how bighelp looks").bighelpFont(.body, weight: .semibold)
-                Text("When you ask, your agent can switch light or dark mode and change your chat color. You can change it back in Appearance.")
-                    .bighelpFont(.metadata).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+        HStack(spacing: BighelpTokens.space8) {
+            Toggle(isOn: Binding(
+                get: { permissions.appearanceAllowed },
+                set: { permissions.setAppearanceAllowed($0) }
+            )) {
+                Text(title).bighelpFont(.body, weight: .semibold)
+            }
+            .accessibilityHint(Text(detail))
+            .accessibilityIdentifier("permissions.device-tools.appearance")
+            .driveTarget("permissions.device-tools.appearance")
+
+            DeviceAccessAboutButton(name: title, identifier: "permissions.device-tools.appearance.about") {
+                onAbout(DeviceAccessAbout(id: "device-tools.appearance", title: title, detail: detail))
             }
         }
-        .accessibilityIdentifier("permissions.device-tools.appearance")
-        .driveTarget("permissions.device-tools.appearance")
         .padding(.vertical, BighelpTokens.space4)
     }
 }
@@ -173,21 +271,29 @@ private struct AgentAppearancePermissionRow: View {
 @MainActor
 private struct AgentNavigationPermissionRow: View {
     let permissions: DeviceToolPermissions
+    let onAbout: (DeviceAccessAbout) -> Void
+
+    private var title: String { String(localized: "Show you around") }
+    private var detail: String {
+        String(localized: "When you ask where something is, your bot can open that page or setting and point at it. It never changes anything for you.")
+    }
 
     var body: some View {
-        Toggle(isOn: Binding(
-            get: { permissions.navigationAllowed },
-            set: { permissions.setNavigationAllowed($0) }
-        )) {
-            VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                Text("Let agents show you around bighelp").bighelpFont(.body, weight: .semibold)
-                Text("When you ask where something is, your agent can open that page or setting and point at it. It never changes anything for you.")
-                    .bighelpFont(.metadata).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+        HStack(spacing: BighelpTokens.space8) {
+            Toggle(isOn: Binding(
+                get: { permissions.navigationAllowed },
+                set: { permissions.setNavigationAllowed($0) }
+            )) {
+                Text(title).bighelpFont(.body, weight: .semibold)
+            }
+            .accessibilityHint(Text(detail))
+            .accessibilityIdentifier("permissions.device-tools.navigation")
+            .driveTarget("permissions.device-tools.navigation")
+
+            DeviceAccessAboutButton(name: title, identifier: "permissions.device-tools.navigation.about") {
+                onAbout(DeviceAccessAbout(id: "device-tools.navigation", title: title, detail: detail))
             }
         }
-        .accessibilityIdentifier("permissions.device-tools.navigation")
-        .driveTarget("permissions.device-tools.navigation")
         .padding(.vertical, BighelpTokens.space4)
     }
 }
@@ -196,12 +302,15 @@ private struct AgentNavigationPermissionRow: View {
 struct PermissionRow: View {
     let center: PermissionCenter
     let kind: PermissionKind
+    /// Device access puts `purpose` behind an info button that opens its sheet; without one
+    /// (Settings › Notifications) the purpose shows under the title.
+    var onAbout: ((DeviceAccessAbout) -> Void)? = nil
 
     var body: some View {
         let status = center.status(for: kind)
         let presentation = PermissionRowPresentation(kind: kind, status: status)
         VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-            HStack(alignment: .top, spacing: BighelpTokens.space12) {
+            HStack(alignment: onAbout == nil ? .top : .center, spacing: BighelpTokens.space12) {
                 Image(systemName: kind.systemImage)
                     .foregroundStyle(theme.action)
                     .frame(width: 28)
@@ -210,15 +319,22 @@ struct PermissionRow: View {
                     Text(kind.title)
                         .bighelpFont(.body, weight: .semibold)
                         .foregroundStyle(theme.primaryText)
-                    Text(kind.purpose)
-                        .bighelpFont(.metadata)
-                        .foregroundStyle(theme.secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if onAbout == nil {
+                        Text(kind.purpose)
+                            .bighelpFont(.metadata)
+                            .foregroundStyle(theme.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 Spacer(minLength: BighelpTokens.space8)
                 Text(status.authorization.statusTitle)
                     .bighelpFont(.metadata, weight: .semibold)
                     .foregroundStyle(status.authorization == .denied ? theme.warning : theme.secondaryText)
+                if let onAbout {
+                    DeviceAccessAboutButton(name: kind.title, identifier: "permissions.\(kind.rawValue).about") {
+                        onAbout(DeviceAccessAbout(id: "permission.\(kind.rawValue)", title: kind.title, detail: kind.purpose))
+                    }
+                }
             }
 
             if let detail = presentation.detailText {

@@ -3,7 +3,7 @@ import SwiftUI
 // Bots mode (Settings › Bots mode): its home in place of the Chat
 // tab, its short Settings, bot profiles, and how its chats look.
 extension RootShellView {
-    /// Bots mode wins over the all-hosts view and Open on (`fleetModeOn`).
+    /// Bots mode wins over the all-hosts view and Opens on (`fleetModeOn`).
     var simpleBotsOn: Bool { settings.simpleBotsEnabled }
 
     /// The home is the tab's root, whatever is pushed over it: no bar, no ☰; the person's circle opens Settings.

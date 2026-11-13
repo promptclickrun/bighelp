@@ -658,6 +658,14 @@ struct SettingsView: View {
         .modifier(ClearCacheConfirmation(isPresented: $isClearCacheConfirmationPresented, onConfirm: clearLocalCache))
     }
 
+    /// A row's title alone. Its second line, when it has one, is the control's own value.
+    func settingTitle(_ title: String) -> some View {
+        Text(title)
+            .bighelpFont(.body)
+            .foregroundStyle(theme.primaryText)
+    }
+
+    /// A row's title with a hint under it, for the few rows whose title can't carry it: six words at most.
     func settingLabel(_ title: String, detail: String) -> some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space4) {
             Text(title)

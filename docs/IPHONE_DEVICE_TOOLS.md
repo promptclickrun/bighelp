@@ -26,8 +26,8 @@ Apple Health came back in #750 (see [Apple Health](#apple-health)); 2.3.0 (105) 
 after App Review (guideline 2.5.1) found no health feature in the app.
 Every data control starts off. An agent can still ask for one that's off: its call shows a
 connect card in the chat ([Connect cards](#connect-cards)), whose Turn on flips the same switch. Enabling one requests its native iOS permission from
-that explicit foreground action. Appearance ("Let agents change how bighelp looks") and
-Navigation ("Let agents show you around bighelp") are the exceptions: they share no data
+that explicit foreground action. Appearance ("Change how bighelp looks") and
+Navigation ("Show you around") are the exceptions: they share no data
 and change nothing the person can't change back, so they're on until the person turns them
 off, and they need no iOS permission. Calendar and Reminders authorize direct reads,
 creation, updates and deletion after enablement, with no per-operation approval.
@@ -387,8 +387,8 @@ the app.
   happened; a control it points at that never shows leaves the trail where the screen
   stopped. Return to chat puts back the tab and pages the person had; Stay here leaves them on
   the place.
-- Like Appearance it shares nothing and needs no iOS permission: its switch ("Let agents show
-  you around bighelp", `bighelp.device-tools.navigation`, missing means on) is one setting for
+- Like Appearance it shares nothing and needs no iOS permission: its switch ("Show you
+  around", `bighelp.device-tools.navigation`, missing means on) is one setting for
   every host. Neither operation is journaled. The phone sends `navigation` in `enabled` only
   when `/native/context` lists `native-device-navigation-v1`.
 - A channel with only Appearance and Navigation polls every 8 seconds, except while the chat's

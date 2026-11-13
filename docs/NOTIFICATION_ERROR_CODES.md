@@ -11,7 +11,7 @@ bighelp shows the code in these places:
 - The Notifications section of the screen for a computer.
 - **Settings › Notifications**.
 - The Notifications step of the first setup.
-- **Settings › Notifications › Advanced › Provider details**. This row shows the last problem and its time.
+- **Settings › Notifications › Advanced › Provider details**. This row shows the last problem and its time. Advanced shows after a setup problem, and always with Nerd Mode on (Settings › Nerd Mode).
 
 ## How to send us a code
 
@@ -50,7 +50,7 @@ The first digit tells you which part stopped:
 | NS-2xx | Your device: permission, push registration, the push service and saved data. |
 | NS-3xx | The computer: the connection, the plugin and Hermes. |
 | NS-4xx | Notification permissions. |
-| NS-5xx | **Turn Off Notifications** and **Set Up Again**. |
+| NS-5xx | **Turn off notifications** and **Set Up Again**. |
 | NS-9xx | Other problems. |
 
 A code always keeps its meaning. A new problem gets a new code.
@@ -72,15 +72,15 @@ Some problems do not go away when you try again. For these problems, bighelp doe
 | NS-108 | A different network problem stopped setup. | Examine the connection of your device. Then try again. | If the problem continues, the code and its details. |
 | NS-109 | The notification service does not accept a request from this version of bighelp. | Update bighelp. | The code and its details. |
 | NS-110 | The notification service refused a step for a reason that this version of bighelp does not know. | Update bighelp. | The code and its details. |
-| NS-111 | The notification service has a different key for your device. | Tap **Turn Off Notifications** at the bottom of **Settings › Notifications**. Then turn notifications on again. | If the problem continues, the code and its details. |
+| NS-111 | The notification service has a different key for your device. | Tap **Turn off notifications** at the bottom of **Settings › Notifications**. Then turn notifications on again. | If the problem continues, the code and its details. |
 | NS-112 | The notification service received the same sign-up two times. | Try again. | Nothing. |
 | NS-113 | The clock on your device is wrong. | Open the Settings app. Go to **General › Date & Time**. Set **Set Automatically** to on. Then try again. | Nothing. |
 | NS-114 | Your network sent too many sign-ups in one hour. | Wait one hour. Then try again. | Nothing. |
 | NS-115 | The notification service cannot accept new sign-ups now. | Try again later. | If the problem continues for more than one hour, the code and its details. |
 | NS-116 | The notification service did not accept the new key of your device. | Update bighelp. | The code and its details. |
 | NS-117 | The notification service did not accept the sign-in of your device. Usually the clock on your device is wrong. | Set **Set Automatically** to on in **General › Date & Time**. Then try again. | If the clock is correct, the code and its details. |
-| NS-118 | The notification service stopped the sign-up of your device. | Tap **Turn Off Notifications**. Then turn notifications on again. | If the problem continues, the code and its details. |
-| NS-119 | The notification service did not accept the notification key of your device. | Tap **Turn Off Notifications**. Then turn notifications on again. | If the problem continues, the code and its details. |
+| NS-118 | The notification service stopped the sign-up of your device. | Tap **Turn off notifications**. Then turn notifications on again. | If the problem continues, the code and its details. |
+| NS-119 | The notification service did not accept the notification key of your device. | Tap **Turn off notifications**. Then turn notifications on again. | If the problem continues, the code and its details. |
 | NS-120 | The notification service received the same request two times. | Try again. | Nothing. |
 | NS-121 | The notification service did not confirm that it removed an old sign-up of your device. | Try again later. | If the problem continues, the code and its details. |
 | NS-122 | The notification service could not remove your device from the push service. | Try again later. | If the problem continues, the code and its details. |
@@ -131,10 +131,10 @@ Some problems do not go away when you try again. For these problems, bighelp doe
 | NS-231 | The notification service cannot connect to the push service. | Try again later. | If the problem continues for more than one hour, the code and its details. |
 | NS-232 | The push service sent the notification service data that it cannot use. | Try again later. | If the problem continues, the code and its details. |
 | NS-233 | The records of the push service for your device do not agree. | Try again. | If the problem continues, the code and its details. |
-| NS-234 | The push service has more than one registration for your device. | Tap **Turn Off Notifications**. Then turn notifications on again. | If the problem continues, the code and its details. |
+| NS-234 | The push service has more than one registration for your device. | Tap **Turn off notifications**. Then turn notifications on again. | If the problem continues, the code and its details. |
 | NS-235 | The notification service cannot use the push service now. Its configuration is not complete. | Try again later. | The code and its details. |
 | NS-240 | bighelp cannot open the keychain on your device. The device is possibly locked. | Unlock your device. Then try again. | If the problem continues, the code and its details. |
-| NS-241 | The notification setup that bighelp saved on your device is damaged. | Tap **Turn Off Notifications**. Then turn notifications on again. | If the problem continues, the code and its details. |
+| NS-241 | The notification setup that bighelp saved on your device is damaged. | Tap **Turn off notifications**. Then turn notifications on again. | If the problem continues, the code and its details. |
 | NS-242 | bighelp cannot save the notification setup on your device. | Make sure that your device has free storage. Then try again. | If the problem continues, the code and its details. |
 | NS-243 | bighelp cannot load the notification setup on your device. | Close bighelp fully and open it again. | If the problem continues, the code and its details. |
 
@@ -199,8 +199,8 @@ Some problems do not go away when you try again. For these problems, bighelp doe
 | NS-405 | A different notification permission uses the key of this computer. | Tap **Set Up Again**. | If the problem continues, the code and its details. |
 | NS-406 | The clock on your device is wrong. | Open the Settings app. Go to **General › Date & Time**. Set **Set Automatically** to on. Then try again. | Nothing. |
 | NS-407 | The notification permission for this computer is not active. | Tap **Set Up Again**. | If the problem continues, the code and its details. |
-| NS-408 | The notification sign-up of your device is from an old version of bighelp. | Tap **Turn Off Notifications**. Then turn notifications on again. | If the problem continues, the code and its details. |
-| NS-409 | The notification sign-up of your device uses a type of sign-in that bighelp removed. | Tap **Turn Off Notifications**. Then turn notifications on again. | If the problem continues, the code and its details. |
+| NS-408 | The notification sign-up of your device is from an old version of bighelp. | Tap **Turn off notifications**. Then turn notifications on again. | If the problem continues, the code and its details. |
+| NS-409 | The notification sign-up of your device uses a type of sign-in that bighelp removed. | Tap **Turn off notifications**. Then turn notifications on again. | If the problem continues, the code and its details. |
 | NS-420 | The notification key of your computer changed after the setup of your device. A new plugin install can cause this. | Tap **Set Up Again**. | Nothing. |
 | NS-421 | The notification service did not confirm that it removed an old notification permission. | Try again. | If the problem continues, the code and its details. |
 | NS-422 | Your computer has more than one old notification permission. | Tap **Set Up Again**. | If the problem continues, the code and its details. |
@@ -212,9 +212,9 @@ Some problems do not go away when you try again. For these problems, bighelp doe
 | NS-428 | The notification permission belongs to a different computer on your device. | Tap **Set Up Again**. | If the problem continues, the code and its details. |
 | NS-429 | An earlier change to notifications did not finish. | Wait one minute. Then try again. | If the problem continues, the code and its details. |
 
-## NS-5xx: Turn Off Notifications and Set Up Again
+## NS-5xx: Turn off notifications and Set Up Again
 
-**Turn Off Notifications** shows these codes when it cannot finish:
+**Turn off notifications** shows these codes when it cannot finish:
 
 | Code | What happened | What to do | What we need |
 |---|---|---|---|

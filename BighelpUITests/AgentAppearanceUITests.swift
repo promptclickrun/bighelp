@@ -56,7 +56,7 @@ final class AgentAppearanceUITests: BighelpUITestCase {
         let toggle = appearanceSwitch(in: app)
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         XCTAssertEqual(toggle.value as? String, "1", "On until the person turns it off")
-        XCTAssertTrue(app.staticTexts["Let agents change how bighelp looks"].exists)
+        XCTAssertTrue(app.staticTexts["Change how bighelp looks"].exists)
         capture("device-access-appearance-on-\(appearance)", in: app)
         toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
         expectation(for: NSPredicate(format: "value == '0'"), evaluatedWith: toggle)

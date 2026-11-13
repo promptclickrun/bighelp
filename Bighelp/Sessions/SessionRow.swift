@@ -7,7 +7,7 @@ import SwiftUI
 struct SessionRow: View {
     let session: SessionSummary
     let agents: AgentDirectoryStore
-    /// Settings › Chat › Projects in the chat list, unless the list groups by project, where
+    /// Settings › Chat › Project names, unless the list groups by project, where
     /// the section header already says it. A line of its own keeps the preview whole at every
     /// text size.
     var showsProject = false

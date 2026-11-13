@@ -320,7 +320,7 @@ known session after refreshing the catalog if necessary.
 
 The main shell presents Agents, Sessions, Scheduled Tasks and Workspace.
 Sessions remains the root of the initial landing destination: by default a cold
-launch opens the agent's latest chat on it, and Settings › Chat › Open on can pick
+launch opens the agent's latest chat on it, and Settings › Chat › Opens on can pick
 another screen and agent instead (`BighelpLanding`). Activity, preferences,
 account/device management and connectivity live inside Workspace. New chat is a
 separate action, not another tab. Existing route identities and legacy
@@ -741,7 +741,7 @@ An update enrolls a phone that already has notifications, with nothing shown and
    (`BighelpAPNSTokenHookCenter`); the same hook now also gives it to the registrar.
 3. The registrar sends `PUT /v1/notifications/push-target` with `{version, token, environment,
    appVersion, mutedTopics}`. `mutedTopics` lists the topics the person turned off in Settings ›
-   Notifications › Notify Me About (read from BuzzKit's preferences, as the settings screen does), because
+   Notifications › Notify me about (read from BuzzKit's preferences, as the settings screen does), because
    the service applies those choices itself when it sends straight to Apple. If they can't be read, nothing
    is sent and it tries again later; an empty list would wrongly say "nothing is turned off". The request is signed by the same code as every other installation request
    (`BighelpNotificationBrokerClient`, the `loopdy-notification-device-v1` transcript). The

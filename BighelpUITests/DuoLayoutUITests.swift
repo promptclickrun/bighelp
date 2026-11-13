@@ -167,6 +167,50 @@ final class DuoLayoutUITests: BighelpUITestCase {
         save("cover-board-face-menu-light", app)
     }
 
+    /// A posture change with the viewer open: photo three must survive it, and so must the viewer.
+    /// It skips on a screen that can't turn — the foldable simulator reports only its cover display
+    /// in portrait, so a test here needs a device that really changes posture.
+    @MainActor
+    func testCoverScreenKeepsTheOpenPhotoWhenTheScreenTurns() throws {
+        XCUIDevice.shared.orientation = .portrait
+        defer { XCUIDevice.shared.orientation = .portrait }
+        let app = makeApp()
+        app.launchArguments = demo + ["-start-chat", "-test-image-stack", "-loopdy.demo.appearance", "light"]
+        app.launch()
+        try requireCoverScreen(app)
+        let agentStack = app.descendants(matching: .any).matching(identifier: "chat.image-stack")
+            .matching(NSPredicate(format: "label == %@", "4 photos")).firstMatch
+        XCTAssertTrue(agentStack.waitForExistence(timeout: 20))
+        agentStack.tap()
+        let pages = element("chat.image-stack.pages", in: app)
+        XCTAssertTrue(pages.waitForExistence(timeout: 10))
+        app.buttons["chat.image-stack.thumbnail.2"].tap()
+        XCTAssertEqual(element("chat.image-stack.position", in: app).label, "3 of 4")
+        XCTAssertFalse(app.navigationBars["3 of 4"].exists, "Opened over the whole display")
+        let upright = app.windows.firstMatch.frame
+        save("cover-photos-before-turning-light", app)
+
+        // On its side the screen is the other posture, where the bar lies along the bottom: reading
+        // the live posture there would swap the cover for a sheet and start the pictures over.
+        XCUIDevice.shared.orientation = .landscapeLeft
+        sleep(3)
+        let sideways = app.windows.firstMatch.frame
+        try XCTSkipUnless(sideways.width > upright.width,
+                          "This screen doesn't turn: the foldable simulator reports only the cover display in portrait")
+        XCTAssertTrue(pages.waitForExistence(timeout: 10), "The picture stays open")
+        XCTAssertEqual(element("chat.image-stack.position", in: app).label, "3 of 4", "On the same picture")
+        XCTAssertFalse(app.navigationBars["3 of 4"].exists, "…still over the whole display, not a sheet")
+        save("cover-photos-turned-light", app)
+
+        XCUIDevice.shared.orientation = .portrait
+        sleep(3)
+        XCTAssertEqual(element("chat.image-stack.position", in: app).label, "3 of 4", "And back again")
+        let close = element("chat.image-stack.close", in: app)
+        XCTAssertTrue(close.exists)
+        close.tap()
+        XCTAssertTrue(pages.waitForNonExistence(timeout: 5), "Close still leaves it")
+    }
+
     // MARK: Open and half-folded (an iPad simulator standing in)
 
     @MainActor

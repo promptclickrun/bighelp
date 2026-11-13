@@ -57,6 +57,7 @@ final class SettingsLayoutUITests: BighelpUITestCase {
             let opensOn = app.buttons["settings.landing.screen"].firstMatch
             XCTAssertTrue(opensOn.waitForExistence(timeout: 5), "Opening leads Settings › Chat")
             XCTAssertTrue(header("Opening", in: app).exists)
+            XCTAssertLessThan(header("Opening", in: app).frame.minY, opensOn.frame.minY, "Opens on sits under Opening")
             XCTAssertTrue(opensOn.label.contains("Opens on"), opensOn.label)
             save("05-chat-\(appearance)", app)
             reach(header("A bot's work", in: app), in: app)
@@ -78,8 +79,11 @@ final class SettingsLayoutUITests: BighelpUITestCase {
             reach(header("Notify me about", in: app), in: app)
             reach(app.switches["settings.notifications.peer-chats"].firstMatch, in: app)
             save("07-notifications-\(appearance)", app)
-            reach(header("Quiet hours", in: app), in: app)
-            let quiet = reach(app.switches["settings.notifications.quiet-hours"].firstMatch, in: app)
+            let quietHeader = reach(header("Quiet hours", in: app), in: app)
+            let quiet = app.switches["settings.notifications.quiet-hours"].firstMatch
+            // The header and the switch share a name; the switch is the one under the header.
+            XCTAssertTrue(quiet.waitForExistence(timeout: 3), "The switch sits right under its header")
+            XCTAssertLessThan(quietHeader.frame.minY, quiet.frame.minY)
             XCTAssertEqual(quiet.label, "Quiet hours")
             reach(app.descendants(matching: .any)["settings.notifications.details"].firstMatch, in: app)
             reach(app.buttons["settings.notifications.turn-off"].firstMatch, in: app)
@@ -91,6 +95,7 @@ final class SettingsLayoutUITests: BighelpUITestCase {
             let calendar = app.switches["permissions.device-tools.calendar"].firstMatch
             XCTAssertTrue(calendar.waitForExistence(timeout: 5))
             XCTAssertTrue(header("Your data", in: app).exists)
+            XCTAssertLessThan(header("Your data", in: app).frame.minY, calendar.frame.minY, "Calendar sits under Your data")
             XCTAssertEqual(calendar.label, "Calendar", "The long description left the row")
             save("09-device-access-\(appearance)", app)
             app.buttons["permissions.device-tools.calendar.about"].firstMatch.tap()

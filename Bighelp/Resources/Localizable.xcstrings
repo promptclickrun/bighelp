@@ -5686,23 +5686,6 @@
         }
       }
     },
-    "Full": {
-      "comment": "Simplified Chinese draft for Settings › Chat › Agent's work and the chat's work block (#564); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Full"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "完整"
-          }
-        }
-      }
-    },
     "GPT Live 1 · a live conversation": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {

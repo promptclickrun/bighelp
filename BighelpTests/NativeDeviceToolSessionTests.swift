@@ -843,6 +843,29 @@ struct NativeDeviceToolSessionTests {
 
 @MainActor
 struct HostPluginFeatureReadinessTests {
+    /// Device access shows the plugin's rows only while there is something to do or wait for (#974);
+    /// the Voice pages always show them.
+    @Test func deviceAccessShowsThePluginRowsOnlyWhenNeeded() {
+        func shows(computer: Bool = true, checked: Bool = true, checking: Bool = false, working: Bool = false,
+                   ready: Bool = false, restart: Bool = false, showed: Bool = false) -> Bool {
+            HostPluginFeature.deviceAccess.showsRows(
+                hasComputer: computer, checked: checked, checking: checking, working: working, ready: ready,
+                restartPending: restart, showedRows: showed)
+        }
+        #expect(!shows(computer: false), "No computer: the opening line says to connect one")
+        #expect(!shows(checked: false), "Nothing before the first check: no line that comes and goes")
+        #expect(!shows(checked: false, checking: true), "The first check shows nothing while it runs")
+        #expect(shows(), "A finished check that isn't ready shows what to do")
+        #expect(!shows(ready: true), "A ready plugin shows nothing")
+        #expect(shows(checking: true, showed: true), "Check again keeps the rows up while it runs")
+        #expect(!shows(checking: true, showed: false), "A later check of a ready plugin stays quiet")
+        #expect(shows(checked: false, working: true), "An install shows its progress")
+        #expect(shows(ready: true, restart: true), "A pending restart shows its button")
+        #expect(HostPluginFeature.liveVoice.showsRows(
+            hasComputer: false, checked: false, checking: false, working: false, ready: true,
+            restartPending: false, showedRows: false), "Voice always shows the plugin's status")
+    }
+
     @Test func staleFeatureCheckAfterHostSwitchCannotPublishReadiness() throws {
         let fixture = try Fixture()
         defer { fixture.cleanup() }

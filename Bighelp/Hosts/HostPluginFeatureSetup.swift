@@ -8,6 +8,21 @@ enum HostPluginFeature: String, Hashable, Sendable {
     /// Device access shows the plugin only while there's something to do or wait for; Voice
     /// settings always show its status line, since every voice mode needs the plugin.
     var showsOnlyWhenNeeded: Bool { self == .deviceAccess }
+
+    /// Whether the plugin's rows show. Device access hides them with no computer chosen (its
+    /// opening line says to connect one), until the first check ends, and once the plugin is
+    /// ready. A check alone changes nothing on screen: most end with the plugin ready, and a line
+    /// that came and went moved the page each time it opened, so rows that were up stay up
+    /// through a later check and rows that were hidden stay hidden.
+    func showsRows(hasComputer: Bool, checked: Bool, checking: Bool, working: Bool, ready: Bool,
+                   restartPending: Bool, showedRows: Bool) -> Bool {
+        guard showsOnlyWhenNeeded else { return true }
+        guard hasComputer else { return false }
+        if working || restartPending { return true }
+        guard checked else { return false }
+        if checking { return showedRows }
+        return !ready
+    }
     var installIdentifier: String {
         self == .liveVoice ? CodexLiveVoiceSettingsPresentation.installAccessibilityIdentifier
             : "settings.install-loopdy-plugin-for-device-access"
@@ -19,8 +34,8 @@ enum HostPluginFeature: String, Hashable, Sendable {
 @MainActor
 struct HostPluginFeatureSection: View {
     let feature: HostPluginFeature
-    /// The page's opening line, in place of the section's title. It also keeps the section on the
-    /// page while its rows are hidden, so the check below still runs.
+    /// The page's opening line, as a row of its own in place of the section's title. The row is
+    /// always on the page, so the check below has somewhere to live while the plugin's rows are hidden.
     var lead: Text? = nil
     @Environment(\.bighelpHostRegistry) private var registry
     @Environment(\.scenePhase) private var scenePhase
@@ -29,7 +44,9 @@ struct HostPluginFeatureSection: View {
     @State private var action: String?
     @State private var checking = false
     @State private var ready = false
-    /// Whether the last finished check left something to do or wait for (`showsRows`).
+    /// Whether a check has finished for the computer in use, and whether it left something to
+    /// do or wait for (`HostPluginFeature.showsRows`).
+    @State private var checked = false
     @State private var showedRows = false
     /// Set after this section installed or turned on the plugin, until a restart finishes it.
     @State private var restarts: HostPluginUpdateModel?
@@ -42,15 +59,10 @@ struct HostPluginFeatureSection: View {
         "\(registry?.selectedHostID?.uuidString ?? "none"):\(registry?.generation.uuidString ?? "none"):\(registry?.selectedWorkspace?.connectionGeneration.uuidString ?? "none"):\(registry?.selectedWorkspace?.isConnected == true)"
     }
 
-    /// Device access hides the rows once the plugin is ready, and with no computer chosen (its
-    /// opening line says to connect one).
     private var showsRows: Bool {
-        guard feature.showsOnlyWhenNeeded else { return true }
-        guard registry?.selectedHost != nil else { return false }
-        // A check alone changes nothing on screen: most end with the plugin ready, and a line that
-        // came and went moved the page each time it opened. Rows that were up stay up through one.
-        if checking, setup?.isWorking != true, restarts == nil { return showedRows }
-        return !ready || restarts != nil
+        feature.showsRows(hasComputer: registry?.selectedHost != nil, checked: checked, checking: checking,
+                          working: setup?.isWorking == true, ready: ready, restartPending: restarts != nil,
+                          showedRows: showedRows)
     }
 
     private var offersInstall: Bool {
@@ -58,6 +70,34 @@ struct HostPluginFeatureSection: View {
     }
 
     var body: some View {
+        if let lead {
+            // A row, not a header: a section whose rows are all hidden may not keep its modifiers
+            // alive, and the check must run to find out whether the rows are needed at all.
+            Section {
+                checksPlugin(lead.bighelpFont(.metadata).foregroundStyle(.secondary)
+                    .listRowBackground(Color.clear))
+            }
+            if showsRows { pluginSection }
+        } else {
+            checksPlugin(pluginSection)
+        }
+    }
+
+    /// Runs the check for the computer in use, again when it changes, and stops it when the page goes.
+    private func checksPlugin(_ view: some View) -> some View {
+        view
+            .task(id: identity) { await check() }
+            .onDisappear { requestID = UUID(); setup?.cancel() }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .background else { return }
+                requestID = UUID()
+                setup?.cancel()
+                // The check this replaces returns without finishing, so it can't clear its own flag.
+                checking = false
+            }
+    }
+
+    private var pluginSection: some View {
         Section {
             if showsRows {
                 Label(status, systemImage: ready ? "checkmark.circle" : "puzzlepiece.extension")
@@ -79,24 +119,13 @@ struct HostPluginFeatureSection: View {
                 }
             }
         } header: {
-            if let lead {
-                lead.textCase(nil).bighelpFont(.metadata).foregroundStyle(.secondary)
-            } else {
-                Text(feature.title)
-            }
+            Text(lead == nil ? feature.title : "bighelp plugin")
         } footer: {
             if feature == .deviceAccess, showsRows, offersInstall {
                 Text(BighelpPlatform.isMac
                      ? "Installation leaves macOS permissions off."
                      : "Installation leaves iOS permissions off.")
             }
-        }
-        .task(id: identity) { await check() }
-        .onDisappear { requestID = UUID(); setup?.cancel() }
-        .onChange(of: scenePhase) { _, phase in
-            guard phase == .background else { return }
-            requestID = UUID()
-            setup?.cancel()
         }
         .pluginRestartPrompt($restartPrompt) { restarted in
             if restarted { restarts = nil }
@@ -129,6 +158,7 @@ struct HostPluginFeatureSection: View {
         defer {
             if requestID == request {
                 checking = false
+                checked = true
                 showedRows = !ready || restarts != nil
             }
         }

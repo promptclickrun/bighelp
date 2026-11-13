@@ -115,7 +115,8 @@ struct BighelpNotificationSettingsView: View {
             BighelpChannelAlertsSection(loadChannels: channelAlertsSync.channels, apply: channelAlertsSync.apply)
             BighelpWorkflowAlertsSection(apply: { await hostRegistry?.notificationSetup?.applyAlertPreferences() })
             quietHoursSection
-            if nerdModeEnabled {
+            // A setup problem is not advanced: its code and time show without Nerd Mode too.
+            if nerdModeEnabled || lastFailure != nil {
                 Section("Advanced") {
                     DisclosureGroup("Provider details") {
                         providerSection

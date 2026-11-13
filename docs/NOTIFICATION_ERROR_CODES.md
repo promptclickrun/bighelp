@@ -11,7 +11,7 @@ bighelp shows the code in these places:
 - The Notifications section of the screen for a computer.
 - **Settings › Notifications**.
 - The Notifications step of the first setup.
-- **Settings › Notifications › Advanced › Provider details**, with Nerd Mode on (Settings › Nerd Mode). This row shows the last problem and its time.
+- **Settings › Notifications › Advanced › Provider details**. This row shows the last problem and its time. Advanced shows after a setup problem, and always with Nerd Mode on (Settings › Nerd Mode).
 
 ## How to send us a code
 

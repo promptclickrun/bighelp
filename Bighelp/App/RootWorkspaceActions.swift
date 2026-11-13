@@ -511,9 +511,14 @@ extension RootShellView {
     }
 
     /// `firstMessage`: New chat's text for a group chat it just made, sent there once it opens.
-    func openHostedGroup(_ id: String, owner: WorkspaceOwner, settings: Bool, firstMessage: String? = nil) {
+    /// `opened` is called once: with the chat's ID when it is on screen, else nil.
+    func openHostedGroup(_ id: String, owner: WorkspaceOwner, settings: Bool, firstMessage: String? = nil,
+                         opened: (@MainActor (String?) -> Void)? = nil) {
         Task { @MainActor in
-            guard currentWorkspaceOwner == owner else { return }
+            guard currentWorkspaceOwner == owner else {
+                opened?(nil)
+                return
+            }
             do {
                 let room = try await botModeRooms.openNativeRoom(roomID: id)
                 guard currentWorkspaceOwner == owner else { throw WorkspaceClientError.ownerChanged }
@@ -533,11 +538,15 @@ extension RootShellView {
                 }
                 if settings {
                     appState.open(.groupSettings(roomID: room.id, conversationID: model.conversationID))
+                    opened?(nil)
                 } else {
                     appState.activateConversation(id: record.id, source: .sessions)
-                    dropNewChatBlank(under: record.id)
+                    // New chat's own paths take its blank chat off the stack here (`dropNewChatBlank`).
+                    // A group chat opened any other way (a link, an alert, Chats) leaves the stack as it is.
+                    opened?(record.id)
                 }
             } catch {
+                opened?(nil)
                 guard currentWorkspaceOwner == owner else { return }
                 actionErrorMessage = "Hermes could not open this group. "
                     + (HermesRefusalMessage.sentence(in: error) ?? "Check the host and try again.")

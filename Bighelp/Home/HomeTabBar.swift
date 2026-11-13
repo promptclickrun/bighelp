@@ -48,7 +48,7 @@ struct HomeTabBar: View {
     @BighelpThemeReader private var theme
 
     static let newChatIdentifier = "home.new-chat"
-    static let newChatVisibleLabel = "New chat"
+    static let newChatVisibleLabel = String(localized: "New chat")
     static let newChatAccessibilityLabel = String(localized: "New chat")
 
     /// Like the system tab bar, the bar sits low, just above the home indicator, instead of a full

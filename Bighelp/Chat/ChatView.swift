@@ -243,10 +243,7 @@ struct ChatView: View {
     /// They go with the pushed header, which holds the To row. A chat without the slot reads
     /// nothing here, and with it only what the rows already read.
     private var newChat: ChatNewChatSlot? {
-        guard let newChatSlot, homeChrome.isPushedChat,
-              model.transcriptEntries.isEmpty, model.stagedSends.isEmpty,
-              model.bigFileSends.isEmpty, !model.isSending, !model.hasPreviousHistory,
-              model.failureMessage == nil else { return nil }
+        guard let newChatSlot, homeChrome.isPushedChat, model.isBlankForNewChat else { return nil }
         return newChatSlot
     }
 
@@ -688,6 +685,8 @@ struct ChatView: View {
             onReferenceSend: onReferenceSend,
             sendOverride: newChat?.sendOverride
         )
+        // One home: while New chat's To row isn't this chat's one bot, voice would be another bot's.
+        .modifier(ChatVoiceAvailability(isOffered: newChat?.isOneBotsChat != false))
         .frame(maxWidth: .infinity, alignment: .center)
     }
 
@@ -1095,8 +1094,11 @@ struct ChatView: View {
         }
     }
 
-    /// A chat with one bot, in the shell: only there is a page to open.
-    private var showsBotPageItem: Bool { !model.isBotMode && homeChrome.isPushedChat }
+    /// A chat with one bot, in the shell: only there is a page to open. Not while New chat's To row
+    /// names nobody or several bots: the page would be the blank chat's bot's, not theirs.
+    private var showsBotPageItem: Bool {
+        !model.isBotMode && homeChrome.isPushedChat && newChat?.isOneBotsChat != false
+    }
 
     /// The bot's page, the same one its name in the header opens.
     @ViewBuilder
@@ -1438,6 +1440,20 @@ struct ChatView: View {
 
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
+}
+
+/// Takes voice out of the message box's button where the chat's bot isn't who the person is
+/// writing to. Read and set here, in a view of its own, so the box's other capabilities stay as
+/// its screen gave them.
+private struct ChatVoiceAvailability: ViewModifier {
+    let isOffered: Bool
+    @Environment(\.chatSurfaceCapabilities) private var capabilities
+
+    func body(content: Content) -> some View {
+        var next = capabilities
+        if !isOffered { next.voice = false }
+        return content.environment(\.chatSurfaceCapabilities, next)
+    }
 }
 
 #Preview("Chat · canonical timeline") {

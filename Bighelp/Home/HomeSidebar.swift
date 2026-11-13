@@ -93,7 +93,9 @@ struct HomeSidebar: View {
                 .foregroundStyle(theme.actionForeground)
                 .frame(width: BighelpTokens.scaled(40), height: BighelpTokens.scaled(40))
                 .background(theme.action, in: Circle())
-                .contentShape(Circle())
+                // The circle stays its size; a touch counts over a full target around it.
+                .frame(minWidth: BighelpTokens.hitTarget, minHeight: BighelpTokens.hitTarget)
+                .contentShape(.rect)
         }
         .bighelpPlainButtonStyle(.circle)
         .textCase(nil)

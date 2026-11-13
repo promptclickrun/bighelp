@@ -89,11 +89,22 @@ struct SpacesTodayBridge {
                     .accessibilityIdentifier("today.space.menu.open")
             }
             Button("Update now", systemImage: "arrow.clockwise") {
-                Task { _ = try? await model.runNow(id) }
+                Task { await Self.updateNow(id, model: model) }
             }
             .disabled(!item.isConnected)
             .accessibilityIdentifier("today.space.menu.update")
         })
+    }
+
+    /// Update now from the menu. What the person can act on shows as Today's notice line: the panel's
+    /// own footer only says it for the panel's Try again.
+    private static func updateNow(_ id: String, model: TodaySpacesModel) async {
+        do throws(SpacesError) {
+            let run = try await model.runNow(id)
+            if let message = SpacesTodayMessage.updateNow(ran: run) { TodayNotice.shared.show(message) }
+        } catch {
+            TodayNotice.shared.show(SpacesTodayMessage.updateNow(error))
+        }
     }
 
     /// The bot's name, and its computer's when Today shows spaces from two or more.
@@ -136,7 +147,10 @@ struct SpacesTodayBridge {
             do throws(SpacesError) {
                 try await model.delete(id)
                 layout.forget(panelID)
-            } catch {}
+            } catch {
+                // A definite refusal: the store put the space back, and the person is told.
+                TodayNotice.shared.show(SpacesTodayMessage.deleteRefused)
+            }
         }
     }
 
@@ -145,6 +159,30 @@ struct SpacesTodayBridge {
     /// One for each computer whose plugin doesn't know spaces yet.
     var notes: [SpacesTodayNote] {
         model.statuses.filter { $0.phase == .needsPluginUpdate }.map { SpacesTodayNote(id: $0.scope, computerName: $0.name) }
+    }
+}
+
+/// The short words for what a panel's action came back with. Words the panel and the draft card
+/// already use stay the same (docs/SPACES.md).
+enum SpacesTodayMessage {
+    /// What Update now answered when it ran: only a paused routine has something to say.
+    static func updateNow(ran: SpaceRefreshRun) -> String? {
+        ran == .paused ? String(localized: "Paused in Scheduled tasks") : nil
+    }
+
+    static func updateNow(_ error: SpacesError) -> String {
+        switch error {
+        case .tooSoon: String(localized: "Try again in a minute")
+        case .routineFailed: String(localized: "Its update failed")
+        case .unreachable: String(localized: "Could not reach your computer. Try again.")
+        case .schedulesUnavailable: String(localized: "Your computer can't run scheduled tasks right now.")
+        default: String(localized: "Could not update it. Try again.")
+        }
+    }
+
+    /// A delete only throws once the computer refused it for good.
+    static var deleteRefused: String {
+        String(localized: "Could not delete it. Try again.")
     }
 }
 

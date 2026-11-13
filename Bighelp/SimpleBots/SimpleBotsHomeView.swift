@@ -331,7 +331,7 @@ enum SimpleBotsHomeProjection {
 
     /// Whether `id` can join the pinned bots. Only pins the home shows count: the
     /// primary bot (pinned as the default agent), hidden bots and bots this
-    /// computer no longer has share the Agents screen's list but take no room here.
+    /// computer no longer has share the bot directory's list but take no room here.
     static func canPin(_ id: String, profiles: [AgentProfile], primaryID: String?, pinnedIDs: [String],
                        pinnedGroups: Int = 0) -> Bool {
         let bots = profiles.map { SimpleBotsBot($0) }

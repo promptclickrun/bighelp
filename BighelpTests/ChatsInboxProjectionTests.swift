@@ -145,18 +145,55 @@ struct ChatsInboxProjectionTests {
         #expect(sections.map { $0.rows.map(\.title) } == [["Pinned"], ["Today"], ["Yesterday"], ["Older"]])
     }
 
+    private func key(_ catalog: AnyObject, revision: Int, unsentDrafts: [String: Bool] = [:]) -> ChatsInboxCache.Key {
+        ChatsInboxCache.Key(catalog: ObjectIdentifier(catalog), revision: revision, rooms: [], codeSessionIDs: [],
+                            selectedHostID: nil, computers: [], showsComputerTags: false, unsentDrafts: unsentDrafts)
+    }
+
     @Test func theCacheSortsOnlyWhenAnInputChanges() {
         let cache = ChatsInboxCache()
+        let catalog = NSObject()
         var builds = 0
-        let key = ChatsInboxCache.Key(revision: 1, rooms: [], codeSessionIDs: [], selectedHostID: Self.home,
-                                      computers: [], showsComputerTags: false)
         let build = { builds += 1; return [ChatsInboxRow]() }
 
-        _ = cache.rows(for: key, build: build)
-        _ = cache.rows(for: key, build: build)
+        _ = cache.rows(for: key(catalog, revision: 1), build: build)
+        _ = cache.rows(for: key(catalog, revision: 1), build: build)
         #expect(builds == 1)
-        _ = cache.rows(for: ChatsInboxCache.Key(revision: 2, rooms: [], codeSessionIDs: [], selectedHostID: Self.home,
-                                                computers: [], showsComputerTags: false), build: build)
+        _ = cache.rows(for: key(catalog, revision: 2), build: build)
         #expect(builds == 2)
+    }
+
+    /// Every computer's catalog counts its revisions from zero, and with Show every computer off
+    /// nothing else in the key names the computer: after a switch, an equal revision must not
+    /// bring back the first computer's rows.
+    @Test func anotherComputersCatalogAtTheSameRevisionBuildsItsOwnRows() {
+        let cache = ChatsInboxCache()
+        let home = NSObject(), studio = NSObject()
+        let homeRows = cache.rows(for: key(home, revision: 3)) {
+            ChatsInboxProjection.rows(ChatsInboxInput(sessions: [session("one", at: 1, title: "On the home Mac")]))
+        }
+        let studioRows = cache.rows(for: key(studio, revision: 3)) {
+            ChatsInboxProjection.rows(ChatsInboxInput(sessions: [session("one", at: 1, title: "On the studio Mac")]))
+        }
+
+        #expect(key(home, revision: 3) != key(studio, revision: 3))
+        #expect(homeRows.map(\.title) == ["On the home Mac"])
+        #expect(studioRows.map(\.title) == ["On the studio Mac"])
+    }
+
+    /// A file added in a chat's message box is never saved, so the catalog's revision stays. The
+    /// Draft mark still has to follow it.
+    @Test func aDraftOnlyTheOpenChatHoldsBuildsTheRowsAgain() {
+        let cache = ChatsInboxCache()
+        let catalog = NSObject()
+        var builds = 0
+        let build = { builds += 1; return [ChatsInboxRow]() }
+
+        _ = cache.rows(for: key(catalog, revision: 1), build: build)
+        _ = cache.rows(for: key(catalog, revision: 1, unsentDrafts: ["mina-chat": true]), build: build)
+        _ = cache.rows(for: key(catalog, revision: 1, unsentDrafts: ["mina-chat": true]), build: build)
+        #expect(builds == 2)
+        _ = cache.rows(for: key(catalog, revision: 1), build: build)
+        #expect(builds == 3)
     }
 }

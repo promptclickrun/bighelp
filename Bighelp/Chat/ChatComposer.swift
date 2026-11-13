@@ -15,9 +15,10 @@ final class ChatComposerActions {
     var dismissKeyboard: () -> Void = {}
     var willSend: () -> Void = {}
     var referenceSend: ((ReferenceFrozenDraft, MidSessionChatBehavior?) async -> Void)?
-    /// One home: a new chat's Send asks this first (`ChatNewChatSlot.sendOverride`). True means the
-    /// message was taken, and the box does nothing more with it.
-    var sendOverride: (@MainActor () -> Bool)?
+    /// One home: a new chat's Send asks this first (`ChatNewChatSlot.sendOverride`), saying whether
+    /// the box holds references. True means the message was taken or can't go yet, and the box does
+    /// nothing more with it.
+    var sendOverride: (@MainActor (_ holdsReferences: Bool) -> Bool)?
 }
 
 /// The message box as the chat screen places it: takes the chat's closures on every draw, puts them
@@ -42,7 +43,7 @@ struct ChatComposerHost: View {
     let referenceHub: ReferenceHubStore
     let referenceSkills: SkillsAndToolsStore?
     let onReferenceSend: ((ReferenceFrozenDraft, MidSessionChatBehavior?) async -> Void)?
-    var sendOverride: (@MainActor () -> Bool)? = nil
+    var sendOverride: (@MainActor (_ holdsReferences: Bool) -> Bool)? = nil
     @State private var actions = ChatComposerActions()
 
     var body: some View {
@@ -667,8 +668,9 @@ struct ChatComposer: View, Equatable {
         guard model.canSend else { return }
         if !keepsFocus { dismissComposerKeyboard() }
         // One home: a new chat's message can belong to a group chat or a coding session. Asked
-        // before the references' own send, so nothing of it goes to this chat by another way.
-        if let sendOverride = actions.sendOverride, sendOverride() { return }
+        // before the references' own send, so nothing of it goes to this chat by another way. It is
+        // told of the references, which only this chat's own send can carry.
+        if let sendOverride = actions.sendOverride, sendOverride(!referenceHub.selected.isEmpty) { return }
         if !referenceHub.selected.isEmpty {
             // A reference send keeps its exact reviewed bytes, so a quote line can't ride along.
             guard model.replyDraft == nil else {

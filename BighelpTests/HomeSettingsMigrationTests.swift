@@ -116,6 +116,20 @@ struct HomeSettingsMigrationTests {
 
     // MARK: Writing it down
 
+    /// Someone who finished first run under the modes and changed no setting has only that key. They
+    /// had one computer's view, so Show every computer must not turn on for them as for a new install.
+    @Test func anInstallThatOnlyFinishedFirstRunIsAnExistingOne() {
+        let (defaults, cleanUp) = defaults()
+        defer { cleanUp() }
+        defaults.set(true, forKey: "loopdy.onboarding.first-run-v1.completed")
+
+        #expect(Migration.Stored(reading: defaults).isExistingInstall)
+        Migration.runIfNeeded(defaults: defaults)
+
+        #expect(defaults.object(forKey: "bighelp.hosts.all-hosts") as? Bool == false)
+        #expect(defaults.string(forKey: "bighelp.home.view") == "chats")
+    }
+
     @Test func runsOnceAndWritesOnlyTheNewTruth() {
         let (defaults, cleanUp) = defaults()
         defer { cleanUp() }

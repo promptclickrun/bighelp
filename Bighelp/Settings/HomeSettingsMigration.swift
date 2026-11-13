@@ -111,12 +111,17 @@ enum HomeSettingsMigration {
         static let leftEdge = "loopdy.workspace.leftEdgeSwipeAction"
         static let rightEdge = "loopdy.workspace.rightEdgeSwipeAction"
 
-        /// Keys any earlier run leaves behind. First run's own step key is written only once it shows, after
-        /// `SettingsStore` is made, so a new install has none of these.
+        /// First run finished: the plainest sign that this isn't a new install. Written by the shell
+        /// (`RootShellView.hasCompletedFirstRunOnboarding`).
+        static let firstRunCompleted = "loopdy.onboarding.first-run-v1.completed"
+
+        /// Keys any earlier run leaves behind. First run's own keys (its step, and that it finished) are
+        /// written only once it shows, after `SettingsStore` is made, so a new install has none of these.
         static let existingInstall = [
             simpleBots, codeMode, codeOpenIn, multiGateway, leftEdge, rightEdge,
             Keys.everyComputer, BighelpLanding.screenKey, BighelpLanding.legacyOpensChatKey,
             BighelpLanding.startAgentKey, AIDataConsent.key, FirstRunOnboarding.afterConnectKey,
+            firstRunCompleted,
             "loopdy.onboarding.first-run-v1.step", "bighelp.app-layout", "loopdy.settings.nerd-mode",
             "loopdy.demo.appearance", "bighelp.settings.unified-mode-toggle", "bighelp.settings.chat-switcher",
         ]

@@ -125,14 +125,24 @@ struct ChatsInboxView: View {
             guard host.id != selectedHostID, let snapshot = fleet?.snapshots[host.id] else { return nil }
             return ChatsInboxComputer(id: host.id, name: host.name, chats: snapshot.chats, groups: snapshot.groups ?? [])
         }
+        // Read on every draw: the catalog's revision doesn't move for what only an open chat's
+        // message box holds (files are never saved), so the Draft mark went stale. Two lookups a chat.
+        var unsentDrafts: [String: Bool] = [:]
+        if let unsentDraft = context.unsentDraft {
+            for record in context.catalog.presentedRecords {
+                if let unsent = unsentDraft(record.id) { unsentDrafts[record.id] = unsent }
+            }
+        }
         let key = ChatsInboxCache.Key(
+            catalog: ObjectIdentifier(context.catalog),
             revision: context.catalog.presentedRevision, rooms: context.rooms, codeSessionIDs: context.codeSessionIDs,
-            selectedHostID: selectedHostID, computers: computers, showsComputerTags: showsComputers
+            selectedHostID: selectedHostID, computers: computers, showsComputerTags: showsComputers,
+            unsentDrafts: unsentDrafts
         )
         let all = cache.rows(for: key) { [context] in
             let summaries = context.catalog.recentSummaries(includeCronSessions: false).map { summary in
                 var summary = summary
-                if let unsent = context.unsentDraft?(summary.id) { summary.hasDraft = unsent }
+                if let unsent = unsentDrafts[summary.id] { summary.hasDraft = unsent }
                 return summary
             }
             return ChatsInboxProjection.rows(ChatsInboxInput(
@@ -331,12 +341,19 @@ struct ChatsInboxView: View {
 @MainActor
 final class ChatsInboxCache {
     struct Key: Equatable {
+        /// Whose chats these are. Every computer has its own catalog, each counting its revisions
+        /// from zero, and the list stays on screen through a switch: without this, two computers at
+        /// the same revision showed the first one's chats.
+        let catalog: ObjectIdentifier
         let revision: Int
         let rooms: [HermesBotModeRoomSummary]
         let codeSessionIDs: Set<String>
         let selectedHostID: UUID?
         let computers: [ChatsInboxComputer]
         let showsComputerTags: Bool
+        /// The Draft marks that aren't the catalog's own: what open chats' message boxes hold, by
+        /// chat. The revision doesn't move for these.
+        var unsentDrafts: [String: Bool] = [:]
     }
 
     private struct SectionsKey: Equatable {

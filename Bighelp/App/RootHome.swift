@@ -38,14 +38,14 @@ extension RootShellView {
         HomeViewSwitch(current: home.view) { home.view = $0 }
     }
 
-    /// Today and Work show the computer in use: with two or more, the header switches it.
+    /// Today and Work show the computer in use: with two or more, the header switches it. A
+    /// computer that doesn't answer gives the selection back (`selectFleetHost`).
     private var homeHeaderComputer: HomeHeaderComputer? {
         let hosts = BighelpMenuHosts.current(registry: hostRegistry, demoHosts: demoHosts)
         guard let name = hosts.hosts.first(where: \.isSelected)?.name else { return nil }
         return HomeHeaderComputer(name: name, hosts: hosts.hosts, select: { id in
-            if let fleet, let hostID = UUID(uuidString: id), hostRegistry?.hosts.isEmpty == false {
-                recordLiveFleet()
-                fleet.select(hostID)
+            if fleet != nil, let hostID = UUID(uuidString: id), hostRegistry?.hosts.isEmpty == false {
+                selectFleetHost(hostID)
             } else {
                 hosts.select(id)
             }
@@ -145,7 +145,7 @@ extension RootShellView {
         if let model {
             oneHostSessions(model)
         } else {
-            ProgressView("Loading sessions")
+            ProgressView("Loading chats")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .task { _ = featureStore.prepareSessions(filteredTo: nil) }
         }
@@ -203,9 +203,15 @@ extension RootShellView {
             onDeletePanel: { deletingSpace = $0 },
             activity: botChatActivity, activitySource: botChatActivitySource)
         context.aboveGrid = AnyView(SpacesTodayNotes(notes: bridge.notes))
-        if !isEditingToday {
+        // The box asks a bot on the computer in use for a space. Where that computer's plugin has
+        // no spaces, the note above says to update it, and the box would only lead to a dead end.
+        let computer = SpacesHost.current()
+        let lacksSpaces = computer.map { computer in
+            TodaySpacesModel.shared.statuses.contains { $0.scope == computer.scope && $0.phase == .needsPluginUpdate }
+        } ?? false
+        if !isEditingToday, !lacksSpaces {
             context.belowGrid = AnyView(TodayCreateBox(
-                bots: SpacesHost.current()?.bots ?? [],
+                bots: computer?.bots ?? [],
                 primaryBotID: agents.primaryAgentID ?? agents.profiles.first(where: \.isDefault)?.id
             ) { agentID, text in
                 appState.leaveComposerText(String(localized: "Make me a space for Today: \(text)"))

@@ -290,7 +290,9 @@ private struct NewChatStagedTray: View {
                 .padding(.horizontal, BighelpTokens.space12)
                 .frame(minHeight: BighelpTokens.scaled(34))
                 .background(theme.action, in: .capsule)
-                .contentShape(.capsule)
+                // The capsule stays its size; a touch counts over a full target's height.
+                .frame(minHeight: BighelpTokens.hitTarget)
+                .contentShape(.rect)
         }
         .bighelpPlainButtonStyle(.capsule)
         .disabled(store.project == nil || count == 0)
@@ -316,14 +318,18 @@ private struct NewChatStagedTray: View {
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Button("Remove", systemImage: "xmark") { store.unstage(job.id) }
-                .labelStyle(.iconOnly)
-                .font(.bighelp(.footnote).weight(.semibold))
-                .foregroundStyle(theme.secondaryText)
-                .frame(width: 32, height: 32)
-                .contentShape(.rect)
-                .bighelpPlainButtonStyle()
-                .accessibilityIdentifier("new-chat.staged.remove.\(number)")
+            Button { store.unstage(job.id) } label: {
+                Image(systemName: "xmark")
+                    .font(.bighelp(.footnote).weight(.semibold))
+                    .foregroundStyle(theme.secondaryText)
+                    .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                    .contentShape(.rect)
+            }
+            .bighelpPlainButtonStyle()
+            // The mark stays about where it was: the full target reaches into the row's edge padding.
+            .padding(.trailing, -min(BighelpTokens.space8, (BighelpTokens.hitTarget - 32) / 2))
+            .accessibilityLabel("Remove")
+            .accessibilityIdentifier("new-chat.staged.remove.\(number)")
         }
         .padding(.horizontal, BighelpTokens.space8)
         .frame(minHeight: BighelpTokens.scaled(56))

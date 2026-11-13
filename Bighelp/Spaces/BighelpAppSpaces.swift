@@ -20,13 +20,19 @@ extension BighelpApp {
                                       isCurrent: true)
             }
             guard let owner = connections.owner, let hostID = registry.selectedHostID else { return nil }
+            // The bots come from the runtime of this same computer. During a switch or a reconnect
+            // the runtime may still be the last one's: then no bots are known and nothing is read.
+            let runtime = nativeWorkspaces.current
+            let bots: [SpacesBot] = runtime?.authority.cacheScopeID == owner.cacheScopeID
+                ? runtime?.agents.profiles.map { SpacesBot(id: $0.id, name: $0.name) } ?? [] : []
             return SpacesComputer(hostKey: hostID.uuidString, scope: owner.cacheScopeID,
                                   name: registry.hosts.first { $0.id == hostID }?.name ?? "",
                                   api: SpacesAPI(client: DirectHermesSpacesClient(workspace: { connections.workspace })),
-                                  bots: nativeWorkspaces.current?.agents.profiles
-                                      .map { SpacesBot(id: $0.id, name: $0.name) } ?? [],
-                                  isCurrent: true)
+                                  bots: bots, isCurrent: true)
         }
+        // A computer's spaces go only when the computer itself leaves the registry (or the sign-in
+        // behind it changes), never for a gap in the list below.
+        SpacesHost.hostKeys = { usesDemo() ? ["demo"] : Set(registry.hosts.map { $0.id.uuidString }) }
         SpacesHost.computers = {
             if usesDemo() { return SpacesHost.current().map { [$0] } ?? [] }
             var list: [SpacesComputer] = []

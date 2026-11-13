@@ -366,7 +366,7 @@ final class AgentDirectoryStore {
         return true
     }
 
-    /// Puts the pinned agents in this order (dragging them on the Agents screen).
+    /// Puts the pinned agents in this order (dragging them on the Bots view).
     /// Pins not named keep their place after the named ones; unknown ids are ignored.
     @discardableResult
     func reorderPinnedAgents(_ ids: [String]) -> Bool {
@@ -613,7 +613,7 @@ extension AgentDirectoryStore {
                   primary: (defaults.dictionary(forKey: Keys.primaryAgentIDByHost) as? [String: String])?[hostBucket])
     }
 
-    /// Saves a sign-in's pins where its Agents screen reads them, for one that isn't in use.
+    /// Saves a sign-in's pins where its Bots view reads them, for one that isn't in use.
     static func savePins(_ pins: SavedPins, in defaults: UserDefaults, hostBucket: String) {
         var pinned = defaults.dictionary(forKey: Keys.pinnedAgentIDsByHost) as? [String: [String]] ?? [:]
         var unpinned = defaults.dictionary(forKey: Keys.unpinnedAgentIDsByHost) as? [String: [String]] ?? [:]
@@ -638,7 +638,7 @@ extension AgentDirectoryStore {
     }
 
     /// Pins or unpins an agent of a host that isn't selected (from the all-hosts
-    /// view), saved just as the Agents screen saves it while that host is selected.
+    /// view), saved just as the Bots view saves it while that host is selected.
     /// An unpinned agent is remembered as unpinned, so a default agent stays off.
     @discardableResult
     static func savePin(_ pinned: Bool, agentID: String, in defaults: UserDefaults, hostBucket: String) -> Bool {

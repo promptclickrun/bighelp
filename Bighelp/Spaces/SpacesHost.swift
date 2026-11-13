@@ -31,6 +31,9 @@ enum SpacesHost {
     /// Every computer Today shows, the one in use first: connected ones with their routes and bots,
     /// the others with their saved scope only.
     static var computers: @MainActor () -> [SpacesComputer] = { [] }
+    /// The `hostKey` of every computer the app has, whether or not it can be read now. Nil when the
+    /// app can't say: only the computers listed above then count.
+    static var hostKeys: @MainActor () -> Set<String>? = { nil }
     /// The HTML app routes of the computer with this cache scope, where a space's page is; nil
     /// while it isn't connected.
     static var pages: @MainActor (_ scope: String) -> HTMLAppsAPI? = { _ in nil }

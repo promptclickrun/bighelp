@@ -69,8 +69,10 @@ struct RootShellView: View {
     @State var isGroupCreationPresented = false
     @State var groupCreationSeed: String?
     @State var groupCreationOwner: WorkspaceOwner?
-    @State private var isStartingNewChat = false
+    @State var isStartingNewChat = false
     @State private var newChatStartID: UUID?
+    /// A New chat pick that came while a chat was starting (`newChatStartEnded`).
+    @State var newChatPickGate = NewChatPickGate()
     @State private var fixtureCanonicalSessions: [String: String] = [:]
     @State var workspaceFixtureGeneration = UUID()
     /// Demo runs' connection; `-demo-reconnects-on-return` makes each return a reconnect.
@@ -318,7 +320,7 @@ struct RootShellView: View {
         .modifier(BighelpShortcutParameterUpdates(agents: agents, scheduledTasks: featureStore.scheduledTasks,
                                                   rooms: botModeRooms, catalog: sessionCatalog))
         .modifier(PendingLinkRetry(acceptsLinks: acceptsIncomingLinks, acceptsChatStarts: acceptsChatStarts,
-                                   retry: openPendingIncomingChatIfNeeded))
+                                   hasNavigation: hasOwnNavigation, retry: openPendingIncomingChatIfNeeded))
         .onChange(of: BighelpExternalSessionOpenCenter.shared.pending, initial: true) { _, open in
             if let open { openExternalSession(open) }
         }
@@ -1035,6 +1037,7 @@ struct RootShellView: View {
         withAnimation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration)) {
             isStartingNewChat = false
         }
+        newChatStartEnded()
     }
 
 
@@ -1135,6 +1138,12 @@ struct RootShellView: View {
         // ("host unavailable") or opened its chat under an alert. It waits for
         // a host that answers instead; the latest one wins.
         if route.opensWorkspaceContent, !(route.startsAChat ? acceptsChatStarts : acceptsIncomingLinks) {
+            pendingIncomingURL = url
+            return
+        }
+        // A page or Settings opens in the computer's own navigation, which isn't here yet as the
+        // app starts: opened now, it went into one that is then replaced, and never showed.
+        if route.opensAPage, !hasOwnNavigation {
             pendingIncomingURL = url
             return
         }
@@ -1446,7 +1455,19 @@ struct RootShellView: View {
         return nativeRuntime.chatsOwner == owner
     }
 
+    /// The navigation that pushed pages and Settings show in is the one on screen. Each computer has
+    /// its own (`NativeWorkspaceRuntime.appState`); until its workspace opens, the shell is handed
+    /// the app's first one, which the computer's then replaces. The demo has only the first.
+    private var hasOwnNavigation: Bool {
+        usesDemoFixtures || nativeRuntime != nil
+    }
+
     private func openPendingIncomingChatIfNeeded() {
+        // A page link waited only for the navigation it shows in, never for the computer to answer.
+        if hasOwnNavigation, let url = pendingIncomingURL, BighelpIncomingURLRoute.parse(url)?.opensAPage == true {
+            pendingIncomingURL = nil
+            handleIncomingURL(url)
+        }
         // A link that only starts a chat goes first; handling it again holds it if it came too soon.
         if !acceptsIncomingLinks, acceptsChatStarts, let url = pendingIncomingURL,
            BighelpIncomingURLRoute.parse(url)?.startsAChat == true {
@@ -1644,6 +1665,16 @@ private extension BighelpIncomingURLRoute {
         }
     }
 
+    /// Routes that push a page or open Settings. They need nothing from the computer, only the
+    /// navigation they show in (`RootShellView.hasOwnNavigation`). A link that only picks a tab or
+    /// a view needs neither: those are the whole app's.
+    var opensAPage: Bool {
+        switch self {
+        case .agent, .scheduledTasks, .scheduledTask, .settings, .usage: true
+        default: false
+        }
+    }
+
     /// Routes that start or open one agent's chat, and read nothing from the chat list.
     var startsAChat: Bool {
         switch self {
@@ -1658,12 +1689,15 @@ private extension BighelpIncomingURLRoute {
 private struct PendingLinkRetry: ViewModifier {
     let acceptsLinks: Bool
     let acceptsChatStarts: Bool
+    /// The computer's own navigation is on screen: a link to a page can open in it.
+    let hasNavigation: Bool
     let retry: () -> Void
 
     func body(content: Content) -> some View {
         content
             .onChange(of: acceptsLinks) { _, ready in if ready { retry() } }
             .onChange(of: acceptsChatStarts) { _, ready in if ready { retry() } }
+            .onChange(of: hasNavigation) { _, ready in if ready { retry() } }
     }
 }
 

@@ -318,7 +318,8 @@ extension WorkSources {
                                   .map { code.status(of: $0, reader: reader) } ?? .ready)
             } + pending.enumerated().map { offset, launch in
                 WorkBatchLine(id: launch.id.uuidString, title: launch.title, index: members.count + offset,
-                              status: launch.step.isFailed ? .failed("Couldn't start") : .starting("Setting up"))
+                              status: launch.step.isFailed ? .failed(String(localized: "Couldn't start"))
+                                  : .starting(String(localized: "Setting up")))
             }
             return WorkCodeBatch(batch: batch, lines: lines, startedCount: members.count)
         }

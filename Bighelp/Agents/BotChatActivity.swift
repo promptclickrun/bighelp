@@ -231,7 +231,7 @@ final class BotChatActivityStore {
         return cells[key]?.value
     }
 
-    /// The gateway in use's bots that are busy, by profile ID (the Agents screen).
+    /// The gateway in use's bots that are busy, by profile ID (the Bots view).
     func liveActivities() -> [String: BotChatActivity] {
         _ = generation
         var result: [String: BotChatActivity] = [:]

@@ -40,6 +40,15 @@ struct SpaceDraftDetails: Equatable, Sendable {
     let updates: String
     /// False only when nothing says an update uses AI: the card never says "No AI" by guess.
     let usesAI: Bool
+
+    /// A bot wrote the words: a card's title has no wire limit of its own, so the card never draws
+    /// more than the plugin accepts for a space.
+    init(title: String, description: String, updates: String, usesAI: Bool) {
+        self.title = String(title.prefix(SpacesWire.maximumTitleLength))
+        self.description = String(description.prefix(SpacesWire.maximumDescriptionLength))
+        self.updates = String(updates.prefix(SpacesWire.maximumUpdatesLength))
+        self.usesAI = usesAI
+    }
 }
 
 /// The draft card's rules, kept apart from the view so they can be tested. Every read and Add gets
@@ -333,6 +342,7 @@ private struct SpaceDraftHeader: View {
                 Text(verbatim: details.title)
                     .font(.bighelp(.headline))
                     .foregroundStyle(theme.primaryText)
+                    .lineLimit(2)
                 Text(verbatim: details.description)
                     .font(.bighelp(.subheadline))
                     .foregroundStyle(theme.secondaryText)

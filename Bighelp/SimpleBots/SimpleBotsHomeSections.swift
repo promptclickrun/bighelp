@@ -407,7 +407,7 @@ struct SimpleBotsGroupPreview: View {
     }
 }
 
-/// Delete Group Chat asks first, in the words the Agents screen uses.
+/// Delete Group Chat asks first.
 struct SimpleBotsGroupDeletion: ViewModifier {
     @Binding var group: SimpleBotsGroup?
     let delete: ((String) -> Void)?

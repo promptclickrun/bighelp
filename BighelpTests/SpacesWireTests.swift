@@ -34,6 +34,29 @@ struct SpacesWireTests {
         return json
     }
 
+    /// A bot wrote the title and the words; native UI never draws more than the plugin accepts.
+    @Test func aBotsTitleAndDescriptionAreCappedAtTheWireMaximums() throws {
+        let long = String(repeating: "w", count: 10_000)
+        let space = try #require(Space(json: Self.spaceJSON(["title": .string(long), "description": .string(long)])))
+        #expect(space.title.count == SpacesWire.maximumTitleLength)
+        #expect(space.description.count == SpacesWire.maximumDescriptionLength)
+        // A blank title falls back to the card's.
+        let untitled = try #require(Space(json: Self.spaceJSON(["title": .string("  ")])))
+        #expect(untitled.title == "Commute")
+        // And the copy on the phone's disk reads back as it was kept.
+        #expect(Space(json: space.json)?.title == space.title)
+    }
+
+    @Test func theDraftCardsWordsAreCappedToo() {
+        let long = String(repeating: "w", count: 10_000)
+        let details = SpaceDraftDetails(title: long, description: long, updates: long, usesAI: false)
+        #expect(details.title.count == SpacesWire.maximumTitleLength)
+        #expect(details.description.count == SpacesWire.maximumDescriptionLength)
+        #expect(details.updates.count == SpacesWire.maximumUpdatesLength)
+        #expect(SpaceDraftDetails(title: "Commute", description: "Drive time.", updates: "Every hour", usesAI: true).title
+                == "Commute")
+    }
+
     // MARK: Space
 
     @Test func aFullSpaceReadsEveryField() throws {

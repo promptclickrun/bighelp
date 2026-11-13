@@ -119,6 +119,58 @@ struct TodaySpacesModelTests {
         #expect(model.statuses.map(\.phase) == [.unreachable])
     }
 
+    /// No scope for a computer for a moment (it reconnects, the selection moves) is a gap in the
+    /// list, not a removed computer: its store and waiting changes stay.
+    @Test func aComputerMissingFromTheListForAMomentKeepsItsStoreAndWaitingChanges() async throws {
+        let folder = Kit.folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let client = HeldSpacesClient(Kit.demo())
+        let listed = SpacesTestFlag(true)
+        let model = TodaySpacesModel(
+            computers: { listed.value ? [Kit.computer(client: client)] : [] }, current: { nil },
+            hostKeys: { ["host-scope-home"] }, cacheFolder: folder, clock: { Kit.now })
+        await model.refresh()
+        let store = try #require(model.stores["scope-home"])
+        try await store.change(Kit.garden, SpaceChanges(size: .tall), api: nil)
+
+        listed.value = false
+        await model.refresh()
+        #expect(model.stores["scope-home"] === store)
+        #expect(store.pending[Kit.garden] != nil)
+
+        listed.value = true
+        await model.refresh()
+        #expect(model.stores["scope-home"] === store)
+        #expect(store.pending.isEmpty)
+    }
+
+    @Test func aRemovedComputerLeavesNoSpacesInMemoryOrOnDisk() async throws {
+        let folder = Kit.folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let client = HeldSpacesClient(Kit.demo())
+        let model = TodaySpacesModel(
+            computers: { [Kit.computer(client: client), Kit.computer("scope-studio", name: "Studio", client: client,
+                                                                     isCurrent: false)] },
+            current: { nil }, cacheFolder: folder, clock: { Kit.now })
+        await model.refresh()
+        let store = try #require(model.stores["scope-home"])
+        await store.savedToDisk()
+        await model.stores["scope-studio"]?.savedToDisk()
+        #expect(SpacesCacheFile.read(scope: "scope-home", folder: folder) != nil)
+
+        model.forget(hostKey: "host-scope-home", scope: "scope-home")
+        #expect(model.stores["scope-home"] == nil)
+        #expect(!model.items.contains { $0.scope == "scope-home" })
+        // The erase waits for a write under way, so nothing brings the file back.
+        try await store.change(Kit.garden, SpaceChanges(size: .tall), api: nil)
+        for _ in 0..<50 { await Task.yield() }
+        await store.savedToDisk()
+        #expect(SpacesCacheFile.read(scope: "scope-home", folder: folder) == nil)
+        // The other computer keeps its panels and its copy.
+        #expect(model.stores["scope-studio"] != nil)
+        #expect(SpacesCacheFile.read(scope: "scope-studio", folder: folder) != nil)
+    }
+
     @Test func aStoppedSpaceRunsAgainButNotTwiceInAMinute() async throws {
         let folder = Kit.folder()
         defer { try? FileManager.default.removeItem(at: folder) }

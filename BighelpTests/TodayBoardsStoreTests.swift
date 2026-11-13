@@ -119,6 +119,28 @@ struct TodayBoardsStoreTests {
         #expect(reconnected.reads.isEmpty)
     }
 
+    @Test func aReadWhereEveryBotFailedIsNotARead() async {
+        let clock = Clock()
+        let client = Client(["mina": [post("m1", minutesAgo: 1, clock: clock)], "avery": []])
+        client.failing = ["mina", "avery"]
+        let store = TodayBoardsStore(now: { clock.now })
+        await store.refresh(client: client, scope: "computer-1", botIDs: ["mina", "avery"])
+        // Today keeps its offline state instead of "Nothing yet".
+        #expect(!store.hasRead)
+        // Away and back to the same computer: still nothing was read.
+        await store.refresh(client: client, scope: "computer-2", botIDs: ["mina"])
+        await store.refresh(client: client, scope: "computer-1", botIDs: ["mina", "avery"])
+        #expect(!store.hasRead)
+        // The next read that works counts, and a later failure keeps it.
+        client.failing = []
+        await store.refresh(client: client, scope: "computer-1", botIDs: ["mina", "avery"], force: true)
+        #expect(store.hasRead)
+        client.failing = ["mina", "avery"]
+        await store.refresh(client: client, scope: "computer-1", botIDs: ["mina", "avery"], force: true)
+        #expect(store.hasRead)
+        #expect(store.entries(.feed).map(\.id) == ["mina/m1"])
+    }
+
     @Test func answeredAndDismissedItemsStayOffToday() {
         let clock = Clock()
         var done = post("i1", minutesAgo: 1, clock: clock, kind: .idea)

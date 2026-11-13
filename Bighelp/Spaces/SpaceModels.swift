@@ -171,7 +171,8 @@ struct Space: Identifiable, Equatable, Sendable {
         self.spaceID = spaceID
         self.agentID = agentID
         state = json["state"]?.string.flatMap(SpaceState.init(rawValue:)) ?? .live
-        description = json["description"]?.string ?? ""
+        // A bot wrote this text: no longer than the plugin accepts, whatever the answer holds.
+        description = String((json["description"]?.string ?? "").prefix(SpacesWire.maximumDescriptionLength))
         size = SpaceSize(wire: json["size"])
         hidden = json["hidden"]?.boolean ?? false
         position = json["position"]?.number.flatMap {
@@ -207,7 +208,7 @@ struct Space: Identifiable, Equatable, Sendable {
         routine = SpaceRoutine(json: json["routine"]?.object)
         status = json["status"]?.string.flatMap(SpaceStatus.init(rawValue:)) ?? .unknown
         let title = (json["title"]?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        self.title = title.isEmpty ? (card?.title ?? "") : title
+        self.title = String((title.isEmpty ? (card?.title ?? "") : title).prefix(SpacesWire.maximumTitleLength))
     }
 
     /// The route's shape again, for the phone's copy on disk; read back by `init(json:)`.

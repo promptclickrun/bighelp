@@ -627,6 +627,8 @@ struct BighelpAppComposition {
                 BighelpExternalSessionOpenCenter.shared.request(catalogSessionID: sessionID)
                 return
             }
+            // The request is the whole app's (`HomeSelection`): the shell on screen reads the
+            // computer in use's `AppState`, not this one, and still sees it.
             appState?.openNeedsYou()
         }
         #if DEBUG

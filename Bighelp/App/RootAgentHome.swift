@@ -231,17 +231,21 @@ extension RootShellView {
 
     /// A group chat with these bots right away, named after them, then opened: what New Group
     /// Chat's Create does, minus the form (New chat's To row already picked who's in it).
-    /// `firstMessage` is sent in it once it opens.
+    /// `firstMessage` is sent in it once it opens. `ended` is called once, however this ends: with
+    /// the group chat's ID once it is open, or nil when it couldn't be made or opened. New chat
+    /// keeps its text, and holds a second Send, until then.
     func createGroupChat(with profileIDs: [String], peers: [HermesBotModePeerCandidate] = [],
-                         firstMessage: String? = nil) {
+                         firstMessage: String? = nil, ended: (@MainActor (String?) -> Void)? = nil) {
         guard let owner = groupCreationReadyOwner else {
             actionErrorMessage = "Group chats need a connected Hermes host."
+            ended?(nil)
             return
         }
         let profiles = profileIDs.compactMap { id in agents.profiles.first { $0.id == id } }
         guard profiles.count == profileIDs.count,
               (2...BotModeRoom.maximumMembers).contains(profiles.count + peers.count) else {
             actionErrorMessage = "Those bots aren't all on this computer anymore. Pick them again from New chat."
+            ended?(nil)
             return
         }
         Task { @MainActor in
@@ -251,13 +255,19 @@ extension RootShellView {
                     name: BotModeCreateRoomView.automaticName(profiles.map(\.name) + peers.map(\.name)),
                     profiles: profiles, peers: peers)
                 // A reconnect meanwhile is still this computer.
-                guard isCurrentSignIn(owner), let current = currentWorkspaceOwner else { return }
-                openHostedGroup(room.id, owner: current, settings: false, firstMessage: firstMessage)
+                guard isCurrentSignIn(owner), let current = currentWorkspaceOwner else {
+                    ended?(nil)
+                    return
+                }
+                openHostedGroup(room.id, owner: current, settings: false, firstMessage: firstMessage, opened: ended)
             } catch is CancellationError {
+                ended?(nil)
             } catch let error as BotModePeerLinkError {
+                ended?(nil)
                 guard isCurrentSignIn(owner) else { return }
                 actionErrorMessage = error.message
             } catch {
+                ended?(nil)
                 // The kind of failure only; never host data.
                 Logger(subsystem: "app.loopdy.mobile", category: "BotMode")
                     .error("Group chat create failed: \(String(reflecting: error), privacy: .public)")

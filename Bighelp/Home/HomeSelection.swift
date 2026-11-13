@@ -16,11 +16,13 @@ final class HomeSelection {
     /// `SettingsStore.homeView`.
     var view: HomeConversationsView = .chats
 
-    /// New chat's text on its way to another computer with its pick: the blank chat or the group chat
-    /// made there takes it (`RootShellView.performFleetOpen`).
-    @ObservationIgnored var newChatText: String?
-    /// The chat about to start on the other computer is New chat's own blank chat (its To row).
-    @ObservationIgnored var newChatFollowsPick = false
+    /// New chat's text and To row on their way to another computer with a pick (`handOffNewChat`,
+    /// `takeNewChatHandoff(after:)`).
+    @ObservationIgnored var newChatHandoff: NewChatHandoff?
+    /// An alert that names no chat asked for Needs you (`AppState.openNeedsYou`). Here, not in an
+    /// `AppState`: every computer has its own, and the one that got the tap isn't always the one
+    /// the shell on screen reads.
+    var isNeedsYouRequested = false
 
     @ObservationIgnored private(set) lazy var newChat = NewChatSession()
     @ObservationIgnored private(set) lazy var todayLayout = TodayPanelLayoutStore()

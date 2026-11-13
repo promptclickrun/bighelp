@@ -27,7 +27,19 @@ final class AppState {
         set { home.tab = newValue }
     }
     var path: [AppRoute] = []
-    private(set) var activeConversationID: String?
+    /// The chat last opened (`activateConversation`).
+    private var activatedConversationID: String?
+    /// The chat the person opened last, while it is still on the stack. Back, a tab or anything
+    /// else that takes it off ends it: it once kept naming a chat that had closed, and the phone
+    /// tools and Needs you went on treating that chat as the open one.
+    var activeConversationID: String? {
+        guard let id = activatedConversationID, path.contains(.chat(conversationID: id)) else { return nil }
+        return id
+    }
+    /// The chat whose bot reaches this phone's tools: the chat opened last, also after Back to a list
+    /// while that bot still works. A bot that goes on working must not lose the phone's tools
+    /// because the person stepped out of its chat.
+    var deviceToolConversationID: String? { activatedConversationID }
     private(set) var pendingVoiceConversationID: String?
     /// Text a board "Ask" or "Discuss" leaves in the next new chat's composer.
     var pendingComposerText: String?
@@ -55,8 +67,12 @@ final class AppState {
     /// What the Settings sheet's stack shows above its first page: `SettingsDestination` values.
     var settingsPath = NavigationPath()
     /// Set by `openNeedsYou()`, before the shell is on screen too; kept until the shell settles it
-    /// (`RootShellView.settleNeedsYouRequest`).
-    var isNeedsYouRequested = false
+    /// (`RootShellView.settleNeedsYouRequest`). One for the whole app (`HomeSelection`), so the shell
+    /// on screen sees a request whichever computer's `AppState` took it.
+    var isNeedsYouRequested: Bool {
+        get { home.isNeedsYouRequested }
+        set { home.isNeedsYouRequested = newValue }
+    }
 
     /// Tests and previews get a selection of their own; the app passes `HomeSelection.shared`.
     init(home: HomeSelection = HomeSelection()) {
@@ -129,7 +145,7 @@ final class AppState {
         // copy would share its model, both would redraw every change, and Back would show it again.
         if let open = path.lastIndex(of: route) {
             path.removeSubrange(path.index(after: open)...)
-            activeConversationID = id
+            activatedConversationID = id
             return
         }
         switch source {
@@ -141,7 +157,16 @@ final class AppState {
         case .sessions, .fork:
             path.append(route)
         }
-        activeConversationID = id
+        activatedConversationID = id
+    }
+
+    /// New chat's blank chat leaves the stack once the chat that takes its place (a group chat) is
+    /// over it, so Back doesn't show an empty New chat. `isBlank`: nothing was sent in it. A chat
+    /// with a message is an ordinary chat and stays, whatever opens over it.
+    func dropBlankChat(_ blankID: String, under conversationID: String, isBlank: Bool) {
+        guard isBlank, blankID != conversationID,
+              path.contains(.chat(conversationID: conversationID)) else { return }
+        path.removeAll { $0 == .chat(conversationID: blankID) }
     }
 
     /// The chat the person is in: the active one, else the chat on top of the path.
@@ -160,7 +185,7 @@ final class AppState {
     func resetForHostBoundary() {
         let showsOnlyConnections = !path.isEmpty && path.allSatisfy { $0 == .workspaceConnections }
         if !showsOnlyConnections { path.removeAll() }
-        activeConversationID = nil
+        activatedConversationID = nil
         pendingVoiceConversationID = nil
         clearComposerText()
         dropPendingShare()
@@ -168,7 +193,7 @@ final class AppState {
 
     func resetForAccountBoundary() {
         path.removeAll()
-        activeConversationID = nil
+        activatedConversationID = nil
         pendingVoiceConversationID = nil
         clearComposerText()
         dropPendingShare()

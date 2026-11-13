@@ -78,6 +78,7 @@ extension RootShellView {
             return
         }
         guard fleet.canOpen(hostID) else {
+            _ = home.takeNewChatHandoff(after: .refused)
             actionErrorMessage = "\(fleet.hostName(hostID)) is a sample host in this demo."
             return
         }
@@ -89,35 +90,55 @@ extension RootShellView {
         returnIfFleetHostDoesNotAnswer(hostID, previous: previous)
     }
 
+    /// The header's computer menu on Today and Work: that computer becomes the one in use, with
+    /// nothing to open there. One that doesn't answer gives the selection back, as a tapped bot's
+    /// computer does, so neither the app nor its next launch is left on it.
+    func selectFleetHost(_ hostID: UUID) {
+        guard let fleet, hostID != fleet.selectedHostID else { return }
+        recordLiveFleet()
+        let previous = fleet.selectedHostID
+        // A tap that waited for another computer is given up: the person picked this one.
+        fleet.pendingOpen = nil
+        _ = home.takeNewChatHandoff(after: .cancelled)
+        fleet.select(hostID)
+        returnIfFleetHostDoesNotAnswer(hostID, previous: previous, opensSomething: false)
+    }
+
     /// Cancel on the opening loader: back to the computer the tap came from.
     func cancelPendingFleetOpen() {
         guard let fleet, let pending = fleet.pendingOpen else { return }
         fleet.pendingOpen = nil
+        _ = home.takeNewChatHandoff(after: .cancelled)
         if let back = pending.returnHostID, fleet.selectedHostID == pending.hostID { fleet.select(back) }
     }
 
     /// A tapped agent's computer that doesn't answer gives the selection back to the one that
     /// worked, so the app (and its next launch) isn't left on a computer that's down, and
     /// the opening loader ends. The one that worked stays connected while
-    /// every host shows, so going back is at once.
-    private func returnIfFleetHostDoesNotAnswer(_ hostID: UUID, previous: UUID?) {
+    /// every host shows, so going back is at once. `opensSomething`: a tap waits for this computer
+    /// (`pendingOpen`), and it is ready once that can open. Without one (the header's computer
+    /// menu) the wait is for the computer alone, and a connection is enough.
+    private func returnIfFleetHostDoesNotAnswer(_ hostID: UUID, previous: UUID?, opensSomething: Bool = true) {
         guard let fleet, let previous, previous != hostID else { return }
+        // With nothing to open, "still waited for" is "still the computer in use".
+        let waitedFor: @MainActor () -> UUID? = { opensSomething ? fleet.pendingOpen?.hostID : hostID }
         Task { @MainActor in
             // Selecting it starts its connection; this makes sure an attempt runs now.
             await nativeWorkspaceStore?.reconnect()
             let wait = BighelpShortcutConnectionWait.Host(
-                isWanted: { FleetSwitchFallback.isWaiting(for: hostID, pending: fleet.pendingOpen?.hostID,
+                isWanted: { FleetSwitchFallback.isWaiting(for: hostID, pending: waitedFor(),
                                                          selected: fleet.selectedHostID) },
                 isConnecting: { nativeWorkspaceStore?.isConnecting == true },
                 isConnected: { nativeWorkspaceStore?.isConnected == true },
-                isReady: { isFleetHostReady },
+                isReady: { opensSomething ? isFleetHostReady : true },
                 synchronize: {})
             let ready = (try? await BighelpShortcutConnectionWait.untilReady(wait, timeout: FleetSwitchFallback.timeout))
                 ?? false
             guard FleetSwitchFallback.shouldReturn(ready: ready, waitingFor: hostID,
-                                                   pending: fleet.pendingOpen?.hostID,
+                                                   pending: waitedFor(),
                                                    selected: fleet.selectedHostID) else { return }
             fleet.pendingOpen = nil
+            _ = home.takeNewChatHandoff(after: .unanswered)
             fleet.select(previous)
             actionErrorMessage = FleetSwitchFallback.message(unreachable: fleet.hostName(hostID),
                                                              stillOn: fleet.hostName(previous))
@@ -170,16 +191,18 @@ extension RootShellView {
     }
 
     func performFleetOpen(_ open: FleetOpen) {
+        // New chat's text and To row, if they came with the switch. Taken whatever opens, so
+        // nothing else ever starts with them later.
+        let handoff = home.takeNewChatHandoff(after: .opened)
         switch open {
         case .agent(let profileID):
             openAgentChat(profileID)
         case .newChat(let profileID):
             // New chat's pick of a bot on this computer came with the switch: its text and its To row.
-            let followsNewChat = home.newChatFollowsPick
-            home.newChatFollowsPick = false
-            if let text = home.newChatText, !text.isEmpty { appState.leaveComposerText(text) }
-            home.newChatText = nil
-            startNewChat(explicitAgentID: profileID, tracksNewChat: followsNewChat)
+            if let text = handoff?.text, !text.isEmpty { appState.leaveComposerText(text) }
+            startNewChat(explicitAgentID: profileID, tracksNewChat: handoff?.followsPick == true,
+                         // The chat is made: the box the text came from lets it go.
+                         opened: { _ in handoff?.delivered() })
         case .chat(let profileID, let storedSessionID, let appSessionID):
             if let appSessionID, let record = sessionCatalog.session(id: appSessionID) {
                 openSessionSelection(record.summary)
@@ -207,9 +230,12 @@ extension RootShellView {
             guard let owner = currentWorkspaceOwner else { return }
             handleAgentWorkspaceAction(.init(owner: owner, action: .openGroupSettings(roomID: roomID)))
         case .newGroup(let profileIDs, let peers):
-            let text = home.newChatText
-            home.newChatText = nil
-            createGroupChat(with: profileIDs, peers: peers, firstMessage: text)
+            let session = newChatSession
+            createGroupChat(with: profileIDs, peers: peers, firstMessage: handoff?.text) { openedID in
+                session.groupEnded()
+                // The group chat has the text: the box it came from lets it go.
+                if openedID != nil { handoff?.delivered() }
+            }
         case .routines(let profileID):
             openScheduledTasks(filteredTo: profileID)
         case .botProfile(let profileID):

@@ -79,10 +79,10 @@ struct ChatComposerRedrawTests {
         drawn.actions.voice()
         #expect(voiceTaps == ["second"])
         // A new chat's Send hook comes and goes the same way.
-        actions.sendOverride = { true }
+        actions.sendOverride = { _ in true }
         let keepsTheBoxWithAHook = drawn == box(model)
         #expect(keepsTheBoxWithAHook)
-        #expect(drawn.actions.sendOverride?() == true)
+        #expect(drawn.actions.sendOverride?(false) == true)
 
         let focusRedraws = drawn != box(model, focused: true)
         let attachmentsRedraw = drawn != box(model, attachments: false)
@@ -146,7 +146,7 @@ struct ChatComposerRedrawTests {
         let hook = SendHook()
         let mounted = try MountedComposerChat(model: model, newChat: ChatNewChatSlot(
             toRow: AnyView(Color.clear.frame(height: 44)),
-            sendOverride: {
+            sendOverride: { _ in
                 hook.asked += 1
                 return hook.takes
             }))

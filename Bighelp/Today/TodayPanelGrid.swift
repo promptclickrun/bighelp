@@ -89,6 +89,9 @@ private struct TodayPanelCell: View {
             .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: BighelpTokens.cardCornerRadius,
                                                                 style: .continuous))
             .contextMenu { TodayPanelMenu(panel: panel, layout: layout, onDelete: onDelete, menuItems: menuItems) }
+            .overlay(alignment: .topTrailing) {
+                TodayPanelAccessibilityActions(panel: panel, layout: layout, onDelete: onDelete, menuItems: menuItems)
+            }
             .accessibilityElement(children: .contain)
             .accessibilityLabel(panel.title)
             .accessibilityIdentifier("today.panel.\(panel.id)")
@@ -96,6 +99,26 @@ private struct TodayPanelCell: View {
 
     static func minimumHeight(_ size: TodayPanelSize) -> CGFloat {
         BighelpTokens.scaled(size == .tall ? 340 : 150)
+    }
+}
+
+/// The long-press menu is out of reach for VoiceOver, and a container can't carry actions of its
+/// own, so a panel also holds one element that only VoiceOver and Switch Control find: a menu with
+/// the same rows (Open, Update now, Hide, Delete). It draws nothing.
+private struct TodayPanelAccessibilityActions: View {
+    let panel: TodayPanelDescriptor
+    let layout: TodayPanelLayoutStore
+    let onDelete: ((TodayPanelDescriptor) -> Void)?
+    let menuItems: ((TodayPanelDescriptor) -> AnyView)?
+
+    var body: some View {
+        Menu {
+            TodayPanelMenu(panel: panel, layout: layout, onDelete: onDelete, menuItems: menuItems)
+        } label: {
+            Color.clear.frame(width: 1, height: 1)
+        }
+        .accessibilityLabel(Text("Actions for \(panel.title)"))
+        .accessibilityIdentifier("today.panel.actions.\(panel.id)")
     }
 }
 
@@ -145,6 +168,8 @@ struct TodayPanelSizePicker: View {
 struct TodayPanelEditList: View {
     let panels: [TodayPanelDescriptor]
     let layout: TodayPanelLayoutStore
+    /// Delete for a panel that `canDelete`; the shell asks first.
+    var onDelete: ((TodayPanelDescriptor) -> Void)? = nil
 
     var body: some View {
         let shown = layout.shown(panels)
@@ -176,6 +201,7 @@ struct TodayPanelEditList: View {
                 Text(panel.title)
                     .font(.bighelp(.body))
                     .foregroundStyle(theme.primaryText)
+                    .lineLimit(2)
                 // Its second line is its size, and picks it.
                 TodayPanelSizePicker(panel: panel, layout: layout)
                     .pickerStyle(.menu)
@@ -196,6 +222,7 @@ struct TodayPanelEditList: View {
             .buttonStyle(.borderless)
             .accessibilityLabel("Hide \(panel.title)")
             .accessibilityIdentifier("today.edit.hide.\(panel.id)")
+            deleteButton(panel)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("today.edit.row.\(panel.id)")
@@ -206,6 +233,7 @@ struct TodayPanelEditList: View {
             Text(panel.title)
                 .font(.bighelp(.body))
                 .foregroundStyle(theme.secondaryText)
+                .lineLimit(2)
             Spacer(minLength: BighelpTokens.space8)
             Button("Show") { layout.setHidden(panel, false) }
                 .font(.bighelp(.body, weight: .semibold))
@@ -213,9 +241,29 @@ struct TodayPanelEditList: View {
                 .buttonStyle(.borderless)
                 .frame(minHeight: BighelpTokens.hitTarget)
                 .accessibilityIdentifier("today.edit.show.\(panel.id)")
+            deleteButton(panel)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("today.edit.hidden.\(panel.id)")
+    }
+
+    /// A space's Delete, in Edit too. The same confirmation as the menu's Delete.
+    @ViewBuilder
+    private func deleteButton(_ panel: TodayPanelDescriptor) -> some View {
+        if panel.canDelete, let onDelete {
+            Button {
+                onDelete(panel)
+            } label: {
+                Image(systemName: "trash")
+                    .font(.bighelp(.body))
+                    .foregroundStyle(theme.secondaryText)
+                    .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Delete \(panel.title)")
+            .accessibilityIdentifier("today.edit.delete.\(panel.id)")
+        }
     }
 
     @BighelpThemeReader private var theme

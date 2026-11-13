@@ -29,8 +29,12 @@ extension RootShellView {
         // A page that showed before the computer answered gets its data now.
         if workflowsStore == nil, isWorkflowsPageOpen { prepareWorkflowsStore() }
         await workflowsAvailability.check { try await client.support() }
+        // A computer with Workflows has its store read at once, not only once Work opens: Today's
+        // Needs you card, the tab's dot and the sidebar's row count a waiting sign-off from it.
+        let hasWorkflows: Bool = if case .available? = workflowsAvailability.support { true } else { false }
+        if hasWorkflows { prepareWorkflowsStore() }
         // What the page shows comes from the new connection, not the closed one.
-        if isWorkflowsPageOpen { await workflowsStore?.load() }
+        if isWorkflowsPageOpen || hasWorkflows { await workflowsStore?.load() }
     }
 
     /// Its page is open, or Work, which lists its runs.

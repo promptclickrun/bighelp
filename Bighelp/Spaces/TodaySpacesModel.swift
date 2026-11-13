@@ -57,6 +57,7 @@ final class TodaySpacesModel {
     @ObservationIgnored private let source: @MainActor () -> [SpacesComputer]
     @ObservationIgnored private let current: @MainActor () -> SpacesComputer?
     @ObservationIgnored private let pages: @MainActor (String) -> HTMLAppsAPI?
+    @ObservationIgnored private let hostKeys: @MainActor () -> Set<String>?
     @ObservationIgnored private let cacheFolder: URL?
     @ObservationIgnored private let clock: @MainActor () -> Date
     @ObservationIgnored private var reading: Task<Void, Never>?
@@ -64,11 +65,13 @@ final class TodaySpacesModel {
     init(computers: @escaping @MainActor () -> [SpacesComputer] = { SpacesHost.computers() },
          current: @escaping @MainActor () -> SpacesComputer? = { SpacesHost.current() },
          pages: @escaping @MainActor (String) -> HTMLAppsAPI? = { SpacesHost.pages($0) },
+         hostKeys: @escaping @MainActor () -> Set<String>? = { SpacesHost.hostKeys() },
          cacheFolder: URL? = SpacesStore.defaultCacheFolder,
          clock: @escaping @MainActor () -> Date = { Date() }) {
         source = computers
         self.current = current
         self.pages = pages
+        self.hostKeys = hostKeys
         self.cacheFolder = cacheFolder
         self.clock = clock
     }
@@ -150,7 +153,9 @@ final class TodaySpacesModel {
     }
 
     /// The computers as the app knows them now: a store for each new scope (with what the phone
-    /// kept), and none for a computer that's gone.
+    /// kept), and none for a computer that's gone. A computer missing from the list only for now (no
+    /// scope while it reconnects or the selection moves) keeps its store, with its waiting changes:
+    /// a store goes when its computer leaves the registry, or the same computer shows under another scope.
     @discardableResult
     private func sync() -> [SpacesComputer] {
         var seen = Set<String>()
@@ -159,12 +164,38 @@ final class TodaySpacesModel {
             stores[computer.scope] = SpacesStore(scope: computer.scope, hostKey: computer.hostKey,
                                                  cacheFolder: cacheFolder, clock: clock)
         }
-        for scope in stores.keys where !seen.contains(scope) { stores[scope] = nil }
+        let known = hostKeys()
+        let listed = Set(list.map(\.hostKey))
+        for (scope, store) in stores where !seen.contains(scope) {
+            let isGone = known.map { !$0.contains(store.hostKey) } ?? true
+            guard isGone || listed.contains(store.hostKey) else { continue }
+            store.retire()
+            stores[scope] = nil
+        }
         let info = list.map {
             ComputerInfo(hostKey: $0.hostKey, scope: $0.scope, name: $0.name, bots: $0.bots, isConnected: $0.api != nil)
         }
         if info != computers { computers = info }
         return list
+    }
+
+    /// A removed computer: its panels leave Today and its copy on this phone is erased. The host
+    /// registry calls it from `remove(_:)`, with the saved scope when it has one. Nothing else
+    /// removes a computer's spaces.
+    func forget(hostKey: String, scope: String?) {
+        var scopes = Set(stores.filter { $0.value.hostKey == hostKey }.keys)
+        if let scope { scopes.insert(scope) }
+        for scope in scopes {
+            let store = stores.removeValue(forKey: scope)
+            store?.retire()
+            guard let cacheFolder else { continue }
+            // A write already under way finishes first, so it can't bring the file back.
+            Task {
+                await store?.savedToDisk()
+                SpacesCacheFile.erase(scope: scope, folder: cacheFolder)
+            }
+        }
+        computers.removeAll { $0.hostKey == hostKey }
     }
 
     /// The connection `HTMLAppScreen` opens a space's page through: the space's own computer,

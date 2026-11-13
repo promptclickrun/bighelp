@@ -23,7 +23,7 @@ final class TodayBoardsStore {
     private(set) var boards: [String: [AgentBoardItem]] = [:]
     /// The computer shown (its cache scope); nil before the first read.
     private(set) var scope: String?
-    /// The computer shown has answered at least once, in this run.
+    /// The computer shown has answered at least once (a bot's board was read), or its boards are held.
     private(set) var hasRead = false
     private(set) var isReading = false
     /// Unread dots show only when the computer keeps read state (`supportsFeedback`).
@@ -56,7 +56,7 @@ final class TodayBoardsStore {
             isReading = false
             self.scope = scope
             boards = byScope[scope] ?? [:]
-            hasRead = byScope[scope] != nil
+            hasRead = !(byScope[scope]?.isEmpty ?? true)
         }
         if !force, let last = readAt[scope], now().timeIntervalSince(last) < Self.freshness { return }
         if isReading, !force { return }
@@ -88,7 +88,9 @@ final class TodayBoardsStore {
         guard !Task.isCancelled else { isReading = false; return }
         byScope[scope] = next
         if next != boards { boards = next }
-        hasRead = true
+        // A read where every bot failed and nothing was held before says nothing: Today keeps its
+        // offline state, not "Nothing yet".
+        hasRead = !next.isEmpty || !previous.isEmpty
         isReading = false
         // Only a read where every bot answered counts, so a dropping connection doesn't hold off the next.
         if allWorked { readAt[scope] = now() }

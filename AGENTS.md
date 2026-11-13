@@ -82,7 +82,8 @@ change in both repos.
   - Every root hides the navigation bar and draws one header (`HomeHeaderBar`, from a `HomeHeaderContext`): the
     person's circle, which opens Settings, then the Bots | Chats switch or the title (Today, Work), search (a
     button that opens a search page, or a field on a row under the buttons: `HomeHeaderSearch`), the computer menu
-    (Today and Work, with two or more computers), the root's own control (Today's Edit) and +. Place the header's
+    (Today and Work, with two or more computers; a computer that doesn't answer gives the selection back, as
+    everywhere: `selectFleetHost`), the root's own control (Today's Edit) and +. Place the header's
     buttons with `bighelpHeaderButtonsPlacement()`, so they sit where a top bar puts them on every screen
     (`MenuButtonPlacementUITests`). When the switch or the title doesn't fit beside the buttons (large text), it
     moves to a row of its own instead of being cut.
@@ -107,10 +108,12 @@ change in both repos.
     opens it, and the sidebar's More has its row, both only while something waits. Each entry is read from where it lives (`RootShellView.needsYouEntries`):
     prompts on open chats' connections, the Dashboard's list for chats that aren't open, one entry per
     prompt ID (`DashboardAttentionItem.promptID`; Hermes' prompts reach the app both ways), and
-    `WorkflowsStore.waiting`. A bot whose chat isn't open gets only an Open chat row. A long command or
+    `WorkflowsStore.waiting` (the store is made and read as soon as the computer says it has Workflows, so a
+    sign-off shows on Today before Work is ever opened). A bot whose chat isn't open gets only an Open chat row. A long command or
     sign-off file opens in full before Approve works. Prompts answer through `DirectHermesPromptResponseView`
     (its `deck` look), the same code as the card in the chat. There is no Activity screen: an alert that names no
-    chat opens Needs you while something waits (`AppState.openNeedsYou()`), else Today. A bot's Dashboard
+    chat opens Needs you while something waits (`AppState.openNeedsYou()`; the request is kept in `HomeSelection`, so
+    the shell on screen gets it whichever computer's `AppState` took it), else Today. A bot's Dashboard
     tab and its Activities list stay.
   - A blueprint is filled in in the message box, nowhere else: a pick anywhere (a board's Blueprints, an
     empty board's starters, a bot's Dashboard) leaves it for the chat with `fillsBlanks`
@@ -133,12 +136,20 @@ change in both repos.
     chat, two to six (`BotModeRoom.maximumMembers`) a group chat, and a group chat the person already has can be
     picked at the end of the list. With nobody picked the blank chat is the primary bot's; picking another single
     bot makes the chat that bot's, replacing the blank chat in one step (`NewChatCoordinator.start(replacingBlankChat:)`).
+    A pick made while a chat starts waits, and the To row is read again when the start ends: the latest pick wins.
     The message box's Send asks `ChatComposerActions.sendOverride` first (`NewChatSend.decide`): `.chat` sends in
-    this chat, `.group` makes the group chat and takes the text there, `.coding` and `.staged` hand it to
-    `CodeHomeStore` and go to Work. With nobody picked it does nothing. The override must not capture a view
-    (the box keeps it while the chat is open), and the choices row reads `ChatModel.draftShape` inside its own
-    host view, never in the shell: a key press would redraw the shell. + offers attachments only for a plain
-    one-bot chat.
+    this chat, `.group` makes the group chat, `.coding` and `.staged` hand the text to `CodeHomeStore` and go to
+    Work. Send sends everything in the box, or sends nothing, keeps the box and says why in a line under the To
+    row (`NewChatSend.Note`): with nobody picked it says "Pick who gets this" and puts the cursor in the To field.
+    A group chat and a coding session start with text only, so they are refused while the box holds an attachment
+    or a reference, and so is a pick that would replace the chat. A group Send keeps its text in the box until the
+    group chat is open (`NewChatSession.isStartingGroup` holds a second Send), so a group that can't be made loses
+    nothing. Text that goes with a pick to another computer rides in `HomeSelection.newChatHandoff`, dropped when
+    that computer doesn't open. Only a blank chat is ever taken off the stack (`AppState.dropBlankChat`). The
+    override holds a `NewChatSendRelay` and must not capture a view (the box keeps it while the chat is open), and
+    the choices row reads `ChatModel.draftShape` inside its own host view, never in the shell: a key press would
+    redraw the shell. + offers attachments only for a plain one-bot chat, and voice and ⋯ › Bot page show only
+    while the To row is exactly the chat's own bot.
   - For exactly one bot on a computer that has a coding store, a single row under the message box scrolls sideways
     (`NewChatChoicesRow`, `Equatable`): Project (none is an ordinary chat), then, once a project is picked, where it
     runs (a new worktree or local), the branch, the mode (Hermes' Plan and YOLO, `CodeSessionMode`) and Stage. A
@@ -154,10 +165,14 @@ change in both repos.
     kept until an input changes (`ChatsInboxCache`), so a computer's events don't redo it.
   - Today (`Bighelp/Today/`) is a grid of panels under the header (`TodayPanelGrid`; Small, Wide or Tall), with the
     Needs you card and the Shared with bighelp card above it while something waits, and the Make a space box
-    below (`TodayCreateBox`). A panel is Feed, Ideas and Goals for every bot (`TodayBoardsPanel`; See all pushes
-    `TodayBoardPage` as `AppRoute.board`) or a space (docs/SPACES.md). Edit changes order, hiding and size
-    (`TodayPanelLayoutStore`; a space's own layout belongs to its computer). One `TodayBoardsStore` and one
-    `TodayPanelLayoutStore` live in `HomeSelection`, above the per-computer `AppState`.
+    below (`TodayCreateBox`, hidden while the computer in use's plugin has no spaces). A panel is Feed, Ideas and
+    Goals for every bot (`TodayBoardsPanel`; See all pushes `TodayBoardPage` as `AppRoute.board`) or a space
+    (docs/SPACES.md). Edit changes order, hiding and size and deletes a space (`TodayPanelLayoutStore`; a space's
+    own layout belongs to its computer). What a panel's long press offers, VoiceOver gets from the panel's Actions
+    menu. A refusal (Update now too soon, a delete the computer refused) shows as one quiet line under the header
+    (`TodayNotice`). A read where no bot answered is not a read: the boards keep loading rather than say "Nothing
+    yet". One `TodayBoardsStore` and one `TodayPanelLayoutStore` live in `HomeSelection`, above the per-computer
+    `AppState`.
   - Work (`Bighelp/Work/`) is one list of what the bots are doing, each row read from the store that holds it
     (`WorkProjection`): coding sessions, chats and background work running now, workflow runs, Kanban tasks and
     scheduled tasks. Chips: All, Needs you, Working, Done. Four doors lead on: Projects, Tasks, Workflows and
@@ -618,7 +633,9 @@ change in both repos.
   `native-device-permission-request-v1`): its Turn on flips the same switch, without reopening the channel
   that carried the call, and the call goes on. Apple Health is read only and asks once about sharing first. The
   channel runs while bighelp is active, inactive or in the background grace, and in any agent's chat on a plugin with
-  `native-device-tools-agents-v1`; after the grace it closes as `paused` so the host waits for the phone.
+  `native-device-tools-agents-v1`; after the grace it closes as `paused` so the host waits for the phone. It
+  belongs to the chat opened last (`AppState.deviceToolConversationID`), also after Back to a list while its bot
+  still works; `activeConversationID` is only the chat still on the stack.
   A channel the host ended (its 30 s lease ran out while a slow tool ran, the plugin unloaded or started again, a
   lost connection) opens again by itself while the chat keeps its tools, with longer waits each time and a limit
   (`runReopeningWhileHeld`, `reopenWaits`); a late answer the host no longer takes loses only that answer, never
@@ -639,7 +656,9 @@ change in both repos.
 - **Agents' apps** ([docs/HTML_APPS.md](docs/HTML_APPS.md), plugin `native-html-apps-v1`): an agent's HTML app is an
   `html_app` card (title, description, Open App); the chat never draws the HTML. Open App loads the page from its own
   `bighelp-app://<app id>/` origin in a full-screen web view (`HTMLAppWebView`) and renders it as made: any site or
-  library loads, while links and new windows open outside and the camera and microphone are refused. Its only way to
+  library loads, while the camera and microphone are refused. Only a link the person taps, to an `http` or `https`
+  address, opens outside; every other way off the page is dropped (`HTMLAppNavigationPolicy`: a script's own
+  navigation or `window.open`, and every other scheme, bighelp's own links included). Its only way to
   the app is `window.bighelp` (`HTMLAppBridge`): data the plugin serves (read every 5 s while a live app is open) and
   `sendAnswer`, which shows the exact message and sends only on the person's Send, as their next message.
 - **Spaces** ([docs/SPACES.md](docs/SPACES.md), plugin `native-spaces-v1`): a space is a live panel on Today. A bot
@@ -653,7 +672,12 @@ change in both repos.
   `operationId`; a change on top of it gets a new one, because the plugin refuses an `operationId` it saw with
   another body. A delete the computer hasn't finished stays off Today and repeats at each read, across launches.
   Only the plugin's own context says the feature is missing ("Update the plugin"); a refused route during a
-  reconnect never does. A space's page opens in `HTMLAppScreen` on its own computer and never sends a message.
+  reconnect never does. A space's page opens in `HTMLAppScreen` on its own computer and never sends a message,
+  whatever the plugin says the page may do. Changes to one space go one at a time (`SpacesStore.send`), so the
+  computer ends on the last choice. A read asks about every bot the phone holds spaces for, and only the computer
+  saying a bot is gone takes its spaces off: a bot list that is short for a moment never does. Removing a computer
+  erases its spaces from the phone (`TodaySpacesModel.forget`). A bot's title and description are cut to the wire
+  maximums as they are read.
 - **Hermes versions never gate connections or features.** Older, newer, custom and absent version strings are
   metadata, not an allowlist. Check actual host capabilities and route responses instead.
   - Hosts differ, so parse leniently: ignore unknown keys and treat most parts as optional.
@@ -681,8 +705,9 @@ Code mode.
 - Hermes doesn't remove a worktree when its session ends; Worktrees does (a project's ⋯ on Work, and New chat's
   choices row). Its `create-pr` route takes no title or description (they come from the commits); "Ask the
   agent to open it" sends the session a message.
-- Work's coding rows show only what the live chat or the session list says (`CodeChatStatusReader`): waiting
-  prompts are "Needs you", running work shows its tool. Demo mode uses `DemoCodeProjectSource` and `DemoCodeGit`.
+- Work's coding rows show only what the live chat, the session list or the Dashboard's waiting list says
+  (`CodeChatStatusReader`): waiting prompts are "Needs you", also for a session whose chat isn't open, and running
+  work shows its tool. Demo mode uses `DemoCodeProjectSource` and `DemoCodeGit`.
 - The mode chip (`CodeSessionMode`) uses Hermes' own options: Plan sends the first message as `/plan …` (Hermes
   writes `.hermes/plans/<date>-<slug>.md` and changes no code); YOLO sets the session's `yolo` config (session
   scope, `setYOLO`) before the first message. A refused YOLO sends nothing and says so (`CodeStartError.yoloRefused`).
@@ -836,7 +861,7 @@ Code mode.
   two steps.
 - **One long-press menu per List row:** a List row shows the first `.contextMenu` in it for every item, so a grid of
   tiles in one row acted on the wrong item (holding a pinned chat offered another chat's Delete). Give each tile a
-  `Menu(primaryAction:)` or its own gesture (`AgentPinnedGrid`).
+  `Menu(primaryAction:)` or its own gesture.
 - **Owners change on every reconnect:** `WorkspaceOwner` includes the connection generation, so returning to the app
   makes a new one. Keep per-computer state (like "this host has Kanban") by `cacheScopeID`, and don't turn a failed
   check during a reconnect into "unavailable" (`KanbanAvailability`; New Group Chat:
@@ -1311,7 +1336,7 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
   (`HostSignInMatrixUITests`).
 - `Scripts/NativeWorkspaceAcceptanceProbe.py` covers the workspace and chat acceptance flows.
 - `Scripts/RoomLinkProbe.py` starts two isolated hosts and checks a group chat with an agent from each
-  (Hermes RoomLink); `--simulator-id` runs the app's own UI test against them. The scratch Hermes needs
+  (Hermes RoomLink) through the protocol calls. The scratch Hermes needs
   Python 3.14 and its `messaging` extra (the API server serves RoomLink).
 - `Scripts/AppStoreScreenshots.sh` takes the App Store screenshots from the real app on an isolated host whose
   agents really run their tools on made-up files. No demo chats in store screenshots.

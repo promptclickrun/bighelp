@@ -206,13 +206,25 @@ final class CodeModeUITests: BighelpUITestCase {
         app.buttons.matching(NSPredicate(format: "identifier == %@ OR label BEGINSWITH %@", identifier, title)).firstMatch
     }
 
-    /// A chip of the choices row, scrolled into view: the choices are one row that scrolls sideways,
-    /// and its last chips start past the screen's edge.
+    /// One of the last chips of the choices row (the mode, Stage), scrolled into view: the choices
+    /// are one row that scrolls sideways, and its last chips start past its right edge. The row is
+    /// always dragged left once, along the chips' own line: `isHittable` says yes for a chip that is
+    /// only partly in view, and the tap then lands beside it. The row stops at its end, so a chip
+    /// that was in view stays there.
     @MainActor
     private func reveal(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         let chip = app.buttons[identifier]
-        let row = element("new-chat.choices", in: app)
-        for _ in 0..<3 where !(chip.exists && chip.isHittable) { row.swipeLeft() }
+        XCTAssertTrue(chip.waitForExistence(timeout: 3), "\(identifier) is in the choices row")
+        let rail = element("new-chat.choices", in: app)
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        for attempt in 0..<3 {
+            let bounds = rail.frame
+            if attempt > 0, chip.frame.minX >= bounds.minX, chip.frame.maxX <= bounds.maxX { break }
+            // The staged jobs sit over the chips in the same container, so its middle isn't the row.
+            let line = chip.frame.midY
+            origin.withOffset(CGVector(dx: bounds.maxX - 24, dy: line))
+                .press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: bounds.minX + 24, dy: line)))
+        }
         return chip
     }
 

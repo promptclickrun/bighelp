@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// What New chat's To row and people list need from the shell. The chat screen draws them over a new
 /// chat that has nothing sent yet: the To row in place of the chat's name, the list over the empty
@@ -21,6 +22,8 @@ struct NewChatContext {
     /// The recipients changed (a pick, a chip's ×): the shell starts the blank chat for one bot.
     let onRecipientsChanged: ([SimpleBotsBot]) -> Void
     let onOpenGroup: (SimpleBotsGroup) -> Void
+    /// Send left this for the shell (`NewChatSession.ask`): the To row hands it over.
+    var onSendRequest: (NewChatRequest) -> Void = { _ in }
     /// The empty list's one action; nil when this computer can't make bots.
     var onNewBot: (() -> Void)? = nil
 }
@@ -40,7 +43,7 @@ struct NewChatView: View {
 // MARK: The To row
 
 /// "To:", a chip for each picked bot (its × takes it out), then a field that filters the people list.
-/// A refused pick says why in one line under it.
+/// A refused pick, or a Send that sent nothing, says why in one line under it.
 struct NewChatToRow: View {
     let context: NewChatContext
     @FocusState private var isFocused: Bool
@@ -79,17 +82,33 @@ struct NewChatToRow: View {
                 .onChange(of: session.recipients.count) { _, _ in proxy.scrollTo("field", anchor: .trailing) }
             }
             if let refusal = session.refusal {
-                Text(refusal.message)
-                    .font(.bighelp(.footnote))
-                    .foregroundStyle(theme.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, BighelpTokens.space16)
-                    .accessibilityIdentifier("new-chat.to.refusal")
+                line(refusal.message, id: "new-chat.to.refusal")
+            } else if let note = session.note {
+                line(note.message, id: "new-chat.to.note")
             }
             Rectangle().fill(theme.separator).frame(height: BighelpTokens.hairline)
         }
+        // Send with nobody picked: the cursor goes where the pick is made.
+        .onChange(of: session.fieldFocusRequests) { _, _ in isFocused = true }
+        // The line is new on screen and may be far from VoiceOver's cursor (it is on Send).
+        .onChange(of: session.noteCount) { _, _ in
+            if let note = session.note { UIAccessibility.post(notification: .announcement, argument: note.message) }
+        }
+        // Send holds no view, so what needs the shell comes through here.
+        .onChange(of: session.requestCount, initial: true) { _, _ in
+            if let request = session.takeRequest() { context.onSendRequest(request) }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("new-chat.to")
+    }
+
+    private func line(_ text: String, id: String) -> some View {
+        Text(text)
+            .font(.bighelp(.footnote))
+            .foregroundStyle(theme.secondaryText)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, BighelpTokens.space16)
+            .accessibilityIdentifier(id)
     }
 
     private func chip(_ bot: SimpleBotsBot) -> some View {
@@ -113,7 +132,9 @@ struct NewChatToRow: View {
             .padding(.trailing, BighelpTokens.space8)
             .frame(minHeight: BighelpTokens.scaled(34))
             .bighelpSurface(.capsuleControl, isInteractive: true)
-            .contentShape(.capsule)
+            // The capsule stays its size; a touch counts over the row's whole height.
+            .frame(minHeight: BighelpTokens.hitTarget)
+            .contentShape(.rect)
         }
         .bighelpPlainButtonStyle(.capsule)
         .accessibilityLabel(bot.name)

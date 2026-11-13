@@ -65,6 +65,8 @@ The code is in `Bighelp/Spaces/`. Today's grid is in `Bighelp/Today/`.
 - A change waiting for its answer is sent again only as the same request, with the same
   `operationId`. A change on top of it is a new request with a new `operationId`. The plugin refuses
   an `operationId` it saw with another body.
+- Changes to one space go to the computer one at a time (`SpacesStore.send`). A change made while
+  one is on its way goes when that one ends, so the computer ends on the last choice.
 - Edit's drag gives every space a new place, 1,024 apart. The new order shows before any computer
   answers, so a panel never jumps back.
 - A hidden space keeps updating. Edit lists it under Hidden.
@@ -77,6 +79,8 @@ The code is in `Bighelp/Spaces/`. Today's grid is in `Bighelp/Today/`.
 - `routine_failed` (502): the run failed. The panel shows the space as the computer read it, with
   "Its update failed".
 - `refresh_too_soon`: "Try again in a minute".
+- A refusal of the menu's Update now shows as one line under Today's header (`TodayNotice`), which
+  VoiceOver also speaks.
 
 ## Deleting
 
@@ -84,7 +88,26 @@ The code is in `Bighelp/Spaces/`. Today's grid is in `Bighelp/Today/`.
 - No answer, no connection, or `schedules_unavailable` (503): the computer has not finished. The
   space stays off Today, and the same request (same `operationId`) goes again at each read until
   the computer answers. The phone keeps the waiting delete across launches.
-- A definite refusal brings the space back, in its place.
+- A definite refusal brings the space back, in its place, and a line under Today's header says so.
+- Edit has a Delete button on each space's row. VoiceOver reaches Open, Update now and Delete from
+  the panel's Actions menu.
+
+## What keeps a space, and what removes it
+
+- A read asks about every bot in the computer's list and every bot the phone holds spaces for.
+- Only the computer's answer removes a space: the space is not in the list any more, or the bot is
+  gone (`profile_not_found`). A bot list that is short for a moment (a reconnect, a computer
+  switch) removes nothing.
+- Removing a computer in Settings erases its spaces from the phone (`TodaySpacesModel.forget`).
+
+## A space's page
+
+- The page loads from its own `bighelp-app://<app id>/` origin and reads only its own data.
+- It never sends a message, whatever the plugin says the page may do.
+- Only a link the person taps, to an `http` or `https` address, opens outside. The app drops every
+  other navigation off the page: a script's own navigation or `window.open`, and every other
+  scheme, bighelp's own links included (`HTMLAppNavigationPolicy`).
+- The title and description a bot writes are cut to the wire maximums as they are read.
 
 ## What a panel shows
 

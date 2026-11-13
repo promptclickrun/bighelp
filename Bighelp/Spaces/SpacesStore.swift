@@ -57,6 +57,11 @@ struct SpacesCacheFile: Codable, Sendable {
         return file
     }
 
+    /// Removes one computer's copy.
+    static func erase(scope: String, folder: URL) {
+        try? FileManager.default.removeItem(at: url(scope: scope, folder: folder))
+    }
+
     /// Writes the copy whole or not at all. A copy too big for the limit keeps its spaces without
     /// their cards, which the next read brings back.
     static func write(_ file: SpacesCacheFile, folder: URL) {
@@ -108,6 +113,11 @@ final class SpacesStore {
     @ObservationIgnored private var sendCount = 0
     @ObservationIgnored private var acceptedSend: [String: Int] = [:]
     @ObservationIgnored private var cacheWrite: Task<Void, Never>?
+    /// Space keys with an update request on its way: one at a time per space.
+    @ObservationIgnored private var sending: Set<String> = []
+    @ObservationIgnored private var sendWaiters: [String: [CheckedContinuation<Void, Never>]] = [:]
+    /// Set once the computer is removed: nothing is written to its copy on disk again.
+    @ObservationIgnored private var isRetired = false
     @ObservationIgnored private let cacheFolder: URL?
     @ObservationIgnored private let clock: @MainActor () -> Date
 
@@ -156,6 +166,11 @@ final class SpacesStore {
             agentIDs.append(bot.id)
         }
         guard !agentIDs.isEmpty else { return }
+        // Bots the phone holds spaces for are asked about too: one deleted on the computer is in no
+        // list any more, and only the computer saying it's gone takes its spaces off Today.
+        for space in confirmed where SpacesWire.isAgentID(space.agentID) && !agentIDs.contains(space.agentID) {
+            agentIDs.append(space.agentID)
+        }
         readGeneration += 1
         let generation = readGeneration
         let start = changeCount
@@ -171,7 +186,7 @@ final class SpacesStore {
                 list.agents.merge(part.agents) { $1 }
             }
             guard isCurrent() else { return }
-            var read = merged(list)
+            var read = merged(list, asked: Set(agentIDs))
             // Cards the list left out: read now, a few at a time per refresh.
             var reads = 0
             for index in read.indices where read[index].needsCards && reads < SpacesWire.maximumCardReadsPerLoad {
@@ -196,13 +211,16 @@ final class SpacesStore {
         }
     }
 
-    /// The answer's spaces, with the cards the phone has where the computer left them out. Bots
-    /// the computer couldn't read now keep their spaces as they were.
-    private func merged(_ list: SpacesList) -> [Space] {
+    /// The answer's spaces, with the cards the phone has where the computer left them out. A bot
+    /// keeps its spaces as they were when the computer couldn't read it now, and when this read
+    /// didn't ask about it (`asked`): a gap in what the phone asked is never the computer saying
+    /// a space is gone.
+    private func merged(_ list: SpacesList, asked: Set<String>) -> [Space] {
         let old = Dictionary(confirmed.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
         let kept = Set(list.agents.filter { $0.value.keepsSpaces }.keys)
-        var read = list.spaces.filter { !kept.contains($0.agentID) }.map { $0.takingCards(from: old[$0.key]) }
-        read += confirmed.filter { kept.contains($0.agentID) }
+        func keepsOld(_ agentID: String) -> Bool { kept.contains(agentID) || !asked.contains(agentID) }
+        var read = list.spaces.filter { !keepsOld($0.agentID) }.map { $0.takingCards(from: old[$0.key]) }
+        read += confirmed.filter { keepsOld($0.agentID) }
         return read
     }
 
@@ -246,8 +264,19 @@ final class SpacesStore {
         try await send(key, api: api)
     }
 
-    /// Sends the space's unconfirmed change. No answer keeps it for the next read.
+    /// Sends the space's unconfirmed change. No answer keeps it for the next read. One request per
+    /// space at a time: a send that finds one on its way waits for it, then sends whatever is
+    /// pending by then (the person's last choice), so the computer never takes two changes to one
+    /// space in the wrong order. A change still waiting repeats with its own `operationId`.
     func send(_ key: String, api: SpacesAPI) async throws(SpacesError) {
+        while sending.contains(key) {
+            await withCheckedContinuation { sendWaiters[key, default: []].append($0) }
+        }
+        sending.insert(key)
+        defer {
+            sending.remove(key)
+            for waiter in sendWaiters.removeValue(forKey: key) ?? [] { waiter.resume() }
+        }
         guard let change = pending[key], let space = confirmed.first(where: { $0.key == key }) else { return }
         sendCount += 1
         let stamp = sendCount
@@ -436,7 +465,7 @@ final class SpacesStore {
 
     /// Written off the main thread, one write after the other, so the newest copy is the one kept.
     private func saveCache() {
-        guard let cacheFolder else { return }
+        guard let cacheFolder, !isRetired else { return }
         let file = SpacesCacheFile(scope: scope, lastLoaded: lastLoaded, spaces: confirmed.map(\.json), pending: pending,
                                    deleting: deleting)
         let previous = cacheWrite
@@ -444,6 +473,11 @@ final class SpacesStore {
             await previous?.value
             SpacesCacheFile.write(file, folder: cacheFolder)
         }
+    }
+
+    /// The computer was removed: its copy on disk is erased by the caller, and nothing writes it again.
+    func retire() {
+        isRetired = true
     }
 
     /// Waits for the copy on disk to be written, for tests.

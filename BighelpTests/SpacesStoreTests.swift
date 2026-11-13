@@ -75,6 +75,30 @@ final class HeldSpacesClient: SpacesClient {
     }
 }
 
+/// The plugin when a bot is gone from the computer: its `list` answer has no spaces for it and
+/// says `profile_not_found` for it.
+@MainActor
+final class GoneBotSpacesClient: SpacesClient {
+    let inner: any SpacesClient
+    let gone: Set<String>
+
+    init(_ inner: any SpacesClient, gone: Set<String>) {
+        self.inner = inner
+        self.gone = gone
+    }
+
+    func perform(_ operation: SpacesOperation,
+                 payload: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] {
+        var answer = try await inner.perform(operation, payload: payload)
+        guard operation == .list else { return answer }
+        answer["spaces"] = .array((answer["spaces"]?.array ?? []).filter { !gone.contains($0.object?["agentId"]?.string ?? "") })
+        var agents = answer["agents"]?.object ?? [:]
+        for id in gone { agents[id] = .string("profile_not_found") }
+        answer["agents"] = .object(agents)
+        return answer
+    }
+}
+
 /// A connection as `DirectHermesSpacesClient` sees it: the plugin's context, and answers or errors.
 @MainActor
 private final class SpacesPerformer: WorkspaceOperationPerforming {
@@ -271,6 +295,85 @@ struct SpacesStoreTests {
         await read.value
         #expect(store.spaces.first { $0.key == Kit.garden }?.size == .tall)
         #expect(store.confirmedSpace(Kit.garden)?.size == .tall)
+    }
+
+
+    // MARK: One request at a time
+
+    /// Hide, then show, before the computer answers the first: the second request waits, so the
+    /// computer never takes them in the wrong order, and the space ends as the person last chose.
+    @Test func overlappingChangesToOneSpaceGoOneAtATimeAndEndOnTheLastChoice() async throws {
+        let folder = Kit.folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let demo = Kit.demo()
+        let client = HeldSpacesClient(demo)
+        let store = Kit.store(folder)
+        await store.load(Kit.computer(client: client))
+        let api = SpacesAPI(client: client)
+        client.holds = [.update]
+
+        let hide = Task { try? await store.change(Kit.garden, SpaceChanges(hidden: true), api: api) }
+        await client.untilHolding()
+        let show = Task { try? await store.change(Kit.garden, SpaceChanges(hidden: false), api: api) }
+        for _ in 0..<20 { await Task.yield() }
+        // The first answer is still out: only one request has gone.
+        #expect(client.payloads.filter { $0.operation == .update }.count == 1)
+        #expect(store.spaces.first { $0.key == Kit.garden }?.hidden == false)
+
+        client.release()
+        await client.untilHolding()
+        client.release()
+        await hide.value
+        await show.value
+
+        let updates = client.payloads.filter { $0.operation == .update }
+        #expect(updates.count == 2)
+        #expect(updates[0].payload["changes"] == .object(["hidden": .boolean(true)]))
+        #expect(updates[1].payload["changes"] == .object(["hidden": .boolean(false)]))
+        #expect(updates[0].payload["operationId"] != updates[1].payload["operationId"])
+        #expect(store.pending.isEmpty)
+        #expect(store.spaces.first { $0.key == Kit.garden }?.hidden == false)
+        let onComputer = try await SpacesAPI(client: demo).space(agentID: "home", spaceID: DemoSpacesClient.gardenID)
+        #expect(!onComputer.hidden)
+    }
+
+    // MARK: A partial list of bots
+
+    /// The phone's list of bots can lag or be partial while a computer reconnects or the selection
+    /// moves. A read that didn't ask about a bot says nothing about its spaces.
+    @Test func aPartialListOfBotsKeepsTheOtherBotsSpacesAndWaitingChanges() async throws {
+        let folder = Kit.folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let client = HeldSpacesClient(Kit.demo())
+        let store = Kit.store(folder)
+        await store.load(Kit.computer(client: client))
+        #expect(store.spaces.count == 3)
+        try await store.change(Kit.garden, SpaceChanges(size: .tall), api: nil)
+
+        await store.load(Kit.computer(client: client, bots: [SpacesBot(id: "travel", name: "Travel")]))
+        #expect(store.spaces.map(\.key).sorted() == [Kit.commute, Kit.garden, Kit.workouts].sorted())
+        #expect(store.pending[Kit.garden] != nil)
+        #expect(store.spaces.first { $0.key == Kit.garden }?.size == .tall)
+
+        // A list with only a bot this computer has no spaces for is a partial list too.
+        await store.load(Kit.computer(client: client, bots: [SpacesBot(id: "finance", name: "Finance")]))
+        #expect(store.spaces.count == 3)
+        await store.savedToDisk()
+        #expect(Kit.store(folder).spaces.count == 3)
+    }
+
+    @Test func onlyTheComputerSayingABotIsGoneRemovesItsSpaces() async throws {
+        let folder = Kit.folder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let demo = Kit.demo()
+        let store = Kit.store(folder)
+        await store.load(Kit.computer(client: demo))
+        try await store.change(Kit.garden, SpaceChanges(size: .tall), api: nil)
+        try await store.change(Kit.commute, SpaceChanges(size: .tall), api: nil)
+
+        await store.load(Kit.computer(client: GoneBotSpacesClient(demo, gone: ["home"])))
+        #expect(store.spaces.map(\.key) == [Kit.commute])
+        #expect(store.pending.keys.contains(Kit.garden) == false)
     }
 
     // MARK: Deleting

@@ -43,7 +43,7 @@ struct CodeProjectPicker: View {
                         if store.isLoading {
                             ProgressView().frame(maxWidth: .infinity)
                         } else {
-                            Text(store.errorMessage ?? "No projects on this computer yet. Add a folder below.")
+                            Text(store.errorMessage ?? String(localized: "No projects on this computer yet. Add a folder below."))
                                 .font(.bighelp(.subheadline))
                                 .foregroundStyle(theme.secondaryText)
                         }
@@ -164,7 +164,7 @@ struct CodeBranchPicker: View {
                     }
                     .listRowBackground(theme.surface)
                 }
-                BighelpSearchField(text: $search, prompt: "Search branches", accessibilityIdentifier: "code.branch.search")
+                BighelpSearchField(text: $search, prompt: String(localized: "Search branches"), accessibilityIdentifier: "code.branch.search")
                     .bighelpListSearchRow()
                 Section(store.placement == .newWorktree ? "Start from" : "Branch") {
                     ForEach(matching(localBranches)) { branch in
@@ -249,9 +249,10 @@ struct CodeBranchPicker: View {
     }
 
     private func note(for branch: StockGitBranch) -> String? {
-        if branch.isDefault { return "Default" }
+        if branch.isDefault { return String(localized: "Default") }
         guard let path = branch.worktreePath else { return nil }
-        return path == store.project?.folder ? "Checked out in the local folder" : "In a worktree"
+        return path == store.project?.folder ? String(localized: "Checked out in the local folder")
+            : String(localized: "In a worktree")
     }
 
     private func matching(_ branches: [StockGitBranch]) -> [StockGitBranch] {

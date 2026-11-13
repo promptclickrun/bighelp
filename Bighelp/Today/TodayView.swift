@@ -41,14 +41,19 @@ struct TodayView: View {
     var body: some View {
         Group {
             if context.isEditing.wrappedValue {
-                TodayPanelEditList(panels: context.panels, layout: context.layout)
+                TodayPanelEditList(panels: context.panels, layout: context.layout, onDelete: context.onDeletePanel)
                     .frame(maxWidth: ChatCanvasLayout.regularLaneMaximumWidth)
                     .frame(maxWidth: .infinity)
             } else {
                 scroll
             }
         }
-        .safeAreaInset(edge: .top, spacing: 0) { context.header }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            VStack(spacing: 0) {
+                context.header
+                TodayNoticeBar()
+            }
+        }
         .background(theme.canvas.ignoresSafeArea())
         .botChatActivityUpdates(context.activity, source: context.activitySource, isActive: scenePhase == .active)
         .accessibilityElement(children: .contain)

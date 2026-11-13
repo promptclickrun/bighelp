@@ -29,7 +29,7 @@ final class RegistryFleetReader: FleetHostReading {
     }
     func canOpen(_ hostID: UUID) -> Bool { registry.hosts.contains { $0.id == hostID } }
 
-    /// Saved where that host's Agents screen keeps its pins (its own settings suite).
+    /// Saved where that host's Bots view keeps its pins (its own settings suite).
     func setPinned(_ pinned: Bool, hostID: UUID, profileID: String) -> Bool {
         guard let host = registry.hosts.first(where: { $0.id == hostID }),
               let scope = registry.workspace(for: host).savedConnection?.workspaceAuthority?.cacheScopeID,

@@ -14,7 +14,7 @@ extension RootShellView {
         /// The selected host's navigation and agents come with its runtime, which
         /// can arrive after its sign-in (opening the app with All hosts on). Opening
         /// Usage goes through the shell configured last, so a new one configures it
-        /// again; otherwise ☰ › Usage pushed onto a stack nothing showed (#99).
+        /// again; otherwise Usage pushed onto a stack nothing showed (#99).
         let navigation: ObjectIdentifier
     }
 

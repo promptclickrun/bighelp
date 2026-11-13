@@ -45,16 +45,16 @@ for kind in ${=BIGHELP_STORE_DEVICES:-iphone ipad}; do
     -only-testing:BighelpUITests/AppStoreScreenshotUITests || echo "$kind: some screens failed"
   kill $host; wait $host 2>/dev/null || true
   rm -f $log
-  # Code mode's home for the Code poster: its own UI test on the demo projects. The shot holds
-  # session cards, not chats.
+  # Work's coding session card for the Code poster: its own UI test on the demo projects. The shot
+  # holds the card a coding send makes on Work, not a chat.
   if [[ $kind != duo ]]; then
     code=$(mktemp -d -t bighelp-store-code)
     TEST_RUNNER_BIGHELP_CODE_MODE_EVIDENCE=$code TEST_RUNNER_BIGHELP_CODE_MODE_APPEARANCE=light \
       xcodebuild test-without-building -project "$repo/Bighelp.xcodeproj" -scheme Bighelp -destination "id=$udid" \
       -derivedDataPath "$derived" \
-      -only-testing:BighelpUITests/CodeModeUITests/testSendsStartSessionsBackToBackAndMenuSwitchesModes \
-      || echo "$kind: Code mode failed"
-    cp "$code/02-two-sessions.png" "$output/$kind-12-code.png" 2>/dev/null || echo "$kind: no Code mode shot"
+      -only-testing:BighelpUITests/CodeModeUITests/testACodingSendOpensItsProjectOnWork \
+      || echo "$kind: coding session test failed"
+    cp "$code/02-session-card.png" "$output/$kind-12-code.png" 2>/dev/null || echo "$kind: no coding session shot"
     rm -rf $code
   fi
   xcrun simctl shutdown $udid

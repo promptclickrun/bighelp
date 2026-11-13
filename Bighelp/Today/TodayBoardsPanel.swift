@@ -78,7 +78,8 @@ struct TodayBoardsPanel: View {
 
             content(entries)
 
-            if !entries.isEmpty {
+            // An empty board's page has its starters and Blueprints, so See all stays once it's read.
+            if !entries.isEmpty || context.store.hasRead {
                 Button {
                     context.onSeeAll(kind, nil)
                 } label: {

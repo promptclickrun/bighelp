@@ -2,66 +2,9 @@ import Foundation
 import Testing
 @testable import Bighelp
 
-/// Settings › Modes' picker, blueprints in the message box, and what the Needs you deck lists.
+/// Blueprints in the message box, and what the Needs you deck lists.
 @MainActor
 struct NeedsYouBlueprintsModesTests {
-    private func settings() throws -> (SettingsStore, () -> Void) {
-        let suite = "bighelp.modes.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        return (SettingsStore(defaults: defaults), { defaults.removePersistentDomain(forName: suite) })
-    }
-
-    // MARK: Modes
-
-    @Test func pickingAHomeSwitchesToItNowAndAtLaunch() throws {
-        let (settings, cleanup) = try settings()
-        defer { cleanup() }
-        #expect(settings.homeMode == .chat)
-
-        settings.selectHomeMode(.bots)
-        #expect(settings.homeMode == .bots)
-        #expect(settings.currentMode == .bots)
-
-        settings.selectHomeMode(.code)
-        #expect(settings.homeMode == .code)
-        #expect(settings.currentMode == .code)
-        #expect(!settings.simpleBotsEnabled)
-        #expect(settings.codeModeEnabled, "Picking Code turns Code mode on")
-        #expect(settings.startExperience == .code)
-
-        settings.selectHomeMode(.chat)
-        #expect(settings.homeMode == .chat)
-        #expect(settings.currentMode == .chat)
-        #expect(settings.startExperience == .bighelp)
-        #expect(settings.availableModes == [.bots, .chat, .code], "Code stays reachable from a Chat home")
-    }
-
-    /// The picker shows the home a launch opens in, not the mode ☰ or the pill switched to for now.
-    @Test func theHomeStaysWhenAModeIsSwitchedForNow() throws {
-        let (settings, cleanup) = try settings()
-        defer { cleanup() }
-        settings.selectHomeMode(.code)
-        settings.switchMode(.chat)
-        #expect(settings.currentMode == .chat)
-        #expect(settings.homeMode == .code)
-    }
-
-    /// Picking Code once left it on for good: no switch turned it off again.
-    @Test func codeModeTurnsOffAgain() throws {
-        let (settings, cleanup) = try settings()
-        defer { cleanup() }
-        settings.selectHomeMode(.code)
-
-        settings.setCodeMode(false)
-        #expect(!settings.codeModeEnabled)
-        #expect(settings.currentMode == .chat)
-        #expect(settings.homeMode == .chat)
-        #expect(settings.availableModes == [.bots, .chat])
-
-        settings.setCodeMode(true)
-        #expect(settings.homeMode == .chat, "Turning it back on doesn't make it the home again")
-    }
-
     // MARK: Blueprints
 
     @Test func startersHaveBlanksAndCoverMoreThanOneTopic() throws {

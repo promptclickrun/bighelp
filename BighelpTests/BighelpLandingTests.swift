@@ -2,58 +2,12 @@ import Foundation
 import Testing
 @testable import Bighelp
 
-/// Opens on: the old shell's nine screens and Start with (until it goes), and how they map to the one
-/// home's four places.
+/// Opens on: the home's four places, and how a screen saved before the one home maps to one.
 @MainActor
 struct BighelpLandingTests {
     private func defaults() -> UserDefaults {
         UserDefaults(suiteName: "landing-\(UUID().uuidString)")!
     }
-
-    // MARK: Which screen each choice opens
-
-    @Test func eachChoiceOpensItsScreen() {
-        func open(_ screen: BighelpLandingScreen) -> BighelpLandingDestination? {
-            BighelpLanding.destination(for: .chosen(screen), kanbanAvailable: true, kanbanWaitIsOver: false,
-                                       projectsAvailable: true)
-        }
-        #expect(open(.agents) == .agents)
-        #expect(open(.allAgents) == .allAgents)
-        #expect(open(.lastChat) == .homeChat)
-        #expect(open(.sessions) == .chatList, "All sessions, to pick a recent one")
-        #expect(open(.feed) == .board(.feed))
-        #expect(open(.ideas) == .board(.ideas))
-        #expect(open(.goals) == .board(.goals))
-        #expect(open(.kanban) == .kanban)
-        #expect(open(.projects) == .projects)
-    }
-
-    @Test func nothingPickedKeepsTodaysStart() {
-        #expect(BighelpLanding.destination(for: .standard(opensChat: true), kanbanAvailable: nil,
-                                           kanbanWaitIsOver: false, projectsAvailable: true) == .homeChat)
-        // `-loopdy.home.opens-chat NO` (the UI tests' older flows) stays on the chat list.
-        #expect(BighelpLanding.destination(for: .standard(opensChat: false), kanbanAvailable: nil,
-                                           kanbanWaitIsOver: false, projectsAvailable: true) == .chatList)
-    }
-
-    @Test func kanbanFallsBackQuietlyWhereTheComputerHasNone() {
-        #expect(BighelpLanding.destination(for: .chosen(.kanban), kanbanAvailable: false, kanbanWaitIsOver: false,
-                                           projectsAvailable: true) == .homeChat)
-    }
-
-    @Test func kanbanWaitsBrieflyForTheFirstAnswer() {
-        #expect(BighelpLanding.destination(for: .chosen(.kanban), kanbanAvailable: nil, kanbanWaitIsOver: false,
-                                           projectsAvailable: true) == nil, "Not known yet: wait")
-        #expect(BighelpLanding.destination(for: .chosen(.kanban), kanbanAvailable: nil, kanbanWaitIsOver: true,
-                                           projectsAvailable: true) == .homeChat, "No answer in time: the default")
-    }
-
-    @Test func projectsFallBackWhereTheyCantOpen() {
-        #expect(BighelpLanding.destination(for: .chosen(.projects), kanbanAvailable: nil, kanbanWaitIsOver: false,
-                                           projectsAvailable: false) == .homeChat)
-    }
-
-    // MARK: The one home's four places
 
     @Test func everyOldScreenMapsToItsPlace() {
         #expect(BighelpLandingScreen.allCases.map(\.homeLanding)
@@ -68,95 +22,19 @@ struct BighelpLandingTests {
         #expect(BighelpLanding.homeLanding(stored: nil) == nil)
     }
 
-    @Test func theOldShellReadsANewPlaceAsNothingPicked() {
+    @Test func aPickedPlaceAppliesNextLaunch() {
         let saved = defaults()
-        SettingsStore(defaults: saved).homeLanding = .today
-        let next = SettingsStore(defaults: saved)
-        #expect(next.landingScreen == nil)
-        #expect(next.launchLanding == .standard(opensChat: true))
-        #expect(next.launchHomeLanding == .today)
+        let settings = SettingsStore(defaults: saved)
+        settings.homeLanding = .today
+        #expect(settings.launchHomeLanding == .chats, "This launch already happened")
+        #expect(SettingsStore(defaults: saved).launchHomeLanding == .today)
     }
 
-    // MARK: Start with
-
-    @Test func aStartAgentThatStillExistsIsUsed() {
-        #expect(BighelpLanding.startAgent(stored: "travel", agentIDs: ["finance", "travel"],
-                                          choice: .chosen(.feed)) == "travel")
-        #expect(BighelpLanding.startAgent(stored: "travel", agentIDs: ["finance", "travel"],
-                                          choice: .standard(opensChat: true)) == "travel")
-    }
-
-    @Test func aStartAgentThatsGoneFallsBackToAutomatic() {
-        #expect(BighelpLanding.startAgent(stored: "deleted", agentIDs: ["finance", "travel"],
-                                          choice: .chosen(.lastChat)) == nil)
-        #expect(BighelpLanding.startAgent(stored: nil, agentIDs: ["finance"], choice: .chosen(.lastChat)) == nil)
-    }
-
-    @Test func allAgentsStartsWithNoOneAgent() {
-        #expect(BighelpLanding.startAgent(stored: "travel", agentIDs: ["travel"], choice: .chosen(.allAgents)) == nil)
-        #expect(!BighelpLandingScreen.allAgents.offersStartAgent)
-        #expect(!BighelpLandingScreen.sessions.offersStartAgent, "Every agent's sessions")
-        #expect(BighelpLandingScreen.allCases.filter(\.offersStartAgent).count == BighelpLandingScreen.allCases.count - 2)
-    }
-
-    // MARK: Saved choices
-
-    @Test func theOldOpensChatValueCarriesOverUntilAScreenIsPicked() {
-        let unset = defaults()
-        #expect(SettingsStore(defaults: unset).launchLanding == .standard(opensChat: true))
-
-        let chatList = defaults()
-        chatList.set(false, forKey: BighelpLanding.legacyOpensChatKey)
-        #expect(SettingsStore(defaults: chatList).launchLanding == .standard(opensChat: false))
-
-        let opensChat = defaults()
-        opensChat.set(true, forKey: BighelpLanding.legacyOpensChatKey)
-        #expect(SettingsStore(defaults: opensChat).launchLanding == .standard(opensChat: true))
-
-        // Picking a screen wins over the old value.
-        chatList.set("goals", forKey: BighelpLanding.screenKey)
-        #expect(SettingsStore(defaults: chatList).launchLanding == .chosen(.goals))
-    }
-
-    @Test func anUnknownSavedScreenKeepsTodaysStart() {
+    @Test func anOldOrUnknownSavedScreenStillOpensSomewhere() {
         let saved = defaults()
+        saved.set("goals", forKey: BighelpLanding.screenKey)
+        #expect(SettingsStore(defaults: saved).launchHomeLanding == .today)
         saved.set("dashboard", forKey: BighelpLanding.screenKey)
-        let settings = SettingsStore(defaults: saved)
-        #expect(settings.landingScreen == nil)
-        #expect(settings.launchLanding == .standard(opensChat: true))
-    }
-
-    @Test func aPickedScreenAppliesNextLaunch() {
-        let saved = defaults()
-        let settings = SettingsStore(defaults: saved)
-        settings.landingScreen = .projects
-        #expect(settings.launchLanding == .standard(opensChat: true), "This launch already happened")
-        let next = SettingsStore(defaults: saved)
-        #expect(next.landingScreen == .projects)
-        #expect(next.launchLanding == .chosen(.projects))
-
-        next.landingScreen = nil
-        #expect(SettingsStore(defaults: saved).launchLanding == .standard(opensChat: true), "Back to the default")
-    }
-
-    @Test func startAgentsAreKeptPerComputer() {
-        let saved = defaults()
-        let settings = SettingsStore(defaults: saved)
-        settings.setStartAgentID("travel", scope: "computer-a")
-        settings.setStartAgentID("home", scope: "computer-b")
-        let next = SettingsStore(defaults: saved)
-        #expect(next.startAgentID(scope: "computer-a") == "travel")
-        #expect(next.startAgentID(scope: "computer-b") == "home")
-        #expect(next.startAgentID(scope: "computer-c") == nil, "Another computer never gets an ID it doesn't have")
-        #expect(next.startAgentID(scope: nil) == nil)
-
-        next.setStartAgentID(nil, scope: "computer-a")
-        #expect(SettingsStore(defaults: saved).startAgentID(scope: "computer-a") == nil, "Automatic again")
-        #expect(SettingsStore(defaults: saved).startAgentID(scope: "computer-b") == "home")
-    }
-
-    @Test func choicesUseThePlainLabels() {
-        #expect(BighelpLandingScreen.allCases.map(\.title)
-                == ["Agents", "Agents (multi)", "Last chat", "Sessions", "Feed", "Ideas", "Goals", "Kanban", "Projects"])
+        #expect(SettingsStore(defaults: saved).launchHomeLanding == .chats)
     }
 }

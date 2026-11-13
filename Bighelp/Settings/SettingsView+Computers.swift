@@ -157,7 +157,7 @@ struct SettingsTimeZoneRow<Label: View>: View {
     /// Whether a store was asked for yet; before that the row says nothing.
     @State private var asked = false
     @State private var isPickerPresented = false
-    // Kept under Bots mode's key, so the choice made there stays.
+    // Kept under the Bots view's key, so the choice made there stays.
     @AppStorage("bighelp.simple-bots.automatic-time-zone") private var automatic = false
     @Environment(\.scenePhase) private var scenePhase
     @BighelpThemeReader private var theme

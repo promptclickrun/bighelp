@@ -13,7 +13,7 @@ The code is in `Bighelp/Spaces/`. Today's grid is in `Bighelp/Today/`.
 
 - `SpacesHost` lists the person's computers (`SpacesComputer`). The computer in use is first. The
   app sets it up in `BighelpApp.wireSpaces`.
-- The computer in use, and the others that the all-hosts view or Multi-gateway keeps connected, are
+- The computer in use, and the others that Show every computer keeps connected, are
   read live. Every other computer shows what the phone kept.
 - Each computer has one `SpacesStore`, kept by its cache scope (`WorkspaceAuthority.cacheScopeID`).
   A reconnect is a new owner with the same scope, so it keeps the same store.

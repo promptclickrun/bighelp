@@ -239,7 +239,7 @@ struct NewChatChoicesRow: View, Equatable {
 }
 
 /// The project's staged jobs over the choices row, each with the chips it was staged with, and Send
-/// all. Code mode's tray (`CodeComposer.stagedTray`), with Send all in it: New chat's own Send
+/// all. Send all is in this tray: New chat's own Send
 /// button never changes for it.
 private struct NewChatStagedTray: View {
     let store: CodeHomeStore

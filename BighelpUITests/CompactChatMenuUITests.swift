@@ -8,7 +8,7 @@ final class CompactChatMenuUITests: BighelpUITestCase {
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-canonical-agent-chat",
                                "-loopdy.home.landing", "bots"]
         app.launch()
-        let primary = app.buttons["simple-bots.primary"]
+        let primary = app.primaryBot
         XCTAssertTrue(primary.waitForExistence(timeout: 20))
         primary.tap()
         let canonical = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "This is the shared Bot Chat.")).firstMatch

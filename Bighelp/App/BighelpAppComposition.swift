@@ -287,11 +287,6 @@ struct BighelpAppComposition {
                 showsStoreScreenshots: arguments.contains(AppStoreScreenshotFixture.launchArgument),
                 createsGroups: arguments.contains(BotModeCatalogFixtureClient.createsGroupsArgument)
             ))
-            // A real host's runtime reads what it can do at connect; the demo
-            // does it now, so New chat › Group chat shows from the start.
-            if arguments.contains(BotModeCatalogFixtureClient.createsGroupsArgument) {
-                Task { await botModeRooms.refreshNativeRoomCatalog() }
-            }
             if arguments.contains(BotModeActivityFixtureClient.launchArgument) {
                 botModeRooms.configureNativeActivityClient(BotModeActivityFixtureClient())
             }
@@ -306,6 +301,10 @@ struct BighelpAppComposition {
                 losesFirstStop: arguments.contains(TeamCallDemoGroupsClient.losesFirstStopArgument)
             ))
         }
+        // A real host's runtime reads its group chats, and what it can do with them, at connect. A demo
+        // with group chats has no runtime, so it reads them now: the Bots view and New chat list them
+        // from the start.
+        if usesFixtures, botModeRooms.usesNativeRooms { Task { await botModeRooms.refreshNativeRoomCatalog() } }
         #endif
         do {
             try BotModeRoomLoadingPolicy.load(botModeRooms, for: .startup)

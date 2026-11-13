@@ -149,7 +149,6 @@ struct SpacePanelView: View {
     var runNow: (@MainActor () async throws -> SpaceRefreshRun)? = nil
 
     @State private var retry = SpacePanelRetryModel()
-    @State private var naturalCardHeight: CGFloat = 0
     @BighelpThemeReader private var theme
 
     /// The card's room at each size; header and footer come on top.
@@ -226,10 +225,11 @@ struct SpacePanelView: View {
         let height = Self.cardHeight(size)
         return ZStack(alignment: .topLeading) {
             if let card = space.card(for: size) {
+                // The card takes the panel's height and shows the rows and lines that fit, each whole
+                // (`BighelpCardWholeRows`): a line cut or faded at the edge reads as a broken panel.
                 BighelpCardRenderer(card: card)
                     .environment(\.bighelpCardLimits, .panel(size))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { naturalCardHeight = $0 }
+                    .frame(maxWidth: .infinity, maxHeight: height, alignment: .topLeading)
             } else if space.cardUnreadable {
                 Image(systemName: "rectangle.dashed")
                     .font(.bighelp(.title2))
@@ -242,8 +242,6 @@ struct SpacePanelView: View {
         }
         .frame(maxWidth: .infinity, minHeight: height, maxHeight: height, alignment: .topLeading)
         .clipped()
-        // Taller than its panel: the rest fades out, still, at the bottom edge.
-        .mask { SpacePanelFade(fades: naturalCardHeight > height + 0.5 && space.card(for: size) != nil) }
     }
 }
 
@@ -259,20 +257,6 @@ struct SpacePanelPlaceholder: View {
         .foregroundStyle(theme.separator.opacity(0.6))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .accessibilityHidden(true)
-    }
-}
-
-private struct SpacePanelFade: View {
-    let fades: Bool
-
-    var body: some View {
-        if fades {
-            LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.72),
-                                   .init(color: .clear, location: 1)],
-                           startPoint: .top, endPoint: .bottom)
-        } else {
-            Rectangle()
-        }
     }
 }
 

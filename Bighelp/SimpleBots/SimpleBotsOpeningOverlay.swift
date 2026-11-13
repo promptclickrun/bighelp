@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Over Bots mode while a bot's chat opens: the bighelp loader, what's opening (and on which
+/// Over the Bots view while a bot's chat opens: the bighelp loader, what's opening (and on which
 /// gateway, when it's another one), and Cancel.
 struct SimpleBotsOpeningOverlay: View {
     let botName: String?

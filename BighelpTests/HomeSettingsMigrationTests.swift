@@ -190,7 +190,6 @@ struct HomeSettingsMigrationTests {
         #expect(settings.homeLanding == .chats)
         #expect(settings.homeView == .chats)
         #expect(settings.showsEveryComputer)
-        #expect(!settings.allHostsMode, "The old shell keeps its one-computer home")
     }
 
     @Test func opensOnSetsTheViewForBotsAndChatsAndKeepsItForTodayAndWork() {

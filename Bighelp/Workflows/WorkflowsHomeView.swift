@@ -32,7 +32,7 @@ struct WorkflowsContext {
     }
 }
 
-/// ☰ › Workflows: what waits for you, what's running, and your workflows.
+/// Work › Workflows: what waits for you, what's running, and your workflows.
 struct WorkflowsHomeView: View {
     let context: WorkflowsContext
     @State private var isUsingTemplate = false

@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-// An agent's background work of the last days, on its Dashboard (Bots mode) as Activities, by day:
+// An agent's background work of the last days, on its Dashboard as Activities, by day:
 // the subagents, background commands and, when the person asks, the routines (scheduled task runs)
 // the plugin's `agents/today` reports (`native-agents-today-v1`), running ones first. Only what the
 // computer says; nothing here starts or stops work.

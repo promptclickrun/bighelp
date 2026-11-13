@@ -8,7 +8,7 @@ final class SimpleBotsUITests: BighelpUITestCase {
     @MainActor
     func testCachedBotChatOpensWithoutTheLookupLoader() {
         let app = launch(appearance: "dark", extra: ["-test-canonical-agent-chat", "-test-simple-bots-open-delay-ms", "3000"])
-        let primary = app.buttons["simple-bots.primary"]
+        let primary = app.primaryBot
         XCTAssertTrue(primary.waitForExistence(timeout: 15))
         primary.tap()
         XCTAssertTrue(app.buttons["chat.identity"].waitForExistence(timeout: 2),
@@ -29,7 +29,7 @@ final class SimpleBotsUITests: BighelpUITestCase {
             let app = launch(appearance: appearance)
             let home = app.descendants(matching: .any)["simple-bots.home"]
             XCTAssertTrue(home.waitForExistence(timeout: 15), "The launch opens on Bots")
-            let primary = app.buttons["simple-bots.primary"]
+            let primary = app.primaryBot
             XCTAssertTrue(primary.exists)
             XCTAssertTrue(app.buttons["simple-bots.bot.travel"].exists, "Other bots are listed")
             save("simple-home-\(appearance)", app)
@@ -178,7 +178,7 @@ final class SimpleBotsUITests: BighelpUITestCase {
     @MainActor
     private func openPrimaryProfile(_ app: XCUIApplication) {
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
-        app.buttons["simple-bots.primary"].tap()
+        app.primaryBot.tap()
         let identity = app.buttons["chat.identity"]
         XCTAssertTrue(identity.waitForExistence(timeout: 10))
         let profile = app.descendants(matching: .any)["simple-bots.profile"]
@@ -195,7 +195,7 @@ final class SimpleBotsUITests: BighelpUITestCase {
         let app = launch(appearance: "dark")
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
         save("simple-home-dark", app)
-        app.buttons["simple-bots.primary"].tap()
+        app.primaryBot.tap()
         let identity = app.buttons["chat.identity"]
         XCTAssertTrue(identity.waitForExistence(timeout: 10))
         identity.tap()
@@ -255,7 +255,7 @@ final class SimpleBotsUITests: BighelpUITestCase {
         for appearance in ["light", "dark"] {
             let app = launch(appearance: appearance)
             XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
-            app.buttons["simple-bots.primary"].tap()
+            app.primaryBot.tap()
             let identity = app.buttons["chat.identity"]
             XCTAssertTrue(identity.waitForExistence(timeout: 10))
             let profile = app.descendants(matching: .any)["simple-bots.profile"]
@@ -346,7 +346,7 @@ final class SimpleBotsUITests: BighelpUITestCase {
     func testProfileFilesAndMedia() throws {
         for appearance in ["light", "dark"] {
             let app = launch(appearance: appearance)
-            let primary = app.buttons["simple-bots.primary"]
+            let primary = app.primaryBot
             XCTAssertTrue(primary.waitForExistence(timeout: 15))
             primary.tap()
             let identity = app.buttons["chat.identity"]
@@ -493,7 +493,7 @@ final class SimpleBotsUITests: BighelpUITestCase {
             app.buttons["simple-bots.create.close"].tap()
 
             // A bot's Share saves it as a template on the computer.
-            app.buttons["simple-bots.primary"].tap()
+            app.primaryBot.tap()
             let identity = app.buttons["chat.identity"]
             XCTAssertTrue(identity.waitForExistence(timeout: 10))
             identity.tap()
@@ -544,8 +544,11 @@ final class SimpleBotsUITests: BighelpUITestCase {
             let labels = ["New Chat", "Pin", "Rearrange", "Move to Section", "Mark Unread", "Bot Profile", "Hide"]
             for label in labels {
                 XCTAssertTrue(app.buttons[label].waitForExistence(timeout: 3), "First-level action: \(label)")
-                XCTAssertTrue(app.buttons[label].isHittable)
             }
+            // The menu grows into place: its last row can be tapped once it has.
+            let settled = expectation(for: NSPredicate(format: "isHittable == true"), evaluatedWith: app.buttons["Hide"])
+            wait(for: [settled], timeout: 5)
+            for label in labels { XCTAssertTrue(app.buttons[label].isHittable, "Can be tapped: \(label)") }
             for (before, after) in zip(labels, labels.dropFirst()) {
                 XCTAssertLessThan(app.buttons[before].frame.midY, app.buttons[after].frame.midY)
             }
@@ -557,7 +560,10 @@ final class SimpleBotsUITests: BighelpUITestCase {
             bot.press(forDuration: 1.2)
             XCTAssertTrue(app.buttons["Mark Read"].waitForExistence(timeout: 3))
             app.buttons["Mark Read"].tap()
+            // The row moves as its dot goes, so the next press waits for it.
+            XCTAssertTrue(app.buttons["Mark Read"].waitForNonExistence(timeout: 5))
             bot.press(forDuration: 1.2)
+            XCTAssertTrue(app.buttons["Bot Profile"].waitForExistence(timeout: 5), "The menu opens again")
             app.buttons["Bot Profile"].tap()
             XCTAssertTrue(app.descendants(matching: .any)["simple-bots.profile"].waitForExistence(timeout: 5))
             app.terminate()
@@ -599,24 +605,24 @@ final class SimpleBotsUITests: BighelpUITestCase {
         save("simple-rearrange-dark", app)
         // The list's rows use the system's reorder handles, which the test can't drive; the top bots drag here.
         let pinned = app.descendants(matching: .any)["simple-bots.pinned.\(agentID)"]
-        let primary = app.descendants(matching: .any)["simple-bots.primary"]
+        let primary = app.primaryBotTile
         XCTAssertGreaterThan(pinned.frame.minX, primary.frame.minX)
         pinned.press(forDuration: 0.1, thenDragTo: primary, withVelocity: .slow, thenHoldForDuration: 0.3)
         XCTAssertTrue(waitUntil { pinned.frame.minX < primary.frame.minX }, "On top, the dragged bot goes first")
         save("simple-rearranged-dark", app)
         saveButton.tap()
         XCTAssertTrue(app.buttons["simple-bots.search"].waitForExistence(timeout: 5), "Save ends rearranging")
-        XCTAssertLessThan(app.buttons["simple-bots.pinned.\(agentID)"].frame.minX, app.buttons["simple-bots.primary"].frame.minX)
+        XCTAssertLessThan(app.buttons["simple-bots.pinned.\(agentID)"].frame.minX, app.primaryBot.frame.minX)
 
         // Cancel drops a change.
         app.buttons["simple-bots.pinned.\(agentID)"].press(forDuration: 1.2)
         tapBotMenuAction("Rearrange", in: app)
         let pinnedAgain = app.descendants(matching: .any)["simple-bots.pinned.\(agentID)"]
-        pinnedAgain.press(forDuration: 0.1, thenDragTo: app.descendants(matching: .any)["simple-bots.primary"],
+        pinnedAgain.press(forDuration: 0.1, thenDragTo: app.primaryBotTile,
                           withVelocity: .slow, thenHoldForDuration: 0.3)
         app.buttons["simple-bots.rearrange.cancel"].tap()
         XCTAssertTrue(app.buttons["simple-bots.search"].waitForExistence(timeout: 5))
-        XCTAssertLessThan(app.buttons["simple-bots.pinned.\(agentID)"].frame.minX, app.buttons["simple-bots.primary"].frame.minX,
+        XCTAssertLessThan(app.buttons["simple-bots.pinned.\(agentID)"].frame.minX, app.primaryBot.frame.minX,
                           "Cancel keeps the saved order")
 
         app.buttons["simple-bots.pinned.\(agentID)"].press(forDuration: 1.2)
@@ -658,8 +664,8 @@ final class SimpleBotsUITests: BighelpUITestCase {
                                "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", "dark",
                                "-loopdy.voice.conversation-mode", "turnBased", "-bighelp.voice.transcription", "hermes"]
         app.launch()
-        XCTAssertTrue(app.buttons["simple-bots.primary"].waitForExistence(timeout: 15))
-        app.buttons["simple-bots.primary"].tap()
+        XCTAssertTrue(app.primaryBot.waitForExistence(timeout: 15))
+        app.primaryBot.tap()
         let voice = app.buttons["chat.voice"]
         XCTAssertTrue(voice.waitForExistence(timeout: 10))
         save("simple-composer-idle-dark", app)

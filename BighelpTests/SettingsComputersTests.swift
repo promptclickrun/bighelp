@@ -5,18 +5,15 @@ import Testing
 /// Settings › Your computers: the one Show every computer setting, and the time zone row's value.
 @MainActor
 struct SettingsComputersTests {
-    @Test func showEveryComputerIsOneSettingThatBotsModesMultiGatewayFollows() {
+    @Test func showEveryComputerKeepsTheOldAllHostsKey() {
         let suite = "settings-computers-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         let settings = SettingsStore(defaults: defaults)
 
         settings.showsEveryComputer = false
-        #expect(!settings.allHostsMode)
-        #expect(!settings.simpleBotsMultiGateway)
+        #expect(defaults.object(forKey: "bighelp.hosts.all-hosts") as? Bool == false)
         settings.showsEveryComputer = true
-        #expect(settings.allHostsMode)
-        #expect(settings.simpleBotsMultiGateway)
         #expect(SettingsStore(defaults: defaults).showsEveryComputer)
         #expect(defaults.object(forKey: "bighelp.hosts.all-hosts") as? Bool == true, "The all-hosts key, kept")
     }

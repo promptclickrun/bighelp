@@ -579,7 +579,7 @@ struct BighelpApp: App {
                 // Shortcuts) still needs the socket, as RootShellView's closer knows.
                 guard BighelpShortcutService.holdsHostConnection == 0 else { return }
                 nativeWorkspaces.suspend()
-                // Other gateways kept connected for the all-hosts view or Multi-gateway close too.
+                // Other gateways kept connected for Show every computer close too.
                 hostRegistry.keepsOtherHostsConnected = false
             }
         }
@@ -720,7 +720,7 @@ struct BighelpApp: App {
             .task(id: nativeWorkspaces.synchronizationKey) {
                 await nativeWorkspaces.synchronize()
             }
-            // Bots mode's order, sections and bot settings from the person's computers.
+            // The Bots view's order, sections and bot settings from the person's computers.
             .task(id: Self.botsAppStateKey(connections: workspaceConnections, registry: hostRegistry,
                                            isActive: scenePhase == .active)) {
                 guard scenePhase == .active else { return }

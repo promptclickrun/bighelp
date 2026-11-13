@@ -11,7 +11,7 @@ final class InstructionsEditingUITests: BighelpUITestCase {
             app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3", "-test-long-soul",
                                    "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", appearance]
             app.launch()
-            let primary = app.buttons["simple-bots.primary"]
+            let primary = app.primaryBot
             XCTAssertTrue(primary.waitForExistence(timeout: 15))
             primary.tap()
             let identity = app.buttons["chat.identity"]

@@ -246,7 +246,7 @@ struct NewChatPeopleList: View {
     }
 }
 
-/// A bot in the people list: Bots mode's row (face, name, its state line or role), with a check
+/// A bot in the people list: the Bots view's row (face, name, its state line or role), with a check
 /// when picked. Its state is read here, so only this row redraws when it changes.
 private struct NewChatBotRow: View {
     let bot: SimpleBotsBot

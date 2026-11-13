@@ -122,6 +122,55 @@ private struct CardBackgroundInk: ViewModifier {
     }
 }
 
+/// A column in a panel, which has a fixed height: rows from the top, each one whole. A row that
+/// doesn't fit is asked for less room (a text then shows fewer whole lines, a column inside fewer
+/// rows); one that still doesn't fit ends the column, so nothing is ever cut through.
+struct BighelpCardWholeRows: Layout {
+    var spacing: CGFloat
+
+    /// Each shown row's size, in order. With no height asked, every row at its own height.
+    private func rows(width: CGFloat?, height: CGFloat?, subviews: Subviews) -> [CGSize] {
+        var sizes: [CGSize] = []
+        var used: CGFloat = 0
+        for subview in subviews {
+            let top = sizes.isEmpty ? used : used + spacing
+            var size = subview.sizeThatFits(ProposedViewSize(width: width, height: nil))
+            if let height, top + size.height > height + 0.5 {
+                let left = height - top
+                guard left > 0 else { break }
+                size = subview.sizeThatFits(ProposedViewSize(width: width, height: left))
+                guard size.height <= left + 0.5 else { break }
+            }
+            sizes.append(size)
+            used = top + size.height
+        }
+        return sizes
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let height = proposal.height.flatMap { $0.isFinite ? $0 : nil }
+        let sizes = rows(width: proposal.width, height: height, subviews: subviews)
+        let rowsHeight = sizes.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(sizes.count - 1, 0))
+        return CGSize(width: proposal.width ?? sizes.map(\.width).max() ?? 0, height: rowsHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let sizes = rows(width: bounds.width, height: bounds.height, subviews: subviews)
+        var y = bounds.minY
+        for (index, subview) in subviews.enumerated() {
+            if index < sizes.count {
+                subview.place(at: CGPoint(x: bounds.minX, y: y), anchor: .topLeading,
+                              proposal: ProposedViewSize(width: bounds.width, height: sizes[index].height))
+                y += sizes[index].height + spacing
+            } else {
+                // A layout can't leave a row out: it goes far below, where the panel clips it.
+                subview.place(at: CGPoint(x: bounds.minX, y: bounds.maxY + 10_000), anchor: .topLeading,
+                              proposal: ProposedViewSize(width: bounds.width, height: nil))
+            }
+        }
+    }
+}
+
 struct BighelpCardRenderer: View {
     static let supportedTypes = BighelpCardValidator.supportedElementTypes
 
@@ -157,7 +206,7 @@ struct BighelpCardRenderer: View {
 
         switch type {
         case "card":
-            return AnyView(VStack(alignment: .leading, spacing: BighelpCardDesignTokens.spacing) {
+            return AnyView(column(spacing: BighelpCardDesignTokens.spacing) {
                 // A panel's header names the space already.
                 if let title = text(props["title"], item: item, itemSourceID: itemSourceID),
                    !(limits?.omitsRootTitle == true && id == card.root) {
@@ -169,7 +218,7 @@ struct BighelpCardRenderer: View {
                 renderChildren(children, item: item, itemSourceID: itemSourceID)
             })
         case "vstack":
-            return AnyView(VStack(alignment: .leading, spacing: spacing(props["spacing"])) {
+            return AnyView(column(spacing: spacing(props["spacing"])) {
                 renderChildren(children, item: item, itemSourceID: itemSourceID)
             })
         case "hstack":
@@ -263,6 +312,14 @@ struct BighelpCardRenderer: View {
         }
     }
 
+    /// A card's column. In a panel it shows whole rows only (`BighelpCardWholeRows`); in a chat it
+    /// is the plain stack it always was.
+    private func column(spacing: CGFloat, @ViewBuilder content: () -> some View) -> some View {
+        let layout = limits == nil ? AnyLayout(VStackLayout(alignment: .leading, spacing: spacing))
+            : AnyLayout(BighelpCardWholeRows(spacing: spacing))
+        return layout { content() }
+    }
+
     private func renderChildren(
         _ children: [String],
         item: BighelpJSONValue?,
@@ -281,7 +338,7 @@ struct BighelpCardRenderer: View {
         let bindingSource = props["items"]?.object?["source"]?.string
         let items = Array((resolved(props["items"], item: nil, itemSourceID: itemSourceID)?.array ?? [])
             .prefix(limits?.maxListItems ?? 50))
-        return VStack(alignment: .leading, spacing: BighelpCardDesignTokens.compactSpacing) {
+        return column(spacing: BighelpCardDesignTokens.compactSpacing) {
             if items.isEmpty {
                 Text(props["empty_text"]?.string ?? "No items available.")
                     .foregroundStyle(.secondary)
@@ -304,7 +361,7 @@ struct BighelpCardRenderer: View {
     ) -> some View {
         let columns = Array((props["columns"]?.array ?? []).prefix(limits?.maxTableColumns ?? 8))
         let rows = Array((props["rows"]?.array ?? []).prefix(limits?.maxTableRows ?? 50))
-        return VStack(alignment: .leading, spacing: 6) {
+        return column(spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 ForEach(Array(columns.enumerated()), id: \.offset) { _, column in
                     Text(column.object?["label"]?.string ?? "Column")

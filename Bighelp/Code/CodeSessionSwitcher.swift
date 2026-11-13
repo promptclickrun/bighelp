@@ -10,7 +10,7 @@ extension CodeHomeStore {
         return reader.status(of: session.id)
     }
 
-    /// Code mode's switcher beside a chat (`BighelpChatSwitcher`): this project's sessions, the
+    /// A coding session's switcher beside its chat (`BighelpChatSwitcher`): this project's sessions, the
     /// ones working or waiting on you first, then the newest.
     func switcherSessions(reader: any CodeSessionStatusReading) -> [(CodeSessionRecord, CodeSessionStatus)] {
         let sessions = projectSingleSessions.map { ($0, status(of: $0, reader: reader)) }

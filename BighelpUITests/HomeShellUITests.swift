@@ -122,6 +122,12 @@ final class HomeShellUITests: BighelpUITestCase {
             XCTAssertTrue(element("new-chat.to.chip.travel", in: app).waitForExistence(timeout: 10), "The pick is in the To row")
             shot("new-chat-one-bot", appearance, app)
 
+            // The plain demo's computer makes no group chats, so the other bots show dimmed: a tap on
+            // one adds nobody and says why.
+            app.buttons["new-chat.bot.finance"].firstMatch.tap()
+            XCTAssertTrue(element("new-chat.to.refusal", in: app).waitForExistence(timeout: 5), "A bot that can't join says why")
+            XCTAssertFalse(element("new-chat.to.chip.finance", in: app).exists)
+
             send("Plan one day in Lisbon", in: app)
             XCTAssertTrue(element("new-chat.to", in: app).waitForNonExistence(timeout: 15), "Once sent it is an ordinary chat")
             XCTAssertFalse(element("new-chat.people", in: app).exists)
@@ -145,6 +151,8 @@ final class HomeShellUITests: BighelpUITestCase {
             openNewChat(in: app)
             app.buttons["new-chat.bot.finance"].firstMatch.tap()
             XCTAssertTrue(element("new-chat.to.chip.finance", in: app).waitForExistence(timeout: 10))
+            // Here a second bot can join, so nobody is dimmed.
+            shot("new-chat-group-one-bot", appearance, app)
             app.buttons["new-chat.bot.travel"].firstMatch.tap()
             XCTAssertTrue(element("new-chat.to.chip.travel", in: app).waitForExistence(timeout: 10))
             shot("new-chat-two-bots", appearance, app)
@@ -194,6 +202,10 @@ final class HomeShellUITests: BighelpUITestCase {
                 shot("today-space-page", appearance, app)
                 let close = app.buttons.matching(NSPredicate(format: "label IN %@", ["Close", "Done"])).firstMatch
                 if close.waitForExistence(timeout: 5) { close.tap() }
+                // The Wide panel below it, for a look at its bottom edge (whole lines only).
+                element("today.home", in: app).swipeUp()
+                shot("today-space-wide", appearance, app)
+                element("today.home", in: app).swipeDown()
             } else {
                 XCTFail("The demo's space has no panel on Today")
             }

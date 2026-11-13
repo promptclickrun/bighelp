@@ -26,11 +26,15 @@ final class CodeModeUITests: BighelpUITestCase {
         app.buttons["code.branch.done"].tap()
 
         // The mode button: Plan for a plain message.
-        app.buttons["new-chat.chip.mode"].tap()
+        reveal("new-chat.chip.mode", in: app).tap()
         let plan = menuItem("new-chat.mode.plan", title: "Plan", in: app)
         XCTAssertTrue(plan.waitForExistence(timeout: 3))
+        save("04b-mode", app)
         plan.tap()
-        XCTAssertEqual(app.buttons["new-chat.chip.mode"].label, "Mode: Plan")
+        // The chip takes the pick once the menu has closed.
+        let picked = expectation(for: NSPredicate(format: "label == %@", "Mode: Plan"),
+                                 evaluatedWith: app.buttons["new-chat.chip.mode"])
+        wait(for: [picked], timeout: 5)
 
         app.buttons["new-chat.chip.project"].tap()
         let moreProjects = menuItem("new-chat.project.more", title: "More projects", in: app)
@@ -202,13 +206,23 @@ final class CodeModeUITests: BighelpUITestCase {
         app.buttons.matching(NSPredicate(format: "identifier == %@ OR label BEGINSWITH %@", identifier, title)).firstMatch
     }
 
+    /// A chip of the choices row, scrolled into view: the choices are one row that scrolls sideways,
+    /// and its last chips start past the screen's edge.
+    @MainActor
+    private func reveal(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+        let chip = app.buttons[identifier]
+        let row = element("new-chat.choices", in: app)
+        for _ in 0..<3 where !(chip.exists && chip.isHittable) { row.swipeLeft() }
+        return chip
+    }
+
     @MainActor
     private func stage(_ message: String, in app: XCUIApplication) {
         let field = app.textViews["chat.composer.text"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
         field.typeText(message)
-        app.buttons["new-chat.chip.stage"].tap()
+        reveal("new-chat.chip.stage", in: app).tap()
     }
 
     @MainActor

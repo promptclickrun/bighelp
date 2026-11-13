@@ -58,7 +58,7 @@ final class ReleaseScreensWalkthroughUITests: BighelpUITestCase {
         XCTAssertTrue(connected, "Connected")
         // The primary bot's chat, from Bots: the chat header the 16 Pro tester found cramped.
         showBots(in: app)
-        let primary = app.buttons["simple-bots.primary"].firstMatch
+        let primary = app.primaryBot
         XCTAssertTrue(primary.waitForExistence(timeout: 30), "Bots shows the primary bot")
         primary.tap()
         let identity = app.buttons["chat.identity"]

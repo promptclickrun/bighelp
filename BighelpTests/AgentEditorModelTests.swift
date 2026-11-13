@@ -5,20 +5,6 @@ import UIKit
 
 @MainActor
 struct AgentEditorModelTests {
-    @Test func chatEditorPresentationRequiresExactProfileAndCurrentOwner() async throws {
-        let store = AgentDirectoryStore(client: AgentDirectoryFixtureClient(profiles: [.financeFixture]), defaults: isolatedDefaults())
-        try await store.load()
-        var current = true
-        let presentation = ChatAgentEditorPresentation(profileID: AgentProfile.financeFixture.id,
-            store: store, isCurrent: { current })
-        #expect(presentation.isAvailable)
-        let wrongProfile = ChatAgentEditorPresentation(profileID: "different-profile", store: store, isCurrent: { true })
-        #expect(!wrongProfile.isAvailable)
-        current = false
-        #expect(!presentation.isAvailable)
-        #expect(store.profiles == [.financeFixture])
-    }
-
     @Test func unchangedDraftCanCloseAndSavedChangesBecomeTheNewBaseline() async throws {
         let store = AgentDirectoryStore(
             client: AgentDirectoryFixtureClient(profiles: [.financeFixture]),

@@ -27,7 +27,7 @@ enum WorkflowsLoadState: Equatable, Sendable {
     }
 }
 
-/// ☰ › Workflows home: the host's status, what waits for you, active runs and
+/// Work › Workflows: the host's status, what waits for you, active runs and
 /// your workflows. One per computer. It asks the host every 15 seconds while
 /// the home is on screen, and never when it isn't.
 @MainActor
@@ -45,7 +45,7 @@ final class WorkflowsStore {
     private(set) var support: WorkflowsSupport?
     /// What the plugin adds (parallel blocks, delivery, outcomes): the editor offers only these.
     private(set) var features: WorkflowFeatures = []
-    /// Asked once per visit, apart from `support`: the ☰ menu's check fills that before this screen opens.
+    /// Asked once per visit, apart from `support`: Work's check fills that before this screen opens.
     @ObservationIgnored private var askedFeatures = false
     var canParallel: Bool { features.contains(.parallel) }
     /// A change from a long-press menu that didn't work, in plain words.
@@ -108,7 +108,7 @@ final class WorkflowsStore {
             let recentValue = try await client.runs(workflowID: nil, filter: .all, before: nil, limit: 20)
             guard !Task.isCancelled else { return }
             self.status = statusValue
-            // Dev Factory's recipes and runs live in Code mode (☰ › Dev Factory), not here.
+            // Dev Factory's recipes and runs live in Dev Factory (a project's ⋯ on Work), not here.
             var shown = listValue
             shown.workflows.removeAll(where: \.isCodeRecipe)
             shown.waiting.removeAll { $0.code != nil }

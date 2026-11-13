@@ -963,7 +963,7 @@ extension RootShellView {
         return CredentialVaultModel(service: service, agents: list, agentID: homeAgent?.id ?? "default")
     }
 
-    /// One bot's own vault, for its profile in Bots mode; nil while the computer isn't connected.
+    /// One bot's own vault, for its page; nil while the computer isn't connected.
     func makeCredentialVault(for agentID: String) -> CredentialVaultModel? {
         guard let service = makeCredentialVaultService() else { return nil }
         let name = agents.profiles.first { $0.id == agentID }?.name ?? agentID

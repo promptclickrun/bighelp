@@ -1,7 +1,7 @@
 import Observation
 import SwiftUI
 
-/// Vision Pro and Mac: ☰ opens as a column beside the app instead of covering
+/// Vision Pro and Mac: the sidebar opens as a column beside the app instead of covering
 /// it. The chat or list stays visible, only narrower. On the Mac it's the
 /// window's sidebar: it stays open while you pick chats and pages.
 @MainActor

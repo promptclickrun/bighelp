@@ -95,7 +95,7 @@ final class FleetStore {
     var sections: [FleetSection] = []
     /// Which section each group chat is in, by its list ID. Kept on this device.
     var groupSectionIDs: [String: String] = [:]
-    /// Group chats pinned on Bots mode's home, and ones hidden from it, by list ID. Hermes keeps
+    /// Group chats pinned on the Bots view, and ones hidden from it, by list ID. Hermes keeps
     /// neither for group chats, so the app does (and the computers, `bots.layout`).
     var pinnedGroupIDs: [String] = []
     var hiddenGroupIDs: [String] = []

@@ -2,7 +2,7 @@ import SwiftUI
 
 extension BighelpApp {
     /// Where Today's spaces come from (`SpacesHost`): every computer, the one in use first. The one
-    /// in use and the others the all-hosts view or Multi-gateway keeps connected are read live; the
+    /// in use and the others Show every computer keeps connected are read live; the
     /// rest show what the phone kept, by their saved cache scope. Demo mode's computer is
     /// `DemoSpacesClient`, with its pages in `DemoHTMLAppsClient`.
     static func wireSpaces(registry: BighelpHostRegistry, connections: WorkspaceConnectionStore, fleet: FleetStore,

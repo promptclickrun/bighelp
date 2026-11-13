@@ -18,7 +18,7 @@ final class SimpleBotsActivityUITests: BighelpUITestCase {
             XCTAssertTrue(wait(for: mina, toSay: "Browsing the web"), mina.label)
             XCTAssertTrue(wait(for: jordan, toSay: "Needs you"), jordan.label)
             // Avery has no turn running but has work in the background: its tile says so, calmly.
-            let primary = app.buttons["simple-bots.primary"]
+            let primary = app.primaryBot
             XCTAssertTrue(wait(for: primary, toSay: "2 things running in the background"), primary.value as? String ?? "")
             // Said once: the row's value, not again in its label.
             XCTAssertFalse(mina.label.contains("Browsing the web"), mina.label)

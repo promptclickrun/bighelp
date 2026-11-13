@@ -424,7 +424,7 @@ final class DirectHermesNativePluginClient {
             return Route(path: "agents/deliveries", feature: DirectHermesAgentTalkReader.deliveriesFeature,
                          isMutation: false, maximumResponseBytes: 1_048_576, timeout: 10)
         case .agentsActivity:
-            // Read every few seconds while Bots mode's home or the Agents screen shows; at most 64 agents.
+            // Read every few seconds while the Bots view shows; at most 64 agents.
             return Route(path: "agents/activity", feature: DirectHermesBotChatActivityClient.feature,
                          isMutation: false, maximumResponseBytes: 32_768, timeout: 10)
         case .computerScreenStatus, .computerScreenObserve:

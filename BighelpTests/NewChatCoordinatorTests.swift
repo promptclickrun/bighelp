@@ -248,14 +248,6 @@ struct NewChatCoordinatorTests {
         #expect(model.isComposerAttachmentInputDisabled)
     }
 
-    @Test func newChatActionExpandsItsHitAreaWithoutGrowingTheVisibleControl() {
-        let presentation = SpectrumAction.hitTargetPresentation
-
-        #expect(presentation.visualSize == BighelpTokens.primaryActionSize)
-        #expect(presentation.minimumHeight == BighelpTokens.primaryActionSize)
-        #expect(presentation.expandsHorizontally)
-    }
-
     @Test func repeatedNewChatTapsShareOneSessionCreation() async throws {
         let client = DeferredNewChatSessionCatalogClient()
         let agents = AgentDirectoryStore(

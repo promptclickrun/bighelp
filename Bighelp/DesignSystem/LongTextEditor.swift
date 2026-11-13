@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 /// The editor for long text people write and tune: an agent's instructions (its SOUL) and a
-/// personality's, in the form's box, the full-screen editor and Bots mode's sheet. One UIKit
+/// personality's, in the form's box, the full-screen editor and a bot page's sheet. One UIKit
 /// text view everywhere, because SwiftUI's `TextEditor` stuttered with thousands of
 /// characters (#727): the form measured all of its text on every keystroke to size the box,
 /// a drag down the box took the form's interactive keyboard dismissal, and nothing kept the

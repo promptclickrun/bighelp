@@ -34,7 +34,7 @@ struct AdvancedOptionsSheet: View {
 
 /// One bot's advanced settings, grouped and in a few words each, then every Nerd Mode page for
 /// it, with the expert ones last. A small (i) beside a setting says what each choice does.
-/// Pushed from Bots mode's Settings too, so it brings its own page destinations.
+/// Pushed inside Settings, so it brings its own page destinations.
 @MainActor
 struct AdvancedOptionsPage: View {
     let context: AdvancedOptionsContext

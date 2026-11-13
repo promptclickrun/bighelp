@@ -33,7 +33,7 @@ final class BotScreenHostUITests: BighelpUITestCase {
 
         // Bots › the primary bot's chat › its page's Computer tab.
         showBots(in: app, timeout: 30)
-        let primary = app.buttons["simple-bots.primary"].firstMatch
+        let primary = app.primaryBot
         XCTAssertTrue(primary.waitForExistence(timeout: 30))
         primary.tap()
         openBotPage(fromChatIn: app)

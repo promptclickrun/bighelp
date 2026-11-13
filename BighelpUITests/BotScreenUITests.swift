@@ -91,7 +91,7 @@ final class BotScreenUITests: BighelpUITestCase {
                                "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", "light"]
         app.launch()
         // Bots: the primary bot's chat, then its profile's Computer tab.
-        let primary = app.buttons["simple-bots.primary"]
+        let primary = app.primaryBot
         XCTAssertTrue(primary.waitForExistence(timeout: 20))
         primary.tap()
         let identity = app.buttons["chat.identity"]

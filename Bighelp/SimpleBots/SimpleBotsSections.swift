@@ -1,9 +1,9 @@
 import Foundation
 
-/// A group chat on Bots mode's home: on the gateway in use (its catalog row, which opens it) or, with
-/// Multi-gateway, on another gateway (the all-hosts copy of it).
+/// A group chat on the Bots view: on the gateway in use (its catalog row, which opens it) or, with
+/// every computer shown, on another gateway (the all-hosts copy of it).
 struct SimpleBotsGroup: Identifiable, Equatable {
-    /// Its row's ID in the home's order: the catalog row's with one gateway, `FleetGroup.id` with Multi-gateway.
+    /// Its row's ID in the home's order: the catalog row's with one gateway, `FleetGroup.id` with every computer shown.
     let id: String
     let roomID: String
     /// The gateway it's on. Its section, pin and hide are kept by it (`key`); nil when that isn't known.
@@ -24,7 +24,7 @@ struct SimpleBotsGroup: Identifiable, Equatable {
     var key: String? { hostID.map { FleetID.make($0, "group/" + roomID) } }
     var itemID: String { "group:" + id }
 
-    /// A catalog row on the gateway in use. `listsByKey` (Multi-gateway) names the row by its gateway too.
+    /// A catalog row on the gateway in use. `listsByKey` (every computer shown) names the row by its gateway too.
     init?(_ summary: SessionSummary, hostID: UUID?, members: [SimpleBotsBot], listsByKey: Bool = false) {
         guard summary.kind == .botMode else { return nil }
         let room = summary.hostedRoomID ?? summary.id
@@ -172,7 +172,7 @@ struct SimpleBotsSectionCard: Identifiable, Equatable {
     var botCount: Int { members.count(where: { if case .bot = $0.kind { true } else { false } }) }
     var groupCount: Int { members.count - botCount }
 
-    /// The gateways its members are on, in the order they first show; more than one only with Multi-gateway.
+    /// The gateways its members are on, in the order they first show; more than one only with every computer shown.
     var hostIDs: [UUID] {
         var seen = Set<UUID>()
         return members.compactMap { item -> UUID? in
@@ -198,7 +198,7 @@ struct SimpleBotsSectionCard: Identifiable, Equatable {
     }
 }
 
-/// Bots mode's sections, changed from the home, a section's page or the sheets: bots' sections are
+/// The Bots view's sections, changed from the home, a section's page or the sheets: bots' sections are
 /// saved on each bot's own computer (its live profile on the gateway in use, its all-hosts copy on
 /// another), group chats' in the app (`FleetStore`). Members go by their row IDs (`SimpleBotsItem.id`).
 @MainActor
@@ -283,7 +283,7 @@ struct SimpleBotsSectionEditor {
     }
 }
 
-/// A touch-and-hold action on Bots mode's home, in the order its menu shows them.
+/// A touch-and-hold action on the Bots view, in the order its menu shows them.
 enum SimpleBotsMenuAction: Hashable {
     case newChat, pin, unpin, rearrange, moveToSection, markRead, markUnread, botProfile, groupSettings
     /// A divider comes before these.
@@ -322,7 +322,7 @@ enum SimpleBotsMenuAction: Hashable {
 #if DEBUG
 /// `-test-bot-sections`: demo mode's sections, for UI tests and screenshots. Home life holds Jordan
 /// and the Household team (`-preview-agent-groups`) on Home Hermes; Work holds Mina on Home Hermes
-/// and Sage and the Launch crew on Studio Mac, so with Multi-gateway off it shows only Mina.
+/// and Sage and the Launch crew on Studio Mac, so with one computer shown it shows only Mina.
 enum SimpleBotsDemoSections {
     static let argument = "-test-bot-sections"
     static var isOn: Bool { ProcessInfo.processInfo.arguments.contains(argument) }

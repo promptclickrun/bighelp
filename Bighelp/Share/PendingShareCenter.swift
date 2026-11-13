@@ -26,7 +26,7 @@ final class PendingShareCenter: ChatShareTracking {
 
     let inbox: PendingShareInbox?
     private(set) var entries: [PendingShareInbox.Entry] = []
-    /// Every share waiting, put off ones too (☰ › Shared with bighelp, or Bots mode's Settings).
+    /// Every share waiting, put off ones too (Shared with bighelp, or Settings' first screen).
     var isListShown = false
     /// Put off with Not now, taken out of a chat's message box, or unconfirmed: in the list, and
     /// offered on their own again only when another share arrives.

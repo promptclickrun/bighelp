@@ -128,6 +128,10 @@ final class SimpleBotsSectionsUITests: BighelpUITestCase {
             XCTAssertTrue(app.buttons["simple-bots.section.Work"].exists, "Mina is in Work on this computer")
             save("sections-demo-home-\(suffix)", app)
 
+            // At a large text size the cards stack, and this one starts under the bar.
+            let home = app.descendants(matching: .any)["simple-bots.home"].firstMatch
+            let bar = app.buttons["home.tab.conversations"].firstMatch
+            for _ in 0..<4 where card.frame.maxY > bar.frame.minY { home.swipeUp() }
             card.press(forDuration: 1.2)
             for label in ["Open", "Rename", "Edit Members", "Edit Sections", "Delete Section"] {
                 XCTAssertTrue(app.buttons[label].waitForExistence(timeout: 3), "Section action: \(label)")

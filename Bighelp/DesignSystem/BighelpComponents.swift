@@ -920,7 +920,7 @@ struct BighelpIconTile: View {
     var body: some View {
         let color = tint ?? theme.action
         let solid = colorSchemeContrast == .increased
-        // Round, as Bots mode draws its rows: a soft wash of the person's color with the icon in it.
+        // Round, as the Bots view draws its rows: a soft wash of the person's color with the icon in it.
         // Increased Contrast keeps a solid circle with the color's own ink.
         BighelpSymbolImage(systemName: systemName)
             .frame(width: side * 0.62, height: side * 0.62)

@@ -18,7 +18,7 @@ final class WidgetLinkHostUITests: BighelpUITestCase {
 
         // A chat with a reply, like the ones a widget lists: the primary bot's, from Bots.
         showBots(in: app)
-        let primary = app.buttons["simple-bots.primary"].firstMatch
+        let primary = app.primaryBot
         XCTAssertTrue(primary.waitForExistence(timeout: 30), "Bots shows the primary bot")
         primary.tap()
         let composer = app.textViews["chat.composer.text"]

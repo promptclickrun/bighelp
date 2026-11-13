@@ -46,7 +46,7 @@ struct AgentLiveAvatar: View {
     var showsBadge = true
     /// How the face rests with no work (voice mode shows listening).
     var restingState: AgentLiveState = .idle
-    /// A photo moves with the work; Bots mode's calm home keeps it still and badges it instead.
+    /// A photo moves with the work; the calm Bots view keeps it still and badges it instead.
     var movesPhoto = true
 
     @Environment(\.companionStore) private var companionStore
@@ -244,7 +244,7 @@ struct AgentHeroHeader: View {
             if showsName {
                 namePillLabel(line: "Updating…").hidden()
             }
-            // Plain text under the avatar, as Bots mode names its bots; the blur under the header
+            // Plain text under the avatar, as the Bots view names its bots; the blur under the header
             // keeps it readable over the messages.
             Button(action: onNameTap) {
                 namePillLabel(line: statusLine ?? sessionTitle)

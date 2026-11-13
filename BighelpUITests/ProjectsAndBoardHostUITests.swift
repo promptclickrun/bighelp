@@ -147,7 +147,7 @@ final class ProjectsAndBoardHostUITests: BighelpUITestCase {
         try onboardOpenHost(app, address: try XCTUnwrap(probe["address"]))
         // Bots › the primary bot's chat › its page › Files.
         showBots(in: app)
-        let primary = app.buttons["simple-bots.primary"].firstMatch
+        let primary = app.primaryBot
         XCTAssertTrue(primary.waitForExistence(timeout: 30), "Bots shows the primary bot")
         primary.tap()
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 30), "The bot's chat opens")

@@ -8,15 +8,15 @@ import subprocess
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-PROFILE = "release-smoke-v2"
+PROFILE = "release-smoke-v3"
 WORKFLOW = ".github/workflows/ios-ci.yml"
 UI_TESTS = (
     "ReferenceHubUITests/testMiddleSlashCommandWorksWithoutRetiredProviders",
     "ReferenceHubUITests/testDarkLargeTextDrawerPreservesKeyboardAndDraft",
     "ReferenceHubUITests/testSendKeepsKeyboardClosedWhileChatUpdates",
-    "AgentsUITests/testChatsOpenedFromAgentsKeepTheTabBar",
-    "BoardSwipeBlueprintsUITests/testBlueprintsAskForTheBlanksThenSendOrEdit",
-    "DefaultModelUITests/testDefaultModelSurvivesProviderKeysAndComingBack",
+    "HomeShellUITests/testAChatIsAPushedPageWithBackTheBotAndNoBar",
+    "BoardSwipeBlueprintsUITests/testBlueprintsGoToTheMessageBoxWithTheirBlanksAsChips",
+    "DefaultModelUITests/testModelsSurvivesABotsPageAndComingBack",
 )
 
 

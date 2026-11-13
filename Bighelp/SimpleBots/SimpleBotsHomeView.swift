@@ -1,7 +1,7 @@
 import Observation
 import SwiftUI
 
-/// What Bots mode's home needs from the shell.
+/// What the Bots view needs from the shell.
 @MainActor
 struct SimpleBotsContext {
     let agents: AgentDirectoryStore
@@ -18,7 +18,7 @@ struct SimpleBotsContext {
     let onNewChat: (String) -> Void
     /// A model for a new bot, set up the way the shell creates agents; nil when this computer can't.
     let makeCreator: () -> AgentEditorModel?
-    /// Multi-gateway: every other gateway's bots too; nil when it's off.
+    /// Every computer shown: every other gateway's bots too; nil when it's off.
     var gateways: SimpleBotsGateways? = nil
     /// Which bots are working or need you, kept current while the home shows.
     var activity: BotChatActivityStore? = nil
@@ -42,7 +42,7 @@ struct SimpleBotsContext {
     var onOpenGroup: ((String) -> Void)? = nil
 }
 
-/// Bots mode's Multi-gateway: every gateway's bots in one home, the gateway in use's live and the
+/// Show every computer: every gateway's bots in one home, the gateway in use's live and the
 /// others' from the copies the all-hosts view keeps (those gateways stay connected meanwhile). Opening or
 /// managing a bot on another gateway makes that gateway the one in use first.
 @MainActor
@@ -65,13 +65,13 @@ struct SimpleBotsGateways {
     var groups: [SimpleBotsGroup] = []
 }
 
-/// A bot on the home: on the gateway in use (with its live profile) or, with Multi-gateway, on another
+/// A bot on the home: on the gateway in use (with its live profile) or, with every computer shown, on another
 /// gateway (with the all-hosts copy of it).
 struct SimpleBotsBot: Identifiable, Equatable {
-    /// The profile ID with one gateway; the gateway and profile (`FleetID`) with Multi-gateway.
+    /// The profile ID with one gateway; the gateway and profile (`FleetID`) with every computer shown.
     let id: String
     let profileID: String
-    /// Multi-gateway: the gateway it's on.
+    /// Every computer shown: the gateway it's on.
     var hostID: UUID? = nil
     let name: String
     let role: String
@@ -107,7 +107,7 @@ struct SimpleBotsBot: Identifiable, Equatable {
         placement = profile?.placement ?? fleetAgent?.placement
     }
 
-    /// A bot on the gateway in use; `hostID` with Multi-gateway.
+    /// A bot on the gateway in use; `hostID` with every computer shown.
     init(_ profile: AgentProfile, hostID: UUID? = nil, imageURL: URL? = nil) {
         self.init(id: hostID.map { FleetID.make($0, profile.id) } ?? profile.id, profileID: profile.id, hostID: hostID,
                   name: profile.name, role: profile.role, imageURL: imageURL, isDefault: profile.isDefault,
@@ -205,7 +205,7 @@ enum SimpleBotsHomeProjection {
 
     /// The gateway in use's group chats, with their members' faces: the catalog's (with their latest
     /// message), then Hermes' rooms with no messages yet, so a group chat just made shows at once.
-    /// `listsByKey`: Multi-gateway, where each row is named by its gateway too.
+    /// `listsByKey`: every computer shown, where each row is named by its gateway too.
     static func groups(_ summaries: [SessionSummary], rooms: [HermesBotModeRoomSummary] = [], hostID: UUID?,
                        bots: [SimpleBotsBot], listsByKey: Bool = false) -> [SimpleBotsGroup] {
         let listed = summaries.compactMap { summary in
@@ -377,7 +377,7 @@ enum SimpleBotsHomeProjection {
     }
 }
 
-/// The order the person dragged Bots mode's list into, per computer.
+/// The order the person dragged the Bots view's list into, per computer.
 @MainActor
 @Observable
 final class SimpleBotsOrderStore {
@@ -447,7 +447,7 @@ private enum SimpleBotsSheet: Identifiable {
     }
 }
 
-/// Bots mode's home: your circle top left, search and + top right, the
+/// The Bots view: your circle top left, search and + top right, the
 /// primary bot large in the middle, then the sections and every other bot and
 /// group chat with its latest message. With `sectionID`, a section's page: its
 /// members, as the home lists them.
@@ -516,11 +516,11 @@ struct SimpleBotsHomeView: View {
         return id
     }
 
-    /// The order is one across gateways with Multi-gateway on, and per gateway without it.
+    /// The order is one across gateways with every computer shown, and per gateway without it.
     var listScope: String { context.gateways == nil ? context.scope : "multi-gateway" }
     var topScope: String { "top|" + listScope }
 
-    // MARK: Acting on a bot (on another gateway with Multi-gateway)
+    // MARK: Acting on a bot (on another gateway with every computer shown)
 
     private func unreadKey(_ bot: SimpleBotsBot) -> (id: String, scope: String) {
         context.gateways == nil ? (bot.profileID, context.scope) : (bot.id, "multi-gateway")
@@ -602,7 +602,7 @@ struct SimpleBotsHomeView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .scrollBounceBehavior(.basedOnSize)
-                // Multi-gateway: the other gateways' bots are read again here (at most once a minute).
+                // Every computer shown: the other gateways' bots are read again here (at most once a minute).
                 .task(id: context.gateways != nil) { context.gateways?.refresh() }
                 .refreshable { if let gateways = context.gateways { gateways.refresh() } }
             } else {
@@ -840,7 +840,7 @@ struct SimpleBotsHomeView: View {
         .accessibilityLabel(isPrimary ? "\(bot.name), your primary bot" : "\(bot.name), pinned")
         .modifier(SimpleBotActivityValue(key: bot.activityKey, activity: context.activity))
         .accessibilityHint("Opens its chat")
-        .accessibilityIdentifier(isPrimary ? "simple-bots.primary" : "simple-bots.pinned.\(bot.id)")
+        .accessibilityIdentifier("simple-bots.\(isPrimary ? "primary" : "pinned").\(bot.id)")
     }
 
     private func canPin(_ bot: SimpleBotsBot, home: SimpleBotsHomeProjection.Home) -> Bool {
@@ -916,7 +916,7 @@ struct SimpleBotsHomeView: View {
         SimpleBotLiveFace(bot: bot, size: size, activity: context.activity)
     }
 
-    /// With Multi-gateway each action works on the bot's own gateway.
+    /// With every computer shown each action works on the bot's own gateway.
     @ViewBuilder
     private func botMenu(_ bot: SimpleBotsBot, isPrimary: Bool, home: SimpleBotsHomeProjection.Home) -> some View {
         let actions = SimpleBotsMenuAction.bot(isPrimary: isPrimary, isPinned: isPinned(bot), canPin: canPin(bot, home: home),
@@ -1059,7 +1059,7 @@ struct SimpleBotsHomeView: View {
         })
         .arrangeLift(key, dragging: dragging, offset: dragOffset(key), space: Self.arrangeSpace) { frames[key] = $0 }
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier(isPrimary ? "simple-bots.primary" : "simple-bots.pinned.\(item.id)")
+        .accessibilityIdentifier("simple-bots.\(isPrimary ? "primary" : "pinned").\(item.id)")
         .accessibilityHint("Drag to change its place")
         .accessibilityAction(named: "Move left") { step(item.id, by: -1, in: ids, top: true) }
         .accessibilityAction(named: "Move right") { step(item.id, by: 1, in: ids, top: true) }
@@ -1305,7 +1305,7 @@ private struct SimpleBotsPreview: View {
             .padding(BighelpTokens.space20)
         }
         .frame(width: 320, alignment: .leading)
-        // A preview is drawn outside the app's own colors; the system's match Bots mode.
+        // A preview is drawn outside the app's own colors; the system's match the Bots view.
         .background(Color(uiColor: .systemBackground))
     }
 }

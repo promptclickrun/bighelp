@@ -9,13 +9,12 @@ struct BotProfileActionsTests {
     static let everything = BotProfileMenuCapabilities(
         isOnComputerInUse: true, isPrimary: false, offersNewChat: true, offersChats: true,
         offersPinning: true, isPinned: false, canPinAnother: true, offersShortcuts: true,
-        offersDuplicate: true, offersEditDetails: true, showsRoutinesToggle: true,
+        offersDuplicate: true, showsRoutinesToggle: true,
         offersManage: true, offersDelete: true, isDefaultBot: false, isDeleting: false)
 
     @Test func everythingInOrderWithDeleteLast() {
         #expect(BotProfileMenu.actions(Self.everything) == [
-            .message, .newChat, .chats, .makePrimary, .pin, .shortcuts, .duplicate, .editDetails,
-            .showRoutines, .manageBots, .delete,
+            .message, .newChat, .chats, .makePrimary, .pin, .shortcuts, .duplicate, .showRoutines, .manageBots, .delete,
         ])
     }
 

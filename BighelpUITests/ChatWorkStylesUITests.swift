@@ -15,8 +15,8 @@ final class ChatWorkStylesUITests: BighelpUITestCase {
                                        "-test-tool-stream", "-test-tool-stream-two-turns", "-test-tool-stream-slow",
                                        "-test-tool-stream-settles"]
                 app.launch()
-                XCTAssertTrue(app.buttons["simple-bots.primary"].waitForExistence(timeout: 15))
-                app.buttons["simple-bots.primary"].tap()
+                XCTAssertTrue(app.primaryBot.waitForExistence(timeout: 15))
+                app.primaryBot.tap()
                 let input = app.textViews["chat.composer.text"]
                 XCTAssertTrue(input.waitForExistence(timeout: 10))
                 input.tap()

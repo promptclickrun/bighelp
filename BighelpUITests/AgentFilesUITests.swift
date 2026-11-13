@@ -12,11 +12,11 @@ final class AgentFilesUITests: BighelpUITestCase {
                                     "-loopdy.demo.appearance", appearance]
             app.launch()
 
-            openFiles(of: "finance", named: "Avery Park", in: app)
+            openFiles(of: "finance", in: app)
             XCTAssertTrue(row("Notes.md", in: app).waitForExistence(timeout: 10), "Avery's own files")
             save("finance-\(appearance)", app)
 
-            openFiles(of: "travel", named: "Mina Shah", in: app)
+            openFiles(of: "travel", in: app)
             let itinerary = row("Itinerary.md", in: app)
             XCTAssertTrue(itinerary.waitForExistence(timeout: 10), "Mina's own files")
             XCTAssertTrue(row("Notes.md", in: app).waitForNonExistence(timeout: 5), "Not Avery's")
@@ -26,7 +26,7 @@ final class AgentFilesUITests: BighelpUITestCase {
             save("travel-open-\(appearance)", app)
             app.buttons["Done"].firstMatch.tap()
 
-            openFiles(of: "home", named: "Jordan Lee", in: app)
+            openFiles(of: "home", in: app)
             XCTAssertTrue(row("Grocery list.txt", in: app).waitForExistence(timeout: 10), "Jordan's own files")
             XCTAssertTrue(row("Itinerary.md", in: app).waitForNonExistence(timeout: 5), "Not Mina's")
             save("home-\(appearance)", app)
@@ -41,7 +41,7 @@ final class AgentFilesUITests: BighelpUITestCase {
             app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.landing", "bots",
                                     "-loopdy.demo.appearance", appearance]
             app.launch()
-            openFiles(of: "finance", named: "Avery Park", in: app)
+            openFiles(of: "finance", in: app)
             let search = app.descendants(matching: .any)["files.search"].firstMatch
             XCTAssertTrue(search.waitForExistence(timeout: 10))
             app.buttons["files.sort"].tap()
@@ -70,17 +70,18 @@ final class AgentFilesUITests: BighelpUITestCase {
         app.launch()
         try onboardOpenHost(app, address: host)
         showBots(in: app)
-        // The primary bot's row carries no ID; the rest name theirs.
-        let listed = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ OR identifier BEGINSWITH %@",
-                                                      "simple-bots.bot.", "simple-bots.pinned."))
+        let listed = app.buttons.matching(NSPredicate(
+            format: "identifier BEGINSWITH %@ OR identifier BEGINSWITH %@ OR identifier BEGINSWITH %@",
+            "simple-bots.primary.", "simple-bots.bot.", "simple-bots.pinned."))
         XCTAssertTrue(listed.firstMatch.waitForExistence(timeout: 30))
         let agents = listed.allElementsBoundByIndex.prefix(3).map {
-            $0.identifier.replacingOccurrences(of: "simple-bots.bot.", with: "")
+            $0.identifier.replacingOccurrences(of: "simple-bots.primary.", with: "")
+                .replacingOccurrences(of: "simple-bots.bot.", with: "")
                 .replacingOccurrences(of: "simple-bots.pinned.", with: "")
         }
         XCTAssertGreaterThanOrEqual(agents.count, 1, "The host has two agents or more: the primary and another")
         for agent in agents + [agents[0]] {
-            openFiles(of: agent, named: nil, in: app)
+            openFiles(of: agent, in: app)
             XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH %@", "Opening"))
                 .firstMatch.waitForNonExistence(timeout: 30), agent)
             XCTAssertFalse(app.staticTexts["Update the bighelp plugin to see files"].exists,
@@ -92,16 +93,13 @@ final class AgentFilesUITests: BighelpUITestCase {
         }
     }
 
-    /// Bots › the bot (its chat opens) › its pill › Files. `name` finds it when it is the primary bot.
+    /// Bots › the bot (its chat opens) › its pill › Files.
     @MainActor
-    private func openFiles(of botID: String, named name: String?, in app: XCUIApplication) {
+    private func openFiles(of botID: String, in app: XCUIApplication) {
         showBots(in: app)
-        var predicate = NSPredicate(format: "identifier IN %@", ["simple-bots.bot.\(botID)", "simple-bots.pinned.\(botID)"])
-        if let name {
-            predicate = NSCompoundPredicate(orPredicateWithSubpredicates: [predicate, NSPredicate(
-                format: "identifier == %@ AND label BEGINSWITH %@", "simple-bots.primary", name)])
-        }
-        let bot = app.buttons.matching(predicate).firstMatch
+        let bot = app.buttons.matching(NSPredicate(format: "identifier IN %@", [
+            "simple-bots.bot.\(botID)", "simple-bots.pinned.\(botID)", "simple-bots.primary.\(botID)",
+        ])).firstMatch
         let home = app.descendants(matching: .any)["simple-bots.home"].firstMatch
         _ = bot.waitForExistence(timeout: 10)
         for _ in 0..<6 where !(bot.exists && bot.isHittable) { home.swipeUp() }

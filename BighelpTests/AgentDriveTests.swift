@@ -343,11 +343,10 @@ private final class DriveGatewaySource {
 private struct DriveGatewayHarness: View {
     let source: DriveGatewaySource
     let navigator: DriveNavigator
-    let settings = SettingsStore(defaults: isolatedDefaults())
 
     var body: some View {
         let gateway = source.gateway
         Color.clear.modifier(DriveShellHooks(appState: gateway.appState, featureStore: gateway.features, agents: gateway.agents,
-                                             settings: settings, usesDemoFixtures: false, navigator: navigator))
+                                             usesDemoFixtures: false, navigator: navigator))
     }
 }

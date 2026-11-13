@@ -13,7 +13,7 @@ extension RootShellView {
         return DirectHermesWorkflowsClient(currentWorkspace: { [weak connections] in connections?.workspace })
     }
 
-    /// Checks the host for Workflows whenever it (re)connects, so ☰ shows the
+    /// Checks the host for Workflows whenever it (re)connects, so Work shows the
     /// row only where it works. The same computer keeps its row and its store;
     /// only a clear answer from the host changes the row (`WorkflowsAvailability`).
     func configureWorkflows(_ key: AgentBoardClientKey) async {
@@ -40,7 +40,7 @@ extension RootShellView {
         }
     }
 
-    /// ☰ shows Workflows for any connected computer. Where the plugin lacks them
+    /// Work shows Workflows for any connected computer. Where the plugin lacks them
     /// or says this computer can't run them, the Workflows page says why and
     /// what to do, so a slow or failed check never hides the feature.
     var canOpenWorkflows: Bool { workflowsAvailability.host != nil || workflowsAvailability.isAvailable == true }

@@ -150,8 +150,8 @@ extension SettingsStore {
         setVoiceConversationMode(.turnBased, computer: computer, agentID: agentID, choices: choices)
     }
 
-    /// The person picked a voice type for one agent, anywhere (Settings › Voice, its Default Voice in
-    /// Bots mode, the voice bar over its chat): that agent's own choice, the same in every mode.
+    /// The person picked a voice type for one agent, anywhere (Settings › Voice, its page's Default Voice,
+    /// the voice bar over its chat): that agent's own choice, the same everywhere.
     /// Without an agent to keep it for, the default for every agent.
     func setVoiceConversationMode(_ mode: VoiceConversationMode, computer: String?, agentID: String?,
                                   choices: AgentVoiceChoices = .shared) {

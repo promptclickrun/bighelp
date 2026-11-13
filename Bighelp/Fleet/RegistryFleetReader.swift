@@ -259,7 +259,7 @@ final class RegistryFleetReader: FleetHostReading {
                              refreshedAt: Date())
     }
 
-    /// Its group chats, for Bots mode's Multi-gateway: the first page, to list and open. A host
+    /// Its group chats, for Show every computer: the first page, to list and open. A host
     /// that can't list them has none here.
     private static func groups(_ hostID: UUID, workspace: DirectHermesWorkspaceClient, owner: WorkspaceOwner,
                                profiles: [AgentProfile]) async -> [FleetGroup] {

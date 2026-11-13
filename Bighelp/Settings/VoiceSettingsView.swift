@@ -72,7 +72,7 @@ struct VoiceSettingsView: View {
     private static let allAgents = "*"
 
     /// Everything on the page is for this agent, the same choices its Default Voice and voice bar
-    /// make in Bots mode. All bots, or no connection, edits the default for every agent.
+    /// make. All bots, or no connection, edits the default for every agent.
     private var editedAgentID: String? {
         computer != nil && agents.contains(where: { $0.id == agentID }) ? agentID : nil
     }

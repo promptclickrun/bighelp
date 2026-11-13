@@ -755,7 +755,7 @@ struct SessionsView: View {
                 } label: {
                     VStack(spacing: 5) {
                         SessionIdentityView(session: session, agents: agents, size: 64, state: state)
-                        // As Bots mode's top bots: the dot after the name.
+                        // As the Bots view's top bots: the dot after the name.
                         HStack(spacing: BighelpTokens.space4) {
                             Text(session.title)
                                 .font(.system(size: pinnedTitleSize, weight: session.isUnread ? .bold : .semibold))

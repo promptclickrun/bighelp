@@ -252,32 +252,6 @@ extension RootShellView {
         OnDeviceSpeechEngine.isSupported ? OnDeviceVoiceSettingsClient(host: client, computer: computer) : client
     }
 
-    var pluginUpdateScope: String? {
-        guard nativeWorkspaceStore == nil else { return nil }
-        #if DEBUG
-        if usesDemoFixtures, ProcessInfo.processInfo.arguments.contains("-plugin-update-fixture") {
-            return "fixture-plugin-update"
-        }
-        #endif
-        return nil
-    }
-
-    var pluginUpdateIsCurrent: @MainActor () -> Bool {
-        #if DEBUG
-        if usesDemoFixtures, ProcessInfo.processInfo.arguments.contains("-plugin-update-fixture") { return { true } }
-        #endif
-        return { false }
-    }
-
-    var pluginUpdateClient: (any PluginUpdateClient)? {
-        #if DEBUG
-        if usesDemoFixtures, ProcessInfo.processInfo.arguments.contains("-plugin-update-fixture") {
-            return PluginUpdatePreviewClient()
-        }
-        #endif
-        return nil
-    }
-
     var hostRuntimeScope: String? {
         guard nativeWorkspaceStore == nil else { return nil }
         #if DEBUG

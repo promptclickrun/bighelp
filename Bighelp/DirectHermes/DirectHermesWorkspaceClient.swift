@@ -386,7 +386,7 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
                 }
                 return .rpc(operation.rawValue, payload)
             }
-            // YOLO (Code mode's mode, the chat's toggle): one session's flag, never the agent's default.
+            // YOLO (a coding session's mode, the chat's toggle): one session's flag, never the agent's default.
             if payload["key"] == .string("yolo") {
                 guard operation == .configSet, payload["profile"]?.string != nil,
                       payload["session_id"]?.string != nil, payload["scope"] == .string("session"),

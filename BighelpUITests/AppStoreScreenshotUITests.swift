@@ -161,14 +161,12 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
         sleep(2)
     }
 
-    /// Bots › the agent's row (or the primary bot's, by its name) opens its chat.
+    /// Bots › the agent's row (in the list, pinned or the primary bot) opens its chat.
     @MainActor
     private func openAgent(_ id: String, in app: XCUIApplication) throws {
         showBots(in: app, timeout: 30)
-        let names = ["default": "Juno", "penny": "Penny", "atlas": "Atlas"]
-        let row = app.buttons.matching(NSCompoundPredicate(orPredicateWithSubpredicates: [
-            NSPredicate(format: "identifier IN %@", ["simple-bots.bot.\(id)", "simple-bots.pinned.\(id)"]),
-            NSPredicate(format: "identifier == %@ AND label BEGINSWITH %@", "simple-bots.primary", names[id] ?? id),
+        let row = app.buttons.matching(NSPredicate(format: "identifier IN %@", [
+            "simple-bots.bot.\(id)", "simple-bots.pinned.\(id)", "simple-bots.primary.\(id)",
         ])).firstMatch
         // A short screen (the Duo's cover) draws the rows below the fold once scrolled to.
         let list = app.descendants(matching: .any)["simple-bots.home"].firstMatch

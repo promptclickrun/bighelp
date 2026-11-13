@@ -54,7 +54,7 @@ struct FleetSectionDeletion: Equatable {
 }
 
 /// An agent a section change files or takes out, and how its placement is saved on its own
-/// computer: through the all-hosts copy here, through the live list in Bots mode.
+/// computer: through the all-hosts copy here, through the live list on the Bots view.
 struct FleetSectionMember {
     let id: String
     let placement: AgentListPlacement?
@@ -289,7 +289,7 @@ extension FleetStore {
         for id in ids where retiringSectionIDs[id] == token { retiringSectionIDs[id] = nil }
     }
 
-    /// Waits until a deleted section's members are out of it (Bots mode's sheets, tests).
+    /// Waits until a deleted section's members are out of it (the Bots view's sheets, tests).
     func waitForSectionUnfiling(_ id: String) async {
         await sectionUnfiling[id]?.value
     }
@@ -349,7 +349,7 @@ extension FleetStore {
         file(groupKey: group.id, in: sectionID)
     }
 
-    /// By its list ID (`FleetGroup.id`), for group chats Bots mode shows from the gateway in use.
+    /// By its list ID (`FleetGroup.id`), for group chats the Bots view shows from the gateway in use.
     func file(groupKey: String, in sectionID: String?) {
         let section = section(id: sectionID)?.id
         guard groupSectionIDs[groupKey] != section else { return }
@@ -357,7 +357,7 @@ extension FleetStore {
         saveSections()
     }
 
-    /// Pinning a group chat puts it on top of Bots mode's home; unpinning takes it off.
+    /// Pinning a group chat puts it on top of the Bots view; unpinning takes it off.
     func setPinned(groupKey: String, _ pinned: Bool) {
         guard pinnedGroupIDs.contains(groupKey) != pinned else { return }
         if pinned { pinnedGroupIDs.append(groupKey) } else { pinnedGroupIDs.removeAll { $0 == groupKey } }
@@ -365,7 +365,7 @@ extension FleetStore {
         saveSections()
     }
 
-    /// Hiding only changes Bots mode's home: the group chat keeps working, and search's filter shows it.
+    /// Hiding only changes the Bots view: the group chat keeps working, and search's filter shows it.
     func setHidden(groupKey: String, _ hidden: Bool) {
         guard hiddenGroupIDs.contains(groupKey) != hidden else { return }
         if hidden { hiddenGroupIDs.append(groupKey) } else { hiddenGroupIDs.removeAll { $0 == groupKey } }
@@ -435,7 +435,7 @@ extension FleetStore {
     }
 
     /// Rebuilds sections other devices made from what their members carry: every host's copies,
-    /// and `live` (the gateway in use's own agents, which Bots mode reads without these copies).
+    /// and `live` (the gateway in use's own agents, which the Bots view reads without these copies).
     func adoptSections(adding live: [AgentListPlacement] = []) {
         let placements = hosts.flatMap { snapshots[$0.id]?.agents ?? [] }.compactMap(\.placement) + live
         let adopted = FleetSectioning.adopt(sections, placements: placements,
@@ -450,7 +450,7 @@ extension FleetStore {
     struct SavedSections: Codable {
         var sections: [FleetSection]
         var groups: [String: String]
-        /// Nil in files saved before Bots mode pinned and hid group chats.
+        /// Nil in files saved before the Bots view pinned and hid group chats.
         var pinnedGroups: [String]? = nil
         var hiddenGroups: [String]? = nil
     }

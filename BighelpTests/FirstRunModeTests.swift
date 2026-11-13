@@ -27,15 +27,4 @@ struct FirstRunHomeTests {
         #expect(settings.homeLanding == .chats)
         #expect(settings.homeView == .chats)
     }
-
-    @Test func theOldShellOpensInTheMatchingMode() {
-        let (settings, cleanUp) = settings()
-        defer { cleanUp() }
-        settings.codeModeEnabled = true
-        FirstRunHome.bots.apply(to: settings)
-        #expect(settings.simpleBotsEnabled)
-        #expect(!settings.codeModeEnabled)
-        FirstRunHome.chats.apply(to: settings)
-        #expect(!settings.simpleBotsEnabled)
-    }
 }

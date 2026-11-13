@@ -64,7 +64,7 @@ final class ProviderUsageHostUITests: BighelpUITestCase {
     /// Bots › the primary bot: its Bot Chat (Settings › Chat › A bot opens, out of the box).
     @MainActor private func openPrimaryBotChat(in app: XCUIApplication) {
         showBots(in: app)
-        let primary = app.buttons["simple-bots.primary"].firstMatch
+        let primary = app.primaryBot
         XCTAssertTrue(primary.waitForExistence(timeout: 45), "Bots shows the primary bot")
         primary.tap()
     }

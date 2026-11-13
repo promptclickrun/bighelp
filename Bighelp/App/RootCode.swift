@@ -8,7 +8,7 @@ enum CodeSheet: String, Identifiable {
 
 // Coding sessions: the computer's Code store, a session's chat and changes, and Dev Factory.
 extension RootShellView {
-    /// Code mode needs a host that starts sessions in a chosen folder: native Hermes, or the demo.
+    /// A coding session needs a host that starts sessions in a chosen folder: native Hermes, or the demo.
     var canUseCodeMode: Bool {
         nativeRuntime != nil || (usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true)
     }
@@ -98,7 +98,7 @@ extension RootShellView {
             files: LiveHostTextFiles(client: client, owner: owner, profileID: profileID))
     }
 
-    /// A Code mode session's chat links Markdown paths to the viewer, inside its folder.
+    /// A coding session's chat links Markdown paths to the viewer, inside its folder.
     func codeFileLinks(sessionID: String) -> HostFileLinkContext? {
         guard let session = codeHome?.sessions.first(where: { $0.id == sessionID }),
               let files = hostTextFiles(profileID: session.agentID) else { return nil }

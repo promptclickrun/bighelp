@@ -346,7 +346,7 @@ final class AgentDirectoryStore {
         pinAgent(id, limit: Self.pinnedAgentLimit, counting: pinnedAgentIDs.count)
     }
 
-    /// Pins `id` while `counting` is under `limit`. Bots mode counts only the
+    /// Pins `id` while `counting` is under `limit`. The Bots view counts only the
     /// pinned bots its home shows (`SimpleBotsHomeProjection.canPin`).
     @discardableResult
     func pinAgent(_ id: String, limit: Int, counting: Int) -> Bool {
@@ -584,7 +584,7 @@ private struct RemoteAgentAvatarCache {
 
 extension AgentDirectoryStore {
     /// A sign-in's pinned agents (in order), the ones unpinned on purpose and its primary agent:
-    /// what Bots mode's top shows, kept on the computer too (`BotsAppState`).
+    /// what the Bots view's top shows, kept on the computer too (`BotsAppState`).
     struct SavedPins: Equatable, Sendable {
         var pinned: [String] = []
         var unpinned: [String] = []

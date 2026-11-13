@@ -152,7 +152,7 @@ enum FleetOpen: Equatable, Sendable {
     case task(jobID: String, profileID: String)
     case newChat(profileID: String)
     case group(roomID: String)
-    /// A group chat's settings (Bots mode's Group Settings).
+    /// A group chat's settings (the Bots view's Group Settings).
     case groupSettings(roomID: String)
     /// A new group chat with these agents, from New chat's Group chat. `peers`
     /// are agents on other computers; this host is the group's home.

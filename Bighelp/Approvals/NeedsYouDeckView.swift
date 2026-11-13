@@ -144,7 +144,7 @@ extension EnvironmentValues {
 }
 
 /// Needs you: every approval, question and sign-off that waits on the person, one per tab, each
-/// answered here. It opens from ☰ and, for a chat's own prompts (`focusedClient`), from that chat.
+/// answered here. It opens from Today's Needs you card and the sidebar and, for a chat's own prompts (`focusedClient`), from that chat.
 @MainActor
 struct NeedsYouDeckView: View {
     var context: NeedsYouDeckContext? = nil

@@ -183,8 +183,7 @@ chat_stress_args=(
   -destination "platform=iOS Simulator,id=$CHAT_SIMULATOR_ID"
   -derivedDataPath "$CHAT_DERIVED_DATA" -parallel-testing-enabled NO
   -only-testing:BighelpTests/ChatTimelineRenderPartitionTests
-  -only-testing:BighelpUITests/ChatStreamingAnchorUITests/testExpandedLongToolStreamKeepsMainThreadResponsive
-  -only-testing:BighelpUITests/ChatStreamingAnchorUITests/testLongToolStreamKeepsMainThreadResponsive
+  -only-testing:BighelpUITests/ChatStreamingAnchorUITests/testConsecutiveLargeToolsKeepMainThreadResponsive
   -only-testing:BighelpUITests/ChatStreamingAnchorUITests/testShortToolStreamKeepsMainThreadResponsive
 )
 xcodebuild build-for-testing "${chat_stress_args[@]}" && \

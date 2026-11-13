@@ -36,6 +36,19 @@ final class BighelpTestApplication: XCUIApplication {
     }
 }
 
+extension XCUIApplication {
+    /// The Bots view's primary bot, whichever bot it is: its row is `simple-bots.primary.<bot id>`.
+    var primaryBot: XCUIElement {
+        buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "simple-bots.primary.")).firstMatch
+    }
+
+    /// The primary bot's tile while the Bots view is being rearranged (not a button then).
+    var primaryBotTile: XCUIElement {
+        descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "simple-bots.primary."))
+            .firstMatch
+    }
+}
+
 class BighelpUITestCase: XCTestCase {
     private let fixtureRunID = UUID().uuidString
 

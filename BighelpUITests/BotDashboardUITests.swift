@@ -21,7 +21,7 @@ final class BotDashboardUITests: BighelpUITestCase {
                                "-UIPreferredContentSizeCategoryName", textSize]
         app.launch()
         defer { app.terminate() }
-        let primary = app.buttons["simple-bots.primary"]
+        let primary = app.primaryBot
         XCTAssertTrue(primary.waitForExistence(timeout: 15))
         primary.tap()
         let identity = app.buttons["chat.identity"]
@@ -60,7 +60,7 @@ final class BotDashboardUITests: BighelpUITestCase {
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
                                "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", "light"]
         app.launch()
-        let primary = app.buttons["simple-bots.primary"]
+        let primary = app.primaryBot
         XCTAssertTrue(primary.waitForExistence(timeout: 15))
         primary.tap()
         let identity = app.buttons["chat.identity"]
@@ -232,7 +232,7 @@ final class BotDashboardUITests: BighelpUITestCase {
 
     @MainActor
     private func openProfile(_ app: XCUIApplication, bot: String) {
-        let button = app.buttons[bot]
+        let button = bot == "simple-bots.primary" ? app.primaryBot : app.buttons[bot]
         XCTAssertTrue(button.waitForExistence(timeout: 15))
         button.tap()
         let identity = app.buttons["chat.identity"]

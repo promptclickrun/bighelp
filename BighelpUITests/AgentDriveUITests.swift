@@ -12,7 +12,7 @@ final class AgentDriveUITests: BighelpUITestCase {
                                "-test-agent-drive", "bot.dashboard.templates.feed",
                                "-test-agent-drive-note", "Each card is something your Feed can do. Swipe right to use one."]
         app.launch()
-        let primary = app.buttons["simple-bots.primary"]
+        let primary = app.primaryBot
         XCTAssertTrue(primary.waitForExistence(timeout: 15))
         primary.tap()
         XCTAssertTrue(app.buttons["chat.identity"].waitForExistence(timeout: 5))

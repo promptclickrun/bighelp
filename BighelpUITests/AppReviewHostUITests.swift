@@ -16,7 +16,7 @@ final class AppReviewHostUITests: BighelpUITestCase {
         try onboardOpenHost(app, address: address)
         // Bots › the primary bot opens its chat.
         showBots(in: app)
-        let primary = app.buttons["simple-bots.primary"].firstMatch
+        let primary = app.primaryBot
         XCTAssertTrue(primary.waitForExistence(timeout: 30), "Bots has the primary bot")
         primary.tap()
         let composer = app.textViews["chat.composer.text"]

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Bots mode's New Group Chat: a section to put the new group chat in.
+/// The Bots view's New Group Chat: a section to put the new group chat in.
 struct BotModeCreateSectionChoice {
     let sections: [FleetSection]
     /// Files the made group chat (its room ID) in the picked section.

@@ -1,8 +1,8 @@
 import SwiftUI
 
 extension BighelpApp {
-    /// Bots mode's choices on the person's computers (`BotsAppStateSync`): the gateway in use, and
-    /// the others the all-hosts view or Multi-gateway keeps connected. Demo mode's computer keeps
+    /// The Bots view's choices on the person's computers (`BotsAppStateSync`): the gateway in use, and
+    /// the others Show every computer keeps connected. Demo mode's computer keeps
     /// them in memory for the run.
     static func startBotsAppState(registry: BighelpHostRegistry, connections: WorkspaceConnectionStore, fleet: FleetStore,
                                   settings: SettingsStore, companions: CompanionStore, demo: DemoHosts?,
@@ -69,7 +69,7 @@ extension BighelpApp {
             }))
     }
 
-    /// When Bots mode's choices are read from the computers: each new connection to the gateway in
+    /// When the Bots view's choices are read from the computers: each new connection to the gateway in
     /// use, coming back to bighelp, and other gateways kept connected or let go.
     static func botsAppStateKey(connections: WorkspaceConnectionStore, registry: BighelpHostRegistry,
                                 isActive: Bool) -> String {

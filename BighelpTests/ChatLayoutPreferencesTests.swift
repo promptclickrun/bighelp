@@ -16,11 +16,11 @@ struct ChatLayoutPreferencesTests {
     }
 
     @Test func tabBarDropsIntoTheHomeIndicatorAreaButNeverOffScreen() {
-        #expect(FloatingTabBar.homeIndicatorSink(forBottomInset: 34) == 20)
-        #expect(FloatingTabBar.homeIndicatorSink(forBottomInset: 21) == 7)
-        #expect(FloatingTabBar.homeIndicatorSink(forBottomInset: 0) == 0)
+        #expect(HomeTabBar.homeIndicatorSink(forBottomInset: 34) == 20)
+        #expect(HomeTabBar.homeIndicatorSink(forBottomInset: 21) == 7)
+        #expect(HomeTabBar.homeIndicatorSink(forBottomInset: 0) == 0)
         // A keyboard's inset is much larger; the bar still moves at most 20 points.
-        #expect(FloatingTabBar.homeIndicatorSink(forBottomInset: 336) == 20)
+        #expect(HomeTabBar.homeIndicatorSink(forBottomInset: 336) == 20)
     }
 
     @Test func textSizeStepsAroundTheSystemSize() {

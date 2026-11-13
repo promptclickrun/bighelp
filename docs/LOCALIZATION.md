@@ -15,19 +15,19 @@ not a claim that the whole app is translated.
 - Core chat composer placeholders and accessibility labels, send/stop/voice
   controls, mid-turn send choices, and attachment/action-menu labels.
 - Top-level Settings rows, identity controls, appearance
-  summary, assistant rows, and the Advanced options entry (Nerd Mode in code).
+  summary, bot rows, and the Advanced options entry (the code name is Nerd Mode).
 
 The second stage (#527) adds:
 
-- The Bots view (Bots mode, and Simple Bot mode before 2.6.11): the home (pinned bots, the list, search,
-  the + menu, a bot's long-press menu, Rearrange, the gateway filter), New Bot and its
+- The Bots view (the first tab's view, once called Bots mode): the home (pinned bots, the list, search,
+  the + menu, a bot's long-press menu, Rearrange, the computer filter), New Bot and its
   Templates sheet, New Group Chat, a bot's profile (Info, Computer, Files and Media tabs,
   Instructions, Default Model, Routines), the voice bar, the opening loader, and the person's
   circle, which opens the one Settings.
 - Teamwork: the line where agents talk to each other ("Asked …", "… answered",
   "N messages with …"), its sheet, the working and typing states, and the Teamwork
   switch with its line. Where the Bots view reaches it, the switch says bots in sentences of its own.
-- The Settings pages these lead to: Experience, Assistants, Notifications (topics,
+- The Settings pages these lead to: Models, Voice, Notifications (topics,
   "Bots messaging each other", channels, workflows, Quiet hours, test and turn-off),
   Chat (with the Advanced options sections), and Appearance with Chat layout.
 - Needs you and a blueprint's chips in the message box.
@@ -36,7 +36,7 @@ The Chinese text is an AI-assisted draft and remains `needs_review` in
 the catalog. It has not received professional or fluent-speaker approval. Screenshots
 and automated checks establish rendering and lookup, not linguistic certification.
 Keep `bighelp`, `Hermes`, provider/model names, and product names intact. Terminology:
-Bots = 机器人 and Chat = 聊天 (the first tab's two views; they were Bots mode = 机器人模式
+Bots = 机器人 and Chat = 聊天 (the first tab's two views; they were the modes Bots mode = 机器人模式
 and Chat mode, which was called Sessions before 2.6.11). A list of
 chats is still Sessions = 会话. Agents = 智能体, Feed = 动态, Ideas = 灵感,
 Goals = 目标, host/computer = 电脑, Teamwork = 团队协作, primary bot = 主机器人,

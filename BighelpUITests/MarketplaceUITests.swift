@@ -132,7 +132,7 @@ final class MarketplaceUITests: BighelpUITestCase {
     @MainActor
     private func openPrimaryProfileInfo(_ app: XCUIApplication) {
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
-        app.buttons["simple-bots.primary"].tap()
+        app.primaryBot.tap()
         let identity = app.buttons["chat.identity"]
         XCTAssertTrue(identity.waitForExistence(timeout: 10))
         let profile = app.descendants(matching: .any)["simple-bots.profile"]

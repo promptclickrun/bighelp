@@ -297,48 +297,6 @@ struct FleetStoreTests {
         #expect(reader.reads == [studio], "The selected host is live; it is never read")
     }
 
-    /// All sessions' search bar matches a chat's title and its preview text, in any case, on every host.
-    @Test func chatSearchMatchesTitleAndPreview() {
-        let fleet = FleetStore(reader: reader(), directory: directory(), saveDelay: .zero)
-        var trip = chat(home, "travel", "Trip to Lisbon", minutesAgo: 1)
-        trip.preview = "Booked the train"
-        var budget = chat(studio, "default", "Budget", minutesAgo: 2)
-        budget.preview = "The lisbon hotel costs more"
-        fleet.recordLive(FleetSnapshot(agents: [agent(home, "travel", "Mina")], chats: [trip], refreshedAt: Date()),
-                         hostID: home)
-        fleet.recordLive(FleetSnapshot(agents: [agent(studio, "default", "Rio")], chats: [budget],
-                                       refreshedAt: Date()), hostID: studio)
-
-        #expect(fleet.chats(matching: "lisbon").map(\.title) == ["Trip to Lisbon", "Budget"])
-        #expect(fleet.chats(matching: "TRAIN").map(\.title) == ["Trip to Lisbon"])
-        #expect(fleet.chats(on: studio, matching: "lisbon").map(\.title) == ["Budget"])
-        #expect(fleet.chats(matching: "  ").count == 2, "An empty search shows every chat")
-        #expect(fleet.chats(matching: "paris").isEmpty)
-    }
-
-    /// All sessions filters like one computer's Sessions: by agent (on its own computer)
-    /// and by where the chats started.
-    @Test func chatFiltersMatchAnAgentOnItsComputerAndWhereChatsStarted() {
-        let fleet = FleetStore(reader: reader(), directory: directory(), saveDelay: .zero)
-        var telegram = chat(home, "travel", "Hotel", minutesAgo: 1)
-        telegram.origin = "telegram"
-        var codex = chat(home, "default", "Menus", minutesAgo: 2)
-        codex.origin = "codex-cli"
-        var studioTravel = chat(studio, "travel", "Flights", minutesAgo: 3)
-        studioTravel.origin = "telegram"
-        fleet.recordLive(FleetSnapshot(agents: [agent(home, "travel", "Mina"), agent(home, "default", "Rio")],
-                                       chats: [telegram, codex], refreshedAt: Date()), hostID: home)
-        fleet.recordLive(FleetSnapshot(agents: [agent(studio, "travel", "Sage")], chats: [studioTravel],
-                                       refreshedAt: Date()), hostID: studio)
-
-        let mina = FleetChatsFilter(agentID: FleetID.make(home, "travel"))
-        #expect(fleet.chats(matching: "", filter: mina).map(\.title) == ["Hotel"], "Same profile on another computer isn't Mina")
-        #expect(fleet.chats(matching: "", filter: FleetChatsFilter(origin: "Telegram")).map(\.title) == ["Hotel", "Flights"])
-        #expect(fleet.chats(on: studio, matching: "", filter: FleetChatsFilter(origin: "Telegram")).map(\.title) == ["Flights"])
-        #expect(fleet.origins() == ["Codex", "Telegram"])
-        #expect(fleet.chats(matching: "", filter: FleetChatsFilter()).count == 3)
-    }
-
     /// Pinned agents from every host stay in the order the person dragged them
     /// into, after a relaunch too; a newly pinned agent joins at the end.
     @Test func pinnedAgentsKeepTheArrangedOrderAcrossHosts() async {

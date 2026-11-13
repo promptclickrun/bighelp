@@ -56,7 +56,7 @@ final class BotActivityHostUITests: BighelpUITestCase {
             if pinned.exists { return pinned }
             RunLoop.current.run(until: Date().addingTimeInterval(0.5))
         }
-        return app.buttons["simple-bots.primary"]
+        return app.primaryBot
     }
 
     /// The state is the row's or tile's value; its label holds the latest message, which can say anything.

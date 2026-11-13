@@ -2,7 +2,7 @@ import SwiftUI
 
 // The Bots view of the first tab, the bot page, and the loader that covers a chat while it opens.
 extension RootShellView {
-    /// Multi-gateway: a bot on another gateway opens once that gateway is connected and its chats
+    /// Every computer shown: a bot on another gateway opens once that gateway is connected and its chats
     /// are loaded, often a few seconds. The Noodle loader covers the whole wait, from the tap to
     /// the chat, so the screen never looks stuck; Cancel goes back to where the tap came from.
     @ViewBuilder var simpleBotsOpeningLoader: some View {
@@ -123,7 +123,7 @@ extension RootShellView {
     }
 
     /// Where the bots' working states come from: the gateway in use's plugin route, else what stock
-    /// Hermes tells the app of its Bot Chats; with Multi-gateway, also the other gateways' fresh
+    /// Hermes tells the app of its Bot Chats; with every computer shown, also the other gateways' fresh
     /// all-hosts copies. The closures hold only stores, so each tick reads what's current.
     var botChatActivitySource: BotChatActivitySource {
         let agents = agents, catalog = sessionCatalog, connections = workspaceConnections

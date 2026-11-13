@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Bots mode's switcher beside a chat (`BighelpChatSwitcher`): the bots on top of the home, in the
+/// The Bots view's switcher beside a chat (`BighelpChatSwitcher`): the bots on top of the home, in the
 /// order the person arranged them, each face showing what its Bot Chat is doing.
 struct SimpleBotsSwitcher: View {
     let context: SimpleBotsContext
@@ -15,7 +15,7 @@ struct SimpleBotsSwitcher: View {
             .botChatActivityUpdates(context.activity, source: context.activitySource, isActive: scenePhase == .active)
     }
 
-    /// The primary and pinned bots, as the home's top shows them (every gateway's with Multi-gateway),
+    /// The primary and pinned bots, as the home's top shows them (every gateway's with every computer shown),
     /// then the bots under them in the home's order, six in all.
     static func top(_ context: SimpleBotsContext) -> [SimpleBotsBot] {
         let home = home(context)

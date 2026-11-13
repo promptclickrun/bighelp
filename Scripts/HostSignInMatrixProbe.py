@@ -20,9 +20,10 @@ HOME and HERMES_HOME, then runs the matching HostSignInMatrixUITests:
             installer from GitHub: the app finds the latest GitHub Release and
             updates to it (PluginReleaseUpdateHostUITests; needs the internet)
   fleet     two hosts with the bighelp plugin (--plugin) and different agents:
-            the all-hosts view lists both and opens an agent on the host that
-            isn't selected (AllHostsHostUITests), and Ask an agent on the gateway
-            that isn't in use (ShortcutGatewaySwitchHostUITests)
+            Ask an agent on the gateway that isn't in use
+            (ShortcutGatewaySwitchHostUITests). The tests that opened another
+            computer's agent from the all-hosts view are gone with that view,
+            and none replaces them here
   media     no sign-in, with the bighelp plugin (--plugin) and the test-only
             Scripts/HostProbePlugin: a generated image stays in the chat after
             the turn ends, two pictures an agent saved outside its folder show
@@ -39,7 +40,7 @@ HOME and HERMES_HOME, then runs the matching HostSignInMatrixUITests:
             original call got back (DeviceAccessHostUITests; Reminders is granted to
             the app on the simulator first, so iOS doesn't ask)
   appstate  no sign-in, with the bighelp plugin (--plugin) and two more agents: Bots
-            mode's top is rearranged and saved, the app is deleted from the
+            view's top is rearranged and saved, the app is deleted from the
             simulator and installed again, and the new install shows the same
             top from the computer (BotsAppStateHostUITests, run twice)
   drafts    no sign-in, with the bighelp plugin (--plugin) and a scripted model:
@@ -97,11 +98,7 @@ TESTS = {
                  "ProjectsAndBoardHostUITests/testAppsShowsTheAgentsFilesWithNoWorkingFolderSet",
                  "ProviderUsageHostUITests/testUsageLoadsFromTheChatTheAppOpensWith"],
     "update": ["PluginReleaseUpdateHostUITests/testUpdatesToTheLatestReleaseOnARealHost"],
-    "fleet": ["AllHostsHostUITests/testAllHostsListsBothHostsAndOpensTheOther",
-              "AllHostsHostUITests/testProviderUsageLoadsInAChatOnTheOtherHost",
-              "AllHostsHostUITests/testUsageOpensFromTheMenuWithAllHosts",
-              "AllHostsHostUITests/testSecureInputAndQuestionsWorkInAChatOnTheOtherHost",
-              "ShortcutGatewaySwitchHostUITests/testAskAnAgentSwitchesToItsGatewayAndGetsTheAnswer"],
+    "fleet": ["ShortcutGatewaySwitchHostUITests/testAskAnAgentSwitchesToItsGatewayAndGetsTheAnswer"],
     "drafts": ["ImageDraftsHostUITests/testAContactDraftFromAPhotoSavesOnceAndTheAgentHearsIt",
                "ImageDraftsHostUITests/testAPhotoAloneGetsTheOfferAndTheAgentCantAddTheContactItself"],
     "apps": ["HTMLAppsHostUITests/testABigAppFromTheAgentOpensAndItsAnswerReachesTheAgent"],
@@ -669,8 +666,7 @@ def session_sources(home: Path) -> list[str]:
 
 def run_fleet(args, repo: Path) -> int:
     """Two open hosts with the plugin: "Desk agent" on one; "Lab agent" and "researcher" on the other.
-    The scripted tool model answers plain messages like the synthetic one, and its secure input and
-    question turns check prompts in a chat on the host the all-hosts view switched to."""
+    The scripted tool model answers plain messages like the synthetic one."""
     if not args.plugin:
         raise SystemExit("fleet mode needs --plugin <bighelp plugin folder>")
     with tempfile.TemporaryDirectory(prefix="signin-fleet-", dir="/tmp") as temporary:
@@ -746,10 +742,6 @@ def run_fleet(args, repo: Path) -> int:
                                         timeout=1500)
             for label, _, _, _, home, _ in hosts:
                 print(json.dumps({"host": label, "session_sources_on_host": session_sources(home)}), flush=True)
-            timings = args.results / "fleet" / "fleet-timings.json"
-            if timings.exists():
-                print(json.dumps({"switch_seconds": json.loads(timings.read_text()),
-                                  "latency_ms": args.latency_ms}), flush=True)
             print(json.dumps({"mode": "fleet", "exit_code": result.returncode}), flush=True)
             return result.returncode
         finally:
@@ -784,7 +776,7 @@ def app_state_on_host(home: Path) -> dict:
 
 
 def run_appstate(args, repo: Path) -> int:
-    """One open host with the plugin and three agents. The app saves a Bots mode order, is deleted
+    """One open host with the plugin and three agents. The app saves a Bots view order, is deleted
     from the simulator and installed again, and gets the order back from the host."""
     if not args.plugin:
         raise SystemExit("appstate mode needs --plugin <bighelp plugin folder>")

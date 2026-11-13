@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// Whether the connected computer has Hermes' Kanban plugin, for the ☰ menu.
+/// Whether the connected computer has Hermes' Kanban plugin, for Work's door.
 /// Remembered per computer, so reconnecting (every return to the app) doesn't
 /// hide it, and only a clear answer from the host changes it: a check that
 /// fails while the connection settles leaves Kanban where it was.

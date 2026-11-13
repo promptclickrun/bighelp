@@ -172,12 +172,12 @@ final class ShellFeatureStore {
     // views, and are retired when presentation resumes or the account changes.
     private var backgroundActivityProjections: [String: BackgroundActivityProjection] = [:]
 
-    // MARK: Code mode
+    // MARK: Coding sessions
 
     /// True when sessions here have Hermes' own settings (a live host, not the demo).
     var hasNativeSessionControls: Bool { sessionControlMessaging is any SessionYOLOControlling }
 
-    /// Turns a session's YOLO setting (no approval prompts) on or off; Code mode's YOLO mode.
+    /// Turns a session's YOLO setting (no approval prompts) on or off; a coding session's YOLO mode.
     func setSessionYOLO(_ on: Bool, sessionID: String, agentID: String) async throws {
         guard let controls = sessionControlMessaging as? any SessionYOLOControlling else {
             throw WorkspaceClientError.unavailable(.unsupportedOperation)

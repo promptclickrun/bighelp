@@ -14,7 +14,7 @@ struct DevFactoryContext {
 }
 
 /// Dev Factory's home (approved 4.1): what runs now, then your recipes, then the templates
-/// new ones start from. ☰ › Dev Factory in Code mode.
+/// new ones start from. Dev Factory (a project's ⋯ on Work).
 struct DevFactoryHomeView: View {
     let context: DevFactoryContext
     @State private var newFrom: WorkflowTemplate?

@@ -84,11 +84,9 @@ struct LocalizationTests {
     }
 
     @Test func localizedDisplayNamesDoNotChangeSavedNavigationOrSendBehavior() throws {
-        let layout = BighelpAppLayout(pinned: [.agents, .feed], menuOrder: [.settings])
-        let saved = try #require(layout.saved)
-        #expect(saved.contains("agents") && saved.contains("feed") && saved.contains("settings"))
-        #expect(BighelpAppLayout(saved: saved) == layout)
+        #expect(HomeLanding.allCases.map(\.rawValue) == ["bots", "chats", "today", "work"])
+        #expect(HomeConversationsView.bots.rawValue == "bots")
         #expect(MidSessionChatBehavior.steer.rawValue == "steer")
-        #expect(FirstRunMode.bots.rawValue == "bots")
+        #expect(FirstRunHome.bots.rawValue == "bots")
     }
 }

@@ -12,7 +12,7 @@ CATALOG = ROOT / "Bighelp/Resources/Localizable.xcstrings"
 # Representative boundaries; this is intentionally not a whole-app coverage claim.
 REQUIRED = {
     "Your agents, right at home.", "Get Started", "Connect your computer",
-    "Add the bighelp plugin", "Choose your mode", "Use %@", "Chat", "Feed",
+    "Add the bighelp plugin", "Use %@", "Chat", "Feed",
     "Ideas", "Goals", "Files", "Agents", "Settings", "New chat", "Send message",
     "Stop response", "Message %@", "Ask %@", "Appearance", "Your name", "Done",
     "Advanced options", "Default model", "AI providers", "Help & feedback",
@@ -21,24 +21,22 @@ REQUIRED = {
     "PDF pages require a current native Hermes conversation.",
     "hermes.example.com or 192.168.1.20",
 }
-# Simple Bot mode, Teamwork and the Settings pages they open (#527).
+# The Bots view, Teamwork and the Settings pages they open (#527).
 SIMPLE_BOTS_AND_TEAMWORK = {
     "Search bots", "New Bot", "New Group Chat", "Mark Unread", "Mark Read", "Pin", "Unpin",
     "Make Primary Bot", "Replace Primary Bot…", "Rearrange", "Hide", "Bot Profile", "Templates",
     "Drag your bots and group chats into the order you want, then tap Save.", "No bots yet",
     "Create New Bot", "Instructions", "Default Model", "Routines", "Computer", "Media", "Character",
     "Your computer isn't connected", "Saved. This is how %@ looks everywhere.", "End voice",
-    "Auto-review", "Multi-gateway", "Your computers", "Your bots see your name.",
+    "Auto-review", "Your computers", "Your bots see your name.",
     "Asked %@", "%@ answered", "%@ didn't answer", "Asking %@…", "Waiting for %@",
     "%@ is working on it…", "%lld messages with %@", "%@ and %@", "%@, %@ and %@",
     "What %@ did", "Bots ask each other for help",
     "The computer didn't save it for %@. Try again.",
     "Bots messaging each other", "Quiet hours", "Notify me about", "Send a test",
     "Turn off notifications", "Channels", "Opens on", "Return sends", "A bot opens",
-    "Chat layout", "App layout", "Light mode", "Dark mode", "Text and buttons", "Bottom bar",
-    # The modes after their 2.6.11 rename (#528).
-    "Bots", "Chat", "Code", "Bots mode", "Chat mode", "Code mode", "Next mode", "Header mode switcher",
-    "Switch between Bots, Chat and Code from the top of each home.",
+    "Chat layout", "Light mode", "Dark mode", "Text and buttons",
+    "Bots", "Chat", "Code",
 }
 PLURALS = {"%lld messages with %@"}
 # These screens' plain-String parameters show text verbatim, so app copy handed to them has to be
@@ -49,7 +47,7 @@ SCOPED_SOURCES = [
     ROOT / "Bighelp/Chat/ChatAgentTalkRail.swift", ROOT / "Bighelp/Settings/SettingsView.swift",
     ROOT / "Bighelp/Settings/SettingsView+Preferences.swift", ROOT / "Bighelp/Settings/SettingsView+Identity.swift",
     ROOT / "Bighelp/Settings/ChatLayoutSettingsView.swift", ROOT / "Bighelp/Settings/AppearanceStudioView.swift",
-    ROOT / "Bighelp/Settings/AppearanceSizeControls.swift", ROOT / "Bighelp/Settings/AppLayoutSettingsView.swift",
+    ROOT / "Bighelp/Settings/AppearanceSizeControls.swift",
     ROOT / "Bighelp/Settings/BighelpNotificationSettingsView.swift",
 ]
 VERBATIM = re.compile(

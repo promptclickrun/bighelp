@@ -11,7 +11,7 @@ struct TodayNeedsYouSummary: Equatable {
     var imageURL: URL? = nil
 }
 
-/// Shares waiting in ☰ › Shared with bighelp (`PendingShareCenter`).
+/// Shares waiting in Shared with bighelp (`PendingShareCenter`).
 @MainActor
 struct TodayPendingShares {
     let count: Int

@@ -157,15 +157,12 @@ final class AvatarCreatorUITests: BighelpUITestCase {
         save("petdex", app)
     }
 
-    /// Bots › the bot (its chat opens) › its pill › Info › Character. The demo's names find the
-    /// primary bot, whose row carries no ID.
+    /// Bots › the bot (its chat opens) › its pill › Info › Character.
     @MainActor
     private func openChooser(of agentID: String, in app: XCUIApplication) {
-        let names = ["finance": "Avery Park", "travel": "Mina Shah", "home": "Jordan Lee"]
         showBots(in: app)
-        let bot = app.buttons.matching(NSCompoundPredicate(orPredicateWithSubpredicates: [
-            NSPredicate(format: "identifier IN %@", ["simple-bots.bot.\(agentID)", "simple-bots.pinned.\(agentID)"]),
-            NSPredicate(format: "identifier == %@ AND label BEGINSWITH %@", "simple-bots.primary", names[agentID] ?? agentID),
+        let bot = app.buttons.matching(NSPredicate(format: "identifier IN %@", [
+            "simple-bots.bot.\(agentID)", "simple-bots.pinned.\(agentID)", "simple-bots.primary.\(agentID)",
         ])).firstMatch
         XCTAssertTrue(bot.waitForExistence(timeout: 10), "Bots lists \(agentID)")
         for _ in 0..<6 where !bot.isHittable { app.descendants(matching: .any)["simple-bots.home"].firstMatch.swipeUp() }

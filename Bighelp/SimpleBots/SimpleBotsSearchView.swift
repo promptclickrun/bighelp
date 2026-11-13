@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Search in Bots mode: every bot by name or what it's for. The filter
+/// Search on the Bots view: every bot by name or what it's for. The filter
 /// shows hidden bots and group chats too, so a hidden one can come back, and
 /// leads to Edit Sections.
 @MainActor

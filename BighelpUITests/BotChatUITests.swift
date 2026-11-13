@@ -104,14 +104,12 @@ final class BotChatUITests: BighelpUITestCase {
         return app
     }
 
-    /// Bots › the bot's row, or the primary bot (Avery Park is the demo's `finance`), whose row carries no ID.
+    /// Bots › the bot's row, wherever it is: in the list, pinned or the primary bot.
     @MainActor
     private func tapAgent(_ id: String, in app: XCUIApplication) {
-        let names = ["finance": "Avery Park", "travel": "Mina Shah", "home": "Jordan Lee"]
         showBots(in: app)
-        let agent = app.buttons.matching(NSCompoundPredicate(orPredicateWithSubpredicates: [
-            NSPredicate(format: "identifier IN %@", ["simple-bots.bot.\(id)", "simple-bots.pinned.\(id)"]),
-            NSPredicate(format: "identifier == %@ AND label BEGINSWITH %@", "simple-bots.primary", names[id] ?? id),
+        let agent = app.buttons.matching(NSPredicate(format: "identifier IN %@", [
+            "simple-bots.bot.\(id)", "simple-bots.pinned.\(id)", "simple-bots.primary.\(id)",
         ])).firstMatch
         XCTAssertTrue(agent.waitForExistence(timeout: 10), "\(id) on Bots")
         agent.tap()

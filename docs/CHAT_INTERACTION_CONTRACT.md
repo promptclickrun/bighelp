@@ -117,7 +117,7 @@ cover these boundaries:
 | Typed drafts survive a relaunch without catalog writes | `ChatDraftJournalTests` |
 
 Run [ChatStreamingAnchorUITests](../BighelpUITests/ChatStreamingAnchorUITests.swift)
-for the three short/long/expanded stress scenarios, growing-tail following,
+for the short and large-tool stress scenarios, growing-tail following,
 reading during a stream, consecutive tool turns, sending from history, and first
 short-response placement. Run
 [ToolDisclosureUITests](../BighelpUITests/ToolDisclosureUITests.swift) for expanded

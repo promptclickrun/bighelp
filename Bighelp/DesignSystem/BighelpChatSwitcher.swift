@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The switcher beside a chat: in Bots mode the faces of the bots on top of the home (then the
-/// ones under them), in Code mode the running sessions. A tap goes to that chat; Back still goes
+/// The switcher beside a chat: on the Bots view the faces of the bots on top of the home (then the
+/// ones under them), in a coding session the running sessions. A tap goes to that chat; Back still goes
 /// home. It lives in the Duo's side column when folded (on unless turned off), and beside the
 /// chat on iPad and Mac in landscape once turned on (Settings › Modes › Chat switcher).
 enum BighelpChatSwitcher {

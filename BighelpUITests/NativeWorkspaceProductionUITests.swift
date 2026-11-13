@@ -1728,7 +1728,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
     private func botButton(_ profile: String, in app: XCUIApplication) -> XCUIElement {
         let row = app.buttons.matching(NSPredicate(format: "identifier IN %@",
                                                    ["simple-bots.bot.\(profile)", "simple-bots.pinned.\(profile)"])).firstMatch
-        if profile == "default", !row.waitForExistence(timeout: 5) { return app.buttons["simple-bots.primary"].firstMatch }
+        if profile == "default", !row.waitForExistence(timeout: 5) { return app.primaryBot }
         return row
     }
 

@@ -362,29 +362,6 @@ struct SettingsStoreTests {
         #expect(BotChatExperience.allCases == [.botChat, .lastChat, .newChat])
     }
 
-    /// Chat is the out-of-box home. Code mode opens a launch only once it's
-    /// on and chosen, and turning it off brings Chat back at once.
-    @Test func codeModeIsOffByDefaultAndOpensOnlyWhenChosen() {
-        let suiteName = #function
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
-        let fresh = SettingsStore(defaults: defaults)
-        #expect(!fresh.codeModeEnabled)
-        #expect(fresh.experience == .bighelp)
-
-        fresh.startExperience = .code
-        #expect(SettingsStore(defaults: defaults).experience == .bighelp)
-
-        fresh.codeModeEnabled = true
-        let relaunched = SettingsStore(defaults: defaults)
-        #expect(relaunched.experience == .code)
-
-        relaunched.codeModeEnabled = false
-        #expect(relaunched.experience == .bighelp)
-    }
-
     @Test func midSessionChatBehaviorDefaultsToSteerAndOffersEveryHermesMode() {
         let suiteName = #function
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -523,7 +500,6 @@ struct SettingsStoreTests {
 
     @Test func settingsMenuUsesFocusedSubsectionsInsteadOfOneLongForm() {
         #expect(SettingsMenuSection.allCases == [
-            .modes,
             .appearance,
             .chat,
             .voice,
@@ -532,12 +508,8 @@ struct SettingsStoreTests {
             .companion,
             .help,
         ])
-        #expect(Set(SettingsMenuSection.allCases.map(\.title)).count == 8)
-        #expect(Set(SettingsMenuSection.allCases.map(\.accessibilityIdentifier)).count == 8)
-    }
-
-    @Test func currentEdgeGestureChoicesExcludeTheLegacyInboxDestination() {
-        #expect(!WorkspaceSwipeAction.allCases.contains(.inbox))
+        #expect(Set(SettingsMenuSection.allCases.map(\.title)).count == 7)
+        #expect(Set(SettingsMenuSection.allCases.map(\.accessibilityIdentifier)).count == 7)
     }
 
     @Test func persistedLegacyInboxEdgeGesturesMigrateToVisibleHomeRouting() {

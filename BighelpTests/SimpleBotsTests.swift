@@ -5,34 +5,14 @@ import Testing
 
 @MainActor
 struct SimpleBotsTests {
-    @Test func simpleBotModeIsOffByDefaultAndChangesTheLook() {
-        let suiteName = #function
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
-        let fresh = SettingsStore(defaults: defaults)
-        #expect(!fresh.simpleBotsEnabled)
-        #expect(!fresh.appearanceContext.simpleBots)
-
-        fresh.simpleBotsEnabled = true
-        let relaunched = SettingsStore(defaults: defaults)
-        #expect(relaunched.simpleBotsEnabled)
-        let context = relaunched.appearanceContext
-        #expect(context.simpleBots)
-        #expect(context.lightBackground == .paper)
-        #expect(context.darkBackground == .black)
-    }
-
-    /// Bots mode's dark page is the one picked in Appearance, like the rest of the app (#718).
-    @Test func botsModeFollowsTheDarkBackgroundChoice() {
+    /// The dark page is the one picked in Appearance (#718).
+    @Test func thePageFollowsTheDarkBackgroundChoice() {
         let suiteName = #function
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let settings = SettingsStore(defaults: defaults)
-        settings.simpleBotsEnabled = true
         settings.darkBackground = .graphite
         #expect(settings.appearanceContext.darkBackground == .graphite)
         let graphite = BighelpTheme.resolve(appearance: settings.appearanceContext, colorScheme: .dark,
@@ -44,15 +24,14 @@ struct SimpleBotsTests {
         #expect(black.canvasHex == BighelpTheme.blackDark.canvasHex)
     }
 
-    /// Bots mode's light page is the theme picked in Appearance too (#719); it used to be Paper always.
-    @Test func botsModeFollowsTheLightThemeChoice() {
+    /// The light page is the theme picked in Appearance too (#719).
+    @Test func thePageFollowsTheLightThemeChoice() {
         let suiteName = #function
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let settings = SettingsStore(defaults: defaults)
-        settings.simpleBotsEnabled = true
         settings.pickTheme(.moss, dark: false)
         settings.pickTheme(.violet, dark: true)
         let context = settings.appearanceContext
@@ -68,23 +47,8 @@ struct SimpleBotsTests {
                                      contrast: .standard).canvasHex == BighelpTheme.light.canvasHex)
     }
 
-    @Test func edgeSwipesGoToYourBotsAndThisBotsProfile() {
-        let suiteName = #function
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let settings = SettingsStore(defaults: defaults)
-        settings.leftEdgeSwipeAction = .newChat
-        settings.rightEdgeSwipeAction = .none
-        #expect(settings.effectiveLeftEdgeSwipeAction == .newChat, "Your choices everywhere else")
-        settings.simpleBotsEnabled = true
-        #expect(settings.effectiveLeftEdgeSwipeAction == .agents)
-        #expect(settings.effectiveRightEdgeSwipeAction == .profile)
-    }
-
     @Test func simpleLookHasBlackBubblesByDayAndInkAfterDark() {
-        var context = BighelpAppearanceContext(appearance: .light, lightBackground: .paper, darkBackground: .black)
-        context.simpleBots = true
+        let context = BighelpAppearanceContext(appearance: .light, lightBackground: .paper, darkBackground: .black)
         let day = BighelpTheme.resolve(appearance: context, colorScheme: .light, contrast: .standard)
         #expect(day.chosenBubbleHex == "111111")
         let night = BighelpTheme.resolve(appearance: BighelpAppearanceContext(appearance: .dark), colorScheme: .dark,
@@ -96,33 +60,29 @@ struct SimpleBotsTests {
         let savedInk = BighelpTheme.resolve(appearance: BighelpAppearanceContext(appearance: .light, bubbleColor: .graphite),
                                             colorScheme: .light, contrast: .standard)
         #expect(savedInk.chosenBubbleHex == "111111", "Ink saved by an older build is the same Ink")
-        var dark = context
-        dark = BighelpAppearanceContext(appearance: .dark, lightBackground: .paper, darkBackground: .black)
-        dark.simpleBots = true
+        let dark = BighelpAppearanceContext(appearance: .dark, lightBackground: .paper, darkBackground: .black)
         #expect(BighelpTheme.resolve(appearance: dark, colorScheme: .dark, contrast: .standard).chosenBubbleHex
                 == "3A3A3F")
     }
 
-    /// Buttons, links and tinted Settings text use the page's ink in Bots mode. The accent used
+    /// Buttons, links and tinted Settings text use the page's ink. The accent used
     /// to follow the bubble color, which is a dark gray after dark, so tinted text in Settings read as
     /// grayed out ("Hermes restart", Check Host Status).
     @Test func simpleLookTintsWithThePagesInk() {
         for (scheme, ink) in [(ColorScheme.light, "111111"), (.dark, "FFFFFF")] {
-            var context = BighelpAppearanceContext(appearance: scheme == .dark ? .dark : .light,
+            let context = BighelpAppearanceContext(appearance: scheme == .dark ? .dark : .light,
                                                    lightBackground: .paper, darkBackground: .black)
-            context.simpleBots = true
             let theme = BighelpTheme.resolve(appearance: context, colorScheme: scheme, contrast: .standard)
             #expect(theme.actionHex.uppercased() == ink, "\(scheme): \(theme.actionHex)")
             #expect(theme.chosenBubbleHex == (scheme == .dark ? "3A3A3F" : "111111"), "Bubbles keep their color")
         }
     }
 
-    /// A bubble color picked in Appearance wins in Bots mode too; black and ink are only its default.
+    /// A bubble color picked in Appearance wins; black and ink are only the default.
     @Test func simpleLookKeepsThePickedBubbleColor() {
         for scheme in [ColorScheme.light, .dark] {
             var context = BighelpAppearanceContext(appearance: scheme == .dark ? .dark : .light,
                                                    lightBackground: .paper, darkBackground: .black, bubbleColor: .teal)
-            context.simpleBots = true
             let theme = BighelpTheme.resolve(appearance: context, colorScheme: scheme, contrast: .standard)
             #expect(theme.chosenBubbleHex == BighelpBubbleColor.teal.hex, "\(scheme)")
             context.bubbleColor = nil

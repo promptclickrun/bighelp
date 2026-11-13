@@ -1,6 +1,6 @@
 import Foundation
 
-/// The projects Code mode can start sessions in, for one agent (Hermes keeps
+/// The projects a coding session can start in, for one agent (Hermes keeps
 /// projects per agent).
 @MainActor
 protocol CodeProjectSource: AnyObject {

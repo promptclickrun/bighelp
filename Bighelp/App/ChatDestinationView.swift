@@ -66,7 +66,7 @@ struct ChatDestinationView: View {
     let onOpenAgentSessions: (String) -> Void
     let onOpenApproval: (ApprovalRequest) -> Void
     let onForkMessage: ((String) -> Void)?
-    /// Code mode sessions: Markdown paths in messages open the viewer.
+    /// Coding sessions: Markdown paths in messages open the viewer.
     let hostFiles: HostFileLinkContext?
     /// ••• › Files: the chat's working folder on the computer. Asked for when Files opens, so it
     /// reads the connection there is then; nil (a group chat) lists the chat's own attachments.

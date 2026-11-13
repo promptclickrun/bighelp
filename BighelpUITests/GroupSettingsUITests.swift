@@ -10,15 +10,16 @@ final class GroupSettingsUITests: BighelpUITestCase {
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-group-settings",
                                "-loopdy.demo.appearance", appearance] + extra
         app.launch()
-        // Bots lists the group chats with the bots.
-        showBots(in: app)
-        let group = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
-                                                     "simple-bots.group.", "Garden")).firstMatch
-        let home = app.descendants(matching: .any)["simple-bots.home"].firstMatch
-        _ = group.waitForExistence(timeout: 8)
-        for _ in 0..<6 where !(group.exists && group.isHittable) { home.swipeUp() }
-        XCTAssertTrue(group.exists && group.isHittable)
+        // The demo has many group chats: New chat's To field finds this one among them.
+        chatNewChatButton(in: app).tap()
+        let to = app.textFields["new-chat.to.field"].firstMatch
+        XCTAssertTrue(to.waitForExistence(timeout: 10))
+        to.tap()
+        to.typeText("Garden party")
+        let group = app.buttons["new-chat.group.hermes-room:group-settings-demo"].firstMatch
+        XCTAssertTrue(group.waitForExistence(timeout: 8), "New chat lists the demo's group chat")
         group.tap()
+        XCTAssertTrue(to.waitForNonExistence(timeout: 10), "The group chat takes New chat's place")
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 10))
         return app
     }

@@ -453,11 +453,6 @@ struct AgentDirectoryStoreTests {
         #expect(restored.pinnedAgents.map(\.id) == ["default", "finance"])
     }
 
-    @Test func pinLimitCopyMatchesTheStoreLimit() {
-        #expect(AgentActionPresentation.pinnedAgentLimit == AgentDirectoryStore.pinnedAgentLimit)
-        #expect(AgentActionPresentation.pinLimitHint.contains("5"))
-    }
-
     @Test func deletingTheAccountErasesPersistedAgentPreferences() async throws {
         let defaults = isolatedDefaults()
         let client = AgentDirectoryFixtureClient(profiles: [.defaultFixture, .financeFixture])
@@ -481,43 +476,6 @@ struct AgentDirectoryStoreTests {
         )
 
         #expect(store.isInitialLoadPending)
-    }
-
-    @Test func cachedAgentsUseInlineRefreshWhileAnEmptyDirectoryUsesFullLoading() {
-        #expect(AgentDirectoryPresentation.loadingMode(isLoading: true, hasProfiles: true) == .inline)
-        #expect(AgentDirectoryPresentation.loadingMode(isLoading: true, hasProfiles: false) == .fullScreen)
-    }
-
-    @Test func visibleDirectorySuppressesOnlyTheInternalBighelpPlaceholder() {
-        let canonicalDefault = AgentProfile(
-            id: "default",
-            name: "Juno",
-            role: "Household agent",
-            summary: "Keeps things moving.",
-            instructions: "Be useful.",
-            isDefault: true
-        )
-
-        #expect(
-            AgentDirectoryPresentation.visibleProfiles([.bighelpLinkDefault, canonicalDefault])
-                == [canonicalDefault]
-        )
-    }
-
-    @Test func agentRowMenuIncludesCanonicalChatAndAllManagementActions() {
-        #expect(AgentRowMenuAction.allCases.map(\.title) == [
-            "Message",
-            "Edit",
-            "Past chats",
-            "Scheduled tasks",
-            "Group chats",
-            "Duplicate",
-            "Use with Siri",
-            "Use for new chats",
-            "Pin",
-            "Save as template",
-            "Delete",
-        ])
     }
 
     @Test func selectedStableIDSurvivesStoreRecreation() async throws {

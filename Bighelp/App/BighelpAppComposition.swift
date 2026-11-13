@@ -691,6 +691,18 @@ struct BighelpAppComposition {
                 conversationID = "demo-finance"
             }
             let route = AppRoute.chat(conversationID: conversationID)
+            // The chat a demo opens at launch shows this run's fixture. The store starts from the copy
+            // an earlier run saved, and a launch argument may have given this chat other content.
+            if let fixture = initialSessions.first(where: { $0.id == conversationID }),
+               sessionCatalog.session(id: conversationID) != fixture {
+                var records = sessionCatalog.records
+                if let index = records.firstIndex(where: { $0.id == conversationID }) {
+                    records[index] = fixture
+                } else {
+                    records.append(fixture)
+                }
+                _ = sessionCatalog.adopt(records)
+            }
             if featureStore.prepare(route) {
                 appState.activateConversation(id: conversationID, source: .newChat)
             }

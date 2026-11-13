@@ -31,8 +31,8 @@ struct ChatAttachmentGallery: View {
             ChatAttachmentPreviewView(attachment: attachment)
                 .bighelpSheetSize(.large)
         }
-        .bighelpMediaPresentation(item: $photoViewer, fullScreen: true) { start in
-            ChatImageStackViewer(images: start.images, startIndex: start.index)
+        .bighelpMediaPresentation(item: $photoViewer) { start in
+            ChatImageStackViewer(images: start.images, startIndex: start.index, fullBleed: start.presentsFullScreen)
         }
     }
 
@@ -40,7 +40,7 @@ struct ChatAttachmentGallery: View {
     /// everything else keeps the preview sheet, with its file name and save options.
     private func open(_ attachment: ChatAttachment) {
         if attachment.kind == .image, ChatImageStackContent.isFullBleed(screen) {
-            photoViewer = ChatPhotoStart(images: [attachment], index: 0)
+            photoViewer = ChatPhotoStart(images: [attachment], index: 0, screen: screen)
         } else {
             previewAttachment = attachment
         }

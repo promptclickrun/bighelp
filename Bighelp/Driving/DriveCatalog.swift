@@ -41,7 +41,7 @@ enum DriveCatalog {
 
     static let places: [DrivePlace] = botPlaces + boardPlaces + workPlaces + settingsPlaces + hermesPlaces
 
-    // MARK: - Bots mode: a bot's profile
+    // MARK: - A bot's page
 
     private static let profile = DriveStep.go("{Bot}'s profile", .botProfile(BotProfileOpening()))
 
@@ -68,84 +68,79 @@ enum DriveCatalog {
     private static let botPlaces: [DrivePlace] = [
         DrivePlace("bot.profile", String(localized: "Bot profile"),
                    String(localized: "A bot's own page: its look, Dashboard, settings, files and screen."),
-                   keywords: ["profile", "about", "bot page"], needs: [.bot], playbooks: [.bots: [profile]]),
+                   keywords: ["profile", "about", "bot page"], needs: [.bot], steps: [profile]),
         DrivePlace("bot.dashboard", String(localized: "Dashboard"),
                    String(localized: "The bot's Feed, Ideas and Goals as piles you swipe, with Today on top."),
                    keywords: ["dashboard", "piles", "cards", "feed", "ideas", "goals"], needs: [.bot],
-                   playbooks: [.bots: profileTab(.dashboard, String(localized: "Dashboard"))]),
+                   steps: profileTab(.dashboard, String(localized: "Dashboard"))),
         DrivePlace("bot.dashboard.today", String(localized: "Activities"),
                    String(localized: "What the bot ran in the background, by day: subagents and commands."),
                    keywords: ["activities", "today", "background", "running", "subagents", "processes", "commands", "activity"],
-                   needs: [.bot], playbooks: [.bots: profileTab(.dashboard, String(localized: "Dashboard"))
-                       + [.point(String(localized: "Activities"), at: "dashboard.today.toggle")]]),
+                   needs: [.bot], steps: profileTab(.dashboard, String(localized: "Dashboard"))
+                       + [.point(String(localized: "Activities"), at: "dashboard.today.toggle")]),
         DrivePlace("bot.dashboard.templates.feed", String(localized: "Feed templates"),
                    String(localized: "Ready-made jobs the bot can do for your Feed. Swipe right to use one."),
                    keywords: ["feed", "templates", "what can feed do", "starter", "ideas for feed", "blueprints"],
-                   needs: [.bot], playbooks: [.bots: templates(.feed, String(localized: "Feed"))]),
+                   needs: [.bot], steps: templates(.feed, String(localized: "Feed"))),
         DrivePlace("bot.dashboard.templates.ideas", String(localized: "Ideas templates"),
                    String(localized: "Ready-made prompts that fill the bot's Ideas."),
                    keywords: ["ideas", "templates", "starter", "suggestions", "blueprints"],
-                   needs: [.bot], playbooks: [.bots: templates(.idea, String(localized: "Ideas"))]),
+                   needs: [.bot], steps: templates(.idea, String(localized: "Ideas"))),
         DrivePlace("bot.dashboard.templates.goals", String(localized: "Goals templates"),
                    String(localized: "Ready-made goals the bot can track for you."),
                    keywords: ["goals", "templates", "habits", "starter", "blueprints"],
-                   needs: [.bot], playbooks: [.bots: templates(.goal, String(localized: "Goals"))]),
+                   needs: [.bot], steps: templates(.goal, String(localized: "Goals"))),
         DrivePlace("bot.info", String(localized: "Info"),
                    String(localized: "The bot's look, instructions, model, voice and routines."),
                    keywords: ["info", "bot settings", "settings for bot"], needs: [.bot],
-                   playbooks: [.bots: profileTab(.info, String(localized: "Info"))]),
+                   steps: profileTab(.info, String(localized: "Info"))),
         DrivePlace("bot.info.character", String(localized: "Character"),
                    String(localized: "The bot's shape and color, or a character, pet or photo."),
                    keywords: ["look", "avatar", "shape", "color", "picture", "face"], needs: [.bot],
-                   playbooks: [.bots: infoRow(String(localized: "Character"), "simple-bots.profile.character")]),
+                   steps: infoRow(String(localized: "Character"), "simple-bots.profile.character")),
         DrivePlace("bot.info.instructions", String(localized: "Instructions"),
                    String(localized: "What the bot is told to be and do."),
                    keywords: ["instructions", "personality", "soul", "prompt", "rules", "behave"], needs: [.bot],
-                   playbooks: [.bots: infoRow(String(localized: "Instructions"), "simple-bots.profile.instructions")]),
+                   steps: infoRow(String(localized: "Instructions"), "simple-bots.profile.instructions")),
         DrivePlace("bot.info.photo-actions", String(localized: "Photo actions"),
                    String(localized: "Turn photos of business cards and posters into contacts and events."),
                    keywords: ["photo", "business card", "poster", "contact", "event"], needs: [.bot],
-                   playbooks: [.bots: infoRow(String(localized: "Photo actions"), "simple-bots.profile.photo-actions")]),
+                   steps: infoRow(String(localized: "Photo actions"), "simple-bots.profile.photo-actions")),
         DrivePlace("bot.info.default-model", String(localized: "Default Model"),
                    String(localized: "The AI model and reasoning the bot uses for its chats."),
                    keywords: ["model", "ai model", "reasoning", "smarter", "faster"], needs: [.bot],
-                   playbooks: [.bots: infoRow(String(localized: "Default Model"), "simple-bots.profile.default-model")]),
+                   steps: infoRow(String(localized: "Default Model"), "simple-bots.profile.default-model")),
         DrivePlace("bot.info.default-voice", String(localized: "Default Voice"),
                    String(localized: "How the bot sounds in voice chats."),
                    keywords: ["voice", "speech", "talk", "sound"], needs: [.bot],
-                   playbooks: [.bots: infoRow(String(localized: "Default Voice"), "simple-bots.profile.default-voice")]),
+                   steps: infoRow(String(localized: "Default Voice"), "simple-bots.profile.default-voice")),
         DrivePlace("bot.info.advanced-options", String(localized: "Advanced Options"),
                    String(localized: "Safety, memory, notices and what happens while the bot works."),
                    keywords: ["advanced", "approvals", "memory", "safety", "permissions"], needs: [.bot],
-                   playbooks: [.bots: infoRow(String(localized: "Advanced Options"), "simple-bots.profile.advanced-options")]),
+                   steps: infoRow(String(localized: "Advanced Options"), "simple-bots.profile.advanced-options")),
         DrivePlace("bot.info.routines", String(localized: "Routines"),
                    String(localized: "Jobs the bot does on a schedule. Add one here."),
                    keywords: ["routines", "schedule", "scheduled", "every day", "reminder", "recurring"], needs: [.bot],
-                   playbooks: [.bots: infoRow(String(localized: "Add routine"), "simple-bots.profile.add-routine")]),
+                   steps: infoRow(String(localized: "Add routine"), "simple-bots.profile.add-routine")),
         DrivePlace("bot.computer", String(localized: "Computer"),
                    String(localized: "The bot's own screen: watch it work or take control."),
                    keywords: ["computer", "screen", "browser", "desktop", "watch"], needs: [.bot],
-                   playbooks: [.bots: profileTab(.computer, String(localized: "Computer"))]),
+                   steps: profileTab(.computer, String(localized: "Computer"))),
         DrivePlace("bot.files", String(localized: "Files"),
                    String(localized: "The bot's folder on your computer."),
                    keywords: ["files", "folder", "documents", "downloads"], needs: [.bot],
-                   playbooks: [.bots: profileTab(.files, String(localized: "Files"))]),
+                   steps: profileTab(.files, String(localized: "Files"))),
         DrivePlace("bot.media", String(localized: "Media"),
                    String(localized: "Photos and videos from your chats with the bot."),
                    keywords: ["media", "photos", "videos", "pictures"], needs: [.bot],
-                   playbooks: [.bots: profileTab(.media, String(localized: "Media"))]),
+                   steps: profileTab(.media, String(localized: "Media"))),
     ]
 
-    // MARK: - Chat and Code: the agent's boards and work pages, pushed over the chat
-
-    private static func both(_ steps: [DriveStep]) -> [BighelpMode: [DriveStep]] { [.chat: steps, .code: steps] }
+    // MARK: - The boards and work pages, pushed over the chat
 
     private static func page(_ id: String, _ title: String, _ what: String, keywords: [String],
-                             needs: Set<DriveNeed> = [], _ route: AppRoute,
-                             modes: [BighelpMode] = [.chat, .code]) -> DrivePlace {
-        let steps = [DriveStep.go(title, .push(route))]
-        return DrivePlace(id, title, what, keywords: keywords, needs: needs,
-                          playbooks: Dictionary(uniqueKeysWithValues: modes.map { ($0, steps) }))
+                             needs: Set<DriveNeed> = [], _ route: AppRoute) -> DrivePlace {
+        DrivePlace(id, title, what, keywords: keywords, needs: needs, steps: [.go(title, .push(route))])
     }
 
     private static let boardPlaces: [DrivePlace] = [
@@ -160,28 +155,28 @@ enum DriveCatalog {
     private static let workPlaces: [DrivePlace] = [
         DrivePlace("agents", String(localized: "Agents"), String(localized: "Every agent and group chat on this computer."),
                    keywords: ["agents", "bots", "group chats", "team"],
-                   playbooks: [.chat: [.go(String(localized: "Bots"), .tab(.conversations, view: .bots))]]),
+                   steps: [.go(String(localized: "Bots"), .tab(.conversations, view: .bots))]),
         DrivePlace("sessions", String(localized: "Sessions"), String(localized: "Every chat on this computer, to search and reopen."),
                    keywords: ["sessions", "chats", "history", "conversations", "old chats"],
-                   playbooks: [.chat: [.go(String(localized: "Chats"), .tab(.conversations, view: .chats))]]),
+                   steps: [.go(String(localized: "Chats"), .tab(.conversations, view: .chats))]),
         page("projects", String(localized: "Projects"), String(localized: "Related chats and folders together."),
              keywords: ["projects", "folders", "workspaces"], .projects),
         page("kanban", String(localized: "Kanban"), String(localized: "Your agents' task board, from Later to Done."),
              keywords: ["kanban", "board", "tasks", "cards", "todo"], .kanban),
         page("workflows", String(localized: "Workflows"), String(localized: "Multi-step jobs agents run, with your sign-off."),
-             keywords: ["workflows", "automation", "pipelines", "runs"], .workflows, modes: [.chat]),
+             keywords: ["workflows", "automation", "pipelines", "runs"], .workflows),
         page("scheduled-tasks", String(localized: "Scheduled tasks"), String(localized: "Work your agents do on a schedule."),
-             keywords: ["scheduled", "tasks", "routines", "cron", "every day", "reminders"], .scheduledTasks, modes: [.chat]),
+             keywords: ["scheduled", "tasks", "routines", "cron", "every day", "reminders"], .scheduledTasks),
         page("usage", String(localized: "Usage"), String(localized: "Your plans, limits, and how much each agent used."),
-             keywords: ["usage", "limits", "plan", "cost", "tokens", "quota"], .usage, modes: [.bots, .chat, .code]),
+             keywords: ["usage", "limits", "plan", "cost", "tokens", "quota"], .usage),
         page("skills", String(localized: "Skills & tools"), String(localized: "The skills and tools your agent can use."),
-             keywords: ["skills", "tools", "abilities", "plugins"], .skillsAndTools, modes: [.chat]),
+             keywords: ["skills", "tools", "abilities", "plugins"], .skillsAndTools),
         page("models", String(localized: "Default model"), String(localized: "The AI model new chats start with."),
              keywords: ["model", "default model", "ai model", "llm"], .workspaceManagement(.models)),
         page("ai-providers", String(localized: "AI providers"), String(localized: "Sign in to AI providers or add their keys."),
              keywords: ["providers", "api key", "keys", "sign in", "accounts"], .workspaceManagement(.keys)),
         page("dev-factory", String(localized: "Dev Factory"), String(localized: "Coding recipes that run across projects, and their runs."),
-             keywords: ["dev factory", "recipes", "automation"], .devFactory, modes: [.code]),
+             keywords: ["dev factory", "recipes", "automation"], .devFactory),
     ]
 
     // MARK: - Settings
@@ -200,9 +195,7 @@ enum DriveCatalog {
             if let point { built.append(.point(point.0, at: point.1)) }
             return built
         }
-        let path = steps(pages, start: [])
-        return DrivePlace(id, title, what, keywords: keywords, needs: needs,
-                          playbooks: [.bots: path, .chat: path, .code: path])
+        return DrivePlace(id, title, what, keywords: keywords, needs: needs, steps: steps(pages, start: []))
     }
 
     private static func section(_ section: SettingsMenuSection) -> (String, SettingsDestination, String?) {

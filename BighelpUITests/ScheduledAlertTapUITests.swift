@@ -35,7 +35,7 @@ final class ScheduledAlertTapUITests: BighelpUITestCase {
 
     private func launch(tap: String, appearance: String) -> XCUIApplication {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "NO",
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays",
                                "-test-scheduled-alert-tap", tap, "-loopdy.demo.appearance", appearance]
         app.launch()
         return app

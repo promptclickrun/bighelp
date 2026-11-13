@@ -27,7 +27,9 @@ final class ShortcutGatewaySwitchHostUITests: BighelpUITestCase {
         try onboardOpenHost(app, address: try XCTUnwrap(probe["address_a"]))
         addAnotherHost(in: app)
         try addHost(app, address: try XCTUnwrap(probe["address_b"]), name: "Lab Hermes")
-        XCTAssertTrue(app.buttons["home.drawer.open"].waitForExistence(timeout: 30))
+        // Setup finishes over Settings; Done shows the home.
+        closeSettings(in: app)
+        XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 30))
         save("1-lab-in-use", app)
 
         // Lab Hermes is in use; the Shortcut asks on the first host (named by its address).
@@ -42,20 +44,14 @@ final class ShortcutGatewaySwitchHostUITests: BighelpUITestCase {
         XCTAssertTrue(text.contains("fixture complete"), "The agent on the other gateway answers: \(text)")
     }
 
-    /// Add host from ☰'s host switcher, after a fresh launch so setup's screens are gone.
+    /// Settings › Your computers › Add a computer, after a fresh launch so setup's screens are gone.
     @MainActor private func addAnotherHost(in app: XCUIApplication) {
         app.terminate()
         app.launch()
-        let menu = app.buttons["home.drawer.open"]
-        XCTAssertTrue(menu.waitForExistence(timeout: 30))
+        XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 30))
         sleep(3)
-        let hosts = app.buttons["menu.hosts"]
-        for _ in 0..<3 where !hosts.exists {
-            menu.tap()
-            _ = hosts.waitForExistence(timeout: 8)
-        }
-        hosts.tap()
-        app.buttons["menu.host.add"].tap()
+        openSettings(in: app)
+        settingsRow("settings.add-computer", in: app).tap()
     }
 
     @MainActor private func addHost(_ app: XCUIApplication, address: String, name: String) throws {

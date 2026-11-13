@@ -1,6 +1,6 @@
 import XCTest
 
-/// Move to Project…, from a chat's ⋯ menu and from a chat's hold menu in Chats, on the demo
+/// Move to Project…, from a chat's ⋯ menu and from a chat's hold menu on Chats › This computer, on the demo
 /// computer: the chat lands in the project picked, and the sheet and the list say so.
 final class MoveChatToProjectUITests: BighelpUITestCase {
     @MainActor
@@ -28,10 +28,9 @@ final class MoveChatToProjectUITests: BighelpUITestCase {
     @MainActor
     func testAChatsHoldMenuMovesItIntoTheProjectsFolder() throws {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-bighelp.hosts.all-hosts", "NO",
-                               "-loopdy.sessions.organizeByProjects", "YES"]
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.sessions.organizeByProjects", "YES"]
         app.launch()
-        XCTAssertTrue(app.descendants(matching: .any)["sessions.screen"].firstMatch.waitForExistence(timeout: 20))
+        openThisComputerSessions(in: app)
         let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'session.row.'"))
         let row = rows.firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 8))

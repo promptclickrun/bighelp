@@ -4,6 +4,10 @@
 > the app's native WebSocket connection to the dashboard. The retired bighelp Link relay plays no part. Some type
 > names still say `Link` (for example `BighelpLinkHermesBotModeClient`, aliased as `HermesHostedRoomClient`); they
 > are legacy names only.
+>
+> The name: "Bot Mode" is Hermes' word for its hosted group chats, and file and type names keep it (`BotModeRoom`,
+> `BotModeRoomStore`). It is not the app's old Bots mode, which is gone. Today the first tab's Bots view lists bots
+> and group chats, and every group chat is also a row in the Chats view.
 
 ## Product boundary
 
@@ -89,8 +93,8 @@ never truncated to fit transport.
 
 A room can hold agents from any number of the person's computers (Hermes
 RoomLink). Cross-gateway links are direct gateway-to-gateway connections; the
-app only carries the setup. New chat › Group chat in the all-computers view
-takes agents from any computer, and the first agent's computer is the room's
+app only carries the setup. New chat's To row takes two to six bots from any computer
+while Show every computer is on, and the first bot's computer is the room's
 home. For each agent on another computer:
 
 1. That computer: `groups.capabilities {profile}` gives `room_link.catalog`
@@ -112,8 +116,8 @@ sign-ins (`RegistryRoomPeerHosts`). A peer member never takes a local
 profile's name or picture, even one with the same profile ID.
 `Scripts/RoomLinkProbe.py` checks the whole flow on two isolated real hosts.
 
-A peer member shows its own computer's current name and picture: the
-all-computers view keeps a copy of each computer's agents
+A peer member shows its own computer's current name and picture: Show every computer
+keeps a copy of each computer's agents
 (`FleetStore.peerAgent`, found by `peer_id`), and a room with peers on screen
 reads those computers again when the copy is old. While such a room is on
 screen, the app holds a connection to each of those computers

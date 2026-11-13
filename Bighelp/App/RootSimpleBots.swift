@@ -292,13 +292,7 @@ extension RootShellView {
             canEdit: canEdit,
             onOpenChat: { openSimpleBotChat($0) },
             onOpenRoutine: { openScheduledTask($0) },
-            onEditDetails: { profile in
-                // The demo has no computer, and its editor opens all the same.
-                guard owner != nil || usesWorkspaceFixtures else { return }
-                let signIn = owner?.signIn
-                workspaceProfileEditor = .editing(profile, store: agents, processor: AvatarImageProcessor(),
-                                                  isCurrent: { currentWorkspaceOwner?.signIn == signIn })
-            },
+
             makeModelDefaults: { id in
                 let capabilities = currentWorkspaceCapabilities
                 guard usesWorkspaceFixtures || owner.map({

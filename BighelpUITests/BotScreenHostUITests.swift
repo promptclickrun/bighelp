@@ -27,14 +27,17 @@ final class BotScreenHostUITests: BighelpUITestCase {
         }
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-no-configured-hosts",
-                               "-loopdy.home.opens-chat", "YES", "-loopdy.settings.nerd-mode", "NO"]
+                               "-loopdy.settings.nerd-mode", "NO"]
         app.launch()
         signIn(app, host: host, user: user, password: password)
 
-        let avatar = app.buttons["agent.hero.avatar"].firstMatch
-        XCTAssertTrue(avatar.waitForExistence(timeout: 30))
-        avatar.tap()
-        let screenTab = app.buttons["agent.profile.tab.screen"]
+        // Bots › the primary bot's chat › its page's Computer tab.
+        showBots(in: app, timeout: 30)
+        let primary = app.buttons["simple-bots.primary"].firstMatch
+        XCTAssertTrue(primary.waitForExistence(timeout: 30))
+        primary.tap()
+        openBotPage(fromChatIn: app)
+        let screenTab = app.buttons["simple-bots.profile.tab.computer"]
         XCTAssertTrue(screenTab.waitForExistence(timeout: 20), "Hermes 0.22 answers display.status")
         screenTab.tap()
 

@@ -49,7 +49,7 @@ final class ChatTurnFailureHostUITests: BighelpUITestCase {
         next.tap()
 
         let newChat = app.buttons.matching(NSPredicate(format: "identifier IN %@",
-            ["sessions.empty.new-chat", "chat.home.new-chat", "chat.new-chat", "root.new-chat"])).firstMatch
+            ["home.new-chat", "chats.empty.new-chat"])).firstMatch
         if newChat.waitForExistence(timeout: 10) {
             newChat.tap()
             confirmNewChatPicker(in: app)

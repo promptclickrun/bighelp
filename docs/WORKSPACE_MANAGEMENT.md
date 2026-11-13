@@ -15,7 +15,7 @@ logs, webhooks, tool backends, diagnostics, backups and the other host pages on 
 computer's page (Advanced groups, with Advanced options on); Clean up chats in
 Settings › Chat; Toolsets and Manage bots in a bot's Advanced Options. Scratchpad,
 GitHub and Wiki remain retired from app navigation, and the contract also leaves
-out Usage (☰ › Usage) and the destinations for this app's own settings, which
+out Usage (the first group of Settings, and the sidebar's More) and the destinations for this app's own settings, which
 live in Settings. Native Wiki
 contracts and clients remain for older hosts that still list `native-wiki-v1`
 (current plugin releases no longer have the Wiki routes), without adding a

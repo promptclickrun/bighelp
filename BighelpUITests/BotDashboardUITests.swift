@@ -17,7 +17,7 @@ final class BotDashboardUITests: BighelpUITestCase {
     private func checkProfileTabs(textSize: String) throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", "dark",
+                               "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", "dark",
                                "-UIPreferredContentSizeCategoryName", textSize]
         app.launch()
         defer { app.terminate() }
@@ -58,7 +58,7 @@ final class BotDashboardUITests: BighelpUITestCase {
     func testProfileOpensOnTheDashboardAndASwipeClearsAPost() throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", "light"]
+                               "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", "light"]
         app.launch()
         let primary = app.buttons["simple-bots.primary"]
         XCTAssertTrue(primary.waitForExistence(timeout: 15))
@@ -110,7 +110,7 @@ final class BotDashboardUITests: BighelpUITestCase {
         for appearance in ["light", "dark"] {
             let app = makeApp()
             app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                                   "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", appearance,
+                                   "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", appearance,
                                    "-bighelp.dashboard.swipe-tutorial-seen", "YES",
                                    "-bighelp.dashboard.activities.show-routines", "YES"]
             app.launch()
@@ -164,7 +164,7 @@ final class BotDashboardUITests: BighelpUITestCase {
         for appearance in ["light", "dark"] {
             let app = makeApp()
             app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                                   "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", appearance,
+                                   "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", appearance,
                                    "-bighelp.dashboard.swipe-tutorial-seen", "NO"]
             app.launch()
             openProfile(app, bot: "simple-bots.primary")

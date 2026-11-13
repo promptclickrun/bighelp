@@ -1,7 +1,7 @@
 import XCTest
 
 /// The iPhone Duo. The cover-screen tests run on the Duo's simulator, which starts folded: the bar in
-/// the side column (Chat mode) and the switcher beside a chat (Bots and Code mode). A test can't open
+/// the side column and the switcher beside a chat. A test can't open
 /// or fold that simulator, so the open screen and the half-folded laptop run on an iPad simulator with
 /// `-bighelp.debug.screen-posture` and `-bighelp.debug.fold-halfway`. Each test skips on a screen it
 /// isn't for. Set BIGHELP_DUO_EVIDENCE (TEST_RUNNER_…) to a folder to save the screenshots.
@@ -19,25 +19,20 @@ final class DuoLayoutUITests: BighelpUITestCase {
             app.launch()
             try requireCoverScreen(app)
             // The bar's places are toolbar items, which iOS stacks down the side strip.
-            let feed = app.buttons["tab.feed"].firstMatch
-            XCTAssertTrue(feed.waitForExistence(timeout: 20), "The places show")
+            let today = app.buttons["home.tab.today"].firstMatch
+            XCTAssertTrue(today.waitForExistence(timeout: 20), "The places show")
             let window = app.windows.firstMatch.frame
-            XCTAssertGreaterThan(feed.frame.minX, window.maxX - 90, "In the side strip")
-            XCTAssertGreaterThan(feed.frame.minY, window.minY + 150, "Under the camera and the status")
-            let chat = app.buttons["tab.sessions"].firstMatch
-            XCTAssertLessThan(abs(chat.frame.midX - feed.frame.midX), 4, "One above the other")
-            let menu = app.buttons["home.drawer.open"].firstMatch
-            if menu.exists {
-                XCTAssertFalse(menu.frame.intersects(feed.frame) || menu.frame.intersects(chat.frame),
-                               "Nothing lies over the screen's own buttons")
-            }
+            XCTAssertGreaterThan(today.frame.minX, window.maxX - 90, "In the side strip")
+            XCTAssertGreaterThan(today.frame.minY, window.minY + 150, "Under the camera and the status")
+            let chat = app.buttons["home.tab.conversations"].firstMatch
+            XCTAssertLessThan(abs(chat.frame.midX - today.frame.midX), 4, "One above the other")
             save("cover-chat-\(appearance)", app)
             if appearance == "light" {
-                feed.tap()
-                // iOS doesn't report a toolbar button as selected: the Feed page is what shows.
-                XCTAssertTrue(element("chat.composer.field", in: app).waitForNonExistence(timeout: 5),
+                today.tap()
+                // iOS doesn't report a toolbar button as selected: the Today page is what shows.
+                XCTAssertTrue(element("today.home", in: app).waitForExistence(timeout: 5),
                               "The places in the strip work")
-                save("cover-feed-light", app)
+                save("cover-today-light", app)
             }
             app.terminate()
         }
@@ -47,7 +42,7 @@ final class DuoLayoutUITests: BighelpUITestCase {
     func testCoverScreenSwitchesBotsFromBesideTheChat() throws {
         for appearance in appearances {
             let app = makeApp()
-            app.launchArguments = demo + ["-bighelp.settings.simple-bots", "YES", "-test-bot-activity",
+            app.launchArguments = demo + ["-loopdy.home.landing", "bots", "-test-bot-activity",
                                           "-loopdy.demo.appearance", appearance]
             app.launch()
             try requireCoverScreen(app)
@@ -74,48 +69,12 @@ final class DuoLayoutUITests: BighelpUITestCase {
     }
 
     @MainActor
-    func testCoverScreenSwitchesCodeSessionsFromBesideTheChat() throws {
-        let app = makeApp()
-        app.launchArguments = demo + ["-bighelp.settings.code-mode", "YES", "-bighelp.settings.code-mode.open-in", "code",
-                                      "-loopdy.demo.appearance", "light"]
-        app.launch()
-        try requireCoverScreen(app)
-        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 15))
-        for message in ["Fix the widget tap when the host is asleep", "Tighten the Usage chart spacing"] {
-            let field = element("code.composer.field", in: app)
-            XCTAssertTrue(field.waitForExistence(timeout: 5))
-            field.tap()
-            field.typeText(message)
-            app.buttons["code.composer.send"].tap()
-        }
-        let cards = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "code.session."))
-        let deadline = Date().addingTimeInterval(10)
-        while cards.count < 2, Date() < deadline { usleep(200_000) }
-        XCTAssertEqual(cards.count, 2)
-        cards.firstMatch.tap()
-        let switcher = element("chat-switcher", in: app)
-        XCTAssertTrue(switcher.waitForExistence(timeout: 10), "A session's chat has the switcher beside it")
-        let stops = app.buttons.matching(identifier: "chat-switcher.stop")
-        XCTAssertEqual(stops.count, 2, "One tile for each session")
-        sleep(1)
-        save("cover-code-switcher-light", app)
-        // Switching goes in place of the open chat (it never piles chats up for Back to walk
-        // through; the shell drops the open chat first), and the tapped session becomes the one open.
-        for _ in 0..<2 {
-            let label = stops.matching(NSPredicate(format: "selected == NO")).firstMatch.label
-            stops.matching(NSPredicate(format: "label == %@", label)).firstMatch.tap()
-            XCTAssertTrue(stops.matching(NSPredicate(format: "label == %@", label)).firstMatch.waitForSelection(timeout: 10))
-        }
-        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "chat-switcher").count, 1)
-    }
-
-    @MainActor
     func testIPadBotSwitcherStaysBelowStatusBar() throws {
         XCUIDevice.shared.orientation = .landscapeLeft
         defer { XCUIDevice.shared.orientation = .portrait }
         for appearance in appearances {
             let app = makeApp()
-            app.launchArguments = demo + ["-bighelp.settings.simple-bots", "YES", "-test-bot-activity",
+            app.launchArguments = demo + ["-loopdy.home.landing", "bots", "-test-bot-activity",
                                           "-bighelp.settings.chat-switcher", "YES",
                                           "-loopdy.demo.appearance", appearance]
             app.launch()
@@ -143,11 +102,10 @@ final class DuoLayoutUITests: BighelpUITestCase {
     // MARK: Open and half-folded (an iPad simulator standing in)
 
     @MainActor
-    func testOpenScreenShowsTheListBesideTheChatInEveryMode() throws {
+    func testOpenScreenShowsTheListBesideTheChatInBothViews() throws {
         let modes: [(name: String, arguments: [String], list: String)] = [
-            ("bots", ["-bighelp.settings.simple-bots", "YES", "-test-bot-activity"], "simple-bots.home"),
-            ("chat", [], "sessions.screen"),
-            ("code", ["-bighelp.settings.code-mode", "YES", "-bighelp.settings.code-mode.open-in", "code"], "code.screen"),
+            ("bots", ["-loopdy.home.landing", "bots", "-test-bot-activity"], "simple-bots.home"),
+            ("chat", ["-loopdy.home.landing", "chats"], "chats.inbox"),
         ]
         XCUIDevice.shared.orientation = .landscapeLeft
         defer { XCUIDevice.shared.orientation = .portrait }
@@ -187,7 +145,7 @@ final class DuoLayoutUITests: BighelpUITestCase {
             app.launch()
             try requireWideScreen(app)
             let field = element("chat.composer.field", in: app)
-            XCTAssertTrue(field.waitForExistence(timeout: 20), "The home chat opens")
+            XCTAssertTrue(field.waitForExistence(timeout: 20), "The chat opens")
             let window = app.windows.firstMatch.frame
             XCTAssertGreaterThan(field.frame.minY, window.midY, "The message box sits under the fold")
             XCTAssertLessThan(field.frame.minY, window.midY + 120, "Just under it")

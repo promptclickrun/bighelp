@@ -13,10 +13,9 @@ final class PluginReleaseUpdateHostUITests: BighelpUITestCase {
         let probe = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
         guard probe["mode"] == "update" else { throw XCTSkip("This host runs the \(probe["mode"] ?? "?") mode") }
         let app = makeApp()
-        app.launchArguments = ["-loopdy.home.opens-chat", "YES"]
         app.launch()
         try onboardOpenHost(app, address: try XCTUnwrap(probe["address"]))
-        XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 30), "The agent's chat opens")
+        XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 30), "The home opens")
 
         openSettings(in: app)
         // Your computers: the computer's row says so once the check finds a newer release.

@@ -5,8 +5,10 @@ import Foundation
 struct NewChatGroupRules: Equatable, Sendable {
     /// The computer in use. A bot without a `hostID` is on it.
     var hostInUse: UUID?
-    /// `BotModeRoomStore.offersNewGroupChat` on the computer in use.
-    var canMakeGroups: Bool
+    /// `BotModeRoomStore.makesGroupChats` on the computer in use: nil until its Hermes has said. A bot
+    /// is refused only on a no: until the answer comes, a second pick is taken, and making the group
+    /// says so if the computer can't.
+    var canMakeGroups: Bool?
     /// `HermesBotModeCapabilities.seatableProfiles` on the computer in use. Hermes' older path
     /// doesn't list them and seats any bot: nil.
     var seatableProfiles: [String]? = nil
@@ -64,7 +66,7 @@ enum NewChatRecipients {
         guard picked.count < BotModeRoom.maximumMembers else { return .full }
         let home = computer(of: first, rules: rules)
         guard home == rules.hostInUse else { return nil }
-        guard rules.canMakeGroups else { return .noGroups }
+        guard rules.canMakeGroups != false else { return .noGroups }
         // Hermes seats only its own bots; the others join as peers.
         let unseated = (picked + [bot])
             .filter { computer(of: $0, rules: rules) == home && !rules.canSeat($0.profileID) }

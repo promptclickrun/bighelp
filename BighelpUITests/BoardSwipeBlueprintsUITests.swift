@@ -1,7 +1,7 @@
 import XCTest
 
-/// Swipe left to dismiss on Feed, Ideas and Goals, the Blueprints on each, and Goals by
-/// category, in demo mode. BIGHELP_BOARD_EVIDENCE (a folder) also saves light and dark
+/// Swipe left to dismiss on Feed, Ideas and Goals (Today › See all › one bot's board), the
+/// Blueprints on each, and Goals by category, in demo mode. BIGHELP_BOARD_EVIDENCE (a folder) also saves light and dark
 /// screenshots for review.
 final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
     /// Each board's rows reveal their own dismiss action, including a swipe that starts at
@@ -16,7 +16,7 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
             ("tab.goals", app.descendants(matching: .any)["board.goal.goal-4"], "Remove", true, false),
         ]
         for (tab, row, action, fromEdge, holds) in cases {
-            openRootTab(tab, in: app)
+            openBoard(tab, in: app)
             // Boards are Lists: rows below the fold don't exist until scrolled to.
             _ = app.buttons["board.blueprints"].waitForExistence(timeout: 10)
             scroll(app, until: row)
@@ -41,7 +41,7 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
         for appearance in ["light", "dark"] {
             let app = launch(appearance: appearance)
             for (tab, pick) in [("tab.feed", "feed-marketing-1"), ("tab.ideas", "ideas-productivity-1")] {
-                openRootTab(tab, in: app)
+                openBoard(tab, in: app)
                 let entry = app.buttons["board.blueprints"].firstMatch
                 XCTAssertTrue(entry.waitForExistence(timeout: 10), "Blueprints on \(tab)")
                 entry.tap()
@@ -95,7 +95,7 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
     func testGoalsGroupByCategoryAndStartOneFromTheList() throws {
         for appearance in ["light", "dark"] {
             let app = launch(appearance: appearance)
-            openRootTab("tab.goals", in: app)
+            openBoard("tab.goals", in: app)
             let health = app.descendants(matching: .any)["board.goals.category.health"]
             XCTAssertTrue(health.waitForExistence(timeout: 10), "Goals are grouped by category")
             XCTAssertTrue(app.descendants(matching: .any)["board.goals.category.finance"].exists)
@@ -125,7 +125,7 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
     func testLetsDoItOpensAChatWithTheIdeaTitleOnly() throws {
         for appearance in ["light", "dark"] {
             let app = launch(appearance: appearance)
-            openRootTab("tab.ideas", in: app)
+            openBoard("tab.ideas", in: app)
             let idea = app.buttons["board.idea.idea-1"]
             XCTAssertTrue(idea.waitForExistence(timeout: 10))
             idea.tap()
@@ -168,10 +168,19 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
 
     @MainActor private func launch(appearance: String) -> XCUIApplication {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance,
-                               "-loopdy.home.opens-chat", "YES"]
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance]
         app.launch()
         return app
+    }
+
+    /// Today › the panel's board (`tab.feed|ideas|goals`) › See all › the demo's Avery (`finance`):
+    /// that bot's whole board.
+    @MainActor private func openBoard(_ tab: String, in app: XCUIApplication,
+                                      file: StaticString = #filePath, line: UInt = #line) {
+        openTodayBoard(tab.replacingOccurrences(of: "tab.", with: ""), in: app, file: file, line: line)
+        let bot = app.buttons["today.board-page.chip.finance"].firstMatch
+        XCTAssertTrue(bot.waitForExistence(timeout: 10), "See all has the bot's chip", file: file, line: line)
+        bot.tap()
     }
 
     @MainActor private func save(_ name: String, _ app: XCUIApplication) {

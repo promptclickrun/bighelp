@@ -61,9 +61,7 @@ struct TodayFixture: View {
 
     private func boardContext(_ bot: SimpleBotsBot, _ store: AgentBoardStore) -> AgentBoardContext {
         AgentBoardContext(agentID: bot.profileID, agentName: bot.name, imageURL: nil, activity: .idle, store: store,
-                          onProfile: {}, onSwitchAgent: {}, onAsk: { _ in }, onSend: { _ in }, onBlueprint: { _ in },
-                          onMenu: {}, onNewChat: {}, onPickAgents: {}, tools: [],
-                          onBack: { path.removeLast() })
+                          onProfile: {}, onSwitchAgent: {}, onAsk: { _ in }, onSend: { _ in }, onBlueprint: { _ in })
     }
 
     private var header: some View {

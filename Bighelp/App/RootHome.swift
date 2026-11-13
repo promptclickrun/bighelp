@@ -249,16 +249,13 @@ extension RootShellView {
         TodayBoardPage(context: todayBoardsContext, kind: kind, agentID: agentID,
                        makeBoardContext: { bot, store in
                            let id = bot.profileID
-                           var board = AgentBoardContext(
+                           // The page has Back and the bot chips, so the board gets no buttons of its own.
+                           return AgentBoardContext(
                                agentID: id, agentName: bot.name, imageURL: bot.imageURL, activity: .idle, store: store,
                                onProfile: { appState.open(.simpleBotProfile(agentID: id)) }, onSwitchAgent: {},
                                onAsk: { askSimpleBot(id, $0, fillsBlanks: false) },
                                onSend: { askSimpleBot(id, $0, fillsBlanks: false, sendsAtOnce: true) },
-                               onBlueprint: { askSimpleBot(id, $0, fillsBlanks: true) },
-                               onMenu: {}, onNewChat: {}, onPickAgents: {}, tools: [])
-                           // The page has Back and the bot chips; the board's own buttons would repeat them.
-                           board.showsHeaderButtons = false
-                           return board
+                               onBlueprint: { askSimpleBot(id, $0, fillsBlanks: true) })
                        },
                        onBack: { [appState] in
                            if case .board? = appState.path.last { appState.path.removeLast() }
@@ -475,7 +472,7 @@ struct HomeBars: ViewModifier {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if showsBar {
                     HomeTabBar(selection: selection, items: items, onNewChat: onNewChat,
-                               homeIndicatorSink: FloatingTabBar.homeIndicatorSink(forBottomInset: bottomInset))
+                               homeIndicatorSink: HomeTabBar.homeIndicatorSink(forBottomInset: bottomInset))
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }

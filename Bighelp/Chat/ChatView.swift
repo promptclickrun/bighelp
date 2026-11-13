@@ -24,73 +24,6 @@ struct ChatHeaderLiveActivityPresentation: Equatable {
     }
 }
 
-/// Owner-fenced dependencies for editing the profile that owns this chat.
-///
-/// The presenting composition root supplies the exact profile and authority
-/// check. `ChatView` owns only the sheet, so opening the editor never replaces
-/// the retained chat route or its draft.
-@MainActor
-struct ChatAgentEditorPresentation {
-    let profileID: String
-    let store: AgentDirectoryStore
-    let runtimeDefaultsClient: (any AgentRuntimeDefaultsClient)?
-    let runtimeDefaultsReadOnlyReason: String?
-    private let isCurrent: @MainActor () -> Bool
-    fileprivate let onCompleted: @MainActor (AgentProfile) -> Void
-
-    init(
-        profileID: String,
-        store: AgentDirectoryStore,
-        runtimeDefaultsClient: (any AgentRuntimeDefaultsClient)? = nil,
-        runtimeDefaultsReadOnlyReason: String? = nil,
-        isCurrent: @escaping @MainActor () -> Bool,
-        onCompleted: @escaping @MainActor (AgentProfile) -> Void = { _ in }
-    ) {
-        self.profileID = profileID
-        self.store = store
-        self.runtimeDefaultsClient = runtimeDefaultsClient
-        self.runtimeDefaultsReadOnlyReason = runtimeDefaultsReadOnlyReason
-        self.isCurrent = isCurrent
-        self.onCompleted = onCompleted
-    }
-
-    var isAvailable: Bool {
-        isCurrent() && store.profiles.contains(where: { $0.id == profileID })
-    }
-
-    fileprivate func makeRoute() -> ChatAgentEditorRoute? {
-        guard isAvailable,
-              let profile = store.profiles.first(where: { $0.id == profileID }) else {
-            return nil
-        }
-        let expectedProfileID = profileID
-        let editor = AgentEditorModel.editing(
-            profile,
-            store: store,
-            processor: AvatarImageProcessor(),
-            isCurrent: {
-                isCurrent()
-                    && store.profiles.contains(where: { $0.id == expectedProfileID })
-            }
-        )
-        return ChatAgentEditorRoute(
-            model: editor,
-            runtimeDefaultsClient: runtimeDefaultsClient,
-            runtimeDefaultsReadOnlyReason: runtimeDefaultsReadOnlyReason,
-            onCompleted: onCompleted
-        )
-    }
-}
-
-@MainActor
-private struct ChatAgentEditorRoute: Identifiable {
-    let id = UUID()
-    let model: AgentEditorModel
-    let runtimeDefaultsClient: (any AgentRuntimeDefaultsClient)?
-    let runtimeDefaultsReadOnlyReason: String?
-    let onCompleted: @MainActor (AgentProfile) -> Void
-}
-
 struct ChatView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.bighelpScreen) private var screen
@@ -127,7 +60,6 @@ struct ChatView: View {
     let agentStatus: String
     let identityParticipants: [ChatIdentityParticipant]?
     let agents: AgentDirectoryStore?
-    let agentEditorPresentation: ChatAgentEditorPresentation?
     let dashboardModel: DashboardModel?
     let directHermesClient: DirectHermesConversationClient?
     let directHermesClarifications: [DirectHermesPrompt]
@@ -184,7 +116,6 @@ struct ChatView: View {
     @State private var optionsButtonBottom: CGFloat = 0
     @State private var canvasWidth: CGFloat = 0
     #endif
-    @State private var agentEditorRoute: ChatAgentEditorRoute?
     @State private var sessionTitleDialog: SessionTitleDialog?
     @State private var sessionTitleDraft = ""
     @State private var sessionTitleErrorMessage = ""
@@ -223,7 +154,6 @@ struct ChatView: View {
         agentStatus: String = "Hermes",
         identityParticipants: [ChatIdentityParticipant]? = nil,
         agents: AgentDirectoryStore? = nil,
-        agentEditorPresentation: ChatAgentEditorPresentation? = nil,
         dashboardModel: DashboardModel? = nil,
         directHermesClient: DirectHermesConversationClient? = nil,
         directHermesClarifications: [DirectHermesPrompt] = [],
@@ -271,7 +201,6 @@ struct ChatView: View {
         self.agentStatus = agentStatus
         self.identityParticipants = identityParticipants
         self.agents = agents
-        self.agentEditorPresentation = agentEditorPresentation
         self.dashboardModel = dashboardModel
         self.directHermesClient = directHermesClient
         self.directHermesClarifications = directHermesClarifications
@@ -331,16 +260,6 @@ struct ChatView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background {
             theme.canvas.ignoresSafeArea()
-        }
-        .bighelpSheet(item: $agentEditorRoute) { route in
-            AgentEditorView(
-                model: route.model,
-                runtimeDefaultsClient: route.runtimeDefaultsClient,
-                runtimeDefaultsReadOnlyReason: route.runtimeDefaultsReadOnlyReason
-            ) { profile in
-                route.onCompleted(profile)
-                agentEditorRoute = nil
-            }
         }
         .environment(\.bighelpUIV3Enabled, true)
         .environment(\.bighelpUIV2Enabled, true)
@@ -639,17 +558,6 @@ struct ChatView: View {
                             .popover(isPresented: sessionControlsPresented(from: .composer)) { macSessionControls }
                             #endif
                         if laptopDeckHeight > 0, !isDraftFocused { Spacer(minLength: 0) }
-                        // Chats keep the bottom bar under the composer.
-                        // One home: chats have no bar; this goes, with `startNewChatFromBar`,
-                        // `pickAgentsFromBar` and `showsChatBar`. New chat's choices keep the place.
-                        if showsChatBar, !screen.usesSideBar, let selection = homeChrome.tabSelection {
-                            FloatingTabBar(selection: selection, tabs: homeChrome.barTabs,
-                                           onNewChat: startNewChatFromBar, onPickAgents: pickAgentsFromBar,
-                                           newChatIdentifier: "chat.home.new-chat",
-                                           homeIndicatorSink: FloatingTabBar.homeIndicatorSink(forBottomInset: bottomSafeArea),
-                                           unread: homeChrome.unreadTabs, isInChat: true)
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
-                        }
                         newChatChoices
                     }
                     // The messages stop at the fold: the timeline keeps clear of all of this.
@@ -658,7 +566,7 @@ struct ChatView: View {
                     // does. Offered an equal share, a long list showed about two rows.
                     .layoutPriority((referenceHub ?? fallbackReferenceHub).isPresented && laptopDeckHeight == 0 ? 1 : 0)
                     #if !os(visionOS)
-                    // The same soft blur under the message box and the tab bar.
+                    // The same soft blur under the message box and a new chat's choices.
                     .background {
                         ChatEdgeBlur(edge: .bottom) { [timelineController] in timelineController.scrollView }
                             .ignoresSafeArea(edges: .bottom)
@@ -668,25 +576,6 @@ struct ChatView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-            // The iPhone Duo: the bar's places go down the side strip instead of under the message box.
-            // One home: this and Vision Pro's ornament below go; the home's roots hold the tabs.
-            .toolbar {
-                if showsChatBar, screen.usesSideBar, let selection = homeChrome.tabSelection {
-                    BighelpStripTabs(selection: selection, tabs: homeChrome.barTabs,
-                                     unread: homeChrome.unreadTabs, isInChat: true,
-                                     selectedTint: theme.action, tint: theme.secondaryText)
-                }
-            }
-            #if os(visionOS)
-            // Chats keep Vision Pro's tab strip beside the window.
-            .ornament(visibility: homeChrome.keepsTabsInChat ? .visible : .hidden,
-                      attachmentAnchor: .scene(.leading), contentAlignment: .trailing) {
-                if let selection = homeChrome.tabSelection {
-                    VisionTabOrnament(selection: selection, tabs: homeChrome.barTabs, unread: homeChrome.unreadTabs,
-                                      isInChat: true)
-                }
-            }
-            #endif
             .onGeometryChange(for: CGFloat.self) { proxy in
                 proxy.size.height + proxy.safeAreaInsets.top + proxy.safeAreaInsets.bottom
             } action: { screenHeight = $0 }
@@ -704,11 +593,6 @@ struct ChatView: View {
     private var laptopDeckHeight: CGFloat {
         guard screen.isLaptop, let fold = screen.fold else { return 0 }
         return max(0, safeBottomInWindow - fold.maxY)
-    }
-
-    /// Chats keep the bar, and it tucks away while you type.
-    private var showsChatBar: Bool {
-        homeChrome.keepsTabsInChat && !isDraftFocused && !BighelpPlatform.usesTabOrnament
     }
 
     /// One home: the bots to pick from, over a new chat's empty messages until something is sent.
@@ -747,21 +631,9 @@ struct ChatView: View {
     /// The table alone reserves the measured header and composer insets.
     private var floatingHeader: some View {
         let toRow = newChat?.toRow
-        let placement: ChatHeaderPlacement.Style = homeChrome.isPushedChat ? .placesItself
-            : homeChrome.isEnabled ? .home : .plain
-        return Group {
-            if homeChrome.isPushedChat {
-                pushedHeader(toRow: toRow)
-            } else if homeChrome.isEnabled {
-                // One home: this header and the plain one below go with the modes.
-                homeHeader
-            } else {
-                standardHeader
-            }
-        }
+        return pushedHeader(toRow: toRow)
         .background(alignment: .bottom) { sessionControlsAnchor }
         .foregroundStyle(theme.primaryText)
-        .modifier(ChatHeaderPlacement(style: placement))
         // The To row ends in its own line, and the people list starts right under it.
         .padding(.bottom, toRow == nil ? 8 : 0)
         #if !os(visionOS)
@@ -774,7 +646,6 @@ struct ChatView: View {
         #endif
     }
 
-    /// Chat tab: the agent's live avatar leads, like a home screen.
     /// One-on-one chats only: group chats already show their title.
     private var shownSessionTitle: String? {
         guard showsSessionTitle, !model.isBotMode else { return nil }
@@ -786,34 +657,6 @@ struct ChatView: View {
         resolvedIdentityParticipants.first?.stableID ?? model.memberIDs.first ?? agentName
     }
 
-    /// The bar's New chat: a new chat with this agent. A group chat has no one agent, so it opens the picker.
-    private func startNewChatFromBar() {
-        dismissKeyboard()
-        if model.isBotMode { homeChrome.onNewChat(nil) } else { homeChrome.onStartChat(homeAgentID) }
-    }
-
-    /// Touch and hold New chat: the picker, with this chat's agent already picked.
-    private func pickAgentsFromBar() {
-        dismissKeyboard()
-        homeChrome.onNewChat(model.isBotMode ? nil : homeAgentID)
-    }
-
-    private var homeHeader: some View {
-        let participant = resolvedIdentityParticipants.first
-        return AgentHomeChatHeader(
-            agentID: homeAgentID,
-            displayName: agentName,
-            imageURL: participant?.imageURL,
-            activity: model.liveActivityKind,
-            sessionTitle: shownSessionTitle,
-            groupIdentity: model.isBotMode ? AnyView(conversationHeader) : nil,
-            options: AnyView(chatOptionsMenu),
-            chrome: homeChrome,
-            screenHeight: screenHeight,
-            beforeAction: dismissKeyboard
-        )
-    }
-
     /// One home: Back, who the chat is with (a bot's pill opens its page) and ⋯; a new chat with
     /// nothing sent has its To row instead. Back pops to wherever the chat was opened from.
     private func pushedHeader(toRow: AnyView?) -> some View {
@@ -822,46 +665,6 @@ struct ChatView: View {
                              dismissKeyboard()
                              dismiss()
                          })
-    }
-
-    private var standardHeader: some View {
-        HStack(alignment: .top, spacing: 8) {
-            HStack(spacing: 4) {
-                Button {
-                    dismissKeyboard()
-                    dismiss()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.bighelp(.title3).weight(.semibold))
-                        .frame(width: 44, height: 44)
-                        .contentShape(.circle)
-                        .bighelpNavigationGlass(in: Circle(), isInteractive: true)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back")
-                .accessibilityIdentifier("chat.back")
-            }
-            .frame(width: 92, alignment: .leading)
-            conversationHeader.frame(maxWidth: .infinity)
-            HStack(spacing: 4) {
-                // Bots mode keeps each bot to one chat on its home; ⋯ still starts a new one.
-                if !homeChrome.isSimpleBots {
-                    Button(action: onNewChatTap) {
-                        Image(systemName: "square.and.pencil")
-                            .font(.bighelp(.title3))
-                            .frame(width: 44, height: 44)
-                            .contentShape(.circle)
-                            .bighelpNavigationGlass(in: Circle(), isInteractive: true)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("New chat")
-                    .accessibilityIdentifier("chat.new-chat")
-                }
-                chatOptionsMenu
-                    .bighelpNavigationGlass(in: Circle(), isInteractive: true)
-            }
-            .frame(width: 92, alignment: .trailing)
-        }
     }
 
     private var composer: some View {
@@ -923,11 +726,8 @@ struct ChatView: View {
                     groupConversationIdentityButton
                     if let teamCallAction { TeamCallHeaderButton(action: teamCallAction) }
                 }
-            } else if homeChrome.isSimpleBots || homeChrome.isPushedChat {
-                simpleBotIdentityButton
             } else {
-                // One home: this label goes with the plain header, and `isSimpleBots` above.
-                conversationIdentityButton
+                simpleBotIdentityButton
             }
         }
         .accessibilityElement(children: .contain)
@@ -1026,7 +826,7 @@ struct ChatView: View {
     }
     #endif
 
-    /// Bots mode and One home's header: the bot's mark and name in one pill; it opens the bot's profile.
+    /// The bot's face and name in one pill; it opens the bot's page.
     private var simpleBotIdentityButton: some View {
         let participant = resolvedIdentityParticipants.first
         let agentID = model.memberIDs.first ?? participant?.stableID ?? agentName
@@ -1041,33 +841,6 @@ struct ChatView: View {
         .accessibilityLabel(agentName)
         .accessibilityValue(headerLiveActivityPresentation?.text ?? shownSessionTitle ?? headerLiveState.label)
         .accessibilityHint("Opens its profile")
-        .accessibilityIdentifier("chat.identity")
-    }
-
-    private var conversationIdentityButton: some View {
-        Button {
-            dismissKeyboard()
-            // Bots mode: a bot's name opens its profile; a group's still opens its people.
-            if homeChrome.isSimpleBots, !model.isBotMode, let agentID = model.memberIDs.first {
-                homeChrome.onProfile(agentID)
-            } else {
-                onPeopleTap()
-            }
-        } label: {
-            ChatConversationIdentityLabel(
-                title: agentName,
-                subtitle: headerLiveActivityPresentation?.text,
-                participants: resolvedIdentityParticipants,
-                theme: theme,
-                subtitleShimmers: headerLiveActivityPresentation?.shimmers == true,
-                showsCaption: true,
-                liveState: headerLiveState
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Chat with \(agentName)")
-        .accessibilityValue(headerLiveActivityPresentation?.text ?? headerLiveState.label)
-        .accessibilityHint("Opens agent and chat details")
         .accessibilityIdentifier("chat.identity")
     }
 
@@ -1160,9 +933,9 @@ struct ChatView: View {
         return device >= .xLarge || dynamicTypeSize.isAccessibilitySize
     }
 
-    /// One list: a Bot Chat's New Bot Chat (the home chat's Switch agent), then This chat (with File
-    /// changes), Model (Model & speed, Usage) and More (Edit agent, Advanced). Folded, This chat, Agent
-    /// and More hold all but Model & speed, so no level needs scrolling without reducing the font.
+    /// One list: a Bot Chat's New Bot Chat, then This chat (with File changes), Model (Model & speed,
+    /// Usage) and More (Bot page, Advanced). Folded, This chat, Agent and More hold all but Model &
+    /// speed, so no level needs scrolling without reducing the font.
     private var chatOptionsMenu: some View {
         Menu {
             if foldsChatOptions {
@@ -1173,10 +946,10 @@ struct ChatView: View {
                     Label("This chat", systemImage: "bubble.left")
                 }
                 .accessibilityIdentifier("chat.options.this-chat")
-                if onNewBotChat != nil || !model.isBotMode {
+                if onNewBotChat != nil || showsBotPageItem {
                     Menu {
                         newChatItems
-                        editAgentItem
+                        botPageItem
                     } label: {
                         Label("Agent", systemImage: "person.crop.circle")
                     }
@@ -1204,15 +977,15 @@ struct ChatView: View {
                     usageMenu
                 }
                 Section {
-                    editAgentItem
+                    botPageItem
                     advancedMenu
                 }
             }
         } label: {
             Image(systemName: "ellipsis")
                 #if targetEnvironment(macCatalyst)
-                // The same glyph as New chat beside it.
-                .font(.bighelp(.title3).weight(homeChrome.isEnabled || homeChrome.isPushedChat ? .semibold : .regular))
+                // The same weight as Back across the header.
+                .font(.bighelp(.title3).weight(.semibold))
                 #endif
                 .frame(minWidth: BighelpTokens.hitTarget, minHeight: BighelpTokens.hitTarget)
             .contentShape(.rect)
@@ -1310,7 +1083,7 @@ struct ChatView: View {
         }
     }
 
-    /// A Bot Chat's New Bot Chat and the home chat's Switch agent.
+    /// A Bot Chat's New Bot Chat.
     @ViewBuilder
     private var newChatItems: some View {
         if let onNewBotChat {
@@ -1320,30 +1093,20 @@ struct ChatView: View {
             }
             .accessibilityIdentifier("chat.new-bot-chat")
         }
-        if homeChrome.isEnabled, !model.isBotMode {
-            Button("Switch agent", systemImage: "person.2") {
-                dismissKeyboard()
-                homeChrome.onSwitchAgent()
-            }
-            .accessibilityIdentifier("chat.switch-agent")
-        }
     }
 
+    /// A chat with one bot, in the shell: only there is a page to open.
+    private var showsBotPageItem: Bool { !model.isBotMode && homeChrome.isPushedChat }
+
+    /// The bot's page, the same one its name in the header opens.
     @ViewBuilder
-    private var editAgentItem: some View {
-        if !model.isBotMode, homeChrome.isPushedChat {
-            // One home: the bot's page, the same one its name in the header opens.
+    private var botPageItem: some View {
+        if showsBotPageItem {
             Button("Bot page", systemImage: "person.crop.circle") {
                 dismissKeyboard()
                 homeChrome.onProfile(homeAgentID)
             }
             .accessibilityIdentifier("chat.bot-page")
-        } else if !model.isBotMode {
-            Button("Edit agent", systemImage: "person.crop.circle") {
-                presentCurrentAgentEditor()
-            }
-            .disabled(!canEditCurrentAgent)
-            .accessibilityIdentifier("chat.edit-current-agent")
         }
     }
 
@@ -1590,19 +1353,6 @@ struct ChatView: View {
         )
     }
 
-    private var canEditCurrentAgent: Bool {
-        guard let presentation = agentEditorPresentation,
-              presentation.profileID == model.memberIDs.first else { return false }
-        return presentation.isAvailable
-    }
-
-    private func presentCurrentAgentEditor() {
-        guard canEditCurrentAgent,
-              let route = agentEditorPresentation?.makeRoute() else { return }
-        dismissKeyboard()
-        agentEditorRoute = route
-    }
-
     private var resolvedIdentityParticipants: [ChatIdentityParticipant] {
         if let identityParticipants, !identityParticipants.isEmpty {
             return identityParticipants
@@ -1718,26 +1468,4 @@ struct ChatView: View {
             initialItems: []
         )
     )
-}
-
-/// The home header's ☰ and buttons sit where a root screen's top bar puts them, the
-/// same as on Feed, Ideas, Goals and Files. The plain header keeps its own margins
-/// (Vision Pro's rounded window corner clipped ☰, so it stays clear). One home's header places
-/// its buttons the same way itself, because its To row runs the whole width under them.
-private struct ChatHeaderPlacement: ViewModifier {
-    enum Style { case home, plain, placesItself }
-    let style: Style
-
-    func body(content: Content) -> some View {
-        switch style {
-        case .home:
-            content.bighelpHeaderButtonsPlacement()
-        case .plain:
-            content
-                .padding(.horizontal, BighelpPlatform.usesTabOrnament ? 22 : 12)
-                .padding(.top, BighelpPlatform.usesTabOrnament ? 12 : 4)
-        case .placesItself:
-            content
-        }
-    }
 }

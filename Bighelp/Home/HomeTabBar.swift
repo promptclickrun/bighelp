@@ -38,7 +38,7 @@ struct HomeTabBar: View {
     @Binding var selection: HomeTab
     let items: [HomeTabItem]
     let onNewChat: () -> Void
-    /// Points the bar drops into the home indicator's area (`FloatingTabBar.homeIndicatorSink`).
+    /// Points the bar drops into the home indicator's area (`homeIndicatorSink(forBottomInset:)`).
     var homeIndicatorSink: CGFloat = 0
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -48,6 +48,14 @@ struct HomeTabBar: View {
     @BighelpThemeReader private var theme
 
     static let newChatIdentifier = "home.new-chat"
+    static let newChatVisibleLabel = "New chat"
+    static let newChatAccessibilityLabel = String(localized: "New chat")
+
+    /// Like the system tab bar, the bar sits low, just above the home indicator, instead of a full
+    /// safe-area inset above it. Clamped so a keyboard's inset never pushes it off screen.
+    static func homeIndicatorSink(forBottomInset inset: CGFloat) -> CGFloat {
+        min(max(0, inset - 14), 20)
+    }
 
     private var isVerticallyCompact: Bool { verticalSizeClass == .compact }
 
@@ -67,7 +75,7 @@ struct HomeTabBar: View {
             RootComposeButton(identifier: Self.newChatIdentifier, systemImage: "square.and.pencil",
                               size: BighelpTokens.scaled(isVerticallyCompact ? 44 : 56), action: onNewChat)
                 .accessibilityShowsLargeContentViewer {
-                    Label(FloatingTabBar.newChatVisibleLabel, systemImage: "square.and.pencil")
+                    Label(Self.newChatVisibleLabel, systemImage: "square.and.pencil")
                 }
         }
         .padding(.horizontal, BighelpTokens.space12)

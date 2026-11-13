@@ -146,12 +146,7 @@ extension SettingsView {
         .listRowBackground(theme.surface)
     }
 
-    /// The home's choices, and a mode swipe only while one is still saved (a launch argument can pin
-    /// one), so the picker can show it.
-    func swipeChoices(keeping current: WorkspaceSwipeAction) -> [WorkspaceSwipeAction] {
-        let choices = WorkspaceSwipeAction.homeChoices
-        return choices.contains(current) ? choices : choices + [current]
-    }
+
 
     /// A Mac has no screen edges to swipe from.
     @ViewBuilder
@@ -159,7 +154,7 @@ extension SettingsView {
         #if !targetEnvironment(macCatalyst)
         Section {
             Picker("Swipe from left edge", selection: $settings.leftEdgeSwipeAction) {
-                ForEach(swipeChoices(keeping: settings.leftEdgeSwipeAction)) { action in
+                ForEach(WorkspaceSwipeAction.allCases) { action in
                     Label(action.title, systemImage: action.systemImage).tag(action)
                 }
             }
@@ -167,7 +162,7 @@ extension SettingsView {
             .accessibilityIdentifier("settings.left-edge-swipe")
 
             Picker("Swipe from right edge", selection: $settings.rightEdgeSwipeAction) {
-                ForEach(swipeChoices(keeping: settings.rightEdgeSwipeAction)) { action in
+                ForEach(WorkspaceSwipeAction.allCases) { action in
                     Label(action.title, systemImage: action.systemImage).tag(action)
                 }
             }

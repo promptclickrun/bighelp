@@ -37,6 +37,18 @@ struct NewChatRecipientsTests {
         #expect(NewChatRecipients.toggling(six[2], in: six, rules: groups).picked.count == 5)
     }
 
+    /// Until the computer's Hermes has said whether it makes group chats, nobody is marked as unable.
+    @Test func aSecondPickIsTakenWhileTheComputerHasNotAnswered() {
+        let rules = NewChatGroupRules(hostInUse: here, canMakeGroups: nil)
+        let avery = bot("avery", on: here), mina = bot("mina", on: here)
+        #expect(NewChatRecipients.canJoin(mina, picked: [avery], rules: rules))
+        let session = NewChatSession()
+        #expect(session.toggle(avery, rules: rules))
+        #expect(session.toggle(mina, rules: rules))
+        #expect(session.kind == .group)
+        #expect(session.refusal == nil)
+    }
+
     @Test func aSecondPickIsRefusedWhereGroupChatsCantBeMade() {
         let rules = NewChatGroupRules(hostInUse: here, canMakeGroups: false)
         let session = NewChatSession()

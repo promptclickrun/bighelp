@@ -63,6 +63,7 @@ Start at the owner of a behavior, then follow its typed boundary:
 | Change | Start here | Boundary to preserve |
 |---|---|---|
 | App construction and account separation | `Bighelp/App/BighelpAppComposition.swift` | Native host authority is independent of the optional account. |
+| The home: bar, header, Chats, New chat, Today, Work | `Bighelp/App/RootHome.swift`, `Bighelp/Home/`, `Bighelp/Today/`, `Bighelp/Work/` | Each computer has its own `AppState` and stores; what sits above them lives in `HomeSelection`. Spaces are in [Spaces](SPACES.md). |
 | Chat presentation and actions | `Bighelp/Chat/ChatView.swift`, `ChatModel.swift`, `ChatComposer.swift` | The retained model owns drafts and submissions; the native timeline owns scrolling. |
 | Rail, goal, tasks and subagent sheets | `Bighelp/Chat/SessionStatusRailView.swift`, `SessionGoalSheet.swift`, `SessionTasksSheet.swift`, `SessionSubagentRosterSheet.swift` | Presentation does not invent execution or session authority. |
 | Local appearance | `Bighelp/DesignSystem/BighelpThemeReader.swift` | Resolve the consuming view's traits, including sheet and hosted-row overrides. |
@@ -206,7 +207,8 @@ never authorize adoption. Explicit host removal does not select another host.
 
 The top-level objects include:
 
-- `AppState` for selected tab, navigation path, and active conversation.
+- `AppState` for the selected tab, navigation path, and active conversation, and `HomeSelection` (one for the app) for
+  what stays when the computer in use changes.
 - `SettingsStore` for local preferences.
 - `UserIdentityStore` for the local display identity and avatar reference.
 - `AgentDirectoryStore` for agent metadata.
@@ -228,8 +230,9 @@ against fixture implementations in tests.
 Native host selection belongs to the independently authenticated host registry.
 `NativeWorkspaceSelectionStore` binds the selected host and exact owner to one
 runtime, retires changed authority, and preserves same-authority recovery.
-The all-hosts view (`Bighelp/Fleet`) lists every configured host's agents,
-direct chats and scheduled tasks without changing that selection model.
+Show every computer (`Bighelp/Fleet`) lists every configured host's agents,
+direct chats and scheduled tasks in the Bots view, the Chats view and New chat's list of bots, without changing that
+selection model.
 `FleetStore` keeps one snapshot per host in Application Support
 (`BighelpFleet`, complete file protection): the selected host's comes from its
 live runtime stores; `RegistryFleetReader` reads the others at most once a
@@ -242,8 +245,8 @@ connected: a switch doesn't suspend the previous host's store, and the reader
 keeps the others open. Turning it off or going to the background closes all but
 the selected one, as before. Opening an agent, chat or task on another host
 selects that host and runs the open as soon as its runtime exists with its saved
-catalog, before the runtime's refresh finishes (the same point the home chat
-opens at launch); host-only screens ask which host first. Removing a host
+catalog, before the runtime's refresh finishes; Today and Work show the host in
+use, and their header's computer menu switches it. Removing a host
 deletes its snapshot.
 
 Resetting the optional notification installation clears its scoped
@@ -318,20 +321,28 @@ known session after refreshing the catalog if necessary.
 
 ## 4. User interface shell
 
-The main shell presents Agents, Sessions, Scheduled Tasks and Workspace.
-Sessions remains the root of the initial landing destination: by default a cold
-launch opens the agent's latest chat on it, and Settings › Chat › Opens on can pick
-another screen and agent instead (`BighelpLanding`). Activity, preferences,
-account/device management and connectivity live inside Workspace. New chat is a
-separate action, not another tab. Existing route identities and legacy
+The shell is one home with three places (`HomeTab`): the first tab shows the Bots view (`SimpleBotsHomeView`) or the
+Chats view (`ChatsInboxView`), then Today (`TodayView`) and Work (`WorkView`). There are no modes. `RootShellView`
+switches the root itself and each root draws its own header (`HomeHeaderBar`); everything else, a chat included, is a
+page pushed on the one navigation stack (`AppState.path`, `AppRoute`) with Back. The bar (`HomeTabBar`; `HomeTabOrnament`
+on Vision Pro, `HomeStripTabs` on the iPhone Duo) shows on roots only, and Settings is a sheet opened by the person's
+circle in the header. `HomeSelection` holds what is above any one computer: the tab, the first tab's view, New chat's
+picks (`NewChatSession`) and Today's layout and boards. Each computer has its own `AppState`, stores and chats
+(`NativeWorkspaceRuntime`), so these stay put when the computer in use changes. `settings.homeLanding` (Settings › Chat ›
+Opens on: Bots, Chats, Today, Work) decides where a cold launch opens, applied once by `HomeSelection.land`; no chat
+opens by itself. `HomeSettingsMigration` reads the older mode settings once. Existing route identities and legacy
 Inbox-to-Activity links remain compatible.
+
+New chat is the new chat's own screen: the ordinary chat with a To row and a list of bots over the empty messages
+(`ChatNewChatSlot`), and for one bot a row of coding choices under the message box. Work lists coding sessions with the
+other work the bots are doing. Spaces (`Bighelp/Spaces/`, [Spaces](SPACES.md)) are panels on Today.
 
 The native chat canvas and unified composer serve production and isolated fixtures. The
 verified Codex presentation, typography, native editor and disclosure behavior
 are retained; native transport selection does not reconstruct them.
-Configurable edge gestures can open the quick workspace, create a chat, or
-navigate to a selected area. The quick workspace surfaces recent sessions and
-common actions without owning duplicate session state.
+Configurable edge gestures can open the sidebar (on iPhone, which has none, they go to Chats), create a chat, or
+navigate to a selected area. The sidebar (`HomeSidebar`) surfaces the three places, recent sessions and a few common
+actions without owning duplicate session state.
 
 ## 5. Feature architecture
 
@@ -407,9 +418,9 @@ protected-file replacement. A strict reference save or authority change cancels
 older checkpoints; changes arriving during encoding remain dirty for the next
 checkpoint. Catch-up must never turn this into a synchronous save per event.
 Queued final answers and child discovery/termination belong to that same batch.
-Home, sidebar and Sessions observe the catalog's stable `presentedRecords`
+The Chats view, the sidebar and Sessions observe the catalog's stable `presentedRecords`
 during catch-up; canonical routing and persistence continue to use `records`.
-Publish the latest presentation and one deferred automatic Home refresh at
+Publish the latest presentation and one deferred automatic home refresh at
 catch-up completion. Account reset clears both presentation and pending reload
 ownership. See [idle startup reliability](IDLE_STARTUP_RELIABILITY.md).
 Unchanged reference state does not repeat its synchronous durability write on
@@ -852,7 +863,7 @@ UserDefaults stores non-secret preferences such as theme, appearance, selected
 and pinned agents, pinned sessions, user-facing identity, and gesture choices.
 Those explicit preferences survive sign-out and app updates until the user
 changes them. Project-section order and collapse state are device-local too,
-shared by the Sessions screen and Quick Workspace. Their versioned settings
+kept for the Sessions page. Their versioned settings
 payload is keyed by the sign-in scope and selected host ID, so a fresh sign-in
 starts a new layout scope. Layout is not synced to
 other devices. Project names are display labels; stable project IDs own the
@@ -933,16 +944,14 @@ only at the native authority boundary. `BighelpHostSelectionChangeRelay` remains
 for demo mode's host switch (`DemoHosts`): it synchronously retires fixture
 models and changes their cache scope. It cannot retarget production native chat.
 
-### Quick Workspace overview
+### Sidebar overview
 
-`QuickWorkspaceDrawer` uses one native list, embedded or inside a navigation
-stack. Conversations contains New chat, Chats and Agents. Work contains Activity,
-Scheduled tasks and Skills & tools. Workspace contains Workspace features,
-Folder, Switch instance and Settings. Saved content follows in Recent chats and
-Pinned agents disclosures. Scratchpad and Wiki are absent. Retain 44-point
-targets and allow accessible text sizes to scroll rather than clipping or
-shrinking text. Native navigation toolbars own their Liquid Glass buttons; do
-not wrap a toolbar button in a second glass circle.
+`HomeSidebar` uses one native list: the three places, Settings and a New chat button; Recent chats (eight, with See
+all); and More (Needs you while something waits, Shared with bighelp while a share waits, Usage, and Simple mode on
+Vision Pro). iPad at regular width slides it in behind a header button, and the Mac and Vision Pro keep it as a column
+(`BighelpSideMenu`). Scratchpad and Wiki are absent. Retain 44-point targets and allow accessible text sizes to scroll
+rather than clipping or shrinking text. Native navigation toolbars own their Liquid Glass buttons; do not wrap a
+toolbar button in a second glass circle.
 
 ### Hermes scheduler compatibility
 

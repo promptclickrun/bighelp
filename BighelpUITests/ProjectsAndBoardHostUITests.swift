@@ -13,17 +13,16 @@ final class ProjectsAndBoardHostUITests: BighelpUITestCase {
         let probe = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
         guard probe["mode"] == "features" else { throw XCTSkip("This host runs the \(probe["mode"] ?? "?") mode") }
         let app = makeApp()
-        app.launchArguments = ["-loopdy.home.opens-chat", "YES"]
         app.launch()
         try onboardOpenHost(app, address: try XCTUnwrap(probe["address"]))
-        XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 30), "The agent's chat opens")
+        XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 30), "The home opens")
 
-        // The seeded posts are new: the Feed tab says so before it's opened.
-        let feedTab = app.buttons["tab.feed"]
-        XCTAssertTrue(feedTab.waitForExistence(timeout: 10))
-        let newOnTab = expectation(for: NSPredicate(format: "value == %@", "New"), evaluatedWith: feedTab)
+        // The seeded posts are new: the Today tab says so before it's opened.
+        let todayTab = app.buttons["home.tab.today"].firstMatch
+        XCTAssertTrue(todayTab.waitForExistence(timeout: 10))
+        let newOnTab = expectation(for: NSPredicate(format: "value == %@", "New"), evaluatedWith: todayTab)
         wait(for: [newOnTab], timeout: 20)
-        feedTab.tap()
+        openBoard("feed", in: app)
         let stockTips = app.descendants(matching: .any)["board.feed.post.probe-stock-tips"]
         XCTAssertTrue(stockTips.waitForExistence(timeout: 20), "The host's Feed shows")
         save("features-1-feed", app)
@@ -74,7 +73,7 @@ final class ProjectsAndBoardHostUITests: BighelpUITestCase {
         XCTAssertTrue(news.waitForExistence(timeout: 10), "Undo brings the post back")
 
         // An idea becomes a goal.
-        app.buttons["tab.ideas"].tap()
+        openBoard("ideas", in: app)
         let idea = app.buttons["board.idea.probe-trip"]
         XCTAssertTrue(idea.waitForExistence(timeout: 10))
         idea.press(forDuration: 1.2)
@@ -82,19 +81,13 @@ final class ProjectsAndBoardHostUITests: BighelpUITestCase {
         XCTAssertTrue(promote.waitForExistence(timeout: 5))
         promote.tap()
         XCTAssertTrue(idea.waitForNonExistence(timeout: 10), "The idea leaves Ideas")
-        app.buttons["tab.goals"].tap()
+        openBoard("goals", in: app)
         let goal = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Plan a weekend trip")).firstMatch
         XCTAssertTrue(goal.waitForExistence(timeout: 10), "…and shows in Goals")
         save("features-4-idea-to-goal", app)
 
-        // Projects: make one, start a chat in it, find the chat in the project.
-        app.buttons["tab.sessions"].tap()
-        let menu = app.buttons["chat.menu"]
-        XCTAssertTrue(menu.waitForExistence(timeout: 10))
-        menu.tap()
-        let projects = app.buttons["menu.projects"]
-        XCTAssertTrue(projects.waitForExistence(timeout: 5), "Projects is in the menu")
-        projects.tap()
+        // Projects (Work's door): make one, start a chat in it, find the chat in the project.
+        openWorkDoor("projects", in: app)
         XCTAssertTrue(app.descendants(matching: .any)["projects.screen"].waitForExistence(timeout: 10))
         let create = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["projects.new", "projects.empty.new"])).firstMatch
         XCTAssertTrue(create.waitForExistence(timeout: 10))
@@ -139,7 +132,7 @@ final class ProjectsAndBoardHostUITests: BighelpUITestCase {
     }
 
     /// The host's profile sets no terminal.cwd, so its agent works where Hermes was started.
-    /// The Apps tab still shows the agent's files from there, not "Workspace unavailable".
+    /// The bot page's Files tab still shows the agent's files from there, not "Workspace unavailable".
     @MainActor
     func testAppsShowsTheAgentsFilesWithNoWorkingFolderSet() throws {
         guard let path = ProcessInfo.processInfo.environment["BIGHELP_SIGNIN_PROBE"] else {
@@ -150,20 +143,34 @@ final class ProjectsAndBoardHostUITests: BighelpUITestCase {
             throw XCTSkip("This host runs the \(probe["mode"] ?? "?") mode")
         }
         let app = makeApp()
-        // Files lives in ☰ by default; pinned here so the bar holds it.
-        app.launchArguments = ["-loopdy.home.opens-chat", "YES", "-bighelp.app-layout", "{pinned=(feed,ideas,files);menu=();}"]
         app.launch()
         try onboardOpenHost(app, address: try XCTUnwrap(probe["address"]))
-        XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 30), "The agent's chat opens")
-        let appsTab = app.buttons["tab.apps"]
-        XCTAssertTrue(appsTab.waitForExistence(timeout: 10))
-        appsTab.tap()
+        // Bots › the primary bot's chat › its page › Files.
+        showBots(in: app)
+        let primary = app.buttons["simple-bots.primary"].firstMatch
+        XCTAssertTrue(primary.waitForExistence(timeout: 30), "Bots shows the primary bot")
+        primary.tap()
+        XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 30), "The bot's chat opens")
+        openBotPage(fromChatIn: app)
+        let filesTab = app.buttons["simple-bots.profile.tab.files"]
+        XCTAssertTrue(filesTab.waitForExistence(timeout: 10))
+        filesTab.tap()
         let file = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label CONTAINS %@", fileName)).firstMatch
         let shown = file.waitForExistence(timeout: 30)
-        save("features-8-apps-files", app)
-        XCTAssertTrue(shown, "The agent's file shows in Apps")
+        save("features-8-bot-files", app)
+        XCTAssertTrue(shown, "The agent's file shows in its Files")
         XCTAssertFalse(app.staticTexts["Workspace unavailable"].exists)
+    }
+
+    /// Today › See all for one kind, then the host's bot: its own board, with posts, ideas or goals.
+    @MainActor private func openBoard(_ kind: String, in app: XCUIApplication) {
+        returnToHome(in: app)
+        openTodayBoard(kind, in: app)
+        let bot = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier != %@",
+                                                   "today.board-page.chip.", "today.board-page.chip.all")).firstMatch
+        XCTAssertTrue(bot.waitForExistence(timeout: 10), "See all lists the host's bot")
+        bot.tap()
     }
 
     @MainActor private func save(_ name: String, _ app: XCUIApplication) {

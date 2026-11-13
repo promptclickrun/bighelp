@@ -12,13 +12,14 @@ final class BackgroundWorkHostUITests: BighelpUITestCase {
         let environment = ProcessInfo.processInfo.environment
         guard let host = environment["BIGHELP_BACKGROUND_HOST"] else { throw XCTSkip("Set BIGHELP_BACKGROUND_HOST") }
         let app = makeApp()
-        app.launchArguments = ["-loopdy.home.opens-chat", "YES", "-bighelp.chat.work-style", "card"]
+        app.launchArguments = ["-bighelp.chat.work-style", "card"]
         app.launch()
         try onboardOpenHost(app, address: host)
         let composer = app.textViews["chat.composer.text"]
-        XCTAssertTrue(composer.waitForExistence(timeout: 30), "The agent's chat opens")
-        // A new chat: the home chat is the person's own, and /model pins the chat it runs in.
-        chatNewChatButton(in: app).tap()
+        // A new chat: the Bot Chat is the person's own, and /model pins the chat it runs in.
+        let newChat = chatNewChatButton(in: app)
+        XCTAssertTrue(newChat.waitForExistence(timeout: 30), "Setup lands on the home")
+        newChat.tap()
         confirmNewChatPicker(in: app)
         XCTAssertTrue(composer.waitForExistence(timeout: 30), "A new chat opens")
         sleep(3)

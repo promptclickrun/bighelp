@@ -10,6 +10,22 @@ ios
 
 bighelp is a native client for conversations with agents, including model selection, reasoning and tool activity, rich generated cards, files, code/project changes and voice interaction.
 
+## The Shape of the App
+
+bighelp is one home with three places and no modes, the same for everyone:
+
+- **Bots or Chats.** The first tab shows one row per bot and group chat (Bots), or every chat on every computer,
+  newest first (Chats). The person picks which opens first, and a switch in the header changes it. Every chat is a
+  page pushed over a place, with Back.
+- **Today.** What needs the person now (answers a bot waits for, shares from other apps), Feed, Ideas and Goals for
+  every bot, and spaces: live panels a bot drafts in a chat and the person adds. See [Spaces](docs/SPACES.md).
+- **Work.** What the bots are doing: coding sessions, chats and background work, workflow runs, Kanban tasks and
+  scheduled tasks in one list, with Projects, Tasks, Workflows and Schedules one tap away.
+- **New chat** is one screen. The person picks who it is to: one bot is a chat, two to six are a group chat, and with
+  one bot and a project it starts a coding session.
+- Settings opens from the person's circle in the header of every place. The same app runs on iPhone, iPad, Mac and
+  Vision Pro; iPad, Mac and Vision Pro add a sidebar.
+
 ## Runtime Direction
 
 bighelp supports Hermes and is also building **bighelp Native**, its own native
@@ -37,7 +53,7 @@ This work does not depend on the unfinished Native harness.
 
 ## Operating Context
 
-Users return to existing sessions, continue live work, switch agents and workspaces, inspect project changes, and personalize appearance. Conversation continuity and readable long-form output remain essential when the presentation changes.
+Users return to existing sessions, continue live work, switch bots and computers, see what is waiting for them, inspect project changes, and personalize appearance. Conversation continuity and readable long-form output remain essential when the presentation changes.
 
 ## Experience Vision
 
@@ -51,15 +67,15 @@ the baseline for future work. New features, themes, and visual redesigns must
 preserve the [Chat interaction contract](docs/CHAT_INTERACTION_CONTRACT.md).
 This is an ongoing product requirement, not a completed performance initiative.
 
-Opening Home with no active chat must also feel immediate. Catching up on old
+Opening the home with no active chat must also feel immediate. Catching up on old
 answers must not replay completed work as new activity, repeatedly rebuild the
-menu, or stall navigation. Preserve the [idle startup contract](docs/IDLE_STARTUP_RELIABILITY.md).
+sidebar or the lists, or stall navigation. Preserve the [idle startup contract](docs/IDLE_STARTUP_RELIABILITY.md).
 
 ## Capabilities and Constraints
 
 - V3 is the only shipping interface. Legacy V1/V2 preference values remain
   decodable for migration; they do not define alternate production chat engines.
-- Preserve established model/reasoning controls, side menu, theme picker, Project Changes, rich drafts, slash commands, attachment flows and voice modes.
+- Preserve established model/reasoning controls, sidebar, theme picker, Project Changes, rich drafts, slash commands, attachment flows and voice modes.
 - Preserve transcript identity, ordering, hydration, grouping, reader-controlled
   scrolling, native input continuity, and request-scoped drafts in every redesign.
 - Large-history efficiency must preserve messages and tool results. Reducing

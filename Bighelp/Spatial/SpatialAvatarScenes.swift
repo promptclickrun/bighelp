@@ -352,7 +352,7 @@ struct SpatialAvatarVolume: View {
                 agentImageURL: model.agent?.imageURL,
                 permissionCenter: permissionCenter,
                 onEnded: { model.endVoice() },
-                onWorkspaceTap: openChat,
+                onOpenChat: openChat,
                 onUseTurnBased: useTurnBasedVoice,
                 onTryAgain: tryLiveVoiceAgain,
                 chatActivity: { model.activity }

@@ -1,50 +1,6 @@
 import SwiftUI
 
 @MainActor
-struct AgentsShellView: View {
-    let agents: AgentDirectoryStore
-    let runtimeDefaultsClient: any AgentRuntimeDefaultsClient
-    let onSelect: (AgentProfile) -> Void
-    let onOpenSessions: (AgentProfile) -> Void
-    let onOpenHostStatus: () -> Void
-    let hostRuntime: HostRuntimeStore?
-    let workspaceOwner: WorkspaceOwner?
-    let capabilities: WorkspaceCapabilities
-    let botModeRooms: BotModeRoomStore
-    let cloneClient: (any AgentProfileCloneClient)?
-    let shortcutsAvailable: Bool
-    let onAction: @MainActor (AgentWorkspaceActionRequest) -> Void
-    var groupFilterRequest: Binding<String?> = .constant(nil)
-    var createRequest: Binding<Bool> = .constant(false)
-    var botChatActivity: BotChatActivityStore? = nil
-    var botChatActivitySource: BotChatActivitySource? = nil
-    /// Bots mode's section cards, between Pinned and the rest.
-    var sectionCards: AnyView? = nil
-
-    var body: some View {
-        AgentsView(
-            store: agents,
-            runtimeDefaultsClient: runtimeDefaultsClient,
-            onSelect: onSelect,
-            onOpenSessions: onOpenSessions,
-            onOpenHostStatus: onOpenHostStatus,
-            hostRuntime: hostRuntime,
-            workspaceOwner: workspaceOwner,
-            capabilities: capabilities,
-            botModeRooms: botModeRooms,
-            cloneClient: cloneClient,
-            shortcutsAvailable: shortcutsAvailable,
-            onAction: onAction,
-            groupFilterRequest: groupFilterRequest,
-            createRequest: createRequest,
-            botChatActivity: botChatActivity,
-            botChatActivitySource: botChatActivitySource,
-            sectionCards: sectionCards
-        )
-    }
-}
-
-@MainActor
 struct ApprovalDestinationView: View {
     @State private var model: ApprovalModel
 
@@ -68,21 +24,13 @@ struct ApprovalDestinationView: View {
 
 }
 
-enum ConversationRootNavigationPresentation {
-    static let composeAccessibilityIdentifier = "root.new-chat"
-}
-
-/// The Chats compose action: a large, tinted Liquid Glass circle that floats
-/// over the list like the iMessage compose affordance, instead of a small
-/// toolbar glyph.
+/// New chat beside the home's bar: a large, tinted Liquid Glass circle, like the iMessage compose
+/// button, instead of a small toolbar glyph.
 struct RootComposeButton: View {
     static let diameter: CGFloat = 60
-    var identifier = ConversationRootNavigationPresentation.composeAccessibilityIdentifier
+    let identifier: String
     var systemImage = "square.and.pencil"
-    /// Bigger where it's the screen's one main action (All agents).
     var size: CGFloat = RootComposeButton.diameter
-    /// Touch and hold (right-click on the Mac): the picker, for another agent or a group.
-    var onLongPress: (() -> Void)?
     let action: () -> Void
 
     @BighelpThemeReader private var theme
@@ -90,33 +38,12 @@ struct RootComposeButton: View {
     @ScaledMetric(relativeTo: .title2) private var glyph: CGFloat = 24
     @State private var taps = 0
 
-    @ViewBuilder
     var body: some View {
-        if let onLongPress {
-            // A tap and a hold on one control: as gestures, so the hold never also counts as a tap.
-            glyphCircle
-                .onTapGesture(perform: tap)
-                .onLongPressGesture(minimumDuration: 0.4) {
-                    BighelpHaptics.tap()
-                    onLongPress()
-                }
-                .newChatRightClickMenu(startTitle: String(localized: "New chat"), start: tap, pick: onLongPress)
-                .bighelpHover(in: Circle())
-                .sensoryFeedback(.impact(weight: .light), trigger: taps)
-                .accessibilityElement()
-                .accessibilityAddTraits(.isButton)
-                .bighelpIconLabel("New chat", shortcut: "⌘N")
-                .accessibilityHint(NewChatButtonCopy.pickHint)
-                .accessibilityAction { tap() }
-                .accessibilityAction(named: "Pick agents") { onLongPress() }
-                .accessibilityIdentifier(identifier)
-        } else {
-            Button(action: tap) { glyphCircle }
-                .bighelpPointerButtonStyle(BighelpPressFeedbackStyle(), outline: .circle)
-                .sensoryFeedback(.impact(weight: .light), trigger: taps)
-                .bighelpIconLabel("New chat", shortcut: "⌘N")
-                .accessibilityIdentifier(identifier)
-        }
+        Button(action: tap) { glyphCircle }
+            .bighelpPointerButtonStyle(BighelpPressFeedbackStyle(), outline: .circle)
+            .sensoryFeedback(.impact(weight: .light), trigger: taps)
+            .bighelpIconLabel("New chat", shortcut: "⌘N")
+            .accessibilityIdentifier(identifier)
     }
 
     private var glyphCircle: some View {

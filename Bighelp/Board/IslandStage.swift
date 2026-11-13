@@ -6,7 +6,6 @@ import SwiftUI
 struct IslandStage: View {
     let activity: AgentIslandActivity
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.appAppearance) private var appearance
 
     static let avatarSize: CGFloat = 38
 
@@ -29,17 +28,10 @@ struct IslandStage: View {
         .accessibilityHidden(true)
     }
 
-    /// Bots mode draws each bot as its mark, here too.
-    @ViewBuilder
+    /// The bot's face as the home draws it (its mark when it has no character or picture).
     private var face: some View {
-        if appearance.simpleBots {
-            SimpleBotFace(agentID: activity.agentID, name: activity.name, imageURL: activity.imageURL,
-                          size: Self.avatarSize)
-        } else {
-            AgentLiveAvatar(agentID: activity.agentID, displayName: activity.name,
-                            imageURL: activity.imageURL, activity: activity.kind,
-                            size: Self.avatarSize, showsBadge: false)
-        }
+        SimpleBotFace(agentID: activity.agentID, name: activity.name, imageURL: activity.imageURL,
+                      size: Self.avatarSize)
     }
 }
 

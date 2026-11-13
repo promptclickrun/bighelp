@@ -8,7 +8,11 @@ final class FeedPostFilesUITests: BighelpUITestCase {
     func testAPostsFilesOpenToPreviewSaveAndShare() throws {
         for appearance in ["light", "dark"] {
             let app = launch(appearance: appearance)
-            openRootTab("tab.feed", in: app)
+            // Today › Feed › See all, on one bot's own board.
+            openTodayBoard("feed", in: app)
+            let finance = app.buttons["today.board-page.chip.finance"].firstMatch
+            XCTAssertTrue(finance.waitForExistence(timeout: 10))
+            finance.tap()
             let strip = app.buttons["board.feed.files.feed-1"]
             XCTAssertTrue(strip.waitForExistence(timeout: 10), "The post shows its files")
             XCTAssertEqual(strip.label, "2 attachments: 1 picture, Lisbon trip options.pdf")
@@ -61,8 +65,7 @@ final class FeedPostFilesUITests: BighelpUITestCase {
 
     @MainActor private func launch(appearance: String) -> XCUIApplication {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance,
-                               "-loopdy.home.opens-chat", "YES"]
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance]
         app.launch()
         return app
     }

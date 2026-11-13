@@ -10,9 +10,7 @@ enum SettingsDestination: Hashable, Sendable {
     case you
     /// Appearance › Chat layout.
     case chatLayout
-    // One home: delete with the old shell; no row opens it, only the drive catalog's "App layout" place.
-    /// Appearance › App layout: the bottom bar and the order of ☰.
-    case appLayout
+
     /// Appearance › Thinking: the look of the Thinking control.
     case thinking
     /// Apps & skills: this device's access, the apps and skills bots can use (its own pages open

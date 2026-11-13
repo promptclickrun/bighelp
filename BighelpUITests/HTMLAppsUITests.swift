@@ -74,7 +74,7 @@ final class HTMLAppsUITests: BighelpUITestCase {
     private func launch(appearance: String) -> XCUIApplication {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-html-apps",
-                               "-loopdy.home.opens-chat", "YES", "-loopdy.settings.nerd-mode", "NO",
+                               "-start-chat", "-loopdy.settings.nerd-mode", "NO",
                                "-loopdy.demo.appearance", appearance]
         app.launch()
         return app

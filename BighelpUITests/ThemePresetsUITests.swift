@@ -54,7 +54,7 @@ final class ThemePresetsUITests: BighelpUITestCase {
     }
 
     /// Light and dark screenshots of Appearance and a chat with bubbles on and off, for three
-    /// presets, and Bots mode's home and chat.
+    /// presets, and the Bots view and a bot's chat.
     @MainActor
     func testEvidenceScreens() throws {
         guard let folder = ProcessInfo.processInfo.environment["BIGHELP_THEME_EVIDENCE"] else {
@@ -83,7 +83,7 @@ final class ThemePresetsUITests: BighelpUITestCase {
         }
         for (scheme, preset) in [("light", "moss"), ("dark", "violet")] {
             let app = launch(scheme: scheme, light: "moss", dark: "violet", style: "page",
-                             extra: ["-bighelp.settings.simple-bots", "YES"])
+                             extra: ["-loopdy.home.landing", "bots"])
             XCTAssertTrue(app.buttons["simple-bots.settings"].waitForExistence(timeout: 15))
             Thread.sleep(forTimeInterval: 0.6)
             save("bots-\(preset)-\(scheme)-home", app, folder)

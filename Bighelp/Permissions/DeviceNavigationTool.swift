@@ -10,8 +10,6 @@ final class DeviceNavigationTool {
         case invalidArguments = "invalid_arguments"
         /// No place has that id; `places` lists them.
         case unknownPlace = "unknown_place"
-        /// One home: never sent any more (every place is reachable); kept for older plugins' lists.
-        case notInThisMode = "not_in_this_mode"
         /// Only with Settings › Nerd Mode on. A drive never turns it on.
         case needsNerdMode = "needs_nerd_mode"
         /// A place inside one bot, and no bot on this computer has that id.

@@ -2,29 +2,26 @@ import XCTest
 import UIKit
 
 final class ComposerInteractionUITests: BighelpUITestCase {
+    /// The bot's pill stays small in the header, and New chat (its own page now, with the To row in
+    /// the pill's place) takes a draft once a bot is picked.
     @MainActor
-    func testChatPillAndNewChatKeepChromeInPlace() {
+    func testChatPillFitsAndNewChatTakesADraft() {
         for appearance in ["light", "dark"] {
             let app = makeApp()
             app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat",
-                                   "-bighelp.settings.simple-bots", "NO", "-loopdy.demo.appearance", appearance]
+                                   "-loopdy.demo.appearance", appearance]
             app.launch()
             let identity = app.buttons["chat.identity"]
             let input = app.textViews["chat.composer.text"]
-            let field = app.otherElements["chat.composer.field"]
             XCTAssertTrue(identity.waitForExistence(timeout: 10))
             XCTAssertTrue(input.waitForExistence(timeout: 5))
             let headerFrame = identity.frame
-            let fieldFrame = field.frame
             XCTAssertLessThanOrEqual(headerFrame.height, 54)
             XCTAssertLessThan(headerFrame.width, app.frame.width * 0.75)
             saveComposer("chat-pill-\(appearance)", app)
 
-            chatNewChatButton(in: app).tap()
-            confirmNewChatPicker(in: app)
+            startNewChat(with: "finance", in: app)
             XCTAssertTrue(input.waitForExistence(timeout: 5))
-            XCTAssertEqual(identity.frame.midY, headerFrame.midY, accuracy: 1)
-            XCTAssertEqual(field.frame.midY, fieldFrame.midY, accuracy: 1)
             input.tap()
             input.typeText("A draft in the new chat")
             XCTAssertEqual(input.value as? String, "A draft in the new chat")

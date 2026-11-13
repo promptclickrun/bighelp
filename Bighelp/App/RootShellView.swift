@@ -52,7 +52,7 @@ struct RootShellView: View {
     @State private var pendingIncomingURL: URL?
     /// Offered as "Try Again" in the error alert.
     @State var actionErrorRetry: (@MainActor () -> Void)?
-    @State var isHermesWorkspacePresented = false
+
     @State var sessionRestoreRequest: SessionRestoreRequest?
     @State var sessionRestoreTask: Task<Void, Never>?
     @State var canonicalChatCoordinator = CanonicalChatCoordinator()
@@ -65,7 +65,7 @@ struct RootShellView: View {
     @State var lifecycleCoordinator: NativeWorkspaceLifecycleCoordinator?
     @State var lifecycleProfileID: String?
     @State var lifecyclePresentationID: UUID?
-    @State var workspaceProfileEditor: AgentEditorModel?
+
     @State var isGroupCreationPresented = false
     @State var groupCreationSeed: String?
     @State var groupCreationOwner: WorkspaceOwner?
@@ -217,10 +217,7 @@ struct RootShellView: View {
             isHostSettled: nativeRuntime.map { $0.isReady && !$0.isSuspended && !$0.isRefreshing } ?? true,
             signIn: $workspaceSignIn, close: closeWorkspacePresentations,
             reattach: reattachWorkspacePresentations))
-        .bighelpSheet(item: $workspaceProfileEditor) { editor in
-            AgentEditorView(model: editor, runtimeDefaultsClient: agentRuntimeDefaults, onCompleted: { _ in })
-                .environment(\.agentDeletion, agentDeletionAction)
-        }
+
         .bighelpSheet(isPresented: $isGroupCreationPresented) {
             BotModeCreateRoomView(rooms: botModeRooms, agents: agents, seedProfileID: groupCreationSeed,
                                   sectionChoice: groupSectionChoice) { roomID in
@@ -317,7 +314,7 @@ struct RootShellView: View {
         .onChange(of: actionErrorMessage != nil) { _, failed in if failed { VoiceLaunchState.shared.finish() } }
         .modifier(LostChatHooks(featureStore: featureStore, attach: watchForLostChats))
         .modifier(DriveShellHooks(appState: appState, featureStore: featureStore, agents: agents,
-                                  settings: settings, usesDemoFixtures: usesDemoFixtures))
+                                  usesDemoFixtures: usesDemoFixtures))
         .modifier(BighelpShortcutParameterUpdates(agents: agents, scheduledTasks: featureStore.scheduledTasks,
                                                   rooms: botModeRooms, catalog: sessionCatalog))
         .modifier(PendingLinkRetry(acceptsLinks: acceptsIncomingLinks, acceptsChatStarts: acceptsChatStarts,
@@ -404,7 +401,6 @@ struct RootShellView: View {
         managementStore = nil
         _ = capabilitiesPresentations.removeAll()
         for page in administrationPresentations.removeAll() { page.retire() }
-        workspaceProfileEditor = nil
         lifecycleCoordinator = nil
         lifecycleProfileID = nil
         lifecyclePresentationID = nil
@@ -580,15 +576,7 @@ struct RootShellView: View {
         }) {
             settingsSheetContent
         }
-        .bighelpSheet(isPresented: $isHermesWorkspacePresented) {
-            HermesWorkspacePickerView(
-                store: hermesWorkspaces,
-                agentID: workspaceAgentID
-            )
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .bighelpSheetSize(.standard)
-        }
+
         .onChange(of: appState.path) { previousPath, path in
             let bindsPendingCanvas: Bool = {
                 guard case .chat(let previousID)? = previousPath.last,
@@ -722,12 +710,11 @@ struct RootShellView: View {
             appState.select(.chats)
         case .agents:
             appState.select(.bots)
-        case .home, .inbox:
+        case .home:
             appState.select(.conversations)
         case .profile:
             openBotPageOrSettings()
-        // One home: the modes are gone, and the migration cleared these from the saved swipes.
-        case .nextMode, .botsMode, .chatMode, .codeMode, .none:
+        case .none:
             break
         }
     }
@@ -950,10 +937,7 @@ struct RootShellView: View {
         )
     }
 
-    // One home: the old shell put ☰ in these pages' bars. Nothing does now; pass 2 drops the wrapper.
-    func routeWithWorkspaceMenu<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        content()
-    }
+
 
     /// The menu bar's New Chat (⌘N), Settings (⌘,), sidebar (⌃⌘S) and, on the Mac, the three
     /// places (⌘1–⌘3).
@@ -1053,21 +1037,13 @@ struct RootShellView: View {
         }
     }
 
-    var activeHermesWorkspaceName: String {
-        hermesWorkspaces.catalog?.workspaces.first(where: \.isActive)?.name
-            ?? "Workspace"
-    }
+
 
     var workspaceAgentID: String {
         agents.resolvedAgent(explicitID: nil)?.id ?? "default"
     }
 
-    func presentHermesWorkspaces() {
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(180))
-            isHermesWorkspacePresented = true
-        }
-    }
+
 
     func openApproval(requestID: String) {
         Task {

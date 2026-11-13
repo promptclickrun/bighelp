@@ -14,14 +14,14 @@ The retained Figma design-context responses establish native toolbar, sheet tool
 
 A new user should understand how to connect and chat in roughly 30 seconds, with the low effort of Muse AI or similar chat apps. This is a comprehension target, not an unmeasured authentication-time guarantee. Keep one obvious primary action, group related settings in clear menus, and keep those settings editable. A setting does not need a separate screen. The source inventory preserves capabilities; it is not a page quota. Use progressive disclosure for advanced choices and recovery mechanics without hiding safety consequences.
 
-The first-run path (`FirstRunOnboardingView`) is Welcome → Connect → Choose your mode, with optional steps between them. The progress bar counts four steps: Welcome, Connect, Plugin or Notifications, and Your mode.
+The first-run path (`FirstRunOnboardingView`) is Welcome → Connect → How to start, with optional steps between them. The progress bar counts four steps: Welcome, Connect, Plugin or Notifications, and How to start.
 
 1. **Welcome.** Get Started goes on to Connect. A small Appearance options button under it opens the optional Appearance step (System, Light or Dark, and the bubble color). That step has Back and Skip, is not counted in the progress bar, and goes on to Connect. Appearance stays editable in Settings.
 2. **AI data agreement.** Before Connect, anyone who hasn't agreed yet is asked once (`AIDataConsent`).
 3. **Connect.** Host setup. It has no Skip.
 4. **Plugin.** Optional, with Skip. It installs the bighelp plugin on the computer.
-5. **Notifications.** Optional, with Skip. It shows only after the plugin is installed and running. Skip on the plugin step, or a plugin that still needs Hermes restarted, goes straight to the mode.
-6. **Choose your mode.** No Skip. The cards are Bots, Chat and Code (`FirstRunMode` `.bots`, `.sessions`, `.code`). Tapping a card shows its preview large, with its Use button. The screen says the choice can be changed later.
+5. **Notifications.** Optional, with Skip. It shows only after the plugin is installed and running. Skip on the plugin step, or a plugin that still needs Hermes restarted, goes straight to How to start.
+6. **How do you want to start?** No Skip. Two cards, With a bot (opens on Bots) and Across chats (opens on Chats) (`FirstRunHome` `.bots`, `.chats`), each with a small drawn sketch of that home, and Continue. The choice sets Opens on. The screen says it can be changed in Settings › Chat.
 
 ## Visual system
 
@@ -39,7 +39,7 @@ Use native navigation, toolbars, search, lists, forms, sections, menus, alerts, 
 
 ## Conversation hierarchy
 
-- Conversations are the primary root. Search, existing filters, pins, groups and compose remain reachable.
+- Conversations are the first tab (the Bots and Chats views). Search, existing filters, pins, groups and compose remain reachable.
 - Direct identity is centered in the conversation toolbar and opens genuine details. Group headers use actual participant identities; incoming group messages identify their real speaker.
 - Incoming prose uses neutral bubbles. Outgoing bubbles carry the selected accent. Rich content retains a wider bounded lane and its existing renderer.
 - Work trails expose actual ordered events, delegated identity, lifecycle and detail disclosure. No timer-generated success or synthetic progress.

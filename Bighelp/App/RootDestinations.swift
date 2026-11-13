@@ -11,7 +11,7 @@ extension RootShellView {
         } else {
         switch (route, featureStore.preparedModel(for: route)) {
         case (.workspaceSettings, _):
-            routeWithWorkspaceMenu { workspaceSettings() }
+            workspaceSettings()
         case (.projects, _):
             if let context = projectsContext {
                 ProjectsHomeView(context: context)
@@ -52,62 +52,58 @@ extension RootShellView {
                     description: Text("Connect to your computer, then open Projects from Work."))
             }
         case (.workspaceConnections, _):
-            routeWithWorkspaceMenu {
-                if let hostRegistry {
-                    BighelpHostsPage(registry: hostRegistry)
-                        .accessibilityIdentifier("workspace.connections")
-                } else {
-                    WorkspaceUnavailableView(destination: .instances, hostName: workspaceHostName,
-                                             reason: "Host selection is unavailable in this presentation.")
-                }
+            if let hostRegistry {
+                BighelpHostsPage(registry: hostRegistry)
+                    .accessibilityIdentifier("workspace.connections")
+            } else {
+                WorkspaceUnavailableView(destination: .instances, hostName: workspaceHostName,
+                                         reason: "Host selection is unavailable in this presentation.")
             }
         case (.workspaceManagement(let destination), _):
-            routeWithWorkspaceMenu {
-                if destination == .logs {
-                    if let connections = workspaceConnections, let owner = currentWorkspaceOwner,
-                       connections.owner == owner, let workspace = connections.workspace,
-                       workspace.owner == owner, let direct = connections.hosts.selectedWorkspace?.nativeClient {
-                        HermesLogsDestinationView(hostName: workspaceHostName, owner: owner,
-                            http: direct, workspace: workspace, currentOwner: {
-                                guard connections.workspace === workspace else { return nil }
-                                return currentWorkspaceOwner
-                            })
-                            .id(owner)
+            if destination == .logs {
+                if let connections = workspaceConnections, let owner = currentWorkspaceOwner,
+                   connections.owner == owner, let workspace = connections.workspace,
+                   workspace.owner == owner, let direct = connections.hosts.selectedWorkspace?.nativeClient {
+                    HermesLogsDestinationView(hostName: workspaceHostName, owner: owner,
+                        http: direct, workspace: workspace, currentOwner: {
+                            guard connections.workspace === workspace else { return nil }
+                            return currentWorkspaceOwner
+                        })
+                        .id(owner)
+                } else {
+                    WorkspaceUnavailableView(destination: .logs, hostName: workspaceHostName,
+                        reason: "Logs require an available direct authenticated Hermes connection.")
+                }
+            } else if destination == .voice {
+                VoiceSettingsView(settings: settings, agents: agents.profiles,
+                                  selectedAgentID: workspaceAgentID,
+                                  client: voiceSettingsClient, scope: voiceSettingsScope,
+                                  isCurrent: voiceSettingsIsCurrent)
+            } else if destination == .permissions {
+                PermissionsSettingsView(center: permissionCenter)
+            } else if destination == .sessionMaintenance || destination == .profileLifecycle {
+                if let coordinator = lifecycleCoordinator,
+                   isCurrentSignIn(coordinator.owner), let profileID = lifecycleProfileID,
+                   agents.profiles.contains(where: { $0.id == profileID }) {
+                    if destination == .sessionMaintenance {
+                        coordinator.sessionMaintenanceView(profileID: profileID)
                     } else {
-                        WorkspaceUnavailableView(destination: .logs, hostName: workspaceHostName,
-                            reason: "Logs require an available direct authenticated Hermes connection.")
+                        coordinator.profileLifecycleView(selectedProfileID: profileID)
                     }
-                } else if destination == .voice {
-                    VoiceSettingsView(settings: settings, agents: agents.profiles,
-                                      selectedAgentID: workspaceAgentID,
-                                      client: voiceSettingsClient, scope: voiceSettingsScope,
-                                      isCurrent: voiceSettingsIsCurrent)
-                } else if destination == .permissions {
-                    PermissionsSettingsView(center: permissionCenter)
-                } else if destination == .sessionMaintenance || destination == .profileLifecycle {
-                    if let coordinator = lifecycleCoordinator,
-                       isCurrentSignIn(coordinator.owner), let profileID = lifecycleProfileID,
-                       agents.profiles.contains(where: { $0.id == profileID }) {
-                        if destination == .sessionMaintenance {
-                            coordinator.sessionMaintenanceView(profileID: profileID)
-                        } else {
-                            coordinator.profileLifecycleView(selectedProfileID: profileID)
-                        }
-                    } else {
-                        WorkspaceUnavailableView(destination: destination, hostName: workspaceHostName,
-                            reason: "Reopen this feature for the selected host and profile.")
-                    }
-                } else if let kind = CapabilitiesManagementKind(destination: destination), opensNativeCapabilities(kind) {
-                    nativeCapabilitiesDestination(kind, destination: destination)
-                } else if opensHostAdministration(destination) {
-                    hostAdministrationDestination(destination)
-                } else if let managementStore {
-                    WorkspaceManagementView(store: managementStore, destination: destination,
-                                            onOpenExisting: openWorkspaceDestination)
                 } else {
                     WorkspaceUnavailableView(destination: destination, hostName: workspaceHostName,
-                                             reason: "This feature requires an available native host connection.")
+                        reason: "Reopen this feature for the selected host and profile.")
                 }
+            } else if let kind = CapabilitiesManagementKind(destination: destination), opensNativeCapabilities(kind) {
+                nativeCapabilitiesDestination(kind, destination: destination)
+            } else if opensHostAdministration(destination) {
+                hostAdministrationDestination(destination)
+            } else if let managementStore {
+                WorkspaceManagementView(store: managementStore, destination: destination,
+                                        onOpenExisting: openWorkspaceDestination)
+            } else {
+                WorkspaceUnavailableView(destination: destination, hostName: workspaceHostName,
+                                         reason: "This feature requires an available native host connection.")
             }
         case (.chat(let conversationID), .chat(let model)?):
             let switcher = chatSwitcherColumn(for: conversationID,
@@ -120,8 +116,6 @@ extension RootShellView {
                 featureStore: featureStore,
                 catalog: sessionCatalog,
                 agents: agents,
-                // One home: ⋯ › Bot page opens the bot's page; nothing presents the editor.
-                agentEditorPresentation: nil,
                 botModeRooms: botModeRooms,
                 skillsAndTools: skillsAndTools,
                 hermesWorkspaces: hermesWorkspaces,
@@ -130,8 +124,7 @@ extension RootShellView {
                 userIdentity: userIdentity,
                 permissionCenter: permissionCenter,
                 responseHapticsCoveredByRoot: isHomeDrawerPresented
-                    || isHostStatusPresented
-                    || isHermesWorkspacePresented || actionErrorMessage != nil,
+                    || isHostStatusPresented || actionErrorMessage != nil,
                 onNewChat: { openNewChat() },
                 onOpenProviderAccounts: { openWorkspaceDestination(.keys) },
                 onNewBotChat: botChatRestart(conversationID),
@@ -159,24 +152,16 @@ extension RootShellView {
             .environment(connectionKeeper)
             .bighelpSideColumn(screen, isShown: switcher != nil) { switcher }
         case (.scheduledTasks, .scheduledTasks(let store)?):
-            routeWithWorkspaceMenu {
-                ScheduledTasksView(store: store, agents: agents, onOpen: openScheduledTask)
-            }
+            ScheduledTasksView(store: store, agents: agents, onOpen: openScheduledTask)
         case (.scheduledTask(let id, let agentID), .scheduledTasks(let store)?):
-            routeWithWorkspaceMenu {
-                ScheduledTaskDetailView(store: store, taskID: id, agents: agents, agentID: agentID)
-            }
+            ScheduledTaskDetailView(store: store, taskID: id, agents: agents, agentID: agentID)
         case (.skillsAndTools, _):
-            routeWithWorkspaceMenu {
-                SkillsAndToolsCatalogView(
-                    store: skillsAndTools,
-                    agentID: agents.resolvedAgent(explicitID: nil)?.id ?? "default"
-                )
-            }
+            SkillsAndToolsCatalogView(
+                store: skillsAndTools,
+                agentID: agents.resolvedAgent(explicitID: nil)?.id ?? "default"
+            )
         case (.approval, .approval(let model)?):
-            routeWithWorkspaceMenu {
-                ApprovalDestinationView(model: model)
-            }
+            ApprovalDestinationView(model: model)
         case (.chat(let conversationID), nil) where appState.suspendedChat?.chatID == conversationID
             || featureStore.hasRetiredUnsentChat(id: conversationID):
             // An unsent chat on screen lost its session (Hermes dropped it while the app was away

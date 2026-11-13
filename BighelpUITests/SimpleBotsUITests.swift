@@ -1,6 +1,6 @@
 import XCTest
 
-/// Bots mode on demo data: the home (your circle, search, +, the primary
+/// The Bots view on demo data: the home (your circle, search, +, the primary
 /// bot, the rest), Settings, Create New Bot, search, a bot's menu, its chat and
 /// its profile, in light and dark. Set BIGHELP_SIMPLE_BOTS_EVIDENCE
 /// (TEST_RUNNER_…) to a folder to save the screenshots.
@@ -24,22 +24,20 @@ final class SimpleBotsUITests: BighelpUITestCase {
     }
 
     @MainActor
-    func testSimpleBotModeHomeChatAndProfile() throws {
+    func testBotsHomeChatAndProfile() throws {
         for appearance in ["light", "dark"] {
             let app = launch(appearance: appearance)
             let home = app.descendants(matching: .any)["simple-bots.home"]
-            XCTAssertTrue(home.waitForExistence(timeout: 15), "Bots mode opens on its home")
-            XCTAssertFalse(app.buttons["home.drawer.open"].exists, "No ☰ in Bots mode")
-            XCTAssertFalse(app.descendants(matching: .any)["tabbar.sessions"].exists, "No tab bar")
+            XCTAssertTrue(home.waitForExistence(timeout: 15), "The launch opens on Bots")
             let primary = app.buttons["simple-bots.primary"]
             XCTAssertTrue(primary.exists)
             XCTAssertTrue(app.buttons["simple-bots.bot.travel"].exists, "Other bots are listed")
             save("simple-home-\(appearance)", app)
 
-            // Settings: the one Settings, the same as in Chat mode.
+            // Settings: the one Settings, from the circle.
             app.buttons["simple-bots.settings"].tap()
             XCTAssertTrue(app.descendants(matching: .any)["settings.screen"].firstMatch.waitForExistence(timeout: 5))
-            XCTAssertTrue(app.buttons["settings.apps"].exists, "Apps & skills, as in every mode")
+            XCTAssertTrue(app.buttons["settings.apps"].exists, "Apps & skills")
             save("simple-settings-\(appearance)", app)
             app.buttons["settings.done"].tap()
 
@@ -92,7 +90,6 @@ final class SimpleBotsUITests: BighelpUITestCase {
             primary.tap()
             let identity = app.buttons["chat.identity"]
             XCTAssertTrue(identity.waitForExistence(timeout: 10))
-            XCTAssertFalse(app.buttons["chat.new-chat"].exists, "One chat per bot on the home")
             save("simple-chat-\(appearance)", app)
             identity.tap()
             XCTAssertTrue(app.descendants(matching: .any)["simple-bots.profile"].waitForExistence(timeout: 5))
@@ -573,7 +570,7 @@ final class SimpleBotsUITests: BighelpUITestCase {
     func testRearrangeReordersTheListAndTheTop() throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", "dark",
+                               "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", "dark",
                                // Each run starts with no saved order, and keeps its own out of later runs.
                                "-bighelp.simple-bots.order", "{}"]
         app.launch()
@@ -652,14 +649,13 @@ final class SimpleBotsUITests: BighelpUITestCase {
         return condition()
     }
 
-    /// The message box: voice mode's pill inside it, Send in its place once there's text. Voice opens as a
-    /// bar over the chat, which stays in use, and End closes the bar. Needs the microphone allowed for
-    /// bighelp on the simulator (`simctl privacy … grant microphone`).
+    /// The message box: voice mode's button inside it, Send in its place once there's text, and Expand
+    /// once the draft runs to three lines.
     @MainActor
-    func testVoiceIsABarOverTheChat() throws {
+    func testTheMessageBoxSwapsVoiceForSend() throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", "dark",
+                               "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", "dark",
                                "-loopdy.voice.conversation-mode", "turnBased", "-bighelp.voice.transcription", "hermes"]
         app.launch()
         XCTAssertTrue(app.buttons["simple-bots.primary"].waitForExistence(timeout: 15))
@@ -667,18 +663,6 @@ final class SimpleBotsUITests: BighelpUITestCase {
         let voice = app.buttons["chat.voice"]
         XCTAssertTrue(voice.waitForExistence(timeout: 10))
         save("simple-composer-idle-dark", app)
-
-        voice.tap()
-        let bar = app.descendants(matching: .any)["simple-bots.voice"]
-        XCTAssertTrue(bar.waitForExistence(timeout: 10), "Voice is a bar over the chat")
-        XCTAssertFalse(app.descendants(matching: .any)["voice.screen"].exists, "Not the voice screen")
-        XCTAssertTrue(app.buttons["simple-bots.voice.microphone"].exists)
-        XCTAssertTrue(app.buttons["chat.attachment"].isHittable, "The chat stays in use")
-        save("simple-voice-bar-dark", app)
-        app.buttons["simple-bots.voice.end"].tap()
-        let gone = NSPredicate(format: "exists == false")
-        expectation(for: gone, evaluatedWith: bar)
-        waitForExpectations(timeout: 10)
 
         let input = app.textViews.firstMatch
         input.tap()
@@ -691,29 +675,6 @@ final class SimpleBotsUITests: BighelpUITestCase {
             + " so the message is long enough to edit in the bigger editor")
         XCTAssertTrue(app.buttons["chat.composer.expand-rail"].waitForExistence(timeout: 3),
                       "Expand shows above the box once the draft has three lines")
-    }
-
-    /// Settings › Modes with Bots picked; picking Chat leaves Bots mode.
-    @MainActor
-    func testTurningSimpleBotModeOffComesBackToBighelp() throws {
-        let app = launch(appearance: "light")
-        XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
-        app.buttons["simple-bots.settings"].tap()
-        let modes = app.buttons["settings.menu.modes"]
-        for _ in 0..<4 where !(modes.exists && modes.isHittable) { app.swipeUp() }
-        XCTAssertTrue(modes.waitForExistence(timeout: 5))
-        XCTAssertTrue(modes.label.contains("Bots mode"), modes.label)
-        modes.tap()
-        let bots = app.buttons["settings.mode.bots"]
-        XCTAssertTrue(bots.waitForExistence(timeout: 5))
-        XCTAssertTrue(bots.isSelected)
-        XCTAssertTrue(app.switches["settings.code-mode"].exists, "Code mode's switch")
-        save("simple-settings-modes", app)
-        app.buttons["settings.mode.chat"].tap()
-        let done = app.buttons["settings.done"]
-        if done.waitForExistence(timeout: 5) { done.tap() }
-        XCTAssertTrue(app.buttons["home.drawer.open"].waitForExistence(timeout: 10), "☰ is back")
-        XCTAssertFalse(app.descendants(matching: .any)["simple-bots.home"].exists)
     }
 
     /// A bot whose chat is slow to open (the demo's Bot Chat lookup takes as long as a slow computer's):
@@ -754,7 +715,7 @@ final class SimpleBotsUITests: BighelpUITestCase {
     private func launch(appearance: String, extra: [String] = []) -> XCUIApplication {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-bighelp.settings.simple-bots", "YES",
+                               "-loopdy.home.landing", "bots",
                                "-loopdy.demo.appearance", appearance] + extra
         app.launch()
         return app

@@ -2,7 +2,7 @@ import UIKit
 import XCTest
 
 /// Messages scroll on under the chat's header, blurred, instead of vanishing behind a solid band
-/// of color. The test reads the pixels beside ☰ before and after a short scroll: a solid band
+/// of color. The test reads the pixels beside Back before and after a short scroll: a solid band
 /// never changes there, blurred messages do. BIGHELP_CHAT_EDGE_EVIDENCE (TEST_RUNNER_…) saves
 /// the screenshots in light and dark.
 final class ChatEdgeBlurUITests: BighelpUITestCase {
@@ -17,14 +17,14 @@ final class ChatEdgeBlurUITests: BighelpUITestCase {
             app.launch()
             let composer = app.textViews["chat.composer.text"]
             XCTAssertTrue(composer.waitForExistence(timeout: 20))
-            let menu = app.buttons["chat.menu"]
-            XCTAssertTrue(menu.waitForExistence(timeout: 10))
+            let back = app.buttons["chat.back"]
+            XCTAssertTrue(back.waitForExistence(timeout: 10))
             // Message text is a text view, not a static text.
             let latest = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "settled sentinel 1000"))
             XCTAssertTrue(latest.firstMatch.waitForExistence(timeout: 20))
 
-            // Beside ☰, left of the avatar: only the backdrop and what scrolls under it.
-            let frame = menu.frame
+            // Beside Back, left of the bot's pill: only the backdrop and what scrolls under it.
+            let frame = back.frame
             let strip = CGRect(x: frame.maxX + 6, y: frame.minY + 4,
                                width: max(app.frame.width * 0.3 - frame.maxX - 6, 24), height: frame.height - 8)
             let before = try Self.luminance(of: app.screenshot().image, in: strip)
@@ -42,7 +42,7 @@ final class ChatEdgeBlurUITests: BighelpUITestCase {
             XCTAssertGreaterThan(meanChange, 0.2,
                                  "\(appearance): the header hides the messages behind a solid fill")
             // The controls still work over the blur.
-            XCTAssertTrue(menu.isHittable)
+            XCTAssertTrue(back.isHittable)
             XCTAssertTrue(composer.isHittable)
             app.terminate()
         }

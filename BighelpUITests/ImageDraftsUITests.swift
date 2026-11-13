@@ -160,18 +160,13 @@ final class ImageDraftsUITests: BighelpUITestCase {
     func testPhotoActionsSettingsSaveAndReset() throws {
         for appearance in ["light", "dark"] {
             let app = launch(appearance: appearance)
-            let options = app.buttons["chat.options"].firstMatch
-            XCTAssertTrue(options.waitForExistence(timeout: 20))
-            options.tap()
-            let thisChat = app.buttons["This chat"].firstMatch
-            XCTAssertTrue(thisChat.waitForExistence(timeout: 5))
-            thisChat.tap()
-            // SwiftUI menu items take their title as their identifier.
-            let edit = app.buttons["Edit this agent"].firstMatch
-            XCTAssertTrue(edit.waitForExistence(timeout: 5))
-            edit.tap()
-            let row = app.buttons["agent.editor.photo-actions"].firstMatch
-            XCTAssertTrue(revealBelow(row, in: app).waitForExistence(timeout: 10), "Photo actions sits beside Instructions")
+            // The bot's page from the chat's pill, then its Info tab's What it can use.
+            openBotPage(fromChatIn: app)
+            let info = app.buttons["simple-bots.profile.tab.info"].firstMatch
+            XCTAssertTrue(info.waitForExistence(timeout: 5))
+            info.tap()
+            let row = app.buttons["simple-bots.profile.photo-actions"].firstMatch
+            XCTAssertTrue(revealBelow(row, in: app).waitForExistence(timeout: 10), "Photo actions is on the bot's Info")
             row.tap()
             XCTAssertTrue(element("photo-actions.page", in: app).waitForExistence(timeout: 5))
             XCTAssertTrue(app.switches["photo-actions.business_card.offer"].firstMatch.waitForExistence(timeout: 5))
@@ -207,7 +202,7 @@ final class ImageDraftsUITests: BighelpUITestCase {
     private func launch(appearance: String, extra: [String] = []) -> XCUIApplication {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-image-drafts",
-                               "-loopdy.home.opens-chat", "YES", "-loopdy.settings.nerd-mode", "NO",
+                               "-start-chat", "-loopdy.settings.nerd-mode", "NO",
                                "-loopdy.demo.appearance", appearance] + extra
         app.launch()
         return app

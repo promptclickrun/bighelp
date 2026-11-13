@@ -2,7 +2,7 @@ import XCTest
 
 /// The Credential Vault on the demo data: a bot's profile opens its own vault (the wallet, then
 /// websites), Add a Website saves a login and a saved card for a new website with one Save, and a
-/// saved card goes on another website without being typed again. ☰ opens the same screens.
+/// saved card goes on another website without being typed again. Settings opens the same screens.
 /// BIGHELP_VAULT_EVIDENCE (TEST_RUNNER_…) saves the screenshots.
 final class CredentialVaultUITests: BighelpUITestCase {
     @MainActor
@@ -10,7 +10,7 @@ final class CredentialVaultUITests: BighelpUITestCase {
         for appearance in ["light", "dark"] {
             let app = makeApp()
             app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                                   "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", appearance]
+                                   "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", appearance]
             app.launch()
             openPrimaryProfile(app)
             app.buttons["simple-bots.profile.tab.info"].tap()
@@ -73,8 +73,7 @@ final class CredentialVaultUITests: BighelpUITestCase {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", "light"]
         app.launch()
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"]))
-            .firstMatch.waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["simple-bots.settings"].firstMatch.waitForExistence(timeout: 15))
         openConnectionsRow("settings.connections.vault", in: app)
 
         let unlinked = app.buttons["vault.wallet.demo-card-3"]
@@ -105,8 +104,7 @@ final class CredentialVaultUITests: BighelpUITestCase {
         let app = makeApp()
         app.launch()
         try onboardOpenHost(app, address: address)
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"]))
-            .firstMatch.waitForExistence(timeout: 30))
+        XCTAssertTrue(app.buttons["simple-bots.settings"].firstMatch.waitForExistence(timeout: 30))
         openConnectionsRow("settings.connections.vault", in: app)
 
         let tile = button(app, containing: card)

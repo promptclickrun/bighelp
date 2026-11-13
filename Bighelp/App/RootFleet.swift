@@ -218,18 +218,6 @@ extension RootShellView {
             // The bot's routines, and the task over them.
             openScheduledTasks(filteredTo: profileID)
             openPrepared(.scheduledTask(id: jobID, agentID: profileID))
-        case .destination(let destination):
-            switch destination {
-            case .settings: isUnifiedSettingsPresented = true
-            // New Bot is the Bots view's own +.
-            case .agents, .newAgent: appState.select(.bots)
-            case .projects:
-                if canOpenProjects { openProjects() } else { actionErrorMessage = "Projects aren't available on this computer." }
-            case .kanban:
-                if canOpenKanban { openKanban() } else { actionErrorMessage = "Kanban isn't set up on this computer." }
-            case .workflows: openWorkflows()
-            case .folder: presentHermesWorkspaces()
-            }
         }
     }
 

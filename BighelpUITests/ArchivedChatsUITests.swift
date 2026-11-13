@@ -8,12 +8,16 @@ final class ArchivedChatsUITests: BighelpUITestCase {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3"]
         app.launch()
-        openRootTab("tab.sessions", in: app)
-        let filters = app.buttons["sessions.filters"].firstMatch
-        XCTAssertTrue(filters.waitForExistence(timeout: 15))
-        filters.tap()
-        let archived = app.buttons["Archived Chats"].firstMatch
-        XCTAssertTrue(archived.waitForExistence(timeout: 5))
+        // Chats › More › Archived opens Settings › Chat, which lists Archived chats.
+        showChats(in: app)
+        let more = app.buttons["chats.more.archived"].firstMatch
+        let inbox = app.descendants(matching: .any)["chats.inbox"].firstMatch
+        for _ in 0..<20 where !(more.exists && more.isHittable) { inbox.swipeUp(velocity: .fast) }
+        XCTAssertTrue(more.exists && more.isHittable, "Archived is at the end of Chats")
+        more.tap()
+        let archived = app.buttons["simple-bots.settings.archived"].firstMatch
+        XCTAssertTrue(archived.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !archived.isHittable { app.swipeUp() }
         archived.tap()
 
         let deletedChat = "travel/demo-archived-lisbon"

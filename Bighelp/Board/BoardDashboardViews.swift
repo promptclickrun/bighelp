@@ -410,8 +410,7 @@ struct BoardDashboardView: View {
             onAsk: { text in after { context.onAsk(text) } },
             onSend: { text in after { context.onSend(text) } },
             onBlueprint: { text in after { context.onBlueprint(text) } },
-            onMenu: {}, onNewChat: { after { context.onNewChat() } }, onPickAgents: {},
-            tools: [], onBack: { model.sheet = nil })
+            onNewChat: { after { context.onNewChat() } }, onBack: { model.sheet = nil })
     }
 }
 

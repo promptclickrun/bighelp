@@ -1,8 +1,7 @@
 import Foundation
 
 enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendable {
-    // One home: delete with the old shell. Settings has no Modes row; the drive catalog still opens it.
-    case modes
+
     case appearance
     case chat
     case voice
@@ -15,7 +14,7 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
 
     var title: String {
         switch self {
-        case .modes: String(localized: "Modes")
+
         case .chat: String(localized: "Chat")
         case .voice: String(localized: "Voice")
         case .notifications: String(localized: "Notifications")
@@ -28,7 +27,7 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
 
     var detail: String {
         switch self {
-        case .modes: String(localized: "Bots, Chat and Code")
+
         case .chat: Self.chatDetail
         case .voice: String(localized: "How voice chats sound")
         case .notifications: String(localized: "Alerts from your bots")
@@ -49,7 +48,7 @@ enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendabl
 
     var systemImage: String {
         switch self {
-        case .modes: "circle.hexagongrid"
+
         case .chat: "bubble.left.and.bubble.right.fill"
         case .voice: "waveform"
         case .notifications: "bell.badge.fill"

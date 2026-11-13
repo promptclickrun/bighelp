@@ -565,14 +565,8 @@ struct ChatAgentTalkFace: View {
     @Environment(\.appAppearance) private var appearance
 
     var body: some View {
-        Group {
-            if appearance.simpleBots {
-                SimpleBotFace(agentID: agentID, name: name, imageURL: imageURL, size: size)
-            } else {
-                AgentLiveAvatar(agentID: agentID, displayName: name, imageURL: imageURL, size: size, showsBadge: false)
-            }
-        }
-        .frame(width: size, height: size)
+        SimpleBotFace(agentID: agentID, name: name, imageURL: imageURL, size: size)
+            .frame(width: size, height: size)
         .accessibilityHidden(true)
     }
 }

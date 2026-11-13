@@ -30,7 +30,7 @@ final class AgentDirectoryStore {
     /// decision rather than a layout accident, so it lives with the store that
     /// owns the pin set, and its copy counterpart in `AgentActionPresentation`
     /// is checked against it by test.
-    static let pinnedAgentLimit = AgentActionPresentation.pinnedAgentLimit
+    static let pinnedAgentLimit = 5
 
     private(set) var profiles: [AgentProfile] = []
     private(set) var selectedAgentID: String?

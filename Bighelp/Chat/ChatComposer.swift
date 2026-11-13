@@ -539,16 +539,14 @@ struct ChatComposer: View, Equatable {
         )
         .overlay(alignment: .topLeading) {
             ComposerPlaceholder(model: model, color: theme.secondaryText,
-                                text: homeChrome.isSimpleBots && !model.isBotMode
-                                    ? String(localized: "Ask \(placeholderName)")
-                                    : String(localized: "Message \(placeholderName)"))
+                                text: String(localized: "Message \(placeholderName)"))
         }
         // The text view says what's typed itself; reading the draft here redrew the whole box
         // on every keystroke.
         .accessibilityLabel("Message")
     }
 
-    @Environment(\.agentHomeChrome) private var homeChrome
+
 
     private var placeholderName: String {
         guard model.isBotMode else { return agentName }

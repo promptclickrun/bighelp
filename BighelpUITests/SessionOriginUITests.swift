@@ -1,6 +1,6 @@
 import XCTest
 
-/// Sessions on demo data: each chat shows where it started, and Started in shows chats from one
+/// Sessions (Chats › This computer) on demo data: each chat shows where it started, and Started in shows chats from one
 /// place. BIGHELP_SESSION_ORIGIN_SHOTS (TEST_RUNNER_…) names a folder for screenshots.
 final class SessionOriginUITests: BighelpUITestCase {
     @MainActor
@@ -8,7 +8,7 @@ final class SessionOriginUITests: BighelpUITestCase {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays"]
         app.launch()
-        openRootTab("tab.sessions", in: app)
+        openThisComputerSessions(in: app)
         let telegram = row(containing: "Started in Telegram", in: app)
         XCTAssertTrue(telegram.waitForExistence(timeout: 15), "A chat from Telegram says so")
         save("sessions-origin-tags", app)

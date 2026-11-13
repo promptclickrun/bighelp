@@ -74,25 +74,6 @@ struct BighelpWordmark: View {
     }
 }
 
-/// The brand bar as a leading toolbar item, without a glass capsule on iOS 26.
-/// Touch and hold it to switch hosts.
-struct BighelpBrandToolbarItem: ToolbarContent {
-    var demoHosts: DemoHosts?
-
-    var body: some ToolbarContent {
-        #if compiler(>=6.2) && !os(visionOS) // visionOS toolbars have no shared glass.
-        if #available(iOS 26.0, *) {
-            ToolbarItem(placement: .topBarLeading) { BighelpHostSwitcherLockup(demoHosts: demoHosts) }
-                .sharedBackgroundVisibility(.hidden)
-        } else {
-            ToolbarItem(placement: .topBarLeading) { BighelpHostSwitcherLockup(demoHosts: demoHosts) }
-        }
-        #else
-        ToolbarItem(placement: .topBarLeading) { BighelpHostSwitcherLockup(demoHosts: demoHosts) }
-        #endif
-    }
-}
-
 #Preview("Noodle") {
     VStack(spacing: 24) {
         BighelpWordmark(height: 40)

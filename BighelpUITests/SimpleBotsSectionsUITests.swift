@@ -1,6 +1,6 @@
 import XCTest
 
-/// Bots mode's sections and group chats on demo data: + makes a section, Move to Section files a
+/// The Bots view's sections and group chats on demo data: + makes a section, Move to Section files a
 /// bot, the card opens the section's page, and deleting it keeps its bots; New Group Chat makes one
 /// and Pin puts it on top. Set BIGHELP_SIMPLE_BOTS_EVIDENCE (TEST_RUNNER_…) to a folder to save the
 /// screenshots.
@@ -155,7 +155,7 @@ final class SimpleBotsSectionsUITests: BighelpUITestCase {
     private func launch(appearance: String, extra: [String] = []) -> XCUIApplication {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", appearance,
+                               "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", appearance,
                                "-bighelp.simple-bots.order", "{}"] + extra
         app.launch()
         return app

@@ -188,28 +188,31 @@ final class VoiceSettingsUITests: BighelpUITestCase {
             XCTAssertLessThanOrEqual(restart.frame.maxX, screen.maxX, "Restart sound runs off screen")
         }
         if let name { save(name, app) }
-        app.navigationBars.buttons.firstMatch.tap()
+        // The sheet's own Back: the screen behind Settings has a navigation bar too.
+        app.buttons["BackButton"].firstMatch.tap()
         let done = app.buttons["settings.done"].firstMatch
         XCTAssertTrue(done.waitForExistence(timeout: 5))
         done.tap()
+        // Back into the chat Settings was opened from, for its call.
+        let chat = chatRow("demo-finance", in: app)
+        XCTAssertTrue(chat.waitForExistence(timeout: 10), "Chats lists the demo chat")
+        chat.tap()
     }
 
     @MainActor
     private func launch(_ appearance: String, extra: [String] = []) -> XCUIApplication {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-voice-settings-fixture",
-                               "-bighelp.settings.simple-bots", "NO", "-loopdy.demo.appearance", appearance] + extra
+                               "-loopdy.demo.appearance", appearance] + extra
         app.launch()
         return app
     }
 
     @MainActor
     private func openVoiceSettings(_ app: XCUIApplication) {
-        app.buttons["chat.menu"].tap()
-        XCTAssertTrue(app.buttons["menu.done"].waitForExistence(timeout: 5))
-        let settingsEntry = app.buttons["menu.settings"]
-        for _ in 0..<4 where !(settingsEntry.exists && settingsEntry.isHittable) { app.swipeUp() }
-        settingsEntry.tap()
+        // Settings opens from the home's circle: Back out of the chat first.
+        goBackFromChat(in: app)
+        openSettings(in: app)
         let voice = settingsRow("settings.chat.voice-settings", in: app)
         XCTAssertTrue(voice.waitForExistence(timeout: 5))
         voice.tap()

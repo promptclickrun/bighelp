@@ -3,7 +3,7 @@ import UIKit
 
 /// The home's places handed to iOS as toolbar items, for the iPhone Duo's side strip. Built with the
 /// iOS 27.1 SDK, the Duo lays a screen's toolbar out down the strip, so the places line up with the
-/// screen's own buttons there instead of a column of our own lying over them (`BighelpStripTabs`).
+/// screen's own buttons there instead of a column of our own lying over them.
 struct HomeStripTabs: ToolbarContent {
     @Binding var selection: HomeTab
     let items: [HomeTabItem]
@@ -18,7 +18,7 @@ struct HomeStripTabs: ToolbarContent {
             }
             if let onNewChat {
                 Button(action: onNewChat) {
-                    Label(FloatingTabBar.newChatVisibleLabel, systemImage: "square.and.pencil")
+                    Label(HomeTabBar.newChatVisibleLabel, systemImage: "square.and.pencil")
                 }
                 .tint(selectedTint)
                 .accessibilityIdentifier(HomeTabBar.newChatIdentifier)

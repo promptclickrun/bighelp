@@ -10,8 +10,7 @@ struct SimpleBotProfileContext {
     let canEdit: Bool
     let onOpenChat: (String) -> Void
     let onOpenRoutine: (ScheduledTask) -> Void
-    // One home: goes with `AgentEditorView` (⋯ › Edit Name and Role); About's rows edit in place.
-    let onEditDetails: (AgentProfile) -> Void
+
     /// The bot's default model and reasoning, where the computer lets the app read and change them.
     var makeModelDefaults: ((String) -> AgentRuntimeDefaultsEditorModel?)? = nil
     /// The bot's helper task models (Default Model › Advanced); nil where the computer can't list them.
@@ -523,7 +522,7 @@ struct SimpleBotProfileView: View {
             canPinAnother: context.pinning?.canPin(profile.id) == true,
             offersShortcuts: context.offersShortcuts,
             offersDuplicate: context.makeDuplicate != nil,
-            offersEditDetails: context.canEdit,
+
             showsRoutinesToggle: shownTab == .dashboard,
             offersManage: context.onManageBots != nil,
             offersDelete: context.deletion != nil,
@@ -541,7 +540,7 @@ struct SimpleBotProfileView: View {
         case .pin, .unpin: context.pinning?.setPinned(id, action == .pin)
         case .shortcuts: isShortcutsPresented = true
         case .duplicate: duplicate = context.makeDuplicate?(profile)
-        case .editDetails: context.onEditDetails(profile)
+
         case .showRoutines: showsRoutines.toggle()
         case .manageBots: context.onManageBots?(id)
         case .delete: isDeleteConfirmationPresented = true
@@ -1261,8 +1260,7 @@ struct SimpleBotProfileView: View {
         }
     }
 
-    /// The bot's board as the Feed, Ideas and Goals pages take it. Bots mode has no menu or agent
-    /// switcher, so those do nothing; the chat is always this bot's own.
+    /// The bot's board as the Feed, Ideas and Goals pages take it. The chat is always this bot's own.
     private func boardContext(_ profile: AgentProfile, hooks: SimpleBotDashboardHooks,
                               store: AgentBoardStore) -> AgentBoardContext {
         let id = profile.id
@@ -1271,7 +1269,7 @@ struct SimpleBotProfileView: View {
             activity: .idle, store: store,
             onProfile: {}, onSwitchAgent: {},
             onAsk: { hooks.onAsk(id, $0) }, onSend: { hooks.onSend(id, $0) }, onBlueprint: { hooks.onBlueprint(id, $0) },
-            onMenu: {}, onNewChat: { context.onOpenChat(id) }, onPickAgents: {}, tools: [])
+            onNewChat: { context.onOpenChat(id) })
     }
 
     private func mediaTab(_ profile: AgentProfile) -> some View {

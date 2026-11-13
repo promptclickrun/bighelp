@@ -10,18 +10,14 @@ struct DrivePlace: Identifiable, Sendable {
     /// Words a person might use for it, beside its title and `what`.
     let keywords: [String]
     let needs: Set<DriveNeed>
-    // One home: the catalog still writes its steps by the mode they were made for. Pass 2 makes
-    // this one list; only `steps` is read.
-    let playbooks: [BighelpMode: [DriveStep]]
-
-    /// The steps that reach it in the one home: a bot's page for a place inside a bot, else the
-    /// page's own push or its Settings pages. Every place has them.
-    var steps: [DriveStep] { playbooks[.bots] ?? playbooks[.chat] ?? playbooks[.code] ?? [] }
+    /// The steps that reach it: a bot's page for a place inside a bot, else the page's own push or its
+    /// Settings pages. Every place has them.
+    let steps: [DriveStep]
 
     init(_ id: String, _ title: String, _ what: String, keywords: [String] = [], needs: Set<DriveNeed> = [],
-         playbooks: [BighelpMode: [DriveStep]]) {
+         steps: [DriveStep]) {
         self.id = id; self.title = title; self.what = what; self.keywords = keywords
-        self.needs = needs; self.playbooks = playbooks
+        self.needs = needs; self.steps = steps
     }
 }
 

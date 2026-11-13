@@ -1,6 +1,6 @@
 import XCTest
 
-/// #504 on a real host with the bighelp plugin: Bots mode's home shows a bot working while
+/// #504 on a real host with the bighelp plugin: Bots shows a bot working while
 /// another Hermes process runs its turn (`hermes -p <bot> chat -q`, started from a terminal on that
 /// computer), within a few seconds, and clears when the run ends. The test only watches the home:
 /// it opens no chat and sends nothing.
@@ -25,7 +25,7 @@ final class BotActivityHostUITests: BighelpUITestCase {
         let (address, profile) = (parts[0], parts[1])
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-no-configured-hosts",
-                               "-bighelp.settings.simple-bots", "YES"]
+                               "-loopdy.home.landing", "bots"]
         app.launch()
         try addHost(app, address: address)
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 30))

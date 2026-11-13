@@ -13,7 +13,7 @@ final class ChatReactionBarUITests: BighelpUITestCase {
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-native-reaction-ui",
                                "-loopdy.demo.appearance", appearance]
         app.launch()
-        let conversation = app.buttons["session.row.demo-finance"]
+        let conversation = chatRow("demo-finance", in: app)
         XCTAssertTrue(conversation.waitForExistence(timeout: 20))
         conversation.tap()
         let reply = app.textViews.matching(NSPredicate(
@@ -80,7 +80,7 @@ final class ChatReactionBarUITests: BighelpUITestCase {
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-native-reaction-ui",
                                "-loopdy.demo.appearance", appearance]
         app.launch()
-        let conversation = app.buttons["session.row.demo-finance"]
+        let conversation = chatRow("demo-finance", in: app)
         XCTAssertTrue(conversation.waitForExistence(timeout: 20))
         conversation.tap()
         let sent = app.textViews.matching(NSPredicate(
@@ -112,7 +112,7 @@ final class ChatReactionBarUITests: BighelpUITestCase {
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-native-reaction-ui",
                                "-test-long-reaction-message", "-loopdy.demo.appearance", appearance]
         app.launch()
-        let conversation = app.buttons["session.row.demo-finance"]
+        let conversation = chatRow("demo-finance", in: app)
         XCTAssertTrue(conversation.waitForExistence(timeout: 20))
         conversation.tap()
         let message = app.textViews.matching(NSPredicate(

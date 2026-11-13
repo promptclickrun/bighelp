@@ -23,8 +23,8 @@ struct HomeTabOrnament: View {
                 .buttonBorderShape(.circle)
                 .contentShape(.hoverEffect, Circle())
                 .hoverEffect(.highlight)
-                .help(FloatingTabBar.newChatVisibleLabel)
-                .accessibilityLabel(FloatingTabBar.newChatAccessibilityLabel)
+                .help(HomeTabBar.newChatVisibleLabel)
+                .accessibilityLabel(HomeTabBar.newChatAccessibilityLabel)
                 .accessibilityIdentifier(HomeTabBar.newChatIdentifier)
             }
         }

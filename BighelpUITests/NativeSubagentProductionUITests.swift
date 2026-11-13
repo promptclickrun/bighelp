@@ -25,9 +25,13 @@ final class NativeSubagentProductionUITests: BighelpUITestCase {
         app.launch()
         defer { capture("real-subagent-final-state-2102", app, directory: artifactDirectory) }
 
-        XCTAssertTrue(app.buttons["root.new-chat"].waitForExistence(timeout: 30),
+        XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 30),
                       "The authorized Hermes workspace must expose New Chat.")
-        app.buttons["root.new-chat"].tap()
+        app.buttons["home.new-chat"].firstMatch.tap()
+        // New chat opens with nobody picked: the first bot listed takes it.
+        let bot = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "new-chat.bot.")).firstMatch
+        XCTAssertTrue(bot.waitForExistence(timeout: 20), "New chat lists the host's bots.")
+        bot.tap()
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 20),
                       "The real chat composer must be available before sending.")
@@ -84,9 +88,10 @@ final class NativeSubagentProductionUITests: BighelpUITestCase {
 
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.buttons["tab.sessions"].waitForExistence(timeout: 30),
-                      "The real chat catalog must restore after relaunch.")
-        app.buttons["tab.sessions"].tap()
+        XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 30),
+                      "The home must restore after relaunch.")
+        // Chats › This computer: the real chat catalog.
+        openThisComputerSessions(in: app)
         let search = app.descendants(matching: .any).matching(identifier: "sessions.search").firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 15),
                       "The session catalog must expose its real search field.")

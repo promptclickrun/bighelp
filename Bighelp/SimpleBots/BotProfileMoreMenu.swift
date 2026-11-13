@@ -3,8 +3,6 @@ import SwiftUI
 /// One entry in a bot page's ⋯ menu.
 enum BotProfileAction: String, CaseIterable, Identifiable, Sendable {
     case message, newChat, chats, makePrimary, pin, unpin, shortcuts, duplicate
-    // One home: goes with `AgentEditorView`; Name, Role and Summary are rows in Info now.
-    case editDetails
     case showRoutines
     case manageBots
     case delete
@@ -35,7 +33,7 @@ enum BotProfileAction: String, CaseIterable, Identifiable, Sendable {
         case .unpin: String(localized: "Unpin")
         case .shortcuts: String(localized: "Use with Siri")
         case .duplicate: String(localized: "Duplicate")
-        case .editDetails: String(localized: "Edit Name and Role")
+
         case .showRoutines: String(localized: "Show routines")
         case .manageBots: String(localized: "Manage bots")
         case .delete: String(localized: "Delete bot")
@@ -52,7 +50,7 @@ enum BotProfileAction: String, CaseIterable, Identifiable, Sendable {
         case .unpin: "pin.slash"
         case .shortcuts: "waveform"
         case .duplicate: "plus.square.on.square"
-        case .editDetails: "pencil"
+
         case .showRoutines: "calendar.badge.clock"
         case .manageBots: "person.2.badge.gearshape"
         case .delete: "trash"
@@ -78,8 +76,7 @@ struct BotProfileMenuCapabilities: Equatable, Sendable {
     var canPinAnother = true
     var offersShortcuts = false
     var offersDuplicate = false
-    /// The computer lets the app edit this bot (the old editor's Edit Name and Role).
-    var offersEditDetails = false
+
     /// The Dashboard is the tab on screen, where routines show.
     var showsRoutinesToggle = false
     var offersManage = false
@@ -102,7 +99,7 @@ enum BotProfileMenu {
         }
         if can.offersShortcuts { actions.append(.shortcuts) }
         if can.offersDuplicate { actions.append(.duplicate) }
-        if can.offersEditDetails { actions.append(.editDetails) }
+
         if can.showsRoutinesToggle { actions.append(.showRoutines) }
         if can.offersManage { actions.append(.manageBots) }
         if can.offersDelete, !can.isDefaultBot, !can.isDeleting { actions.append(.delete) }

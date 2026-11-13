@@ -6,7 +6,6 @@ struct DriveShellHooks: ViewModifier {
     let appState: AppState
     let featureStore: ShellFeatureStore
     let agents: AgentDirectoryStore
-    let settings: SettingsStore
     let usesDemoFixtures: Bool
     var navigator: DriveNavigator = .shared
 

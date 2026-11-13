@@ -1,6 +1,6 @@
 import XCTest
 
-/// Agents › an agent › Edit avatar: the chooser (Bot Studio, PetDex or a photo), Bot Studio's
+/// A bot's page › Info › Character: the chooser (Bot Studio, PetDex or a photo), Bot Studio's
 /// drawer with every tab, Undo and Surprise me, and PetDex with only pets.
 /// BIGHELP_AVATAR_EVIDENCE (TEST_RUNNER_…) saves the screenshots; BIGHELP_AVATAR_APPEARANCE
 /// (light, dark) sets how they're drawn.
@@ -60,13 +60,10 @@ final class AvatarCreatorUITests: BighelpUITestCase {
         app.buttons["bot.studio.undo"].firstMatch.tap()
         XCTAssertTrue(stage.label.hasSuffix("Peak"), "Undo takes back the surprise")
 
+        // The bot's page saves the avatar from the studio's own Save.
         app.buttons["bot.studio.save"].firstMatch.tap()
-        let saveAgent = app.buttons["agent.editor.save"].firstMatch
-        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: saveAgent)
-        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed)
-        save("editor-with-studio-avatar-\(appearance)", app)
-        saveAgent.tap()
-        XCTAssertTrue(saveAgent.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(stage.waitForNonExistence(timeout: 10), "Save closes the studio")
+        save("profile-with-studio-avatar-\(appearance)", app)
 
         openChooser(of: "finance", in: app)
         any["avatar.chooser.studio"].firstMatch.tap()
@@ -160,20 +157,27 @@ final class AvatarCreatorUITests: BighelpUITestCase {
         save("petdex", app)
     }
 
+    /// Bots › the bot (its chat opens) › its pill › Info › Character. The demo's names find the
+    /// primary bot, whose row carries no ID.
     @MainActor
     private func openChooser(of agentID: String, in app: XCUIApplication) {
-        openAgents(in: app)
-        let more = app.buttons["agent.\(agentID).more"].firstMatch
-        XCTAssertTrue(more.waitForExistence(timeout: 10))
-        for _ in 0..<6 where !more.isHittable { app.swipeUp() }
-        // The last row's button sits partly under the floating New chat button: tap its top.
-        more.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)).tap()
-        let edit = app.buttons["agent.\(agentID).edit"].firstMatch
-        XCTAssertTrue(edit.waitForExistence(timeout: 5))
-        edit.tap()
-        let design = app.buttons["agent.editor.design-avatar"].firstMatch
-        XCTAssertTrue(design.waitForExistence(timeout: 10))
-        design.tap()
+        let names = ["finance": "Avery Park", "travel": "Mina Shah", "home": "Jordan Lee"]
+        showBots(in: app)
+        let bot = app.buttons.matching(NSCompoundPredicate(orPredicateWithSubpredicates: [
+            NSPredicate(format: "identifier IN %@", ["simple-bots.bot.\(agentID)", "simple-bots.pinned.\(agentID)"]),
+            NSPredicate(format: "identifier == %@ AND label BEGINSWITH %@", "simple-bots.primary", names[agentID] ?? agentID),
+        ])).firstMatch
+        XCTAssertTrue(bot.waitForExistence(timeout: 10), "Bots lists \(agentID)")
+        for _ in 0..<6 where !bot.isHittable { app.descendants(matching: .any)["simple-bots.home"].firstMatch.swipeUp() }
+        bot.tap()
+        openBotPage(fromChatIn: app)
+        let info = app.buttons["simple-bots.profile.tab.info"].firstMatch
+        XCTAssertTrue(info.waitForExistence(timeout: 5))
+        info.tap()
+        let character = app.buttons["simple-bots.profile.character"].firstMatch
+        XCTAssertTrue(character.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !character.isHittable { app.swipeUp() }
+        character.tap()
         XCTAssertTrue(app.descendants(matching: .any)["avatar.chooser.studio"].firstMatch.waitForExistence(timeout: 10))
     }
 

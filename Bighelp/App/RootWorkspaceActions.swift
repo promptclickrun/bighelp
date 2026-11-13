@@ -313,18 +313,8 @@ extension RootShellView {
         return nil
     }
 
-    /// Deleting from the Agents screen or the agent editor. Same lifecycle path
-    /// as Profiles, with no navigation beyond leaving a chat that was retired.
-    /// Lets other screens (the Chats rail) offer the Agents list's hold menu.
-    var agentActionsConfig: AgentActionsConfig {
-        AgentActionsConfig(
-            store: agents, runtimeDefaultsClient: agentRuntimeDefaults, owner: currentWorkspaceOwner,
-            capabilities: currentWorkspaceCapabilities, cloneClient: workspaceConnections?.cloneClient,
-            shortcutsAvailable: usesWorkspaceFixtures || (nativeRuntime != nil && currentWorkspaceOwner != nil),
-            onAction: handleAgentWorkspaceAction, agentDeletion: agentDeletionAction
-        )
-    }
-
+    /// Deleting from a bot's page. Same lifecycle path as Profiles, with no navigation beyond leaving a
+    /// chat that was retired.
     var agentDeletionAction: AgentDeletionAction? {
         if usesWorkspaceFixtures, nativeRuntime == nil {
             // The demo has no computer: the agent leaves its own list, and its screens close the same way.
@@ -391,11 +381,9 @@ extension RootShellView {
         closeScreens(ofDeletedAgent: profileID, chats: retired.ids)
     }
 
-    /// The deleted agent's editor, profile and chats leave the screen, so the person lands where
-    /// they were before them (Bots mode's home, the Agents list) instead of on a page for an agent
-    /// that isn't there.
+    /// The deleted bot's page and chats leave the screen, so the person lands where they were before
+    /// them instead of on a page for a bot that isn't there.
     func closeScreens(ofDeletedAgent profileID: String, chats: Set<String>) {
-        if workspaceProfileEditor?.editingAgentID == profileID { workspaceProfileEditor = nil }
         appState.path.removeAll { route in
             switch route {
             case .simpleBotProfile(let agentID, _): agentID == profileID
@@ -482,17 +470,6 @@ extension RootShellView {
             return
         }
         switch request.action {
-        case .openAgentSessions(let id):
-            openSessions(filteredTo: id)
-        case .openAgentGroups:
-            // The Bots view lists the group chats with the bots.
-            appState.select(.bots)
-        case .openAgentScheduledTasks(let id):
-            openScheduledTasks(filteredTo: id)
-        case .openHostStatus:
-            isHostStatusPresented = true
-        case .openAgentChat(let id):
-            openAgentChat(id)
         case .openGroup(let id):
             openHostedGroup(id, owner: request.owner, settings: false)
         case .openGroupSettings(let id):

@@ -1,15 +1,15 @@
 import XCTest
 
-/// The Needs you deck, an empty board's starters and their chips in the message box, and
-/// Settings › Modes' picker, in demo mode. BIGHELP_UX_EVIDENCE (a folder) also saves the screenshots.
+/// The Needs you deck, and an empty board's starters (a bot's Feed, from Today › See all) and their
+/// chips in the message box, in demo mode. BIGHELP_UX_EVIDENCE (a folder) also saves the screenshots.
 final class NeedsYouBlueprintsModesUITests: BighelpUITestCase {
     @MainActor
-    func testDeckStartersChipsAndModesDark() throws {
+    func testDeckStartersAndChipsDark() throws {
         try walkthrough(appearance: "dark")
     }
 
     @MainActor
-    func testDeckStartersChipsAndModesLight() throws {
+    func testDeckStartersAndChipsLight() throws {
         try walkthrough(appearance: "light")
     }
 
@@ -45,8 +45,11 @@ final class NeedsYouBlueprintsModesUITests: BighelpUITestCase {
         app.buttons["needs-you.later"].tap()
         XCTAssertTrue(deck.waitForNonExistence(timeout: 5), "Later closes the deck")
 
-        // An empty Feed offers starters.
-        openRootTab("tab.feed", in: app)
+        // An empty Feed offers starters: one bot's, from Today › See all.
+        openTodayBoard("feed", in: app)
+        let bot = app.buttons["today.board-page.chip.finance"].firstMatch
+        XCTAssertTrue(bot.waitForExistence(timeout: 10), "See all lists the bots")
+        bot.tap()
         XCTAssertTrue(app.descendants(matching: .any)["board.feed.empty"].firstMatch.waitForExistence(timeout: 10))
         let starter = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "board.starter.")).firstMatch
         XCTAssertTrue(starter.waitForExistence(timeout: 5), "A starter to pick")
@@ -65,29 +68,6 @@ final class NeedsYouBlueprintsModesUITests: BighelpUITestCase {
         blank.typeText("Acme\n")
         XCTAssertTrue(send.isEnabled)
         save("blueprint-chips-filled-\(appearance)", app)
-
-        // Modes: one picker for the home, and Code mode's own switch.
-        openSettings(in: app)
-        settingsRow("settings.menu.modes", in: app).tap()
-        let chat = app.buttons["settings.mode.chat"]
-        let code = app.buttons["settings.mode.code"]
-        XCTAssertTrue(chat.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["settings.mode.bots"].exists)
-        XCTAssertTrue(chat.isSelected)
-        let codeMode = app.switches["settings.code-mode"]
-        XCTAssertEqual(codeMode.value as? String, "0")
-        save("settings-modes-\(appearance)", app)
-
-        code.tap()
-        XCTAssertTrue(code.isSelected)
-        XCTAssertEqual(codeMode.value as? String, "1", "Picking Code turns Code mode on")
-        codeMode.switches.firstMatch.tap()
-        XCTAssertTrue(chat.isSelected, "Code mode off goes back to Chat")
-        code.tap()
-        app.buttons["settings.done"].tap()
-        XCTAssertTrue(app.descendants(matching: .any)["code.screen"].waitForExistence(timeout: 10),
-                      "Picking Code makes it the home")
-
         app.terminate()
     }
 

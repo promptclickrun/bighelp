@@ -97,8 +97,8 @@ struct HomeSidebar: View {
         }
         .bighelpPlainButtonStyle(.circle)
         .textCase(nil)
-        .bighelpHelp(FloatingTabBar.newChatAccessibilityLabel, shortcut: "⌘N")
-        .accessibilityLabel(FloatingTabBar.newChatAccessibilityLabel)
+        .bighelpHelp(HomeTabBar.newChatAccessibilityLabel, shortcut: "⌘N")
+        .accessibilityLabel(HomeTabBar.newChatAccessibilityLabel)
         .accessibilityIdentifier("home.sidebar.new-chat")
     }
 

@@ -1,8 +1,8 @@
 import XCTest
 
-/// Settings › Chat › Shows as in a Bots chat, on the demo tool stream (two notes, each before a tool,
-/// then the answer). Card and Minimal gather the running turn into one block; Full keeps every step in
-/// place. When the turn ends the work folds: above the answer, or under it for Minimal.
+/// Settings › Chat › Shows as in the primary bot's chat (from Bots), on the demo tool stream (two
+/// notes, each before a tool, then the answer). Card and Minimal gather the running turn into one
+/// block; Full keeps every step in place. When the turn ends the work folds: above the answer, or under it for Minimal.
 final class ChatWorkStylesUITests: BighelpUITestCase {
     @MainActor
     func testEachStyleShowsTheRunningTurnAndFoldsItWhenItEnds() throws {
@@ -10,7 +10,7 @@ final class ChatWorkStylesUITests: BighelpUITestCase {
             for style in ["card", "minimal", "full"] {
                 let app = makeApp()
                 app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                                       "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", appearance,
+                                       "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", appearance,
                                        "-bighelp.chat.work-style", style,
                                        "-test-tool-stream", "-test-tool-stream-two-turns", "-test-tool-stream-slow",
                                        "-test-tool-stream-settles"]

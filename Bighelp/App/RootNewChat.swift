@@ -44,7 +44,7 @@ extension RootShellView {
 
     private var newChatRules: NewChatGroupRules {
         NewChatGroupRules(hostInUse: showsEveryHost ? fleet?.selectedHostID : nil,
-                          canMakeGroups: botModeRooms.offersNewGroupChat,
+                          canMakeGroups: botModeRooms.makesGroupChats,
                           seatableProfiles: botModeRooms.nativeCapabilities?.seatableProfiles)
     }
 

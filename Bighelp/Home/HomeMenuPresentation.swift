@@ -1,94 +1,6 @@
 import SwiftUI
 
-/// ☰: bighelp's one menu (hosts, chats, and everywhere else). A sheet on
-/// iPhone, a panel from the leading edge on iPad, a sidebar on Mac and Vision
-/// Pro (see HomeMenuPresentation).
-struct AgentHomeDrawer: View {
-    let chats: [SessionSummary]
-    let agent: (String) -> (name: String, imageURL: URL?)?
-    let hosts: BighelpMenuHosts
-    let destinations: BighelpMenuDestinations
-    let onOpen: (SessionSummary) -> Void
-    /// In the all-hosts view, recent chats come from every host.
-    var fleetChats: (fleet: FleetStore, open: (FleetChat) -> Void)? = nil
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.homeMenuClose) private var panelClose
 
-    var body: some View {
-        NavigationStack {
-            BighelpMenu(hosts: hosts, destinations: destinations, close: close, hasRecent: hasRecent) {
-                AnyView(recentChats)
-            }
-            .navigationTitle("Menu")
-            .navigationBarTitleDisplayMode(.inline)
-            // A Mac sidebar has no title bar of its own.
-            .toolbar(BighelpPlatform.isMac ? .hidden : .automatic, for: .navigationBar)
-            .toolbar {
-                // The Mac's sidebar stays; ☰ and View › Hide Sidebar put it away.
-                if !BighelpPlatform.isMac {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done", action: close)
-                            .accessibilityIdentifier("menu.done")
-                    }
-                }
-            }
-        }
-        .presentationDragIndicator(.visible)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("home.drawer")
-    }
-
-    /// The panel isn't a presentation, so `dismiss` would do nothing there.
-    private func close() {
-        if let panelClose { panelClose() } else { dismiss() }
-    }
-
-    private var hasRecent: Bool {
-        if let fleetChats { return !fleetChats.fleet.chats().isEmpty }
-        return !chats.isEmpty
-    }
-
-    @ViewBuilder
-    private var recentChats: some View {
-        if let fleetChats {
-            ForEach(fleetChats.fleet.chats().prefix(12)) { chat in
-                Button {
-                    close()
-                    fleetChats.open(chat)
-                } label: {
-                    FleetChatRow(chat: chat, fleet: fleetChats.fleet, compact: true)
-                        .padding(.horizontal, BighelpMenuRowLayout.labelInset)
-                }
-                .bighelpPlainButtonStyle(BighelpMenuRowLayout.outline, padding: BighelpMenuRowLayout.highlightPadding)
-                .listRowInsets(BighelpPlatform.isMac ? BighelpMenuRowLayout.insets : nil)
-                .bighelpMenuRowSeparator()
-                .accessibilityIdentifier("menu.fleet-chat.\(chat.title)")
-            }
-        } else {
-            sessionChats
-        }
-    }
-
-    private var sessionChats: some View {
-        ForEach(chats) { chat in
-            Button {
-                close()
-                onOpen(chat)
-            } label: {
-                BighelpMenuChatRow(chat: chat, agent: agent)
-                    .padding(.horizontal, BighelpMenuRowLayout.labelInset)
-            }
-            .bighelpPlainButtonStyle(BighelpMenuRowLayout.outline, padding: BighelpMenuRowLayout.highlightPadding)
-            .listRowInsets(BighelpPlatform.isMac ? BighelpMenuRowLayout.insets : nil)
-            .bighelpMenuRowSeparator()
-            .accessibilityIdentifier("menu.chat.\(chat.id)")
-        }
-    }
-}
-
-extension EnvironmentValues {
-    @Entry var homeMenuClose: (@MainActor () -> Void)?
-}
 
 /// Presents the sidebar on iPad: it slides in from the leading edge over a dimmed screen, and a tap
 /// outside closes it. iPhone has no sidebar: its bar holds the places.
@@ -138,7 +50,6 @@ struct HomeMenuPresentation<Menu: View>: ViewModifier {
         // Build inside a SwiftUI update, not the presentation callback, so
         // readiness keeps updating. contentID also replaces captured stores.
         let panel = BighelpDeferredSection { menu() }
-            .environment(\.homeMenuClose, { if !BighelpPlatform.isMac { isPresented = false } })
         sideMenu.show(AnyView(panel)) {
             isPresented = false
             onDismiss()
@@ -176,7 +87,6 @@ struct HomeMenuPresentation<Menu: View>: ViewModifier {
                     .accessibilityHidden(true)
                     .transition(.opacity)
                 menu()
-                    .environment(\.homeMenuClose, { isPresented = false })
                     .frame(width: Self.panelWidth)
                     .frame(maxHeight: .infinity)
                     .clipShape(.rect(topLeadingRadius: 0, bottomLeadingRadius: 0,

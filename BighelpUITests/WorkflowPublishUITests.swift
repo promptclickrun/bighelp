@@ -52,10 +52,10 @@ final class WorkflowPublishUITests: BighelpUITestCase {
 
     @MainActor private func launch() -> XCUIApplication {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES"]
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays"]
         app.launch()
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"]))
-            .firstMatch.waitForExistence(timeout: 15))
+        // The home is up before the link comes in.
+        XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 15))
         return app
     }
 

@@ -67,13 +67,7 @@ enum HomeSettingsMigration {
     /// The mode swipes go: Bots mode becomes Bots; Next mode, Chat mode and Code mode become the edge's
     /// default. An unknown value is the default too, as `SettingsStore` reads it.
     static func remapped(_ raw: String?, edgeDefault: WorkspaceSwipeAction) -> WorkspaceSwipeAction {
-        guard let raw, let action = WorkspaceSwipeAction(rawValue: raw) else { return edgeDefault }
-        switch action {
-        case .botsMode: return .agents
-        case .nextMode, .chatMode, .codeMode: return edgeDefault
-        case .inbox: return .home
-        default: return action
-        }
+        WorkspaceSwipeAction.saved(raw, edgeDefault: edgeDefault)
     }
 
     /// Runs once: while the marker is unset (UI tests can pin `-bighelp.home.migrated-v1 NO` to run it at
@@ -89,7 +83,7 @@ enum HomeSettingsMigration {
     /// and an unset "Show every computer" reads as on.
     static func write(_ outcome: Outcome, over stored: Stored, to defaults: UserDefaults) {
         guard stored.isExistingInstall else { return }
-        // An old screen that maps to the same place stays as it is; the old shell still reads it.
+        // An old screen that maps to the same place stays as it is.
         if BighelpLanding.homeLanding(stored: stored.landing) != outcome.landing {
             defaults.set(outcome.landing.rawValue, forKey: BighelpLanding.screenKey)
         }
@@ -134,7 +128,7 @@ extension HomeSettingsMigration.Stored {
         typealias Keys = HomeSettingsMigration.Keys
         botsMode = defaults.bool(forKey: Keys.simpleBots)
         codeMode = defaults.bool(forKey: Keys.codeMode)
-        codeOpensAtLaunch = defaults.string(forKey: Keys.codeOpenIn) == BighelpExperience.code.rawValue
+        codeOpensAtLaunch = defaults.string(forKey: Keys.codeOpenIn) == "code"
         landing = defaults.string(forKey: BighelpLanding.screenKey)
         allHosts = defaults.object(forKey: Keys.everyComputer) == nil
             ? nil : defaults.bool(forKey: Keys.everyComputer)

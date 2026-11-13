@@ -2,8 +2,8 @@ import XCTest
 
 /// For a Release build with the phone's 1 MB main-thread stack (see
 /// device-stack notes): real onboarding, a real host behind a password proxy,
-/// then the chat header, Provider Usage, Settings › Voice with its provider
-/// list, Chat layout and Provider Usage settings. Test shortcuts are
+/// then the primary bot's chat header, Provider Usage, Settings › Voice with its
+/// provider list, and Settings › Appearance › Chat layout. Test shortcuts are
 /// Debug-only, so this uses none.
 /// BIGHELP_RELEASE_WALK is "address|proxy username|proxy password".
 final class ReleaseScreensWalkthroughUITests: BighelpUITestCase {
@@ -19,7 +19,6 @@ final class ReleaseScreensWalkthroughUITests: BighelpUITestCase {
             parts[0] = "release-\(UUID().uuidString.prefix(8).lowercased()).\(parts[0])"
         }
         let app = makeApp()
-        app.launchArguments = ["-loopdy.home.opens-chat", "YES"]
         app.launch()
 
         let start = app.buttons["onboarding.get-started"]
@@ -57,9 +56,13 @@ final class ReleaseScreensWalkthroughUITests: BighelpUITestCase {
             connected = continueAfterConnecting(app, timeout: 30)
         }
         XCTAssertTrue(connected, "Connected")
-        // The chat header the 16 Pro tester found cramped.
-        let avatar = app.buttons["agent.hero.avatar"]
-        XCTAssertTrue(avatar.waitForExistence(timeout: 30), "The agent's chat opens")
+        // The primary bot's chat, from Bots: the chat header the 16 Pro tester found cramped.
+        showBots(in: app)
+        let primary = app.buttons["simple-bots.primary"].firstMatch
+        XCTAssertTrue(primary.waitForExistence(timeout: 30), "Bots shows the primary bot")
+        primary.tap()
+        let identity = app.buttons["chat.identity"]
+        XCTAssertTrue(identity.waitForExistence(timeout: 30), "The bot's chat opens")
         // iOS offers to save the proxy password, sometimes after the chat
         // shows; it covers the chat, so wait for it before tapping on.
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
@@ -83,38 +86,41 @@ final class ReleaseScreensWalkthroughUITests: BighelpUITestCase {
         save("release-5-usage", app)
         for _ in 0..<6 { page.swipeUp() }
         save("release-6-usage-bottom", app)
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.navigationBars["Usage"].buttons.element(boundBy: 0).tap()
         XCTAssertTrue(page.waitForNonExistence(timeout: 5))
 
-        app.buttons["chat.menu"].tap()
-        XCTAssertTrue(app.buttons["menu.done"].waitForExistence(timeout: 5))
-        // Settings sits below the fold, past Go to.
-        let settingsEntry = app.buttons["menu.settings"]
-        for _ in 0..<4 where !(settingsEntry.exists && settingsEntry.isHittable) { app.swipeUp() }
-        settingsEntry.tap()
-        let mode = app.segmentedControls["settings.voice.mode"]
-        for _ in 0..<6 where !(mode.exists && mode.isHittable) { app.swipeUp() }
-        XCTAssertTrue(mode.waitForExistence(timeout: 5))
-        mode.buttons["Take turns"].tap()
+        // Settings, from the home's circle.
+        goBackFromChat(in: app)
+        openSettings(in: app)
         let voice = settingsRow("settings.chat.voice-settings", in: app)
         XCTAssertTrue(voice.waitForExistence(timeout: 5))
         voice.tap()
+        // Take turns lists the host's speech providers.
+        let mode = app.segmentedControls["voice.settings.conversation-mode"]
+        XCTAssertTrue(mode.waitForExistence(timeout: 10))
+        mode.buttons["Take turns"].tap()
         let provider = app.buttons["voice.settings.provider"]
         XCTAssertTrue(provider.waitForExistence(timeout: 20), "The host's speech settings load")
         save("release-2-voice", app)
         provider.tap()
         XCTAssertTrue(app.buttons["voice.provider.piper"].waitForExistence(timeout: 5))
         save("release-3-providers", app)
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        // The sheet's own Back: the screen behind Settings has a navigation bar too.
+        app.buttons["BackButton"].firstMatch.tap()
         XCTAssertTrue(provider.waitForExistence(timeout: 5))
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["BackButton"].firstMatch.tap()
 
-        let layout = settingsRow("settings.appearance.chat-layout", in: app)
+        // Appearance › Chat layout.
+        settingsRow("settings.themes", in: app).tap()
+        let studio = app.descendants(matching: .any)["appearance.studio"].firstMatch
+        XCTAssertTrue(studio.waitForExistence(timeout: 5))
+        let layout = app.buttons["settings.appearance.chat-layout"].firstMatch
+        for _ in 0..<6 where !(layout.exists && layout.isHittable) { studio.swipeUp() }
         XCTAssertTrue(layout.waitForExistence(timeout: 5))
         layout.tap()
         XCTAssertTrue(app.segmentedControls["chat-layout.avatar-size"].waitForExistence(timeout: 5))
         save("release-4-chat-layout", app)
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["BackButton"].firstMatch.tap()
 
         XCTAssertEqual(app.state, .runningForeground, "No crash on the phone-sized stack")
     }

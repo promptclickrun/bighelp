@@ -1,9 +1,9 @@
 import XCTest
 
-/// #504: Bots mode shows which bots are working on a turn and which need you, and (#890) which run
+/// #504: the Bots view shows which bots are working on a turn and which need you, and (#890) which run
 /// work in the background. On the demo data with `-test-bot-activity`, Mina Shah browses the web in
-/// her Bot Chat, Jordan Lee needs you and Avery Park has work in the background; with Multi-gateway,
-/// Sage Ortiz works on the sample Studio Mac. Light and dark.
+/// her Bot Chat, Jordan Lee needs you and Avery Park has work in the background; with every computer
+/// showing, Sage Ortiz works on the sample Studio Mac. Light and dark.
 /// TEST_RUNNER_BIGHELP_BOT_ACTIVITY_EVIDENCE=<folder> saves the screenshots there, and
 /// TEST_RUNNER_BIGHELP_BOT_ACTIVITY_REDUCED=1 says the simulator has Reduce Motion on (a test can't
 /// switch it), which names them "-reduced".
@@ -45,7 +45,8 @@ final class SimpleBotsActivityUITests: BighelpUITestCase {
 
     @MainActor
     func testAnotherGatewaysBotShowsItsOwnState() throws {
-        let app = launch(appearance: "light", extra: ["-test-bot-activity", "-bighelp.simple-bots.multi-gateway", "YES"])
+        // Settings › Show every computer.
+        let app = launch(appearance: "light", extra: ["-test-bot-activity", "-bighelp.hosts.all-hosts", "YES"])
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
         let sage = app.buttons.matching(NSPredicate(format: "identifier ENDSWITH %@", "/reviewer")).firstMatch
         XCTAssertTrue(sage.waitForExistence(timeout: 10))
@@ -70,24 +71,10 @@ final class SimpleBotsActivityUITests: BighelpUITestCase {
     }
 
     @MainActor
-    func testTheAgentsScreenShowsTheSameStates() throws {
-        let app = makeApp()
-        app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-test-bot-activity"]
-        app.launch()
-        openRootTab("tab.agents", in: app)
-        let mina = app.buttons["agent.travel"]
-        XCTAssertTrue(mina.waitForExistence(timeout: 10))
-        XCTAssertTrue(wait(for: mina, toSay: "Thinking"), mina.label)
-        let jordan = app.buttons["agent.home"]
-        XCTAssertTrue(wait(for: jordan, toSay: "Has an update"), jordan.label)
-        save("agents-light", app)
-    }
-
-    @MainActor
     private func launch(appearance: String, extra: [String] = []) -> XCUIApplication {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-bighelp.settings.simple-bots", "YES",
+                               "-loopdy.home.landing", "bots",
                                "-loopdy.demo.appearance", appearance] + extra
         app.launch()
         return app

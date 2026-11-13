@@ -1,26 +1,17 @@
 import XCTest
 
-/// ☰ › Usage on demo data: it sits right above Settings, opens one page with
-/// plans and limits, the chart, totals and the models behind them, and covers
-/// every computer while All hosts is on. The chat's ⋯ opens the same page.
+/// Settings › Usage on demo data: one page with plans and limits, the chart, totals
+/// and the models behind them, and it covers every computer while Show every computer
+/// is on. The chat's ⋯ opens the same page.
 /// BIGHELP_USAGE_EVIDENCE (TEST_RUNNER_…) saves screenshots;
 /// BIGHELP_USAGE_APPEARANCE picks light or dark (light by default).
 final class ProviderUsageUITests: BighelpUITestCase {
     private var appearance: String { ProcessInfo.processInfo.environment["BIGHELP_USAGE_APPEARANCE"] ?? "light" }
 
     @MainActor
-    func testUsageOpensFromTheMenuAboveSettings() throws {
+    func testUsageOpensFromSettings() throws {
         let app = launch(["-bighelp.hosts.all-hosts", "NO"])
-        openMenu(app)
-        let usage = app.buttons["menu.usage"]
-        let settings = app.buttons["menu.settings"]
-        XCTAssertTrue(usage.waitForExistence(timeout: 8), "Usage is in ☰")
-        XCTAssertTrue(usage.isHittable, "on the first screen")
-        XCTAssertLessThan(usage.frame.maxY, settings.frame.minY + 2, "right above Settings")
-        XCTAssertLessThan(app.buttons["menu.scheduled-tasks"].frame.maxY, usage.frame.minY + 2)
-        XCTAssertEqual(app.buttons.matching(identifier: "menu.usage").count, 1, "One Usage, not a second copy under More")
-        save("usage-0-menu-\(appearance)", app)
-        usage.tap()
+        openUsage(app)
 
         let page = expectPage(app)
         XCTAssertTrue(app.descendants(matching: .any)["provider-usage.claude"].waitForExistence(timeout: 8),
@@ -95,10 +86,7 @@ final class ProviderUsageUITests: BighelpUITestCase {
     @MainActor
     func testLimitsFollowTheChosenOrder() throws {
         let app = launch(["-bighelp.hosts.all-hosts", "NO", "-bighelp.provider-usage.order", "copilot"])
-        openMenu(app)
-        let usage = app.buttons["menu.usage"]
-        XCTAssertTrue(usage.waitForExistence(timeout: 8))
-        usage.tap()
+        openUsage(app)
         let page = expectPage(app)
         XCTAssertTrue(app.descendants(matching: .any)["provider-usage.copilot"].waitForExistence(timeout: 8),
                       "Limits shows the plan put first")
@@ -132,21 +120,11 @@ final class ProviderUsageUITests: BighelpUITestCase {
         app.alerts.buttons["Save"].firstMatch.tap()
     }
 
+    /// Settings › Show every computer on: Usage adds up every computer.
     @MainActor
-    func testAllHostsAddsUpEveryComputer() throws {
-        let app = launch(["-bighelp.hosts.all-hosts", "NO"])
-        openMenu(app)
-        let allHosts = app.buttons["menu.all-hosts"]
-        XCTAssertTrue(allHosts.waitForExistence(timeout: 5))
-        allHosts.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["fleet.home"].waitForExistence(timeout: 8))
-        openMenu(app)
-        let usage = app.buttons["menu.usage"]
-        XCTAssertTrue(usage.waitForExistence(timeout: 5))
-        XCTAssertLessThan(usage.frame.maxY, app.buttons["menu.settings"].frame.minY + 2, "Above Settings here too")
-        usage.tap()
-        XCTAssertFalse(app.buttons["fleet.gate.host.Home Hermes"].waitForExistence(timeout: 2),
-                       "Usage covers every host, so it doesn't ask which")
+    func testEveryComputerAddsUp() throws {
+        let app = launch(["-bighelp.hosts.all-hosts", "YES"])
+        openUsage(app)
 
         let page = expectPage(app)
         save("usage-4-all-hosts-\(appearance)", app)
@@ -167,10 +145,7 @@ final class ProviderUsageUITests: BighelpUITestCase {
     @MainActor
     func testLimitsShowOneComputerOrAllUnderTheirNames() throws {
         let app = launch(["-bighelp.hosts.all-hosts", "YES"])
-        openMenu(app)
-        let usage = app.buttons["menu.usage"]
-        XCTAssertTrue(usage.waitForExistence(timeout: 8))
-        usage.tap()
+        openUsage(app)
         _ = expectPage(app)
         let any = app.descendants(matching: .any)
         let menu = app.buttons["usage.limits.computer"]
@@ -213,8 +188,7 @@ final class ProviderUsageUITests: BighelpUITestCase {
     @MainActor
     func testShareOffersFourFormats() throws {
         let app = launch(["-bighelp.hosts.all-hosts", "YES", "-test-slow-usage-export"])
-        openMenu(app)
-        app.buttons["menu.usage"].tap()
+        openUsage(app)
         _ = expectPage(app)
         let share = app.buttons["usage.share"]
         XCTAssertTrue(share.waitForExistence(timeout: 8))
@@ -240,8 +214,7 @@ final class ProviderUsageUITests: BighelpUITestCase {
     @MainActor
     func testOneComputerHasNoLimitsMenu() throws {
         let app = launch(["-bighelp.hosts.all-hosts", "NO"])
-        openMenu(app)
-        app.buttons["menu.usage"].tap()
+        openUsage(app)
         _ = expectPage(app)
         XCTAssertTrue(app.descendants(matching: .any)["provider-usage.claude"].waitForExistence(timeout: 8))
         XCTAssertFalse(app.buttons["usage.limits.computer"].exists)
@@ -252,7 +225,7 @@ final class ProviderUsageUITests: BighelpUITestCase {
     @MainActor
     func testTheChatMenuOpensTheSamePage() throws {
         let app = launch(["-preview-simple-chat"])
-        let conversation = app.buttons["session.row.demo-finance"]
+        let conversation = chatRow("demo-finance", in: app)
         XCTAssertTrue(conversation.waitForExistence(timeout: 15))
         conversation.tap()
         let options = app.buttons["chat.options"]
@@ -261,7 +234,7 @@ final class ProviderUsageUITests: BighelpUITestCase {
         XCTAssertTrue(usage.waitForExistence(timeout: 5))
         usage.tap()
         _ = expectPage(app)
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.navigationBars["Usage"].buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.buttons["chat.options"].waitForExistence(timeout: 5), "Back returns to the chat")
     }
 
@@ -276,11 +249,11 @@ final class ProviderUsageUITests: BighelpUITestCase {
         return app
     }
 
+    /// Settings › Usage: Settings closes and Usage opens over the home.
     @MainActor
-    private func openMenu(_ app: XCUIApplication) {
-        let menu = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"])).firstMatch
-        XCTAssertTrue(menu.waitForExistence(timeout: 10), "☰ menu")
-        menu.tap()
+    private func openUsage(_ app: XCUIApplication) {
+        openSettings(in: app)
+        settingsRow("simple-bots.settings.usage", in: app).tap()
     }
 
     /// On screen and below the glass header, which takes taps over the page.

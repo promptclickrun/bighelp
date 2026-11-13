@@ -31,7 +31,7 @@ final class MarketplaceUITests: BighelpUITestCase {
 
     @MainActor
     func testABotsProfileOpensItsOwnMarketplace() {
-        let app = launch(appearance: "light", extra: ["-preview-ui-v3", "-bighelp.settings.simple-bots", "YES"])
+        let app = launch(appearance: "light", extra: ["-preview-ui-v3", "-loopdy.home.landing", "bots"])
         openPrimaryProfileInfo(app)
 
         let row = app.buttons["simple-bots.profile.marketplace"]
@@ -63,7 +63,7 @@ final class MarketplaceUITests: BighelpUITestCase {
     @MainActor
     func testABotsProfileOpensItsCoreFilesAndConnections() {
         for appearance in ["light", "dark"] {
-            let app = launch(appearance: appearance, extra: ["-preview-ui-v3", "-bighelp.settings.simple-bots", "YES"])
+            let app = launch(appearance: appearance, extra: ["-preview-ui-v3", "-loopdy.home.landing", "bots"])
             openPrimaryProfileInfo(app)
 
             let coreFiles = app.buttons["simple-bots.profile.core-files"]
@@ -93,11 +93,11 @@ final class MarketplaceUITests: BighelpUITestCase {
         }
     }
 
-    /// A bot's profile sets the project its new chats start in, for that bot (also in Bots mode).
+    /// A bot's profile sets the project its new chats start in, for that bot.
     @MainActor
     func testABotsProfileChoosesItsActiveProject() {
         for appearance in ["light", "dark"] {
-            let app = launch(appearance: appearance, extra: ["-preview-ui-v3", "-bighelp.settings.simple-bots", "YES"])
+            let app = launch(appearance: appearance, extra: ["-preview-ui-v3", "-loopdy.home.landing", "bots"])
             openPrimaryProfileInfo(app)
 
             let row = app.buttons["simple-bots.profile.active-project"]
@@ -175,10 +175,13 @@ final class MarketplaceUITests: BighelpUITestCase {
         return app
     }
 
+    /// The sheet's own Back: the screen behind a sheet has a navigation bar too.
     @MainActor
     private func goBack(in app: XCUIApplication) {
-        let back = app.navigationBars.buttons.element(boundBy: 0)
-        if back.waitForExistence(timeout: 3) { back.tap() }
+        let back = app.buttons["BackButton"].firstMatch
+        if back.waitForExistence(timeout: 3) { back.tap(); return }
+        let bar = app.navigationBars.buttons.element(boundBy: 0)
+        if bar.waitForExistence(timeout: 1) { bar.tap() }
     }
 
     @MainActor

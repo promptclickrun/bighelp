@@ -3,15 +3,18 @@ import XCTest
 /// Fixture-only layout and navigation checks; no live host or paid turns.
 final class CompactChatMenuUITests: BighelpUITestCase {
     @MainActor
-    func testHomeOpensCanonicalBotChatInsteadOfTheNewerOrdinaryConversation() {
+    func testABotOpensItsCanonicalBotChatInsteadOfTheNewerOrdinaryConversation() {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-canonical-agent-chat",
-                               "-loopdy.home.opens-chat", "YES"]
+                               "-loopdy.home.landing", "bots"]
         app.launch()
+        let primary = app.buttons["simple-bots.primary"]
+        XCTAssertTrue(primary.waitForExistence(timeout: 20))
+        primary.tap()
         let canonical = app.textViews.matching(NSPredicate(format: "value CONTAINS %@", "This is the shared Bot Chat.")).firstMatch
-        XCTAssertTrue(canonical.waitForExistence(timeout: 20), "Home must open the canonical chat, not the newer ordinary one")
+        XCTAssertTrue(canonical.waitForExistence(timeout: 20), "The bot must open the canonical chat, not the newer ordinary one")
         chatNewChatButton(in: app).tap()
-        confirmNewChatPicker(in: app)
+        confirmNewChatPicker(in: app, botID: "finance")
         XCTAssertTrue(canonical.waitForNonExistence(timeout: 8), "Explicit New chat still starts an ordinary conversation")
     }
 
@@ -34,8 +37,8 @@ final class CompactChatMenuUITests: BighelpUITestCase {
             evidence("compact-menu-\(appearance)-\(size ?? "default")")
             let rootRows = large
                 ? ["chat.options.model-speed", "chat.options.this-chat", "chat.options.agent", "chat.options.more"]
-                : ["chat.switch-agent", "chat.rename", "chat.move-project", "chat.files", "chat.file-changes",
-                   "chat.options.model-speed", "chat.options.usage", "chat.edit-current-agent", "chat.options.advanced"]
+                : ["chat.rename", "chat.move-project", "chat.files", "chat.file-changes",
+                   "chat.options.model-speed", "chat.options.usage", "chat.bot-page", "chat.options.advanced"]
             for title in rootRows {
                 let row = chatMenuElement(title, in: app)
                 let at = size ?? "the default size"
@@ -63,7 +66,7 @@ final class CompactChatMenuUITests: BighelpUITestCase {
             // More and This chat still exercise full rows.
             let submenus = large ? [
                 ["chat.rename", "chat.move-project", "chat.files"],
-                ["chat.switch-agent", "chat.edit-current-agent"],
+                ["chat.bot-page"],
                 ["chat.file-changes", "chat.options.usage", "chat.options.advanced"],
                 ["chat.provider-usage", "chat.context-window", "chat.compact"]
             ] + (accessibility ? [["chat.options.display"]] : []) + [

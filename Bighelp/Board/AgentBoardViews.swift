@@ -17,18 +17,22 @@ struct AgentBoardContext {
     let onSend: (String) -> Void
     /// Opens a chat with this agent with a blueprint in its message box, its blanks as chips.
     let onBlueprint: (String) -> Void
-    /// The Chat tab's header controls, so every board has ☰, New chat and ⋯ too.
-    let onMenu: () -> Void
-    let onNewChat: () -> Void
-    let onPickAgents: () -> Void
-    /// This agent's places on the host, for ⋯ (Files, Memory, Skills & tools…).
-    let tools: [(title: String, systemImage: String, action: () -> Void)]
-    /// Something new on a board that's only in ☰, for a dot on ☰.
-    var menuHasUnread = false
-    /// Opened as a quick screen (from ☰, not in the bottom bar): Back where ☰ would be.
+    /// Opens this agent's chat, from New chat on a board in a sheet.
+    var onNewChat: () -> Void = {}
+    /// A board in a sheet (a bot's Dashboard › See all): Back and New chat float over it. Nil on a page
+    /// that draws its own Back over the board (Today's See all).
     var onBack: (() -> Void)? = nil
-    /// False on a page that draws its own Back and options over the board (Today's See all).
-    var showsHeaderButtons = true
+}
+
+extension View {
+    /// Back and New chat over a board that was opened in a sheet.
+    func boardSheetButtons(_ context: AgentBoardContext) -> some View {
+        overlay(alignment: .top) {
+            if let onBack = context.onBack {
+                AgentBoardHeaderButtons(agentName: context.agentName, onBack: onBack, onNewChat: context.onNewChat)
+            }
+        }
+    }
 }
 
 // MARK: - Shared pieces
@@ -54,8 +58,7 @@ struct BoardScroll<Content: View>: View {
             let side = max(BighelpTokens.space20, (geometry.size.width - 720) / 2 + BighelpTokens.space20)
             List {
                 Group {
-                    // Between ☰ and New chat, as on the chat: the avatar opens the profile, the name
-                    // switches agents.
+                    // The avatar opens the bot's page.
                     AgentHeroHeader(agentID: context.agentID, displayName: context.agentName,
                                     imageURL: context.imageURL, activity: context.activity, avatarSize: 56,
                                     onAvatarTap: context.onProfile, onNameTap: context.onSwitchAgent)
@@ -78,7 +81,7 @@ struct BoardScroll<Content: View>: View {
             .contentMargins(.bottom, 120, for: .scrollContent)
         }
         .scrollIndicators(.hidden)
-        .overlay(alignment: .top) { if context.showsHeaderButtons { AgentBoardHeaderButtons(context: context) } }
+        .boardSheetButtons(context)
         .bighelpRefreshable { await context.store.load(agentID: context.agentID) }
         .task(id: context.agentID) {
             if context.store.agentID != context.agentID || context.store.state == .idle {
@@ -1323,98 +1326,6 @@ struct IdeaDetailSheet: View {
         guard outcome != .failed else { acceptFailed = true; return }
         dismiss()
         context.onSend(idea.letsDoItMessage)
-    }
-
-    @BighelpThemeReader private var theme
-}
-
-// MARK: - Apps
-
-struct AgentAppsView<Artifacts: View>: View {
-    enum Segment: String, CaseIterable, Identifiable {
-        case artifacts = "Artifacts", media = "Media"
-        var id: String { rawValue }
-    }
-
-    let context: AgentBoardContext
-    let media: AgentMediaStore
-    @ViewBuilder let artifacts: () -> Artifacts
-    @State private var segment: Segment = .artifacts
-    @State private var preview: ChatAttachment?
-
-    var body: some View {
-        VStack(spacing: BighelpTokens.space12) {
-            AgentHeroHeader(agentID: context.agentID, displayName: context.agentName,
-                            imageURL: context.imageURL, activity: context.activity,
-                            onAvatarTap: context.onProfile, onNameTap: context.onSwitchAgent)
-                .frame(maxWidth: .infinity)
-                .padding(.top, BighelpTokens.space8)
-                .overlay(alignment: .top) { if context.showsHeaderButtons { AgentBoardHeaderButtons(context: context) } }
-            Picker("Show", selection: $segment) {
-                ForEach(Segment.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .bighelpSegmentedPicker()
-            .padding(.horizontal, BighelpTokens.space20)
-            .accessibilityIdentifier("board.apps.segment")
-            switch segment {
-            case .artifacts:
-                artifacts()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .media:
-                mediaGrid
-            }
-        }
-        .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
-        .task(id: context.agentID) {
-            if context.store.agentID != context.agentID { await context.store.load(agentID: context.agentID) }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("board.apps")
-    }
-
-    /// Pictures and videos the agent sent or made, then pictures from its posts.
-    private var mediaGrid: some View {
-        let pictures = context.store.items.filter { !$0.dismissed }.flatMap { item in
-            item.pictures.map { (item, $0) }
-        }
-        return ScrollView {
-            if media.items.isEmpty, pictures.isEmpty {
-                if media.state == .loading || media.state == .idle {
-                    ProgressView().padding(.top, BighelpTokens.space32)
-                } else {
-                    ContentUnavailableView("No media yet", systemImage: "photo.on.rectangle",
-                        description: Text(emptyMediaText))
-                        .padding(.top, BighelpTokens.space24)
-                }
-            } else {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 3), spacing: 2) {
-                    ForEach(media.items) { item in
-                        AgentMediaTile(item: item, store: media) {
-                            Task { preview = await media.attachment(for: item) }
-                        }
-                    }
-                    ForEach(Array(pictures.enumerated()), id: \.offset) { _, entry in
-                        BoardPictureView(item: entry.0, picture: entry.1, store: context.store)
-                            .aspectRatio(1, contentMode: .fill)
-                            .frame(minWidth: 0, maxWidth: .infinity)
-                            .clipped()
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .padding(.horizontal, BighelpTokens.space20)
-            }
-        }
-        .bighelpRefreshable { await media.load(agentID: context.agentID) }
-        .task(id: context.agentID) { await media.load(agentID: context.agentID) }
-        .bighelpSheet(item: $preview) { ChatAttachmentPreviewView(attachment: $0).bighelpSheetSize(.large) }
-        .padding(.bottom, 100)
-        .accessibilityIdentifier("board.media")
-    }
-
-    private var emptyMediaText: String {
-        media.state == .unavailable
-            ? "Pictures and videos \(context.agentName) sends you show up here once the bighelp plugin on your Hermes host is updated."
-            : "Pictures and videos \(context.agentName) sends you or makes show up here."
     }
 
     @BighelpThemeReader private var theme

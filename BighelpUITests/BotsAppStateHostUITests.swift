@@ -1,7 +1,7 @@
 import XCTest
 
-/// #857 on a real host with the bighelp plugin (`native-app-state-v1`): the order of Bots mode's
-/// home comes back after bighelp is deleted and installed again. Scripts/HostSignInMatrixProbe.py
+/// #857 on a real host with the bighelp plugin (`native-app-state-v1`): the order of Bots
+/// comes back after bighelp is deleted and installed again. Scripts/HostSignInMatrixProbe.py
 /// (`--modes appstate`) runs it twice against one isolated host: `save` pins a bot, drags it before
 /// the primary bot and saves; the probe deletes the app; `restore` connects the new install to the
 /// same host and finds the same top, pinned bot first.
@@ -18,7 +18,7 @@ final class BotsAppStateHostUITests: BighelpUITestCase {
         let (address, phase, profile) = (parts[0], parts[1], parts[2])
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-no-configured-hosts",
-                               "-bighelp.settings.simple-bots", "YES"]
+                               "-loopdy.home.landing", "bots"]
         app.launch()
         try addHost(app, address: address)
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 30))

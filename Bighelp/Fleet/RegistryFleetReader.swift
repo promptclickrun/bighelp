@@ -253,18 +253,10 @@ final class RegistryFleetReader: FleetHostReading {
                        isDefault: profile.isDefault, activity: activity[profile.id], placement: profile.placement,
                        botChat: botChats[profile.id].map(FleetBotChat.init), look: profile.look)
         }
-        // Codex and Claude Code chats on that computer; an older Hermes can't list them.
-        let defaultProfile = profiles.first(where: \.isDefault)?.id ?? profiles.first?.id ?? "default"
-        let otherApps = try? await DirectHermesSessionMaintenanceClient(
-            rpc: client, http: client, owner: owner, currentOwner: current,
-            resolveClosableRuntime: { _ in throw HermesSessionMaintenanceError.invalidRequest },
-            reconcileClosedRuntime: { _ in throw HermesSessionMaintenanceError.invalidRequest }
-        ).foreignSessions(profileID: defaultProfile, source: nil, offset: 0, limit: 10)
         return FleetSnapshot(agents: agents, chats: chats,
                              tasks: tasks.map { FleetTask(hostID: hostID, scheduledTask: $0) },
                              groups: await groups(hostID, workspace: workspace, owner: owner, profiles: profiles),
-                             refreshedAt: Date(),
-                             otherAppChats: otherApps.map { $0.sessions.map { FleetOtherAppChat(hostID: hostID, item: $0) } })
+                             refreshedAt: Date())
     }
 
     /// Its group chats, for Bots mode's Multi-gateway: the first page, to list and open. A host

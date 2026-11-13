@@ -2,12 +2,9 @@ import SwiftUI
 
 /// Settings › Your computers › Update every computer, with every computer shown: update Hermes,
 /// update the bighelp plugin and restart messaging everywhere at once, or on one computer from its
-/// own row, each with its own live status. From the all-hosts view, this app's Appearance and Chat
-/// are here too.
+/// own row, each with its own live status.
 struct FleetSettingsView: View {
     let store: FleetMaintenanceStore
-    /// This app's own pages (Appearance, Chat), the same ones Settings opens.
-    var appPage: ((SettingsMenuSection) -> AnyView)?
     @State private var confirmation: Confirmation?
 
     private enum Confirmation: Identifiable {
@@ -35,7 +32,7 @@ struct FleetSettingsView: View {
             hermesSection
             pluginSection
             gatewaySection
-            if let appPage { appSection(appPage) }
+
         }
         .listStyle(.insetGrouped)
         .bighelpFormSurface()
@@ -57,31 +54,6 @@ struct FleetSettingsView: View {
     @BighelpThemeReader private var theme
 
     // MARK: Sections
-
-    /// Appearance and Chat apply to bighelp on every host, so they're here too.
-    private func appSection(_ page: @escaping (SettingsMenuSection) -> AnyView) -> some View {
-        Section {
-            ForEach([SettingsMenuSection.appearance, .chat]) { section in
-                NavigationLink { page(section) } label: {
-                    HStack(spacing: BighelpTokens.space12) {
-                        BighelpIconTile(systemName: section == .appearance ? "paintpalette.fill" : "bubble.left.and.bubble.right.fill")
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(section.title)
-                                .font(.bighelp(.body).weight(.semibold))
-                                .foregroundStyle(theme.primaryText)
-                            Text(section.detail)
-                                .font(.bighelp(.footnote))
-                                .foregroundStyle(theme.secondaryText)
-                        }
-                    }
-                    .frame(minHeight: BighelpTokens.hitTarget)
-                }
-                .accessibilityIdentifier("fleet.settings.app.\(section.rawValue)")
-            }
-        } header: {
-            Text("This app")
-        }
-    }
 
     private var hermesSection: some View {
         Section {

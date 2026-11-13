@@ -1,13 +1,13 @@
 import XCTest
 
-/// Settings › Chat › Opens on: each choice is where a cold launch lands, and
-/// Start with picks the agent. Demo data. Set BIGHELP_LANDING_EVIDENCE
-/// (TEST_RUNNER_BIGHELP_LANDING_EVIDENCE) to a folder to save the picker in
-/// light and dark.
+/// Settings › Chat › Opens on: a choice saved before the one home lands on the place that holds it
+/// now, a link that opens the app wins over it, and the picker. Demo data. Set
+/// BIGHELP_LANDING_EVIDENCE (TEST_RUNNER_BIGHELP_LANDING_EVIDENCE) to a folder to save the picker in
+/// light and dark. Each new choice's own landing is `HomeShellUITests`'.
 final class LandingScreenUITests: BighelpUITestCase {
-    private func launch(_ app: XCUIApplication, landing: String?, extra: [String] = []) {
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.settings.nerd-mode", "NO"]
-            + (landing.map { ["-loopdy.home.landing", $0] } ?? []) + extra
+    private func launch(_ app: XCUIApplication, landing: String, extra: [String] = []) {
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.settings.nerd-mode", "NO",
+                               "-loopdy.home.landing", landing] + extra
         app.launch()
     }
 
@@ -15,107 +15,81 @@ final class LandingScreenUITests: BighelpUITestCase {
         app.descendants(matching: .any)[identifier].firstMatch
     }
 
+    /// Opens on as the old shell saved it: each screen opens the place that holds it now, with no chat.
     @MainActor
-    func testEachChoiceOpensOnItsScreen() throws {
+    func testAChoiceSavedBeforeOpensOnThePlaceThatHoldsItNow() throws {
         let app = makeApp()
-        let screens: [(landing: String, identifier: String, tab: String?)] = [
-            ("feed", "board.feed", "tab.feed"),
-            ("ideas", "board.ideas", "tab.ideas"),
-            ("goals", "board.goals", "tab.goals"),
-            ("projects", "projects.screen", nil),
-            ("kanban", "kanban.screen", nil),
-            ("agents", "agents.screen", nil),
-            ("last-chat", "chat.identity", nil),
-            ("sessions", "sessions.screen", nil),
-            ("all-agents", "fleet.home", nil),
+        let screens: [(landing: String, identifier: String)] = [
+            ("feed", "today.home"),
+            ("goals", "today.home"),
+            ("projects", "work.screen"),
+            ("kanban", "work.screen"),
+            ("agents", "simple-bots.home"),
+            ("all-agents", "simple-bots.home"),
+            ("last-chat", "chats.inbox"),
+            ("sessions", "chats.inbox"),
         ]
         for screen in screens {
             launch(app, landing: screen.landing)
             XCTAssertTrue(element(screen.identifier, in: app).waitForExistence(timeout: 25),
                           "\(screen.landing) opens on \(screen.identifier)")
-            if let tab = screen.tab {
-                XCTAssertTrue(app.buttons[tab].firstMatch.isSelected, "\(screen.landing): its tab is selected")
-            }
-            if screen.landing == "last-chat" {
-                XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 5), "A chat is open")
-            }
-            if screen.landing == "sessions" {
-                XCTAssertTrue(app.navigationBars["Sessions"].exists, "All sessions, to pick a recent one")
-            }
-            if screen.landing == "agents" {
-                XCTAssertFalse(element("fleet.home", in: app).exists, "One computer's agents, not every computer's")
-            }
+            XCTAssertFalse(app.textViews["chat.composer.text"].exists, "\(screen.landing): no chat opens by itself")
             app.terminate()
         }
     }
 
-    /// The real controls: pick a screen and an agent in Settings, then the
-    /// next launch opens there with that agent.
+    /// The real controls: Opens on picks a place, and Today or Work asks which view the first tab shows.
     @MainActor
-    func testPickedInSettingsOpensThereWithThatAgent() throws {
+    func testOpensOnPicksAPlaceAndTheFirstTabsView() throws {
         let app = makeApp()
-        launch(app, landing: nil, extra: ["-loopdy.home.opens-chat", "YES"])
-        let hero = app.buttons["chat.identity"].firstMatch
-        XCTAssertTrue(hero.waitForExistence(timeout: 25), "Nothing picked: today's start, the agent's chat")
-        XCTAssertEqual(hero.label, "Avery Park", "The demo's default agent")
+        launch(app, landing: "chats")
+        XCTAssertTrue(element("chats.inbox", in: app).waitForExistence(timeout: 25))
 
-        openRootTab("tab.profile", in: app)
+        openSettings(in: app)
         settingsRow("settings.menu.chat", in: app).tap()
         let openOn = app.buttons["settings.landing.screen"].firstMatch
         XCTAssertTrue(openOn.waitForExistence(timeout: 5), "Opens on leads Settings › Chat")
-        XCTAssertTrue(openOn.label.contains("Last chat"), "Shows today's start until you pick: \(openOn.label)")
-        openOn.tap()
-        let feed = app.buttons["Feed"].firstMatch
-        XCTAssertTrue(feed.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["Agents (multi)"].firstMatch.exists)
-        feed.tap()
-        XCTAssertTrue(openOn.label.contains("Feed"), openOn.label)
+        XCTAssertTrue(openOn.label.contains("Chats"), "Shows where this launch opened: \(openOn.label)")
+        let firstTab = app.buttons["settings.landing.view"].firstMatch
+        XCTAssertFalse(firstTab.exists, "Bots and Chats name the first tab's view themselves")
 
-        let startWith = app.buttons["settings.landing.agent"].firstMatch
-        XCTAssertTrue(startWith.waitForExistence(timeout: 5))
-        XCTAssertTrue(startWith.label.contains("Last bot used"), startWith.label)
-        startWith.tap()
-        let mina = app.buttons["Mina Shah"].firstMatch
-        XCTAssertTrue(mina.waitForExistence(timeout: 5))
-        mina.tap()
-        XCTAssertTrue(startWith.label.contains("Mina Shah"), startWith.label)
+        openOn.tap()
+        let today = app.buttons["Today"].firstMatch
+        XCTAssertTrue(today.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Work"].firstMatch.exists)
+        today.tap()
+        XCTAssertTrue(openOn.label.contains("Today"), openOn.label)
+        XCTAssertTrue(firstTab.waitForExistence(timeout: 3), "Today asks which view the first tab shows")
+        firstTab.tap()
+        let bots = app.buttons["Bots"].firstMatch
+        XCTAssertTrue(bots.waitForExistence(timeout: 5))
+        bots.tap()
+        XCTAssertTrue(firstTab.label.contains("Bots"), firstTab.label)
 
-        // Agents (multi) has no one agent to start with.
         openOn.tap()
-        app.buttons["Agents (multi)"].firstMatch.tap()
-        XCTAssertTrue(startWith.waitForNonExistence(timeout: 3), "No Start with for every computer's agents")
-        openOn.tap()
-        app.buttons["Feed"].firstMatch.tap()
-        XCTAssertTrue(startWith.waitForExistence(timeout: 3))
+        app.buttons["Chats"].firstMatch.tap()
+        XCTAssertTrue(firstTab.waitForNonExistence(timeout: 3), "Back to Chats, the row goes")
         app.terminate()
-
-        // The same test run keeps its saved settings across relaunches. The
-        // Chat tab opens the agent's chat, as it does outside these tests.
-        launch(app, landing: nil, extra: ["-loopdy.home.opens-chat", "YES"])
-        XCTAssertTrue(element("board.feed", in: app).waitForExistence(timeout: 25), "Opens on Feed")
-        XCTAssertTrue(app.buttons["tab.feed"].firstMatch.isSelected)
-        app.buttons["tab.sessions"].firstMatch.tap()
-        let homeHero = app.buttons["chat.identity"].firstMatch
-        XCTAssertTrue(homeHero.waitForExistence(timeout: 10))
-        XCTAssertEqual(homeHero.label, "Mina Shah", "Started with the picked agent")
     }
 
     /// A link that opens the app wins over the landing screen.
     @MainActor
     func testALinkOpeningTheAppWinsOverTheLandingScreen() throws {
         let app = makeApp()
-        launch(app, landing: "feed")
-        XCTAssertTrue(element("board.feed", in: app).waitForExistence(timeout: 25))
+        launch(app, landing: "today")
+        XCTAssertTrue(element("today.home", in: app).waitForExistence(timeout: 25))
         app.terminate()
 
-        // Cold launch through a widget-style link to Goals.
+        // Cold launch through a widget-style link to Goals: every bot's Goals over Today.
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.settings.nerd-mode", "NO",
-                               "-loopdy.home.landing", "projects"]
+                               "-loopdy.home.landing", "work"]
         app.open(URL(string: "loopdy://agent/goals")!)
-        XCTAssertTrue(element("board.goals", in: app).waitForExistence(timeout: 25), "The link's screen opens")
+        let board = element("today.board-page", in: app)
+        XCTAssertTrue(board.waitForExistence(timeout: 25), "The link's screen opens")
         sleep(3)
-        XCTAssertFalse(element("projects.screen", in: app).exists, "The landing screen doesn't cover the link")
-        XCTAssertTrue(app.buttons["tab.goals"].firstMatch.isSelected)
+        XCTAssertTrue(board.exists, "The landing screen doesn't cover the link")
+        let work = element("work.screen", in: app)
+        XCTAssertFalse(work.exists && work.isHittable, "Work, the landing, isn't on top")
     }
 
     @MainActor
@@ -123,26 +97,25 @@ final class LandingScreenUITests: BighelpUITestCase {
         let folder = ProcessInfo.processInfo.environment["BIGHELP_LANDING_EVIDENCE"]
         for appearance in ["light", "dark"] {
             let app = makeApp()
-            launch(app, landing: "goals", extra: ["-loopdy.demo.appearance", appearance])
-            XCTAssertTrue(element("board.goals", in: app).waitForExistence(timeout: 25))
-            app.buttons["tab.sessions"].firstMatch.tap()
-            openRootTab("tab.profile", in: app)
+            launch(app, landing: "today", extra: ["-loopdy.demo.appearance", appearance])
+            XCTAssertTrue(element("today.home", in: app).waitForExistence(timeout: 25))
+            openSettings(in: app)
             settingsRow("settings.menu.chat", in: app).tap()
             let openOn = app.buttons["settings.landing.screen"].firstMatch
             XCTAssertTrue(openOn.waitForExistence(timeout: 5))
             save(folder, "\(appearance)-1-chat-page", app)
             openOn.tap()
-            XCTAssertTrue(app.buttons["Projects"].firstMatch.waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["Work"].firstMatch.waitForExistence(timeout: 5))
             sleep(1)
             save(folder, "\(appearance)-2-open-on", app)
-            app.buttons["Goals"].firstMatch.tap()
-            let startWith = app.buttons["settings.landing.agent"].firstMatch
-            XCTAssertTrue(startWith.waitForExistence(timeout: 5))
-            startWith.tap()
-            XCTAssertTrue(app.buttons["Last bot used"].firstMatch.waitForExistence(timeout: 5))
+            app.buttons["Today"].firstMatch.tap()
+            let firstTab = app.buttons["settings.landing.view"].firstMatch
+            XCTAssertTrue(firstTab.waitForExistence(timeout: 5))
+            firstTab.tap()
+            XCTAssertTrue(app.buttons["Chats"].firstMatch.waitForExistence(timeout: 5))
             sleep(1)
-            save(folder, "\(appearance)-3-start-with", app)
-            app.buttons["Last bot used"].firstMatch.tap()
+            save(folder, "\(appearance)-3-first-tab", app)
+            app.buttons["Chats"].firstMatch.tap()
             app.terminate()
         }
     }

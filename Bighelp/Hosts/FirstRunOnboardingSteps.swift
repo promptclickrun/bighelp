@@ -341,14 +341,8 @@ enum FirstRunHome: String, CaseIterable, Identifiable {
     @MainActor
     func apply(to settings: SettingsStore) {
         settings.homeLanding = landing
-        // One home: delete with the old shell, which still opens in a mode: Bots mode, or Chat.
-        settings.codeModeEnabled = false
-        settings.simpleBotsEnabled = self == .bots
     }
 }
-
-// One home: delete with `LocalizationTests`' check that the saved value stays "bots".
-typealias FirstRunMode = FirstRunHome
 
 /// "How do you want to start?": two choices and Continue. No Skip: the home needs an answer.
 @MainActor

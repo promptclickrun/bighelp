@@ -54,7 +54,7 @@ struct BighelpAppComposition {
         if arguments.contains("-test-forget-ai-data-agreement") { defaults.removeObject(forKey: AIDataConsent.key) }
         #endif
         let settings = SettingsStore(defaults: defaults)
-        // Built once per launch: Open on picks one computer or all of them.
+        // Built once per launch: Opens on picks one computer or all of them.
         settings.applyLaunchLandingToAllHostsMode()
         let companion = CompanionStore(defaults: defaults)
         #if DEBUG

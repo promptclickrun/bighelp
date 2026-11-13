@@ -435,7 +435,7 @@ final class SettingsStore {
     /// The home on screen now. ☰ switches it; each launch starts on `startExperience`.
     var experience: BighelpExperience
 
-    /// Settings › Chat › Open on; nil until picked (the agent's latest chat).
+    /// Settings › Chat › Opens on; nil until picked (the agent's latest chat).
     var landingScreen: BighelpLandingScreen? {
         didSet { defaults.set(landingScreen?.rawValue, forKey: BighelpLanding.screenKey) }
     }
@@ -627,8 +627,8 @@ final class SettingsStore {
         defaults.set(startAgentIDs, forKey: BighelpLanding.startAgentKey)
     }
 
-    /// A picked Open on decides, at launch, whether every computer's agents show. Bots mode
-    /// opens on its own home and ignores Open on (its Multi-gateway switch shows every computer).
+    /// A picked Opens on decides, at launch, whether every computer's agents show. Bots mode
+    /// opens on its own home and ignores Opens on (its Multi-gateway switch shows every computer).
     func applyLaunchLandingToAllHostsMode() {
         guard !simpleBotsEnabled,
               let on = BighelpLanding.allHostsMode(for: launchLanding), allHostsMode != on else { return }
@@ -637,7 +637,7 @@ final class SettingsStore {
     }
 
     /// A notification, widget or link that opened the app goes where it points, in the mode you
-    /// were in: Open on decides only for a launch you started yourself. Only right after launch.
+    /// were in: Opens on decides only for a launch you started yourself. Only right after launch.
     func restoreAllHostsModeForOutsideOpen() {
         guard let before = modeBeforeLaunchLanding else { return }
         modeBeforeLaunchLanding = nil
@@ -645,7 +645,7 @@ final class SettingsStore {
         allHostsMode = before.on
     }
 
-    /// The switch as it was before Open on changed it at this launch.
+    /// The switch as it was before Opens on changed it at this launch.
     @ObservationIgnored private var modeBeforeLaunchLanding: (on: Bool, at: Date)?
     @ObservationIgnored private let now: () -> Date
     private static let outsideOpenWindow: TimeInterval = 30

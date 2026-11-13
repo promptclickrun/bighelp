@@ -752,7 +752,7 @@ final class BighelpManagedNotificationService: HostNotificationSetupServing {
         return true
     }
 
-    /// Settings › Notifications › Quiet Hours changed: tell every computer with notifications on.
+    /// Settings › Notifications › Quiet hours changed: tell every computer with notifications on.
     /// A computer that can't be reached now gets it the next time a chat opens there.
     func applyQuietHours() async -> BighelpQuietHoursSyncResult {
         var outdated: [String] = []

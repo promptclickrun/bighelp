@@ -790,7 +790,7 @@ final class SessionCatalogStore {
         persistChangesIfNeeded()
     }
 
-    /// What a chat shows: its own ⋯ choice, or Settings › Chat details.
+    /// What a chat shows: its own ⋯ choice, or Settings › Chat › Advanced · A bot's work.
     func activityVisibility(for record: SessionRecord) -> ChatActivityVisibility {
         record.activityVisibility ?? defaultActivityVisibility()
     }

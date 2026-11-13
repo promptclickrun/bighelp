@@ -42,7 +42,7 @@ and keeps none of them. With Location off, no place is sent.
 Agents can also change how bighelp looks (light or dark mode and the chat color)
 with `iphone_appearance`. It reads and changes only those two settings, shares no
 phone data and needs no iOS permission, so it's on until the person turns off
-"Let agents change how bighelp looks" in Device access (one switch for every
+"Change how bighelp looks" in Device access (one switch for every
 host). It works only while that chat is open and bighelp is in front.
 
 Requested results travel over the chat's native Hermes connection to the host of

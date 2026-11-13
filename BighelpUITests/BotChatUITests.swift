@@ -1,6 +1,6 @@
 import XCTest
 
-/// Settings › Chat › Bot chat experience decides what tapping an agent on Agents opens,
+/// Settings › Chat › A bot opens decides what tapping an agent on Agents opens,
 /// and an agent's Bot Chat offers This chat › New Bot Chat. On the demo data, whose
 /// finance agent has a Bot Chat. Set BIGHELP_BOT_CHAT_EVIDENCE (TEST_RUNNER_…) to save
 /// screenshots.
@@ -40,7 +40,7 @@ final class BotChatUITests: BighelpUITestCase {
             settingsRow("settings.menu.chat", in: settings).tap()
             let picker = settings.descendants(matching: .any)["settings.chat.bot-chat-experience"].firstMatch
             XCTAssertTrue(picker.waitForExistence(timeout: 5))
-            XCTAssertTrue(settings.staticTexts["Persistent Bot Chat"].exists, "Persistent Bot Chat is the default")
+            XCTAssertTrue(settings.staticTexts["Its ongoing chat"].exists, "Its ongoing chat is the default")
             save("settings-\(appearance)", settings)
             settings.terminate()
         }

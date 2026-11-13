@@ -217,7 +217,7 @@ final class LocalizationUITests: BighelpUITestCase {
                 XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 5), title)
                 capture("settings-\(identifier)", language, appearance)
                 if identifier == "notifications" {
-                    let peers = app.staticTexts[say("Agents messaging each other", "智能体之间的消息")]
+                    let peers = app.staticTexts[say("Bots messaging each other", "机器人之间的消息")]
                     for _ in 0..<5 where !peers.exists { app.swipeUp() }
                     XCTAssertTrue(peers.exists)
                     capture("settings-notifications-lower", language, appearance)

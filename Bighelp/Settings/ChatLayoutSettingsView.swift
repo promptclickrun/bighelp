@@ -11,10 +11,10 @@ enum ChatLayoutPreferences {
     static let agentMessageStyleKey = "bighelp.appearance.agent-messages"
     /// With a hardware keyboard, Return sends (true) or adds a line (false).
     static let returnSendsKey = "bighelp.chat.return-sends"
-    /// Settings › Chat › Session title: the chat's title under the agent's name. Off by default.
+    /// Settings › Chat › Chat title: the chat's title under the agent's name. Off by default.
     static let showsSessionTitleKey = "bighelp.chat.shows-session-title"
     static let showsSessionTitleByDefault = false
-    /// Settings › Chat › Projects in the chat list: each chat's project on a line of its own in
+    /// Settings › Chat › Project names: each chat's project on a line of its own in
     /// Chats. On by default.
     static let showsChatProjectKey = "bighelp.chat-list.shows-project"
     static let showsChatProjectByDefault = true

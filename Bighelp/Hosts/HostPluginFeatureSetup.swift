@@ -5,12 +5,9 @@ enum HostPluginFeature: String, Hashable, Sendable {
 
     var capability: String { self == .liveVoice ? "native-voice-v1" : "native-device-tools-v1" }
     var title: String { self == .liveVoice ? "bighelp plugin" : "Device access" }
-    /// Voice settings show only the plugin's status line; every voice mode needs the plugin.
-    var detail: String? {
-        self == .liveVoice
-            ? nil
-            : "Phone tools like \(DeviceToolCapability.health.isOfferedOnThisPlatform ? "Apple Health, " : "")Calendar, Contacts, Photos, and Location need the bighelp plugin on your Hermes host. You choose each permission separately on this \(BighelpPlatform.isMac ? "Mac" : "iPhone")."
-    }
+    /// Device access shows the plugin only while there's something to do or wait for; Voice
+    /// settings always show its status line, since every voice mode needs the plugin.
+    var showsOnlyWhenNeeded: Bool { self == .deviceAccess }
     var installIdentifier: String {
         self == .liveVoice ? CodexLiveVoiceSettingsPresentation.installAccessibilityIdentifier
             : "settings.install-loopdy-plugin-for-device-access"
@@ -22,6 +19,9 @@ enum HostPluginFeature: String, Hashable, Sendable {
 @MainActor
 struct HostPluginFeatureSection: View {
     let feature: HostPluginFeature
+    /// The page's opening line, in place of the section's title. It also keeps the section on the
+    /// page while its rows are hidden, so the check below still runs.
+    var lead: Text? = nil
     @Environment(\.bighelpHostRegistry) private var registry
     @Environment(\.scenePhase) private var scenePhase
     @State private var setup: HostNotificationSetupModel?
@@ -29,6 +29,8 @@ struct HostPluginFeatureSection: View {
     @State private var action: String?
     @State private var checking = false
     @State private var ready = false
+    /// Whether the last finished check left something to do or wait for (`showsRows`).
+    @State private var showedRows = false
     /// Set after this section installed or turned on the plugin, until a restart finishes it.
     @State private var restarts: HostPluginUpdateModel?
     @State private var restartPrompt: HostPluginUpdateModel?
@@ -40,35 +42,53 @@ struct HostPluginFeatureSection: View {
         "\(registry?.selectedHostID?.uuidString ?? "none"):\(registry?.generation.uuidString ?? "none"):\(registry?.selectedWorkspace?.connectionGeneration.uuidString ?? "none"):\(registry?.selectedWorkspace?.isConnected == true)"
     }
 
+    /// Device access hides the rows once the plugin is ready, and with no computer chosen (its
+    /// opening line says to connect one).
+    private var showsRows: Bool {
+        guard feature.showsOnlyWhenNeeded else { return true }
+        guard registry?.selectedHost != nil else { return false }
+        // A check alone changes nothing on screen: most end with the plugin ready, and a line that
+        // came and went moved the page each time it opened. Rows that were up stay up through one.
+        if checking, setup?.isWorking != true, restarts == nil { return showedRows }
+        return !ready || restarts != nil
+    }
+
+    private var offersInstall: Bool {
+        action != nil && setup != nil && !checking && setup?.isWorking != true && restarts?.isWorking != true
+    }
+
     var body: some View {
         Section {
-            if let detail = feature.detail {
-                Text(detail).fixedSize(horizontal: false, vertical: true)
-            }
-            Label(status, systemImage: ready ? "checkmark.circle" : "puzzlepiece.extension")
-                .bighelpFont(.metadata).foregroundStyle(.secondary)
-                .accessibilityIdentifier("settings.plugin-status.\(feature.rawValue)")
-            if let restarts, restarts.isWorking {
-                ProgressView(restarts.message ?? "Restarting Hermes…")
-            } else if checking || setup?.isWorking == true {
-                ProgressView(setup?.isWorking == true ? "Setting up the plugin…" : "Checking plugin…")
-            } else if let action, let setup {
-                Button(action) { Task { await install(setup) } }
-                    .accessibilityIdentifier(feature.installIdentifier)
-            } else if let restarts {
-                Button("Restart Hermes to Finish") { restartPrompt = restarts }
-                    .accessibilityIdentifier("settings.plugin-restart.\(feature.rawValue)")
-            } else if !ready, registry?.selectedHost != nil {
-                Button("Check again") { Task { await check() } }
-                    .accessibilityIdentifier("settings.plugin-check.\(feature.rawValue)")
+            if showsRows {
+                Label(status, systemImage: ready ? "checkmark.circle" : "puzzlepiece.extension")
+                    .bighelpFont(.metadata).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("settings.plugin-status.\(feature.rawValue)")
+                if let restarts, restarts.isWorking {
+                    ProgressView(restarts.message ?? "Restarting Hermes…")
+                } else if checking || setup?.isWorking == true {
+                    ProgressView(setup?.isWorking == true ? "Setting up the plugin…" : "Checking plugin…")
+                } else if let action, let setup {
+                    Button(action) { Task { await install(setup) } }
+                        .accessibilityIdentifier(feature.installIdentifier)
+                } else if let restarts {
+                    Button("Restart Hermes to Finish") { restartPrompt = restarts }
+                        .accessibilityIdentifier("settings.plugin-restart.\(feature.rawValue)")
+                } else if !ready, registry?.selectedHost != nil {
+                    Button("Check again") { Task { await check() } }
+                        .accessibilityIdentifier("settings.plugin-check.\(feature.rawValue)")
+                }
             }
         } header: {
-            Text(feature.title)
+            if let lead {
+                lead.textCase(nil).bighelpFont(.metadata).foregroundStyle(.secondary)
+            } else {
+                Text(feature.title)
+            }
         } footer: {
-            if feature == .deviceAccess {
+            if feature == .deviceAccess, showsRows, offersInstall {
                 Text(BighelpPlatform.isMac
-                     ? "Installation leaves macOS permissions off. Keep bighelp open while your agent uses this Mac."
-                     : "Installation leaves iOS permissions off. Keep bighelp open while your agent uses this iPhone.")
+                     ? "Installation leaves macOS permissions off."
+                     : "Installation leaves iOS permissions off.")
             }
         }
         .task(id: identity) { await check() }
@@ -106,7 +126,12 @@ struct HostPluginFeatureSection: View {
         let request = UUID()
         requestID = request
         checking = true; ready = false; action = nil
-        defer { if requestID == request { checking = false } }
+        defer {
+            if requestID == request {
+                checking = false
+                showedRows = !ready || restarts != nil
+            }
+        }
         guard let registry, let host = registry.selectedHost,
               let workspace = registry.selectedWorkspace, workspace.isConnected,
               let direct = workspace.nativeClient,

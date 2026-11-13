@@ -126,7 +126,7 @@ struct ChatActivityRow: View {
 /// Back-to-back thinking as one row, named by the model's newest heading
 /// ("Reading the PDF"); without one, "Thinking" while it runs, then "Thought
 /// for 6s". The agent's thinking text unfolds under it; it's open while the
-/// agent thinks, and after that too with Settings › Chat › Keep reasoning open,
+/// agent thinks, and after that too with Settings › Chat › Keep thinking open,
 /// unless the reader chose otherwise.
 struct ChatThinkingRow: View {
     let events: [ChatActivityEvent]

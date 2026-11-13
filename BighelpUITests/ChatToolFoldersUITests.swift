@@ -47,7 +47,7 @@ final class ChatToolFoldersUITests: BighelpUITestCase {
             let reasoning = app.buttons["chat.reasoning:message:folders-q1"]
             XCTAssertTrue(reasoning.exists)
             XCTAssertEqual(reasoning.label, "Thought for 12s")
-            XCTAssertEqual(reasoning.value as? String, "Expanded", "Keep reasoning open is on by default")
+            XCTAssertEqual(reasoning.value as? String, "Expanded", "Keep thinking open is on by default")
             XCTAssertLessThan(reasoning.frame.minY, fold.frame.minY, "Above the work")
             let words = app.staticTexts["chat.reasoning:message:folders-q1.words"]
             XCTAssertTrue(words.label.contains("Finding the setup steps"), words.label)
@@ -135,7 +135,7 @@ final class ChatToolFoldersUITests: BighelpUITestCase {
             app.terminate()
         }
 
-        // Keep reasoning open off: finished reasoning is one line; the running one still shows its words.
+        // Keep thinking open off: finished reasoning is one line; the running one still shows its words.
         var app = launch(["-\(Self.staysOpenKey)", "NO"])
         let timeline = app.tables["chat.timeline"]
         XCTAssertEqual(app.buttons[liveID].value as? String, "Expanded")

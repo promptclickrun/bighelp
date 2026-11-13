@@ -941,11 +941,12 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         app.navigationBars.buttons.firstMatch.tap()
         app.buttons["settings.apps"].tap()
         app.buttons["settings.connections.device-access"].tap()
+        // Device access shows the plugin only while something needs doing; a ready plugin shows nothing.
         let devicePlugin = app.descendants(matching: .any).matching(identifier: "settings.plugin-status.deviceAccess").firstMatch
-        XCTAssertTrue(devicePlugin.waitForExistence(timeout: 10))
+        XCTAssertTrue(devicePlugin.waitForNonExistence(timeout: 20))
         capture("real-host-device-plugin-settings-116", app)
         app.buttons["permissions.open.calendar"].tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "You choose each permission separately")).firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.switches["permissions.device-tools.calendar"].firstMatch.waitForExistence(timeout: 5))
         capture("real-host-calendar-plugin-settings-116", app)
     }
 
@@ -1552,12 +1553,10 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             guard connections.isHittable else { XCTFail("Connections must be reachable from Settings."); return }
             connections.tap()
             app.buttons["settings.connections.device-access"].tap()
+            // Device access hides a ready plugin: its status goes once the check passes.
             let device = app.staticTexts["settings.plugin-status.deviceAccess"].firstMatch
-            for _ in 0..<6 where !device.exists || !device.isHittable { app.swipeUp() }
-            guard device.waitForExistence(timeout: 15) else { XCTFail("Device plugin status must be visible."); return }
-            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
-                predicate: NSPredicate(format: "label CONTAINS %@", "bighelp plugin connected."), object: device
-            )], timeout: 20), .completed)
+            XCTAssertTrue(device.waitForNonExistence(timeout: 20), "A ready plugin shows nothing on Device access")
+            XCTAssertTrue(app.switches["permissions.device-tools.calendar"].firstMatch.waitForExistence(timeout: 5))
             capture("native-reviewed-plugin-device-ready", app)
         }
     }

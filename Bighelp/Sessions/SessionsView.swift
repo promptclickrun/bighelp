@@ -26,7 +26,7 @@ struct SessionsView: View {
     @Environment(\.bighelpUIV2Enabled) private var uiV2Enabled
     @Environment(\.bighelpUIV3Enabled) private var uiV3Enabled
     @Environment(\.verticalSizeClass) private var verticalSizeClass
-    /// Settings › Chat › Projects in the chat list, saved on this device only.
+    /// Settings › Chat › Project names, saved on this device only.
     @AppStorage(ChatLayoutPreferences.showsChatProjectKey)
     private var showsChatProject = ChatLayoutPreferences.showsChatProjectByDefault
     private enum ActionDialog {

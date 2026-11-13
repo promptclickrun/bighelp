@@ -683,7 +683,7 @@ final class BighelpPushRegistrar {
     }
 }
 
-/// Tells the push registrar that the person changed Settings › Notifications › Notify Me About.
+/// Tells the push registrar that the person changed Settings › Notifications › Notify me about.
 @MainActor
 enum BighelpPushPreferenceChanges {
     static var handler: (@MainActor () -> Void)?

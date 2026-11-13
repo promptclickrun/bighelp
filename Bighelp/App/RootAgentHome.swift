@@ -247,7 +247,7 @@ extension RootShellView {
         openSessionSelection(summary)
     }
 
-    /// Opens Settings › Chat › Open on once at launch, with its Start with
+    /// Opens Settings › Chat › Opens on once at launch, with its Start with
     /// agent, after saved chats and agents have loaded. False while it waits
     /// for Kanban's first answer.
     @discardableResult
@@ -408,7 +408,7 @@ extension RootShellView {
         startNewChat(explicitAgentID: agentID)
     }
 
-    /// An agent tapped on Agents opens what Settings › Chat › Bot chat experience
+    /// An agent tapped on Agents opens what Settings › Chat › A bot opens
     /// asks for: its Bot Chat, its latest chat, or a new one. The all-hosts view
     /// keeps its Back navigation (`openFleetAgent` is its version).
     func openAgentChat(_ agentID: String) {

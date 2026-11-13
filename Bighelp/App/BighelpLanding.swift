@@ -1,6 +1,6 @@
 import Foundation
 
-/// The screen bighelp opens on (Settings › Chat › Open on). It applies to a
+/// The screen bighelp opens on (Settings › Chat › Opens on). It applies to a
 /// cold launch only, and a link, widget or notification that opens the app wins.
 enum BighelpLandingScreen: String, CaseIterable, Identifiable, Sendable {
     case agents
@@ -22,20 +22,6 @@ enum BighelpLandingScreen: String, CaseIterable, Identifiable, Sendable {
         case .goals: String(localized: "Goals")
         case .kanban: String(localized: "Kanban")
         case .projects: String(localized: "Projects")
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .agents: String(localized: "This computer's agents.")
-        case .allAgents: String(localized: "Every agent on every computer.")
-        case .lastChat: String(localized: "Your latest chat with the agent.")
-        case .sessions: String(localized: "All sessions, to pick a recent one.")
-        case .feed: String(localized: "The agent's Feed.")
-        case .ideas: String(localized: "The agent's Ideas.")
-        case .goals: String(localized: "The agent's Goals.")
-        case .kanban: String(localized: "The board, where this computer has Kanban.")
-        case .projects: String(localized: "This computer's projects.")
         }
     }
 

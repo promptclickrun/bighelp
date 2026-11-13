@@ -40,7 +40,7 @@ final class ChatTranscriptCanvasCache {
         let interimReplies: ChatInterimReplyPlacement
         /// The chat's `ChatWorkStyle`; nil in a group chat.
         let workStyle: ChatWorkStyle?
-        /// Where each turn's thinking goes (Settings › Chat › Reasoning shows).
+        /// Where each turn's thinking goes (Settings › Chat › Thinking).
         var reasoning = ChatReasoningPlacement.steps
     }
 

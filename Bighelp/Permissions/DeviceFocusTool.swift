@@ -74,7 +74,7 @@ struct FocusPermissionExtras: View {
 
     var body: some View {
         if permissions.isEnabled(.focus) {
-            Text("To share a Focus, add bighelp's filter to it in iOS Settings › Focus. Then pick a name and a note for your agents, and choose if their alerts stay quiet.")
+            Text("To share a Focus, add bighelp's filter to it in iOS Settings › Focus, then pick its name, its note for your bots and whether their alerts stay quiet.")
                 .bighelpFont(.metadata).foregroundStyle(.secondary)
                 .accessibilityIdentifier("permissions.device-tools.focus.setup")
         }

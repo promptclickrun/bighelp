@@ -69,11 +69,11 @@ struct QuietHoursTests {
     @Test func computersWithAnOlderPluginAreNamedInOneShortNote() {
         #expect(BighelpQuietHoursSyncResult().note == nil)
         #expect(BighelpQuietHoursSyncResult(needsPluginUpdate: ["Studio Mac"]).note
-            == "Quiet Hours needs a plugin update on Studio Mac.")
+            == "Quiet hours needs a plugin update on Studio Mac.")
         #expect(BighelpQuietHoursSyncResult(needsPluginUpdate: ["Studio Mac", "Home Server"]).note
-            == "Quiet Hours needs a plugin update on Studio Mac and Home Server.")
+            == "Quiet hours needs a plugin update on Studio Mac and Home Server.")
         #expect(BighelpQuietHoursSyncResult(needsPluginUpdate: ["A", "B", "C"]).note
-            == "Quiet Hours needs a plugin update on A, B and C.")
+            == "Quiet hours needs a plugin update on A, B and C.")
     }
 
     private static func date(_ text: String) throws -> Date {

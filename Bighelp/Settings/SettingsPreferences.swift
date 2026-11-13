@@ -242,7 +242,7 @@ enum MidSessionChatBehavior: String, CaseIterable, Identifiable, Sendable {
 }
 
 /// What tapping an agent on Agents opens, with one gateway or several
-/// (Settings › Chat › Bot chat experience).
+/// (Settings › Chat › A bot opens).
 enum BotChatExperience: String, CaseIterable, Identifiable, Sendable {
     /// The agent's one ongoing Bot Chat; its latest chat or a new one when the host has none to give.
     case botChat
@@ -253,22 +253,14 @@ enum BotChatExperience: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .botChat: String(localized: "Persistent Bot Chat")
-        case .lastChat: String(localized: "Open last chat")
-        case .newChat: String(localized: "Open new chat")
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .botChat: String(localized: "Tapping an agent opens its one ongoing Bot Chat.")
-        case .lastChat: String(localized: "Tapping an agent opens your most recent chat with it.")
-        case .newChat: String(localized: "Tapping an agent starts a new chat with it.")
+        case .botChat: String(localized: "Its ongoing chat")
+        case .lastChat: String(localized: "Your last chat")
+        case .newChat: String(localized: "A new chat")
         }
     }
 }
 
-/// How a one-to-one chat shows its agent's work (Settings › Chat › Agent's work). Show reasoning and
+/// How a one-to-one chat shows its agent's work (Settings › Chat › A bot's work › Shows as). Show thinking and
 /// Show tool calls decide what's in it; Fold finished turns, whether a finished turn's work starts closed.
 /// Group chats keep their own folders.
 enum ChatWorkStyle: String, CaseIterable, Identifiable, Sendable {
@@ -286,17 +278,10 @@ enum ChatWorkStyle: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .minimal: String(localized: "Minimal")
+        // The row's second line is the choice, so each name says what the chat shows.
+        case .minimal: String(localized: "One line")
         case .card: String(localized: "Card")
-        case .full: String(localized: "Full")
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .minimal: String(localized: "One line while your agent works. Its steps wait under the answer.")
-        case .card: String(localized: "A card shows the newest steps while your agent works.")
-        case .full: String(localized: "Every step, message and thought, open as it happens.")
+        case .full: String(localized: "Everything")
         }
     }
 
@@ -308,8 +293,8 @@ enum ChatWorkStyle: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Where a one-to-one chat shows its agent's reasoning (Settings › Chat › Reasoning shows, #943).
-/// Show reasoning still decides whether a chat shows any. Saved on this device (`@AppStorage`);
+/// Where a one-to-one chat shows its agent's reasoning (Settings › Chat › A bot's work › Thinking, #943).
+/// Show thinking still decides whether a chat shows any. Saved on this device (`@AppStorage`);
 /// the chat reads it directly. Group chats keep reasoning in the steps.
 enum ChatReasoningPlacement: String, CaseIterable, Identifiable, Sendable {
     /// One outlined message above the turn's work, so the steps hold only tool calls.
@@ -321,21 +306,14 @@ enum ChatReasoningPlacement: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .ownMessage: String(localized: "As its own message")
-        case .steps: String(localized: "In the steps")
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .ownMessage: String(localized: "Your agent's thinking is a message above its work.")
-        case .steps: String(localized: "Your agent's thinking sits between its tool calls.")
+        case .ownMessage: String(localized: "Above the work")
+        case .steps: String(localized: "Between steps")
         }
     }
 
     static let storageKey = "bighelp.chat.reasoning-placement"
     static let defaultPlacement = ChatReasoningPlacement.ownMessage
-    /// Settings › Chat › Keep reasoning open: finished reasoning keeps its words in view.
+    /// Settings › Chat › Keep thinking open: finished reasoning keeps its words in view.
     static let staysOpenKey = "bighelp.chat.reasoning-stays-open"
     static let staysOpenByDefault = true
 }

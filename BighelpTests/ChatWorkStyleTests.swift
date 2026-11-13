@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Bighelp
 
-/// Settings › Chat › Agent's work (`ChatWorkStyle`): how a one-to-one chat shows what its agent did.
+/// Settings › Chat › Shows as (`ChatWorkStyle`): how a one-to-one chat shows what its agent did.
 @MainActor
 struct ChatWorkStyleTests {
     private let agent = TimelineSender.agent(id: "finance", snapshot: .init(name: "Avery"))

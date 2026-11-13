@@ -164,7 +164,7 @@ extension RootShellView {
     // MARK: Opening across hosts
 
     /// An agent tapped on the all-hosts Agents list, on its own computer: what
-    /// Settings › Chat › Bot chat experience asks for, as `openAgentChat` does.
+    /// Settings › Chat › A bot opens asks for, as `openAgentChat` does.
     func openFleetAgent(_ agent: FleetAgent) {
         switch settings.botChatExperience {
         case .botChat:

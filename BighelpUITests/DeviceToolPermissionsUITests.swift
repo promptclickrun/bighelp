@@ -23,9 +23,8 @@ final class DeviceToolPermissionsUITests: BighelpUITestCase {
                 waitForExpectations(timeout: 10)
             }
             if capability == "calendar" || capability == "reminders" {
-                XCTAssertTrue(app.staticTexts[capability == "calendar"
-                    ? "Read, create, update, and delete events directly after you enable access."
-                    : "Read, create, update, and delete reminders directly after you enable access."].exists)
+                // What each switch does sits behind its info button.
+                XCTAssertTrue(app.buttons["permissions.device-tools.\(capability).about"].exists, capability)
             }
             XCTAssertTrue(app.navigationBars["Device access"].exists)
         }
@@ -101,14 +100,13 @@ final class DeviceToolPermissionsUITests: BighelpUITestCase {
 
         let toggle = deviceToolSwitch("location", in: app)
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts[
-            "Share where you are when your agent asks, for things like finding places near you."].exists)
+        XCTAssertTrue(app.staticTexts["When a bot asks"].exists)
         capture("device-access-location-off-\(appearance)", in: app)
         if toggle.value as? String == "0" { toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap() }
         let on = NSPredicate(format: "value == '1'")
         expectation(for: on, evaluatedWith: toggle)
         waitForExpectations(timeout: 5)
-        let note = app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Only while bighelp is open.'"))
+        let note = app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Only while bighelp is open'"))
         XCTAssertTrue(note.firstMatch.waitForExistence(timeout: 5))
         XCTAssertEqual(app.alerts.count, 0)
         capture("device-access-location-on-\(appearance)", in: app)

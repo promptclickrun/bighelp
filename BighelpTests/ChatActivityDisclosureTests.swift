@@ -28,7 +28,7 @@ struct ChatActivityDisclosureTests {
         #expect(!store.isExpanded(tool), "Full does not open individual tool details")
     }
 
-    /// Keep reasoning open (Settings › Chat) decides only until the reader does.
+    /// Keep thinking open (Settings › Chat) decides only until the reader does.
     @Test func aReasoningChoiceIsOnlyWhatTheReaderChose() {
         let store = ChatActivityDisclosureStore()
         store.configure(style: .full)

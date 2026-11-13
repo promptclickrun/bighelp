@@ -1,6 +1,6 @@
 import XCTest
 
-/// Settings › Notifications › Quiet Hours on the demo data, where Studio Mac has an older
+/// Settings › Notifications › Quiet hours on the demo data, where Studio Mac has an older
 /// plugin (`-demo-quiet-hours-old-plugin`). Set BIGHELP_QUIET_HOURS_EVIDENCE
 /// (TEST_RUNNER_BIGHELP_QUIET_HOURS_EVIDENCE) to a folder to save screenshots.
 final class QuietHoursUITests: BighelpUITestCase {
@@ -33,7 +33,7 @@ final class QuietHoursUITests: BighelpUITestCase {
         XCTAssertTrue(end.exists, "End time shows once it's on")
         let note = app.staticTexts["settings.notifications.quiet-hours.note"].firstMatch
         XCTAssertTrue(note.waitForExistence(timeout: 5))
-        XCTAssertEqual(note.label, "Quiet Hours needs a plugin update on Studio Mac.")
+        XCTAssertEqual(note.label, "Quiet hours needs a plugin update on Studio Mac.")
         for _ in 0..<3 where !note.isHittable { page.swipeUp() }
         save("quiet-hours-\(appearance)", app)
     }

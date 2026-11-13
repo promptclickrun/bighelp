@@ -219,7 +219,7 @@ struct SessionRecord: Identifiable, Codable, Equatable, Sendable {
     /// agent. Bot Mode's canonical shared log lives in `items` after conversion.
     var botModePrivateHistory: [TimelineItem]
     var activityEvents: [ChatActivityEvent]
-    /// What this chat's ⋯ menu chose to show. Nil follows Settings › Chat details, so a chat
+    /// What this chat's ⋯ menu chose to show. Nil follows Settings › Chat › Advanced · A bot's work, so a chat
     /// bighelp first sees on the host shows what Settings says, like one it starts itself.
     var activityVisibility: ChatActivityVisibility?
     /// True while Hermes reports this durable session as live, even before

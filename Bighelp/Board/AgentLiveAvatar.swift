@@ -209,7 +209,7 @@ struct AgentHeroHeader: View {
     /// Hidden by choice (Settings › Chat layout): the chip shows only while
     /// there's a status, and holding the avatar offers Switch agent.
     var showsName = true
-    /// The chat's title (Settings › Chat › Session title), on the line under the name while
+    /// The chat's title (Settings › Chat › Chat title), on the line under the name while
     /// nothing is happening; a status or the agent's activity takes that line while it shows.
     var sessionTitle: String? = nil
     let onAvatarTap: () -> Void

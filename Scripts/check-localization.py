@@ -34,11 +34,11 @@ SIMPLE_BOTS_AND_TEAMWORK = {
     "What %@ did", "Your bots learn about each other and ask each other for help.",
     "Your %lld bots know each other and ask each other for help.",
     "The computer didn't save it for %@. Try again.",
-    "Agents messaging each other", "Quiet Hours", "Notify Me About", "Send Test Notification",
-    "Turn Off Notifications", "Channels", "Open on", "Return sends", "Bot chat experience",
+    "Bots messaging each other", "Quiet hours", "Notify me about", "Send a test",
+    "Turn off notifications", "Channels", "Opens on", "Return sends", "A bot opens",
     "Chat layout", "App layout", "Light mode", "Dark mode", "Text and buttons", "Bottom bar",
     # The modes after their 2.6.11 rename (#528).
-    "Bots", "Chat", "Code", "Bots mode", "Chat mode", "Code mode", "Next mode", "Unified Mode Toggle",
+    "Bots", "Chat", "Code", "Bots mode", "Chat mode", "Code mode", "Next mode", "Header mode switcher",
     "Switch between Bots, Chat and Code from the top of each home.",
 }
 PLURALS = {"Your %lld agents know each other and ask each other for help.",
@@ -56,7 +56,7 @@ SCOPED_SOURCES = [
 ]
 VERBATIM = re.compile(
     r'\b(?:SimpleBotsRow|SimpleBotsSectionLabel|SimpleBotsMessageCard)\([^()]*?\b(?:title|detail):\s*"'
-    r'|\b(?:rowText|settingLabel|note)\(\s*"'
+    r'|\b(?:rowText|settingLabel|settingTitle|note)\(\s*"'
     r'|\bsettingsPage\(title:\s*"'
     r'|\b(?:errorMessage|saveState|notice|hideError|templateNotice|testMessage|turnOffMessage|preferenceError'
     r'|runtimeError|avatarError|actionErrorMessage|quietHoursNote)\s*=\s*(?:[^"\n]*\?\s*)?"[A-Z]'

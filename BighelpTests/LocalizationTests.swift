@@ -53,8 +53,8 @@ struct LocalizationTests {
         let expected = [
             ("Search bots", "搜索机器人"), ("Mark Unread", "标为未读"), ("Make Primary Bot", "设为主机器人"),
             ("Rearrange", "重新排列"), ("Instructions", "指令"), ("Default Model", "默认模型"),
-            ("Routines", "例行任务"), ("Teamwork", "团队协作"), ("Agents messaging each other", "智能体之间的消息"),
-            ("Quiet Hours", "勿扰时段"), ("Chat layout", "聊天布局"), ("Multi-gateway", "多网关"),
+            ("Routines", "例行任务"), ("Teamwork", "团队协作"), ("Bots messaging each other", "机器人之间的消息"),
+            ("Quiet hours", "勿扰时段"), ("Chat layout", "聊天布局"), ("Multi-gateway", "多网关"),
             ("Bots", "机器人"), ("Chat", "聊天"), ("Code", "代码"), ("Bots mode", "机器人模式"),
             ("Code mode", "代码模式"), ("Header mode switcher", "顶部模式切换"),
         ]

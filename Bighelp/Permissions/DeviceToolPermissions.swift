@@ -3,7 +3,7 @@ import Observation
 import CryptoKit
 import os
 
-/// The order here is the order of Settings › Device access.
+/// The order here is the order of Settings › Device access, within each of its sections (`accessSection`).
 enum DeviceToolCapability: String, CaseIterable, Codable, Identifiable, Sendable {
     case health, calendar, reminders, contacts, photos, location, geofences, alarms, music, focus, shortcuts, appearance, navigation
     var id: String { rawValue }
@@ -81,20 +81,46 @@ enum DeviceToolCapability: String, CaseIterable, Codable, Identifiable, Sendable
         }
     }
 
+    /// Device access's section for this switch.
+    enum AccessSection {
+        case yourData, whereYouAre, onThisDevice, bighelp
+    }
+
+    var accessSection: AccessSection {
+        switch self {
+        case .health, .calendar, .reminders, .contacts, .photos: .yourData
+        case .location, .geofences: .whereYouAre
+        case .alarms, .music, .focus, .shortcuts: .onThisDevice
+        case .appearance, .navigation: .bighelp
+        }
+    }
+
+    /// Device access's second line, only where the title can't carry it; the rest is in `detail`.
+    var hint: String? {
+        switch self {
+        case .health: String(localized: "Read only")
+        case .location: String(localized: "When a bot asks")
+        case .geofences: String(localized: "Places you name")
+        default: nil
+        }
+    }
+
+    /// What Device access's info button and the switch's VoiceOver hint say. Appearance's and Navigation's
+    /// are only their connect card's line: their rows say more (`AgentAppearancePermissionRow`).
     var detail: String {
         switch self {
-        // App Review 5.1.3(i): the exact kinds of Health data an agent can read.
-        case .health: String(localized: "Read only. Your agent can read steps, distance, active and resting energy, flights climbed, exercise and stand time, sleep, heart rate, resting and walking heart rate, heart rate variability, blood oxygen, breathing rate, blood pressure, height, weight, body mass index, lean body mass, body fat, and workouts.")
+        // App Review 5.1.3(i): the exact kinds of Health data a bot can read.
+        case .health: String(localized: "Read only. Your bot can read steps, distance, active and resting energy, flights climbed, exercise and stand time, sleep, heart rate, resting and walking heart rate, heart rate variability, blood oxygen, breathing rate, blood pressure, height, weight, body mass index, lean body mass, body fat, and workouts.")
         case .calendar: String(localized: "Read, create, update, and delete events directly after you enable access.")
         case .reminders: String(localized: "Read, create, update, and delete reminders directly after you enable access.")
         case .contacts: String(localized: "Look up, add, change, and delete people in your contacts.")
-        case .photos: String(localized: "Find and look at your photos, save pictures your agent makes, and sort them into albums.")
-        case .location: String(localized: "Share where you are when your agent asks, for things like finding places near you.")
-        case .geofences: String(localized: "Your agent can watch places you name and hear from bighelp when you arrive or leave.")
+        case .photos: String(localized: "Find and look at your photos, save pictures your bot makes, and sort them into albums. Photos you attach in chat go through Apple’s private picker, which needs no library access.")
+        case .location: String(localized: "Share where you are when your bot asks, for things like finding places near you.")
+        case .geofences: String(localized: "Your bot can watch places you name and hear from bighelp when you arrive or leave.")
         case .alarms: String(localized: "Set, change, and turn off alarms and timers that ring even on silent.")
         case .music: String(localized: "See what's playing, play and pause music, and make playlists in Apple Music.")
-        case .focus: String(localized: "Tell your agent when a Focus is on, with the note you set for it.")
-        case .shortcuts: String(localized: "Run the shortcuts you pick and give your agent what they return.")
+        case .focus: String(localized: "Tell your bot when a Focus is on, with the note you set for it.")
+        case .shortcuts: String(localized: "Run the shortcuts you pick and give your bot what they return.")
         case .appearance: String(localized: "Switch light or dark mode and change your chat color when you ask.")
         case .navigation: String(localized: "Open the page or setting you ask about and point at it.")
         }
@@ -154,9 +180,9 @@ enum DeviceToolSystemAccess: Equatable, Sendable {
 
 @MainActor @Observable
 final class DeviceToolPermissions {
-    /// Where "Let agents change how bighelp looks" is saved; missing means on.
+    /// Where Device access's "Change how bighelp looks" is saved; missing means on.
     static let appearanceAllowedKey = "bighelp.device-tools.appearance"
-    /// Where "Let agents show you around bighelp" is saved; missing means on.
+    /// Where Device access's "Show you around" is saved; missing means on.
     static let navigationAllowedKey = "bighelp.device-tools.navigation"
     /// Where the person's yes to Apple Health's sharing note is saved: asked once, before the first grant.
     static let healthSharingKey = "bighelp.device-tools.health-sharing"
@@ -171,9 +197,9 @@ final class DeviceToolPermissions {
     private(set) var revision: UInt64 = 0
     private(set) var requestInFlight: DeviceToolCapability?
     private var enabled: Set<DeviceToolCapability> = []
-    /// Settings › Device access › "Let agents change how bighelp looks". One switch for every host.
+    /// Settings › Device access › "Change how bighelp looks". One switch for every host.
     private(set) var appearanceAllowed: Bool
-    /// Settings › Device access › "Let agents show you around bighelp". One switch for every host.
+    /// Settings › Device access › "Show you around". One switch for every host.
     private(set) var navigationAllowed: Bool
     /// The person read where Health data goes (their computer and its AI provider) and agreed, once.
     private(set) var healthSharingAgreed: Bool

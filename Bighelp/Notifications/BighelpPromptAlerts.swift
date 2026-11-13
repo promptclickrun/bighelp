@@ -57,7 +57,7 @@ final class BighelpPromptAlerts {
         return DispatchQueue.main.sync { MainActor.assumeIsolated { shared.alertedRecently(eventType: eventType) } }
     }
 
-    /// Settings › Notifications › Questions and Approvals applies here too.
+    /// Settings › Notifications › Questions and approvals applies here too.
     func questionsAndApprovalsChanged(enabled: Bool) {
         questionsAndApprovals = (enabled, Date())
     }

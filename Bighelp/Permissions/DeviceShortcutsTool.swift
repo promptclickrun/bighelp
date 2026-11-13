@@ -256,7 +256,7 @@ struct ShortcutsPermissionExtras: View {
             VStack(alignment: .leading, spacing: BighelpTokens.space4) {
                 Button { isEditing = true } label: {
                     HStack {
-                        Text("Shortcuts your agent can run").bighelpFont(.body)
+                        Text("Shortcuts your bot can run").bighelpFont(.body)
                         Spacer(minLength: BighelpTokens.space8)
                         Text(store.names.isEmpty ? String(localized: "None") : "\(store.names.count)")
                             .bighelpFont(.metadata).foregroundStyle(.secondary)
@@ -268,7 +268,7 @@ struct ShortcutsPermissionExtras: View {
                 }
                 .buttonStyle(.borderless)
                 .accessibilityIdentifier("permissions.device-tools.shortcuts.names")
-                Text("To run one, bighelp opens Shortcuts, then comes back when it is done. Your agent can only run the shortcuts you add here.")
+                Text("Your bot can run only the shortcuts you add here; bighelp opens Shortcuts to run one and comes back after.")
                     .bighelpFont(.metadata).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -315,7 +315,7 @@ private struct ShortcutNamesEditor: View {
 
                 Section {
                     if store.names.isEmpty {
-                        Text("No shortcuts yet. Your agent can run none.").foregroundStyle(.secondary)
+                        Text("No shortcuts yet. Your bot can run none.").foregroundStyle(.secondary)
                     }
                     ForEach(store.names, id: \.self) { name in
                         HStack {
@@ -333,7 +333,7 @@ private struct ShortcutNamesEditor: View {
                         }
                     }
                 } header: {
-                    Text("Your agent can run")
+                    Text("Your bot can run")
                 }
                 .listRowBackground(theme.surface)
             }

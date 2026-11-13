@@ -118,7 +118,7 @@ struct ChatView: View {
     let model: ChatModel
     let onForceRefresh: (@MainActor () async throws -> Void)?
     let foldCompletedTurns: Bool
-    /// Settings › Chat › Agent's work. A group chat keeps its own folders (`workStyleInUse`).
+    /// Settings › Chat › Shows as. A group chat keeps its own folders (`workStyleInUse`).
     let workStyle: ChatWorkStyle
     let showsHeader: Bool
     let sessionControlAccessory: ChatSessionControlAccessory?

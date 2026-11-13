@@ -42,7 +42,7 @@ Answer, HTTP 200:
 {"version":1,"target":{"kind":"alert","environment":"sandbox","updatedAt":1767225600}}
 ```
 
-`mutedTopics` is required. It lists the topics this person turned off in Settings › Notifications › Notify Me About: a
+`mutedTopics` is required. It lists the topics this person turned off in Settings › Notifications › Notify me about: a
 unique subset of `chat-replies-completions`, `scheduled-tasks-deliveries`, `questions-approvals` and
 `subagent-completions`, possibly empty. The app sends it with every `PUT`, and again whenever those settings change.
 BuzzKit applies the same settings to its own sends, so the Worker has to apply them to direct ones (see "Muted topics").

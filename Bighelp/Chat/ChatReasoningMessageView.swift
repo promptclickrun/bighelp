@@ -34,7 +34,7 @@ extension ChatReasoningMessage {
 /// A turn's reasoning as its own message (#943), above the turn's work. It's outlined, never
 /// filled, so it doesn't read as the answer. While the agent thinks it says "Reasoning…" over
 /// the newest words; once it's done, "Thought for 12s" over all of them, cut at six lines (Show
-/// more). With Settings › Chat › Keep reasoning open off, finished reasoning is one line. A tap
+/// more). With Settings › Chat › Keep thinking open off, finished reasoning is one line. A tap
 /// on the heading opens or closes it, and the reader's choice holds.
 struct ChatReasoningMessageView: View {
     let message: ChatReasoningMessage

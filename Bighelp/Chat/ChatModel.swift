@@ -353,7 +353,7 @@ final class ChatModel {
     var compaction: ChatCompaction?
     var sessionGoal: SessionGoalSnapshot?
     var sessionTitle: String
-    /// The title to show under the agent's name (Settings › Chat › Session title): nil for an
+    /// The title to show under the agent's name (Settings › Chat › Chat title): nil for an
     /// untitled chat and the agent's home chat, whose names don't tell one chat from another.
     var headerSessionTitle: String? { Self.headerSessionTitle(from: sessionTitle) }
     var sessionWorkspaceID: String? { sourceSession?.workspaceID }
@@ -374,9 +374,9 @@ final class ChatModel {
     /// What each helper did, kept after it finishes so its canvas can show the end.
     var subagentCanvases = SubagentCanvasLedger()
     /// The chat's own ⋯ choice (`setReasoningVisible`, `setToolCallsVisible`); nil while it
-    /// follows Settings › Chat details.
+    /// follows Settings › Chat › Advanced · A bot's work.
     var chosenActivityVisibility: ChatActivityVisibility?
-    /// What the chat shows: its own ⋯ choice, or Settings › Chat details when it has none.
+    /// What the chat shows: its own ⋯ choice, or Settings › Chat › Advanced · A bot's work when it has none.
     var activityVisibility: ChatActivityVisibility {
         didSet {
             rebuildTranscript()

@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Bighelp
 
-/// Settings › Chat › Session title: off by default, and only a title the chat really has
+/// Settings › Chat › Chat title: off by default, and only a title the chat really has
 /// shows under the agent's name.
 @MainActor
 struct ChatSessionTitleHeaderTests {

@@ -393,7 +393,6 @@ final class ShellFeatureStore {
         dashboardModel.configureWorkPresentation { [weak self] in
             self?.dashboardWorkSessions(presentation: true) ?? []
         }
-        dashboardModel.configureWorkScheduledTasks { [weak scheduledTasks] in scheduledTasks?.tasks ?? [] }
     }
 
     private func dashboardWorkSessions(presentation: Bool) -> [SessionRecord] {
@@ -420,7 +419,7 @@ final class ShellFeatureStore {
         case .approval(let requestID):
             approvalModels[requestID].map(PreparedRouteModel.approval)
         case .skillsAndTools,
-             .workspaceActivity, .workspaceSettings, .workspaceManagement, .workspaceConnections, .workspaceHub,
+             .workspaceSettings, .workspaceManagement, .workspaceConnections,
              .projects, .project, .kanban, .usage, .allHostsChats, .board,
              .workflows, .workflow, .workflowRun, .workflowSignoff, .workflowRuns, .codeChanges, .codeBatch,
              .devFactory, .devFactoryRecipe, .devFactoryGroup, .devFactoryChanges, .simpleBotProfile, .groupSettings, .simpleBotsSection:
@@ -507,7 +506,7 @@ final class ShellFeatureStore {
             _ = approvalModel(for: request)
             return true
         case .skillsAndTools,
-             .workspaceActivity, .workspaceSettings, .workspaceManagement, .workspaceConnections, .workspaceHub,
+             .workspaceSettings, .workspaceManagement, .workspaceConnections,
              .projects, .project, .kanban, .usage, .allHostsChats, .board,
              .workflows, .workflow, .workflowRun, .workflowSignoff, .workflowRuns, .codeChanges, .codeBatch,
              .devFactory, .devFactoryRecipe, .devFactoryGroup, .devFactoryChanges, .simpleBotProfile, .groupSettings, .simpleBotsSection:
@@ -1802,7 +1801,7 @@ final class ShellFeatureStore {
                         .finishExternallyOwnedTurnWithoutReply()
                 },
                 // GPT Live answers on its own call and hands requests to Hermes; music over it
-                // would talk over the voice. Turn-based voice (also after "Use TTS voice mode",
+                // would talk over the voice. Turn-based voice (also after "Take turns instead",
                 // which makes a new presentation) keeps its music unless it's turned off.
                 holdMusic: conversationMode == .codexLive || !voiceHoldMusicEnabled() ? nil : voiceHoldMusic()
             ),

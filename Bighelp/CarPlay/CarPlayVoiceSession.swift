@@ -281,7 +281,7 @@ final class CarPlayVoiceSession {
             case .idle, .preparing, .connecting: .connecting
             case .live: live.workStatus == .working ? .working : .listening
             case .interrupted, .ended: .paused
-            case .failed: .problem(live.errorMessage ?? "Live voice isn't available. Choose TTS voice in bighelp's Settings.")
+            case .failed: .problem(live.errorMessage ?? "Live voice isn't available. Choose Take turns in bighelp's Settings.")
             }
             return
         }

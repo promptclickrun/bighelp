@@ -79,10 +79,35 @@ extension RootShellView {
         )
     }
 
+    /// Whether the computer in use can say what waits: its connection is up and its workspace open,
+    /// since the prompts are read from that connection. The demo has none to wait for.
+    var needsYouListIsReady: Bool {
+        if usesWorkspaceFixtures, workspaceConnections?.isDirectSelected != true { return true }
+        guard let runtime = nativeRuntime, runtime.isReady, !runtime.isSuspended else { return false }
+        return nativeWorkspaceStore?.isConnected == true && currentWorkspaceOwner != nil
+    }
+
+    /// What the shell follows to settle `AppState.openNeedsYou()` (`settleNeedsYouRequest`): it
+    /// looks again when a request comes or the computer's list becomes readable.
+    var needsYouRequestKey: NeedsYouRequestKey {
+        NeedsYouRequestKey(isRequested: appState.isNeedsYouRequested, listIsReady: needsYouListIsReady)
+    }
+
     /// ☰'s Needs you row, only while something waits.
     var menuNeedsYou: (count: Int, open: () -> Void)? {
         let count = needsYouEntries.count
         guard count > 0 else { return nil }
         return (count: count, open: { afterClosingHomeSheets { isNeedsYouPresented = true } })
     }
+}
+
+struct NeedsYouRequestKey: Equatable {
+    let isRequested: Bool
+    let listIsReady: Bool
+}
+
+enum NeedsYouRequest {
+    /// How long a request waits for the computer's connection before it gives up and opens the
+    /// home chat (a cold launch from an alert can ask before the computer answers).
+    static let connectionWait = Duration.seconds(10)
 }

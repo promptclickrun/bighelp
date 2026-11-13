@@ -3579,7 +3579,6 @@ struct ChatModelTests {
             expiresAt: nil
         )
         let snapshot = DashboardSnapshot(
-            inbox: [],
             attentionItems: [
                 DashboardAttentionItem(
                     id: currentRequest.eventID,

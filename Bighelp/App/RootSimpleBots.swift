@@ -454,36 +454,4 @@ extension RootShellView {
                                           isCurrent: { current() == owner })
             })
     }
-
-    /// Bots mode's Settings sheet; All Settings leads to everything else.
-    func simpleBotsSettings() -> some View {
-        let close = { isUnifiedSettingsPresented = false }
-        let profile = agents.resolvedAgent(explicitID: nil)?.id ?? "default"
-        let agents = agents
-        let configuration = makeSimpleBotHostConfiguration()
-        return SimpleBotsSettingsView(context: SimpleBotsSettingsContext(
-            settings: settings, userIdentity: userIdentity, agents: agents,
-            makeHostSettings: {
-                configuration.map {
-                    SimpleBotHostSettings(client: $0, profile: profile, allProfiles: { agents.profiles.map(\.id) })
-                }
-            },
-            usage: providerUsage,
-            makeTeamwork: { teamworkModel() },
-            page: { page in AnyView(workspaceSettings().withDone(close).simpleBotsPage(page)) },
-            onOpenUsage: { leaveSettings { appState.open(.usage) } },
-            onOpenComputer: { id in leaveSettings { appState.open(.simpleBotProfile(agentID: id)) } },
-            onDone: close,
-            gateways: BighelpMenuHosts.current(registry: hostRegistry, demoHosts: demoHosts),
-            catalog: sessionCatalog,
-            onOpenSession: { summary in
-                leaveSettings {
-                    appState.chatOpenedFromList = true
-                    openSession(summary)
-                }
-            },
-            pendingShares: settingsPendingShareContext,
-            makeAdvancedOptions: { makeAdvancedOptions(for: $0) }
-        ))
-    }
 }

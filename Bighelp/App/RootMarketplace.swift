@@ -1,10 +1,10 @@
 import SwiftUI
 
-// The Marketplace (Settings › Marketplace, and each bot's profile): one agent's Apps, Skills,
-// Plugins and Talk anywhere, on the same pages Hermes tools and Advanced Options open. None of it
-// needs Nerd Mode.
+// The Marketplace (Settings › Apps & skills, and each bot's profile): one bot's Skills, Plugins,
+// Talk anywhere and, with Advanced options, MCP servers and toolsets, on the same pages Hermes tools
+// and Advanced Options open.
 extension RootShellView {
-    /// The Marketplace for `agentID`: Settings passes the agent in use, a bot's profile its own.
+    /// The Marketplace for `agentID`: Settings passes the bot in use, a bot's profile its own.
     func makeMarketplace(for agentID: String) -> MarketplaceContext {
         let name = agents.profiles.first { $0.id == agentID }?.name ?? agentID
         let dependencies = marketplaceDependencies(agentID: agentID)
@@ -20,10 +20,12 @@ extension RootShellView {
     private func marketplacePage(_ section: MarketplaceSection, agentID: String, name: String,
                                  dependencies: CapabilitiesManagementDependencies?) -> some View {
         switch section {
-        case .apps:
-            MarketplaceAppsPage(native: connectorAppsModel(), composio: composioAppsModel(for: agentID))
-        case .skills, .plugins:
-            let destination: WorkspaceDestination = section == .skills ? .skills : .plugins
+        case .skills, .plugins, .toolsets:
+            let destination: WorkspaceDestination = switch section {
+            case .skills: .skills
+            case .plugins: .plugins
+            default: .toolsets
+            }
             if let dependencies, let page = CapabilitiesManagementView(
                 destination: destination, hostName: workspaceHostName, profileName: name, dependencies: dependencies) {
                 page
@@ -73,8 +75,8 @@ extension RootShellView {
         Task { await hermesWorkspaces.load(agentID: agentID) }
     }
 
-    /// A bot's Connections: this device's access and the apps the bot can use, as Settings › Connections
-    /// lists them. Its saved logins have their own row on the profile.
+    /// A bot's Connections: this device's access and the apps the bot can use, as Settings › Apps & skills
+    /// lists them. Its skills and plugins are in its Marketplace, and its saved logins have their own row.
     func makeBotConnections(for agentID: String) -> AnyView {
         AnyView(AppsHubView(native: connectorAppsModel(), composio: composioAppsModel(for: agentID)) {
             NavigationLink {

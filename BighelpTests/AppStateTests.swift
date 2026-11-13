@@ -5,12 +5,12 @@ import Testing
 struct AppStateTests {
     @Test @MainActor func hostSwitchKeepsTheConnectionsScreenButClearsChatOwnership() {
         let state = AppState()
-        state.selectedTab = .workspace
+        state.selectedTab = .agents
         state.activateConversation(id: "old-host-chat", source: .newChat)
         state.requestVoiceMode(for: "old-host-chat")
         state.path = [.workspaceConnections]
         state.resetForHostBoundary()
-        #expect(state.selectedTab == .workspace)
+        #expect(state.selectedTab == .agents)
         #expect(state.path == [.workspaceConnections])
         #expect(state.activeConversationID == nil)
         #expect(state.pendingVoiceConversationID == nil)
@@ -118,26 +118,27 @@ struct AppStateTests {
         #expect(state.activeConversationID == "forked")
     }
 
-    @Test func legacyInboxNotificationOpensWorkspaceActivity() {
+    @Test func anAlertWithoutAChatAsksForNeedsYouAndLeavesThePlaceAlone() {
         let state = AppState()
         state.select(.agents)
         state.path = [.sessions, .chat(conversationID: "current")]
 
-        state.openInbox()
+        state.openNeedsYou()
 
-        #expect(state.selectedTab == .workspace)
-        #expect(state.path == [.workspaceActivity])
+        #expect(state.isNeedsYouRequested)
+        #expect(state.selectedTab == .agents)
+        #expect(state.path == [.sessions, .chat(conversationID: "current")])
     }
 
-    @Test func legacyInboxTabSelectionNormalizesToWorkspaceActivity() {
+    @Test func legacyInboxTabSelectionOpensChat() {
         let state = AppState()
         state.select(.agents)
         state.path = [.sessions]
 
         state.select(.inbox)
 
-        #expect(state.selectedTab == .workspace)
-        #expect(state.path == [.workspaceActivity])
+        #expect(state.selectedTab == .sessions)
+        #expect(state.path.isEmpty)
         #expect(AppTab.allCases == [.sessions, .feed, .ideas, .goals, .apps])
     }
 

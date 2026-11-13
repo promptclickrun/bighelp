@@ -170,7 +170,7 @@ Generic conversation deletion is disabled: the Direct catalog reports
 `deleteNativeRow` operation refreshes the catalog target, deletes through the
 editor and returns a row-only receipt that warns other history may remain. The
 app itself uses the editor's delete only to remove the empty chat a failed Bot
-Chat title claim left behind. Bulk clean-up in Session Maintenance (Nerd Mode)
+Chat title claim left behind. Bulk clean-up in Session Maintenance (Settings › Chat › Clean up chats, with Advanced options on)
 uses separate dashboard routes (`/api/sessions/bulk-delete`, `/api/sessions/empty`,
 `/api/sessions/prune`) through `DirectHermesSessionMaintenanceClient`. Hermes deletes that row and
 delegate children but orphans branch/compression descendants; neither root nor

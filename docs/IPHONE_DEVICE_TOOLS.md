@@ -244,7 +244,7 @@ additional HTTP service or model-supplied executable code.
 
 `health.read` (`AppleDeviceToolService`, `LiveAppleDeviceToolNativeBoundary`). Read only:
 the app asks HealthKit with `requestAuthorization(toShare: [], read: …)` and has no write
-operation. Settings › Connections › Device access › Apple Health shows only where
+operation. Settings › Apps & skills › Device access › Apple Health shows only where
 `HKHealthStore.isHealthDataAvailable()` is true (iPhone, iPad, Vision Pro; never the Mac),
 and its detail names every kind of data it reads (App Review 5.1.3(i)).
 
@@ -373,8 +373,8 @@ the app.
 
 - `places` takes an optional `query` (1–120 characters, the person's own words) and `limit`
   (1–20, default 8). It answers `places` (each `id`, `title`, `what`, `steps`, and `needs`:
-  `"bot"` for a place inside one bot, else null) and `total`, for the mode the app is in. Nerd
-  Mode places are listed only while Nerd Mode is on.
+  `"bot"` for a place inside one bot, else null) and `total`, for the mode the app is in. Places
+  that need Advanced options (`settings.nerdModeEnabled`) are listed only while it is on.
 - `open` takes `place` (1–96 characters, lowercase letters, digits, `.` and `-`), and optional
   `bot` (an agent id, 1–96 characters) and `note` (1–160 characters, shown beside the place).
   A place inside one bot opens for `bot`, else for the agent in the chat. It answers `opened`,
@@ -627,7 +627,7 @@ The app reads HealthKit and never writes it. Keep it that way:
   Connect refuses any build with the HealthKit entitlement and no `NSHealthUpdateUsageDescription`
   (ITMS-90683), even though nothing asks to share (`toShare: []`), so it says that bighelp never
   writes.
-- App Review (2.5.1) looks for the health feature: Settings › Connections › Device access › Apple Health, and
+- App Review (2.5.1) looks for the health feature: Settings › Apps & skills › Device access › Apple Health, and
   in a chat ("How did I sleep this week?") the card, the Health sheet, an Apple Health step and
   a chart. Review notes for each build say where it is, with a screen recording.
 - The App ID needs the HealthKit capability; automatic signing with

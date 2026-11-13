@@ -130,30 +130,13 @@ enum WorkspaceManagementContent: Equatable, Sendable {
     case fileRoots([WorkspaceFileRoot])
     case files(WorkspaceFileListing)
     case logs([String])
-    case configuration(WorkspaceReasoningConfiguration)
     case credentials([WorkspaceCredentialStatus])
     case webhooks([WorkspaceWebhook], platformEnabled: Bool)
-}
-
-struct WorkspaceReasoningConfiguration: Equatable, Sendable {
-    enum Effort: String, CaseIterable, Identifiable, Sendable {
-        case none, minimal, low, medium, high, xhigh, max, ultra
-        var id: Self { self }
-        var title: String { self == .xhigh ? "Extra high" : rawValue.capitalized }
-
-        init?(hostValue: String) {
-            let normalized = hostValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            self.init(rawValue: ["false", "disabled"].contains(normalized) ? "none" : normalized)
-        }
-    }
-    let effort: Effort
-    let showsReasoning: Bool
 }
 
 enum WorkspaceManagementMutation: Identifiable, Equatable, Sendable {
     case archiveProject(id: String, restore: Bool)
     case renameProject(id: String, name: String)
-    case reasoning(WorkspaceReasoningConfiguration.Effort)
     case replaceCredential(key: String, value: String)
     case setWebhookEnabled(name: String, enabled: Bool)
 
@@ -162,7 +145,6 @@ enum WorkspaceManagementMutation: Identifiable, Equatable, Sendable {
     var destination: WorkspaceDestination {
         switch self {
         case .archiveProject, .renameProject: .projects
-        case .reasoning: .config
         case .replaceCredential: .keys
         case .setWebhookEnabled: .webhooks
         }
@@ -172,7 +154,6 @@ enum WorkspaceManagementMutation: Identifiable, Equatable, Sendable {
         switch self {
         case .archiveProject(_, let restore): restore ? "Restore project?" : "Archive project?"
         case .renameProject: "Rename project?"
-        case .reasoning: "Change profile reasoning?"
         case .replaceCredential: "Replace host credential?"
         case .setWebhookEnabled(_, let enabled): enabled ? "Enable webhook?" : "Disable webhook?"
         }
@@ -185,8 +166,6 @@ enum WorkspaceManagementMutation: Identifiable, Equatable, Sendable {
                 : "Archive this project registration in Hermes. Files remain on the host, and the project can be restored."
         case .renameProject(_, let name):
             "Change the project display name to \(name). Folder names and files will not change."
-        case .reasoning(let effort):
-            "Set the selected profile's default reasoning to \(effort.title). This affects future work, not another session's explicit selection."
         case .replaceCredential(let key, _):
             "Replace \(key) in the selected Hermes profile. The value is sent only to this host and is not stored by this screen. Saving does not verify the provider account."
         case .setWebhookEnabled(_, let enabled):

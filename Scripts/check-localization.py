@@ -15,7 +15,7 @@ REQUIRED = {
     "Add the bighelp plugin", "Choose your mode", "Use %@", "Chat", "Feed",
     "Ideas", "Goals", "Files", "Agents", "Settings", "New chat", "Send message",
     "Stop response", "Message %@", "Ask %@", "Appearance", "Your name", "Done",
-    "Nerd Mode", "Default model", "AI providers", "Help & feedback",
+    "Advanced options", "Default model", "AI providers", "Help & feedback",
     "Add", "Voice mode", "Drawing",
     "Document scanning requires a supported camera device.",
     "PDF pages require a current native Hermes conversation.",
@@ -28,11 +28,10 @@ SIMPLE_BOTS_AND_TEAMWORK = {
     "Drag your bots and group chats into the order you want, then tap Save.", "No bots yet",
     "Create New Bot", "Instructions", "Default Model", "Routines", "Computer", "Media", "Character",
     "Your computer isn't connected", "Saved. This is how %@ looks everywhere.", "End voice",
-    "Auto-review", "Multi-gateway", "All Settings", "Your name and photo in chats",
+    "Auto-review", "Multi-gateway", "Your computers", "Your bots see your name.",
     "Asked %@", "%@ answered", "%@ didn't answer", "Asking %@…", "Waiting for %@",
     "%@ is working on it…", "%lld messages with %@", "%@ and %@", "%@, %@ and %@",
-    "What %@ did", "Your bots learn about each other and ask each other for help.",
-    "Your %lld bots know each other and ask each other for help.",
+    "What %@ did", "Bots ask each other for help",
     "The computer didn't save it for %@. Try again.",
     "Bots messaging each other", "Quiet hours", "Notify me about", "Send a test",
     "Turn off notifications", "Channels", "Opens on", "Return sends", "A bot opens",
@@ -41,8 +40,7 @@ SIMPLE_BOTS_AND_TEAMWORK = {
     "Bots", "Chat", "Code", "Bots mode", "Chat mode", "Code mode", "Next mode", "Header mode switcher",
     "Switch between Bots, Chat and Code from the top of each home.",
 }
-PLURALS = {"Your %lld agents know each other and ask each other for help.",
-           "Your %lld bots know each other and ask each other for help.", "%lld messages with %@"}
+PLURALS = {"%lld messages with %@"}
 # These screens' plain-String parameters show text verbatim, so app copy handed to them has to be
 # resolved with String(localized:) first. A bare English literal here never reaches the catalog.
 SCOPED_SOURCES = [

@@ -54,7 +54,7 @@ enum HostUsageLoader {
         case WorkspaceClientError.unavailable:
             "This computer's Hermes doesn't share usage. Update Hermes on it."
         case WorkspaceClientError.authenticationRequired, DirectHermesError.authenticationRequired:
-            "Sign in to this computer again in Settings › Hosts."
+            "Sign in to this computer again in Settings, on its page."
         case _ where ProviderUsageStore.isConnectionHiccup(error):
             "Couldn't reach this computer."
         default:

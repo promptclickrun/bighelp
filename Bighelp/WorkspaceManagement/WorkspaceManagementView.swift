@@ -21,7 +21,7 @@ struct WorkspaceManagementView: View {
                 content
             } else {
                 WorkspaceUnavailableView(destination: destination, hostName: store.hostName,
-                    reason: "This workspace is no longer selected. Return to Workspace to open the current host.")
+                    reason: "This computer is no longer selected. Open this page again for the computer in use.")
             }
         }
         .navigationTitle(destination.title)
@@ -155,8 +155,6 @@ struct WorkspaceManagementView: View {
                 }
                 pagination(count: rows.count)
             }
-        case .configuration(let configuration):
-            WorkspaceConfigurationSection(store: store, configuration: configuration)
         case .files(let listing):
             WorkspaceFilesSection(store: store, listing: listing)
         case .logs(let lines):

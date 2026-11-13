@@ -77,7 +77,7 @@ struct AdvancedOption: Equatable, Sendable, Identifiable {
 /// A Nerd Mode page Advanced Options opens for the bot, so everything lives behind one doorway.
 enum AdvancedPage: String, CaseIterable, Hashable, Identifiable, Sendable {
     case skillsAndTools, messaging, memory
-    case rawConfiguration, skillsHub, toolServers, plugins, webhooks, logs
+    case rawConfiguration, toolsets, manageBots, skillsHub, toolServers, plugins, webhooks, logs
 
     var id: String { rawValue }
 
@@ -87,6 +87,9 @@ enum AdvancedPage: String, CaseIterable, Hashable, Identifiable, Sendable {
         case .messaging: String(localized: "Messaging apps")
         case .memory: String(localized: "What it remembers")
         case .rawConfiguration: String(localized: "Edit config.yaml")
+        case .toolsets: String(localized: "Toolsets")
+        // Hermes' profile tools: export, import, rename and make default.
+        case .manageBots: String(localized: "Manage bots")
         case .skillsHub: String(localized: "Skills Hub")
         case .toolServers: String(localized: "MCP servers")
         case .plugins: String(localized: "Plugins")
@@ -96,12 +99,14 @@ enum AdvancedPage: String, CaseIterable, Hashable, Identifiable, Sendable {
     }
 
     /// Pages for the whole computer, not just this bot: their rows say so.
-    var isWholeComputer: Bool { [.plugins, .webhooks, .logs].contains(self) }
+    var isWholeComputer: Bool { [.manageBots, .plugins, .webhooks, .logs].contains(self) }
 
     /// The Hermes tools page it is, where it has one.
     var destination: WorkspaceDestination? {
         switch self {
         case .skillsAndTools, .rawConfiguration: nil
+        case .toolsets: .toolsets
+        case .manageBots: .profileLifecycle
         case .messaging: .messaging
         case .memory: .memory
         case .skillsHub: .skills
@@ -328,5 +333,5 @@ enum AdvancedOptionsCatalog {
         id: "experts",
         title: String(localized: "For experts"),
         // The Skills Hub, MCP servers and Plugins are in the bot's Marketplace.
-        rows: [.page(.rawConfiguration), .page(.webhooks), .page(.logs)])
+        rows: [.page(.rawConfiguration), .page(.toolsets), .page(.manageBots), .page(.webhooks), .page(.logs)])
 }

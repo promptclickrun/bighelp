@@ -131,7 +131,7 @@ that opens it; the Watch also offers the same link through Handoff.
 ### CarPlay voice
 
 Opening bighelp in CarPlay starts a new chat with the agent from Settings ›
-CarPlay (`CarPlayAgentPreference`: a computer and an agent), else the one last
+Voice › In the car (`CarPlayAgentPreference`: a computer and an agent), else the one last
 picked in the car (`CarPlayAgentChoice`), else the default agent, and runs
 `CarPlayVoiceSession` without a screen (the iPhone is usually locked, and the
 phone's voice screen only listens while it's active). It builds the same
@@ -495,8 +495,8 @@ adding it to the canonical timeline.
 ### Local customization
 
 Card templates remain a local feature. There is no card template catalog,
-publishing workflow or install gateway. (Settings › Marketplace is Hermes' own
-catalog of apps, skills and plugins, and agent templates come from the Template
+publishing workflow or install gateway. (Settings › Apps & skills lists Hermes' own
+catalog of skills and plugins, and agent templates come from the Template
 Catalog; see AGENTS.md.) Themes are gone:
 the look is one bubble color and a light and dark page, kept on the device, and
 old saved themes and their logo files are removed at launch.

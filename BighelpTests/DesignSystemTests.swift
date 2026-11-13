@@ -361,38 +361,6 @@ struct DesignSystemTests {
         #expect(presentation.hitTarget == 48)
     }
 
-    @Test func localGreetingUsesExactMorningAfternoonAndEveningBoundaries() throws {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = try #require(TimeZone(identifier: "America/Chicago"))
-
-        #expect(DashboardGreeting.title(at: dashboardDate(hour: 4, minute: 59, calendar: calendar), calendar: calendar) == "Good evening")
-        #expect(DashboardGreeting.title(at: dashboardDate(hour: 5, minute: 0, calendar: calendar), calendar: calendar) == "Good morning")
-        #expect(DashboardGreeting.title(at: dashboardDate(hour: 11, minute: 59, calendar: calendar), calendar: calendar) == "Good morning")
-        #expect(DashboardGreeting.title(at: dashboardDate(hour: 12, minute: 0, calendar: calendar), calendar: calendar) == "Good afternoon")
-        #expect(DashboardGreeting.title(at: dashboardDate(hour: 16, minute: 59, calendar: calendar), calendar: calendar) == "Good afternoon")
-        #expect(DashboardGreeting.title(at: dashboardDate(hour: 17, minute: 0, calendar: calendar), calendar: calendar) == "Good evening")
-    }
-
-    @Test func localGreetingSchedulesTheNextDaypartBoundary() throws {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = try #require(TimeZone(identifier: "America/Chicago"))
-
-        let morning = dashboardDate(hour: 8, minute: 15, calendar: calendar)
-        let afternoon = dashboardDate(hour: 13, minute: 30, calendar: calendar)
-        let evening = dashboardDate(hour: 20, minute: 45, calendar: calendar)
-
-        #expect(calendar.component(.hour, from: DashboardGreeting.nextTransition(after: morning, calendar: calendar)) == 12)
-        #expect(calendar.component(.hour, from: DashboardGreeting.nextTransition(after: afternoon, calendar: calendar)) == 17)
-        let nextMorning = DashboardGreeting.nextTransition(after: evening, calendar: calendar)
-        #expect(calendar.component(.hour, from: nextMorning) == 5)
-        #expect(calendar.isDate(nextMorning, inSameDayAs: evening) == false)
-    }
-
-    @Test func rootAndDashboardHeadersExposeOnlyTheRequestedItems() {
-        #expect(DashboardHeaderPresentation.showsSessionsShortcut == false)
-        #expect(DashboardHeaderPresentation.logoPlacement == .greetingRow)
-    }
-
     @Test func primaryNavigationActionUsesNeutralGlassAndThemeAccentWithoutAnOutline() {
         let presentation = FloatingTabBar.newChatPresentation(for: .bighelp)
 
@@ -401,17 +369,6 @@ struct DesignSystemTests {
         #expect(!presentation.usesGradient)
         #expect(!presentation.showsBorder)
         #expect(!presentation.usesGlow)
-    }
-
-    private func dashboardDate(hour: Int, minute: Int, calendar: Calendar) -> Date {
-        calendar.date(from: DateComponents(
-            timeZone: calendar.timeZone,
-            year: 2026,
-            month: 8,
-            day: 31,
-            hour: hour,
-            minute: minute
-        ))!
     }
 
     @Test func primitiveSpectrumAndStatusColorsMatchTheApprovedPalette() {

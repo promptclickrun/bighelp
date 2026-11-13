@@ -32,8 +32,8 @@ struct AgentDriveTests {
     }
 
     @Test func nerdModePlacesStayHiddenUntilItIsOn() {
-        #expect(!DriveCatalog.search("hermes tools", mode: .chat, nerdMode: false, limit: 5).contains { $0.id == "hermes.tools" })
-        #expect(DriveCatalog.search("hermes tools", mode: .chat, nerdMode: true, limit: 5).contains { $0.id == "hermes.tools" })
+        #expect(!DriveCatalog.search("logs", mode: .chat, nerdMode: false, limit: 5).contains { $0.id == "hermes.logs" })
+        #expect(DriveCatalog.search("logs", mode: .chat, nerdMode: true, limit: 5).contains { $0.id == "hermes.logs" })
     }
 
     @Test func feedTemplatesWalkTheProfileThenPointAtTheDeck() throws {
@@ -84,7 +84,7 @@ struct AgentDriveTests {
         #expect(failure(["place": .string("kanban"), "note": .string(String(repeating: "a", count: 161))]) == "invalid_arguments")
         #expect(failure(["place": .string("nowhere")]) == "unknown_place")
         #expect(failure(["place": .string("bot.dashboard")]) == "not_in_this_mode")
-        #expect(failure(["place": .string("hermes.tools")]) == "needs_nerd_mode")
+        #expect(failure(["place": .string("hermes.logs")]) == "needs_nerd_mode")
         #expect(fixture.opened.isEmpty)
     }
 

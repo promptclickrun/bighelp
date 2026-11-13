@@ -46,84 +46,9 @@ enum DashboardEventIntentPolicy {
 }
 
 struct DashboardSnapshot: Equatable, Sendable {
-    let inbox: [DashboardInboxItem]
     let attentionItems: [DashboardAttentionItem]
     let completedItems: [DashboardCompletion]
     let agents: [DashboardAgent]
-}
-
-struct DashboardInboxItem: Identifiable, Equatable, Sendable {
-    let id: String
-    let title: String
-    let detail: String
-    let agentName: String
-    let status: String
-    let card: GenerativeUICard?
-    let bighelpCard: BighelpCardDocument?
-    let sessionID: String?
-    let agentID: String?
-    let isRead: Bool
-    let isPinned: Bool
-    let isSessionClosed: Bool
-    let createdAt: Date
-
-    init(
-        id: String,
-        title: String,
-        detail: String,
-        agentName: String,
-        status: String,
-        card: GenerativeUICard? = nil,
-        bighelpCard: BighelpCardDocument? = nil,
-        sessionID: String? = nil,
-        agentID: String? = nil,
-        isRead: Bool = false,
-        isPinned: Bool = false,
-        isSessionClosed: Bool = false,
-        createdAt: Date = .distantPast
-    ) {
-        self.id = id
-        self.title = title
-        self.detail = detail
-        self.agentName = agentName
-        self.status = status
-        self.card = card
-        self.bighelpCard = bighelpCard
-        self.sessionID = sessionID
-        self.agentID = agentID
-        self.isRead = isRead
-        self.isPinned = isPinned
-        self.isSessionClosed = isSessionClosed
-        self.createdAt = createdAt
-    }
-
-    var cardEnvelope: BighelpCardEnvelope? {
-        if let bighelpCard { return .card(bighelpCard) }
-        if let card { return .legacy(card) }
-        return nil
-    }
-
-    var cardImportance: BighelpCardImportance {
-        bighelpCard?.importance ?? .normal
-    }
-
-    func withState(isRead: Bool, isPinned: Bool) -> DashboardInboxItem {
-        DashboardInboxItem(
-            id: id,
-            title: title,
-            detail: detail,
-            agentName: agentName,
-            status: status,
-            card: card,
-            bighelpCard: bighelpCard,
-            sessionID: sessionID,
-            agentID: agentID,
-            isRead: isRead,
-            isPinned: isPinned,
-            isSessionClosed: isSessionClosed,
-            createdAt: createdAt
-        )
-    }
 }
 
 struct DashboardClarificationQuestion: Equatable, Sendable, Identifiable {
@@ -329,8 +254,6 @@ struct DashboardAttentionItem: Identifiable, Equatable, Sendable {
     let approvalID: String?
     let sessionID: String?
     let agentID: String?
-    let isRead: Bool
-    let isPinned: Bool
     let isSessionClosed: Bool
     let interaction: DashboardAttentionInteraction
     let createdAt: Date
@@ -343,8 +266,6 @@ struct DashboardAttentionItem: Identifiable, Equatable, Sendable {
         approvalID: String? = nil,
         sessionID: String? = nil,
         agentID: String? = nil,
-        isRead: Bool = false,
-        isPinned: Bool = false,
         isSessionClosed: Bool = false,
         interaction: DashboardAttentionInteraction = .none,
         createdAt: Date = .distantPast
@@ -356,8 +277,6 @@ struct DashboardAttentionItem: Identifiable, Equatable, Sendable {
         self.approvalID = approvalID
         self.sessionID = sessionID
         self.agentID = agentID
-        self.isRead = isRead
-        self.isPinned = isPinned
         self.isSessionClosed = isSessionClosed
         self.interaction = interaction
         self.createdAt = createdAt
@@ -369,23 +288,6 @@ struct DashboardAttentionItem: Identifiable, Equatable, Sendable {
             return request.sessionID
         }
         return sessionID
-    }
-
-    func withState(isRead: Bool, isPinned: Bool) -> DashboardAttentionItem {
-        DashboardAttentionItem(
-            id: id,
-            title: title,
-            detail: detail,
-            urgency: urgency,
-            approvalID: approvalID,
-            sessionID: sessionID,
-            agentID: agentID,
-            isRead: isRead,
-            isPinned: isPinned,
-            isSessionClosed: isSessionClosed,
-            interaction: interaction,
-            createdAt: createdAt
-        )
     }
 }
 
@@ -438,16 +340,6 @@ struct DashboardCompletion: Identifiable, Equatable, Sendable {
         self.parentSessionID = parentSessionID
         self.delegationID = delegationID
         self.turnID = turnID
-    }
-
-    func presented(title: String, sessionID: String?) -> DashboardCompletion {
-        DashboardCompletion(
-            id: id, title: title, detail: detail, taskID: taskID, jobID: jobID,
-            agentName: agentName, status: status, completedAt: completedAt,
-            completedLabel: completedLabel, sessionID: sessionID, agentID: agentID,
-            childSessionID: childSessionID, parentSessionID: parentSessionID,
-            delegationID: delegationID, turnID: turnID
-        )
     }
 }
 
@@ -531,11 +423,12 @@ struct DashboardAgent: Identifiable, Equatable, Sendable {
 }
 
 @MainActor
+/// What Needs you, the Watch and chats read from the computer: its attention list. An item
+/// leaves it for good through `dismissDashboardEvent`: the person's Remove in Needs you, and the
+/// clean-up of rows that went stale.
 protocol DashboardDataSource {
     func loadDashboard() async throws -> DashboardSnapshot
-    func setDashboardEventState(id: String, isRead: Bool, isPinned: Bool) async throws
     func dismissDashboardEvent(id: String) async throws
-    func dismissDashboardEvents(types: [String], createdBefore: Date) async throws
 }
 
 enum DashboardMutationError: Error {
@@ -543,15 +436,7 @@ enum DashboardMutationError: Error {
 }
 
 extension DashboardDataSource {
-    func setDashboardEventState(id: String, isRead: Bool, isPinned: Bool) async throws {
-        throw DashboardMutationError.unsupported
-    }
-
     func dismissDashboardEvent(id: String) async throws {
-        throw DashboardMutationError.unsupported
-    }
-
-    func dismissDashboardEvents(types: [String], createdBefore: Date) async throws {
         throw DashboardMutationError.unsupported
     }
 }

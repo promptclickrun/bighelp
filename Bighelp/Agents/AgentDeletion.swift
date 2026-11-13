@@ -87,7 +87,7 @@ enum AgentDeletionPresentation {
         case HermesProfileLifecycleError.currentProfileProtected:
             "Hermes is running as this agent on this connection, so it can't be deleted from here."
         case HermesProfileLifecycleError.activeDefaultProtected:
-            "This agent is your computer's default. Make another agent the default first, in Hermes Tools › Profiles."
+            "This agent is your computer's default. Make another bot the default first, in its Advanced Options › Manage bots."
         case HermesProfileLifecycleError.reviewChanged:
             "This agent changed while it was being deleted. Try again."
         case HermesProfileLifecycleError.outcomeUnknown:

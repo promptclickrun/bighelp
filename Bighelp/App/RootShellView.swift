@@ -589,11 +589,6 @@ struct RootShellView: View {
     }
 
     @ViewBuilder
-    private var hostAwareHomeTab: some View {
-        workspaceActivity
-    }
-
-    @ViewBuilder
     private var hostAwareAgentsTab: some View {
             AgentsShellView(
                 agents: agents,
@@ -789,22 +784,15 @@ struct RootShellView: View {
         }
     }
 
-    /// The Settings sheet: Bots mode's short Settings, or the full one. Its stack's path lives in
-    /// `AppState`, and `SettingsDestination` values pushed on it draw here, so one place serves
-    /// the full Settings and Bots mode's All Settings row.
+    /// The Settings sheet, the same one in every mode. Its stack's path lives in `AppState`, and
+    /// `SettingsDestination` values pushed on it draw here.
     private var settingsSheetContent: some View {
         // Done on every page closes Settings; Back steps through its pages.
         let settingsSheet = workspaceSettings().withDone { isUnifiedSettingsPresented = false }
         return NavigationStack(path: Binding(get: { appState.settingsPath },
                                              set: { appState.settingsPath = $0 })) {
-            Group {
-                if simpleBotsOn {
-                    simpleBotsSettings()
-                } else {
-                    settingsSheet.settingsDone(settingsSheet)
-                }
-            }
-            .navigationDestination(for: SettingsDestination.self) { settingsSheet.showing($0) }
+            settingsSheet.settingsDone(settingsSheet)
+                .navigationDestination(for: SettingsDestination.self) { settingsSheet.showing($0) }
         }
         .bighelpSheetSize()
         .presentationDragIndicator(.visible)
@@ -846,17 +834,10 @@ struct RootShellView: View {
             hostAwareAgentsTab
         case .scheduledTasks:
             scheduledTasksRootTab
-        case .workspace:
-            WorkspaceHubView(
-                hostName: workspaceHostName,
-                profileName: workspaceProfileName,
-                onOpen: openWorkspaceDestination
-            )
-        case .home, .inbox:
-            hostAwareHomeTab
         case .profile:
             workspaceSettings()
-        case .sessions, .sessionList:
+        // Home and Inbox were the Activity screen; they open Chat now.
+        case .sessions, .sessionList, .home, .inbox:
             if let splitList, splitList.isList { splitPlaceholder(splitList) } else if simpleBotsOn { simpleBotsHome } else { sessionsRootTab }
         case .feed, .ideas, .goals, .apps:
             agentBoardTab(appState.selectedTab)
@@ -888,12 +869,11 @@ struct RootShellView: View {
 
     var rootNavigationTitle: String {
         switch appState.selectedTab {
-        case .sessions, .sessionList: fleetModeOn ? String(localized: "All agents") : String(localized: "Sessions")
+        case .sessions, .sessionList, .home, .inbox:
+            fleetModeOn ? String(localized: "All agents") : String(localized: "Sessions")
         case .agents: String(localized: "Agents")
         // Its tab's name: the long one didn't fit beside its buttons.
         case .scheduledTasks: String(localized: "Tasks")
-        case .home, .inbox: String(localized: "Activity")
-        case .workspace: String(localized: "Hermes Tools")
         case .profile: String(localized: "Settings")
         case .feed: String(localized: "Feed")
         case .ideas: String(localized: "Ideas")
@@ -1225,9 +1205,9 @@ struct RootShellView: View {
         AnyView(workspaceSettings().opening(section))
     }
 
-    func workspaceSettings(destination: WorkspaceDestination? = nil) -> SettingsView {
+    func workspaceSettings() -> SettingsView {
         SettingsView(
-            settings: settings, focusedDestination: destination, userIdentity: userIdentity,
+            settings: settings, userIdentity: userIdentity,
             agents: agents.profiles, personalities: personalities,
             permissionCenter: permissionCenter,
             onOpenSessions: { leaveSettings { openSessions(filteredTo: nil) } },
@@ -1238,9 +1218,7 @@ struct RootShellView: View {
             },
             voiceSettingsScope: voiceSettingsScope, voiceSettingsClient: voiceSettingsClient,
             voiceSettingsIsCurrent: voiceSettingsIsCurrent,
-            pluginUpdateScope: pluginUpdateScope, pluginUpdateClient: pluginUpdateClient,
-            pluginUpdateIsCurrent: pluginUpdateIsCurrent,
-            hostRuntime: currentHostRuntime, agentDirectory: agents,
+            agentDirectory: agents,
             landingScope: currentWorkspaceOwner?.cacheScopeID,
             onOpenWorkspaceDestination: { destination in
                 leaveSettings { openWorkspaceDestination(destination) }
@@ -1255,8 +1233,39 @@ struct RootShellView: View {
             teamwork: { teamworkModel() },
             fleet: fleet.map { fleet in
                 SettingsFleetAccess(maintenance: { fleet.maintenance() }, gatewayCount: { fleet.hosts.count })
-            }
+            },
+            usage: providerUsage,
+            pendingShares: settingsPendingShareContext,
+            archivedChats: settingsArchivedChats,
+            computerTimeZone: computerTimeZoneSettings(),
+            onSetAllHosts: fleet == nil ? nil : { (on: Bool) in setAllHostsMode(on) }
         )
+    }
+
+    /// Settings › Chat › Archived chats: a chat opened from it leaves Settings for the chat.
+    private var settingsArchivedChats: SettingsArchivedChats {
+        let agents = agents
+        return SettingsArchivedChats(
+            catalog: sessionCatalog,
+            agentName: { id in agents.profiles.first { $0.id == id }?.name ?? id },
+            onOpen: { summary in
+                leaveSettings {
+                    appState.chatOpenedFromList = true
+                    openSession(summary)
+                }
+            })
+    }
+
+    /// Settings › Your computers › Time zone: saved for every bot on the computer in use, read
+    /// through its primary bot. Nil without a computer to ask.
+    private func computerTimeZoneSettings() -> @MainActor () -> SimpleBotHostSettings? {
+        let agents = agents
+        return {
+            guard let configuration = makeSimpleBotHostConfiguration() else { return nil }
+            let profile = agents.resolvedAgent(explicitID: nil)?.id ?? "default"
+            return SimpleBotHostSettings(client: configuration, profile: profile,
+                                         allProfiles: { agents.profiles.map(\.id) })
+        }
     }
 
     /// Settings › Teamwork on the computer in use; demo mode's made-up computer otherwise.
@@ -1330,26 +1339,6 @@ struct RootShellView: View {
                     currentOwner() == owner ? connections?.workspace : nil
                 })
             )
-        )
-    }
-
-    /// Home's pet: the primary agent's own avatar.
-    var homeCompanionPet: AgentPetIdentity? {
-        let profile = agents.profiles.first { $0.id == agents.primaryAgentID }
-            ?? agents.profiles.first(where: \.isDefault) ?? agents.profiles.first
-        return profile.map { AgentPetIdentity(agentID: $0.id, name: $0.name, imageURL: agents.avatarURL(for: $0)) }
-    }
-
-    var workspaceActivity: some View {
-        DashboardView(
-            model: featureStore.dashboardModel,
-            connection: HostConnectionStatus(dashboardIsConnected: nativeRuntime != nil
-                ? currentWorkspaceOwner != nil : dashboardFixtureIsConnected,
-                hasFailed: connectionKeeper.state == .disconnected),
-            companionPet: homeCompanionPet,
-            onInboxItemTap: openDashboardInboxItem,
-            onAttentionItemTap: openDashboardAttentionItem,
-            onWorkItemTap: openDashboardWorkItem
         )
     }
 
@@ -2068,44 +2057,6 @@ struct RootShellView: View {
             if openCachedChatWhileReconnecting(route) { return }
             actionErrorMessage = "This session could not be prepared. Try again."
         }
-    }
-
-    private func openDashboardInboxItem(_ item: DashboardInboxItem) {
-        guard let sessionID = item.sessionID,
-              let session = sessionCatalog.session(id: sessionID) else {
-            actionErrorMessage = "This conversation is no longer available."
-            return
-        }
-        openSession(session.summary)
-    }
-
-    private func openDashboardAttentionItem(_ item: DashboardAttentionItem) {
-        if let approvalID = item.approvalID {
-            openApproval(requestID: approvalID)
-            return
-        }
-        guard let session = featureStore.dashboardModel.session(for: item) else {
-            actionErrorMessage = "This conversation is no longer available."
-            return
-        }
-        openSession(session.summary)
-    }
-
-    private func openDashboardWorkItem(_ item: DashboardWorkItem) {
-        guard let session = sessionCatalog.session(id: item.sessionID) else {
-            actionErrorMessage = "This conversation is no longer available."
-            return
-        }
-        openSession(session.summary)
-    }
-
-    /// The demo dashboard reads as connected only in the Home work fixture.
-    private var dashboardFixtureIsConnected: Bool {
-        #if DEBUG
-        let arguments = ProcessInfo.processInfo.arguments
-        if arguments.contains("-use-demo-fixtures") && arguments.contains("-test-home-work") { return true }
-        #endif
-        return false
     }
 
     @BighelpThemeReader var theme

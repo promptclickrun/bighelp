@@ -8,7 +8,7 @@
 >   Legacy code). Files that the routes saved stay on hosts, but nothing reads them.
 > - The app has no Wiki screen. `WikiBrowserView`, `WikiConnectionView`, `WikiDocumentView` and
 >   `WikiSaveControls` are not in it.
-> - Hermes tools leaves Wiki out (`WorkspaceDestination.appMenuCases`).
+> - No page lists Wiki: not Settings, a computer's page or a bot's Advanced Options.
 > - If someone sends a Wiki or GitHub reference in chat, the app says that these references are no longer
 >   available (`ReferenceChatComposition`).
 > - What is left is inactive code: the models, store, drafts and persistence in `Bighelp/Wiki/`, the request

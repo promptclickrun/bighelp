@@ -210,7 +210,7 @@ final class ProviderAccountsStore {
             _ = try await client.saveCustomEndpoint(profileID: profileID, draft: draft)
             guard ownsScope else { return false }
             endpointValidation = nil
-            try await reloadAfterMutation(message: "Hermes saved the custom endpoint and confirmed its profile state.")
+            try await reloadAfterMutation(message: "Hermes saved the custom endpoint and confirmed the bot's settings.")
             return true
         } catch is CancellationError {
             return false
@@ -227,7 +227,7 @@ final class ProviderAccountsStore {
         do {
             try await client.activateCustomEndpoint(profileID: profileID, endpointID: id)
             guard ownsScope else { return }
-            try await reloadAfterMutation(message: "Hermes made this endpoint the profile default.")
+            try await reloadAfterMutation(message: "Hermes made this endpoint the bot's default.")
         } catch is CancellationError {
         } catch {
             guard ownsScope else { return }
@@ -241,7 +241,7 @@ final class ProviderAccountsStore {
         do {
             try await client.deleteCustomEndpoint(profileID: profileID, endpointID: id)
             guard ownsScope else { return false }
-            try await reloadAfterMutation(message: "Hermes removed the custom endpoint and detached its profile default.")
+            try await reloadAfterMutation(message: "Hermes removed the custom endpoint and no longer uses it as the bot's default.")
             return true
         } catch is CancellationError {
             return false
@@ -284,7 +284,7 @@ final class ProviderAccountsStore {
                 errorMessage = completed.errorMessage ?? "Provider sign-in was not accepted."
                 return false
             }
-            try await reloadAfterMutation(message: "Hermes confirmed the provider sign-in and profile account state.")
+            try await reloadAfterMutation(message: "Hermes confirmed the provider sign-in and the bot's account.")
             return true
         } catch is CancellationError {
             return false
@@ -363,7 +363,7 @@ final class ProviderAccountsStore {
                 label: label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : label
             )
             guard ownsScope else { return false }
-            try await reloadAfterMutation(message: "Hermes added and confirmed the serving-profile account credential.")
+            try await reloadAfterMutation(message: "Hermes added and confirmed the serving bot's account credential.")
             return true
         } catch is CancellationError {
             return false
@@ -572,6 +572,10 @@ final class ProviderAccountsStore {
     }
 }
 
+/// Settings › Models, which Default model and AI providers both open: the computer's providers with
+/// Connect a provider, then each bot's default model (`ModelsDefaultModelSection`), then (Advanced
+/// options) Mixture of Agents, local models, custom endpoints, credential pools, every key setting and
+/// Refresh model lists.
 @MainActor
 struct ProviderAccountsView: View {
     private struct PoolRemoval: Identifiable {
@@ -581,6 +585,12 @@ struct ProviderAccountsView: View {
     }
 
     let store: ProviderAccountsStore
+    /// Each bot's default model; nil leaves the section out (no way to read them).
+    var botDefaults: ModelsBotDefaults?
+    /// Mixture of Agents reads and saves through it; nil hides its row.
+    var models: DirectHermesModelAdministrationClient?
+    /// Advanced › Local models; nil hides its row.
+    var localModels: LocalModelsStore?
     @State private var addingEndpoint = false
     @State private var addingPoolCredential = false
     @State private var removing: ProviderKeysOverview.Connected?
@@ -591,7 +601,7 @@ struct ProviderAccountsView: View {
     @State private var replacingKey: String?
     /// The connected account whose sign-in runs on the computer, by row ID.
     @State private var computerSignIn: String?
-    @State private var showsAdvanced = false
+    @AppStorage("loopdy.settings.nerd-mode") private var nerdMode = false
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -600,38 +610,13 @@ struct ProviderAccountsView: View {
                 Form {
                     statusSections
                     if let snapshot = store.snapshot, let overview = store.overview {
-                        yourProvidersSection(overview.connected, portal: snapshot.portal)
-                        Section {
-                            NavigationLink {
-                                ProviderConnectView(store: store)
-                            } label: {
-                                Label("Connect a provider", systemImage: "plus.circle.fill")
-                            }
-                            .accessibilityIdentifier("providers.connect")
-                        } footer: {
-                            Text("Sign-ins and keys stay on \(store.hostName). bighelp never sees your passwords.")
-                        }
+                        providersSection(overview.connected, portal: snapshot.portal)
                     }
+                    if let botDefaults { ModelsDefaultModelSection(defaults: botDefaults) }
+                    if nerdMode { advancedSection }
                 }
+                .bighelpFormSurface()
                 .bighelpRefreshable { await store.refresh() }
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
-                            Button("Refresh model lists", systemImage: "arrow.clockwise") {
-                                Task { await store.refreshModelCatalogs() }
-                            }
-                            .disabled(store.isBusy)
-                            .accessibilityIdentifier("providers.refresh-model-catalogs")
-                            Button("Advanced", systemImage: "gearshape.2") { showsAdvanced = true }
-                                .accessibilityIdentifier("providers.advanced")
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                        }
-                        .accessibilityLabel("More")
-                        .accessibilityIdentifier("providers.more")
-                    }
-                }
-                .navigationDestination(isPresented: $showsAdvanced) { advancedForm }
                 .navigationDestination(item: $replacingKey) { key in
                     ProviderCredentialEditorView(store: store, credentialID: key)
                 }
@@ -640,12 +625,12 @@ struct ProviderAccountsView: View {
                 }
             } else {
                 ContentUnavailableView(
-                    "AI providers unavailable", systemImage: "person.crop.circle.badge.exclamationmark",
-                    description: Text("The selected host changed. Open AI providers again from Settings.")
+                    "Models unavailable", systemImage: "person.crop.circle.badge.exclamationmark",
+                    description: Text("The computer in use changed. Open Models again from Settings.")
                 )
             }
         }
-        .navigationTitle("AI providers")
+        .navigationTitle("Models")
         .navigationBarTitleDisplayMode(.inline)
         .task { if store.snapshot == nil { await store.load() } }
         .bighelpSheet(item: $signingIn, onDismiss: {
@@ -673,11 +658,11 @@ struct ProviderAccountsView: View {
         .accessibilityIdentifier("providers.accounts")
     }
 
-    // MARK: Your providers
+    // MARK: Providers
 
     @ViewBuilder
-    private func yourProvidersSection(_ rows: [ProviderKeysOverview.Connected],
-                                      portal: DirectHermesPortalStatus?) -> some View {
+    private func providersSection(_ rows: [ProviderKeysOverview.Connected],
+                                  portal: DirectHermesPortalStatus?) -> some View {
         Section {
             if rows.isEmpty {
                 Text("None yet. Connect a provider to start chatting.")
@@ -704,8 +689,16 @@ struct ProviderAccountsView: View {
                 .accessibilityHint("Sign in again or remove")
                 .accessibilityIdentifier("providers.connected.\(row.id)")
             }
+            NavigationLink {
+                ProviderConnectView(store: store)
+            } label: {
+                Label("Connect a provider", systemImage: "plus.circle.fill")
+            }
+            .accessibilityIdentifier("providers.connect")
         } header: {
-            Text("Your providers")
+            Text("Providers")
+        } footer: {
+            Text("Sign-ins and keys stay on \(store.hostName). bighelp never sees them.")
         }
     }
 
@@ -770,22 +763,58 @@ struct ProviderAccountsView: View {
 
     // MARK: Advanced
 
-    private var advancedForm: some View {
+    private var advancedSection: some View {
+        Section {
+            if let models {
+                NavigationLink("Mixture of Agents") {
+                    ModelsMixtureOfAgentsView(hostName: store.hostName, profileID: store.profileID, client: models)
+                }
+                .accessibilityIdentifier("models.advanced.moa")
+            }
+            if let localModels {
+                NavigationLink("Local models") { LocalModelsView(store: localModels) }
+                    .accessibilityIdentifier("models.advanced.local-models")
+            }
+            NavigationLink("Custom endpoints") { endpointsPage }
+                .accessibilityIdentifier("models.advanced.endpoints")
+            if store.canManageServingState {
+                NavigationLink("Credential pools") { poolsPage }
+                    .accessibilityIdentifier("models.advanced.pools")
+            }
+            NavigationLink("Every key setting") { keySettingsPage }
+                .accessibilityIdentifier("providers.advanced")
+            Button("Refresh model lists") { Task { await store.refreshModelCatalogs() } }
+                .disabled(store.isBusy)
+                .accessibilityIdentifier("providers.refresh-model-catalogs")
+        } header: {
+            Text("Advanced")
+        }
+    }
+
+    /// Every key setting, where each signed-in account's credentials come from, and what each provider supports.
+    private var keySettingsPage: some View {
         Form {
             statusSections
-            scopeSection
             if let snapshot = store.snapshot {
-                if snapshot.setup != nil || snapshot.runtime != nil { runtimeSection(snapshot) }
+                credentialSection(snapshot.credentials)
                 if let portal = snapshot.portal { portalSection(portal) }
                 accountSourcesSection(snapshot.oauthProviders)
-                credentialSection(snapshot.credentials)
                 supportedProvidersSection(snapshot.providers)
-                endpointsSection(snapshot.customEndpoints)
-                poolsSection(snapshot.credentialPools)
                 SkippedPartsNote(parts: snapshot.skippedParts)
             }
         }
-        .navigationTitle("Advanced")
+        .navigationTitle("Every key setting")
+        .navigationBarTitleDisplayMode(.inline)
+        .bighelpRefreshable { await store.refresh() }
+        .accessibilityIdentifier("providers.advanced.screen")
+    }
+
+    private var endpointsPage: some View {
+        Form {
+            statusSections
+            if let snapshot = store.snapshot { endpointsSection(snapshot.customEndpoints) }
+        }
+        .navigationTitle("Custom endpoints")
         .navigationBarTitleDisplayMode(.inline)
         .bighelpRefreshable { await store.refresh() }
         .bighelpSheet(isPresented: $addingEndpoint) {
@@ -794,6 +823,16 @@ struct ProviderAccountsView: View {
             }
             .bighelpSheetSize(.standard)
         }
+    }
+
+    private var poolsPage: some View {
+        Form {
+            statusSections
+            if let snapshot = store.snapshot { poolsSection(snapshot.credentialPools) }
+        }
+        .navigationTitle("Credential pools")
+        .navigationBarTitleDisplayMode(.inline)
+        .bighelpRefreshable { await store.refresh() }
         .bighelpSheet(isPresented: $addingPoolCredential) {
             NavigationStack {
                 ProviderPoolCredentialEditorView(store: store) { addingPoolCredential = false }
@@ -820,7 +859,6 @@ struct ProviderAccountsView: View {
         } message: {
             Text("Hermes will remove the selected credential-pool entry and suppress its backing source when required so it does not return on refresh.")
         }
-        .accessibilityIdentifier("providers.advanced.screen")
     }
 
     /// Where each signed-in account's credentials come from, for troubleshooting.
@@ -834,17 +872,6 @@ struct ProviderAccountsView: View {
                                    value: provider.status.sourceLabel ?? provider.status.source ?? "Hermes")
                 }
             }
-        }
-    }
-
-    private var scopeSection: some View {
-        Section {
-            LabeledContent("Host", value: store.hostName)
-            LabeledContent("Profile", value: store.profileID)
-        } header: {
-            Text("Applies to")
-        } footer: {
-            Text("Saved credentials stay on this host and are never displayed in bighelp.")
         }
     }
 
@@ -866,22 +893,6 @@ struct ProviderAccountsView: View {
         }
     }
 
-    private func runtimeSection(_ snapshot: DirectHermesProviderSnapshot) -> some View {
-        Section("New chats") {
-            if let setup = snapshot.setup {
-                LabeledContent("Provider configured", value: setup.providerConfigured == true ? "Yes" : "No")
-            }
-            if let runtime = snapshot.runtime {
-                LabeledContent("New sessions", value: runtime.isUsable ? "Ready" : "Needs attention")
-            }
-            if let provider = snapshot.runtime?.providerID { LabeledContent("Effective provider", value: provider) }
-            if let model = snapshot.runtime?.modelID { LabeledContent("Effective model", value: model) }
-            if let error = snapshot.runtime?.errorMessage, !error.isEmpty {
-                Text(error).font(.bighelp(.footnote)).foregroundStyle(.secondary)
-            }
-        }
-    }
-
     @ViewBuilder
     private func portalSection(_ portal: DirectHermesPortalStatus) -> some View {
         Section("Nous account") {
@@ -895,7 +906,7 @@ struct ProviderAccountsView: View {
     }
 
     private func supportedProvidersSection(_ providers: [DirectHermesProviderDescriptor]) -> some View {
-        Section("Advanced · Provider support") {
+        Section("Provider support") {
             ForEach(providers) { provider in
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
@@ -915,7 +926,7 @@ struct ProviderAccountsView: View {
     }
 
     private func credentialSection(_ credentials: [DirectHermesProviderCredential]) -> some View {
-        Section("Every key setting") {
+        Section {
             let rows = ProviderCredentialPresentation.sorted(
                 credentials.filter { !$0.isChannelManaged && ($0.category == "provider" || $0.providerID != nil || $0.isCustom) }
             )
@@ -933,11 +944,13 @@ struct ProviderAccountsView: View {
                 .accessibilityIdentifier("providers.credential.\(credential.id)")
             }
             if rows.isEmpty { Text("No provider key fields were reported.").foregroundStyle(.secondary) }
+        } footer: {
+            Text("Saved values stay on \(store.hostName) and never show in bighelp.")
         }
     }
 
     private func endpointsSection(_ endpoints: [DirectHermesCustomEndpoint]) -> some View {
-        Section("Advanced · Custom endpoints") {
+        Section {
             ForEach(endpoints) { endpoint in
                 NavigationLink {
                     ProviderEndpointEditorView(store: store, endpoint: endpoint)
@@ -945,7 +958,7 @@ struct ProviderAccountsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text(endpoint.name)
-                            if endpoint.isCurrent { Image(systemName: "checkmark").accessibilityLabel("Profile default") }
+                            if endpoint.isCurrent { Image(systemName: "checkmark").accessibilityLabel("Bot default") }
                         }
                         Text(endpoint.baseURL).font(.bighelp(.caption)).foregroundStyle(.secondary).lineLimit(2)
                     }
@@ -956,34 +969,29 @@ struct ProviderAccountsView: View {
         }
     }
 
-    @ViewBuilder
     private func poolsSection(_ pools: [DirectHermesCredentialPool]) -> some View {
-        if store.canManageServingState {
-            Section {
-                ForEach(pools) { pool in
-                    DisclosureGroup(pool.id) {
-                        ForEach(pool.entries) { entry in
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(entry.label)
-                                    Text(entry.source).font(.bighelp(.caption)).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Button("Remove", role: .destructive) {
-                                    poolRemoval = .init(providerID: pool.id, entry: entry)
-                                }
-                                .disabled(store.isBusy)
+        Section {
+            ForEach(pools) { pool in
+                DisclosureGroup(pool.id) {
+                    ForEach(pool.entries) { entry in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(entry.label)
+                                Text(entry.source).font(.bighelp(.caption)).foregroundStyle(.secondary)
                             }
+                            Spacer()
+                            Button("Remove", role: .destructive) {
+                                poolRemoval = .init(providerID: pool.id, entry: entry)
+                            }
+                            .disabled(store.isBusy)
                         }
                     }
                 }
-                Button("Add account credential", systemImage: "plus") { addingPoolCredential = true }
-                    .disabled(store.isBusy)
-            } header: {
-                Text("Advanced · Credential pools")
-            } footer: {
-                Text("Entries belong to the host’s serving profile. Saved values are never shown.")
             }
+            Button("Add account credential", systemImage: "plus") { addingPoolCredential = true }
+                .disabled(store.isBusy)
+        } footer: {
+            Text("Entries belong to the computer's serving bot. Saved values are never shown.")
         }
     }
 }
@@ -1103,7 +1111,7 @@ struct ProviderCredentialEditorView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Hermes will test this value, replace the selected profile's saved credential, and reconcile provider mirrors.")
+            Text("Hermes will test this value, replace the bot's saved credential, and reconcile provider mirrors.")
         }
         .confirmationDialog("Remove this credential?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Remove", role: .destructive) {
@@ -1162,7 +1170,7 @@ private struct ProviderEndpointEditorView: View {
                     .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
                 TextField("Default model", text: $model)
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
-                Toggle("Make profile default", isOn: $makeDefault)
+                Toggle("Make bot default", isOn: $makeDefault)
             }
             Section("Advanced") {
                 TextField("Context length (optional)", text: $contextLength).keyboardType(.numberPad)
@@ -1185,7 +1193,7 @@ private struct ProviderEndpointEditorView: View {
                 Button(endpoint == nil ? "Review new endpoint" : "Review changes") { confirmSave = true }
                     .disabled(!valid || store.isBusy)
                 if let endpoint {
-                    Button(endpoint.isCurrent ? "Profile default" : "Make profile default") {
+                    Button(endpoint.isCurrent ? "Bot default" : "Make bot default") {
                         Task { await store.activateEndpoint(id: endpoint.id) }
                     }
                     .disabled(endpoint.isCurrent || store.isBusy)
@@ -1216,7 +1224,7 @@ private struct ProviderEndpointEditorView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Hermes will merge these fields into the selected profile's endpoint entry. Hidden hand-edited fields remain on the host.")
+            Text("Hermes will merge these fields into the bot's endpoint entry. Hidden hand-edited fields stay on the computer.")
         }
         .confirmationDialog("Delete this endpoint?", isPresented: $confirmDelete, titleVisibility: .visible) {
             if let endpoint {
@@ -1265,7 +1273,7 @@ private struct ProviderPoolCredentialEditorView: View {
                 SecureField("API key", text: $apiKey)
                     .textInputAutocapitalization(.never).autocorrectionDisabled().privacySensitive()
             } header: { Text("Account") } footer: {
-                Text("The key is sent once to the serving profile and is never read back into bighelp.")
+                Text("The key is sent once to the serving bot and is never read back into bighelp.")
             }
             Section {
                 Button("Review account credential") { confirm = true }
@@ -1288,7 +1296,7 @@ private struct ProviderPoolCredentialEditorView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Hermes will add a separate credential-pool entry for this provider on the serving profile.")
+            Text("Hermes will add a separate credential-pool entry for this provider on the serving bot.")
         }
     }
 }

@@ -1,10 +1,12 @@
 import SwiftUI
 
-/// Every time zone, searchable.
+/// Settings › Your computers › Time zone: Automatic (follow this device), then every time zone,
+/// searchable. `onPick` gets nil for Automatic.
 @MainActor
 struct SimpleBotTimeZonePicker: View {
     let current: String
-    let onPick: (String) -> Void
+    let isAutomatic: Bool
+    let onPick: (String?) -> Void
     @State private var query = ""
     @Environment(\.dismiss) private var dismiss
 
@@ -17,23 +19,44 @@ struct SimpleBotTimeZonePicker: View {
 
     var body: some View {
         NavigationStack {
-            List(zones, id: \.self) { zone in
-                Button { onPick(zone) } label: {
-                    HStack {
-                        Text(zone.replacingOccurrences(of: "_", with: " "))
-                        Spacer()
-                        if zone == current { Image(systemName: "checkmark") }
+            List {
+                if query.isEmpty {
+                    Section {
+                        choice(String(localized: "Automatic"), isSelected: isAutomatic) { onPick(nil) }
+                            .accessibilityIdentifier("settings.time-zone.automatic")
+                    } footer: {
+                        Text("Follows this device's time zone.")
                     }
-                    .contentShape(.rect)
                 }
-                .buttonStyle(.plain)
+                Section {
+                    ForEach(zones, id: \.self) { zone in
+                        choice(Self.name(zone), isSelected: !isAutomatic && zone == current) { onPick(zone) }
+                    }
+                }
             }
             .searchable(text: $query)
-            .navigationTitle("Time Zone")
+            .navigationTitle("Time zone")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             }
         }
+    }
+
+    /// "America/New York" for "America/New_York".
+    static func name(_ identifier: String) -> String {
+        identifier.replacingOccurrences(of: "_", with: " ")
+    }
+
+    private func choice(_ title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(title)
+                Spacer()
+                if isSelected { Image(systemName: "checkmark") }
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
     }
 }

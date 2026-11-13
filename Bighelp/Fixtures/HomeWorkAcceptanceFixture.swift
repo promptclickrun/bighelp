@@ -58,7 +58,7 @@ final class HomeWorkAcceptanceFixture: DashboardDataSource, DashboardClarificati
                 agentName: "Avery", createdAt: Date.now.addingTimeInterval(-Double(index + 1) * 60),
                 completedLabel: "Completed recently", fallbackTitle: entry.2, fallbackDetail: "Finished")
         }
-        return DashboardSnapshot(inbox: [], attentionItems: dismissed ? [] : [
+        return DashboardSnapshot(attentionItems: dismissed ? [] : [
             DashboardAttentionItem(id: request.eventID, title: "Clarification needed", detail: request.question,
                 urgency: .important, sessionID: Self.clarifyID, agentID: "finance",
                 interaction: .clarification(request), createdAt: Date.now.addingTimeInterval(-30))
@@ -74,6 +74,5 @@ final class HomeWorkAcceptanceFixture: DashboardDataSource, DashboardClarificati
     }
 
     func dismissDashboardEvent(id: String) async throws { if id == "home-clarify-card" { dismissed = true } }
-    func dismissDashboardEvents(types: [String], createdBefore: Date) async throws { dismissed = true }
 }
 #endif

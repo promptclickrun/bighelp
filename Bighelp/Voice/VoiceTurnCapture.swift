@@ -12,8 +12,8 @@ enum VoiceTranscriptionSource: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .onDevice: "This device"
-        case .hermes: "Hermes"
+        case .onDevice: String(localized: "This device")
+        case .hermes: String(localized: "Computer")
         }
     }
 
@@ -22,7 +22,7 @@ enum VoiceTranscriptionSource: String, CaseIterable, Identifiable, Sendable {
         case .onDevice:
             "Apple's speech recognition turns what you say into text right on this device."
         case .hermes:
-            "Your computer turns what you say into text with the speech-to-text provider set up in Hermes."
+            "Your computer turns what you say into text with the speech-to-text provider set up there."
         }
     }
 }

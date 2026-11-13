@@ -1,9 +1,9 @@
 import SwiftUI
 
-// Advanced Options (a bot's profile › Info, and Bots mode's Settings › Approvals): the bot's
-// settings, and every Nerd Mode page made for that bot. Hermes tools opens the same pages for
-// the agent the app has selected (`workspaceAgentID`); these name the bot themselves, so they
-// work for any bot and without Nerd Mode.
+// Advanced Options (a bot's profile › Info): the bot's settings, and every Advanced options page
+// (Nerd Mode) made for that bot. `openWorkspaceDestination` opens the same pages for the agent the
+// app has selected (`workspaceAgentID`); these name the bot themselves, so they work for any bot
+// and without the Advanced options switch.
 extension RootShellView {
     /// Nil without a computer to read the bot's settings from.
     func makeAdvancedOptions(for agentID: String) -> AdvancedOptionsContext? {
@@ -24,8 +24,8 @@ extension RootShellView {
     private func advancedOptionsOffers(_ page: AdvancedPage) -> Bool {
         if advancedOptionsOnDemo {
             switch page {
-            // The made-up computer has no Skills Hub.
-            case .skillsHub: return false
+            // The made-up computer has no Skills Hub, and no bots to export or import.
+            case .skillsHub, .manageBots: return false
             case .rawConfiguration: return advancedDemoHasConfigFile
             default: return true
             }
@@ -53,6 +53,11 @@ extension RootShellView {
             AdvancedKeptPage(title: page.title) { makeAdvancedRawConfiguration(agentID: agentID) } content: {
                 RawConfigurationView(store: $0)
             }
+        case .manageBots:
+            // Export, import, rename and make default, with a connection of its own while the page shows.
+            AdvancedKeptPage(title: page.title) { try? makeLifecycleCoordinator(isShown: { true }) } content: {
+                $0.profileLifecycleView(selectedProfileID: agentID)
+            }
         default:
             if let destination = page.destination {
                 if advancedOptionsOnDemo {
@@ -67,7 +72,7 @@ extension RootShellView {
         }
     }
 
-    /// The computer's own pages, as Hermes tools opens them, for this bot.
+    /// The computer's own pages, as `openWorkspaceDestination` opens them, for this bot.
     @ViewBuilder
     private func advancedHostPage(_ destination: WorkspaceDestination, agentID: String, name: String) -> some View {
         if let owner = currentWorkspaceOwner, let connections = workspaceConnections,
@@ -99,8 +104,7 @@ extension RootShellView {
                 } content: { kept in
                     NativeAdministrationDestination(
                         presentation: kept.presentation, permissionCenter: permissionCenter,
-                        agents: modelAdministrationAgents, reasoningDefaults: agentRuntimeDefaults,
-                        onOpenProviderAccounts: {}, onOpenAgentDefaults: {})
+                        agents: modelAdministrationAgents, reasoningDefaults: agentRuntimeDefaults)
                 }
             }
         } else {

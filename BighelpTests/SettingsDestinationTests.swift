@@ -23,9 +23,9 @@ struct SettingsDestinationTests {
 
     @Test func openingAgainReplacesThePagesOfTheOpenSettings() {
         let state = AppState()
-        state.openSettings(at: [.section(.connectivityAndNotifications), .connection])
+        state.openSettings(at: [.section(.appearance), .appLayout])
 
-        state.openSettings(at: [.bots(.chat)])
+        state.openSettings(at: [.section(.chat)])
 
         #expect(state.isSettingsPresented)
         #expect(state.settingsPath.count == 1)
@@ -33,7 +33,7 @@ struct SettingsDestinationTests {
 
     @Test func closingSettingsDismissesItAndForgetsThePages() {
         let state = AppState()
-        state.openSettings(at: [.allSettings, .section(.chat)])
+        state.openSettings(at: [.section(.chat), .chatLayout])
 
         state.closeSettings()
 

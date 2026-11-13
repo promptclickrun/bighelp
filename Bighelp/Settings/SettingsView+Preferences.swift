@@ -138,32 +138,18 @@ extension SettingsView {
                 settingTitle(String(localized: "Scheduled runs"))
             }
             .accessibilityIdentifier("settings.show-cron-sessions")
-        }
-        .listRowBackground(theme.surface)
-    }
 
-    var agentBehavior: some View {
-        Section("Agent Behavior") {
-            Button {
-                isPersonalitiesPresented = true
-            } label: {
-                HStack(spacing: BighelpTokens.space12) {
-                    Label("Personalities", systemImage: "theatermasks")
-                    Spacer(minLength: BighelpTokens.space8)
-                    if let active = personalities.catalog?.activeName, !active.isEmpty {
-                        Text(active.capitalized)
-                            .bighelpFont(.metadata)
-                            .foregroundStyle(theme.secondaryText)
-                    }
-                    Image(systemName: "chevron.right")
-                        .font(.bighelp(.caption).weight(.semibold))
-                        .foregroundStyle(theme.tertiaryText)
-                        .accessibilityHidden(true)
+            if let onOpenWorkspaceDestination {
+                // Hermes' Manage Sessions: ended and old chats, in bulk.
+                Button { onOpenWorkspaceDestination(.sessionMaintenance) } label: {
+                    settingTitle(String(localized: "Clean up chats"))
+                        .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget, alignment: .leading)
+                        .contentShape(.rect)
                 }
-                .foregroundStyle(theme.primaryText)
-                .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget, alignment: .leading)
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("settings.chat.clean-up-chats")
+                .driveTarget("settings.chat.clean-up-chats")
             }
-            .accessibilityIdentifier("profile.personalities")
         }
         .listRowBackground(theme.surface)
     }
@@ -302,6 +288,15 @@ extension SettingsView {
             }
             .accessibilityIdentifier("settings.chat.return-sends")
             .driveTarget("settings.chat.return-sends")
+
+            // The Duo folded, and iPad and Mac in landscape: Bots and Code mode's chats have it.
+            if settings.simpleBotsEnabled || settings.codeModeEnabled, BighelpChatSwitcher.isOffered(screen: screen) {
+                Toggle(isOn: $settings.chatSwitcherEnabled) {
+                    settingLabel(String(localized: "Chat switcher"), detail: String(localized: "Your bots beside each chat"))
+                }
+                .accessibilityIdentifier("settings.chat-switcher")
+                .driveTarget("settings.chat-switcher")
+            }
         }
         .listRowBackground(theme.surface)
     }
@@ -322,12 +317,23 @@ extension SettingsView {
                 settingTitle(String(localized: "Project names"))
             }
             .accessibilityIdentifier("settings.chat.chat-projects")
+
+            if let archivedChats {
+                NavigationLink {
+                    settingsDone(ArchivedChatsView(catalog: archivedChats.catalog, agentName: archivedChats.agentName,
+                                                   onOpen: archivedChats.onOpen))
+                } label: {
+                    settingTitle(String(localized: "Archived chats"))
+                }
+                .accessibilityIdentifier("simple-bots.settings.archived")
+                .driveTarget("simple-bots.settings.archived")
+            }
         }
         .listRowBackground(theme.surface)
     }
 
-    /// Settings › Chat: four named groups, then Nerd Mode's Advanced groups (what chats show,
-    /// sending, edge swipes and the chat list). Everyday controls are never only in those.
+    /// Settings › Chat: four named groups, then the Advanced groups (what chats show, sending,
+    /// edge swipes, and the chat list with Clean up chats). Everyday controls are never only in those.
     var chatPage: some View {
         Form {
             BighelpDeferredSection { opening }

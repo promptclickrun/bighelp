@@ -7,7 +7,7 @@ struct SkippedPartsNote: View {
     var body: some View {
         if !parts.isEmpty {
             Section {
-                Label("This host didn't return: \(parts.joined(separator: ", ")). Everything else is up to date.",
+                Label("This computer didn't return: \(parts.joined(separator: ", ")). Everything else is up to date.",
                       systemImage: "info.circle")
                     .font(.bighelp(.footnote))
                     .foregroundStyle(.secondary)

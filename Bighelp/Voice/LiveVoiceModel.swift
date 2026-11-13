@@ -592,19 +592,19 @@ final class LiveVoiceModel {
         case .authenticationRequired?:
             return "Sign in to your computer again, then try live voice."
         case .unavailable?:
-            return "Live voice isn't set up on your computer. Use TTS voice mode instead."
+            return "Live voice isn't set up on your computer. Take turns instead."
         case .rejected(let code, _)? where code == "voice_already_active":
             return "Another live voice call is still open with your computer. End it, then try again."
         case .rejected(let code, _)? where code == "profile_not_found":
-            return "This agent is no longer on your computer."
+            return "This bot is no longer on your computer."
         case .rejected(let code?, _)? where code.hasPrefix("voice_provider_"):
             return providerMessage(String(code.dropFirst("voice_provider_".count)))
         case .ownerChanged?:
             return "Your connection to your computer changed. Close voice and open it again."
         case .some:
-            return "Your computer couldn't start the Codex voice call. Try again, or use TTS voice mode."
+            return "Your computer couldn't start the Codex voice call. Try again, or take turns instead."
         case nil:
-            return "Live voice couldn't connect. Try again, or use TTS voice mode."
+            return "Live voice couldn't connect. Try again, or take turns instead."
         }
     }
 
@@ -618,13 +618,13 @@ final class LiveVoiceModel {
         case .rejected(let code, _)? where code == "voice_already_active":
             return "Another live voice call is still open with your computer. End it, then try again."
         case .rejected(let code, _)? where code == "profile_not_found":
-            return "This agent is no longer on your computer."
+            return "This bot is no longer on your computer."
         case .rejected(let code?, _)? where code.hasPrefix("voice_provider_"):
             switch String(code.dropFirst("voice_provider_".count)) {
             case "credentials_unavailable":
-                return "This agent has no Gemini API key on your computer. Add one as GEMINI_API_KEY, then try again."
+                return "This bot has no Gemini API key on your computer. Add one as GEMINI_API_KEY, then try again."
             case "authentication_failed":
-                return "Gemini didn't accept this agent's API key. Check the key on your computer, then try again."
+                return "Gemini didn't accept this bot's API key. Check the key on your computer, then try again."
             case "access_denied":
                 return "This Gemini key can't start live voice."
             case "rate_limited":
@@ -634,12 +634,12 @@ final class LiveVoiceModel {
             case "unsupported_voice":
                 return "That voice isn't available for live voice. Pick another in Settings › Voice."
             default:
-                return "Gemini couldn't start the voice call. Try again, or use TTS voice mode."
+                return "Gemini couldn't start the voice call. Try again, or take turns instead."
             }
         case .ownerChanged?:
             return "Your connection to your computer changed. Close voice and open it again."
         case .some, nil:
-            return "Gemini Live couldn't connect. Try again, or use TTS voice mode."
+            return "Gemini Live couldn't connect. Try again, or take turns instead."
         }
     }
 
@@ -649,7 +649,7 @@ final class LiveVoiceModel {
         case "authentication_failed", "ambiguous_auth":
             "Codex sign-in on your computer didn't work. Run `hermes auth add openai-codex` there, then try again."
         case "credentials_unavailable":
-            "bighelp couldn't read this agent's Codex sign-in on your computer. Update the bighelp plugin and restart Hermes, then try again."
+            "bighelp couldn't read this bot's Codex sign-in on your computer. Update the bighelp plugin and restart Hermes, then try again."
         case "access_denied":
             "Your Codex account can't start live voice right now."
         case "rate_limited":
@@ -663,7 +663,7 @@ final class LiveVoiceModel {
         case "explicit_api_key_mode_required":
             "API-key live voice needs an OpenAI key on your computer."
         default:
-            "Codex couldn't start the voice call. Try again, or use TTS voice mode."
+            "Codex couldn't start the voice call. Try again, or take turns instead."
         }
     }
 }

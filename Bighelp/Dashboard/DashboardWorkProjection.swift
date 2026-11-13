@@ -86,51 +86,6 @@ enum DashboardWorkProjection {
         }
     }
 
-    static func presentedCompletedItems(
-        _ items: [DashboardCompletion], sessions: [SessionRecord],
-        attentionItems: [DashboardAttentionItem], scheduledTasks: [ScheduledTask] = [], now: Date
-    ) -> [DashboardCompletion] {
-        let blocked = blockedSessionIDs(sessions: sessions, attentionItems: attentionItems, now: now)
-        var seen = Set<CompletionIdentity>()
-        return items.sorted {
-            $0.completedAt == $1.completedAt ? $0.id < $1.id : $0.completedAt > $1.completedAt
-        }.compactMap { item in
-            guard DashboardEventIntentPolicy.isCompletedLifecycle(item.status) || item.status == "completed" else {
-                return nil
-            }
-            let targetID = item.childSessionID ?? item.sessionID
-            let owner = session(resolving: targetID, agentID: item.agentID, in: sessions)
-            // Home places a conversation in its current section. Host turn IDs
-            // and activity wire IDs are different coordinates, not comparable.
-            if let owner, owner.hasActiveWork || blocked.contains(owner.id) { return nil }
-            let identity = CompletionIdentity(
-                agentID: item.agentID, sessionID: owner?.id ?? targetID,
-                kind: targetID == nil ? item.status : "session",
-                runID: item.turnID ?? item.delegationID,
-                jobID: item.jobID, taskID: item.taskID,
-                // Older hosts lack run coordinates: retain separate executions
-                // by their exact completion time, not merely the reusable job ID.
-                legacyDate: item.turnID == nil && item.delegationID == nil ? item.completedAt : nil,
-                fallbackID: targetID == nil && item.jobID == nil && item.taskID == nil ? item.id : nil
-            )
-            guard seen.insert(identity).inserted else { return nil }
-            let title: String
-            if item.status == "job.completed" {
-                let tasks = scheduledTasks.filter {
-                    ($0.id == item.taskID || $0.id == item.jobID)
-                        && (item.agentID == nil || $0.agentID == item.agentID)
-                }
-                title = (tasks.count == 1 ? meaningfulTitle(tasks[0].name) : nil)
-                    ?? meaningfulTitle(item.title) ?? "Scheduled task"
-            } else {
-                title = owner.flatMap { meaningfulTitle($0.title) }
-                    ?? meaningfulTitle(item.title)
-                    ?? (item.status == "delegation.completed" ? "Subagent task" : "Conversation")
-            }
-            return item.presented(title: title, sessionID: owner?.id ?? targetID)
-        }
-    }
-
     static func meaningfulTitle(_ value: String?) -> String? {
         guard let value else { return nil }
         let text = value.split(whereSeparator: \.isWhitespace).joined(separator: " ")
@@ -162,16 +117,5 @@ enum DashboardWorkProjection {
         Set(attentionItems.filter { isActionable($0, at: now) }.compactMap {
             session(resolving: $0.owningSessionID, agentID: $0.agentID, in: sessions)?.id
         })
-    }
-
-    private struct CompletionIdentity: Hashable {
-        let agentID: String?
-        let sessionID: String?
-        let kind: String
-        let runID: String?
-        let jobID: String?
-        let taskID: String?
-        let legacyDate: Date?
-        let fallbackID: String?
     }
 }

@@ -6,18 +6,6 @@ import UIKit
 
 @MainActor
 struct SettingsStoreTests {
-    @Test func manageAllGatewaysIsOffUntilTurnedOnAndStays() {
-        let suiteName = #function
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
-        let initial = SettingsStore(defaults: defaults)
-        #expect(!initial.systemManagesAllGateways)
-        initial.systemManagesAllGateways = true
-        #expect(SettingsStore(defaults: defaults).systemManagesAllGateways)
-    }
-
     /// Shows as starts on Card with reasoning shown; anyone who turned on an old Expand switch
     /// asked to see everything, which is Full.
     @Test func agentWorkStyleDefaultsToCardAndAnOldExpandChoiceBecomesFull() {
@@ -310,7 +298,6 @@ struct SettingsStoreTests {
         settings.messageActionsEnabled = false
         settings.inlineUIEnabled = false
         settings.voiceSpeed = .fast
-        settings.offlineModeEnabled = true
         settings.notificationsEnabled = false
         settings.showReasoningByDefault = true
         settings.showToolCallsByDefault = false
@@ -327,7 +314,6 @@ struct SettingsStoreTests {
         #expect(!restored.messageActionsEnabled)
         #expect(!restored.inlineUIEnabled)
         #expect(restored.voiceSpeed == .fast)
-        #expect(restored.offlineModeEnabled)
         #expect(!restored.notificationsEnabled)
         #expect(restored.showReasoningByDefault)
         #expect(!restored.showToolCallsByDefault)
@@ -539,20 +525,15 @@ struct SettingsStoreTests {
         #expect(SettingsMenuSection.allCases == [
             .modes,
             .appearance,
-            .workspace,
-            .agentsAndPersonalities,
             .chat,
             .voice,
             .notifications,
             .permissions,
-            .connectivityAndNotifications,
             .companion,
             .help,
-            .watch,
-            .carPlay,
         ])
-        #expect(Set(SettingsMenuSection.allCases.map(\.title)).count == 13)
-        #expect(Set(SettingsMenuSection.allCases.map(\.accessibilityIdentifier)).count == 13)
+        #expect(Set(SettingsMenuSection.allCases.map(\.title)).count == 8)
+        #expect(Set(SettingsMenuSection.allCases.map(\.accessibilityIdentifier)).count == 8)
     }
 
     @Test func currentEdgeGestureChoicesExcludeTheLegacyInboxDestination() {

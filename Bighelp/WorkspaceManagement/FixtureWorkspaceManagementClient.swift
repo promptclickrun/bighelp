@@ -3,7 +3,7 @@ import Foundation
 /// Synthetic, in-memory host behavior. Never composed into a production connection.
 @MainActor
 final class FixtureWorkspaceManagementClient: WorkspaceManagementClient {
-    var editableDestinations: Set<WorkspaceDestination> = [.projects, .config, .keys, .webhooks]
+    var editableDestinations: Set<WorkspaceDestination> = [.projects, .keys, .webhooks]
     var failure: WorkspaceManagementError?
     private var projects: [WorkspaceProject] = [
         .init(id: "research", name: "Research", summary: "A synthetic workspace for notes and analysis.",
@@ -11,7 +11,6 @@ final class FixtureWorkspaceManagementClient: WorkspaceManagementClient {
         .init(id: "website", name: "Website", summary: "A sample project, not a live repository.",
             isArchived: false, folders: [.init(path: "/workspace/website", label: nil, isPrimary: true)])
     ]
-    private var effort: WorkspaceReasoningConfiguration.Effort = .medium
     private var credentialIsSet = false
     private var webhookEnabled = true
 
@@ -25,7 +24,6 @@ final class FixtureWorkspaceManagementClient: WorkspaceManagementClient {
                 providers: [.init(id: "example", name: "Example provider", models: ["example-reasoner", "example-fast"], isAuthenticated: true)],
                 currentProvider: "example", currentModel: "example-reasoner"
             ))
-        case .config: return .configuration(.init(effort: effort, showsReasoning: true))
         case .keys:
             return .credentials([.init(id: "EXAMPLE_API_KEY", description: "Synthetic provider credential", category: "Models",
                 isSet: credentialIsSet, canReplace: true)])
@@ -74,7 +72,6 @@ final class FixtureWorkspaceManagementClient: WorkspaceManagementClient {
             }
             let project = projects[index]
             projects[index] = .init(id: project.id, name: name, summary: project.summary, isArchived: project.isArchived, folders: project.folders)
-        case .reasoning(let value): effort = value
         case .replaceCredential(let key, let value):
             guard key == "EXAMPLE_API_KEY", !value.isEmpty else { throw WorkspaceManagementError.invalidInput }
             credentialIsSet = true

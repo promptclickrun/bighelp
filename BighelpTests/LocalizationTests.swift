@@ -36,14 +36,13 @@ struct LocalizationTests {
     @Test func pluralCatalogUsesEnglishAndChineseRules() throws {
         let chinese = try bundle("zh-Hans")
         let english = try bundle("en")
+        let name = "Mina"
         for count in [0, 1, 2, 12] {
-            let en = String(localized: "Your \(count) agents know each other and ask each other for help.",
-                            bundle: english, locale: Locale(identifier: "en"))
-            let zh = String(localized: "Your \(count) agents know each other and ask each other for help.",
-                            bundle: chinese, locale: Locale(identifier: "zh-Hans"))
-            #expect(en == (count == 1 ? "Your 1 agent can ask other agents for help."
-                          : "Your \(count) agents know each other and ask each other for help."))
-            #expect(zh == "你的 \(count) 个智能体会了解彼此，并相互寻求帮助。")
+            let en = String(localized: "\(count) messages with \(name)", bundle: english, locale: Locale(identifier: "en"))
+            let zh = String(localized: "\(count) messages with \(name)", bundle: chinese,
+                            locale: Locale(identifier: "zh-Hans"))
+            #expect(en == (count == 1 ? "1 message with Mina" : "\(count) messages with Mina"))
+            #expect(zh == "与Mina交流了 \(count) 条消息")
         }
     }
 

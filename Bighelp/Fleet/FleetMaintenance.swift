@@ -113,7 +113,7 @@ final class FleetMaintenanceHost: Identifiable {
         switch reach {
         case .ready: nil
         case .connecting: FleetHostJob(.checking, "Connecting…")
-        case .signedOut: FleetHostJob(.unavailable, "Signed out. Sign in again in Settings › Hosts.")
+        case .signedOut: FleetHostJob(.unavailable, "Signed out. Sign in again in Settings, on its page.")
         case .offline(let message): FleetHostJob(.unavailable, message)
         }
     }

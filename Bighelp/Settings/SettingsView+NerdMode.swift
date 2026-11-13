@@ -1,47 +1,39 @@
 import SwiftUI
 
 extension EnvironmentValues {
-    /// Mirrors Settings › Nerd Mode so any surface can hide technical detail
+    /// Mirrors Settings › Advanced options (Nerd Mode) so any surface can hide technical detail
     /// (token context, subagents, project diffs) from everyday use.
     @Entry var nerdModeEnabled = false
 }
 
-/// Everyday settings stay on the first page. Host administration (files,
-/// gateways, plugins, logs, ...) is revealed only by the Nerd Mode toggle.
+/// Settings' first page past you: your bots and what they use, then (last) Help & feedback and
+/// the Advanced options switch, which shows the technical groups at the end of each page.
 extension SettingsView {
-    var assistantBasics: some View {
+    var yourBotsSection: some View {
         Section {
             if let onOpenWorkspaceDestination {
-                routeRow(String(localized: "Default model"), detail: String(localized: "The model new chats start with"),
-                         symbol: "cpu", identifier: "settings.default-model") {
+                // Default model and AI providers are one page.
+                routeRow(String(localized: "Models"), symbol: "cpu", identifier: "settings.default-model") {
                     onOpenWorkspaceDestination(.models)
                 }
-                routeRow(String(localized: "AI providers"), detail: String(localized: "Sign in to model providers or add API keys"),
-                         symbol: "key.fill", identifier: "settings.providers") {
-                    onOpenWorkspaceDestination(.keys)
-                }
-            }
-            if marketplace != nil {
-                settingsLink(to: .marketplace) {
-                    rowLabel(String(localized: "Marketplace"),
-                             detail: String(localized: "Apps, skills and plugins for your agents"),
-                             symbol: "storefront.fill", showsChevron: BighelpPlatform.drawsOwnLinkChevron)
-                        .bighelpSettingsLinkLabel()
-                }
-                .bighelpSettingsLink()
-                .accessibilityIdentifier("settings.marketplace")
-                .driveTarget("settings.marketplace")
             }
             // Always here: Device access works before any computer is connected.
             settingsLink(to: .apps) {
-                rowLabel(String(localized: "Connections"),
-                         detail: String(localized: "This device, your apps and saved logins"),
-                         symbol: "app.connected.to.app.below.fill", showsChevron: BighelpPlatform.drawsOwnLinkChevron)
+                rowLabel(String(localized: "Apps & skills"), symbol: "app.connected.to.app.below.fill",
+                         showsChevron: BighelpPlatform.drawsOwnLinkChevron)
                     .bighelpSettingsLinkLabel()
             }
             .bighelpSettingsLink()
             .accessibilityIdentifier("settings.apps")
             .driveTarget("settings.apps")
+            settingsMenuLink(.voice)
+            Button {
+                isPersonalitiesPresented = true
+            } label: {
+                rowLabel(String(localized: "Personality"), detail: personalityDetail, symbol: "theatermasks.fill")
+            }
+            .bighelpSettingsButton()
+            .accessibilityIdentifier("profile.personalities")
             if let teamworkModel {
                 TeamworkToggle(model: teamworkModel) { detail in
                     rowLabel(String(localized: "Teamwork"), detail: detail, symbol: "person.3.fill",
@@ -49,32 +41,36 @@ extension SettingsView {
                 }
                 .bighelpSettingsRowInsets()
             }
-            Button {
-                isPersonalitiesPresented = true
-            } label: {
-                rowLabel(String(localized: "Personalities"), detail: personalityDetail, symbol: "theatermasks.fill")
-            }
-            .bighelpSettingsButton()
-            .accessibilityIdentifier("profile.personalities")
         } header: {
-            Text("Agents")
+            Text("Your bots")
         }
         .listRowBackground(theme.surface)
-        // Asked once per Settings visit; the switch reads and saves through the plugin.
-        .task { if teamworkModel == nil { teamworkModel = teamwork?() } }
+        // Asked once per computer while Settings shows; the switch reads and saves through the plugin.
+        // Keyed by the computer, never the owner: a reconnect keeps it, a switch from a computer's
+        // row makes a new one, and a moment without a connection keeps the one it has.
+        .task(id: workspaceConnections?.owner?.cacheScopeID) { refreshTeamworkModel() }
     }
 
-    private var personalityDetail: String {
-        guard let active = personalities.catalog?.activeName, !active.isEmpty else { return String(localized: "How agents sound") }
+    private func refreshTeamworkModel() {
+        let scope = workspaceConnections?.owner?.cacheScopeID
+        guard teamworkModel == nil || (scope != nil && scope != teamworkScope) else { return }
+        teamworkModel = teamwork?()
+        teamworkScope = scope
+    }
+
+    /// The personality in use; nothing until one is.
+    private var personalityDetail: String? {
+        guard let active = personalities.catalog?.activeName, !active.isEmpty else { return nil }
         return active.capitalized
     }
 
-    var nerdModeToggle: some View {
+    var helpAndAdvancedSection: some View {
         Section {
+            settingsMenuLink(.help)
             Toggle(isOn: $settings.nerdModeEnabled) {
                 HStack(spacing: BighelpTokens.space12) {
                     BighelpIconTile(systemName: "wrench.adjustable.fill")
-                    settingLabel(String(localized: "Nerd Mode"), detail: String(localized: "Hermes tools and extra chat settings"))
+                    settingTitle(String(localized: "Advanced options"))
                 }
                 .padding(.horizontal, BighelpMenuRowLayout.labelInset)
             }
@@ -84,23 +80,7 @@ extension SettingsView {
         .listRowBackground(theme.surface)
     }
 
-    /// Nerd Mode: the host's own tools, with the ones people come for most
-    /// (updating Hermes, restarting its gateway) one tap away.
-    var hermesSection: some View {
-        Section {
-            if let onOpenRoute {
-                routeRow(String(localized: "Hermes tools"), detail: String(localized: "Files, skills, memory, logs and more"),
-                         symbol: "square.grid.2x2.fill", identifier: "settings.hermes-tools") {
-                    onOpenRoute(.workspaceHub)
-                }
-            }
-        } header: {
-            Text("Hermes")
-        }
-        .listRowBackground(theme.surface)
-    }
-
-    func routeRow(_ title: String, detail: String, symbol: String, tint: Color? = nil,
+    func routeRow(_ title: String, detail: String? = nil, symbol: String, tint: Color? = nil,
                   identifier: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             rowLabel(title, detail: detail, symbol: symbol, tint: tint)
@@ -109,7 +89,8 @@ extension SettingsView {
         .accessibilityIdentifier(identifier)
     }
 
-    func rowLabel(_ title: String, detail: String, symbol: String, tint: Color? = nil,
+    /// A root row: its icon tile, its title and, when it has one, its value under it.
+    func rowLabel(_ title: String, detail: String? = nil, symbol: String, tint: Color? = nil,
                   showsChevron: Bool = true) -> some View {
         HStack(spacing: BighelpTokens.space12) {
             BighelpIconTile(systemName: symbol, tint: tint)
@@ -117,9 +98,12 @@ extension SettingsView {
                 Text(title)
                     .bighelpFont(.body)
                     .foregroundStyle(theme.primaryText)
-                Text(detail)
-                    .bighelpFont(.metadata)
-                    .foregroundStyle(theme.secondaryText)
+                if let detail {
+                    Text(detail)
+                        .bighelpFont(.metadata)
+                        .foregroundStyle(theme.secondaryText)
+                        .lineLimit(1)
+                }
             }
             Spacer(minLength: BighelpTokens.space8)
             if showsChevron {

@@ -16,14 +16,14 @@ command, `state-backed-presentation-v1` relay negotiation) is retired, and chat 
 
 ## Voice
 
-Live voice is called **Full Duplex** in the app. On plugins that list `native-voice-context-v1`, the offer
+Live voice is called **Live** in the app (Settings › Voice › Mode; the other mode is **Take turns**). On plugins that list `native-voice-context-v1`, the offer
 also carries who is talking and where (`LiveVoiceCallContext`): the agent's name as the app shows it, the
 person's saved name, the phone's time zone and, only while Device access › Location is usable, a coarse place
 (`LiveVoicePlace`; city, region, country, never coordinates). It comes from the last known fix when that is
 under an hour old, else a fresh city-level fix (kilometer accuracy). The offer waits about 1 s at most, and a
 slower search fills a 30-minute cache for the next call.
 The plugin's brief uses them, keeps the phone's language until the person asks in words for another, and
-treats each field as untrusted text. Each agent has one voice type (TTS or Full Duplex), provider and
+treats each field as untrusted text. Each agent has one voice type (Take turns or Live), provider and
 voice, kept on the device for its computer (`AgentVoiceChoices`). Settings › Voice, the bot's Default Voice in Bots
 mode and the chat's voice button all read and change the same choice; with no computer connected, Settings › Voice
 edits the defaults. The voice button starts the call at once, in both voice types, and End goes back to the chat.
@@ -77,8 +77,8 @@ again while it still said it was playing, it took every piece of Gemini's voice 
 cut itself off and the player stopped. Each call keeps a call audio report: what Gemini sent, what was
 scheduled and finished, the main mixer's output level, the engine, the session and the route, and each change
 with its time (`GeminiLiveAudioDiagnostics`, also in the `LiveVoiceAudio` log every 10 s). Settings › Voice ›
-Debug, in Nerd Mode only, has a switch for each part the call screen shows (`LiveVoiceDebug`, both off at
-first): Show call sound report shows it once a second, and Copy report button puts Copy report there and in
+Advanced, with Advanced options (`settings.nerdModeEnabled`) on, has a switch for each part the call screen shows (`LiveVoiceDebug`, both off at
+first): Call sound report shows it once a second, and Copy report button puts Copy report there and in
 Bots mode's voice bar menu. Its Restart sound stops and starts the player of the Gemini Live call in progress
 only (`LiveVoiceCurrentCall`, a weak reference the call clears as it ends).
 

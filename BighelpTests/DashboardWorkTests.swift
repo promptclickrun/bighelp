@@ -33,10 +33,9 @@ struct DashboardWorkTests {
         await model.load()
         #expect(model.workInFlightItems.map(\.sessionID) == ["one"])
         #expect(model.workInFlightItems.first?.subtitle != "Making tool calls")
-        #expect(model.presentedCompletedItems.isEmpty)
     }
 
-    @Test func clarifyPromotesOnlyItsOwnerAndClearingReturnsTheActiveSession() async {
+    @Test func clarifyPromotesOnlyItsOwnerAndAnsweringReturnsTheActiveSession() async {
         let source = WorkDashboardSource(attention: [attention("ask", sessionID: "stored-one")])
         let one = session("one", title: "Plan the release", storedID: "stored-one")
         let two = session("two", title: "Review the changes")
@@ -44,9 +43,9 @@ struct DashboardWorkTests {
         model.configureWorkSessions { [one, two] }
         await model.load()
         #expect(model.workInFlightItems.map(\.sessionID) == ["two"])
-        await model.dismissAttention(id: "ask")
+        await model.respondToClarification(itemID: "ask", response: "First")
         #expect(Set(model.workInFlightItems.map(\.sessionID)) == ["one", "two"])
-        #expect(source.responses.isEmpty)
+        #expect(source.responses == ["First"])
     }
 
     @Test func aSecondClarifyKeepsSessionInNeedsYouUntilBothAreAnswered() async {
@@ -95,7 +94,6 @@ struct DashboardWorkTests {
         model.configureWorkSessions { [record] }
         await model.load()
         #expect(model.workInFlightItems.isEmpty)
-        #expect(model.presentedCompletedItems.isEmpty)
     }
 
     @Test func remoteAndLocalHandoffTimestampsRepresentTheSameInstant() {
@@ -164,7 +162,7 @@ private final class WorkDashboardSource: DashboardDataSource, DashboardClarifica
     var responses: [String] = []
     init(attention: [DashboardAttentionItem] = []) { self.attention = attention }
     func loadDashboard() async throws -> DashboardSnapshot {
-        DashboardSnapshot(inbox: [], attentionItems: attention, completedItems: completed, agents: [])
+        DashboardSnapshot(attentionItems: attention, completedItems: completed, agents: [])
     }
     func dismissDashboardEvent(id: String) async throws { attention.removeAll { $0.id == id } }
     func respond(to request: DashboardClarificationRequest, response: String) async throws -> DashboardClarificationReceipt {

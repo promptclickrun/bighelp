@@ -154,32 +154,6 @@ struct WorkspaceModelsSection: View {
 }
 
 @MainActor
-struct WorkspaceConfigurationSection: View {
-    let store: WorkspaceManagementStore
-    let configuration: WorkspaceReasoningConfiguration
-
-    var body: some View {
-        Section {
-            LabeledContent("Default effort", value: configuration.effort.title)
-            LabeledContent("Show reasoning on Hermes", value: configuration.showsReasoning ? "Yes" : "No")
-            if store.canEdit {
-                Menu("Change default effort") {
-                    ForEach(WorkspaceReasoningConfiguration.Effort.allCases) { effort in
-                        Button(effort.title) { store.review = .reasoning(effort) }
-                            .disabled(effort == configuration.effort)
-                    }
-                }
-                .frame(minHeight: BighelpTokens.hitTarget)
-            }
-        } header: {
-            Text("Profile reasoning")
-        } footer: {
-            Text("This changes only the selected profile's default. Session overrides remain separate. Other host configuration and approval policy stay in their dedicated Hermes controls; raw configuration is never displayed.")
-        }
-    }
-}
-
-@MainActor
 struct WorkspaceFilesSection: View {
     let store: WorkspaceManagementStore
     let listing: WorkspaceFileListing

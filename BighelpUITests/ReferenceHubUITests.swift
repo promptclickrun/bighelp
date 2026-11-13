@@ -404,7 +404,6 @@ final class ReferenceHubUITests: BighelpUITestCase {
             ("first-command", app.buttons.matching(NSPredicate(
                 format: "identifier BEGINSWITH %@", "reference-hub.command.")).firstMatch),
             ("options", app.buttons["chat.options"]),
-            ("hermes-tools", app.buttons["settings.hermes-tools"].firstMatch),
         ]
         var details = "Checkpoint: \(checkpoint)\nApp state: \(app.state.rawValue)\nApp frame: \(app.frame)\n"
         for (name, element) in elements {

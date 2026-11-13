@@ -190,7 +190,7 @@ final class LocalizationUITests: BighelpUITestCase {
         }
     }
 
-    /// #527: Simple Bot mode's Settings with Teamwork, and the Notifications, Chat and Appearance pages it opens.
+    /// #527: Settings in Bots mode with Teamwork, and the Notifications, Chat and Appearance pages it opens.
     func testSimpleBotSettingsAndItsPagesInBothLanguagesAndAppearances() {
         for (language, appearance) in variants {
             let say = { (english: String, chinese: String) in language == "en" ? english : chinese }
@@ -202,21 +202,21 @@ final class LocalizationUITests: BighelpUITestCase {
             let teamwork = app.switches["settings.teamwork"]
             XCTAssertTrue(teamwork.waitForExistence(timeout: 10))
             XCTAssertTrue(teamwork.label.contains(say("Teamwork", "团队协作")), teamwork.label)
-            XCTAssertTrue(teamwork.label.contains(say("Your bots learn about each other", "机器人会了解彼此")),
+            XCTAssertTrue(teamwork.label.contains(say("Bots ask each other for help", "机器人会互相求助")),
                           teamwork.label)
             capture("simple-settings", language, appearance)
             app.swipeUp()
             capture("simple-settings-lower", language, appearance)
             app.swipeDown()
 
-            for (identifier, title) in [("notifications", say("Notifications", "通知")), ("chat", say("Chat", "聊天")),
-                                        ("appearance", say("Appearance", "外观"))] {
-                let row = app.buttons["simple-bots.settings.\(identifier)"]
+            for (identifier, title) in [("menu.notifications", say("Notifications", "通知")), ("menu.chat", say("Chat", "聊天")),
+                                        ("themes", say("Appearance", "外观"))] {
+                let row = app.buttons["settings.\(identifier)"]
                 for _ in 0..<3 where !row.isHittable { app.swipeUp() }
                 row.tap()
                 XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 5), title)
                 capture("settings-\(identifier)", language, appearance)
-                if identifier == "notifications" {
+                if identifier == "menu.notifications" {
                     let peers = app.staticTexts[say("Bots messaging each other", "机器人之间的消息")]
                     for _ in 0..<5 where !peers.exists { app.swipeUp() }
                     XCTAssertTrue(peers.exists)

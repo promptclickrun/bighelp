@@ -43,19 +43,14 @@ final class BighelpMenuUITests: BighelpUITestCase {
         XCTAssertFalse(hosts.isEmpty, "The switcher lists hosts.")
         save("02b-host-switcher", app)
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)).tap()
-        XCTAssertFalse(app.buttons["menu.hermes-tools"].exists, "Hermes tools live in Settings, not the menu.")
+        XCTAssertFalse(app.buttons["menu.hermes-tools"].exists, "The menu has no Hermes tools row.")
         tap(app.buttons["menu.settings"])
 
-        // Settings › Hermes tools keeps the host's tools; this app's own settings aren't in it.
-        openHermesTool("activity", in: app)
-        XCTAssertTrue(app.descendants(matching: .any)["dashboard.screen"].firstMatch.waitForExistence(timeout: 5))
-        app.navigationBars.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.descendants(matching: .any)["workspace.hub"].firstMatch.waitForExistence(timeout: 5))
-        for moved in ["appearance", "permissions", "watch", "contact", "tabBar", "caching", "instances", "security"] {
-            XCTAssertFalse(app.buttons["workspace.open.\(moved)"].exists, moved)
-        }
-        save("03-hermes-tools", app)
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        // Settings has no Hermes tools list either: each tool is on the page it belongs to.
+        XCTAssertTrue(app.descendants(matching: .any)["settings.screen"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["settings.hermes-tools"].exists)
+        save("03-settings", app)
+        closeSettings(in: app)
 
         // Touch and hold the logo to switch hosts.
         let logo = app.buttons["brand.host-switcher"].firstMatch
@@ -65,13 +60,11 @@ final class BighelpMenuUITests: BighelpUITestCase {
         save("04-logo-host-switcher", app)
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).tap()
 
-        // Settings: help, Apple Watch and hosts live here.
+        // Settings: help and the computers live here; Apple Watch is a row on Help & feedback.
         openSettings(in: app)
         let help = app.buttons["settings.menu.help"].firstMatch
-        let watch = app.buttons["settings.menu.watch"].firstMatch
-        for _ in 0..<8 where !(help.exists && help.isHittable && watch.exists && watch.isHittable) { app.swipeUp() }
+        for _ in 0..<8 where !(help.exists && help.isHittable) { app.swipeUp() }
         XCTAssertTrue(help.exists, "Settings has Help & feedback.")
-        XCTAssertTrue(watch.exists, "Settings has Apple Watch.")
         save("05-settings-help", app)
         tap(help)
         XCTAssertTrue(app.staticTexts["Version"].waitForExistence(timeout: 5))

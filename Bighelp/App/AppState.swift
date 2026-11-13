@@ -73,10 +73,11 @@ final class AppState {
     /// The Settings sheet. It lives here, not in the shell's view state, so code outside the
     /// view (an agent's drive) can open it straight to a page: `openSettings(at:)`.
     var isSettingsPresented = false
-    /// What the Settings sheet's stack shows above its first page. Type-erased: Bots mode pushes
-    /// `SimpleBotsSettingsPage` values and the full Settings pushes `SettingsDestination` values
-    /// on the same stack.
+    /// What the Settings sheet's stack shows above its first page: `SettingsDestination` values.
     var settingsPath = NavigationPath()
+    /// Set by `openNeedsYou()`, before the shell is on screen too; kept until the shell settles it
+    /// (`RootShellView.settleNeedsYouRequest`).
+    var isNeedsYouRequested = false
 
     /// The drawer reflects the destination on screen, while `selectedTab`
     /// deliberately retains the root to return to when a pushed route closes.
@@ -91,11 +92,9 @@ final class AppState {
             heldChat = HeldChat(conversationID: id, openedFromList: chatOpenedFromList)
         }
         switch tab {
-        case .home, .inbox:
-            selectedTab = .workspace
-            path = [.workspaceActivity]
-            return
-        case .sessionList:
+        // The Activity tab of older builds and launch arguments: what it held waits in Needs you
+        // and in the chats, so it opens Chat.
+        case .home, .inbox, .sessionList:
             selectedTab = .sessions
         default:
             selectedTab = tab
@@ -135,14 +134,10 @@ final class AppState {
     }
 
     /// Opens Settings with `pages` pushed one after another, so Back steps through them. With no
-    /// pages it opens the first screen (Bots mode's short Settings in Bots mode). Replaces the
-    /// pages when Settings is already open.
+    /// pages it opens the first screen. Replaces the pages when Settings is already open.
     func openSettings(at pages: [SettingsDestination] = []) {
         var next = NavigationPath()
-        for page in pages {
-            // Bots mode's own screen registers its page type, not `SettingsDestination`.
-            if case .bots(let botsPage) = page { next.append(botsPage) } else { next.append(page) }
-        }
+        for page in pages { next.append(page) }
         settingsPath = next
         isSettingsPresented = true
     }
@@ -160,8 +155,10 @@ final class AppState {
         select(.scheduledTasks)
     }
 
-    func openInbox() {
-        select(.inbox)
+    /// An alert that names no chat: the shell opens Needs you when something waits, else the
+    /// home chat (`RootShellView.settleNeedsYouRequest`).
+    func openNeedsYou() {
+        isNeedsYouRequested = true
     }
 
     func activateConversation(id: String, source: ConversationActivationSource) {

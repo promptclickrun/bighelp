@@ -5,16 +5,6 @@ extension BighelpUITestCase {
     func openRootDestination(_ destination: String, sidebarIdentifier: String,
                              in app: XCUIApplication,
                              file: StaticString = #filePath, line: UInt = #line) {
-        if sidebarIdentifier == "menu.hermes-tools" {
-            // Hermes tools moved from ☰ into Settings (Nerd Mode).
-            openSettings(in: app, file: file, line: line)
-            let tools = settingsRow("settings.hermes-tools", in: app, file: file, line: line)
-            guard tools.exists else { return }
-            tools.tap()
-            XCTAssertTrue(app.descendants(matching: .any)["workspace.hub"].firstMatch.waitForExistence(timeout: 5),
-                          "Settings › Hermes tools must open the tools list.", file: file, line: line)
-            return
-        }
         // iPad and iPhone share ☰; there's no always-open sidebar.
         openSidebarDestination(sidebarIdentifier, in: app, file: file, line: line)
     }
@@ -84,34 +74,47 @@ extension BighelpUITestCase {
         return field.waitForExistence(timeout: 2)
     }
 
+    /// A computer's tool page, from the page it lives on (#976): skills, plugins, mcp, toolsets and
+    /// messaging in Settings › Apps & skills; logs and webhooks on the computer's own page;
+    /// sessionMaintenance (Clean up chats) in Settings › Chat. The Advanced rows need Advanced options on.
     @MainActor
-    func openActivity(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
-        openHermesTool("activity", in: app, file: file, line: line)
-        XCTAssertTrue(app.descendants(matching: .any)["dashboard.screen"].firstMatch.waitForExistence(timeout: 5),
-                      "Activity must open from Settings › Hermes tools.", file: file, line: line)
-    }
-
-    @MainActor
-    func openSkillsAndTools(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
-        openHermesTool("skills", in: app, file: file, line: line)
-    }
-
-    /// Host tools live in Settings › Hermes tools (Nerd Mode).
-    @MainActor
-    func openHermesTool(_ destination: String, in app: XCUIApplication,
-                        file: StaticString = #filePath, line: UInt = #line) {
+    func openHostPage(_ page: String, in app: XCUIApplication,
+                      file: StaticString = #filePath, line: UInt = #line) {
         openSettings(in: app, file: file, line: line)
-        let tools = settingsRow("settings.hermes-tools", in: app, file: file, line: line)
-        guard tools.exists else { return }
-        tools.tap()
-        let row = app.buttons["workspace.open.\(destination)"].firstMatch
-        // Let Hermes Tools finish opening before scrolling, or the first rows scroll away.
-        _ = app.descendants(matching: .any)["workspace.hub"].firstMatch.waitForExistence(timeout: 5)
-        _ = row.waitForExistence(timeout: 2)
-        for _ in 0..<6 where !(row.exists && row.isHittable) { app.swipeUp() }
-        XCTAssertTrue(row.waitForExistence(timeout: 8), "Hermes Tools must list \(destination).", file: file, line: line)
+        let row: XCUIElement
+        switch page {
+        case "logs", "webhooks":
+            let computer = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "hosts.host.")).firstMatch
+            for _ in 0..<8 where !(computer.exists && computer.isHittable) { app.swipeUp() }
+            XCTAssertTrue(computer.exists, "Settings lists the computer.", file: file, line: line)
+            guard computer.exists else { return }
+            computer.tap()
+            row = app.buttons["system.\(page)"].firstMatch
+        case "sessionMaintenance":
+            settingsRow("settings.menu.chat", in: app, file: file, line: line).tap()
+            row = app.buttons["settings.chat.clean-up-chats"].firstMatch
+        default:
+            settingsRow("settings.apps", in: app, file: file, line: line).tap()
+            row = app.buttons["marketplace.\(page)"].firstMatch
+        }
+        _ = row.waitForExistence(timeout: 5)
+        for _ in 0..<12 where !(row.exists && row.isHittable) { app.swipeUp() }
+        XCTAssertTrue(row.exists, "\(page) must be reachable from Settings.", file: file, line: line)
         guard row.exists else { return }
         row.tap()
+    }
+
+    /// Leaves Settings from any page in it: Back until Done shows, then Done.
+    @MainActor
+    func leaveSettings(in app: XCUIApplication) {
+        let done = app.buttons["settings.done"].firstMatch
+        for _ in 0..<6 where !(done.exists && done.isHittable) {
+            // The sheet's own Back: the screen behind it has a navigation bar too.
+            let back = app.buttons["BackButton"].firstMatch
+            guard back.exists, back.isHittable else { break }
+            back.tap()
+        }
+        if done.exists, done.isHittable { done.tap() }
     }
 
     @MainActor

@@ -129,7 +129,7 @@ struct AgentVoiceChoicesTests {
         #expect(juniper.liveProvider == .gemini)
         #expect(juniper.liveVoice == "Kore")
         #expect(juniper.hasOwnLiveProvider)
-        #expect(bot.summary == "Full Duplex · Gemini Live · Kore")
+        #expect(bot.summary == "Live · Gemini Live · Kore")
         let other = settings.voicePreference(computer: "computer-a", agentID: "finance", choices: choices)
         #expect(other.liveProvider == .codexSubscription, "Every other agent keeps the default provider")
         #expect(other.liveVoice == LiveVoiceProvider.codexSubscription.defaultVoice)

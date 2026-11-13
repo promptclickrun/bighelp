@@ -95,7 +95,7 @@ final class ReleaseScreensWalkthroughUITests: BighelpUITestCase {
         let mode = app.segmentedControls["settings.voice.mode"]
         for _ in 0..<6 where !(mode.exists && mode.isHittable) { app.swipeUp() }
         XCTAssertTrue(mode.waitForExistence(timeout: 5))
-        mode.buttons["TTS"].tap()
+        mode.buttons["Take turns"].tap()
         let voice = settingsRow("settings.chat.voice-settings", in: app)
         XCTAssertTrue(voice.waitForExistence(timeout: 5))
         voice.tap()

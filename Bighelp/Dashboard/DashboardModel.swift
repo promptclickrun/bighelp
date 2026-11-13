@@ -21,6 +21,8 @@ final class DashboardClarificationDraft {
     }
 }
 
+/// The computer's attention list (the questions and approvals Hermes waits on), which Needs you,
+/// the Watch and chats read and answer.
 @MainActor
 @Observable
 final class DashboardModel {
@@ -39,13 +41,8 @@ final class DashboardModel {
         return draft
     }
 
-    // Updates are useful as a short activity log; decisions remain visible a
-    // little longer so an owner has time to act on them.
-    static let agentUpdateRetentionInterval: TimeInterval = 30 * 24 * 60 * 60
+    // Decisions stay in Needs you a while so an owner has time to act on them.
     static let decisionRetentionInterval: TimeInterval = 7 * 24 * 60 * 60
-
-    static let updateEventTypes = DashboardEventIntentPolicy.intentionalUserSurfaceTypes
-    static let attentionEventTypes = ["approval.required", "attention.required"]
 
     private let source: any DashboardDataSource
     @ObservationIgnored private let verifiedConnectionGeneration: @MainActor () -> UInt64?
@@ -57,7 +54,6 @@ final class DashboardModel {
     private var externalRefreshGeneration: UInt64 = 0
     @ObservationIgnored private var workSessions: @MainActor () -> [SessionRecord] = { [] }
     @ObservationIgnored private var workPresentation: (@MainActor () -> [SessionRecord])?
-    @ObservationIgnored private var workScheduledTasks: @MainActor () -> [ScheduledTask] = { [] }
     private var activeSubagentSessionIDs: Set<String> = []
     private var uncertainClarificationIDs: Set<String> = []
     private var resolvedClarificationIDs: Set<String> = []
@@ -72,14 +68,9 @@ final class DashboardModel {
             clarificationDrafts = clarificationDrafts.filter { currentRequests.contains($0.key) }
         }
     }
-    private(set) var lastUpdatedLabel = "Not updated yet"
     private(set) var mutationErrorMessage: String?
-    private(set) var notificationOpenMessage: String?
-    private(set) var focusedUpdateID: String?
-    private(set) var focusedAttentionID: String?
     private(set) var resolvingAttentionIDs: Set<String> = []
     private(set) var clarificationDeliveryMessages: [String: String] = [:]
-    private var requestedFocusUpdateID: String?
 
     init(
         source: any DashboardDataSource,
@@ -99,10 +90,6 @@ final class DashboardModel {
         workPresentation = provider
     }
 
-    func configureWorkScheduledTasks(_ provider: @escaping @MainActor () -> [ScheduledTask]) {
-        workScheduledTasks = provider
-    }
-
     var workInFlightItems: [DashboardWorkItem] {
         DashboardWorkProjection.workInFlightItems(
             sessions: (workPresentation ?? workSessions)(), attentionItems: snapshot?.attentionItems ?? [], now: now(),
@@ -118,40 +105,10 @@ final class DashboardModel {
         }
     }
 
-    var presentedCompletedItems: [DashboardCompletion] {
-        Array(DashboardWorkProjection.presentedCompletedItems(
-            snapshot?.completedItems ?? [], sessions: (workPresentation ?? workSessions)(),
-            attentionItems: snapshot?.attentionItems ?? [],
-            scheduledTasks: workScheduledTasks(), now: now()
-        ).prefix(5))
-    }
-
     func session(for item: DashboardAttentionItem) -> SessionRecord? {
         DashboardWorkProjection.session(
             resolving: item.owningSessionID, agentID: item.agentID, in: workSessions()
         )
-    }
-
-    var nextAttentionExpiry: Date? {
-        snapshot?.attentionItems.compactMap { item -> Date? in
-            switch item.interaction {
-            case .clarification(let request): request.expiresAt
-            case .approval(let request): request.expiresAt
-            case .none: nil
-            }
-        }.min()
-    }
-
-    /// The Home view owns the sleeping task; leaving Home cancels it. Expiry
-    /// changes presentation only and never submits an answer or stops Hermes.
-    func expireAttentionWhenDue() async {
-        guard let expiry = nextAttentionExpiry else { return }
-        let generation = accountGeneration
-        do {
-            try await Task.sleep(for: .seconds(max(0, expiry.timeIntervalSince(now()))))
-        } catch { return }
-        guard generation == accountGeneration, !Task.isCancelled else { return }
-        expireAttention()
     }
 
     func expireAttention() {
@@ -160,8 +117,8 @@ final class DashboardModel {
             DashboardWorkProjection.isActionable($0, at: now())
         }
         guard attention != current.attentionItems else { return }
-        snapshot = DashboardSnapshot( inbox: current.inbox, attentionItems: attention,
-            completedItems: current.completedItems, agents: current.agents
+        snapshot = DashboardSnapshot(
+            attentionItems: attention, completedItems: current.completedItems, agents: current.agents
         )
     }
 
@@ -189,7 +146,7 @@ final class DashboardModel {
                 accountGeneration: accountGeneration,
                 loadGeneration: loadGeneration
             ) else { return }
-            let resolvedSnapshot = rankedSnapshot(loadedSnapshot)
+            let resolvedSnapshot = actionableSnapshot(loadedSnapshot)
             snapshot = resolvedSnapshot
             let dismissedIDs = await autoDismissStaleItems(
                 from: resolvedSnapshot,
@@ -202,14 +159,11 @@ final class DashboardModel {
             ) else { return }
             if !dismissedIDs.isEmpty, let current = snapshot {
                 snapshot = DashboardSnapshot(
-                    inbox: current.inbox.filter { !dismissedIDs.contains($0.id) },
                     attentionItems: current.attentionItems.filter { !dismissedIDs.contains($0.id) },
                     completedItems: current.completedItems,
                     agents: current.agents
                 )
             }
-            resolveRequestedUpdateFocus()
-            lastUpdatedLabel = "Updated just now"
             state = .loaded
         } catch {
             guard !(error is CancellationError) else { return }
@@ -220,14 +174,12 @@ final class DashboardModel {
             if let current = snapshot {
                 // Keep the last known-good dashboard visible when a refresh
                 // briefly loses the relay. A transient transport failure
-                // must not erase useful inbox and attention content.
+                // must not erase what waits on the person.
                 snapshot = DashboardSnapshot(
-                    inbox: current.inbox,
                     attentionItems: current.attentionItems,
                     completedItems: current.completedItems,
                     agents: current.agents
                 )
-                lastUpdatedLabel = "Could not refresh"
                 state = .loaded
             } else {
                 state = .failure(message: "Dashboard data is unavailable. Please try again.")
@@ -276,148 +228,23 @@ final class DashboardModel {
         loadGeneration &+= 1
         state = .idle
         snapshot = nil
-        lastUpdatedLabel = "Not updated yet"
         mutationErrorMessage = nil
-        notificationOpenMessage = nil
-        focusedUpdateID = nil
-        focusedAttentionID = nil
         resolvingAttentionIDs = []
         activeSubagentSessionIDs = []
         uncertainClarificationIDs = []
         resolvedClarificationIDs = []
         clarificationDeliveryMessages = [:]
-        requestedFocusUpdateID = nil
     }
 
-    func focusUpdate(id: String) {
-        guard snapshot?.inbox.contains(where: { $0.id == id }) == true else { return }
-        focusedUpdateID = id
-    }
-
-    func requestUpdateFocus(id: String) {
-        guard
-            !id.isEmpty,
-            id.count <= 220,
-            id.allSatisfy({ $0.isASCII && !$0.isWhitespace })
-        else { return }
-        requestedFocusUpdateID = id
-        resolveRequestedUpdateFocus()
-    }
-
-    func openNotification(eventID: String, eventType: String?) async {
-        requestedFocusUpdateID = nil
-        focusedUpdateID = nil
-        focusedAttentionID = nil
-        notificationOpenMessage = nil
-
-        await refreshAfterExternalChange()
-
-        guard let snapshot else {
-            notificationOpenMessage = "This item is no longer available"
-            return
-        }
-        if snapshot.inbox.contains(where: { $0.id == eventID }) {
-            focusedUpdateID = eventID
-            return
-        }
-        if snapshot.attentionItems.contains(where: { $0.id == eventID }) {
-            focusedAttentionID = eventID
-            return
-        }
-        notificationOpenMessage = eventType == "attention.required"
-            ? "This question has already been answered"
-            : "This item is no longer available"
-    }
-
-    func clearNotificationOpenMessage() {
-        notificationOpenMessage = nil
-    }
-
-    func consumeFocusedUpdate(id: String) {
-        guard focusedUpdateID == id else { return }
-        focusedUpdateID = nil
-    }
-
-    func consumeFocusedAttention(id: String) {
-        guard focusedAttentionID == id else { return }
-        focusedAttentionID = nil
-    }
-
-    func dismissUpdate(id: String) async {
-        guard snapshot?.inbox.contains(where: { $0.id == id }) == true else { return }
-        let generation = accountGeneration
-        do {
-            try await source.dismissDashboardEvent(id: id)
-            guard generation == accountGeneration else { return }
-            invalidateInFlightLoad()
-            guard let snapshot else { return }
-            self.snapshot = DashboardSnapshot(
-                inbox: snapshot.inbox.filter { $0.id != id },
-                attentionItems: snapshot.attentionItems,
-                completedItems: snapshot.completedItems,
-                agents: snapshot.agents
-            )
-            mutationErrorMessage = nil
-        } catch {
-            guard generation == accountGeneration else { return }
-            invalidateInFlightLoad()
-            let reconciliationLoadGeneration = loadGeneration
-            do {
-                let refreshed = try await source.loadDashboard()
-                guard ownsLoad(
-                    accountGeneration: generation,
-                    loadGeneration: reconciliationLoadGeneration
-                ) else { return }
-                let resolved = rankedSnapshot(refreshed)
-                snapshot = resolved
-                if !resolved.inbox.contains(where: { $0.id == id }) {
-                    mutationErrorMessage = nil
-                    return
-                }
-            } catch {
-                guard ownsLoad(
-                    accountGeneration: generation,
-                    loadGeneration: reconciliationLoadGeneration
-                ) else { return }
-            }
-            mutationErrorMessage = "That item could not be removed. Please try again."
-        }
-    }
-
-    func setUpdateRead(id: String, isRead: Bool) async {
-        guard let item = snapshot?.inbox.first(where: { $0.id == id }) else { return }
-        await setUpdateState(item, isRead: isRead, isPinned: item.isPinned)
-    }
-
-    func setUpdatePinned(id: String, isPinned: Bool) async {
-        guard let item = snapshot?.inbox.first(where: { $0.id == id }) else { return }
-        await setUpdateState(item, isRead: item.isRead, isPinned: isPinned)
-    }
-
-    func setAttentionRead(id: String, isRead: Bool) async {
-        guard let item = snapshot?.attentionItems.first(where: { $0.id == id }) else { return }
-        await setAttentionState(item, isRead: isRead, isPinned: item.isPinned)
-    }
-
-    func setAttentionPinned(id: String, isPinned: Bool) async {
-        guard let item = snapshot?.attentionItems.first(where: { $0.id == id }) else { return }
-        await setAttentionState(item, isRead: item.isRead, isPinned: isPinned)
-    }
-
+    /// Takes one item out of Needs you for good (the person's Remove): only the computer's list,
+    /// never its chat. A refused removal leaves the item, with why.
     func dismissAttention(id: String) async {
         guard snapshot?.attentionItems.contains(where: { $0.id == id }) == true else { return }
         let generation = accountGeneration
         do {
             try await source.dismissDashboardEvent(id: id)
             guard generation == accountGeneration else { return }
-            invalidateInFlightLoad()
-            guard let snapshot else { return }
-            self.snapshot = DashboardSnapshot(
-                inbox: snapshot.inbox,
-                attentionItems: snapshot.attentionItems.filter { $0.id != id },
-                completedItems: snapshot.completedItems,
-                agents: snapshot.agents
-            )
+            removeAttentionFromSnapshot(id: id)
             mutationErrorMessage = nil
         } catch {
             guard generation == accountGeneration else { return }
@@ -603,86 +430,21 @@ final class DashboardModel {
         }
     }
 
-    func clearUpdates() async {
-        guard
-            let snapshot,
-            let cutoff = snapshot.inbox.map(\.createdAt).max()
-        else { return }
-        let generation = accountGeneration
-        do {
-            try await source.dismissDashboardEvents(
-                types: Self.updateEventTypes,
-                createdBefore: cutoff
-            )
-            guard generation == accountGeneration else { return }
-            guard let current = self.snapshot else { return }
-            self.snapshot = DashboardSnapshot(
-                inbox: current.inbox.filter { $0.createdAt > cutoff },
-                attentionItems: current.attentionItems,
-                completedItems: current.completedItems,
-                agents: current.agents
-            )
-            mutationErrorMessage = nil
-        } catch {
-            guard generation == accountGeneration else { return }
-            mutationErrorMessage = "Agent updates could not be cleared. Please try again."
-        }
-    }
-
-    func clearAttention() async {
-        guard
-            let snapshot,
-            let cutoff = snapshot.attentionItems.map(\.createdAt).max()
-        else { return }
-        let generation = accountGeneration
-        do {
-            try await source.dismissDashboardEvents(
-                types: Self.attentionEventTypes,
-                createdBefore: cutoff
-            )
-            guard generation == accountGeneration else { return }
-            invalidateInFlightLoad()
-            guard let current = self.snapshot else { return }
-            self.snapshot = DashboardSnapshot(
-                inbox: current.inbox,
-                attentionItems: current.attentionItems.filter { $0.createdAt > cutoff },
-                completedItems: current.completedItems,
-                agents: current.agents
-            )
-            mutationErrorMessage = nil
-        } catch {
-            guard generation == accountGeneration else { return }
-            mutationErrorMessage = "Decision requests could not be cleared. Please try again."
-        }
-    }
-
-    func clearMutationError() {
-        mutationErrorMessage = nil
-    }
-
     private func autoDismissStaleItems(
         from snapshot: DashboardSnapshot,
         accountGeneration: UInt64,
         loadGeneration: UInt64
     ) async -> Set<String> {
         let referenceDate = now()
-        let staleUpdates = snapshot.inbox.filter { item in
-            guard !item.isPinned else { return false }
-            return item.isSessionClosed || isExpired(
-                item.createdAt,
-                before: referenceDate.addingTimeInterval(-Self.agentUpdateRetentionInterval)
-            )
-        }
         let staleDecisions = snapshot.attentionItems.filter { item in
-            guard !item.isPinned else { return false }
-            return (item.isSessionClosed && !item.interaction.isStructuredDecision) || isExpired(
+            (item.isSessionClosed && !item.interaction.isStructuredDecision) || isExpired(
                 item.createdAt,
                 before: referenceDate.addingTimeInterval(-Self.decisionRetentionInterval)
             )
         }
 
         var dismissedIDs = Set<String>()
-        for itemID in staleUpdates.map(\.id) + staleDecisions.map(\.id) {
+        for itemID in staleDecisions.map(\.id) {
             guard ownsLoad(
                 accountGeneration: accountGeneration,
                 loadGeneration: loadGeneration
@@ -715,35 +477,17 @@ final class DashboardModel {
         invalidateInFlightLoad()
         guard let snapshot else { return }
         self.snapshot = DashboardSnapshot(
-            inbox: snapshot.inbox,
             attentionItems: snapshot.attentionItems.filter { $0.id != id },
             completedItems: snapshot.completedItems,
             agents: snapshot.agents
         )
     }
 
-    private func rankedSnapshot(
+    private func actionableSnapshot(
         _ snapshot: DashboardSnapshot
     ) -> DashboardSnapshot {
         let referenceDate = now()
-        let rankedInbox = snapshot.inbox.enumerated()
-            .filter { _, item in
-                if item.isPinned { return true }
-                guard let validUntil = item.bighelpCard?.validUntil else { return true }
-                return validUntil > referenceDate
-            }
-            .sorted { left, right in
-                if left.element.isPinned != right.element.isPinned {
-                    return left.element.isPinned
-                }
-                if left.element.cardImportance != right.element.cardImportance {
-                    return left.element.cardImportance > right.element.cardImportance
-                }
-                return left.offset < right.offset
-            }
-            .map(\.element)
         return DashboardSnapshot(
-            inbox: rankedInbox,
             attentionItems: snapshot.attentionItems.filter {
                 !resolvedClarificationIDs.contains($0.id)
                     && DashboardWorkProjection.isActionable($0, at: referenceDate)
@@ -767,90 +511,6 @@ final class DashboardModel {
         loadGeneration &+= 1
         if snapshot != nil {
             state = .loaded
-        }
-    }
-
-    private func resolveRequestedUpdateFocus() {
-        guard let requestedFocusUpdateID, let snapshot else { return }
-        if snapshot.inbox.contains(where: { $0.id == requestedFocusUpdateID }) {
-            self.requestedFocusUpdateID = nil
-            focusedUpdateID = requestedFocusUpdateID
-            return
-        }
-        guard snapshot.attentionItems.contains(where: { $0.id == requestedFocusUpdateID }) else {
-            return
-        }
-        self.requestedFocusUpdateID = nil
-        focusedAttentionID = requestedFocusUpdateID
-    }
-
-    private func setUpdateState(
-        _ item: DashboardInboxItem,
-        isRead: Bool,
-        isPinned: Bool
-    ) async {
-        let generation = accountGeneration
-        do {
-            try await source.setDashboardEventState(
-                id: item.id,
-                isRead: isRead,
-                isPinned: isPinned
-            )
-            guard generation == accountGeneration else { return }
-            guard let snapshot else { return }
-            let replaced = snapshot.inbox.map { candidate in
-                candidate.id == item.id
-                    ? candidate.withState(isRead: isRead, isPinned: isPinned)
-                    : candidate
-            }
-            let ordered = replaced.filter(\.isPinned).sorted { left, right in
-                left.createdAt > right.createdAt
-            } + replaced.filter { !$0.isPinned }
-            self.snapshot = DashboardSnapshot(
-                inbox: ordered,
-                attentionItems: snapshot.attentionItems,
-                completedItems: snapshot.completedItems,
-                agents: snapshot.agents
-            )
-            mutationErrorMessage = nil
-        } catch {
-            guard generation == accountGeneration else { return }
-            mutationErrorMessage = "That item could not be updated. Please try again."
-        }
-    }
-
-    private func setAttentionState(
-        _ item: DashboardAttentionItem,
-        isRead: Bool,
-        isPinned: Bool
-    ) async {
-        let generation = accountGeneration
-        do {
-            try await source.setDashboardEventState(
-                id: item.id,
-                isRead: isRead,
-                isPinned: isPinned
-            )
-            guard generation == accountGeneration else { return }
-            guard let snapshot else { return }
-            let replaced = snapshot.attentionItems.map { candidate in
-                candidate.id == item.id
-                    ? candidate.withState(isRead: isRead, isPinned: isPinned)
-                    : candidate
-            }
-            let ordered = replaced.filter(\.isPinned).sorted { left, right in
-                left.createdAt > right.createdAt
-            } + replaced.filter { !$0.isPinned }
-            self.snapshot = DashboardSnapshot(
-                inbox: snapshot.inbox,
-                attentionItems: ordered,
-                completedItems: snapshot.completedItems,
-                agents: snapshot.agents
-            )
-            mutationErrorMessage = nil
-        } catch {
-            guard generation == accountGeneration else { return }
-            mutationErrorMessage = "That item could not be updated. Please try again."
         }
     }
 }

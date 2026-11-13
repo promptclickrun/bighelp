@@ -4,7 +4,7 @@ import Foundation
 /// (an agent's drive, a link) can open Settings straight to one with `AppState.openSettings(at:)`.
 /// Pages that are not reachable by a push (sheets, the host's own tools) are not listed.
 enum SettingsDestination: Hashable, Sendable {
-    /// One row of the Settings menu (Modes, Appearance, Chat, Voice, System ...).
+    /// One page by its `SettingsMenuSection` (Modes, Appearance, Chat, Voice, Help ...).
     case section(SettingsMenuSection)
     /// The first row: your name and photo.
     case you
@@ -14,20 +14,9 @@ enum SettingsDestination: Hashable, Sendable {
     case appLayout
     /// Appearance › Thinking: the look of the Thinking control.
     case thinking
-    /// Connections: this device's access, then Native App Connections and Composio Apps, then the
-    /// credential vault. Device access opens from it as `.section(.permissions)`.
+    /// Apps & skills: this device's access, the apps and skills bots can use (its own pages open
+    /// from it), then the credential vault. Device access opens from it as `.section(.permissions)`.
     case apps
-    /// Connections › Native App Connections: Hermes' own connectors on this computer.
-    case nativeAppConnections
-    /// Connections › Composio Apps.
-    case composioApps
-    /// Marketplace: Apps, Skills, Plugins and Talk anywhere for the agent in use, and this week's
-    /// featured plugin. For everyone, not Nerd Mode.
-    case marketplace
-    /// System › Connection & plugin features (Nerd Mode).
+    /// Connection details of the computer in use, from its page with Advanced options on.
     case connection
-    /// One page of Bots mode's short Settings.
-    case bots(SimpleBotsSettingsPage)
-    /// The full Settings menu, as Bots mode's All Settings row opens it.
-    case allSettings
 }

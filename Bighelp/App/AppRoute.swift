@@ -1,7 +1,7 @@
 import Foundation
 
 enum AppTab: String, CaseIterable, Identifiable {
-    case home, agents, sessions, inbox, profile, scheduledTasks, workspace
+    case home, agents, sessions, inbox, profile, scheduledTasks
     case feed, ideas, goals, apps
     /// Pages ☰ opens, as tabs when the person pins them to the bottom bar.
     case projects, kanban, workflows, usage
@@ -36,11 +36,9 @@ enum AppRoute: Hashable {
     case scheduledTask(id: String, agentID: String? = nil)
     case skillsAndTools
     case approval(requestID: String)
-    case workspaceActivity
     case workspaceSettings
     case workspaceManagement(WorkspaceDestination)
     case workspaceConnections
-    case workspaceHub
     /// Projects, like Claude's: related chats and folders together.
     case projects
     case project(id: String)

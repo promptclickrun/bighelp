@@ -64,7 +64,7 @@ struct OnDeviceVoiceRows: View {
                 .confirmationDialog("Remove \(model.title)?", isPresented: $confirmsRemoval, titleVisibility: .visible) {
                     Button("Remove", role: .destructive) { installer.remove(model) }
                 } message: {
-                    Text("Agents that use it speak with your computer's voice until you download it again.")
+                    Text("Bots that use it speak with your computer's voice until you download it again.")
                 }
         case .notInstalled:
             Button {

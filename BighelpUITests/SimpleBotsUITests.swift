@@ -36,14 +36,12 @@ final class SimpleBotsUITests: BighelpUITestCase {
             XCTAssertTrue(app.buttons["simple-bots.bot.travel"].exists, "Other bots are listed")
             save("simple-home-\(appearance)", app)
 
-            // Settings: the short sheet, with the way back to all of bighelp.
+            // Settings: the one Settings, the same as in Chat mode.
             app.buttons["simple-bots.settings"].tap()
-            XCTAssertTrue(app.descendants(matching: .any)["simple-bots.settings"].waitForExistence(timeout: 5))
-            XCTAssertTrue(app.buttons["simple-bots.settings.modes"].exists, "Modes, as in All Settings")
-            XCTAssertTrue(app.buttons["simple-bots.settings.approvals"].waitForExistence(timeout: 5),
-                          "Approvals links to the primary bot's Advanced Options")
+            XCTAssertTrue(app.descendants(matching: .any)["settings.screen"].firstMatch.waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["settings.apps"].exists, "Apps & skills, as in every mode")
             save("simple-settings-\(appearance)", app)
-            app.buttons["simple-bots.settings.close"].tap()
+            app.buttons["settings.done"].tap()
 
             // Create New Bot: + opens a short menu, New Bot first.
             XCTAssertEqual(app.buttons["simple-bots.new"].label, "Add")
@@ -283,14 +281,14 @@ final class SimpleBotsUITests: BighelpUITestCase {
 
             voice.tap()
             XCTAssertTrue(app.descendants(matching: .any)["simple-bots.default-voice.mode"]
-                .waitForExistence(timeout: 5), "The sheet picks TTS or GPT Live")
+                .waitForExistence(timeout: 5), "The sheet picks Live or Take turns")
             XCTAssertTrue(app.buttons["simple-bots.default-voice.done"].exists)
             save("simple-default-voice-\(appearance)", app)
-            let tts = app.descendants(matching: .any)["simple-bots.default-voice.mode"].buttons["TTS"]
+            let tts = app.descendants(matching: .any)["simple-bots.default-voice.mode"].buttons["Take turns"]
             if tts.exists {
                 tts.tap()
                 XCTAssertTrue(app.buttons["simple-bots.default-voice.save"].waitForExistence(timeout: 5),
-                              "TTS shows the voice settings with Save")
+                              "Take turns shows the voice settings with Save")
                 save("simple-default-voice-tts-\(appearance)", app)
             }
             app.buttons["simple-bots.default-voice.done"].tap()
@@ -337,20 +335,6 @@ final class SimpleBotsUITests: BighelpUITestCase {
                           "Edit config.yaml opens the editor")
             app.terminate()
         }
-    }
-
-    /// Bots mode's Settings: Approvals opens the primary bot's Advanced Options, the one place approvals are set.
-    @MainActor
-    func testSettingsApprovalsOpensThePrimaryBotsAdvancedOptions() {
-        let app = launch(appearance: "light")
-        XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
-        app.buttons["simple-bots.settings"].tap()
-        let approvals = app.buttons["simple-bots.settings.approvals"]
-        XCTAssertTrue(approvals.waitForExistence(timeout: 5))
-        approvals.tap()
-        XCTAssertTrue(app.buttons["advanced.option.approvals.mode"].waitForExistence(timeout: 10))
-        XCTAssertEqual(app.buttons["advanced.option.approvals.mode"].value as? String, "Smart")
-        save("simple-settings-approvals-light", app)
     }
 
     /// A bot's profile: Files and Media after Computer. Files opens a folder in place, Back goes up,
@@ -703,23 +687,23 @@ final class SimpleBotsUITests: BighelpUITestCase {
                       "Expand shows above the box once the draft has three lines")
     }
 
-    /// Settings › Modes, the same page as All Settings', with Bots picked; picking Chat leaves Bots mode.
+    /// Settings › Modes with Bots picked; picking Chat leaves Bots mode.
     @MainActor
     func testTurningSimpleBotModeOffComesBackToBighelp() throws {
         let app = launch(appearance: "light")
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
         app.buttons["simple-bots.settings"].tap()
-        let modes = app.buttons["simple-bots.settings.modes"]
+        let modes = app.buttons["settings.menu.modes"]
+        for _ in 0..<4 where !(modes.exists && modes.isHittable) { app.swipeUp() }
         XCTAssertTrue(modes.waitForExistence(timeout: 5))
         XCTAssertTrue(modes.label.contains("Bots mode"), modes.label)
         modes.tap()
         let bots = app.buttons["settings.mode.bots"]
         XCTAssertTrue(bots.waitForExistence(timeout: 5))
         XCTAssertTrue(bots.isSelected)
-        XCTAssertTrue(app.switches["settings.code-mode"].exists, "Code mode's switch, as in All Settings")
+        XCTAssertTrue(app.switches["settings.code-mode"].exists, "Code mode's switch")
         save("simple-settings-modes", app)
         app.buttons["settings.mode.chat"].tap()
-        // The full Settings takes over the sheet; close it.
         let done = app.buttons["settings.done"]
         if done.waitForExistence(timeout: 5) { done.tap() }
         XCTAssertTrue(app.buttons["home.drawer.open"].waitForExistence(timeout: 10), "☰ is back")

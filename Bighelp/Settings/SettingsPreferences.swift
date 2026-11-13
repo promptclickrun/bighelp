@@ -318,6 +318,7 @@ enum ChatReasoningPlacement: String, CaseIterable, Identifiable, Sendable {
     static let staysOpenByDefault = true
 }
 
+// One home: delete with the old shell (`BighelpExperience`, `BighelpMode`, `BighelpModeSwitch`).
 /// Which home bighelp shows: the everyday agent chat, or Code mode's coding
 /// sessions (Settings › Code mode; ☰ switches between them).
 enum BighelpExperience: String, CaseIterable, Identifiable, Sendable {
@@ -390,6 +391,14 @@ enum WorkspaceSwipeAction: String, CaseIterable, Identifiable, Sendable {
     case codeMode
     case none
 
+    /// Settings › Chat › Edge swipes: what the one home offers, in order. "Bot page or Settings" is this
+    /// bot's page in a chat and Settings elsewhere; "Sidebar" opens it where there is one, else Chats.
+    static let homeChoices: [WorkspaceSwipeAction] = [
+        .newChat, .sessions, .agents, .home, .profile, .quickWorkspace, .none,
+    ]
+
+    // One home: delete with the old shell, with the mode cases above and `mode`/`switchesMode`; the
+    // migration turned saved mode swipes into places.
     static let allCases: [WorkspaceSwipeAction] = [
         .quickWorkspace,
         .newChat,
@@ -420,13 +429,13 @@ enum WorkspaceSwipeAction: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .quickWorkspace: String(localized: "Menu")
-        case .newChat: String(localized: "New Chat")
-        case .sessions: String(localized: "Sessions")
-        case .agents: String(localized: "Agents")
+        case .quickWorkspace: String(localized: "Sidebar")
+        case .newChat: String(localized: "New chat")
+        case .sessions: String(localized: "Chats")
+        case .agents: String(localized: "Bots")
         case .home: String(localized: "Home")
         case .inbox: String(localized: "Inbox")
-        case .profile: String(localized: "Profile & Settings")
+        case .profile: String(localized: "Bot page or Settings")
         case .nextMode: String(localized: "Next mode")
         case .botsMode: String(localized: "Bots mode")
         case .chatMode: String(localized: "Chat mode")

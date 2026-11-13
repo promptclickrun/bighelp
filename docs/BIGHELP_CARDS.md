@@ -225,6 +225,21 @@ full contract is [HTML apps](HTML_APPS.md). The app adds `html_app` to `renders`
 only when `/native/context` lists `native-html-apps-v1` (and
 `native-card-objects-v1`).
 
+## Space drafts
+
+Plugin feature `native-spaces-v1` adds `space_draft`: a live panel for Today that
+the agent drafted with `bighelp_draft_space`. Only that tool makes one, and it
+is its card's only element. The card shows a preview of the panel, how often it
+updates, whether that uses AI, a size, and Add to Today. Nothing runs on the
+computer until the person taps Add. The app adds `space_draft` to `renders`
+only when `/native/context` lists `native-spaces-v1` (and
+`native-card-objects-v1`). The full contract is [Spaces](SPACES.md).
+
+A space's own card is an ordinary card drawn in a panel on Today. The panel
+draws less of it than a chat would (`BighelpCardLimits`): fewer list items,
+table rows and columns, a shorter chart and fewer lines of text, and no root
+title, since the panel names the space. In a chat nothing changes.
+
 ## Weather backgrounds
 
 A `card` element may carry an animated weather background beside its `props`:

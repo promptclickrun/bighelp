@@ -1,7 +1,11 @@
 import Foundation
 
-/// The screen bighelp opens on (Settings › Chat › Opens on). It applies to a
-/// cold launch only, and a link, widget or notification that opens the app wins.
+// One home: delete with the old shell, all but `screenKey`, `homeLanding(stored:)` and the mapping to
+// `HomeLanding`. The home opens on one of four places (`HomeLanding`, Settings › Chat › Opens on), saved
+// under the same key; the old shell still reads the nine screens below until it goes.
+
+/// The screen the old shell opens on. It applies to a cold launch only, and a link, widget or
+/// notification that opens the app wins.
 enum BighelpLandingScreen: String, CaseIterable, Identifiable, Sendable {
     case agents
     case allAgents = "all-agents"
@@ -27,6 +31,16 @@ enum BighelpLandingScreen: String, CaseIterable, Identifiable, Sendable {
 
     /// Every choice but every computer's agents starts with one agent.
     var offersStartAgent: Bool { self != .allAgents && self != .sessions }
+
+    /// Where the one home opens for a screen saved before it (PLAN-shell § 4).
+    var homeLanding: HomeLanding {
+        switch self {
+        case .agents, .allAgents: .bots
+        case .sessions, .lastChat: .chats
+        case .feed, .ideas, .goals: .today
+        case .kanban, .projects: .work
+        }
+    }
 }
 
 /// What a cold launch was asked to open on.
@@ -51,6 +65,13 @@ enum BighelpLanding {
     static let startAgentKey = "loopdy.home.start-agent.by-scope"
     /// How long Kanban gets to say whether a computer has it, the first time.
     static let kanbanWait: Duration = .seconds(3)
+
+    /// Opens on as saved: one of the four, or an old screen mapped to its place. Nil when nothing was
+    /// picked, or the value is unknown.
+    static func homeLanding(stored: String?) -> HomeLanding? {
+        guard let stored else { return nil }
+        return HomeLanding(rawValue: stored) ?? BighelpLandingScreen(rawValue: stored)?.homeLanding
+    }
 
     static func choice(screen: BighelpLandingScreen?, legacyOpensChat: Bool?) -> BighelpLandingChoice {
         if let screen { return .chosen(screen) }
@@ -81,13 +102,6 @@ enum BighelpLanding {
             case nil: return kanbanWaitIsOver ? .homeChat : nil
             }
         }
-    }
-
-    /// A picked screen decides the all-hosts view at launch; nothing picked, or a screen both views
-    /// have (Sessions, Last chat), leaves the switch as it was.
-    static func allHostsMode(for choice: BighelpLandingChoice) -> Bool? {
-        guard case .chosen(let screen) = choice, screen != .sessions, screen != .lastChat else { return nil }
-        return screen == .allAgents
     }
 
     /// The agent to start with, while it's still on that computer; nil is

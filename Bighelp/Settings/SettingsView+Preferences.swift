@@ -3,7 +3,7 @@ import UIKit
 
 extension SettingsView {
     /// Settings › Appearance: colors, light and dark, and the rest of the look on one page, with
-    /// Chat layout, App layout, Thinking and the companion pet a row each.
+    /// Chat layout, Thinking and the companion pet a row each.
     var appearancePage: some View {
         AppearanceStudioView(settings: settings) {
             settingsLink(to: .chatLayout) {
@@ -14,14 +14,6 @@ extension SettingsView {
             .buttonStyle(.plain)
             .accessibilityIdentifier("settings.appearance.chat-layout")
             .driveTarget("settings.appearance.chat-layout")
-            settingsLink(to: .appLayout) {
-                AppearanceStudioRow(title: String(localized: "App layout"),
-                                    detail: String(localized: "Bottom bar and menu order"),
-                                    systemImage: "rectangle.bottomthird.inset.filled")
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("settings.appearance.app-layout")
-            .driveTarget("settings.appearance.app-layout")
             settingsLink(to: .thinking) {
                 AppearanceStudioRow(title: String(localized: "Thinking"),
                                     detail: String(localized: "The look of the Thinking control"),
@@ -154,9 +146,11 @@ extension SettingsView {
         .listRowBackground(theme.surface)
     }
 
-    /// Code mode's swipe only while Code mode is on (or already picked, so the picker still shows it).
+    /// The home's choices, and a mode swipe only while one is still saved (a launch argument can pin
+    /// one), so the picker can show it.
     func swipeChoices(keeping current: WorkspaceSwipeAction) -> [WorkspaceSwipeAction] {
-        WorkspaceSwipeAction.allCases.filter { $0 != .codeMode || settings.codeModeEnabled || current == .codeMode }
+        let choices = WorkspaceSwipeAction.homeChoices
+        return choices.contains(current) ? choices : choices + [current]
     }
 
     /// A Mac has no screen edges to swipe from.
@@ -189,34 +183,32 @@ extension SettingsView {
         #endif
     }
 
-    /// Where bighelp opens when it starts and with which bot (`BighelpLanding`), and what a tap
-    /// on a bot opens. Each row's second line is its value: the choices' own names say what they do.
+    /// Where bighelp opens when it starts, which view the first tab shows when that's Today or Work,
+    /// and what a tap on a bot opens. Each row's second line is its value: the choices' names say what
+    /// they do. A pick applies at the next launch.
     private var opening: some View {
-        let screen = settings.landingScreen ?? .lastChat
-        let startAgentID = settings.startAgentID(scope: landingScope).flatMap { id in
-            agents.contains { $0.id == id } ? id : nil
-        }
-        return Section {
-            Picker(selection: Binding(get: { screen }, set: { settings.landingScreen = $0 })) {
-                ForEach(BighelpLandingScreen.allCases) { choice in
+        Section {
+            Picker(selection: $settings.homeLanding) {
+                ForEach(HomeLanding.allCases, id: \.self) { choice in
                     Text(choice.title).tag(choice)
                 }
             } label: {
                 settingTitle(String(localized: "Opens on"))
             }
             .accessibilityIdentifier("settings.landing.screen")
+            .driveTarget("settings.landing.screen")
 
-            if screen.offersStartAgent, let scope = landingScope, !agents.isEmpty {
-                Picker(selection: Binding(get: { startAgentID },
-                                          set: { settings.setStartAgentID($0, scope: scope) })) {
-                    Text("Last bot used").tag(String?.none)
-                    ForEach(agents) { agent in
-                        Text(agent.name).tag(Optional(agent.id))
+            // Bots and Chats name the view themselves.
+            if settings.homeLanding == .today || settings.homeLanding == .work {
+                Picker(selection: $settings.homeView) {
+                    ForEach(HomeConversationsView.allCases, id: \.self) { view in
+                        Text(view.title).tag(view)
                     }
                 } label: {
-                    settingTitle(String(localized: "Start with"))
+                    settingTitle(String(localized: "First tab shows"))
                 }
-                .accessibilityIdentifier("settings.landing.agent")
+                .accessibilityIdentifier("settings.landing.view")
+                .driveTarget("settings.landing.view")
             }
 
             Picker(selection: $settings.botChatExperience) {
@@ -289,8 +281,8 @@ extension SettingsView {
             .accessibilityIdentifier("settings.chat.return-sends")
             .driveTarget("settings.chat.return-sends")
 
-            // The Duo folded, and iPad and Mac in landscape: Bots and Code mode's chats have it.
-            if settings.simpleBotsEnabled || settings.codeModeEnabled, BighelpChatSwitcher.isOffered(screen: screen) {
+            // The Duo folded, and iPad and Mac in landscape.
+            if BighelpChatSwitcher.isOffered(screen: screen) {
                 Toggle(isOn: $settings.chatSwitcherEnabled) {
                     settingLabel(String(localized: "Chat switcher"), detail: String(localized: "Your bots beside each chat"))
                 }

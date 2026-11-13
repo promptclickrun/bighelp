@@ -37,7 +37,7 @@ struct FirstRunOnboardingView: View {
             case .host: String(localized: "Step 2 of 4 · Connect")
             case .plugin: String(localized: "Step 3 of 4 · Plugin · Optional")
             case .notifications: String(localized: "Step 3 of 4 · Notifications · Optional")
-            case .mode: String(localized: "Step 4 of 4 · Your mode")
+            case .mode: String(localized: "Step 4 of 4 · How to start")
             }
         }
 
@@ -69,13 +69,13 @@ struct FirstRunOnboardingView: View {
             case .host: String(localized: "Connect")
             case .plugin: String(localized: "Plugin")
             case .notifications: String(localized: "Notifications")
-            case .mode: String(localized: "Mode")
+            case .mode: String(localized: "How to start")
             }
         }
 
         /// After Connect, the computer is set up; Back can't undo that.
         var allowsBack: Bool { [.appearance, .host, .mode].contains(self) }
-        /// Steps a person can pass by: everything but connecting and choosing a mode.
+        /// Steps a person can pass by: everything but connecting and choosing how to start.
         var allowsSkip: Bool { [.appearance, .plugin, .notifications].contains(self) }
     }
 
@@ -215,7 +215,7 @@ struct FirstRunOnboardingView: View {
             FirstRunNotificationsStep(registry: registry, onDone: { if step == .notifications { move(to: .mode) } })
                 .transition(stepTransition)
         case .mode:
-            FirstRunModeStep(settings: settings, onChoose: completeOnboarding)
+            FirstRunHomeStep(settings: settings, onChoose: completeOnboarding)
                 .transition(stepTransition)
         }
     }
@@ -425,7 +425,7 @@ struct FirstRunOnboardingView: View {
         if registry.onboardingHostID != nil {
             destination = .host
         } else if isAfterConnect {
-            // Connected already: pick up at the plugin, notifications or mode step.
+            // Connected already: pick up at the plugin, notifications or how-to-start step.
             destination = Step(rawValue: savedStepRawValue).flatMap { $0.rawValue > Step.host.rawValue ? $0 : nil }
                 ?? .plugin
         } else {

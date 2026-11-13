@@ -15,6 +15,9 @@ final class ChatComposerActions {
     var dismissKeyboard: () -> Void = {}
     var willSend: () -> Void = {}
     var referenceSend: ((ReferenceFrozenDraft, MidSessionChatBehavior?) async -> Void)?
+    /// One home: a new chat's Send asks this first (`ChatNewChatSlot.sendOverride`). True means the
+    /// message was taken, and the box does nothing more with it.
+    var sendOverride: (@MainActor () -> Bool)?
 }
 
 /// The message box as the chat screen places it: takes the chat's closures on every draw, puts them
@@ -39,6 +42,7 @@ struct ChatComposerHost: View {
     let referenceHub: ReferenceHubStore
     let referenceSkills: SkillsAndToolsStore?
     let onReferenceSend: ((ReferenceFrozenDraft, MidSessionChatBehavior?) async -> Void)?
+    var sendOverride: (@MainActor () -> Bool)? = nil
     @State private var actions = ChatComposerActions()
 
     var body: some View {
@@ -48,6 +52,7 @@ struct ChatComposerHost: View {
         actions.dismissKeyboard = onDismissKeyboard
         actions.willSend = onWillSend
         actions.referenceSend = onReferenceSend
+        actions.sendOverride = sendOverride
         return ChatComposer(
             model: model, agentName: agentName, sessionCatalog: sessionCatalog, actions: actions,
             offersAttachments: onAttachmentTap != nil, draftFocus: draftFocus, isDraftFocused: isDraftFocused,
@@ -663,6 +668,9 @@ struct ChatComposer: View, Equatable {
     private func submit(behavior: MidSessionChatBehavior?, keepsFocus: Bool = false) {
         guard model.canSend else { return }
         if !keepsFocus { dismissComposerKeyboard() }
+        // One home: a new chat's message can belong to a group chat or a coding session. Asked
+        // before the references' own send, so nothing of it goes to this chat by another way.
+        if let sendOverride = actions.sendOverride, sendOverride() { return }
         if !referenceHub.selected.isEmpty {
             // A reference send keeps its exact reviewed bytes, so a quote line can't ride along.
             guard model.replyDraft == nil else {

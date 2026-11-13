@@ -1,5 +1,8 @@
 import SwiftUI
 
+// One home: delete this file with the old shell. Appearance no longer links it; only the drive
+// catalog's "App layout" place (`SettingsDestination.appLayout`) opens it.
+
 /// Settings › Appearance › App layout: what the bottom bar holds after Chat, and the
 /// order of ☰. Whatever isn't in the bar is in ☰, so nothing is ever out of reach.
 struct AppLayoutSettingsView: View {

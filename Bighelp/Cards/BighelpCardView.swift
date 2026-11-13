@@ -41,6 +41,9 @@ struct BighelpCardView: View {
         } else if let app = HTMLAppCard.app(in: card) {
             // An agent's app: the card opens it; its page never draws in the chat.
             HTMLAppCardView(app: app, cardID: card.id)
+        } else if let draft = SpaceDraftCard.draft(in: card) {
+            // A bot's draft of a space: Add to Today puts it there; nothing runs before.
+            SpaceDraftCardView(draft: draft)
         } else {
             displayCard
         }
@@ -124,6 +127,8 @@ struct BighelpCardRenderer: View {
 
     let card: BighelpCardDocument
     let isValid: Bool
+    /// A space's panel draws less of its card (Spaces); nil in chats, where nothing changes.
+    @Environment(\.bighelpCardLimits) private var limits
 
     init(card: BighelpCardDocument) {
         self.card = card
@@ -153,7 +158,9 @@ struct BighelpCardRenderer: View {
         switch type {
         case "card":
             return AnyView(VStack(alignment: .leading, spacing: BighelpCardDesignTokens.spacing) {
-                if let title = text(props["title"], item: item, itemSourceID: itemSourceID) {
+                // A panel's header names the space already.
+                if let title = text(props["title"], item: item, itemSourceID: itemSourceID),
+                   !(limits?.omitsRootTitle == true && id == card.root) {
                     Text(title).font(.bighelp(.headline))
                 }
                 if let subtitle = text(props["subtitle"], item: item, itemSourceID: itemSourceID) {
@@ -183,7 +190,7 @@ struct BighelpCardRenderer: View {
             return AnyView(Text(value)
                 .font(textFont(props["typography"]?.string))
                 .foregroundStyle(semanticColor(props["color"]?.string))
-                .lineLimit(props["line_limit"]?.integer))
+                .lineLimit(Self.lineLimit(props["line_limit"]?.integer, panel: limits?.maxTextLines)))
         case "metric":
             let label = text(props["label"], item: item, itemSourceID: itemSourceID) ?? "Value"
             let value = resolved(props["value"], item: item, itemSourceID: itemSourceID)
@@ -224,7 +231,8 @@ struct BighelpCardRenderer: View {
             }
             return AnyView(BighelpCardMiniChart(
                 values: values,
-                color: semanticColor(props["series"]?.array?.first?.object?["semantic"]?.string)
+                color: semanticColor(props["series"]?.array?.first?.object?["semantic"]?.string),
+                height: limits?.chartHeight
             ).accessibilityLabel(props["description"]?.string ?? "Chart"))
         case "table":
             return AnyView(renderTable(props: props, children: children, item: item, itemSourceID: itemSourceID))
@@ -271,7 +279,8 @@ struct BighelpCardRenderer: View {
         itemSourceID: String?
     ) -> some View {
         let bindingSource = props["items"]?.object?["source"]?.string
-        let items = Array((resolved(props["items"], item: nil, itemSourceID: itemSourceID)?.array ?? []).prefix(50))
+        let items = Array((resolved(props["items"], item: nil, itemSourceID: itemSourceID)?.array ?? [])
+            .prefix(limits?.maxListItems ?? 50))
         return VStack(alignment: .leading, spacing: BighelpCardDesignTokens.compactSpacing) {
             if items.isEmpty {
                 Text(props["empty_text"]?.string ?? "No items available.")
@@ -293,8 +302,8 @@ struct BighelpCardRenderer: View {
         item: BighelpJSONValue?,
         itemSourceID: String?
     ) -> some View {
-        let columns = Array((props["columns"]?.array ?? []).prefix(8))
-        let rows = Array((props["rows"]?.array ?? []).prefix(50))
+        let columns = Array((props["columns"]?.array ?? []).prefix(limits?.maxTableColumns ?? 8))
+        let rows = Array((props["rows"]?.array ?? []).prefix(limits?.maxTableRows ?? 50))
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 ForEach(Array(columns.enumerated()), id: \.offset) { _, column in
@@ -376,6 +385,12 @@ struct BighelpCardRenderer: View {
         }
     }
 
+    /// The card's own line limit, but never more than a panel allows.
+    private static func lineLimit(_ asked: Int?, panel: Int?) -> Int? {
+        guard let panel else { return asked }
+        return min(asked ?? panel, panel)
+    }
+
     private func spacing(_ value: BighelpJSONValue?) -> CGFloat {
         switch value?.string {
         case "none": 0
@@ -415,6 +430,8 @@ struct BighelpCardRenderer: View {
 private struct BighelpCardMiniChart: View {
     let values: [Double]
     let color: Color
+    /// A panel's fixed chart height; nil grows from 72 points as a chat card does.
+    var height: CGFloat? = nil
 
     var body: some View {
         GeometryReader { geometry in
@@ -427,7 +444,7 @@ private struct BighelpCardMiniChart: View {
                 }
             }
         }
-        .frame(minHeight: 72)
+        .frame(minHeight: height ?? 72, maxHeight: height)
         .accessibilityLabel("Chart with \(values.count) values")
     }
 }

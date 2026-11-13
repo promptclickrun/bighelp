@@ -213,6 +213,8 @@ final class DirectHermesHTTP {
         // A photo draft's picture, in the same ~3 MB pieces as attachments/fetch.
         "/api/plugins/loopdy/native/image-drafts/source": 4 * 1_024 * 1_024 + 65_536,
         "/api/plugins/loopdy/native/board/media": 12 * 1_024 * 1_024,
+        // Every bot's spaces with their cards: the plugin stops adding cards at 3.5 MiB.
+        "/api/plugins/loopdy/native/spaces/list": 4 * 1_024 * 1_024 + 65_536,
         "/api/plugins/loopdy/native/workspace-files/read": maximumMediaResponseBytes,
     ]
 

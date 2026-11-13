@@ -57,6 +57,7 @@ struct ChatDestinationView: View {
     let projectMove: ChatProjectMove?
     let userIdentity: UserIdentityStore
     let permissionCenter: PermissionCenter
+    /// One home: unused; it goes once the shell stops passing it.
     let selectedTab: AppTab?
     let responseHapticsCoveredByRoot: Bool
     let appearanceAuthority: WorkspaceAuthority?
@@ -77,6 +78,9 @@ struct ChatDestinationView: View {
     /// ••• › Files: the chat's working folder on the computer. Asked for when Files opens, so it
     /// reads the connection there is then; nil (a group chat) lists the chat's own attachments.
     let chatFolders: (() -> ChatFolderContext?)?
+    /// One home: New chat's parts, for its blank chat only. The shell decides that from the chat's
+    /// id; this view only hands them on, and never reads the chat's messages to decide.
+    let newChat: ChatNewChatSlot?
 
     private var nativeSessionControls: NativeSessionControlsPresentation? {
         guard let native = model.nativeConversationClient else { return nil }
@@ -115,7 +119,7 @@ struct ChatDestinationView: View {
         projectGitClient: any ProjectGitClient,
         userIdentity: UserIdentityStore,
         permissionCenter: PermissionCenter,
-        selectedTab: AppTab?,
+        selectedTab: AppTab? = nil,
         responseHapticsCoveredByRoot: Bool,
         onNewChat: @escaping () -> Void,
         onOpenProviderAccounts: @escaping () -> Void,
@@ -128,7 +132,8 @@ struct ChatDestinationView: View {
         onForkMessage: ((String) -> Void)?,
         appearanceAuthority: WorkspaceAuthority? = nil,
         hostFiles: HostFileLinkContext? = nil,
-        chatFolders: (() -> ChatFolderContext?)? = nil
+        chatFolders: (() -> ChatFolderContext?)? = nil,
+        newChat: ChatNewChatSlot? = nil
     ) {
         self.model = model
         self.appState = appState
@@ -149,6 +154,7 @@ struct ChatDestinationView: View {
         self.appearanceAuthority = appearanceAuthority
         self.hostFiles = hostFiles
         self.chatFolders = chatFolders
+        self.newChat = newChat
         self.headerActions = ChatHeaderActions(newChat: onNewChat)
         self.onNewChat = onNewChat
         self.onOpenProviderAccounts = onOpenProviderAccounts
@@ -412,7 +418,8 @@ struct ChatDestinationView: View {
             onReferenceSend: sendReferences.action,
             foldCompletedTurns: settings.foldCompletedTurns,
             workStyle: settings.chatWorkStyle,
-            onForceRefresh: forceRefreshAction
+            onForceRefresh: forceRefreshAction,
+            newChat: newChat
         )
         }
     }
@@ -588,6 +595,7 @@ struct ChatDestinationView: View {
             if isPresented { VoiceLaunchState.shared.finish() }
         }
         .bighelpFullScreenCover(item: $voicePresentation, onDismiss: {
+            // One home: a chat has no ☰, so this does nothing there; it goes with the voice screen's ☰.
             guard opensMenuAfterVoice else { return }
             opensMenuAfterVoice = false
             homeChrome.onMenu()

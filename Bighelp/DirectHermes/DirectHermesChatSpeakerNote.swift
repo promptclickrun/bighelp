@@ -75,7 +75,9 @@ final class DirectHermesChatSpeakerNote: ChatSpeakerNoting {
             // Drafts only with the plugin that knows them: older ones refuse names they don't know.
             let drafts = pluginFeatures.contains(ImageDraftWire.feature) ? ImageDraftWire.renders : []
             let apps = pluginFeatures.contains(HTMLAppWire.feature) ? HTMLAppWire.renders : []
-            payload["renders"] = .array((BighelpCardObjects.renders + drafts + apps).map(BighelpJSONValue.string))
+            let spaces = pluginFeatures.contains(SpacesWire.feature) ? SpacesWire.renders : []
+            // Seven names; the plugin takes at most eight.
+            payload["renders"] = .array((BighelpCardObjects.renders + drafts + apps + spaces).map(BighelpJSONValue.string))
         }
         return payload
     }

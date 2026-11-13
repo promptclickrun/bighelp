@@ -1,6 +1,7 @@
 import Foundation
 
 enum SettingsMenuSection: String, CaseIterable, Identifiable, Equatable, Sendable {
+    // One home: delete with the old shell. Settings has no Modes row; the drive catalog still opens it.
     case modes
     case appearance
     case chat

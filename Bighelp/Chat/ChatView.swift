@@ -162,6 +162,8 @@ struct ChatView: View {
     let referenceHub: ReferenceHubStore?
     let referenceSkills: SkillsAndToolsStore?
     let onReferenceSend: ((ReferenceFrozenDraft, MidSessionChatBehavior?) async -> Void)?
+    /// One home: New chat's parts, given to its blank chat only. Read through `newChat`.
+    let newChatSlot: ChatNewChatSlot?
     @State private var fallbackReferenceHub = ReferenceHubStore(owner: nil, providers: [])
     @State private var isChatVisible = false
     /// Tells the app which chat this screen shows (`BighelpVisibleChats`, ...).
@@ -252,9 +254,11 @@ struct ChatView: View {
         workStyle: ChatWorkStyle = .card,
         showsHeader: Bool = true,
         sessionControlAccessory: ChatSessionControlAccessory? = nil,
-        onForceRefresh: (@MainActor () async throws -> Void)? = nil
+        onForceRefresh: (@MainActor () async throws -> Void)? = nil,
+        newChat: ChatNewChatSlot? = nil
     ) {
         self.model = model
+        self.newChatSlot = newChat
         self.onForceRefresh = onForceRefresh
         self.foldCompletedTurns = foldCompletedTurns
         self.workStyle = workStyle
@@ -303,6 +307,18 @@ struct ChatView: View {
     /// A group chat's turns hold several agents' thinking, so it stays in each one's steps.
     var reasoningPlacementInUse: ChatReasoningPlacement {
         model.isBotMode ? .steps : reasoningPlacement
+    }
+
+    /// One home: New chat's parts while nothing is sent here. A first message (waiting, on its way
+    /// or sent) or a failure to show makes this an ordinary chat, whatever the shell still passes.
+    /// They go with the pushed header, which holds the To row. A chat without the slot reads
+    /// nothing here, and with it only what the rows already read.
+    private var newChat: ChatNewChatSlot? {
+        guard let newChatSlot, homeChrome.isPushedChat,
+              model.transcriptEntries.isEmpty, model.stagedSends.isEmpty,
+              model.bigFileSends.isEmpty, !model.isSending, !model.hasPreviousHistory,
+              model.failureMessage == nil else { return nil }
+        return newChatSlot
     }
 
     var body: some View {
@@ -576,6 +592,8 @@ struct ChatView: View {
     // insets; overlay heights do not reserve a second SwiftUI scroll region.
     private var chatCanvas: some View {
         timeline
+            // One home: a new chat's people list stands where its empty messages would be.
+            .opacity(showsNewChatPeople ? 0 : 1)
             #if !os(visionOS)
             // Messages run on under the status bar and home indicator, so the blur under the
             // header reaches the top of the screen without a hard edge. UIKit adds those
@@ -599,6 +617,7 @@ struct ChatView: View {
                 .ignoresSafeArea()
             }
             #endif
+            .overlay { newChatPeople }
             .overlay(alignment: .bottom) { timelineStatusOverlay }
             .overlay(alignment: .top) {
                 floatingHeader
@@ -621,6 +640,8 @@ struct ChatView: View {
                             #endif
                         if laptopDeckHeight > 0, !isDraftFocused { Spacer(minLength: 0) }
                         // Chats keep the bottom bar under the composer.
+                        // One home: chats have no bar; this goes, with `startNewChatFromBar`,
+                        // `pickAgentsFromBar` and `showsChatBar`. New chat's choices keep the place.
                         if showsChatBar, !screen.usesSideBar, let selection = homeChrome.tabSelection {
                             FloatingTabBar(selection: selection, tabs: homeChrome.barTabs,
                                            onNewChat: startNewChatFromBar, onPickAgents: pickAgentsFromBar,
@@ -629,6 +650,7 @@ struct ChatView: View {
                                            unread: homeChrome.unreadTabs, isInChat: true)
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
+                        newChatChoices
                     }
                     // The messages stop at the fold: the timeline keeps clear of all of this.
                     .frame(minHeight: laptopDeckHeight)
@@ -647,6 +669,7 @@ struct ChatView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             // The iPhone Duo: the bar's places go down the side strip instead of under the message box.
+            // One home: this and Vision Pro's ornament below go; the home's roots hold the tabs.
             .toolbar {
                 if showsChatBar, screen.usesSideBar, let selection = homeChrome.tabSelection {
                     BighelpStripTabs(selection: selection, tabs: homeChrome.barTabs,
@@ -656,8 +679,7 @@ struct ChatView: View {
             }
             #if os(visionOS)
             // Chats keep Vision Pro's tab strip beside the window.
-            .ornament(visibility: homeChrome.isEnabled && homeChrome.showsTabBar && homeChrome.tabSelection != nil
-                          ? .visible : .hidden,
+            .ornament(visibility: homeChrome.keepsTabsInChat ? .visible : .hidden,
                       attachmentAnchor: .scene(.leading), contentAlignment: .trailing) {
                 if let selection = homeChrome.tabSelection {
                     VisionTabOrnament(selection: selection, tabs: homeChrome.barTabs, unread: homeChrome.unreadTabs,
@@ -686,15 +708,52 @@ struct ChatView: View {
 
     /// Chats keep the bar, and it tucks away while you type.
     private var showsChatBar: Bool {
-        homeChrome.isEnabled && homeChrome.showsTabBar && homeChrome.tabSelection != nil
-            && !isDraftFocused && !BighelpPlatform.usesTabOrnament
+        homeChrome.keepsTabsInChat && !isDraftFocused && !BighelpPlatform.usesTabOrnament
+    }
+
+    /// One home: the bots to pick from, over a new chat's empty messages until something is sent.
+    private var showsNewChatPeople: Bool { newChat?.people != nil }
+
+    /// Between the header and the message box, so the list follows the keyboard and its rows never
+    /// run under either. An overlay of its own: it takes no part in the message box's layout.
+    @ViewBuilder
+    private var newChatPeople: some View {
+        if let people = newChat?.people {
+            people
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .contentShape(.rect)
+                .clipped()
+                .padding(.top, headerHeight)
+                .padding(.bottom, composerHeight)
+        }
+    }
+
+    /// One home: a new chat's choices (project, where it runs, branch, mode) under the message box,
+    /// in the place the in-chat bar had. A sibling of the box, so a change in it never redraws the
+    /// box, and `composerHeight` measures both, so the messages keep clear of it.
+    @ViewBuilder
+    private var newChatChoices: some View {
+        if let choices = newChat?.choicesRow {
+            choices
+                // The box's lane, with the row's own side padding outside it.
+                .frame(maxWidth: horizontalSizeClass == .regular
+                       ? ChatCanvasLayout.regularLaneMaximumWidth + 2 * BighelpTokens.space12 : .infinity)
+                // Its own height only: offered a share of the spare room, it would take it from the spacer.
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     /// Each control samples the transcript, never an opaque toolbar slab.
     /// The table alone reserves the measured header and composer insets.
     private var floatingHeader: some View {
-        Group {
-            if homeChrome.isEnabled {
+        let toRow = newChat?.toRow
+        let placement: ChatHeaderPlacement.Style = homeChrome.isPushedChat ? .placesItself
+            : homeChrome.isEnabled ? .home : .plain
+        return Group {
+            if homeChrome.isPushedChat {
+                pushedHeader(toRow: toRow)
+            } else if homeChrome.isEnabled {
+                // One home: this header and the plain one below go with the modes.
                 homeHeader
             } else {
                 standardHeader
@@ -702,8 +761,9 @@ struct ChatView: View {
         }
         .background(alignment: .bottom) { sessionControlsAnchor }
         .foregroundStyle(theme.primaryText)
-        .modifier(ChatHeaderPlacement(isHome: homeChrome.isEnabled))
-        .padding(.bottom, 8)
+        .modifier(ChatHeaderPlacement(style: placement))
+        // The To row ends in its own line, and the people list starts right under it.
+        .padding(.bottom, toRow == nil ? 8 : 0)
         #if !os(visionOS)
         .background {
             // Messages scroll on beneath the header and blur near the top, so the
@@ -752,6 +812,16 @@ struct ChatView: View {
             screenHeight: screenHeight,
             beforeAction: dismissKeyboard
         )
+    }
+
+    /// One home: Back, who the chat is with (a bot's pill opens its page) and ⋯; a new chat with
+    /// nothing sent has its To row instead. Back pops to wherever the chat was opened from.
+    private func pushedHeader(toRow: AnyView?) -> some View {
+        ChatPushedHeader(identity: AnyView(conversationHeader), toRow: toRow, options: AnyView(chatOptionsMenu),
+                         onBack: {
+                             dismissKeyboard()
+                             dismiss()
+                         })
     }
 
     private var standardHeader: some View {
@@ -812,7 +882,8 @@ struct ChatView: View {
             companionIsAdventurous: companionStore?.isAdventurous == true,
             referenceHub: referenceHub ?? fallbackReferenceHub,
             referenceSkills: referenceSkills,
-            onReferenceSend: onReferenceSend
+            onReferenceSend: onReferenceSend,
+            sendOverride: newChat?.sendOverride
         )
         .frame(maxWidth: .infinity, alignment: .center)
     }
@@ -852,9 +923,10 @@ struct ChatView: View {
                     groupConversationIdentityButton
                     if let teamCallAction { TeamCallHeaderButton(action: teamCallAction) }
                 }
-            } else if homeChrome.isSimpleBots {
+            } else if homeChrome.isSimpleBots || homeChrome.isPushedChat {
                 simpleBotIdentityButton
             } else {
+                // One home: this label goes with the plain header, and `isSimpleBots` above.
                 conversationIdentityButton
             }
         }
@@ -954,7 +1026,7 @@ struct ChatView: View {
     }
     #endif
 
-    /// Bots mode: the bot's mark and name in one pill; it opens the bot's profile.
+    /// Bots mode and One home's header: the bot's mark and name in one pill; it opens the bot's profile.
     private var simpleBotIdentityButton: some View {
         let participant = resolvedIdentityParticipants.first
         let agentID = model.memberIDs.first ?? participant?.stableID ?? agentName
@@ -1140,7 +1212,7 @@ struct ChatView: View {
             Image(systemName: "ellipsis")
                 #if targetEnvironment(macCatalyst)
                 // The same glyph as New chat beside it.
-                .font(.bighelp(.title3).weight(homeChrome.isEnabled ? .semibold : .regular))
+                .font(.bighelp(.title3).weight(homeChrome.isEnabled || homeChrome.isPushedChat ? .semibold : .regular))
                 #endif
                 .frame(minWidth: BighelpTokens.hitTarget, minHeight: BighelpTokens.hitTarget)
             .contentShape(.rect)
@@ -1585,7 +1657,8 @@ struct ChatView: View {
 
 
     private var attachmentAction: ((ChatActionMenuAction) -> Void)? {
-        guard let onAttachmentTap else { return nil }
+        // One home: a new chat's message that a group chat or a coding session takes is text only.
+        guard let onAttachmentTap, newChat?.offersAttachments != false else { return nil }
         return { action in
             dismissKeyboard()
             onAttachmentTap(action)
@@ -1642,17 +1715,22 @@ struct ChatView: View {
 
 /// The home header's ☰ and buttons sit where a root screen's top bar puts them, the
 /// same as on Feed, Ideas, Goals and Files. The plain header keeps its own margins
-/// (Vision Pro's rounded window corner clipped ☰, so it stays clear).
+/// (Vision Pro's rounded window corner clipped ☰, so it stays clear). One home's header places
+/// its buttons the same way itself, because its To row runs the whole width under them.
 private struct ChatHeaderPlacement: ViewModifier {
-    let isHome: Bool
+    enum Style { case home, plain, placesItself }
+    let style: Style
 
     func body(content: Content) -> some View {
-        if isHome {
+        switch style {
+        case .home:
             content.bighelpHeaderButtonsPlacement()
-        } else {
+        case .plain:
             content
                 .padding(.horizontal, BighelpPlatform.usesTabOrnament ? 22 : 12)
                 .padding(.top, BighelpPlatform.usesTabOrnament ? 12 : 4)
+        case .placesItself:
+            content
         }
     }
 }

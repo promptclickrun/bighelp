@@ -2,10 +2,19 @@ import SwiftUI
 
 /// Hooks the shell gives a chat so it can draw the agent-home look: the
 /// big live avatar, the ☰ drawer, New chat, and the bottom bar under the composer.
+///
+/// One home: every chat is a pushed page with `pushedChat(onProfile:)`. Once the shell passes only
+/// that, everything here but `isPushedChat` and `onProfile` goes, with `AgentHomeChatHeader`,
+/// `newChatButton`, `NewChatButtonCopy` and `newChatRightClickMenu` (the boards' header still uses
+/// the last two until it has no New chat).
 struct AgentHomeChrome {
     var isEnabled = false
     /// Bots mode's chat header: Back, the bot (its profile) and options, no New chat.
     var isSimpleBots = false
+    /// One home's chat header (`ChatPushedHeader`): Back, the bot (`onProfile` opens its page) and
+    /// options. It wins over `isEnabled`: the chat draws no ☰, mode pill, tab bar, side strip tabs
+    /// or tab ornament of its own.
+    var isPushedChat = false
     /// The tab bar under the message box. Every chat on one computer has it,
     /// whether it's the Chat tab's own or opened from the list, Agents or Feed.
     var showsTabBar = false
@@ -29,6 +38,17 @@ struct AgentHomeChrome {
     func barHoldsNewChat(screen: BighelpScreenGeometry) -> Bool {
         showsTabBar && !screen.usesSideBar && !BighelpPlatform.usesTabOrnament
     }
+
+    /// One home: the chrome of every chat. `onProfile` opens the bot's page.
+    static func pushedChat(onProfile: @escaping @MainActor (String) -> Void) -> AgentHomeChrome {
+        AgentHomeChrome(isPushedChat: true, onProfile: onProfile)
+    }
+
+    /// The chat keeps the bar's places with it: under the message box, down the iPhone Duo's side
+    /// strip or in Vision Pro's ornament.
+    var keepsTabsInChat: Bool {
+        isEnabled && !isPushedChat && showsTabBar && tabSelection != nil
+    }
 }
 
 /// Equal when what it shows is the same. Its actions are the shell's own, the same every time
@@ -38,6 +58,7 @@ struct AgentHomeChrome {
 extension AgentHomeChrome: Equatable {
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.isEnabled == rhs.isEnabled && lhs.isSimpleBots == rhs.isSimpleBots
+            && lhs.isPushedChat == rhs.isPushedChat
             && lhs.showsTabBar == rhs.showsTabBar && (lhs.tabSelection == nil) == (rhs.tabSelection == nil)
             && lhs.unreadTabs == rhs.unreadTabs && lhs.barTabs == rhs.barTabs
             && (lhs.modeSwitch == nil) == (rhs.modeSwitch == nil)
@@ -139,6 +160,77 @@ struct AgentHomeChatHeader: View {
                 }
             }
         }
+    }
+}
+
+/// One home: every chat's header. Back goes to where the person came from, the middle says who the
+/// chat is with (a bot's pill opens its page) and ⋯ holds the chat's options. A new chat with
+/// nothing sent says "New chat" there, with its To row under the buttons across the whole lane.
+struct ChatPushedHeader: View {
+    /// The bot's pill, or a group chat's name.
+    let identity: AnyView
+    /// A new chat's To row (`ChatNewChatSlot.toRow`), which takes the identity's place.
+    var toRow: AnyView? = nil
+    let options: AnyView
+    let onBack: () -> Void
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ZStack(alignment: .top) {
+                Group {
+                    if toRow == nil { identity } else { newChatTitle }
+                }
+                // Clear of Back and ⋯ at every text size: the pill's name truncates instead.
+                .padding(.horizontal, HeaderButtonMetrics.glass + 2 * HeaderButtonMetrics.slop)
+                .padding(.top, HeaderButtonMetrics.slop)
+                .frame(maxWidth: .infinity)
+                HStack(alignment: .top) {
+                    backButton
+                    Spacer(minLength: 0)
+                    options
+                        .frame(width: HeaderButtonMetrics.glass, height: HeaderButtonMetrics.glass)
+                        .bighelpNavigationGlass(in: Circle(), isInteractive: true)
+                        .padding(HeaderButtonMetrics.slop)
+                        .contentShape(.rect)
+                }
+            }
+            // Only the buttons' row: Back sits where a root screen's top bar puts its first button.
+            .bighelpHeaderButtonsPlacement()
+            if let toRow {
+                // It scrolls sideways inside its own bounds, so large text never pushes the buttons.
+                toRow
+                    .frame(maxWidth: horizontalSizeClass == .regular ? ChatCanvasLayout.regularLaneMaximumWidth : .infinity)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var backButton: some View {
+        Button(action: onBack) {
+            Image(systemName: "chevron.left")
+                .font(.bighelp(.title3).weight(.semibold))
+                .foregroundStyle(theme.primaryText)
+                .frame(width: HeaderButtonMetrics.glass, height: HeaderButtonMetrics.glass)
+                .bighelpNavigationGlass(in: Circle(), isInteractive: true)
+                .padding(HeaderButtonMetrics.slop)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Back")
+        .accessibilityIdentifier("chat.back")
+    }
+
+    private var newChatTitle: some View {
+        Text("New chat")
+            .font(.bighelp(.title3, weight: .semibold))
+            .foregroundStyle(theme.primaryText)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(minHeight: HeaderButtonMetrics.glass)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityIdentifier("new-chat.title")
     }
 }
 

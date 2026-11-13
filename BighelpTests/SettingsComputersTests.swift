@@ -1,17 +1,24 @@
+import Foundation
 import Testing
 @testable import Bighelp
 
-/// Settings › Your computers: which setting Show every computer changes, and the time zone row's value.
+/// Settings › Your computers: the one Show every computer setting, and the time zone row's value.
 @MainActor
 struct SettingsComputersTests {
-    @Test func showEveryComputerIsBotsModesMultiGatewayWhileBotsModeIsOn() {
-        #expect(SettingsEveryComputer.choice(botsModeOn: true, canSetAllHosts: true) == .botsMultiGateway)
-        #expect(SettingsEveryComputer.choice(botsModeOn: true, canSetAllHosts: false) == .botsMultiGateway)
-    }
+    @Test func showEveryComputerIsOneSettingThatBotsModesMultiGatewayFollows() {
+        let suite = "settings-computers-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = SettingsStore(defaults: defaults)
 
-    @Test func showEveryComputerIsTheAllHostsViewElsewhereWhenTheShellCanSetIt() {
-        #expect(SettingsEveryComputer.choice(botsModeOn: false, canSetAllHosts: true) == .allHosts)
-        #expect(SettingsEveryComputer.choice(botsModeOn: false, canSetAllHosts: false) == nil)
+        settings.showsEveryComputer = false
+        #expect(!settings.allHostsMode)
+        #expect(!settings.simpleBotsMultiGateway)
+        settings.showsEveryComputer = true
+        #expect(settings.allHostsMode)
+        #expect(settings.simpleBotsMultiGateway)
+        #expect(SettingsStore(defaults: defaults).showsEveryComputer)
+        #expect(defaults.object(forKey: "bighelp.hosts.all-hosts") as? Bool == true, "The all-hosts key, kept")
     }
 
     @Test func timeZoneSaysNothingUntilTheComputerAnswers() {

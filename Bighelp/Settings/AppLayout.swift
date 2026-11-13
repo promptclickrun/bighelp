@@ -1,5 +1,8 @@
 import Foundation
 
+// One home: delete this file with the old shell. The home has three fixed tabs and no Settings row
+// for the bar; `RootShellView` and ☰ still read `settings.appLayout` until then.
+
 /// A place in bighelp that ☰ lists and the bottom bar can hold.
 enum BighelpPlace: String, CaseIterable, Codable, Identifiable, Sendable {
     case feed, ideas, goals, files

@@ -106,7 +106,7 @@ extension SettingsView {
     func menuDetail(_ section: SettingsMenuSection) -> String? {
         switch section {
         case .appearance: appearanceSummary
-        case .modes: settings.modesSummary
+        case .modes: settings.modesSummary // One home: delete with the old shell.
         case .voice: voiceDetail
         default: nil
         }

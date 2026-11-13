@@ -189,6 +189,9 @@ struct BighelpApp: App {
             else { return nil }
             return (scope, demoAgents)
         })
+        Self.wireSpaces(registry: hostRegistry, connections: connections, fleet: fleet,
+                        nativeWorkspaces: nativeWorkspaces, demoHosts: demoHosts, demoAgents: demoAgents,
+                        usesDemoWorkspace: usesDemoWorkspace)
         let nativeWorkspaceKey: @MainActor () -> BighelpShortcutWorkspaceKey? = {
             if usesDemoWorkspace, !connections.isDirectSelected { return nil }
             guard hostRegistry.connectionMode == .independent || connections.isDirectSelected else { return nil }
@@ -631,6 +634,8 @@ struct BighelpApp: App {
                 #if DEBUG && targetEnvironment(simulator)
                 ConnectorCardFixture.rootView()
                 #endif
+            } else if let oneHomeFixture {
+                oneHomeFixture
             } else if BighelpLoaderGallery.isRequested {
                 BighelpLoaderGallery.rootView()
             } else if isCarPlaySessionFixture {
@@ -805,6 +810,21 @@ struct BighelpApp: App {
                             companionAgentScope: companionAgentScope, permissionCenter: permissionCenter)
         KanbanWindowScene(settings: settings, companion: companion, companionAgentScope: companionAgentScope)
         #endif
+    }
+
+    /// One home's new screens alone on made-up data, each behind its own launch argument, before
+    /// the shell shows them. One home: the wiring step can drop the ones the shell shows.
+    private var oneHomeFixture: AnyView? {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-test-home-chrome") { return AnyView(HomeChromeFixture()) }
+        if arguments.contains(ChatsInboxFixture.launchArgument) { return AnyView(ChatsInboxFixture.view()) }
+        if arguments.contains(NewChatFixture.launchArgument) { return AnyView(NewChatFixture.makeView()) }
+        if arguments.contains(TodayFixture.launchArgument) { return AnyView(TodayFixture()) }
+        if arguments.contains(WorkFixture.launchArgument) { return AnyView(NavigationStack { WorkFixture.view() }) }
+        if arguments.contains(SpacesTodayFixture.launchArgument) { return AnyView(SpacesTodayFixture()) }
+        #endif
+        return nil
     }
 
     private var isModelsPageFixture: Bool {

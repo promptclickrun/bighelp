@@ -103,6 +103,11 @@ enum AppFixtureSetup {
            let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
             initialSessions[index] = ConversationFixtures.htmlAppsPreview
         }
+        // A bot's space draft in its chat, with Add to Today (the demo computer, `DemoSpacesClient`).
+        if usesFixtures, arguments.contains("-test-spaces"),
+           let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
+            initialSessions[index] = ConversationFixtures.spacesPreview
+        }
         if usesFixtures, arguments.contains("-test-completed-turn-context"),
            let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
             initialSessions[index] = ConversationFixtures.completedTurnContextPreview

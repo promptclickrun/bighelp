@@ -1,5 +1,8 @@
 import SwiftUI
 
+// One home: delete this file with the old shell. Settings has no Modes row; only the drive catalog's
+// "Modes" place (`SettingsMenuSection.modes`) opens the page.
+
 /// Settings › Modes: the home a launch opens in (Bots, Chat or Code), Code mode's own switch, and
 /// the switcher that puts the modes at the top of each home. The chat switcher is in Settings › Chat.
 extension SettingsView {

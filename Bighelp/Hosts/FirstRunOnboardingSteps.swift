@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The first-run steps after Connect: the optional plugin, notifications (once the plugin is in), and the
-/// mode bighelp opens in. Plain words throughout: these screens are for everyone, not only the technical.
+/// The first-run steps after Connect: the optional plugin, notifications (once the plugin is in), and how
+/// the home opens. Plain words throughout: these screens are for everyone, not only the technical.
 enum FirstRunOnboarding {
     /// Connected, with the steps after Connect still to go. Keeps onboarding on screen past the host
     /// setup's own finish, which clears `onboardingHostID`.
@@ -15,6 +15,7 @@ private struct FirstRunStepLayout<Content: View>: View {
     let systemImage: String
     let title: LocalizedStringKey
     let subtitle: LocalizedStringKey
+    var subtitleIdentifier: String?
     let primaryTitle: String
     let primaryIdentifier: String
     var isWorking = false
@@ -44,6 +45,7 @@ private struct FirstRunStepLayout<Content: View>: View {
                         .foregroundStyle(theme.secondaryText)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier(subtitleIdentifier ?? "")
                 }
                 content
             }
@@ -305,245 +307,168 @@ private struct FirstRunAlertPreview: View {
     }
 }
 
-// MARK: Mode
+// MARK: How to start
 
-/// The three ways to use bighelp, offered once at the end of setup.
-enum FirstRunMode: String, CaseIterable, Identifiable {
-    case bots, sessions, code
+/// How the home opens, asked once at the end of setup: one ongoing chat with each bot, or many chats.
+/// Either way it's the same home; the answer picks Opens on, which Settings › Chat changes later.
+enum FirstRunHome: String, CaseIterable, Identifiable {
+    case bots, chats
 
     var id: Self { self }
 
     var title: String {
         switch self {
-        case .bots: String(localized: "Bots")
-        case .sessions: String(localized: "Chat")
-        case .code: String(localized: "Code")
+        case .bots: String(localized: "With a bot")
+        case .chats: String(localized: "Across chats")
         }
     }
 
     var detail: String {
         switch self {
-        case .bots: String(localized: "Simple chats with your bots, like texting friends.")
-        case .sessions: String(localized: "Every chat, tool and setting in the full bighelp app.")
-        case .code: String(localized: "Start coding tasks on your projects and review the changes.")
+        case .bots: String(localized: "One ongoing chat with each bot.")
+        case .chats: String(localized: "Many chats, newest first.")
         }
     }
 
-    var systemImage: String {
+    var landing: HomeLanding {
         switch self {
-        case .bots: "bubble.left.and.bubble.right.fill"
-        case .sessions: "square.grid.2x2.fill"
-        case .code: "chevron.left.forwardslash.chevron.right"
+        case .bots: .bots
+        case .chats: .chats
         }
     }
 
-    /// The preview: a screenshot of the mode, in light and dark.
-    var previewImage: String {
-        switch self {
-        case .bots: "OnboardingModeBots"
-        case .sessions: "OnboardingModeSessions"
-        case .code: "OnboardingModeCode"
-        }
-    }
-
-    /// Bots is Bots mode; Sessions the app as it comes; Code opens in Code mode.
+    /// Opens on, which also sets the first tab's view.
     @MainActor
     func apply(to settings: SettingsStore) {
-        switch self {
-        case .bots:
-            settings.codeModeEnabled = false
-            settings.simpleBotsEnabled = true
-        case .sessions:
-            settings.simpleBotsEnabled = false
-            settings.codeModeEnabled = false
-        case .code:
-            settings.simpleBotsEnabled = false
-            settings.codeModeEnabled = true
-            settings.startExperience = .code
-            settings.experience = .code
-        }
+        settings.homeLanding = landing
+        // One home: delete with the old shell, which still opens in a mode: Bots mode, or Chat.
+        settings.codeModeEnabled = false
+        settings.simpleBotsEnabled = self == .bots
     }
 }
 
-/// "Choose your mode": three cards to swipe through, each with a preview of the mode. Tapping one shows
-/// its preview large.
+// One home: delete with `LocalizationTests`' check that the saved value stays "bots".
+typealias FirstRunMode = FirstRunHome
+
+/// "How do you want to start?": two choices and Continue. No Skip: the home needs an answer.
 @MainActor
-struct FirstRunModeStep: View {
+struct FirstRunHomeStep: View {
     let settings: SettingsStore
     let onChoose: () -> Void
-    @State private var selection: FirstRunMode? = .bots
-    @State private var previewing: FirstRunMode?
-    @BighelpThemeReader private var theme
-
-    private var chosen: FirstRunMode { selection ?? .bots }
+    @State private var choice = FirstRunHome.bots
 
     var body: some View {
-        VStack(spacing: 0) {
-            VStack(spacing: BighelpTokens.space4) {
-                Text("Choose your mode")
-                    .bighelpFont(.display)
-                    .foregroundStyle(theme.primaryText)
-                    .accessibilityAddTraits(.isHeader)
-                Text("You can change this later")
-                    .bighelpFont(.metadata)
-                    .foregroundStyle(theme.secondaryText)
-                    .accessibilityIdentifier("onboarding.mode.later")
+        FirstRunStepLayout(
+            systemImage: "house.fill",
+            title: "How do you want to start?",
+            subtitle: "You can change this in Settings › Chat.",
+            subtitleIdentifier: "onboarding.mode.later",
+            primaryTitle: String(localized: "Continue"),
+            primaryIdentifier: "onboarding.mode.continue",
+            primary: {
+                choice.apply(to: settings)
+                onChoose()
             }
-            .padding(.top, BighelpTokens.space24)
-            .padding(.horizontal, BighelpTokens.space24)
-
-            GeometryReader { geometry in
-                let cardWidth = min(geometry.size.width * 0.72, 300)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: BighelpTokens.space16) {
-                        ForEach(FirstRunMode.allCases) { mode in
-                            card(mode, width: cardWidth, height: geometry.size.height - BighelpTokens.space32)
-                                .id(mode)
-                        }
-                    }
-                    .scrollTargetLayout()
-                }
-                .scrollTargetBehavior(.viewAligned)
-                .scrollPosition(id: $selection, anchor: .center)
-                .contentMargins(.horizontal, (geometry.size.width - cardWidth) / 2, for: .scrollContent)
-                .padding(.vertical, BighelpTokens.space16)
-            }
-
-            HStack(spacing: BighelpTokens.space8) {
-                ForEach(FirstRunMode.allCases) { mode in
-                    Circle()
-                        .fill(mode == chosen ? theme.action : theme.secondaryText.opacity(0.3))
-                        .frame(width: 8, height: 8)
+        ) {
+            VStack(spacing: BighelpTokens.space12) {
+                ForEach(FirstRunHome.allCases) { home in
+                    FirstRunHomeCard(home: home, isChosen: home == choice) { choice = home }
                 }
             }
-            .accessibilityHidden(true)
-            .padding(.bottom, BighelpTokens.space8)
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 0) {
-                Divider().overlay(theme.border)
-                Button { choose(chosen) } label: {
-                    Text("Use \(chosen.title)")
-                        .bighelpFont(.label, weight: .semibold)
-                        .frame(maxWidth: .infinity, minHeight: BighelpTokens.controlHeight)
-                        .contentShape(.rect)
-                }
-                .controlSize(.large)
-                .bighelpActionStyle(.primary)
-                .accessibilityIdentifier("onboarding.mode.continue")
-                .frame(maxWidth: 620)
-                .padding(.horizontal, BighelpTokens.space24)
-                .padding(.vertical, BighelpTokens.space12)
-            }
-            .frame(maxWidth: .infinity)
-            .background(.bar)
-        }
-        .bighelpSheet(item: $previewing) { mode in
-            FirstRunModePreview(mode: mode) {
-                previewing = nil
-                choose(mode)
-            } onClose: {
-                previewing = nil
-            }
-            .bighelpSheetSize(.large)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("onboarding.mode")
     }
-
-    private func card(_ mode: FirstRunMode, width: CGFloat, height: CGFloat) -> some View {
-        let isChosen = mode == chosen
-        return Button {
-            withAnimation(.snappy) { selection = mode }
-            previewing = mode
-        } label: {
-            VStack(spacing: BighelpTokens.space12) {
-                Image(mode.previewImage)
-                    .resizable()
-                    .scaledToFit()
-                    .clipShape(.rect(cornerRadius: 22))
-                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(theme.border, lineWidth: BighelpTokens.hairline))
-                    .frame(maxHeight: .infinity)
-                    .accessibilityHidden(true)
-                HStack(spacing: BighelpTokens.space8) {
-                    Image(systemName: mode.systemImage)
-                        .foregroundStyle(theme.action)
-                    Text(mode.title)
-                        .bighelpFont(.sectionTitle, weight: .semibold)
-                        .foregroundStyle(theme.primaryText)
-                    if isChosen {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(theme.action)
-                    }
-                }
-                Text(mode.detail)
-                    .bighelpFont(.metadata)
-                    .foregroundStyle(theme.secondaryText)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(BighelpTokens.space16)
-            .frame(width: width, height: max(height, 200))
-            .background(theme.surface, in: .rect(cornerRadius: 28))
-            .overlay {
-                RoundedRectangle(cornerRadius: 28)
-                    .stroke(isChosen ? theme.action : theme.border, lineWidth: isChosen ? 2 : BighelpTokens.hairline)
-            }
-            .contentShape(.rect(cornerRadius: 28))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(mode.title). \(mode.detail)")
-        .accessibilityHint("Shows a preview")
-        .accessibilityAddTraits(isChosen ? .isSelected : [])
-        .accessibilityIdentifier("onboarding.mode.\(mode.rawValue)")
-    }
-
-    private func choose(_ mode: FirstRunMode) {
-        mode.apply(to: settings)
-        onChoose()
-    }
 }
 
-/// A mode's preview, large, with the button to choose it.
-private struct FirstRunModePreview: View {
-    let mode: FirstRunMode
-    let onUse: () -> Void
-    let onClose: () -> Void
+/// One choice: a small drawing of where it opens, its name and one line.
+private struct FirstRunHomeCard: View {
+    let home: FirstRunHome
+    let isChosen: Bool
+    let onSelect: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @BighelpThemeReader private var theme
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: BighelpTokens.space16) {
-                Image(mode.previewImage)
-                    .resizable()
-                    .scaledToFit()
-                    .clipShape(.rect(cornerRadius: 28))
-                    .overlay(RoundedRectangle(cornerRadius: 28).stroke(theme.border, lineWidth: BighelpTokens.hairline))
-                    .frame(maxHeight: .infinity)
-                    .accessibilityLabel("Preview of \(mode.title)")
-                Text(mode.detail)
-                    .bighelpFont(.body)
-                    .foregroundStyle(theme.secondaryText)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button(action: onUse) {
-                    Text("Use \(mode.title)")
+        let shape = RoundedRectangle(cornerRadius: BighelpTokens.radius20, style: .continuous)
+        // At the largest text sizes the words get the card's whole width, under the drawing.
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: BighelpTokens.space12))
+            : AnyLayout(HStackLayout(spacing: BighelpTokens.space16))
+        Button(action: onSelect) {
+            layout {
+                FirstRunHomeSketch(home: home)
+                VStack(alignment: .leading, spacing: BighelpTokens.space4) {
+                    Text(home.title)
                         .bighelpFont(.label, weight: .semibold)
-                        .frame(maxWidth: .infinity, minHeight: BighelpTokens.controlHeight)
-                        .contentShape(.rect)
+                        .foregroundStyle(theme.primaryText)
+                    Text(home.detail)
+                        .bighelpFont(.metadata)
+                        .foregroundStyle(theme.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .controlSize(.large)
-                .bighelpActionStyle(.primary)
-                .accessibilityIdentifier("onboarding.mode.preview.use")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: isChosen ? "checkmark.circle.fill" : "circle")
+                    .font(.bighelp(.title3))
+                    .foregroundStyle(isChosen ? theme.action : theme.tertiaryText)
+                    .accessibilityHidden(true)
             }
-            .padding(BighelpTokens.space24)
-            .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
-            .navigationTitle(mode.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close", action: onClose)
+            .padding(BighelpTokens.space16)
+            .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget, alignment: .leading)
+            .background(shape.fill(isChosen ? theme.action.opacity(theme.isDarkPalette ? 0.16 : 0.08) : theme.surface))
+            .overlay {
+                shape.strokeBorder(isChosen ? theme.action : theme.border,
+                                   lineWidth: isChosen ? 2 : BighelpTokens.hairline)
+            }
+            .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(home.title)
+        .accessibilityValue(home.detail)
+        .accessibilityAddTraits(isChosen ? .isSelected : [])
+        .accessibilityIdentifier("onboarding.mode.\(home.rawValue)")
+    }
+}
+
+/// A still drawing of the home each choice opens on, in the theme's colors: a face for each bot, or a
+/// list of chats with their times. Drawn, not a screenshot, so it can't show a home that's gone.
+private struct FirstRunHomeSketch: View {
+    let home: FirstRunHome
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            ForEach(0..<3, id: \.self) { row in
+                HStack(spacing: 6) {
+                    switch home {
+                    case .bots:
+                        Circle().fill(faceTint(row)).frame(width: 14, height: 14)
+                        bar(width: [30, 24, 34][row])
+                    case .chats:
+                        VStack(alignment: .leading, spacing: 3) {
+                            bar(width: [36, 28, 38][row])
+                            bar(width: [24, 32, 20][row]).opacity(0.6)
+                        }
+                        Spacer(minLength: 0)
+                        bar(width: 8)
+                    }
                 }
             }
         }
+        .padding(10)
+        .frame(width: 76, height: 76, alignment: .topLeading)
+        .background(theme.canvas, in: .rect(cornerRadius: BighelpTokens.radius12))
+        .overlay {
+            RoundedRectangle(cornerRadius: BighelpTokens.radius12).stroke(theme.border, lineWidth: BighelpTokens.hairline)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func bar(width: CGFloat) -> some View {
+        Capsule().fill(theme.secondaryText.opacity(0.35)).frame(width: width, height: 5)
+    }
+
+    private func faceTint(_ row: Int) -> Color {
+        [theme.action, theme.action.opacity(0.55), theme.secondaryText.opacity(0.45)][row]
     }
 }

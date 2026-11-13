@@ -215,6 +215,8 @@ final class SettingsStore {
         didSet { defaults.set(rightEdgeSwipeAction.rawValue, forKey: Keys.rightEdgeSwipeAction) }
     }
 
+    // One home: delete with the old shell (`effective…` and `effective(_:…)`); the home reads the two
+    // swipes as saved, which the migration cleared of mode actions.
     /// What the edge swipes do. Bots mode hides most places they lead to, so there they're its
     /// own: from the left, your bots; from the right, this bot's profile. A mode swipe stays a mode
     /// swipe, so it can bring you back out of Bots mode.
@@ -233,19 +235,21 @@ final class SettingsStore {
         return isBotsMode ? botsMode : action
     }
 
+    // One home: delete with the old shell (no Settings row any more).
     /// Settings › Modes › Header mode switcher: Bots, Chat and Code in a pill at the top of each
     /// home. Off by default; ☰ keeps its Chat and Code switch while it's off.
     var unifiedModeToggleEnabled: Bool {
         didSet { defaults.set(unifiedModeToggleEnabled, forKey: Keys.unifiedModeToggle) }
     }
 
-    /// Settings › Modes › Chat switcher: the bots (Bots mode) or running sessions (Code mode)
-    /// beside a chat. On by default on phones, where only the iPhone Duo folded shows it; iPad and
+    /// Settings › Chat › Chat switcher: the bots, or a coding chat's running sessions, beside a chat. On by default on phones, where only the iPhone Duo folded shows it; iPad and
     /// Mac show it in landscape once it's turned on (`BighelpChatSwitcher`).
     var chatSwitcherEnabled: Bool {
         didSet { defaults.set(chatSwitcherEnabled, forKey: Keys.chatSwitcher) }
     }
 
+    // One home: delete with the old shell, from here to `setCodeMode` (the modes, their switch and
+    // Settings › Modes, which has no row any more).
     /// The modes on offer: Code only while Settings › Code mode is on.
     var availableModes: [BighelpMode] { codeModeEnabled ? [.bots, .chat, .code] : [.bots, .chat] }
 
@@ -360,6 +364,7 @@ final class SettingsStore {
         didSet { defaults.set(showCronSessions, forKey: Keys.showCronSessions) }
     }
 
+    // One home: delete with the old shell (no Settings row any more; the home has three tabs).
     /// The bottom bar's tabs after Chat and the order of ☰ (Appearance › App layout).
     var appLayout: BighelpAppLayout {
         didSet {
@@ -382,11 +387,36 @@ final class SettingsStore {
         }
     }
 
-    /// The all-hosts view: every agent on every host in one list.
-    var allHostsMode: Bool {
-        didSet { defaults.set(allHostsMode, forKey: Keys.allHostsMode) }
+    /// Settings › Your computers › Show every computer: every computer's bots and chats in the home,
+    /// and the other computers kept connected. Unset (a new install) is on; the migration writes what an
+    /// existing install had.
+    var showsEveryComputer: Bool {
+        get { everyComputer ?? true }
+        set {
+            everyComputer = newValue
+            // One home: delete with the old shell. Bots mode's Multi-gateway follows the one switch.
+            simpleBotsMultiGateway = newValue
+        }
     }
 
+    /// `bighelp.hosts.all-hosts` as saved; nil until something sets it.
+    private var everyComputer: Bool? {
+        didSet {
+            if let everyComputer { defaults.set(everyComputer, forKey: Keys.allHostsMode) }
+            else { defaults.removeObject(forKey: Keys.allHostsMode) }
+        }
+    }
+
+    // One home: delete with the old shell. The same saved value as `showsEveryComputer`, but off while
+    // unset, so a new install's old shell keeps its one-computer home.
+    /// The all-hosts view: every agent on every host in one list.
+    var allHostsMode: Bool {
+        get { everyComputer ?? false }
+        set { everyComputer = newValue }
+    }
+
+    // One home: delete with the old shell, with `simpleBotsMultiGateway`, `simpleBotsGatewayFilter`,
+    // `simpleBotsEnabled`, `startExperience` and `experience` below. The migration reads them once.
     /// Settings › Code mode: a second home for coding sessions on the host's
     /// projects. Off by default; Chat stays the out-of-box home.
     var codeModeEnabled: Bool {
@@ -396,14 +426,14 @@ final class SettingsStore {
         }
     }
 
-    /// Settings › Bots mode: a calm home with just your bots, in place of
-    /// the tab bar and ☰. Its own Settings sheet turns it off again.
     /// Bots mode's Multi-gateway: the home lists every gateway's bots, not only the selected one's.
+    /// Show every computer sets it too.
     var simpleBotsMultiGateway: Bool {
         didSet { defaults.set(simpleBotsMultiGateway, forKey: Keys.simpleBotsMultiGateway) }
     }
 
     /// Multi-gateway's Filter by Gateway: a filter button on the home that shows one gateway's bots.
+    /// No Settings row any more: the home shows its computer chips with two or more computers.
     var simpleBotsGatewayFilter: Bool {
         didSet { defaults.set(simpleBotsGatewayFilter, forKey: Keys.simpleBotsGatewayFilter) }
     }
@@ -414,6 +444,7 @@ final class SettingsStore {
         didSet { defaults.set(simpleBotsMultiPrimary, forKey: Keys.simpleBotsMultiPrimary) }
     }
 
+    /// Bots mode: a calm home with just your bots, in place of the tab bar and ☰.
     var simpleBotsEnabled: Bool {
         didSet { defaults.set(simpleBotsEnabled, forKey: Keys.simpleBots) }
     }
@@ -426,28 +457,71 @@ final class SettingsStore {
     /// The home on screen now. ☰ switches it; each launch starts on `startExperience`.
     var experience: BighelpExperience
 
-    /// Settings › Chat › Opens on; nil until picked (the agent's latest chat).
-    var landingScreen: BighelpLandingScreen? {
-        didSet { defaults.set(landingScreen?.rawValue, forKey: BighelpLanding.screenKey) }
+    /// Settings › Chat › Opens on: Bots, Chats, Today or Work. Saved under the old key; a screen saved
+    /// before maps to its place (`BighelpLanding.homeLanding(stored:)`), and nothing saved is Chats.
+    /// Bots and Chats also set the first tab's view.
+    var homeLanding: HomeLanding {
+        get { BighelpLanding.homeLanding(stored: savedLanding) ?? .chats }
+        set {
+            savedLanding = newValue.rawValue
+            switch newValue {
+            case .bots: savedHomeView = .bots
+            case .chats: savedHomeView = .chats
+            case .today, .work: break
+            }
+        }
     }
 
-    /// What this launch opens on, read once: a new pick applies next time.
+    /// The first tab's view: the one Opens on names, or Settings › Chat › First tab shows when the home
+    /// opens on Today or Work (default Chats).
+    var homeView: HomeConversationsView {
+        get {
+            switch homeLanding {
+            case .bots: .bots
+            case .chats: .chats
+            case .today, .work: savedHomeView ?? .chats
+            }
+        }
+        set { savedHomeView = newValue }
+    }
+
+    /// Where this launch opens, read once: a new pick applies next time.
+    let launchHomeLanding: HomeLanding
+
+    /// `loopdy.home.landing` as saved: one of the four, an old screen, or nil.
+    private var savedLanding: String? {
+        didSet { defaults.set(savedLanding, forKey: BighelpLanding.screenKey) }
+    }
+
+    private var savedHomeView: HomeConversationsView? {
+        didSet { defaults.set(savedHomeView?.rawValue, forKey: Keys.homeView) }
+    }
+
+    // One home: delete with the old shell (`landingScreen`, `launchLanding` and Start with). The old
+    // shell reads only the nine old screens; one of the four new values reads as nothing picked.
+    /// The old shell's Opens on; nil until picked (the agent's latest chat).
+    var landingScreen: BighelpLandingScreen? {
+        get { savedLanding.flatMap(BighelpLandingScreen.init(rawValue:)) }
+        set { savedLanding = newValue?.rawValue }
+    }
+
+    /// What this launch opens on in the old shell, read once: a new pick applies next time.
     let launchLanding: BighelpLandingChoice
 
-    /// Settings › Chat › Start with, per computer (`cacheScopeID` → agent ID).
+    /// The old Settings › Chat › Start with, per computer (`cacheScopeID` → agent ID).
     private(set) var startAgentIDs: [String: String]
 
     private let defaults: UserDefaults
 
     init(
         defaults: UserDefaults = .standard,
-        legacyThemeLogoDirectory: URL? = nil,
-        now: @escaping () -> Date = Date.init
+        legacyThemeLogoDirectory: URL? = nil
     ) {
         self.defaults = defaults
-        self.now = now
         Self.removeRetiredThemes(defaults: defaults,
                                  logoDirectory: legacyThemeLogoDirectory ?? Self.defaultLegacyThemeLogoDirectory)
+        // Before anything below reads the keys it may write.
+        HomeSettingsMigration.runIfNeeded(defaults: defaults)
         let recoveredReflectiveVisionActivation = ReflectiveVisionRecoveryMarker(
             defaults: defaults
         ).consumePendingActivation()
@@ -578,7 +652,8 @@ final class SettingsStore {
         if defaults === UserDefaults.standard {
             BighelpActivityDetailLevel.showsNerdLine = defaults.bool(forKey: Keys.nerdMode, default: false)
         }
-        allHostsMode = defaults.bool(forKey: Keys.allHostsMode, default: false)
+        everyComputer = defaults.object(forKey: Keys.allHostsMode) == nil
+            ? nil : defaults.bool(forKey: Keys.allHostsMode)
         let codeMode = defaults.bool(forKey: Keys.codeMode, default: false)
         let start = defaults.string(forKey: Keys.startExperience).flatMap(BighelpExperience.init(rawValue:)) ?? .bighelp
         codeModeEnabled = codeMode
@@ -590,8 +665,11 @@ final class SettingsStore {
         simpleBotsMultiPrimary = defaults.string(forKey: Keys.simpleBotsMultiPrimary)
         startExperience = start
         experience = codeMode ? start : .bighelp
-        let landing = defaults.string(forKey: BighelpLanding.screenKey).flatMap(BighelpLandingScreen.init(rawValue:))
-        landingScreen = landing
+        let savedLanding = defaults.string(forKey: BighelpLanding.screenKey)
+        self.savedLanding = savedLanding
+        savedHomeView = defaults.string(forKey: Keys.homeView).flatMap(HomeConversationsView.init(rawValue:))
+        launchHomeLanding = BighelpLanding.homeLanding(stored: savedLanding) ?? .chats
+        let landing = savedLanding.flatMap(BighelpLandingScreen.init(rawValue:))
         let legacyOpensChat = defaults.object(forKey: BighelpLanding.legacyOpensChatKey) == nil
             ? nil : defaults.bool(forKey: BighelpLanding.legacyOpensChatKey)
         launchLanding = BighelpLanding.choice(screen: landing, legacyOpensChat: legacyOpensChat)
@@ -613,28 +691,10 @@ final class SettingsStore {
         defaults.set(startAgentIDs, forKey: BighelpLanding.startAgentKey)
     }
 
-    /// A picked Opens on decides, at launch, whether every computer's agents show. Bots mode
-    /// opens on its own home and ignores Opens on (its Multi-gateway switch shows every computer).
-    func applyLaunchLandingToAllHostsMode() {
-        guard !simpleBotsEnabled,
-              let on = BighelpLanding.allHostsMode(for: launchLanding), allHostsMode != on else { return }
-        modeBeforeLaunchLanding = (allHostsMode, now())
-        allHostsMode = on
-    }
-
-    /// A notification, widget or link that opened the app goes where it points, in the mode you
-    /// were in: Opens on decides only for a launch you started yourself. Only right after launch.
-    func restoreAllHostsModeForOutsideOpen() {
-        guard let before = modeBeforeLaunchLanding else { return }
-        modeBeforeLaunchLanding = nil
-        guard now().timeIntervalSince(before.at) < Self.outsideOpenWindow, allHostsMode != before.on else { return }
-        allHostsMode = before.on
-    }
-
-    /// The switch as it was before Opens on changed it at this launch.
-    @ObservationIgnored private var modeBeforeLaunchLanding: (on: Bool, at: Date)?
-    @ObservationIgnored private let now: () -> Date
-    private static let outsideOpenWindow: TimeInterval = 30
+    // One home: delete with the old shell (`BighelpAppComposition` and `RootShellView` call these).
+    // Opens on no longer turns Show every computer on or off at launch, so there's nothing to undo.
+    func applyLaunchLandingToAllHostsMode() {}
+    func restoreAllHostsModeForOutsideOpen() {}
 
     /// Themes (Nous, Superpilot and your own, with their logos) were replaced by
     /// bubble colors and light and dark backgrounds. Picking a bubble color
@@ -898,7 +958,8 @@ private extension SettingsStore {
         static let showCronSessions = "loopdy.sessions.showCronSessions"
         static let appLayout = "bighelp.app-layout"
         static let nerdMode = "loopdy.settings.nerd-mode"
-        static let allHostsMode = "bighelp.hosts.all-hosts"
+        static let allHostsMode = HomeSettingsMigration.Keys.everyComputer
+        static let homeView = HomeSettingsMigration.Keys.homeView
         static let codeMode = "bighelp.settings.code-mode"
         static let startExperience = "bighelp.settings.code-mode.open-in"
         static let simpleBots = "bighelp.settings.simple-bots"

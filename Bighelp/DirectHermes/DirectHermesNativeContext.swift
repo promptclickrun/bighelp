@@ -243,7 +243,7 @@ final class DirectHermesNativePluginClient {
         }
         guard (200...299).contains(response.http.statusCode) else {
             if [401, 403, 412, 428].contains(response.http.statusCode) { self.context = nil }
-            throw responseError(response, mutation: route.isMutation)
+            throw responseError(response, mutation: route.isMutation, knownOutcomeCodes: route.knownOutcomeCodes)
         }
         guard echoedID == requestGuard.requestIDHeader,
               DirectHermesNativeRequestGuard.contextTag(response.http.value(forHTTPHeaderField: "ETag")) == requestGuard.etag else {
@@ -279,7 +279,8 @@ final class DirectHermesNativePluginClient {
     /// Features whose plugin routes refuse requests over 192 KB.
     private static let smallRequestFeatures: Set<String> = ["native-card-templates-v1", workflowsFeature,
                                                             workflowsEditFeature, workflowsTriggerFeature,
-                                                            MyTemplatesWire.feature, ImageDraftWire.feature]
+                                                            MyTemplatesWire.feature, ImageDraftWire.feature,
+                                                            SpacesWire.feature]
 
     /// Workflows: stages run by agents on the host, with your sign-off.
     static let workflowsFeature = "native-workflows-v1"
@@ -309,6 +310,9 @@ final class DirectHermesNativePluginClient {
         /// A route that takes file bytes; others keep the 1 MiB (or 192 KiB) request cap.
         /// `DirectHermesHTTP.requestBodyLimit` must allow the same.
         var maximumRequestBytes: Int?
+        /// 5xx codes this route's plugin sends only once it knows what happened, so they read as a
+        /// refusal (`.rejected`) rather than an unknown outcome.
+        var knownOutcomeCodes: Set<String> = []
     }
 
     private static func route(_ operation: WorkspaceOperation) throws -> Route {
@@ -516,6 +520,26 @@ final class DirectHermesNativePluginClient {
             // Read every few seconds while a live app is open; at most 1 MiB of data.
             return Route(path: "html-apps/data", feature: HTMLAppWire.feature, isMutation: false,
                          maximumResponseBytes: 2 * 1_024 * 1_024 + 131_072, timeout: 10)
+        case .spacesList:
+            // Every bot's live spaces; cards the phone has are left out, and the plugin keeps the rest
+            // under 3.5 MiB.
+            return Route(path: "spaces/list", feature: SpacesWire.feature, isMutation: false,
+                         maximumResponseBytes: 4 * 1_024 * 1_024 + 65_536, timeout: 30)
+        case .spacesGet:
+            return Route(path: "spaces/get", feature: SpacesWire.feature, isMutation: false,
+                         maximumResponseBytes: 524_288, timeout: 20)
+        case .spacesAdd, .spacesUpdate, .spacesDelete:
+            // spaces.add -> spaces/add. `schedules_unavailable` is known: nothing was scheduled for
+            // add, and for delete the space is off Today already (a retry with the same
+            // `operationId` finishes it; SpacesStore does).
+            return Route(path: operation.rawValue.replacingOccurrences(of: ".", with: "/"),
+                         feature: SpacesWire.feature, isMutation: true, maximumResponseBytes: 524_288, timeout: 20,
+                         knownOutcomeCodes: Self.spacesKnownOutcomeCodes)
+        case .spacesRefresh:
+            // A script runs inside the request, for up to 50 seconds. `routine_failed` (502) means it
+            // ran and failed: the outcome is known.
+            return Route(path: "spaces/refresh", feature: SpacesWire.feature, isMutation: true,
+                         maximumResponseBytes: 524_288, timeout: 60, knownOutcomeCodes: Self.spacesKnownOutcomeCodes)
         case .peopleSpeaking:
             // Sent before each message; a slow host never holds a message for long.
             return Route(path: "people/speaking", feature: "native-people-v1", isMutation: true,
@@ -592,16 +616,26 @@ final class DirectHermesNativePluginClient {
 
     /// Plugin codes for "this computer can't do that at all", sent before any work starts.
     static let refusedBeforeStartingCodes: Set<String> = ["runner_unavailable", "workflows_unavailable", "store_unavailable",
-                                                         "bot_chat_gateway_unavailable",
+                                                         "bot_chat_gateway_unavailable", "spaces_unavailable",
                                                          // A failed skill upload is rolled back before the answer.
                                                          "skill_import_failed", "skill_import_unavailable"]
 
+    /// The spaces routes' 5xx answers with a known outcome: `routine_failed` (502, Update now ran and
+    /// failed) and `schedules_unavailable` (503; for delete, the space is off Today and not yet gone).
+    /// Not in `refusedBeforeStartingCodes`: Workflows' triggers send `schedules_unavailable` too.
+    private static let spacesKnownOutcomeCodes: Set<String> = ["routine_failed", "schedules_unavailable"]
+
     static func refusedBeforeStarting(_ response: DirectHermesHTTP.Response) -> Bool {
-        guard let code = (try? response.object())?["error"]?.object?["code"]?.string else { return false }
+        guard let code = errorCode(response) else { return false }
         return refusedBeforeStartingCodes.contains(code)
     }
 
-    private func responseError(_ response: DirectHermesHTTP.Response, mutation: Bool) -> WorkspaceClientError {
+    private static func errorCode(_ response: DirectHermesHTTP.Response) -> String? {
+        (try? response.object())?["error"]?.object?["code"]?.string
+    }
+
+    private func responseError(_ response: DirectHermesHTTP.Response, mutation: Bool,
+                               knownOutcomeCodes: Set<String> = []) -> WorkspaceClientError {
         switch response.http.statusCode {
         case 401, 403: return .authenticationRequired
         case 412: return .conflict
@@ -609,7 +643,10 @@ final class DirectHermesNativePluginClient {
         case 428: return .unavailable(.unsupportedOperation)
         case 503 where Self.refusedBeforeStarting(response):
             // The plugin says so before it does anything, so the outcome is known.
-            return .rejected(code: (try? response.object())?["error"]?.object?["code"]?.string ?? "")
+            return .rejected(code: Self.errorCode(response) ?? "")
+        case 500...599 where Self.errorCode(response).map({ knownOutcomeCodes.contains($0) }) == true:
+            // This route's plugin sends the code only once it knows what happened.
+            return .rejected(code: Self.errorCode(response))
         case 500...599: return mutation ? .outcomeUnknown : .transportUnavailable
         default: break
         }

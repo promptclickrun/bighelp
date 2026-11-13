@@ -18,6 +18,40 @@ struct AgentHeroHeaderLayoutTests {
         #expect(first != read, "A dot going away still redraws the bar")
     }
 
+    /// One home's chat chrome is a look of its own, and wins over the home look: the chat keeps no
+    /// bar, side strip or ornament of tabs with it.
+    @Test func pushedChatChromeKeepsNoTabsInTheChat() {
+        var opened: [String] = []
+        let pushed = AgentHomeChrome.pushedChat(onProfile: { opened.append($0) })
+        #expect(pushed == AgentHomeChrome.pushedChat(onProfile: { _ in }))
+        #expect(pushed != AgentHomeChrome())
+        #expect(!pushed.keepsTabsInChat)
+        pushed.onProfile("atlas")
+        #expect(opened == ["atlas"])
+
+        var home = AgentHomeChrome(isEnabled: true, showsTabBar: true, tabSelection: Binding.constant(AppTab.sessions))
+        #expect(home.keepsTabsInChat)
+        home.isPushedChat = true
+        #expect(!home.keepsTabsInChat)
+    }
+
+    /// Back, the bot and ⋯ are one row, as in Bots mode. A new chat's To row is a row of its own
+    /// under them: it adds its height and leaves the buttons where they are.
+    @Test func aNewChatsToRowSitsUnderTheHeadersButtons() {
+        func height(toRow: AnyView?) -> CGFloat {
+            let pill = ChatAgentIdentityPill(agentID: "default", name: "Atlas", imageURL: nil)
+            let controller = UIHostingController(rootView:
+                ChatPushedHeader(identity: AnyView(pill), toRow: toRow, options: AnyView(Color.clear), onBack: {})
+            )
+            return controller.sizeThatFits(in: CGSize(width: 393, height: 852)).height
+        }
+        let plain = height(toRow: nil)
+        #expect(plain > 0)
+        #expect(plain <= 54)
+        let withToRow = height(toRow: AnyView(Color.clear.frame(height: 48)))
+        #expect(abs(withToRow - plain - 48) < 1)
+    }
+
     @Test func chatHomeUsesACompactIdentityPill() {
         let controller = UIHostingController(rootView:
             AgentHomeChatHeader(agentID: "default", displayName: "Atlas", imageURL: nil,

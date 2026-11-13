@@ -14,7 +14,8 @@ struct SettingsView: View {
     let onOpenScheduledTasks: () -> Void
     let onClearLocalCache: @MainActor () async -> Bool
     let agentDirectory: AgentDirectoryStore?
-    /// The computer Start with is kept for (`cacheScopeID`).
+    // One home: delete with the old shell (Start with is gone; `RootShellView` still passes it).
+    /// The computer Start with was kept for (`cacheScopeID`).
     let landingScope: String?
     let voiceSettingsScope: String?
     let voiceSettingsClient: (any VoiceSettingsClient)?
@@ -51,7 +52,9 @@ struct SettingsView: View {
     var archivedChats: SettingsArchivedChats?
     /// Your computers › Time zone, for the computer in use; nil (or nil from it) has no row to change.
     var computerTimeZone: (@MainActor () -> SimpleBotHostSettings?)?
-    /// Show every computer outside Bots mode: the all-hosts view, which the shell turns on and off.
+    // One home: delete with the old shell. Show every computer is `settings.showsEveryComputer`; this
+    // lets the old shell's all-hosts view follow it outside Bots mode.
+    /// The old shell's all-hosts view, which only the shell can turn on and off.
     var onSetAllHosts: ((Bool) -> Void)?
     @State var teamworkModel: TeamworkModel?
     /// The computer `teamworkModel` was made for (`cacheScopeID`).
@@ -226,6 +229,7 @@ struct SettingsView: View {
         case .section(let section): self.destination(for: section)
         case .you: settingsPage(title: String(localized: "You")) { localIdentity }
         case .chatLayout: ChatLayoutSettingsView()
+        // One home: delete with the old shell; no row opens it, only the drive catalog.
         case .appLayout: AppLayoutSettingsView(settings: settings)
         case .thinking: ThinkingLookSettingsView()
         case .apps: connectionsPage
@@ -265,7 +269,7 @@ struct SettingsView: View {
             BighelpDeferredSection { yourBotsSection }
             BighelpDeferredSection {
                 settingsMenuGroup(header: String(localized: "This app"),
-                                  sections: [.appearance, .chat, .notifications, .modes])
+                                  sections: [.appearance, .chat, .notifications])
             }
             #if os(visionOS)
             BighelpDeferredSection { SpatialAvatarSettingsSection(settings: settings) }
@@ -274,7 +278,7 @@ struct SettingsView: View {
             BighelpDeferredSection { helpAndAdvancedSection }
         }
         .animation(.snappy(duration: BighelpTokens.transitionDuration), value: settings.nerdModeEnabled)
-        .animation(.snappy(duration: BighelpTokens.transitionDuration), value: settings.simpleBotsMultiGateway)
+        .animation(.snappy(duration: BighelpTokens.transitionDuration), value: settings.showsEveryComputer)
         .bighelpFormSurface()
         .listSectionSpacing(20)
         .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
@@ -403,7 +407,7 @@ struct SettingsView: View {
     @ViewBuilder
     func destination(for section: SettingsMenuSection) -> some View {
         switch section {
-        case .modes:
+        case .modes: // One home: delete with the old shell; no row opens it, only the drive catalog.
             settingsPage(title: section.title) { experienceSection }
         case .chat:
             chatPage

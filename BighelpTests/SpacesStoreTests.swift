@@ -340,8 +340,9 @@ struct SpacesStoreTests {
     // MARK: A partial list of bots
 
     /// The phone's list of bots can lag or be partial while a computer reconnects or the selection
-    /// moves. A read that didn't ask about a bot says nothing about its spaces.
-    @Test func aPartialListOfBotsKeepsTheOtherBotsSpacesAndWaitingChanges() async throws {
+    /// moves. A read asks about the bots the phone holds spaces for too, so a short list takes
+    /// nothing off Today and a waiting change still gets to the computer.
+    @Test func aPartialListOfBotsKeepsTheOtherBotsSpacesAndTheirChanges() async throws {
         let folder = Kit.folder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let client = HeldSpacesClient(Kit.demo())
@@ -352,7 +353,6 @@ struct SpacesStoreTests {
 
         await store.load(Kit.computer(client: client, bots: [SpacesBot(id: "travel", name: "Travel")]))
         #expect(store.spaces.map(\.key).sorted() == [Kit.commute, Kit.garden, Kit.workouts].sorted())
-        #expect(store.pending[Kit.garden] != nil)
         #expect(store.spaces.first { $0.key == Kit.garden }?.size == .tall)
 
         // A list with only a bot this computer has no spaces for is a partial list too.

@@ -181,6 +181,7 @@ final class ComposerInteractionUITests: BighelpUITestCase {
         }
         type(untilLines: 3)
         XCTAssertTrue(rail.waitForExistence(timeout: 3), "Three lines offer Expand")
+        saveComposer("composer-expand-rail-3-lines-\(appearance)", app)
         checkBoxStill("Expand shows")
         XCTAssertTrue(rail.isHittable)
         XCTAssertGreaterThanOrEqual(rail.frame.width, 44)

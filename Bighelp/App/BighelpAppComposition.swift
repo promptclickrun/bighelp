@@ -306,6 +306,10 @@ struct BighelpAppComposition {
         // from the start.
         if usesFixtures, botModeRooms.usesNativeRooms { Task { await botModeRooms.refreshNativeRoomCatalog() } }
         #endif
+        // The same for its chats. The store starts from the copy an earlier run saved, and the one
+        // home's lists only draw what it holds (the old Chat home's first chat used to load it), so a
+        // demo reads its chat list now. Without this, a demo showed last run's chats until a refresh.
+        if usesFixtures { Task { try? await sessionCatalog.load() } }
         do {
             try BotModeRoomLoadingPolicy.load(botModeRooms, for: .startup)
         } catch {

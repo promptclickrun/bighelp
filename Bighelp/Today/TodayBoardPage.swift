@@ -10,6 +10,12 @@ struct TodayBoardPage: View {
     /// The board for one bot, as the shell builds it for a bot's Dashboard. Its header buttons are
     /// this page's, so the shell turns the board's own off.
     let makeBoardContext: (SimpleBotsBot, AgentBoardStore) -> AgentBoardContext
+    /// The shell's board connection of the moment, and the shell's own setup for it. The shell sets
+    /// its board up in a root task, which waits while this page covers the root. Without these, a
+    /// reconnect (coming back to the app) left the page on the old connection: it showed its copy
+    /// and the computer refused every thumbs down and Clear.
+    let shellBoardKey: @MainActor () -> RootShellView.AgentBoardClientKey
+    let configureShellBoard: @MainActor (RootShellView.AgentBoardClientKey) async -> Void
     let onBack: () -> Void
     /// The bot picked; nil is All bots.
     @State private var agentID: String?
@@ -17,10 +23,14 @@ struct TodayBoardPage: View {
 
     init(context: TodayBoardsContext, kind: AgentBoardItem.Kind, agentID: String? = nil,
          makeBoardContext: @escaping (SimpleBotsBot, AgentBoardStore) -> AgentBoardContext,
+         shellBoardKey: @escaping @MainActor () -> RootShellView.AgentBoardClientKey,
+         configureShellBoard: @escaping @MainActor (RootShellView.AgentBoardClientKey) async -> Void,
          onBack: @escaping () -> Void) {
         self.context = context
         self.kind = kind
         self.makeBoardContext = makeBoardContext
+        self.shellBoardKey = shellBoardKey
+        self.configureShellBoard = configureShellBoard
         self.onBack = onBack
         _agentID = State(initialValue: agentID)
     }
@@ -42,6 +52,12 @@ struct TodayBoardPage: View {
         .toolbar(.hidden, for: .navigationBar)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("today.board-page")
+        // Bring the shell's board to the connection of the moment (see `shellBoardKey`). Its own
+        // task, so this one ending for a newer connection never cuts the setup short.
+        .task(id: TodayBoardShellKey(connection: shellBoardKey(), shell: context.shellBoard)) {
+            let connection = shellBoardKey()
+            await Task { await configureShellBoard(connection) }.value
+        }
     }
 
     @ViewBuilder
@@ -112,6 +128,19 @@ struct TodayBoardPage: View {
     }
 
     @BighelpThemeReader private var theme
+}
+
+/// What the shell's own board setup depends on, read while this page is on screen: the connection,
+/// and the shell board's state, which changes as the app leaves and comes back.
+private struct TodayBoardShellKey: Equatable {
+    let connection: RootShellView.AgentBoardClientKey
+    let follow: TodayBoardFollowKey
+
+    @MainActor
+    init(connection: RootShellView.AgentBoardClientKey, shell: AgentBoardStore) {
+        self.connection = connection
+        follow = TodayBoardFollowKey(agentID: "", shell: shell)
+    }
 }
 
 /// What following the shell's board depends on.

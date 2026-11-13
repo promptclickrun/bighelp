@@ -172,7 +172,9 @@ change in both repos.
     menu. A refusal (Update now too soon, a delete the computer refused) shows as one quiet line under the header
     (`TodayNotice`). A read where no bot answered is not a read: the boards keep loading rather than say "Nothing
     yet". One `TodayBoardsStore` and one `TodayPanelLayoutStore` live in `HomeSelection`, above the per-computer
-    `AppState`.
+    `AppState`. `TodayBoardPage` is a pushed page, so it brings the shell's board to the connection of the moment
+    itself (`configureShellBoard`, as a bot's Dashboard does): the shell's root task waits under a pushed page, and
+    after a return to the app the page then showed its copy while the computer refused every thumbs down and Clear.
   - Work (`Bighelp/Work/`) is one list of what the bots are doing, each row read from the store that holds it
     (`WorkProjection`): coding sessions, chats and background work running now, workflow runs, Kanban tasks and
     scheduled tasks. Chips: All, Needs you, Working, Done. Four doors lead on: Projects, Tasks, Workflows and

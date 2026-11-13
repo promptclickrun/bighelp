@@ -31,7 +31,14 @@ struct TodayFixture: View {
                 .toolbar(.hidden, for: .navigationBar)
                 .navigationDestination(for: SeeAll.self) { seeAll in
                     TodayBoardPage(context: boardsContext, kind: seeAll.kind, agentID: seeAll.agentID,
-                                   makeBoardContext: boardContext, onBack: { path.removeLast() })
+                                   makeBoardContext: boardContext,
+                                   shellBoardKey: {
+                                       RootShellView.AgentBoardClientKey(
+                                           owner: nil, board: .available, feedback: true, goalCategories: true,
+                                           files: false, answers: true, today: true, todayDetail: true,
+                                           fixtures: true, reconnects: false)
+                                   },
+                                   configureShellBoard: { _ in }, onBack: { path.removeLast() })
                 }
         }
         .task { await shellBoard.connect(client: DemoAgentBoardClient(), scope: "today-fixture") }

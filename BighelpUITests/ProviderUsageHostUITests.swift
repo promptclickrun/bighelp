@@ -43,6 +43,7 @@ final class ProviderUsageHostUITests: BighelpUITestCase {
             if chatMenuItem("chat.provider-usage", in: app, timeout: 3).exists { break }
             app.tap() // close the menu; the entry shows once the host connects
         } while Date() < deadline
+        save("\(name)-menu", app)
         XCTAssertTrue(usage.exists, "Usage is in the chat's ⋯ menu (\(name))")
         usage.tap()
         XCTAssertTrue(app.descendants(matching: .any)["usage"].waitForExistence(timeout: 10))

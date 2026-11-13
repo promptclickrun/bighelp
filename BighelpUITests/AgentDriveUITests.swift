@@ -8,11 +8,11 @@ final class AgentDriveUITests: BighelpUITestCase {
     func testFeedTemplatesDriveOpensTheDeckAndReturnsToTheChat() {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", "light",
+                               "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", "light",
                                "-test-agent-drive", "bot.dashboard.templates.feed",
                                "-test-agent-drive-note", "Each card is something your Feed can do. Swipe right to use one."]
         app.launch()
-        let primary = app.buttons["simple-bots.primary"]
+        let primary = app.primaryBot
         XCTAssertTrue(primary.waitForExistence(timeout: 15))
         primary.tap()
         XCTAssertTrue(app.buttons["chat.identity"].waitForExistence(timeout: 5))

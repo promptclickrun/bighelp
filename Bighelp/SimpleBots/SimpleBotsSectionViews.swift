@@ -200,7 +200,7 @@ struct SimpleBotsSectionsModel {
     let editor: SimpleBotsSectionEditor
     /// Bots and group chats that can go in a section here (not hidden), in the home's order.
     let candidates: [SimpleBotsItem]
-    /// Multi-gateway: each computer's name, so the members sheet lists them by computer.
+    /// Every computer shown: each computer's name, so the members sheet lists them by computer.
     var hostNames: [UUID: String]? = nil
 
     var sections: [FleetSection] { editor.fleet.sections }

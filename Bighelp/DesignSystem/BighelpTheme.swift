@@ -752,8 +752,7 @@ struct BighelpAppearanceContext: Equatable, Sendable {
     }
     /// Vision Pro: 0 is a solid window, 1 shows the room through the glass.
     var windowTransparency = BighelpVisionGlass.defaultTransparency
-    /// Bots mode is on (Settings › Modes). It takes the same themes as the rest of the app.
-    var simpleBots = false
+
     /// The Ink look, bighelp's default: black bubbles and buttons by day, ink after dark. Ink is
     /// `.graphite`; no saved choice is Ink too.
     func usesInk(dark: Bool) -> Bool {
@@ -780,12 +779,10 @@ struct BighelpAppearanceContext: Equatable, Sendable {
 
     /// The same choices, shown in one mode (previews, widgets, exports).
     func forcing(_ scheme: ColorScheme) -> BighelpAppearanceContext {
-        var context = BighelpAppearanceContext(
+        BighelpAppearanceContext(
             appearance: scheme == .dark ? .dark : .light, lightBackground: lightBackground,
             darkBackground: darkBackground, bubbleColor: bubbleColor, customBubbleHex: customBubbleHex,
             bubbleFollowsTheme: bubbleFollowsTheme, windowTransparency: windowTransparency)
-        context.simpleBots = simpleBots
-        return context
     }
 }
 

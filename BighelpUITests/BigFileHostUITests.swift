@@ -77,8 +77,7 @@ final class BigFileHostUITests: BighelpUITestCase {
         let next = app.buttons["host-setup.continue"]
         XCTAssertTrue(next.waitForExistence(timeout: 45), "Connected")
         next.tap()
-        let newChat = app.buttons.matching(NSPredicate(format: "identifier IN %@",
-            ["sessions.empty.new-chat", "chat.home.new-chat", "chat.new-chat", "root.new-chat"])).firstMatch
+        let newChat = app.buttons["home.new-chat"].firstMatch
         if newChat.waitForExistence(timeout: 10) {
             newChat.tap()
             confirmNewChatPicker(in: app)

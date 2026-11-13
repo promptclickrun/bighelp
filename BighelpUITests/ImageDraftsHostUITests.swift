@@ -97,12 +97,11 @@ final class ImageDraftsHostUITests: BighelpUITestCase {
         let next = app.buttons["host-setup.continue"]
         XCTAssertTrue(next.waitForExistence(timeout: 45), "Connected")
         next.tap()
-        let newChat = app.buttons.matching(NSPredicate(format: "identifier IN %@",
-            ["sessions.empty.new-chat", "chat.home.new-chat", "chat.new-chat", "root.new-chat"])).firstMatch
-        if newChat.waitForExistence(timeout: 10) {
-            newChat.tap()
-            confirmNewChatPicker(in: app)
-        }
+        // The home's New chat, beside the bar; it opens with nobody picked.
+        let newChat = app.buttons["home.new-chat"].firstMatch
+        XCTAssertTrue(newChat.waitForExistence(timeout: 20), "The home opens")
+        newChat.tap()
+        confirmNewChatPicker(in: app)
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 20), "A chat opens")
         XCTAssertTrue(app.descendants(matching: .any)["chat.draft-attachments"].firstMatch.waitForExistence(timeout: 10)
                       || app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "1 photo")).firstMatch.exists,

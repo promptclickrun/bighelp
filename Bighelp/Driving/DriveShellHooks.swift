@@ -6,7 +6,6 @@ struct DriveShellHooks: ViewModifier {
     let appState: AppState
     let featureStore: ShellFeatureStore
     let agents: AgentDirectoryStore
-    let settings: SettingsStore
     let usesDemoFixtures: Bool
     var navigator: DriveNavigator = .shared
 
@@ -30,10 +29,10 @@ struct DriveShellHooks: ViewModifier {
             #if DEBUG
             .onAppear {
                 guard usesDemoFixtures, ProcessInfo.processInfo.arguments.contains(DriveFixture.launchArgument) else { return }
-                let state = appState, features = featureStore, settings = settings
+                let state = appState, features = featureStore
                 // Not a `.task`: the root's tasks stop once a chat covers it (AGENTS.md › Root `.task(id:)`).
                 Task {
-                    await DriveFixture.play(arguments: ProcessInfo.processInfo.arguments, mode: { settings.currentMode },
+                    await DriveFixture.play(arguments: ProcessInfo.processInfo.arguments,
                                             chat: { state.chatOnScreen.flatMap { features.preparedChatModel(id: $0) } })
                 }
             }
@@ -53,7 +52,7 @@ enum DriveFixture {
 
     /// Waits up to 20 seconds for a chat to be on screen (a test taps one, or the demo opens it), then
     /// plays the drive a moment later, once.
-    static func play(arguments: [String], mode: () -> BighelpMode, chat: () -> ChatModel?) async {
+    static func play(arguments: [String], chat: () -> ChatModel?) async {
         guard !played, let place = value(after: launchArgument, in: arguments).flatMap(DriveCatalog.place) else { return }
         var open: ChatModel?
         for _ in 0..<80 {
@@ -61,12 +60,12 @@ enum DriveFixture {
             if open != nil { break }
             try? await Task.sleep(for: .milliseconds(250))
         }
-        guard let agentID = open?.memberIDs.first, let steps = place.playbooks[mode()] else { return }
+        guard let agentID = open?.memberIDs.first, !place.steps.isEmpty else { return }
         try? await Task.sleep(for: .milliseconds(1500))
         guard !played else { return }
         played = true
         let bot = place.needs.contains(.bot) ? DriveNavigator.shared.agent(agentID).map { (id: $0.id, name: $0.name) } : nil
-        DriveNavigator.shared.open(place, steps: steps, bot: bot,
+        DriveNavigator.shared.open(place, steps: place.steps, bot: bot,
                                    note: value(after: noteArgument, in: arguments) ?? place.what, agentID: agentID)
     }
 

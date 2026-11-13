@@ -153,10 +153,10 @@ struct BotChatActivitySource {
     }
 
     var live: @MainActor () -> Live?
-    /// Multi-gateway: the other gateways' bots from their all-hosts copies, by `FleetID`. Only fresh
+    /// Every computer shown: the other gateways' bots from their all-hosts copies, by `FleetID`. Only fresh
     /// copies: an old one says nothing.
     var others: @MainActor () -> [String: BotChatActivity] = { [:] }
-    /// Multi-gateway: reads again the copies older than a minute (`FleetStore.refresh`), so the other
+    /// Every computer shown: reads again the copies older than a minute (`FleetStore.refresh`), so the other
     /// gateways stay current while the home shows.
     var refreshOthers: @MainActor () -> Void = {}
 }
@@ -187,7 +187,7 @@ enum BotChatActivitySignals {
     }
 }
 
-/// Each bot's Bot Chat state, for Bots mode and the Agents screen. While a screen that shows
+/// Each bot's Bot Chat state, for the Bots view. While a screen that shows
 /// it is open and the app is active, it reads the gateway in use once per tick, in one request,
 /// quicker while something works; nothing runs otherwise, and what's shown is cleared then, since
 /// it would go stale. Each bot's state is observed on its own, so a row redraws only when its own
@@ -231,7 +231,7 @@ final class BotChatActivityStore {
         return cells[key]?.value
     }
 
-    /// The gateway in use's bots that are busy, by profile ID (the Agents screen).
+    /// The gateway in use's bots that are busy, by profile ID (the Bots view).
     func liveActivities() -> [String: BotChatActivity] {
         _ = generation
         var result: [String: BotChatActivity] = [:]

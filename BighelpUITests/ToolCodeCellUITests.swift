@@ -11,7 +11,7 @@ final class ToolCodeCellUITests: BighelpUITestCase {
             let app = makeApp()
             app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3",
                                    "-test-code-tool",
-                                   "-loopdy.chat.foldCompletedTurns", "NO", "-bighelp.settings.simple-bots", "NO",
+                                   "-loopdy.chat.foldCompletedTurns", "NO",
                                    "-loopdy.demo.appearance", appearance]
             app.launch()
             let timeline = app.tables["chat.timeline"]

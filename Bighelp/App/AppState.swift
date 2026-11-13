@@ -15,39 +15,34 @@ struct SuspendedChat: Equatable {
     let text: String
 }
 
-/// The chat the person was in when they left it for another place (Feed, Agents, Kanban…). The bar
-/// tab it was under opens it again, as any tab keeps its place.
-struct HeldChat: Equatable {
-    let conversationID: String
-    /// Picked from the full chat list: with Sessions in the bar, Sessions holds it, not Chat.
-    let openedFromList: Bool
-
-    /// The bar tab that opens it again: Chat (`.sessions`) or Sessions (`.sessionList`).
-    func tab(sessionsInBar: Bool) -> AppTab {
-        openedFromList && sessionsInBar ? .sessionList : .sessions
-    }
-
-    /// Chat is the chat of the agent in use, so it opens a 1:1 chat again only while that chat's
-    /// agent is in use (a board opened from it makes its agent the one in use). A group chat isn't
-    /// any one agent's.
-    static func fitsChat(members: [String], agentInUse: String?) -> Bool {
-        members.count != 1 || members.first == agentInUse
-    }
-}
-
 @MainActor
 @Observable
 final class AppState {
-    var selectedTab: AppTab = .sessions
-    /// The root a host or account change returns to: Chat, or Code in Code mode.
-    var homeTab: AppTab = .sessions
+    /// The home's tab and view, and what New chat and Today hold. One for the whole app: every
+    /// computer has its own `AppState`, and a chat opened on another computer keeps the tab.
+    let home: HomeSelection
+    /// The bar's tab. A pushed page stays over it; `select` clears the path.
+    var selectedTab: HomeTab {
+        get { home.tab }
+        set { home.tab = newValue }
+    }
     var path: [AppRoute] = []
-    private(set) var activeConversationID: String?
+    /// The chat last opened (`activateConversation`).
+    private var activatedConversationID: String?
+    /// The chat the person opened last, while it is still on the stack. Back, a tab or anything
+    /// else that takes it off ends it: it once kept naming a chat that had closed, and the phone
+    /// tools and Needs you went on treating that chat as the open one.
+    var activeConversationID: String? {
+        guard let id = activatedConversationID, path.contains(.chat(conversationID: id)) else { return nil }
+        return id
+    }
+    /// The chat whose bot reaches this phone's tools: the chat opened last, also after Back to a list
+    /// while that bot still works. A bot that goes on working must not lose the phone's tools
+    /// because the person stepped out of its chat.
+    var deviceToolConversationID: String? { activatedConversationID }
     private(set) var pendingVoiceConversationID: String?
     /// Text a board "Ask" or "Discuss" leaves in the next new chat's composer.
     var pendingComposerText: String?
-    /// The chat left for another place; opening a chat, or another computer or account, forgets it.
-    private(set) var heldChat: HeldChat?
     /// The open chat's agent and text when the app left, while that chat had sent nothing.
     /// Hermes saves a chat only on its first message, so it can be gone on return.
     var suspendedChat: SuspendedChat?
@@ -59,10 +54,6 @@ final class AppState {
     /// The bot whose own chat may take `pendingComposerText` even though it has history: a bot's
     /// Dashboard opens that bot's Bot Chat, never a new one. Only an empty message box takes it.
     var pendingComposerAgentID: String?
-    /// A chat picked from the full chat list isn't the Chat tab's own chat
-    /// (auto-opened, ☰ › New chat, the switcher, an agent tapped on Agents), so
-    /// tapping Chat leaves it. Both have ☰, the tab bar and the big-avatar header.
-    var chatOpenedFromList = false
     /// Chats that send their draft once connected: a branch made when Hermes refused a
     /// message because another Hermes process held the original (`continueInBranch`).
     var sendsDraftOnOpen: Set<String> = []
@@ -76,33 +67,28 @@ final class AppState {
     /// What the Settings sheet's stack shows above its first page: `SettingsDestination` values.
     var settingsPath = NavigationPath()
     /// Set by `openNeedsYou()`, before the shell is on screen too; kept until the shell settles it
-    /// (`RootShellView.settleNeedsYouRequest`).
-    var isNeedsYouRequested = false
-
-    /// The drawer reflects the destination on screen, while `selectedTab`
-    /// deliberately retains the root to return to when a pushed route closes.
-    var drawerSelectedTab: AppTab? {
-        path.isEmpty ? selectedTab : nil
+    /// (`RootShellView.settleNeedsYouRequest`). One for the whole app (`HomeSelection`), so the shell
+    /// on screen sees a request whichever computer's `AppState` took it.
+    var isNeedsYouRequested: Bool {
+        get { home.isNeedsYouRequested }
+        set { home.isNeedsYouRequested = newValue }
     }
 
-    func select(_ tab: AppTab) {
-        // Leaving a chat for another place: the tab it was under opens it again. Chat and
-        // Sessions share a root, so moving between them leaves nothing behind.
-        if selectedTab == .sessions, tab != .sessions, tab != .sessionList, case .chat(let id)? = path.last {
-            heldChat = HeldChat(conversationID: id, openedFromList: chatOpenedFromList)
-        }
-        switch tab {
-        // The Activity tab of older builds and launch arguments: what it held waits in Needs you
-        // and in the chats, so it opens Chat.
-        case .home, .inbox, .sessionList:
-            selectedTab = .sessions
-        default:
-            selectedTab = tab
-        }
-        // Root tabs are destinations, not another level in the current route.
-        // Clearing the path prevents a stale pushed chat/session from winning
-        // the NavigationStack presentation after a tab or drawer selection.
+    /// Tests and previews get a selection of their own; the app passes `HomeSelection.shared`.
+    init(home: HomeSelection = HomeSelection()) {
+        self.home = home
+    }
+
+    /// A tab is a root, never another level in the current route: whatever was pushed closes.
+    func select(_ tab: HomeTab) {
+        selectedTab = tab
         path.removeAll()
+    }
+
+    /// The first tab on one of its views (a link to Bots or to Chats).
+    func select(_ view: HomeConversationsView) {
+        home.view = view
+        select(.conversations)
     }
 
     func open(_ route: AppRoute) {
@@ -112,7 +98,7 @@ final class AppState {
     /// Switches to `tab` and opens `routes` on it. On the Mac they open a moment
     /// after the switch: pushed in the same update, the tab's title-bar search
     /// field stayed drawn over the pushed page's Back button and blocked it.
-    func select(_ tab: AppTab, thenOpen routes: [AppRoute]) {
+    func select(_ tab: HomeTab, thenOpen routes: [AppRoute]) {
         guard selectedTab != tab || !path.isEmpty else {
             path = routes
             return
@@ -147,29 +133,19 @@ final class AppState {
         settingsPath = NavigationPath()
     }
 
-    func openSessions() {
-        select(.sessions)
-    }
-
-    func openScheduledTasks() {
-        select(.scheduledTasks)
-    }
-
-    /// An alert that names no chat: the shell opens Needs you when something waits, else the
-    /// home chat (`RootShellView.settleNeedsYouRequest`).
+    /// An alert that names no chat: the shell opens Needs you when something waits, else Today
+    /// (`RootShellView.settleNeedsYouRequest`).
     func openNeedsYou() {
         isNeedsYouRequested = true
     }
 
     func activateConversation(id: String, source: ConversationActivationSource) {
-        // The chat on screen now is the one a tab holds when the person leaves it.
-        heldChat = nil
         let route = AppRoute.chat(conversationID: id)
         // Already open (a notification, widget or link about it): go back to that copy. A second
         // copy would share its model, both would redraw every change, and Back would show it again.
         if let open = path.lastIndex(of: route) {
             path.removeSubrange(path.index(after: open)...)
-            activeConversationID = id
+            activatedConversationID = id
             return
         }
         switch source {
@@ -181,11 +157,19 @@ final class AppState {
         case .sessions, .fork:
             path.append(route)
         }
-        activeConversationID = id
+        activatedConversationID = id
     }
 
-    /// The chat the person is in: the active one, else the chat on top of the path (the Chat tab's own
-    /// chat opens without activating).
+    /// New chat's blank chat leaves the stack once the chat that takes its place (a group chat) is
+    /// over it, so Back doesn't show an empty New chat. `isBlank`: nothing was sent in it. A chat
+    /// with a message is an ordinary chat and stays, whatever opens over it.
+    func dropBlankChat(_ blankID: String, under conversationID: String, isBlank: Bool) {
+        guard isBlank, blankID != conversationID,
+              path.contains(.chat(conversationID: conversationID)) else { return }
+        path.removeAll { $0 == .chat(conversationID: blankID) }
+    }
+
+    /// The chat the person is in: the active one, else the chat on top of the path.
     var chatOnScreen: String? {
         if let activeConversationID { return activeConversationID }
         if case .chat(let id)? = path.last { return id }
@@ -196,37 +180,22 @@ final class AppState {
         pendingVoiceConversationID = conversationID
     }
 
-    /// `keepsAllHostsScreens`: with every computer showing, its lists (All agents, All sessions,
-    /// every computer's tasks) stay up while the working computer changes; that computer's own
-    /// pages above them go.
-    func resetForHostBoundary(keepsAllHostsScreens: Bool = false) {
-        // The connections screen stays up while you switch hosts from it.
-        // Host-owned routes do not.
+    /// Another computer: its pages close and the tab stays. The connections screen stays up while
+    /// you switch computers from it.
+    func resetForHostBoundary() {
         let showsOnlyConnections = !path.isEmpty && path.allSatisfy { $0 == .workspaceConnections }
-        if keepsAllHostsScreens {
-            if ![.sessions, .scheduledTasks].contains(selectedTab) { selectedTab = .sessions }
-            path = Array(path.prefix { $0.isAllHosts })
-        } else if !showsOnlyConnections {
-            selectedTab = homeTab
-            path.removeAll()
-        }
-        activeConversationID = nil
+        if !showsOnlyConnections { path.removeAll() }
+        activatedConversationID = nil
         pendingVoiceConversationID = nil
         clearComposerText()
-        chatOpenedFromList = false
-        // Its chat is the other computer's.
-        heldChat = nil
         dropPendingShare()
     }
 
     func resetForAccountBoundary() {
-        selectedTab = homeTab
         path.removeAll()
-        activeConversationID = nil
+        activatedConversationID = nil
         pendingVoiceConversationID = nil
         clearComposerText()
-        chatOpenedFromList = false
-        heldChat = nil
         dropPendingShare()
     }
 

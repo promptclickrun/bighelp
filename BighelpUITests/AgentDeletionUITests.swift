@@ -1,14 +1,14 @@
 import XCTest
 
-/// Delete Agent from a bot's profile in Bots mode, on the demo's agents (#949): the agent goes,
-/// its editor and profile close, and the person is back on the Bots home, never on a page that
-/// says "This bot isn't here anymore".
+/// Delete bot from a bot's profile on Bots, on the demo's agents (#949): the agent goes, its
+/// profile closes, and the person is back on the Bots home, never on a page that says "This bot
+/// isn't here anymore".
 final class AgentDeletionUITests: BighelpUITestCase {
     @MainActor
     func testDeletingABotFromItsProfileGoesBackToTheBotsHome() throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-bighelp.settings.simple-bots", "YES"]
+                               "-loopdy.home.landing", "bots"]
         app.launch()
         let home = app.descendants(matching: .any)["simple-bots.home"]
         XCTAssertTrue(home.waitForExistence(timeout: 15))
@@ -23,23 +23,17 @@ final class AgentDeletionUITests: BighelpUITestCase {
         let profile = app.descendants(matching: .any)["simple-bots.profile"]
         XCTAssertTrue(profile.waitForExistence(timeout: 10))
 
+        // ⋯ › Delete bot, then the confirmation's Delete bot.
         app.buttons["simple-bots.profile.more"].tap()
-        let edit = app.buttons["Edit Name and Role"].firstMatch
-        XCTAssertTrue(edit.waitForExistence(timeout: 5))
-        edit.tap()
-        // Delete Agent is the editor's last row, which the form builds once it scrolls there.
-        XCTAssertTrue(app.buttons["agent.editor.save-template"].firstMatch.waitForExistence(timeout: 10)
-                      || app.navigationBars.firstMatch.waitForExistence(timeout: 5), "The editor opens")
-        let delete = app.buttons["agent.editor.delete"]
-        for _ in 0..<8 where !(delete.exists && delete.isHittable) { app.swipeUp() }
+        let delete = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@",
+                                                      "simple-bots.profile.more.delete", "Delete bot")).firstMatch
         XCTAssertTrue(delete.waitForExistence(timeout: 5))
         delete.tap()
-        let confirm = app.buttons["agent.editor.delete.confirm"].firstMatch
+        let confirm = app.buttons["simple-bots.profile.delete.confirm"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         confirm.tap()
 
         // Back where the profile opened from, with the bot gone.
-        XCTAssertTrue(delete.waitForNonExistence(timeout: 10), "The editor closes")
         XCTAssertTrue(profile.waitForNonExistence(timeout: 10), "The profile closes")
         XCTAssertTrue(home.waitForExistence(timeout: 5), "The Bots home is back")
         XCTAssertFalse(app.staticTexts["This bot isn't here anymore"].exists)

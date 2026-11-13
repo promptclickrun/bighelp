@@ -577,42 +577,42 @@ struct ShellFeatureStoreTests {
         ))
         let originPath: [AppRoute] = []
         #expect(SessionRestorePresentationPolicy.canComplete(
-            originTab: .sessions,
+            originTab: .conversations,
             originPath: originPath,
-            currentTab: .sessions,
+            currentTab: .conversations,
             currentPath: originPath
         ))
         #expect(!SessionRestorePresentationPolicy.canComplete(
-            originTab: .sessions,
+            originTab: .conversations,
             originPath: originPath,
-            currentTab: .home,
+            currentTab: .today,
             currentPath: originPath
         ))
         #expect(!SessionRestorePresentationPolicy.canComplete(
-            originTab: .sessions,
+            originTab: .conversations,
             originPath: originPath,
-            currentTab: .sessions,
+            currentTab: .conversations,
             currentPath: [.scheduledTasks]
         ))
         #expect(SessionRestorePresentationPolicy.ownsRestore(
             route: route,
-            originTab: .sessions,
+            originTab: .conversations,
             originPath: originPath,
-            currentTab: .sessions,
+            currentTab: .conversations,
             currentPath: [route]
         ))
         #expect(!SessionRestorePresentationPolicy.ownsRestore(
             route: route,
-            originTab: .sessions,
+            originTab: .conversations,
             originPath: originPath,
-            currentTab: .home,
+            currentTab: .today,
             currentPath: []
         ))
         #expect(!SessionRestorePresentationPolicy.ownsRestore(
             route: route,
-            originTab: .sessions,
+            originTab: .conversations,
             originPath: originPath,
-            currentTab: .sessions,
+            currentTab: .conversations,
             currentPath: [.scheduledTasks]
         ))
     }

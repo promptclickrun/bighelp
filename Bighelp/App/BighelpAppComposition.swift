@@ -40,21 +40,20 @@ struct BighelpAppComposition {
             || arguments.contains("-use-demo-fixtures")
         bighelpCardDataClient = BighelpCardStaticDataClient()
         let timing: DemoFixtureTiming = .immediate
-        let appState = AppState()
-        if arguments.contains("-start-inbox") {
-            appState.select(.inbox)
-        }
-        if usesFixtures, let index = arguments.firstIndex(of: "-initial-tab"),
-           arguments.indices.contains(index + 1), let tab = AppTab(rawValue: arguments[index + 1]) {
-            appState.select(tab)
-        }
+        let appState = AppState(home: .shared)
         #if DEBUG
         // A bighelp set up before the AI data agreement existed: tests forget the agreement.
         if arguments.contains("-test-forget-ai-data-agreement") { defaults.removeObject(forKey: AIDataConsent.key) }
         #endif
         let settings = SettingsStore(defaults: defaults)
-        // Built once per launch: Opens on picks one computer or all of them.
-        settings.applyLaunchLandingToAllHostsMode()
+        // Where the app opens, before anything is drawn. A link or an alert that opens the app
+        // picks its own place after this.
+        appState.home.land(on: settings.launchHomeLanding, view: settings.homeView)
+        if usesFixtures, let index = arguments.firstIndex(of: "-initial-tab"),
+           arguments.indices.contains(index + 1), let place = Self.initialPlace(arguments[index + 1]) {
+            appState.home.tab = place.tab
+            if let view = place.view { appState.home.view = view }
+        }
         let companion = CompanionStore(defaults: defaults)
         #if DEBUG
         if usesFixtures, let index = arguments.firstIndex(of: "-test-companion-adventure"),
@@ -288,11 +287,6 @@ struct BighelpAppComposition {
                 showsStoreScreenshots: arguments.contains(AppStoreScreenshotFixture.launchArgument),
                 createsGroups: arguments.contains(BotModeCatalogFixtureClient.createsGroupsArgument)
             ))
-            // A real host's runtime reads what it can do at connect; the demo
-            // does it now, so New chat › Group chat shows from the start.
-            if arguments.contains(BotModeCatalogFixtureClient.createsGroupsArgument) {
-                Task { await botModeRooms.refreshNativeRoomCatalog() }
-            }
             if arguments.contains(BotModeActivityFixtureClient.launchArgument) {
                 botModeRooms.configureNativeActivityClient(BotModeActivityFixtureClient())
             }
@@ -307,6 +301,10 @@ struct BighelpAppComposition {
                 losesFirstStop: arguments.contains(TeamCallDemoGroupsClient.losesFirstStopArgument)
             ))
         }
+        // A real host's runtime reads its group chats, and what it can do with them, at connect. A demo
+        // with group chats has no runtime, so it reads them now: the Bots view and New chat list them
+        // from the start.
+        if usesFixtures, botModeRooms.usesNativeRooms { Task { await botModeRooms.refreshNativeRoomCatalog() } }
         #endif
         do {
             try BotModeRoomLoadingPolicy.load(botModeRooms, for: .startup)
@@ -386,7 +384,6 @@ struct BighelpAppComposition {
         DeviceAccessCardStore.shared.permissions = deviceToolPermissions
         let appearanceTool = DeviceAppearanceTool(settings: settings)
         let navigationTool = DeviceNavigationTool(.init(
-            mode: { settings.currentMode },
             nerdMode: { settings.nerdModeEnabled },
             botName: { DriveNavigator.shared.agent($0)?.name },
             open: { place, steps, bot, note, context in
@@ -630,6 +627,8 @@ struct BighelpAppComposition {
                 BighelpExternalSessionOpenCenter.shared.request(catalogSessionID: sessionID)
                 return
             }
+            // The request is the whole app's (`HomeSelection`): the shell on screen reads the
+            // computer in use's `AppState`, not this one, and still sees it.
             appState?.openNeedsYou()
         }
         #if DEBUG
@@ -692,9 +691,27 @@ struct BighelpAppComposition {
                 conversationID = "demo-finance"
             }
             let route = AppRoute.chat(conversationID: conversationID)
+            // The chat a demo opens at launch shows this run's fixture. The store starts from the copy
+            // an earlier run saved, and a launch argument may have given this chat other content.
+            if let fixture = initialSessions.first(where: { $0.id == conversationID }),
+               sessionCatalog.session(id: conversationID) != fixture {
+                var records = sessionCatalog.records
+                if let index = records.firstIndex(where: { $0.id == conversationID }) {
+                    records[index] = fixture
+                } else {
+                    records.append(fixture)
+                }
+                _ = sessionCatalog.adopt(records)
+            }
             if featureStore.prepare(route) {
                 appState.activateConversation(id: conversationID, source: .newChat)
             }
+        } else if usesFixtures, subagentStreamAcceptanceFixture == nil {
+            // A real host's runtime reads the chat list at connect. A demo's store starts from the copy
+            // an earlier run saved, and the one home's lists only draw what it holds, so a demo that
+            // opens on the home reads its chat list now. A chat opened at launch (above) reads it
+            // itself as it loads; a read before that would leave that chat on the saved copy.
+            Task { try? await sessionCatalog.load() }
         }
 
         self.appState = appState
@@ -791,6 +808,19 @@ struct BighelpAppComposition {
         }
         #endif
         return { SilentVoiceInputLevelSource() }
+    }
+
+    /// `-initial-tab` in demo runs: one of the three places, or a screen of the old shell by the
+    /// place that holds it now.
+    static func initialPlace(_ name: String) -> (tab: HomeTab, view: HomeConversationsView?)? {
+        if let tab = HomeTab(rawValue: name) { return (tab, nil) }
+        switch name {
+        case "bots", "agents": return (.conversations, .bots)
+        case "chats", "sessions", "sessionList": return (.conversations, .chats)
+        case "feed", "ideas", "goals": return (.today, nil)
+        case "projects", "kanban", "workflows", "scheduledTasks", "code": return (.work, nil)
+        default: return nil
+        }
     }
 
     static func initialAgentProfiles(

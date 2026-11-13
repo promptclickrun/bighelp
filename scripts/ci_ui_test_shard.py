@@ -7,8 +7,10 @@ import sys
 from pathlib import Path
 
 
+# The one test that rotates an iPad and checks a chat's header. The Duo's other tests skip on an iPad
+# or run on the Duo's own simulator.
 IPAD_TESTS = (
-    "AgentsUITests/testLastRowClearsSearchAndNavigationInPortraitAndLandscape",
+    "DuoLayoutUITests/testIPadBotSwitcherStaysBelowStatusBar",
 )
 SELECTOR_PREFIX = "-only-testing:BighelpUITests/"
 

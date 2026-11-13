@@ -1,6 +1,6 @@
 import Foundation
 
-/// Demo mode's computer: two sample apps, answering the way the plugin does (docs/HTML_APPS.md ›
+/// Demo mode's computer: two sample apps and the demo spaces' pages, answering the way the plugin does (docs/HTML_APPS.md ›
 /// Routes), so UI tests and the demo need no host. Made-up numbers only.
 @MainActor
 final class DemoHTMLAppsClient: HTMLAppsClient {
@@ -25,6 +25,20 @@ final class DemoHTMLAppsClient: HTMLAppsClient {
         gardenWatchID: App(title: "Garden watch",
                            description: "Soil, temperature and the last watering, from the sensors.",
                            sendsAnswers: false, html: DemoHTMLApps.gardenWatch, data: DemoHTMLApps.gardenData),
+        // The demo spaces' pages (`DemoSpacesClient`): a panel on Today opens one.
+        DemoSpacesClient.commutePageID: App(title: "Commute", description: "Drive time to work, from live traffic.",
+                                            sendsAnswers: false, html: DemoSpacePages.commute,
+                                            data: DemoSpacePages.commuteData),
+        DemoSpacesClient.gardenPageID: App(title: "Garden", description: "Soil, temperature and the last watering.",
+                                           sendsAnswers: false, html: DemoSpacePages.garden,
+                                           data: DemoSpacePages.gardenData),
+        DemoSpacesClient.workoutsPageID: App(title: "Workouts",
+                                             description: "This week's training, read from the log each evening.",
+                                             sendsAnswers: false, html: DemoSpacePages.workouts,
+                                             data: DemoSpacePages.workoutsData),
+        DemoSpacesClient.spendingPageID: App(title: "Spending", description: "This month's spending against the budget.",
+                                             sendsAnswers: false, html: DemoSpacePages.spending,
+                                             data: DemoSpacePages.spendingData),
     ]
     /// Small, so demo mode and its UI tests load every page in several pieces, as a big page does.
     var pieceBytes = 1_024

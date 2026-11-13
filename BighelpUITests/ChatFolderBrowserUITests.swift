@@ -98,17 +98,7 @@ final class ChatFolderBrowserUITests: BighelpUITestCase {
         let app = makeApp()
         app.launch()
         try onboardOpenHost(app, address: try XCTUnwrap(probe["address"]))
-        openRootTab("tab.agents", in: app)
-        let row = app.buttons["agent.\(agent)"].firstMatch
-        // A long list builds only the rows on screen.
-        if !row.waitForExistence(timeout: 20) {
-            let search = app.descendants(matching: .any).matching(identifier: "agents.search").firstMatch
-            XCTAssertTrue(search.waitForExistence(timeout: 10))
-            search.tap()
-            app.typeText(agent + "\n")
-        }
-        XCTAssertTrue(row.waitForExistence(timeout: 30), "agent.\(agent) on Agents")
-        row.tap()
+        openHostBot(agent, in: app)
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 45), "Its Bot Chat opens")
         chatMenuItem("chat.files", in: app).tap()
 
@@ -164,5 +154,26 @@ final class ChatFolderBrowserUITests: BighelpUITestCase {
         try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
         try? app.screenshot().pngRepresentation.write(
             to: URL(fileURLWithPath: folder).appendingPathComponent("\(name).png"))
+    }
+
+    /// Opens a real host's bot from Bots (`simple-bots.bot.<id>`), through Search when the list hasn't
+    /// built its row; the tap opens its Bot Chat.
+    @MainActor
+    private func openHostBot(_ agent: String, in app: XCUIApplication) {
+        showBots(in: app)
+        var row = app.buttons["simple-bots.bot.\(agent)"].firstMatch
+        // A long list builds only the rows on screen.
+        if !row.waitForExistence(timeout: 20) {
+            let search = app.buttons["simple-bots.search"].firstMatch
+            XCTAssertTrue(search.waitForExistence(timeout: 10))
+            search.tap()
+            let field = app.descendants(matching: .any)["simple-bots.search.field"].firstMatch
+            XCTAssertTrue(field.waitForExistence(timeout: 10))
+            field.tap()
+            field.typeText(agent)
+            row = app.buttons["simple-bots.search.bot.\(agent)"].firstMatch
+        }
+        XCTAssertTrue(row.waitForExistence(timeout: 30), "\(agent) on Bots")
+        row.tap()
     }
 }

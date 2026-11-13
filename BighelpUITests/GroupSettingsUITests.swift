@@ -10,14 +10,16 @@ final class GroupSettingsUITests: BighelpUITestCase {
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-group-settings",
                                "-loopdy.demo.appearance", appearance] + extra
         app.launch()
-        openAgents(in: app)
-        let search = app.searchFields["Search agents and groups"].firstMatch
-        XCTAssertTrue(revealSearchField(search, in: app))
-        search.tap()
-        search.typeText("Garden\n")
-        let group = app.buttons["agents.group.group-settings-demo"]
-        XCTAssertTrue(group.waitForExistence(timeout: 8))
+        // The demo has many group chats: New chat's To field finds this one among them.
+        chatNewChatButton(in: app).tap()
+        let to = app.textFields["new-chat.to.field"].firstMatch
+        XCTAssertTrue(to.waitForExistence(timeout: 10))
+        to.tap()
+        to.typeText("Garden party")
+        let group = app.buttons["new-chat.group.hermes-room:group-settings-demo"].firstMatch
+        XCTAssertTrue(group.waitForExistence(timeout: 8), "New chat lists the demo's group chat")
         group.tap()
+        XCTAssertTrue(to.waitForNonExistence(timeout: 10), "The group chat takes New chat's place")
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 10))
         return app
     }
@@ -125,9 +127,13 @@ final class GroupSettingsUITests: BighelpUITestCase {
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-group-create",
                                "-loopdy.demo.appearance", "light"]
         app.launch()
-        openAgents(in: app)
-        let create = app.buttons["agents.groups.create"]
-        for _ in 0..<6 where !(create.exists && create.isHittable) { app.swipeUp() }
+        // Bots › + › New Group Chat.
+        showBots(in: app)
+        let add = app.buttons["simple-bots.new"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        add.tap()
+        let create = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@",
+                                                      "simple-bots.new.group", "New Group Chat")).firstMatch
         XCTAssertTrue(create.waitForExistence(timeout: 5))
         create.tap()
         let everyone = app.buttons["bot-mode.create.routing.everyone"]

@@ -37,9 +37,9 @@ enum SessionRestorePresentationPolicy {
     }
 
     static func canComplete(
-        originTab: AppTab,
+        originTab: HomeTab,
         originPath: [AppRoute],
-        currentTab: AppTab,
+        currentTab: HomeTab,
         currentPath: [AppRoute]
     ) -> Bool {
         currentTab == originTab && currentPath == originPath
@@ -47,9 +47,9 @@ enum SessionRestorePresentationPolicy {
 
     static func ownsRestore(
         route: AppRoute,
-        originTab: AppTab,
+        originTab: HomeTab,
         originPath: [AppRoute],
-        currentTab: AppTab,
+        currentTab: HomeTab,
         currentPath: [AppRoute]
     ) -> Bool {
         canComplete(
@@ -101,7 +101,7 @@ enum ProjectChangesTargetResolver {
 struct SessionRestoreRequest: Equatable {
     let token = UUID()
     let sessionID: String
-    let originTab: AppTab
+    let originTab: HomeTab
     let originPath: [AppRoute]
 }
 

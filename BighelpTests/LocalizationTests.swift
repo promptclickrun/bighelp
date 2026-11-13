@@ -46,16 +46,16 @@ struct LocalizationTests {
         }
     }
 
-    @Test func simpleBotModeTeamworkAndTheirSettingsHaveChinese() throws {
+    @Test func botsTeamworkTheHomeAndTheirSettingsHaveChinese() throws {
         let chinese = try bundle("zh-Hans")
         let english = try bundle("en")
         let expected = [
             ("Search bots", "搜索机器人"), ("Mark Unread", "标为未读"), ("Make Primary Bot", "设为主机器人"),
             ("Rearrange", "重新排列"), ("Instructions", "指令"), ("Default Model", "默认模型"),
             ("Routines", "例行任务"), ("Teamwork", "团队协作"), ("Bots messaging each other", "机器人之间的消息"),
-            ("Quiet hours", "勿扰时段"), ("Chat layout", "聊天布局"), ("Multi-gateway", "多网关"),
-            ("Bots", "机器人"), ("Chat", "聊天"), ("Code", "代码"), ("Bots mode", "机器人模式"),
-            ("Code mode", "代码模式"), ("Header mode switcher", "顶部模式切换"),
+            ("Quiet hours", "勿扰时段"), ("Chat layout", "聊天布局"), ("Show every computer", "显示所有电脑"),
+            ("Bots", "机器人"), ("Chats", "聊天"), ("Today", "今天"), ("Work", "工作"),
+            ("Make a space", "创建空间"), ("How do you want to start?", "你想怎么开始？"),
         ]
         for (key, value) in expected {
             #expect(chinese.localizedString(forKey: key, value: nil, table: nil) == value)
@@ -84,11 +84,9 @@ struct LocalizationTests {
     }
 
     @Test func localizedDisplayNamesDoNotChangeSavedNavigationOrSendBehavior() throws {
-        let layout = BighelpAppLayout(pinned: [.agents, .feed], menuOrder: [.settings])
-        let saved = try #require(layout.saved)
-        #expect(saved.contains("agents") && saved.contains("feed") && saved.contains("settings"))
-        #expect(BighelpAppLayout(saved: saved) == layout)
+        #expect(HomeLanding.allCases.map(\.rawValue) == ["bots", "chats", "today", "work"])
+        #expect(HomeConversationsView.bots.rawValue == "bots")
         #expect(MidSessionChatBehavior.steer.rawValue == "steer")
-        #expect(FirstRunMode.bots.rawValue == "bots")
+        #expect(FirstRunHome.bots.rawValue == "bots")
     }
 }

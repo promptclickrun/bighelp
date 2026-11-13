@@ -1,14 +1,13 @@
 import XCTest
 
-/// Sessions on demo data: Hermes, Codex and Claude Code above the list, on one computer
-/// and on all of them. Codex and Claude Code cover the chats Hermes already brought in
-/// and the ones still in those apps. Set BIGHELP_APP_FILTER_EVIDENCE (TEST_RUNNER_…) to
+/// Sessions (Chats › This computer) on demo data: Hermes, Codex and Claude Code above the list.
+/// Codex and Claude Code cover the chats Hermes already brought in and the ones still in those apps. Set BIGHELP_APP_FILTER_EVIDENCE (TEST_RUNNER_…) to
 /// save screenshots.
 final class SessionAppFilterUITests: BighelpUITestCase {
     @MainActor
     func testOneComputerFiltersHermesCodexAndClaudeCode() throws {
-        let app = launch(allHosts: false)
-        openRootTab("tab.sessions", in: app)
+        let app = launch()
+        openThisComputerSessions(in: app)
         let codex = segment("Codex", in: app)
         XCTAssertTrue(codex.waitForExistence(timeout: 15), "The choice sits above the list")
         save("sessions-app-all", app)
@@ -51,45 +50,9 @@ final class SessionAppFilterUITests: BighelpUITestCase {
         save("sessions-filter-menu-agent", app)
     }
 
-    @MainActor
-    func testAllComputersFilterTheSameWayAndKeepTheChoice() throws {
-        let app = launch(allHosts: true)
-        let menu = app.buttons["home.drawer.open"].firstMatch
-        XCTAssertTrue(menu.waitForExistence(timeout: 15))
-        menu.tap()
-        app.buttons["menu.chats"].firstMatch.tap()
-        XCTAssertTrue(app.navigationBars["All sessions"].waitForExistence(timeout: 8))
-
-        segment("Codex", in: app).tap()
-        XCTAssertTrue(app.buttons["fleet.chat.Release checklist"].waitForExistence(timeout: 8),
-                      "A chat another computer brought in from Codex")
-        XCTAssertFalse(app.buttons["fleet.chat.Market scan"].exists, "Hermes' own chats are filtered out")
-        XCTAssertTrue(scrollTo(otherApp("fleet.other-app.Speed up the test suite", in: app), in: app),
-                      "A chat still in Codex on another computer")
-        XCTAssertTrue(scrollTo(otherApp("fleet.other-app.Polish the Mac menus", in: app), in: app), "And on this one")
-        save("all-sessions-app-codex", app)
-
-        scrollToTop(app)
-        segment("Claude Code", in: app).tap()
-        XCTAssertTrue(scrollTo(otherApp("fleet.other-app.Draft the launch post", in: app), in: app))
-        XCTAssertFalse(otherApp("fleet.other-app.Speed up the test suite", in: app).exists)
-        save("all-sessions-app-claude-code", app)
-        scrollToTop(app)
-
-        // A computer's own Sessions keeps the choice.
-        app.buttons["fleet.filter.Home Hermes"].tap()
-        XCTAssertTrue(row(containing: "Started in Claude Code", in: app).waitForExistence(timeout: 10),
-                      "That computer's Sessions shows Claude Code too")
-        XCTAssertTrue(segment("Claude Code", in: app).isSelected)
-        XCTAssertTrue(scrollTo(otherApp("sessions.other-app.Trip budget script", in: app), in: app))
-        save("one-computer-in-all-hosts-claude-code", app)
-    }
-
-    @MainActor private func launch(allHosts: Bool) -> XCUIApplication {
+    @MainActor private func launch() -> XCUIApplication {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays",
-                               "-bighelp.hosts.all-hosts", allHosts ? "YES" : "NO",
-                               "-loopdy.home.opens-chat", "NO"]
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays"]
         app.launch()
         return app
     }

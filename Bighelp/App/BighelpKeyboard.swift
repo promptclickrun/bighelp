@@ -15,31 +15,3 @@ enum BighelpKeyboard {
         )
     }
 }
-
-/// ☰ as a glass button, for screens drawn over the app (the voice screen).
-struct WorkspaceMenuButton: View {
-    let accessibilityIdentifier: String
-    let action: () -> Void
-
-    init(
-        accessibilityIdentifier: String = "workspace.menu",
-        action: @escaping () -> Void
-    ) {
-        self.accessibilityIdentifier = accessibilityIdentifier
-        self.action = action
-    }
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "line.3.horizontal")
-                .font(.bighelp(.body).weight(.semibold))
-                .foregroundStyle(.primary)
-                .frame(width: 44, height: 44)
-                .contentShape(.circle)
-        }
-        .buttonStyle(.plain)
-        .bighelpNavigationGlass(in: Circle(), isInteractive: true)
-        .accessibilityLabel("Menu")
-        .accessibilityIdentifier(accessibilityIdentifier)
-    }
-}

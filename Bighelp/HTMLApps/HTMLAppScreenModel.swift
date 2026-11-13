@@ -98,7 +98,8 @@ final class HTMLAppScreenModel {
 
     var title: String { info?.title ?? app.title }
     var isLive: Bool { info?.isLive ?? app.isLive }
-    var sendsAnswers: Bool { info?.sendsAnswers ?? app.sendsAnswers }
+    /// A card that says no is final (a space's never sends): the plugin's `info` can only narrow a yes.
+    var sendsAnswers: Bool { app.sendsAnswers && (info?.sendsAnswers ?? true) }
 
     func open() async {
         guard let connection = connection() else {

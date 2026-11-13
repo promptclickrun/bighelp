@@ -1,10 +1,11 @@
 import XCTest
 
 /// Settings' first screen in short groups: you, your bots and what they can use (Apps & skills,
-/// with this device's access first), this app (Appearance, Chat, ...), your computers, then Help. Set BIGHELP_SETTINGS_EVIDENCE (TEST_RUNNER_BIGHELP_SETTINGS_EVIDENCE) to save screenshots.
+/// with this device's access first), this app (Appearance, Chat, ...), your computers, then Help.
+/// Settings is a sheet: its pages go back with the sheet's own Back button. Set BIGHELP_SETTINGS_EVIDENCE (TEST_RUNNER_BIGHELP_SETTINGS_EVIDENCE) to save screenshots.
 final class SettingsLayoutUITests: BighelpUITestCase {
     @MainActor
-    func testConnectionsHoldDeviceAccessAndModesHoldTheModeSwitches() throws {
+    func testConnectionsHoldDeviceAccess() throws {
         for appearance in ["light", "dark"] {
             let app = makeApp()
             app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance]
@@ -13,15 +14,6 @@ final class SettingsLayoutUITests: BighelpUITestCase {
             XCTAssertTrue(app.buttons["settings.you"].waitForExistence(timeout: 5), "You is one row")
             XCTAssertFalse(app.textFields["profile.display-name"].exists, "The name box is on the You page")
             save("01-settings-\(appearance)", app)
-
-            settingsRow("settings.menu.modes", in: app).tap()
-            XCTAssertTrue(app.buttons["settings.mode.bots"].waitForExistence(timeout: 5), "Bots mode is under Modes")
-            XCTAssertTrue(app.buttons["settings.mode.chat"].exists, "Chat mode is under Modes")
-            XCTAssertTrue(app.buttons["settings.mode.code"].exists, "Code mode is under Modes")
-            XCTAssertTrue(app.switches["settings.unified-mode-toggle"].exists, "Header mode switcher is under Modes")
-            XCTAssertTrue(app.switches["settings.code-mode"].exists, "Code mode keeps its own switch")
-            save("02-modes-\(appearance)", app)
-            app.navigationBars.buttons.firstMatch.tap()
 
             settingsRow("settings.apps", in: app).tap()
             let device = app.buttons["settings.connections.device-access"].firstMatch
@@ -73,7 +65,7 @@ final class SettingsLayoutUITests: BighelpUITestCase {
             reach(header("Advanced · Chat list", in: app), in: app)
             reach(app.switches["settings.show-cron-sessions"].firstMatch, in: app)
             reach(app.buttons["settings.chat.clean-up-chats"].firstMatch, in: app)
-            app.navigationBars.buttons.firstMatch.tap()
+            app.buttons["BackButton"].firstMatch.tap()
 
             settingsRow("settings.menu.notifications", in: app).tap()
             XCTAssertTrue(app.descendants(matching: .any)["settings.notifications"].firstMatch.waitForExistence(timeout: 8))
@@ -90,7 +82,7 @@ final class SettingsLayoutUITests: BighelpUITestCase {
             reach(app.descendants(matching: .any)["settings.notifications.details"].firstMatch, in: app)
             reach(app.buttons["settings.notifications.turn-off"].firstMatch, in: app)
             save("08-notifications-end-\(appearance)", app)
-            app.navigationBars.buttons.firstMatch.tap()
+            app.buttons["BackButton"].firstMatch.tap()
 
             settingsRow("settings.apps", in: app).tap()
             app.buttons["settings.connections.device-access"].firstMatch.tap()
@@ -111,13 +103,14 @@ final class SettingsLayoutUITests: BighelpUITestCase {
         }
     }
 
-    /// One Settings in every mode (#976): you, Your bots, This app, Your computers, then Help & feedback
-    /// and Advanced options. Bots mode's circle opens the same page.
+    /// One Settings (#976): you, Your bots, This app, Your computers, then Help & feedback and Advanced
+    /// options. The circle on Chats and on Bots opens the same page.
     @MainActor
-    func testOneSettingsInChatAndBotsMode() throws {
-        for (mode, extra) in [("chat", [String]()), ("bots", ["-bighelp.settings.simple-bots", "YES"])] {
+    func testOneSettingsFromChatsAndBots() throws {
+        for mode in ["chats", "bots"] {
             let app = makeApp()
-            app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3"] + extra
+            app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
+                                   "-loopdy.home.landing", mode]
             app.launch()
             if mode == "bots" {
                 let circle = app.buttons["simple-bots.settings"]

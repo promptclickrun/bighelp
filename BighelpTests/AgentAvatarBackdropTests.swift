@@ -18,15 +18,6 @@ struct AgentAvatarBackdropTests {
         }
     }
 
-    @Test func theEditorPreviewDrawsNothingBehindACharacter() throws {
-        let preview = try section(of: "Bighelp/Agents/AgentEditorView.swift",
-                                  from: "private func avatarPreview(", to: "} else if model.pendingAvatar != nil, let look = model.pendingLook")
-        #expect(preview.contains("CompanionAvatar("))
-        for shape in ["Circle()", ".fill(", ".background("] {
-            #expect(!preview.contains(shape), "Something is drawn behind the character: \(shape)")
-        }
-    }
-
     private func section(of path: String, from start: String, to end: String) throws -> String {
         let source = try String(contentsOf: repository.appending(path: path), encoding: .utf8)
         let lower = try #require(source.range(of: start), "\(start) in \(path)")

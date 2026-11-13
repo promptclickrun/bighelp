@@ -13,7 +13,7 @@ extension RootShellView {
         return DirectHermesWorkflowsClient(currentWorkspace: { [weak connections] in connections?.workspace })
     }
 
-    /// Checks the host for Workflows whenever it (re)connects, so ☰ shows the
+    /// Checks the host for Workflows whenever it (re)connects, so Work shows the
     /// row only where it works. The same computer keeps its row and its store;
     /// only a clear answer from the host changes the row (`WorkflowsAvailability`).
     func configureWorkflows(_ key: AgentBoardClientKey) async {
@@ -29,28 +29,33 @@ extension RootShellView {
         // A page that showed before the computer answered gets its data now.
         if workflowsStore == nil, isWorkflowsPageOpen { prepareWorkflowsStore() }
         await workflowsAvailability.check { try await client.support() }
+        // A computer with Workflows has its store read at once, not only once Work opens: Today's
+        // Needs you card, the tab's dot and the sidebar's row count a waiting sign-off from it.
+        let hasWorkflows: Bool = if case .available? = workflowsAvailability.support { true } else { false }
+        if hasWorkflows { prepareWorkflowsStore() }
         // What the page shows comes from the new connection, not the closed one.
-        if isWorkflowsPageOpen { await workflowsStore?.load() }
+        if isWorkflowsPageOpen || hasWorkflows { await workflowsStore?.load() }
     }
 
+    /// Its page is open, or Work, which lists its runs.
     private var isWorkflowsPageOpen: Bool {
-        appState.selectedTab == .workflows || appState.path.contains { route in
+        appState.selectedTab == .work || appState.path.contains { route in
             if case .workflows = route { true } else { false }
         }
     }
 
-    /// ☰ shows Workflows for any connected computer. Where the plugin lacks them
+    /// Work shows Workflows for any connected computer. Where the plugin lacks them
     /// or says this computer can't run them, the Workflows page says why and
     /// what to do, so a slow or failed check never hides the feature.
     var canOpenWorkflows: Bool { workflowsAvailability.host != nil || workflowsAvailability.isAvailable == true }
 
-    /// Opens ☰ › Workflows over the chat, so Back returns there.
+    /// Opens Workflows over Work, so Back returns there.
     func openWorkflows() {
         guard prepareWorkflowsStore() != nil else {
             actionErrorMessage = "Connect to your computer to use Workflows."
             return
         }
-        showOneHostPageOnSessions([.workflows])
+        showOverWork([.workflows])
     }
 
     /// Opens one workflow (a Shortcut or a link): its flow, or its Run sheet straight away.
@@ -59,13 +64,13 @@ extension RootShellView {
             actionErrorMessage = "Connect to your computer to use Workflows."
             return
         }
-        showOneHostPageOnSessions([.workflows, .workflow(id: id, startsRun: startsRun)])
+        showOverWork([.workflows, .workflow(id: id, startsRun: startsRun)])
     }
 
     /// Opens one run (a widget, a link or a notification later).
     func openWorkflows(run: String) {
         guard prepareWorkflowsStore() != nil else { return }
-        showOneHostPageOnSessions([.workflows, BighelpPlatform.isMac ? .workflowRuns(selected: run) : .workflowRun(id: run)])
+        showOverWork([.workflows, BighelpPlatform.isMac ? .workflowRuns(selected: run) : .workflowRun(id: run)])
     }
 
     /// A tapped workflow alert names its run only as a chat reference (`workflow.run.<id>`,
@@ -122,7 +127,7 @@ extension RootShellView {
                 .accessibilityIdentifier("workflows.connecting")
         } else {
             ContentUnavailableView("Workflows aren't available", systemImage: "flowchart",
-                description: Text("Connect to your computer, then open Workflows from the menu."))
+                description: Text("Connect to your computer, then open Workflows from Work."))
         }
     }
 }

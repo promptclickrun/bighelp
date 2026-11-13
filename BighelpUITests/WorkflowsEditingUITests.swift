@@ -315,8 +315,7 @@ final class WorkflowsEditingUITests: BighelpUITestCase {
     @MainActor
     func testAWorkflowLinkOpensItOrItsRunSheet() throws {
         let app = launch()
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"]))
-            .firstMatch.waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 15))
         app.open(URL(string: "loopdy://workflows/wf-morning")!)
         let pad = app.userInterfaceIdiom == .pad
         let make = element(pad ? "workflows.canvas.node.make" : "workflows.flow.stage.make", app)
@@ -470,10 +469,10 @@ final class WorkflowsEditingUITests: BighelpUITestCase {
     @MainActor
     func testAComputerThatCantRunWorkflowsSaysWhyInPlainWords() throws {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES",
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays",
                                "-demo-workflows-unavailable", "chat_runner_missing"]
         app.launch()
-        openMenuRow(app)
+        openWorkDoor("workflows", in: app)
         let explanation = element("workflows.cant-run", app)
         XCTAssertTrue(explanation.waitForExistence(timeout: 8), "The screen explains instead of failing")
         let words = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Update Hermes'")).firstMatch
@@ -511,7 +510,7 @@ final class WorkflowsEditingUITests: BighelpUITestCase {
     @MainActor
     private func launch(_ extra: [String] = []) -> XCUIApplication {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES"] + extra
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays"] + extra
         app.launch()
         return app
     }
@@ -522,18 +521,8 @@ final class WorkflowsEditingUITests: BighelpUITestCase {
     }
 
     @MainActor
-    private func openMenuRow(_ app: XCUIApplication) {
-        let menu = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"])).firstMatch
-        XCTAssertTrue(menu.waitForExistence(timeout: 15))
-        menu.tap()
-        let row = app.buttons["menu.workflows"]
-        XCTAssertTrue(row.waitForExistence(timeout: 8), "☰ lists Workflows")
-        row.tap()
-    }
-
-    @MainActor
     private func openWorkflows(_ app: XCUIApplication) {
-        openMenuRow(app)
+        openWorkDoor("workflows", in: app)
         XCTAssertTrue(element("workflows.home", app).waitForExistence(timeout: 8))
         XCTAssertTrue(app.buttons["workflows.workflow.wf-research"].waitForExistence(timeout: 8))
     }

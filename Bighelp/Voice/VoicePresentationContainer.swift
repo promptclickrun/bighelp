@@ -10,7 +10,8 @@ struct VoicePresentationContainer: View {
     var agentImageURL: URL? = nil
     let permissionCenter: PermissionCenter
     let onEnded: () -> Void
-    let onWorkspaceTap: () -> Void
+    /// Opens the chat, where voice isn't over it (the agent in the room). Nil over a chat.
+    var onOpenChat: (() -> Void)? = nil
     /// Switches Settings to turn-based voice and reopens voice.
     var onUseTurnBased: (() -> Void)? = nil
     /// Opens live voice again, once what stopped it may be gone.
@@ -26,7 +27,7 @@ struct VoicePresentationContainer: View {
                 VoiceView(model: presentation.model, agentID: agentID,
                           agentImageURL: agentImageURL,
                           permissionCenter: permissionCenter,
-                          onEnded: onEnded, onWorkspaceTap: onWorkspaceTap,
+                          onEnded: onEnded, onOpenChat: onOpenChat,
                           chatActivity: chatActivity, chatStep: chatStep)
             } else if let live = presentation.liveModel {
                 NavigationStack {

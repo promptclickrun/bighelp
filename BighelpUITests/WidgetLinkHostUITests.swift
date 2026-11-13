@@ -13,13 +13,16 @@ final class WidgetLinkHostUITests: BighelpUITestCase {
         let probe = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
         guard probe["mode"] == "widgets" else { throw XCTSkip("This host runs the \(probe["mode"] ?? "?") mode") }
         let app = makeApp()
-        app.launchArguments = ["-loopdy.home.opens-chat", "YES"]
         app.launch()
         try onboardOpenHost(app, address: try XCTUnwrap(probe["address"]))
 
-        // A chat with a reply, like the ones a widget lists.
+        // A chat with a reply, like the ones a widget lists: the primary bot's, from Bots.
+        showBots(in: app)
+        let primary = app.primaryBot
+        XCTAssertTrue(primary.waitForExistence(timeout: 30), "Bots shows the primary bot")
+        primary.tap()
         let composer = app.textViews["chat.composer.text"]
-        XCTAssertTrue(composer.waitForExistence(timeout: 30), "The agent's chat opens")
+        XCTAssertTrue(composer.waitForExistence(timeout: 30), "The bot's chat opens")
         composer.tap()
         composer.typeText("Widget link fixture message")
         app.buttons["chat.send"].tap()
@@ -66,29 +69,28 @@ final class WidgetLinkHostUITests: BighelpUITestCase {
                       "The widget's chat opens after a relaunch")
         save("widget-5-relaunch", app)
 
-        // A chat that's gone, at launch: the error closes onto a screen with ☰, never a dead end.
+        // A chat that's gone, at launch: the error closes onto the home and its bar, never a dead end.
         app.terminate()
         app.open(chatURL("native-session-v1:missing:bWlzc2luZw:bWlzc2luZw"))
         let alert = app.alerts.firstMatch
         XCTAssertTrue(alert.waitForExistence(timeout: 30), "A missing chat explains itself")
         sleep(3) // the agent's chat would open under the alert here
         alert.buttons["OK"].tap()
-        let menu = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"])).firstMatch
-        XCTAssertTrue(menu.waitForExistence(timeout: 10), "☰ is there after the error")
-        XCTAssertTrue(menu.isHittable)
+        let newChat = app.buttons["home.new-chat"].firstMatch
+        XCTAssertTrue(newChat.waitForExistence(timeout: 10), "The home is there after the error")
+        XCTAssertTrue(newChat.isHittable)
         save("widget-6-after-error", app)
     }
 
-    /// The first row in All chats, as the widget stores it (`session.row.<id>`).
+    /// The first row in Chats, as the widget stores it (`chats.row.here/<id>` for the computer in use).
     @MainActor private func recentChatID(_ app: XCUIApplication) throws -> String {
-        app.buttons["chat.menu"].tap()
-        let chats = app.buttons["menu.chats"]
-        XCTAssertTrue(chats.waitForExistence(timeout: 5))
-        chats.tap()
+        goBackFromChat(in: app)
+        showChats(in: app)
+        let prefix = "chats.row.here/"
         let row = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "session.row.")).firstMatch
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 20), "The chat is listed")
-        let id = String(row.identifier.dropFirst("session.row.".count))
+        let id = String(row.identifier.dropFirst(prefix.count))
         // Back to the agent's chat, where the app sits when someone leaves it.
         row.tap()
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 20))

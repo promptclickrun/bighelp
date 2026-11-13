@@ -11,9 +11,18 @@ final class BighelpTestApplication: XCUIApplication {
         if !launchArguments.contains("-loopdy.settings.nerd-mode") {
             launchArguments += ["-loopdy.settings.nerd-mode", "YES"]
         }
-        // Older flows start on the chat list; the agent-home tests opt back in.
-        if !launchArguments.contains("-loopdy.home.opens-chat") {
-            launchArguments += ["-loopdy.home.opens-chat", "NO"]
+        // The one home's settings are moved over from the old shell's once; tests start past that.
+        if !launchArguments.contains("-bighelp.home.migrated-v1") {
+            launchArguments += ["-bighelp.home.migrated-v1", "YES"]
+        }
+        // Tests start on the Chats list with the bar; a test pins its own place (bots, chats, today
+        // or work, with `-bighelp.home.view bots|chats` under today or work).
+        if !launchArguments.contains("-loopdy.home.landing") {
+            launchArguments += ["-loopdy.home.landing", "chats"]
+        }
+        // The computer in use only; tests of every computer at once opt in.
+        if !launchArguments.contains("-bighelp.hosts.all-hosts") {
+            launchArguments += ["-bighelp.hosts.all-hosts", "NO"]
         }
         // A bot profile's one-time swipe tutorial dims the page; tests of it opt back in.
         if !launchArguments.contains("-bighelp.dashboard.swipe-tutorial-seen") {
@@ -24,6 +33,19 @@ final class BighelpTestApplication: XCUIApplication {
             launchArguments += extra.split(separator: " ").map(String.init)
         }
         super.launch()
+    }
+}
+
+extension XCUIApplication {
+    /// The Bots view's primary bot, whichever bot it is: its row is `simple-bots.primary.<bot id>`.
+    var primaryBot: XCUIElement {
+        buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "simple-bots.primary.")).firstMatch
+    }
+
+    /// The primary bot's tile while the Bots view is being rearranged (not a button then).
+    var primaryBotTile: XCUIElement {
+        descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "simple-bots.primary."))
+            .firstMatch
     }
 }
 
@@ -44,36 +66,38 @@ class BighelpUITestCase: XCTestCase {
         return app
     }
 
-    /// Agents, Tasks and Settings left the iPhone bottom bar for ☰ (the chat
-    /// list's leading button, or the home chat's menu). Bar tabs still tap directly.
-    /// Who the chat is with: the big live avatar on iPhone, the name chip on
-    /// iPad and in group chats.
+    /// Who the chat is with: the pill in a chat's header (a bot's opens its page).
     @MainActor
     func chatIdentity(in app: XCUIApplication) -> XCUIElement {
-        app.buttons.matching(NSPredicate(format: "identifier IN %@", ["agent.hero.avatar", "chat.identity"])).firstMatch
+        app.buttons["chat.identity"].firstMatch
     }
 
-    /// The chat header's New chat button (the big-avatar header on iPhone,
-    /// the name-chip header on iPad).
+    /// The bar's New chat. Chats have no New chat of their own, so this leaves an open chat (its
+    /// Back) first; the bar shows again under it.
     @MainActor
     func chatNewChatButton(in app: XCUIApplication) -> XCUIElement {
-        app.buttons.matching(NSPredicate(format: "identifier IN %@", ["chat.home.new-chat", "chat.new-chat"])).firstMatch
+        let back = app.buttons["chat.back"].firstMatch
+        if back.exists, back.isHittable {
+            back.tap()
+            _ = back.waitForNonExistence(timeout: 5)
+        }
+        return app.buttons["home.new-chat"].firstMatch
     }
 
-    /// The big header's New chat asks who to chat with, with the current
-    /// agent already picked. Confirms it when it shows.
+    /// New chat opens with nobody picked: picks `botID`'s `new-chat.bot.<id>`, or the first bot listed.
     @MainActor
-    func confirmNewChatPicker(in app: XCUIApplication) {
-        let start = app.buttons["bot-mode.create.submit"].firstMatch
-        if start.waitForExistence(timeout: 3), start.isEnabled { start.tap() }
+    func confirmNewChatPicker(in app: XCUIApplication, botID: String? = nil) {
+        guard app.descendants(matching: .any)["new-chat.to"].firstMatch.waitForExistence(timeout: 5) else { return }
+        let bot = botID.map { app.buttons["new-chat.bot.\($0)"].firstMatch }
+            ?? app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "new-chat.bot.")).firstMatch
+        if bot.waitForExistence(timeout: 5), bot.isHittable { bot.tap() }
     }
 
-    /// The header's status line ("Updating…" while a chat reloads).
+    /// The header's status (the pill's value reads "Updating…" while a chat reloads).
     @MainActor
     func chatStatus(in app: XCUIApplication) -> XCUIElement {
-        app.buttons.matching(NSPredicate(format: "identifier IN %@", ["agent.hero.name", "chat.identity"])).firstMatch
+        app.buttons["chat.identity"].firstMatch
     }
-
     /// Chat Info (People & Chat): a group chat's members. One-agent chats have
     /// none; everything it held is in their ⋯ menu.
     @MainActor
@@ -109,7 +133,7 @@ class BighelpUITestCase: XCTestCase {
             groups = ["chat.options.more", "chat.options.usage"]
         case "chat.info", "chat.group-settings", "chat.rename", "chat.move-project", "chat.files":
             groups = ["chat.options.this-chat"]
-        case "chat.edit-current-agent", "chat.new-bot-chat", "chat.switch-agent": groups = ["chat.options.agent"]
+        case "chat.bot-page", "chat.new-bot-chat": groups = ["chat.options.agent"]
         case "chat.options.usage", "chat.options.advanced", "chat.file-changes": groups = ["chat.options.more"]
         case "chat.force-refresh", "chat.options.display": groups = ["chat.options.more", "chat.options.advanced"]
         case "chat.visibility.reasoning", "chat.visibility.tool-calls": groups = ["chat.options.more", "chat.options.advanced", "chat.options.display"]
@@ -138,8 +162,8 @@ class BighelpUITestCase: XCTestCase {
     func chatMenuElement(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         let titles: [String: [String]] = [
             "chat.info": ["Chat info"], "chat.group-settings": ["Group Settings"], "chat.rename": ["Rename…"], "chat.move-project": ["Move to Project…", "Move…"],
-            "chat.files": ["Files"], "chat.edit-current-agent": ["Edit agent"],
-            "chat.new-bot-chat": ["New Bot Chat"], "chat.switch-agent": ["Switch agent"], "chat.compact": ["Compact"],
+            "chat.files": ["Files"], "chat.bot-page": ["Bot page"],
+            "chat.new-bot-chat": ["New Bot Chat"], "chat.compact": ["Compact"],
             "chat.file-changes": ["File changes"], "chat.options.usage": ["Usage"], "chat.options.advanced": ["Advanced"],
             "chat.options.model-speed": ["Model & speed", "Model"], "chat.session-controls": ["Model settings", "Model"],
             "chat.fast-mode": ["Fast Mode"], "chat.fast-mode.on": ["On"], "chat.fast-mode.off": ["Off"],
@@ -162,13 +186,11 @@ class BighelpUITestCase: XCTestCase {
         return matches.firstMatch
     }
 
-    /// Leaves a pushed chat the way people do: a swipe from the leading edge.
-    /// Chats have ☰ in the top left, not Back.
+    /// Leaves a pushed chat by its Back (`chat.back`), top left in its header.
     @MainActor
     func swipeBackFromLeadingEdge(in app: XCUIApplication) {
-        let window = app.windows.firstMatch
-        let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: 2, dy: 0))
-        start.press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)))
+        let back = app.buttons["chat.back"].firstMatch
+        if back.waitForExistence(timeout: 5) { back.tap() }
     }
 
     /// ⋯ › Context window (Nerd Mode, a chat with context). Returns the pop-up.
@@ -182,47 +204,29 @@ class BighelpUITestCase: XCTestCase {
         return popover
     }
 
+    /// The old shell's tabs, through the one home's doors: `tab.sessions` is Chats and `tab.agents`
+    /// Bots (the first tab's switch), `tab.feed|ideas|goals` Today's panel on that board,
+    /// `tab.scheduled-tasks`, `tab.kanban`, `tab.workflows` and `tab.projects` Work's doors, and
+    /// `tab.profile` Settings (the circle). Anything else has no place now and fails.
     @MainActor
     func openRootTab(_ identifier: String, in app: XCUIApplication, timeout: TimeInterval = 20,
                      file: StaticString = #filePath, line: UInt = #line) {
-        let drawerRows = ["tab.agents": "menu.agents", "tab.scheduled-tasks": "menu.scheduled-tasks",
-                          "tab.profile": "menu.settings", "tab.apps": "menu.files"]
-        let sidebar = ["tab.sessions": "chats", "tab.agents": "agents",
-                       "tab.scheduled-tasks": "scheduledTasks", "tab.profile": "settings"]
-        let deadline = Date.now.addingTimeInterval(timeout)
-        repeat {
-            let direct = app.buttons[identifier].firstMatch
-            if direct.exists, direct.isHittable { direct.tap(); return }
-            if let id = sidebar[identifier], app.buttons["root.destination.\(id)"].firstMatch.isHittable {
-                app.buttons["root.destination.\(id)"].firstMatch.tap()
-                return
+        let doors = ["tab.scheduled-tasks": "schedules", "tab.kanban": "tasks",
+                     "tab.workflows": "workflows", "tab.projects": "projects"]
+        let boards = ["tab.feed": "feed", "tab.ideas": "ideas", "tab.goals": "goals"]
+        switch identifier {
+        case "tab.sessions", "tab.session-list": showChats(in: app, timeout: timeout, file: file, line: line)
+        case "tab.agents": showBots(in: app, timeout: timeout, file: file, line: line)
+        case "tab.profile": openSettings(in: app, file: file, line: line)
+        default:
+            if let door = doors[identifier] {
+                openWorkDoor(door, in: app, timeout: timeout, file: file, line: line)
+            } else if let board = boards[identifier] {
+                openTodayPanel(board, in: app, timeout: timeout, file: file, line: line)
+            } else {
+                XCTFail("\(identifier) has no place in the one home", file: file, line: line)
             }
-            if let row = drawerRows[identifier] {
-                let menu = [app.buttons["home.drawer.open"].firstMatch, app.buttons["chat.menu"].firstMatch]
-                    .first { $0.exists && $0.isHittable }
-                if let menu {
-                    menu.tap()
-                    let item = app.buttons[row].firstMatch
-                    let list = app.descendants(matching: .any)["navigation.menu"].firstMatch
-                    _ = list.waitForExistence(timeout: 10)
-                    // Hosts come first, so later rows can sit below the fold.
-                    for _ in 0..<6 where !(item.exists && item.isHittable) { list.swipeUp() }
-                    XCTAssertTrue(item.waitForExistence(timeout: 10), "Missing \(row)", file: file, line: line)
-                    item.tap()
-                    return
-                }
-                // Feed, Ideas, Goals and Apps have no ☰; Chat does.
-                let chat = app.buttons["tab.sessions"].firstMatch
-                // A pushed page (Activity, a task) has the system Back button.
-                let navigationBack = app.navigationBars.firstMatch.buttons.firstMatch
-                if chat.exists, chat.isHittable { chat.tap() }
-                else if navigationBack.exists, navigationBack.isHittable, navigationBack.frame.minX < 60 {
-                    navigationBack.tap()
-                }
-            }
-            usleep(300_000)
-        } while Date.now < deadline
-        XCTFail("Could not open \(identifier)", file: file, line: line)
+        }
     }
 
     @MainActor
@@ -262,10 +266,7 @@ final class ReferenceHubUITests: BighelpUITestCase {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", "dark"]
         app.launch()
-        let menu = app.buttons["home.drawer.open"]
-        XCTAssertTrue(menu.waitForExistence(timeout: 5))
-        menu.tap()
-        app.buttons["menu.new-chat"].tap()
+        startNewChat(with: "finance", in: app)
         let editor = app.textViews["chat.composer.text"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.tap()
@@ -327,11 +328,7 @@ final class ReferenceHubUITests: BighelpUITestCase {
             app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         }
         app.launch()
-        let menu = app.buttons["home.drawer.open"]
-        XCTAssertTrue(menu.waitForExistence(timeout: 5))
-        menu.tap()
-        XCTAssertFalse(app.buttons["quick-workspace.wiki"].exists)
-        app.buttons["menu.new-chat"].tap()
+        startNewChat(with: "finance", in: app)
         let editor = app.textViews["chat.composer.text"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.tap()

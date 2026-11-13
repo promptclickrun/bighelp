@@ -1,48 +1,23 @@
 import SwiftUI
 
-/// Hooks the shell gives a chat so it can draw the agent-home look: the
-/// big live avatar, the ☰ drawer, New chat, and the bottom bar under the composer.
+/// What the shell gives a chat it pushed: `onProfile` opens the bot's page, from the header's pill and
+/// from ⋯ › Bot page. A chat drawn outside the shell (a fixture, a test) has neither, and no New chat
+/// parts.
 struct AgentHomeChrome {
-    var isEnabled = false
-    /// Bots mode's chat header: Back, the bot (its profile) and options, no New chat.
-    var isSimpleBots = false
-    /// The tab bar under the message box. Every chat on one computer has it,
-    /// whether it's the Chat tab's own or opened from the list, Agents or Feed.
-    var showsTabBar = false
-    var onMenu: @MainActor () -> Void = {}
+    var isPushedChat = false
     var onProfile: @MainActor (String) -> Void = { _ in }
-    var onSwitchAgent: @MainActor () -> Void = {}
-    /// Opens the New chat picker (one agent, or several for a group).
-    var onNewChat: @MainActor (String?) -> Void = { _ in }
-    /// Starts a new chat with this agent right away.
-    var onStartChat: @MainActor (String) -> Void = { _ in }
-    var tabSelection: Binding<AppTab>?
-    /// Board tabs with something new, for the dots on the tab bar.
-    var unreadTabs: Set<AppTab> = []
-    /// The bar's tabs: Chat, then what's pinned (Appearance › App layout).
-    var barTabs: [AppTab] = AppTab.allCases
-    /// The Header mode switcher, on the Chat tab's own chat only (Settings › Modes).
-    var modeSwitch: BighelpModeSwitch?
 
-    /// New chat lives in the bar under the message box. A chat without that bar (Code mode, the
-    /// iPhone Duo's side strip, Vision Pro's tab ornament) keeps it in the header.
-    func barHoldsNewChat(screen: BighelpScreenGeometry) -> Bool {
-        showsTabBar && !screen.usesSideBar && !BighelpPlatform.usesTabOrnament
+    /// The chrome of every chat the shell pushes.
+    static func pushedChat(onProfile: @escaping @MainActor (String) -> Void) -> AgentHomeChrome {
+        AgentHomeChrome(isPushedChat: true, onProfile: onProfile)
     }
 }
 
-/// Equal when what it shows is the same. Its actions are the shell's own, the same every time
-/// (they read live state when tapped), and the tab selection is read live where it's used.
-/// Compared as a whole, every shell update redrew the chat on screen, its header and its
-/// message box, which made Chat mode's chats slower than Bots mode's.
+/// Equal when what it shows is the same. Its action is the shell's own, the same every time (it reads
+/// live state when tapped). Compared as a whole, every shell update redrew the chat on screen, its
+/// header and its message box.
 extension AgentHomeChrome: Equatable {
-    static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.isEnabled == rhs.isEnabled && lhs.isSimpleBots == rhs.isSimpleBots
-            && lhs.showsTabBar == rhs.showsTabBar && (lhs.tabSelection == nil) == (rhs.tabSelection == nil)
-            && lhs.unreadTabs == rhs.unreadTabs && lhs.barTabs == rhs.barTabs
-            && (lhs.modeSwitch == nil) == (rhs.modeSwitch == nil)
-            && lhs.modeSwitch?.modes == rhs.modeSwitch?.modes && lhs.modeSwitch?.current == rhs.modeSwitch?.current
-    }
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.isPushedChat == rhs.isPushedChat }
 }
 
 private struct AgentHomeChromeKey: EnvironmentKey {
@@ -56,81 +31,32 @@ extension EnvironmentValues {
     }
 }
 
-/// Every chat's header: ☰ on the left, the live avatar and name in the
-/// middle, chat options on the right (New chat too where there's no bar). ☰ is in the same place as
-/// on the other root screens; the edge swipe goes back to where the chat opened from.
-struct AgentHomeChatHeader: View {
-    let agentID: String
-    let displayName: String
-    let imageURL: URL?
-    let activity: AgentActivityKind
-    var status: String? = nil
-    /// The chat's title when Settings › Chat › Chat title is on.
-    var sessionTitle: String? = nil
-    /// Group chats show their own identity control instead of one agent.
-    let groupIdentity: AnyView?
+/// Every chat's header. Back goes to where the person came from, the middle says who the
+/// chat is with (a bot's pill opens its page) and ⋯ holds the chat's options. A new chat with
+/// nothing sent says "New chat" there, with its To row under the buttons across the whole lane.
+struct ChatPushedHeader: View {
+    /// The bot's pill, or a group chat's name.
+    let identity: AnyView
+    /// A new chat's To row (`ChatNewChatSlot.toRow`), which takes the identity's place.
+    var toRow: AnyView? = nil
     let options: AnyView
-    let chrome: AgentHomeChrome
-    /// Full screen height, for the Auto avatar size.
-    var screenHeight: CGFloat = 0
-    let beforeAction: () -> Void
-    @Environment(\.bighelpScreen) private var screen
+    let onBack: () -> Void
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @BighelpThemeReader private var theme
 
     var body: some View {
-        ZStack(alignment: .top) {
-            Group {
-                if let groupIdentity {
-                    groupIdentity
-                } else {
-                    VStack(spacing: 0) {
-                        Button {
-                            beforeAction()
-                            chrome.onProfile(agentID)
-                        } label: {
-                            ChatAgentIdentityPill(agentID: agentID, name: displayName, imageURL: imageURL,
-                                                  sessionTitle: sessionTitle)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(displayName)
-                        .accessibilityValue(status ?? activity.label)
-                        .accessibilityHint("Opens its profile")
-                        .accessibilityIdentifier("chat.identity")
-                    }
-                        .padding(.horizontal, (HeaderButtonMetrics.glass + 2 * HeaderButtonMetrics.slop)
-                                 * (chrome.barHoldsNewChat(screen: screen) ? 1 : 2))
-                        .padding(.top, HeaderButtonMetrics.slop)
-                        .accessibilityElement(children: .contain)
-                        .accessibilityIdentifier("chat.header-surface")
+        VStack(spacing: 0) {
+            ZStack(alignment: .top) {
+                Group {
+                    if toRow == nil { identity } else { newChatTitle }
                 }
-            }
-            .frame(maxWidth: .infinity)
-            // The mode pill takes the top row's middle, so the agent steps down below it.
-            .padding(.top, chrome.modeSwitch == nil ? 0 : HeaderButtonMetrics.glass + HeaderButtonMetrics.slop)
-            HStack(alignment: .top) {
-                Button {
-                    beforeAction()
-                    chrome.onMenu()
-                } label: {
-                    Image(systemName: "line.3.horizontal")
-                        .font(.bighelp(.title3).weight(.semibold))
-                        // On the glyph, where the top bar's ☰ shows it.
-                        .bighelpMenuDot(!chrome.unreadTabs.subtracting(chrome.barTabs).isEmpty)
-                        .frame(width: HeaderButtonMetrics.glass, height: HeaderButtonMetrics.glass)
-                        .bighelpNavigationGlass(in: Circle(), isInteractive: true)
-                        .padding(HeaderButtonMetrics.slop)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Chats and menu")
-                .accessibilityIdentifier("chat.menu")
-                Spacer(minLength: 0)
-                if let modeSwitch = chrome.modeSwitch {
-                    BighelpModePill(modeSwitch: modeSwitch)
-                        .padding(.top, HeaderButtonMetrics.slop)
+                // Clear of Back and ⋯ at every text size: the pill's name truncates instead.
+                .padding(.horizontal, HeaderButtonMetrics.glass + 2 * HeaderButtonMetrics.slop)
+                .padding(.top, HeaderButtonMetrics.slop)
+                .frame(maxWidth: .infinity)
+                HStack(alignment: .top) {
+                    backButton
                     Spacer(minLength: 0)
-                }
-                HStack(spacing: 0) {
-                    if !chrome.barHoldsNewChat(screen: screen) { newChatButton }
                     options
                         .frame(width: HeaderButtonMetrics.glass, height: HeaderButtonMetrics.glass)
                         .bighelpNavigationGlass(in: Circle(), isInteractive: true)
@@ -138,11 +64,45 @@ struct AgentHomeChatHeader: View {
                         .contentShape(.rect)
                 }
             }
+            // Only the buttons' row: Back sits where a root screen's top bar puts its first button.
+            .bighelpHeaderButtonsPlacement()
+            if let toRow {
+                // It scrolls sideways inside its own bounds, so large text never pushes the buttons.
+                toRow
+                    .frame(maxWidth: horizontalSizeClass == .regular ? ChatCanvasLayout.regularLaneMaximumWidth : .infinity)
+                    .frame(maxWidth: .infinity)
+            }
         }
+    }
+
+    private var backButton: some View {
+        Button(action: onBack) {
+            Image(systemName: "chevron.left")
+                .font(.bighelp(.title3).weight(.semibold))
+                .foregroundStyle(theme.primaryText)
+                .frame(width: HeaderButtonMetrics.glass, height: HeaderButtonMetrics.glass)
+                .bighelpNavigationGlass(in: Circle(), isInteractive: true)
+                .padding(HeaderButtonMetrics.slop)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Back")
+        .accessibilityIdentifier("chat.back")
+    }
+
+    private var newChatTitle: some View {
+        Text("New chat")
+            .font(.bighelp(.title3, weight: .semibold))
+            .foregroundStyle(theme.primaryText)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(minHeight: HeaderButtonMetrics.glass)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityIdentifier("new-chat.title")
     }
 }
 
-/// Chat and Bots share the same bounded glass identity surface.
+/// The bot a chat is with: its face and name in one bounded glass pill.
 struct ChatAgentIdentityPill: View {
     let agentID: String
     let name: String
@@ -178,117 +138,32 @@ struct ChatAgentIdentityPill: View {
     }
 }
 
-extension AgentHomeChatHeader {
-    /// Tap: a new chat with this agent. Touch and hold: the picker, for another
-    /// agent or a group. A group chat has no one agent, so a tap opens the picker.
-    var newChatButton: some View {
-        let isDirect = groupIdentity == nil
-        let pickAgents = {
-            beforeAction()
-            chrome.onNewChat(isDirect ? agentID : nil)
-        }
-        return Image(systemName: "square.and.pencil")
-            .font(.bighelp(.title3).weight(.semibold))
-            .frame(width: HeaderButtonMetrics.glass, height: HeaderButtonMetrics.glass)
-            .bighelpNavigationGlass(in: Circle(), isInteractive: true)
-            .padding(HeaderButtonMetrics.slop)
-            .contentShape(.rect)
-            .onTapGesture {
-                guard isDirect else { return pickAgents() }
-                beforeAction()
-                chrome.onStartChat(agentID)
-            }
-            .onLongPressGesture(minimumDuration: 0.4) {
-                BighelpHaptics.tap()
-                pickAgents()
-            }
-            .newChatRightClickMenu(startTitle: isDirect ? "New chat with \(displayName)" : nil,
-                                   start: { beforeAction(); chrome.onStartChat(agentID) }, pick: pickAgents)
-            .accessibilityElement()
-            .accessibilityAddTraits(.isButton)
-            .accessibilityLabel(isDirect ? "New chat with \(displayName)" : "New chat")
-            .accessibilityHint(isDirect
-                ? NewChatButtonCopy.pickHint
-                : "Pick one agent for a chat, or several for a group chat.")
-            .accessibilityAction {
-                if isDirect { beforeAction(); chrome.onStartChat(agentID) } else { pickAgents() }
-            }
-            .accessibilityAction(named: "Pick agents") { pickAgents() }
-            .accessibilityIdentifier("chat.home.new-chat")
-    }
-}
-
-/// Feed, Ideas, Goals and Apps: the Chat tab's ☰, New chat and ⋯, floating
-/// over the board so they stay in reach while it scrolls.
+/// A board opened in a sheet (a bot's Dashboard › See all): Back and New chat, floating over the
+/// board so they stay in reach while it scrolls.
 struct AgentBoardHeaderButtons: View {
-    let context: AgentBoardContext
+    let agentName: String
+    let onBack: () -> Void
+    let onNewChat: () -> Void
 
     var body: some View {
         HStack(alignment: .top) {
-            if let onBack = context.onBack {
-                Button(action: onBack) { glyph("chevron.left") }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Back")
-                    .accessibilityIdentifier("board.back")
-            } else {
-                Button(action: context.onMenu) { glyph("line.3.horizontal", dot: context.menuHasUnread) }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Chats and menu")
-                    .accessibilityIdentifier("home.drawer.open")
-            }
+            Button(action: onBack) { glyph("chevron.left") }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
+                .accessibilityIdentifier("board.back")
             Spacer()
-            HStack(spacing: 0) {
-                // A board opened with Back has no bar, so it keeps New chat up here.
-                if context.onBack != nil { newChatButton }
-                Menu {
-                    Button("Agent profile", systemImage: "person.crop.circle", action: context.onProfile)
-                    Divider()
-                    ForEach(Array(context.tools.enumerated()), id: \.offset) { _, tool in
-                        Button(tool.title, systemImage: tool.systemImage, action: tool.action)
-                    }
-                } label: {
-                    // Glass goes around the menu, not in its label, or it takes the tap.
-                    Image(systemName: "ellipsis")
-                        .font(.bighelp(.title3).weight(.semibold))
-                        .foregroundStyle(theme.primaryText)
-                        .frame(width: HeaderButtonMetrics.glass, height: HeaderButtonMetrics.glass)
-                        .contentShape(.rect)
-                }
-                .frame(width: HeaderButtonMetrics.glass, height: HeaderButtonMetrics.glass)
-                .bighelpNavigationGlass(in: Circle(), isInteractive: true)
-                .padding(HeaderButtonMetrics.slop)
-                .contentShape(.rect)
-                .accessibilityLabel("More for \(context.agentName)")
-                .accessibilityIdentifier("board.more")
-            }
+            Button(action: onNewChat) { glyph("square.and.pencil") }
+                .buttonStyle(.plain)
+                .accessibilityLabel("New chat with \(agentName)")
+                .accessibilityIdentifier("board.new-chat")
         }
         .bighelpHeaderButtonsPlacement()
     }
 
-    /// Tap: a new chat with this agent. Touch and hold: the picker, for another agent or a group.
-    private var newChatButton: some View {
-        glyph("square.and.pencil")
-            .onTapGesture(perform: context.onNewChat)
-            .onLongPressGesture(minimumDuration: 0.4) {
-                BighelpHaptics.tap()
-                context.onPickAgents()
-            }
-            .newChatRightClickMenu(startTitle: "New chat with \(context.agentName)",
-                                   start: context.onNewChat, pick: context.onPickAgents)
-            .accessibilityElement()
-            .accessibilityAddTraits(.isButton)
-            .accessibilityLabel("New chat with \(context.agentName)")
-            .accessibilityHint(NewChatButtonCopy.pickHint)
-            .accessibilityAction { context.onNewChat() }
-            .accessibilityAction(named: "Pick agents") { context.onPickAgents() }
-            .accessibilityIdentifier("board.new-chat")
-    }
-
-    private func glyph(_ systemImage: String, dot: Bool = false) -> some View {
+    private func glyph(_ systemImage: String) -> some View {
         Image(systemName: systemImage)
             .font(.bighelp(.title3).weight(.semibold))
             .foregroundStyle(theme.primaryText)
-            .bighelpMenuDot(dot)
             .frame(width: HeaderButtonMetrics.glass, height: HeaderButtonMetrics.glass)
             .bighelpNavigationGlass(in: Circle(), isInteractive: true)
             .padding(HeaderButtonMetrics.slop)
@@ -312,9 +187,9 @@ enum HeaderButtonMetrics {
     static let slop: CGFloat = 5
     #endif
 
-    /// From the screen's side to the first glass button: where the top bar puts ☰ on
-    /// Agents and the other root screens, so ☰ never moves between them and Chat, Feed,
-    /// Ideas, Goals and Files. Measured on iOS 26: 16 points on iPhone, 10 on iPad.
+    /// From the screen's side to the first glass button: where a top bar puts its first button, so
+    /// Back and the home's header buttons sit in one place on every screen. Measured on iOS 26:
+    /// 16 points on iPhone, 10 on iPad.
     static func edgeInset(regularWidth: Bool) -> CGFloat {
         if BighelpPlatform.usesTabOrnament { return 22 }
         if BighelpPlatform.isMac { return 12 }
@@ -345,29 +220,5 @@ private struct HeaderButtonsPlacement: ViewModifier {
             .padding(.horizontal, HeaderButtonMetrics.edgeInset(regularWidth: horizontalSizeClass == .regular)
                      - HeaderButtonMetrics.slop)
             .padding(.top, HeaderButtonMetrics.topInset - HeaderButtonMetrics.slop)
-    }
-}
-
-enum NewChatButtonCopy {
-    static var pickHint: String {
-        BighelpPlatform.isMac
-            ? "Right-click to pick other agents or start a group."
-            : "Touch and hold to pick other agents or start a group."
-    }
-}
-
-extension View {
-    /// The Mac has no touch and hold: right-click offers the same choices.
-    @ViewBuilder
-    func newChatRightClickMenu(startTitle: String?, start: @escaping () -> Void,
-                               pick: @escaping () -> Void) -> some View {
-        #if targetEnvironment(macCatalyst)
-        contextMenu {
-            if let startTitle { Button(startTitle, systemImage: "square.and.pencil", action: start) }
-            Button("Pick Agents or Start a Group…", systemImage: "person.2", action: pick)
-        }
-        #else
-        self
-        #endif
     }
 }

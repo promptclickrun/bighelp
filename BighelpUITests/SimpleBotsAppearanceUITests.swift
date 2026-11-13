@@ -1,16 +1,16 @@
 import XCTest
 
-/// Bots mode on demo data, switching Light and Dark the way people do: in Settings, with a
-/// page open. The open page, its name field and the home behind it change at once. Back from a
-/// bot's chat never shows ☰. Set BIGHELP_SIMPLE_BOTS_EVIDENCE (TEST_RUNNER_…) to a folder to save
-/// the screenshots.
+/// The Bots view on demo data, switching Light and Dark the way people do: in Settings, with a
+/// page open. The open page, its name field and the home behind it change at once. Settings is a
+/// sheet, so its pages go back with the sheet's own Back button. Set BIGHELP_SIMPLE_BOTS_EVIDENCE
+/// (TEST_RUNNER_…) to a folder to save the screenshots.
 final class SimpleBotsAppearanceUITests: BighelpUITestCase {
-    /// Bots mode's Settings is the one Settings: its Chat row opens Settings › Chat.
+    /// The circle on Bots opens Settings: its Chat row opens Settings › Chat.
     @MainActor
     func testSettingsOpensChatDirectly() throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-bighelp.settings.simple-bots", "YES"]
+                               "-loopdy.home.landing", "bots"]
         app.launch()
         XCTAssertTrue(app.buttons["simple-bots.settings"].waitForExistence(timeout: 15))
         app.buttons["simple-bots.settings"].tap()
@@ -29,21 +29,17 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
         let app = makeApp()
         // The appearance isn't pinned here, so Settings can change it.
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-bighelp.settings.simple-bots", "YES"]
+                               "-loopdy.home.landing", "bots"]
         app.launch()
         defer { setAppearance("System", in: app) }
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
         setAppearance("Light", in: app)
         XCTAssertGreaterThan(brightness(of: app.windows.firstMatch, in: app), 0.8, "Light: a light home")
 
-        // Back from a bot's chat: the home's own header, never ☰ on the way.
+        // Back from a bot's chat: the home's own header.
         app.buttons["simple-bots.bot.travel"].tap()
         XCTAssertTrue(app.buttons["chat.back"].waitForExistence(timeout: 10))
         app.buttons["chat.back"].tap()
-        for _ in 0..<10 {
-            XCTAssertFalse(app.buttons["home.drawer.open"].exists, "☰ showed while going back")
-            Thread.sleep(forTimeInterval: 0.08)
-        }
         XCTAssertTrue(app.buttons["simple-bots.settings"].waitForExistence(timeout: 5))
 
         // Dark from Settings › Appearance: the open page changes now, not after reopening it.
@@ -57,7 +53,7 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
         XCTAssertLessThan(brightness(of: app.windows.firstMatch, in: app), 0.25, "The open page turned dark")
 
         // Your name: a dark box with light text, readable.
-        app.navigationBars.buttons.firstMatch.tap()
+        app.buttons["BackButton"].firstMatch.tap()
         app.buttons["settings.you"].tap()
         let name = app.textFields["profile.display-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))
@@ -65,20 +61,20 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
         XCTAssertLessThan(brightness(of: name, in: app, edge: true), 0.35, "The name box is dark")
 
         // The home behind the sheet changed too.
-        app.navigationBars.buttons.firstMatch.tap()
+        app.buttons["BackButton"].firstMatch.tap()
         app.buttons["settings.done"].tap()
         XCTAssertTrue(app.buttons["simple-bots.settings"].waitForExistence(timeout: 5))
         save("appearance-home-dark", app)
         XCTAssertLessThan(brightness(of: app.windows.firstMatch, in: app), 0.25, "The home turned dark")
     }
 
-    /// The dark page picked in Appearance (Graphite or Black) is Bots mode's page too, and the
+    /// The dark page picked in Appearance (Graphite or Black) is the Bots view's page too, and the
     /// home, Settings and a bot's chat change as soon as it's picked (#718).
     @MainActor
-    func testDarkBackgroundChoiceRepaintsBotsMode() throws {
+    func testDarkBackgroundChoiceRepaintsBots() throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", "dark",
+                               "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", "dark",
                                "-loopdy.appearance.darkBackground", "black"]
         app.launch()
         let home = app.descendants(matching: .any)["simple-bots.home"]
@@ -102,7 +98,7 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
     func testLightHomeKeepsItsPage() throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", "light",
+                               "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", "light",
                                "-loopdy.appearance.darkBackground", "graphite"]
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
@@ -110,7 +106,7 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
         save("light-home", app)
     }
 
-    /// Picks a dark page in Bots mode's Settings › Appearance and goes back to the home.
+    /// Picks a dark page in Settings › Appearance and goes back to the home.
     @MainActor
     private func pickDarkBackground(_ choice: String, in app: XCUIApplication) {
         app.buttons["simple-bots.settings"].tap()
@@ -118,13 +114,13 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
         let tile = app.buttons["appearance.dark.\(choice)"]
         XCTAssertTrue(tile.waitForExistence(timeout: 5))
         tile.tap()
-        app.navigationBars.buttons.firstMatch.tap()
+        app.buttons["BackButton"].firstMatch.tap()
         app.buttons["settings.done"].tap()
         XCTAssertTrue(app.buttons["simple-bots.settings"].waitForExistence(timeout: 5))
         Thread.sleep(forTimeInterval: 0.6)
     }
 
-    /// The home, Bots mode's Settings and a bot's chat, for the evidence folder.
+    /// The home, Settings and a bot's chat, for the evidence folder.
     @MainActor
     private func saveScreens(_ suffix: String, _ app: XCUIApplication) {
         save("home-\(suffix)", app)
@@ -142,13 +138,13 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
         XCTAssertTrue(app.buttons["simple-bots.settings"].waitForExistence(timeout: 5))
     }
 
-    /// Your name in Bots mode's Settings: a box that reads in light and in dark.
+    /// Your name in Settings, opened from Bots: a box that reads in light and in dark.
     @MainActor
     func testNameRowReadsInBothModes() throws {
         for (appearance, isDark) in [("light", false), ("dark", true)] {
             let app = makeApp()
             app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                                   "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", appearance]
+                                   "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", appearance]
             app.launch()
             XCTAssertTrue(app.buttons["simple-bots.settings"].waitForExistence(timeout: 15))
             app.buttons["simple-bots.settings"].tap()
@@ -171,7 +167,7 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
         let mode = app.buttons["appearance.mode.\(title.lowercased())"]
         guard mode.waitForExistence(timeout: 5) else { return }
         mode.tap()
-        app.navigationBars.buttons.firstMatch.tap()
+        app.buttons["BackButton"].firstMatch.tap()
         app.buttons["settings.done"].tap()
         _ = app.buttons["simple-bots.settings"].waitForExistence(timeout: 5)
     }

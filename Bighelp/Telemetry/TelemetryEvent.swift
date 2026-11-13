@@ -13,6 +13,7 @@ enum TelemetryFeature: String, CaseIterable, Codable, Sendable {
     case voiceTurn = "voice_turn"
     case voiceLive = "voice_live"
     case workflowRun = "workflow_run"
+    /// Not sent any more (the app has one home); the contract still lists it.
     case modeSwitched = "mode_switched"
     case agentOpened = "agent_opened"
     case fileOpened = "file_opened"

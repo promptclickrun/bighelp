@@ -1,7 +1,7 @@
 import XCTest
 
-/// The brand kit's Noodle: its motions in the loader gallery, the chat's one-loader rule,
-/// the wordmark in the header and the first run's reveal. Set `BIGHELP_NOODLE_EVIDENCE`
+/// The brand kit's Noodle: its motions in the loader gallery, the chat's one-loader rule
+/// and the first run's reveal. Set `BIGHELP_NOODLE_EVIDENCE`
 /// (as TEST_RUNNER_…) to a folder to keep screenshots; `BIGHELP_NOODLE_APPEARANCE` picks
 /// light or dark (dark by default).
 final class NoodleUITests: BighelpUITestCase {
@@ -24,15 +24,7 @@ final class NoodleUITests: BighelpUITestCase {
     }
 
     @MainActor
-    func testHeaderShowsTheWordmarkAndTheFirstRunWritesTheMark() throws {
-        let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance]
-        app.launch()
-        XCTAssertTrue(app.buttons["brand.host-switcher"].waitForExistence(timeout: 15)
-                      || app.otherElements["brand.host-switcher"].exists)
-        save("noodle-header", app)
-        app.terminate()
-
+    func testTheFirstRunWritesTheMark() throws {
         let fresh = makeApp()
         fresh.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-no-configured-hosts",
                                  "-force-signed-out-onboarding", "-loopdy.demo.appearance", appearance]

@@ -24,7 +24,7 @@ struct DevFactoryRecipeSetup: Equatable {
     }
 }
 
-/// Dev Factory (☰ › Dev Factory in Code mode) for one computer: its coding recipes,
+/// Dev Factory (a project's ⋯ on Work) for one computer: its coding recipes,
 /// their runs grouped by start (one run per project), and the templates new recipes
 /// come from. It's Workflows underneath (`native-workflows-code-v1`): the same client,
 /// runs and sign-offs.

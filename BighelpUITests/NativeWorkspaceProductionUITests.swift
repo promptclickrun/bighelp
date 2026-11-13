@@ -13,7 +13,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         continueAfterFailure = true
         let app = XCUIApplication()
         app.launchArguments = []; app.launchEnvironment = [:]; app.launch()
-        XCTAssertTrue(app.buttons["tab.sessions"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 20))
         exerciseImageAfterFirstMessage(app)
     }
 
@@ -29,7 +29,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
                 try? app.debugDescription.write(toFile: evidence + "/\(name).txt", atomically: true, encoding: .utf8)
             }
         }
-        app.buttons["root.new-chat"].firstMatch.tap()
+        startFreshChat(app)
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 20))
         composer.tap(); composer.typeText("Hi")
@@ -107,8 +107,10 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             let deadline = Date().addingTimeInterval(30)
             while Date() < deadline, (try? String(contentsOfFile: signal, encoding: .utf8)) != "done" { sleep(1) }
         }
-        app.buttons["Back"].firstMatch.tap()
+        // Back, then the computer's Sessions page (Chats › This computer), newest first.
+        goBackFromChat(in: app)
         sleep(2)
+        openThisComputerSessions(in: app)
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "session.row.")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         row.tap()
@@ -127,7 +129,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
     /// screen offers turn-based voice, which opens the listening screen.
     @MainActor
     private func exerciseVoiceFallback(_ app: XCUIApplication) {
-        app.buttons["root.new-chat"].firstMatch.tap()
+        startFreshChat(app)
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 20))
         app.buttons["chat.voice"].firstMatch.tap()
         let unavailable = app.buttons["voice.live-unavailable.use-turn-based"]
@@ -158,12 +160,19 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         }
         sleep(8)
         record("start")
-        for tab in ["feed", "goals", "apps"] {
-            openRootTab("tab.\(tab)", in: app)
-            sleep(tab == "apps" ? 8 : 4)
-            record(tab)
+        for kind in ["feed", "goals"] {
+            openOwnBoard(kind, in: app)
+            sleep(4)
+            record(kind)
         }
-        let media = app.buttons["Media"].firstMatch
+        // The bot's own Files and Media, on its page.
+        returnToHome(in: app)
+        openBot("default", in: app)
+        openBotPage(fromChatIn: app)
+        app.buttons["simple-bots.profile.tab.files"].firstMatch.tap()
+        sleep(8)
+        record("files")
+        let media = app.buttons["simple-bots.profile.tab.media"].firstMatch
         if media.exists {
             media.tap(); sleep(10); record("media")
             let first = app.buttons["board.media.item"].firstMatch
@@ -182,10 +191,10 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
                 try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: evidence + "/\(name).png"))
             }
         }
-        // Signing in lands in the agent's home chat; Chat reopens it from the list.
-        let avatar = app.buttons["agent.hero.avatar"]
-        if !avatar.waitForExistence(timeout: 15) { openRootTab("tab.sessions", in: app) }
-        XCTAssertTrue(avatar.waitForExistence(timeout: 20), "The Chat tab opens the agent's home chat with its live avatar.")
+        // The default bot's chat, from Bots: its header pill says what it's doing.
+        openBot("default", in: app)
+        let avatar = app.buttons["chat.identity"].firstMatch
+        XCTAssertTrue(avatar.waitForExistence(timeout: 20), "The bot's chat opens with the bot in its header.")
         record("home-chat")
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 20))
@@ -250,22 +259,23 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             XCTAssertTrue(reacted, "The agent's reaction must show on my message.")
         }
 
-        avatar.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["agent.profile"].waitForExistence(timeout: 10))
+        // The bot's page: its Dashboard (recorded activity), then Info.
+        openBotPage(fromChatIn: app)
         sleep(3)
         record("profile-activity")
-        app.buttons["agent.profile.tab.identity"].tap()
+        app.buttons["simple-bots.profile.tab.info"].tap()
         sleep(2)
         record("profile-identity")
-        app.buttons["agent.profile.close"].tap()
+        app.buttons["simple-bots.profile.back"].tap()
 
-        for (tab, screen) in [("feed", "board.feed.empty"), ("goals", "board.goals.empty")] {
-            openRootTab("tab.\(tab)", in: app)
+        for (kind, screen) in [("feed", "board.feed.empty"), ("goals", "board.goals.tracking.empty")] {
+            openOwnBoard(kind, in: app)
             XCTAssertTrue(app.descendants(matching: .any)[screen].firstMatch.waitForExistence(timeout: 15), screen)
             XCTAssertFalse(app.descendants(matching: .any)["board.plugin-required"].exists, "The host advertises the board.")
-            record(tab)
+            record(kind)
         }
-        openRootTab("tab.sessions", in: app)
+        returnToHome(in: app)
+        showChats(in: app)
         record("chat-list")
 
         // Settings › Models (the providers and each bot's default model) loads from this host.
@@ -283,8 +293,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             record("settings-\(name)")
             XCTAssertFalse(app.descendants(matching: .any).matching(invalid).firstMatch.exists,
                            "\(name) must load from this host")
-            let back = app.navigationBars.buttons.firstMatch
-            if back.exists { back.tap() }
+            leaveSettings(in: app)
         }
     }
 
@@ -313,7 +322,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         let identity = chatStatus(in: app)
         for round in 1...Int(environment["BIGHELP_TURN_BACKGROUND_ROUNDS"] ?? "1")! {
             if round == 1 {
-                app.buttons["root.new-chat"].firstMatch.tap()
+                startFreshChat(app)
             }
             let composer = app.textViews["chat.composer.text"]
             XCTAssertTrue(composer.waitForExistence(timeout: 20))
@@ -399,7 +408,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             return found
         }
         func startChat(_ text: String) {
-            app.buttons["root.new-chat"].firstMatch.tap()
+            startFreshChat(app)
             let composer = app.textViews["chat.composer.text"]
             XCTAssertTrue(composer.waitForExistence(timeout: 20))
             composer.tap(); composer.typeText(text)
@@ -409,9 +418,11 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             XCTAssertTrue(reply.waitForExistence(timeout: 60), "First turn must complete.")
             sleep(2)
         }
+        /// Back to the computer's Sessions page (Chats › This computer), where the rows are.
         func back() {
-            app.buttons["Back"].firstMatch.tap()
+            goBackFromChat(in: app)
             sleep(2)
+            if !app.descendants(matching: .any)["sessions.screen"].firstMatch.exists { openThisComputerSessions(in: app) }
         }
         let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "session.row."))
         func open(_ row: XCUIElement, _ step: String) {
@@ -516,7 +527,8 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         continueAfterFailure = true
         let app = XCUIApplication()
         app.launchArguments = []; app.launchEnvironment = [:]; app.launch()
-        XCTAssertTrue(app.buttons["tab.sessions"].waitForExistence(timeout: 20), "The saved host must open the tab bar.")
+        XCTAssertTrue(app.buttons["home.tab.conversations"].firstMatch.waitForExistence(timeout: 20),
+                      "The saved host must open the tab bar.")
         func alive(_ step: String) {
             sleep(2)
             XCTAssertEqual(app.state, .runningForeground, "App must survive: \(step)")
@@ -529,24 +541,30 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             if discard.waitForExistence(timeout: 1) { discard.tap() }
             sleep(1)
         }
-        for tab in ["tab.sessions", "tab.feed", "tab.ideas", "tab.goals", "tab.apps",
-                    "tab.agents", "tab.scheduled-tasks", "tab.profile"] {
-            openRootTab(tab, in: app)
-            alive(tab)
+        // Every root, then every door from them.
+        for (door, name) in [("home.switch.bots", "bots"), ("home.switch.chats", "chats"),
+                             ("home.tab.today", "today"), ("home.tab.work", "work")] {
+            if name == "bots" || name == "chats" { app.buttons["home.tab.conversations"].firstMatch.tap() }
+            app.buttons[door].firstMatch.tap()
+            alive(name)
         }
-        // The agent home's sheets: switcher from Feed, ☰ from Chat.
-        openRootTab("tab.feed", in: app)
-        if app.buttons["agent.hero.name"].waitForExistence(timeout: 5) {
-            app.buttons["agent.hero.name"].tap(); alive("agent-switcher")
-            app.buttons["Done"].firstMatch.tap()
+        for kind in ["feed", "ideas", "goals"] {
+            // See all shows once a board has something on it.
+            openTodayBoard(kind, in: app)
+            alive("today-\(kind)")
+            returnToHome(in: app)
         }
-        openRootTab("tab.sessions", in: app)
-        let menu = [app.buttons["chat.menu"], app.buttons["home.drawer.open"]].first { $0.waitForExistence(timeout: 5) }
-        if let menu {
-            menu.tap(); alive("home-drawer")
-            app.buttons["menu.done"].tap()
+        for door in ["projects", "tasks", "workflows", "schedules"] {
+            app.buttons["home.tab.work"].firstMatch.tap()
+            // Each door shows only where the computer has it.
+            let button = app.buttons["work.door.\(door)"].firstMatch
+            for _ in 0..<4 where !button.waitForExistence(timeout: 1) { app.swipeUp() }
+            guard button.exists else { continue }
+            openWorkDoor(door, in: app)
+            alive("work-\(door)")
+            returnToHome(in: app)
         }
-        openRootTab("tab.profile", in: app)
+        openSettings(in: app)
         let nerd = app.switches["settings.nerd-mode"]
         for _ in 0..<6 where !nerd.isHittable { app.swipeUp() }
         if nerd.isHittable {
@@ -565,16 +583,26 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         if colors.exists && colors.isHittable {
             colors.tap(); alive("appearance")
         }
-        openRootTab("tab.agents", in: app)
-        if app.buttons["agents.create"].waitForExistence(timeout: 5), app.buttons["agents.create"].isEnabled {
-            app.buttons["agents.create"].tap(); alive("agent-studio"); dismiss()
+        leaveSettings(in: app)
+        // Bots' + › New Bot.
+        showBots(in: app)
+        let add = app.buttons["simple-bots.new"].firstMatch
+        if add.waitForExistence(timeout: 5) {
+            add.tap()
+            let newBot = app.buttons["New Bot"].firstMatch
+            if newBot.waitForExistence(timeout: 5) {
+                newBot.tap(); alive("new-bot")
+                let close = app.buttons["simple-bots.create.close"].firstMatch
+                if close.waitForExistence(timeout: 5) { close.tap() }
+            }
         }
-        openRootTab("tab.scheduled-tasks", in: app)
+        openWorkDoor("schedules", in: app)
         if app.buttons["scheduled-tasks.create"].waitForExistence(timeout: 5), app.buttons["scheduled-tasks.create"].isEnabled {
             app.buttons["scheduled-tasks.create"].tap(); alive("task-editor"); dismiss()
         }
-        app.buttons["tab.sessions"].tap()
-        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "session.row.")).firstMatch
+        returnToHome(in: app)
+        showChats(in: app)
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "chats.row.")).firstMatch
         if row.waitForExistence(timeout: 5) {
             row.tap(); alive("chat")
             if openChatInfo(in: app) { alive("chat-info") }
@@ -627,8 +655,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             try? app.debugDescription.write(to: URL(fileURLWithPath: directory).appendingPathComponent("real-model-picker-tree.txt"), atomically: true, encoding: .utf8)
             capture("real-model-picker", app)
         }
-        XCTAssertTrue(app.buttons["root.new-chat"].waitForExistence(timeout: 20))
-        app.buttons["root.new-chat"].tap()
+        startFreshChat(app)
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 10)); composer.tap()
         let controls = app.buttons["chat.composer.model"].firstMatch
@@ -677,9 +704,10 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = []; app.launchEnvironment = [:]; app.launch()
-        XCTAssertTrue(app.buttons["root.new-chat"].waitForExistence(timeout: 20))
+        let newChat = app.buttons["home.new-chat"].firstMatch
+        XCTAssertTrue(newChat.waitForExistence(timeout: 20))
         let started = Date()
-        app.buttons["root.new-chat"].tap()
+        newChat.tap()
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 2), "New Chat must present a canvas immediately.")
         let timing = ["automationTapToComposerSeconds": Date().timeIntervalSince(started)]
@@ -687,6 +715,8 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         XCTAssertFalse(app.staticTexts["Opening new chat"].exists)
         XCTAssertFalse(app.otherElements["new-chat.opening"].exists)
         capture("real-host-fresh-canvas-2101", app)
+        // New chat opens with nobody picked: the first bot listed takes it.
+        pickFirstBot(app)
         composer.tap()
         composer.typeText("Reply with exactly UI2101 OK. Do not call tools or delegate.")
         let send = app.buttons["chat.send"]
@@ -718,9 +748,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = []; app.launchEnvironment = [:]; app.launch()
-        openRootTab("tab.agents", in: app, timeout: 20)
-        XCTAssertTrue(app.buttons["agents.groups.create"].waitForExistence(timeout: 20))
-        app.buttons["agents.groups.create"].tap()
+        openNewGroupChat(app)
         let name = app.textFields["bot-mode.create.title"]
         XCTAssertTrue(name.waitForExistence(timeout: 10))
         name.tap(); name.typeText("bighelp verification 117")
@@ -749,7 +777,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         XCTAssertTrue(sentTree.contains("Juno NEWGROUP117 OK"))
         XCTAssertTrue(sentTree.contains("Nova NEWGROUP117 OK"))
         app.terminate(); app.launch()
-        openRootTab("tab.agents", in: app, timeout: 20)
+        showBots(in: app)
         let group = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "bighelp verification 117")).firstMatch
         XCTAssertTrue(group.waitForExistence(timeout: 20)); group.tap()
         XCTAssertTrue(composer.waitForExistence(timeout: 20))
@@ -834,14 +862,11 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = []; app.launchEnvironment = [:]; app.launch()
-        XCTAssertTrue(app.buttons["root.new-chat"].waitForExistence(timeout: 20))
-        app.buttons["root.new-chat"].tap()
-        XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 15))
-        openChatWorkspaceMenu(in: app)
-        app.buttons["menu.settings"].tap()
-        app.buttons["settings.apps"].tap()
+        // Settings › Apps & skills › Device access, from the home's circle.
+        XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 20))
+        openSettings(in: app)
+        settingsRow("settings.apps", in: app).tap()
         app.buttons["settings.connections.device-access"].tap()
-        app.buttons["permissions.open.calendar"].firstMatch.tap()
         let toggle = app.switches["permissions.device-tools.calendar"].firstMatch
         XCTAssertTrue(toggle.waitForExistence(timeout: 10))
         if toggle.value as? String != "1" {
@@ -850,10 +875,8 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             if grant.waitForExistence(timeout: 5) { grant.tap() }
         }
         capture("real-host-phone-calendar-enabled-116", app)
-        for _ in 0..<3 { app.navigationBars.buttons.firstMatch.tap() }
-        if app.buttons["Done"].exists { app.buttons["Done"].tap() }
-        XCTAssertTrue(app.buttons["root.new-chat"].waitForExistence(timeout: 10))
-        app.buttons["root.new-chat"].tap()
+        leaveSettings(in: app)
+        startFreshChat(app)
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 15))
         composer.tap()
@@ -876,8 +899,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = []; app.launchEnvironment = [:]; app.launch()
-        XCTAssertTrue(app.buttons["root.new-chat"].waitForExistence(timeout: 20))
-        app.buttons["root.new-chat"].tap()
+        startFreshChat(app)
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 15))
         composer.tap(); composer.typeText("/")
@@ -910,69 +932,54 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         app.launchArguments = []
         app.launchEnvironment = [:]
         app.launch()
-        let entry = app.buttons["root.new-chat"]
+        let entry = app.buttons["home.new-chat"].firstMatch
         let available = entry.waitForExistence(timeout: 20)
         capture("real-host-root-116", app)
         XCTAssertTrue(available, "The real saved host must expose its normal workspace controls.")
-        let sessions = app.buttons["tab.sessions"]
-        sessions.tap()
+        showChats(in: app)
         let knownSession = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Confirm bighelp direct-connect message")).firstMatch
         XCTAssertTrue(knownSession.waitForExistence(timeout: 20))
         knownSession.tap()
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 20), "Existing Hermes chat must load.")
         capture("real-host-existing-chat-116", app)
-        openChatWorkspaceMenu(in: app)
-        let chatsMenu = app.buttons["quick-workspace.menu.chats"]
-        let agentsMenu = app.buttons["menu.agents"]
-        let agentsVisible = agentsMenu.waitForExistence(timeout: 5)
-        capture("real-host-sidebar-116", app)
-        XCTAssertTrue(agentsVisible)
-        XCTAssertGreaterThan(agentsMenu.frame.minY, chatsMenu.frame.minY)
-        capture("real-host-sidebar-116", app)
-        app.buttons["menu.settings"].tap()
-        let chatSettings = app.buttons["settings.menu.chat"]
-        XCTAssertTrue(chatSettings.waitForExistence(timeout: 5))
-        chatSettings.tap()
-        app.buttons["settings.chat.voice-settings"].tap()
+        // Settings › Voice, from the home's circle.
+        goBackFromChat(in: app)
+        openSettings(in: app)
+        settingsRow("settings.chat.voice-settings", in: app).tap()
         let voicePlugin = app.descendants(matching: .any).matching(identifier: "settings.plugin-status.liveVoice").firstMatch
         XCTAssertTrue(voicePlugin.waitForExistence(timeout: 10))
         capture("real-host-voice-plugin-settings-116", app)
-        app.navigationBars.buttons.firstMatch.tap()
-        app.navigationBars.buttons.firstMatch.tap()
-        app.buttons["settings.apps"].tap()
+        // The sheet's own Back: the screen behind Settings has a navigation bar too.
+        app.buttons["BackButton"].firstMatch.tap()
+        settingsRow("settings.apps", in: app).tap()
         app.buttons["settings.connections.device-access"].tap()
         // Device access shows the plugin only while something needs doing; a ready plugin shows nothing.
         let devicePlugin = app.descendants(matching: .any).matching(identifier: "settings.plugin-status.deviceAccess").firstMatch
         XCTAssertTrue(devicePlugin.waitForNonExistence(timeout: 20))
         capture("real-host-device-plugin-settings-116", app)
-        app.buttons["permissions.open.calendar"].tap()
         XCTAssertTrue(app.switches["permissions.device-tools.calendar"].firstMatch.waitForExistence(timeout: 5))
         capture("real-host-calendar-plugin-settings-116", app)
     }
 
     @MainActor
-    func testSavedRealHostGroupsNewChatAndWorkspace() throws {
+    func testSavedRealHostNewGroupAndNewChat() throws {
         guard ProcessInfo.processInfo.environment["BIGHELP_REAL_HOST_UI"] == "1" else {
             throw XCTSkip("Requires explicit authorization and a saved real Hermes host.")
         }
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = []; app.launchEnvironment = [:]; app.launch()
-        openRootTab("tab.agents", in: app, timeout: 20)
-        let createGroup = app.buttons["agents.groups.create"]
-        let canCreate = createGroup.waitForExistence(timeout: 20)
+        openNewGroupChat(app)
         capture("real-host-agents-before-group-116", app)
         if let directory = ProcessInfo.processInfo.environment["BIGHELP_REAL_HOST_ARTIFACTS"] {
             try app.debugDescription.write(to: URL(fileURLWithPath: directory).appendingPathComponent("real-host-agents-tree.txt"), atomically: true, encoding: .utf8)
         }
-        XCTAssertTrue(canCreate)
-        createGroup.tap()
         XCTAssertTrue(app.textFields["bot-mode.create.title"].waitForExistence(timeout: 8))
         capture("real-host-new-group-116", app)
         app.buttons["Cancel"].tap()
         let started = Date()
-        app.buttons["root.new-chat"].tap()
+        app.buttons["home.new-chat"].firstMatch.tap()
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 15))
         if let directory = ProcessInfo.processInfo.environment["BIGHELP_REAL_HOST_ARTIFACTS"] {
@@ -980,18 +987,6 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             try JSONEncoder().encode(value).write(to: URL(fileURLWithPath: directory).appendingPathComponent("new-chat-ui-timing.json"))
         }
         capture("real-host-new-chat-116", app)
-        openChatWorkspaceMenu(in: app)
-        app.buttons["menu.folder"].tap()
-        XCTAssertTrue(app.otherElements["hermes-workspaces.screen"].waitForExistence(timeout: 8))
-        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND NOT identifier BEGINSWITH %@", "hermes-workspace.", "hermes-workspace.archive."))
-        let loadedRows = rows.firstMatch.waitForExistence(timeout: 15)
-        capture("real-host-project-picker-116", app)
-        if let directory = ProcessInfo.processInfo.environment["BIGHELP_REAL_HOST_ARTIFACTS"] {
-            try app.debugDescription.write(to: URL(fileURLWithPath: directory).appendingPathComponent("real-host-project-picker-tree.txt"), atomically: true, encoding: .utf8)
-        }
-        XCTAssertTrue(loadedRows, "The real host project registry must load.")
-        capture("real-host-project-picker-116", app)
-        app.buttons["Done"].tap()
     }
 
     /// Opt-in actual microphone/provider test. Spoken input is supplied outside
@@ -1005,8 +1000,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = []; app.launchEnvironment = [:]; app.launch()
-        XCTAssertTrue(app.buttons["root.new-chat"].waitForExistence(timeout: 20))
-        app.buttons["root.new-chat"].tap()
+        startFreshChat(app)
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 15))
         app.buttons["chat.voice"].tap()
         // Live voice starts as its screen opens: no Start tap.
@@ -1068,9 +1062,6 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         if browserHost.state != .notRunning { browserHost.terminate() }
         let app = makeApp()
         app.launchArguments = ["-native-workspace-acceptance"]
-        if ProcessInfo.processInfo.environment["NATIVE_PROBE_AGENT_HOME"] == "1" {
-            app.launchArguments += ["-loopdy.home.opens-chat", "YES"]
-        }
         app.launch()
         let getStarted = app.buttons["onboarding.get-started"]
         XCTAssertTrue(getStarted.waitForExistence(timeout: 15))
@@ -1140,12 +1131,9 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             capture("native-production-auth-result", app)
             return
         }
-        let newChat = app.buttons["root.new-chat"]
-        let homeChat = app.buttons["agent.hero.avatar"]
-        let reachDeadline = Date().addingTimeInterval(60)
-        while Date() < reachDeadline, !newChat.exists, !homeChat.exists { usleep(500_000) }
-        XCTAssertTrue(newChat.exists || homeChat.exists, "Real native feature clients must reach the shared workspace.")
-        guard newChat.exists || homeChat.exists else { capture("native-production-workspace-load", app); return }
+        let newChat = app.buttons["home.new-chat"].firstMatch
+        XCTAssertTrue(newChat.waitForExistence(timeout: 60), "Real native feature clients must reach the shared workspace.")
+        guard newChat.exists else { capture("native-production-workspace-load", app); return }
         if ProcessInfo.processInfo.environment["NATIVE_PROBE_IMAGE_FOLLOWUP"] == "1" {
             continueAfterFailure = true
             exerciseImageAfterFirstMessage(app)
@@ -1176,78 +1164,17 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             inspectBoardReadOnly(app)
             return
         }
-        if ProcessInfo.processInfo.environment["NATIVE_PROBE_VERIFY_AGENTS"] == "1" {
-            openAgents(in: app)
-            let create = app.buttons["agents.create"]
-            XCTAssertTrue(create.waitForExistence(timeout: 15))
-            create.tap()
-            XCTAssertTrue(app.textFields["agent.editor.name"].waitForExistence(timeout: 10))
-            XCTAssertTrue(app.buttons["agent.editor.avatar-picker"].exists)
-            app.buttons["agent.editor.design-avatar"].tap()
-            // Every Bot Studio tab must render (Release builds run on a 1 MB main stack on iPhone).
-            let studio = app.descendants(matching: .any)["avatar.chooser.studio"].firstMatch
-            XCTAssertTrue(studio.waitForExistence(timeout: 10))
-            studio.tap()
-            for tab in ["eyes", "color", "shape", "moves", "body"] {
-                app.buttons["bot.studio.tab.\(tab)"].tap()
-                XCTAssertTrue(app.buttons["bot.studio.save"].waitForExistence(timeout: 5), tab)
-            }
-            app.buttons["bot.studio.chip.classics"].tap()
-            let pinch = app.buttons["bot.studio.choice.Pinch"]
-            XCTAssertTrue(pinch.waitForExistence(timeout: 10))
-            pinch.tap()
-            app.buttons["bot.studio.save"].tap()
-            let preview = app.descendants(matching: .any)["agent.editor.avatar-preview"].firstMatch
-            XCTAssertTrue(preview.waitForExistence(timeout: 20))
-            capture("native-agent-pet-avatar-selected", app)
-            for (id, text) in [("name", "MiXeD Avatar BOT"), ("role", "Helper")] {
-                let field = app.textFields["agent.editor.\(id)"]
-                for _ in 0..<5 where !field.isHittable { app.swipeUp() }
-                field.tap(); field.typeText(text)
-                app.buttons["Dismiss keyboard"].tap()
-            }
-            for (id, text) in [("summary", "A controlled avatar fixture."), ("instructions", "Be concise.")] {
-                let field = app.descendants(matching: .any)["agent.editor.\(id)"].firstMatch
-                for _ in 0..<6 where !field.isHittable { app.swipeUp() }
-                field.tap(); field.typeText(text)
-                app.buttons["Dismiss keyboard"].tap()
-            }
-            app.buttons["agent.editor.save"].tap()
-            guard app.buttons["agent.editor.save"].waitForNonExistence(timeout: 40) else {
-                capture("native-agent-create-failed", app)
-                XCTFail("The real profile/avatar creation must complete: " + app.debugDescription)
-                return
-            }
-            let catalog = try await get(config: config, components: ["api", "profiles"], query: [])
-            let rows = try XCTUnwrap(catalog["profiles"] as? [[String: Any]])
-            XCTAssertEqual(rows.filter { $0["name"] as? String == "mixed-avatar-bot" }.count, 1)
-            XCTAssertFalse(rows.contains { $0["name"] as? String == "MiXeD Avatar BOT" })
-            app.terminate(); app.launch()
-            XCTAssertTrue(app.buttons["home.drawer.open"].waitForExistence(timeout: 60))
-            openAgents(in: app)
-            let agent = app.buttons["agent.mixed-avatar-bot"]
-            XCTAssertTrue(agent.waitForExistence(timeout: 25))
-            for _ in 0..<5 where !agent.isHittable { app.swipeUp() }
-            XCTAssertTrue(agent.label.contains("MiXeD Avatar BOT"))
-            capture("native-agent-avatar-cold-reload", app)
-            return
-        }
-        app.buttons["home.drawer.open"].tap()
-        for id in ["menu.agents", "menu.chats", "menu.scheduled-tasks"] {
-            XCTAssertTrue(app.buttons[id].exists, id)
-        }
-        app.buttons["menu.done"].tap()
         if ProcessInfo.processInfo.environment["NATIVE_PROBE_VERIFY_SESSION_RECOVERY"] == "1" {
             try await verifyNativeSessionRecovery(config: config, in: app)
             return
         }
         if ProcessInfo.processInfo.environment["NATIVE_PROBE_VERIFY_MANAGEMENT"] == "1" {
-            // Each page opens from where it lives: Projects and Files from ☰, the rest from Settings.
-            for (key, title) in [("projects", "Projects"), ("files", "Files"), ("toolsets", "Toolsets"),
+            // Each page opens from where it lives: Projects from Work, the rest from Settings.
+            for (key, title) in [("projects", "Projects"), ("toolsets", "Toolsets"),
                                  ("plugins", "Plugins"), ("mcp", "MCP Servers"), ("logs", "Logs")] {
-                let fromMenu = key == "projects" || key == "files"
-                if fromMenu {
-                    openRootDestination(key, sidebarIdentifier: "menu.\(key)", in: app)
+                let fromWork = key == "projects"
+                if fromWork {
+                    openWorkDoor(key, in: app)
                 } else {
                     openHostPage(key, in: app)
                 }
@@ -1256,63 +1183,38 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
                     XCTFail("The \(title) destination did not open on first tap.")
                     return
                 }
-                if key == "files" {
-                    let root = try XCTUnwrap(config["workspace_path"])
-                    let rootText = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", root)).firstMatch
-                    XCTAssertTrue(rootText.waitForExistence(timeout: 20), "The confirmed host workspace must be visible.")
-                    XCTAssertFalse(app.staticTexts["Workspace unavailable"].exists)
-                }
                 capture("native-management-\(key)", app)
-                if ProcessInfo.processInfo.environment["NATIVE_PROBE_VERIFY_MEDIA"] == "1" {
-                    if key == "files" {
-                        let video = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "native-preview.mp4")).firstMatch
-                        XCTAssertTrue(video.waitForExistence(timeout: 15))
-                        video.tap()
-                        let play = app.buttons["workspace.file-transfers.play-media"]
-                        for _ in 0..<6 where !play.isHittable { app.swipeUp() }
-                        XCTAssertTrue(play.isHittable)
-                        play.tap()
-                        XCTAssertTrue(app.navigationBars["Video Preview"].waitForExistence(timeout: 15))
-                        let player = app.descendants(matching: .any)["workspace.managed-media.player"].firstMatch
-                        XCTAssertTrue(player.waitForExistence(timeout: 20), "The actual native video decoder must become ready.")
-                        XCTAssertFalse(app.staticTexts["Playback unavailable"].exists)
-                        capture("native-managed-video-playing", app)
-                        app.buttons["Done"].tap()
-                        XCTAssertTrue(app.navigationBars["Files"].waitForExistence(timeout: 10))
-                    } else if key == "logs" {
-                        let row = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "NATIVE_UI_LOG_PROOF")).firstMatch
-                        for _ in 0..<8 where !row.isHittable { app.swipeUp() }
-                        XCTAssertTrue(row.waitForExistence(timeout: 15), "The bounded host log line must render, not only a severity count.")
-                        capture("native-logs-rendered-line", app)
-                    }
+                if ProcessInfo.processInfo.environment["NATIVE_PROBE_VERIFY_MEDIA"] == "1", key == "logs" {
+                    let row = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "NATIVE_UI_LOG_PROOF")).firstMatch
+                    for _ in 0..<8 where !row.isHittable { app.swipeUp() }
+                    XCTAssertTrue(row.waitForExistence(timeout: 15), "The bounded host log line must render, not only a severity count.")
+                    capture("native-logs-rendered-line", app)
                 }
-                if fromMenu {
-                    let back = app.navigationBars.buttons.element(boundBy: 0)
-                    XCTAssertTrue(back.isHittable)
-                    back.tap()
+                if fromWork {
+                    returnToHome(in: app)
                 } else {
                     leaveSettings(in: app)
                 }
-                XCTAssertTrue(app.buttons["home.drawer.open"].waitForExistence(timeout: 10))
+                XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 10))
             }
         }
-        openRootDestination("scheduledTasks", sidebarIdentifier: "menu.scheduled-tasks", in: app)
+        openWorkDoor("schedules", in: app)
         let createTask = app.buttons["scheduled-tasks.create"]
-        XCTAssertTrue(createTask.waitForExistence(timeout: 15), "Native cron management must be reachable from the Tasks menu.")
+        XCTAssertTrue(createTask.waitForExistence(timeout: 15), "Native cron management must be reachable from Work's Schedules.")
         XCTAssertFalse(app.alerts["Unable to open"].exists)
         guard createTask.exists else { capture("native-production-cron-route", app); return }
         createTask.tap()
         let taskName = app.textFields["scheduled-task.editor.name"]
         XCTAssertTrue(taskName.waitForExistence(timeout: 10), "Native tasks must expose their existing editor.")
         app.buttons["Cancel"].tap()
-        openAgents(in: app)
-        XCTAssertTrue(app.buttons["agent.default"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.staticTexts["agents.groups.empty"].waitForExistence(timeout: 15))
+        returnToHome(in: app)
+        showBots(in: app)
+        let defaultBot = botButton("default", in: app)
+        XCTAssertTrue(defaultBot.waitForExistence(timeout: 15))
         XCUIDevice.shared.press(.home)
         app.activate()
-        XCTAssertTrue(app.buttons["agent.default"].waitForExistence(timeout: 3), "Cached agents should remain visible on foreground.")
-        XCTAssertFalse(app.staticTexts["agents.groups.error"].exists)
-        app.buttons["agent.default"].tap()
+        XCTAssertTrue(defaultBot.waitForExistence(timeout: 3), "Cached bots should remain visible on foreground.")
+        defaultBot.tap()
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 30))
         guard composer.exists else { capture("native-production-create", app); return }
@@ -1352,8 +1254,9 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         capture("native-production-stream", app)
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.buttons["home.drawer.open"].waitForExistence(timeout: 60), "Device-only credentials must restore the same native workspace.")
-        openRootDestination("chats", sidebarIdentifier: "menu.chats", in: app)
+        XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 60),
+                      "Device-only credentials must restore the same native workspace.")
+        openThisComputerSessions(in: app)
         let saved = app.buttons.matching(NSPredicate(
             format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "session.row.native-session-v1:", nonce
         )).firstMatch
@@ -1421,8 +1324,8 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             capture("native-reaction-confirmed", app)
             app.terminate()
             app.launch()
-            XCTAssertTrue(app.buttons["home.drawer.open"].waitForExistence(timeout: 60))
-            openRootDestination("chats", sidebarIdentifier: "menu.chats", in: app)
+            XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 60))
+            openThisComputerSessions(in: app)
             XCTAssertTrue(saved.waitForExistence(timeout: 25))
             saved.tap()
             for target in reactionRows {
@@ -1465,9 +1368,8 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
                 thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95))
             )
             XCTAssertTrue(app.buttons["chat.options"].waitForExistence(timeout: 10))
-            openChatWorkspaceMenu(in: app)
-            openSidebarDestination("menu.chats", in: app)
-            XCTAssertTrue(app.buttons["home.drawer.open"].waitForExistence(timeout: 10))
+            returnToHome(in: app)
+            XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 10))
             openHostPage("sessionMaintenance", in: app)
             XCTAssertTrue(app.navigationBars["Session Maintenance"].waitForExistence(timeout: 15))
             let mostRecent = app.buttons["session-maintenance.most-recent"]
@@ -1505,7 +1407,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             XCTAssertTrue(close.waitForExistence(timeout: 5))
             close.tap()
             app.buttons["Close Runtime"].tap()
-            if !app.buttons["home.drawer.open"].waitForExistence(timeout: 5) {
+            if !app.buttons["settings.done"].firstMatch.waitForNonExistence(timeout: 5) {
                 let success = app.descendants(matching: .any)["session-maintenance.success"].firstMatch
                 let error = app.descendants(matching: .any)["session-maintenance.error"].firstMatch
                 for _ in 0..<10 where !success.isHittable && !error.isHittable { app.swipeDown() }
@@ -1514,10 +1416,10 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
                     XCTFail("Close must reconcile the exact runtime and preserve history: " + app.debugDescription)
                     return
                 }
-                app.navigationBars.buttons["Back"].tap()
+                leaveSettings(in: app)
             }
-            XCTAssertTrue(app.buttons["home.drawer.open"].waitForExistence(timeout: 15))
-            openRootDestination("chats", sidebarIdentifier: "menu.chats", in: app)
+            XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 15))
+            openThisComputerSessions(in: app)
             XCTAssertFalse(app.staticTexts["Route unavailable"].exists)
             let preservedSession = try await storedSession(config: config, prompt: followup, reply: followupReply)
             XCTAssertEqual(preservedSession, originalSession)
@@ -1545,7 +1447,8 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
                 predicate: NSPredicate(format: "label CONTAINS %@", "bighelp plugin connected."), object: voice
             )], timeout: 20), .completed)
             capture("native-reviewed-plugin-voice-ready", app)
-            app.navigationBars.buttons.firstMatch.tap()
+            // The sheet's own Back: the screen behind Settings has a navigation bar too.
+            app.buttons["BackButton"].firstMatch.tap()
             let connections = app.buttons["settings.apps"]
             for _ in 0..<5 where !connections.isHittable { app.collectionViews["settings.screen"].swipeUp() }
             guard connections.isHittable else { XCTFail("Connections must be reachable from Settings."); return }
@@ -1649,10 +1552,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         let receiptPath = try XCTUnwrap(config["receipt_path"])
         var receipts: [[String: String]] = []
         for profile in ["default", secondary] {
-            openAgents(in: app)
-            let agent = app.buttons["agent.\(profile)"]
-            XCTAssertTrue(agent.waitForExistence(timeout: 20))
-            agent.tap()
+            openBot(profile, in: app)
             let composer = app.textViews["chat.composer.text"]
             let send = app.buttons["chat.send"]
             XCTAssertTrue(composer.waitForExistence(timeout: 30), "One agent tap must open its new native chat.")
@@ -1671,8 +1571,8 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
                 if phase == "cold-reopen" {
                     app.terminate()
                     app.launch()
-                    XCTAssertTrue(app.buttons["home.drawer.open"].waitForExistence(timeout: 60))
-                    openRootDestination("chats", sidebarIdentifier: "menu.chats", in: app)
+                    XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 60))
+                    openThisComputerSessions(in: app)
                     let saved = nativeSessionRow(in: app, profileID: profile, storedID: try XCTUnwrap(storedID))
                     XCTAssertTrue(saved.waitForExistence(timeout: 25))
                     saved.tap()
@@ -1693,7 +1593,8 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
                     XCTAssertTrue(composer.waitForExistence(timeout: 15))
                     XCTAssertEqual(composer.value as? String, prompt, "Suspension must preserve the exact draft.")
                 } else if phase == "warm-reopen" {
-                    openRootDestination("chats", sidebarIdentifier: "menu.chats", in: app)
+                    returnToHome(in: app)
+                    openThisComputerSessions(in: app)
                     let saved = nativeSessionRow(in: app, profileID: profile, storedID: try XCTUnwrap(storedID))
                     XCTAssertTrue(saved.waitForExistence(timeout: 25))
                     saved.tap()
@@ -1802,6 +1703,69 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         return values
     }
 
+    // MARK: The one home
+
+    /// New chat from the home; the first bot listed takes it, so the box becomes its chat.
+    @MainActor
+    private func startFreshChat(_ app: XCUIApplication) {
+        returnToHome(in: app)
+        let newChat = app.buttons["home.new-chat"].firstMatch
+        XCTAssertTrue(newChat.waitForExistence(timeout: 20), "The home has New chat.")
+        newChat.tap()
+        pickFirstBot(app)
+    }
+
+    /// New chat opens with nobody picked.
+    @MainActor
+    private func pickFirstBot(_ app: XCUIApplication) {
+        let bot = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "new-chat.bot.")).firstMatch
+        XCTAssertTrue(bot.waitForExistence(timeout: 20), "New chat lists the host's bots.")
+        bot.tap()
+    }
+
+    /// A bot on Bots: listed or pinned by its profile, or (for the default one) the primary tile.
+    @MainActor
+    private func botButton(_ profile: String, in app: XCUIApplication) -> XCUIElement {
+        let row = app.buttons.matching(NSPredicate(format: "identifier IN %@",
+                                                   ["simple-bots.bot.\(profile)", "simple-bots.pinned.\(profile)"])).firstMatch
+        if profile == "default", !row.waitForExistence(timeout: 5) { return app.primaryBot }
+        return row
+    }
+
+    /// Bots › a bot: its chat (Settings › Chat › A bot opens, out of the box).
+    @MainActor
+    private func openBot(_ profile: String, in app: XCUIApplication) {
+        returnToHome(in: app)
+        showBots(in: app)
+        let bot = botButton(profile, in: app)
+        XCTAssertTrue(bot.waitForExistence(timeout: 20), "Bots lists \(profile).")
+        bot.tap()
+    }
+
+    /// Today › See all for one kind, then the host's first bot: its own board.
+    @MainActor
+    private func openOwnBoard(_ kind: String, in app: XCUIApplication) {
+        returnToHome(in: app)
+        openTodayBoard(kind, in: app)
+        let bot = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier != %@",
+                                                   "today.board-page.chip.", "today.board-page.chip.all")).firstMatch
+        XCTAssertTrue(bot.waitForExistence(timeout: 10), "See all lists the host's bots.")
+        bot.tap()
+    }
+
+    /// Bots' + › New Group Chat.
+    @MainActor
+    private func openNewGroupChat(_ app: XCUIApplication) {
+        returnToHome(in: app)
+        showBots(in: app)
+        let add = app.buttons["simple-bots.new"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 20), "Bots has +.")
+        add.tap()
+        let newGroup = app.buttons["New Group Chat"].firstMatch
+        XCTAssertTrue(newGroup.waitForExistence(timeout: 10), "+ offers New Group Chat on a host that can make one.")
+        newGroup.tap()
+    }
+
     @MainActor
     private func capture(_ name: String, _ app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
@@ -1815,137 +1779,6 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
            let config = try? readFixtureConfiguration(path),
            let receipt = config["receipt_path"], !name.contains("auth") {
             try? app.debugDescription.write(toFile: receipt + "." + name + ".txt", atomically: true, encoding: .utf8)
-        }
-    }
-}
-
-
-/// Production-path checks that deliberately require an explicit project ID.
-/// The test creates a fresh chat and associates only that disposable session
-/// with an already-registered project. It never creates, renames, archives, or
-/// moves an existing session.
-final class NativeProjectActivityProductionUITests: BighelpUITestCase {
-    @MainActor
-    func testSavedRealHostNewChatSelectsExistingProjectAndShowsCheckmark() throws {
-        guard ProcessInfo.processInfo.environment["BIGHELP_REAL_PROJECT_SELECTION_UI"] == "1",
-              let projectID = ProcessInfo.processInfo.environment["BIGHELP_REAL_PROJECT_ID"],
-              !projectID.isEmpty else {
-            throw XCTSkip(
-                "Requires explicit real-host project-selection authorization and BIGHELP_REAL_PROJECT_ID."
-            )
-        }
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchArguments = []
-        app.launchEnvironment = [:]
-        app.launch()
-
-        let newChat = app.buttons["root.new-chat"]
-        XCTAssertTrue(newChat.waitForExistence(timeout: 20), "The saved native host must expose New Chat.")
-        newChat.tap()
-
-        let composer = app.textViews["chat.composer.text"]
-        XCTAssertTrue(
-            composer.waitForExistence(timeout: 20),
-            "A newly-created disposable chat must reach the composer before project selection."
-        )
-        guard composer.exists else { return }
-
-        XCTAssertTrue(app.buttons["chat.options"].waitForExistence(timeout: 10))
-        openChatWorkspaceMenu(in: app)
-
-        let workspaceChooser = app.buttons["menu.folder"]
-        XCTAssertTrue(
-            workspaceChooser.waitForExistence(timeout: 10),
-            "The native chat must expose the workspace chooser."
-        )
-        guard workspaceChooser.exists else { return }
-        workspaceChooser.tap()
-
-        let picker = app.descendants(matching: .any)["hermes-workspaces.screen"].firstMatch
-        XCTAssertTrue(
-            picker.waitForExistence(timeout: 15),
-            "The workspace picker must load from the selected native host."
-        )
-        guard picker.exists else { return }
-
-        let project = app.buttons["hermes-workspace.\(projectID)"]
-        XCTAssertTrue(
-            project.waitForExistence(timeout: 20),
-            "The explicitly selected existing project must be present in the host catalog."
-        )
-        guard project.exists else { return }
-        for _ in 0..<8 where !project.isHittable { app.swipeUp() }
-        XCTAssertTrue(project.isHittable, "The existing project row must be selectable.")
-        project.tap()
-        // Successful selection closes the sheet. Reopen it to verify the
-        // host-backed association rather than querying a dismissed row.
-        let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: picker)
-        let selectionResult = XCTWaiter.wait(for: [dismissed], timeout: 20)
-        if let directory = ProcessInfo.processInfo.environment["BIGHELP_REAL_HOST_ARTIFACTS"] {
-            try? app.debugDescription.write(to: URL(fileURLWithPath: directory).appendingPathComponent("real-project-after-selection.txt"), atomically: true, encoding: .utf8)
-        }
-        XCTAssertEqual(selectionResult, .completed)
-        XCTAssertTrue(composer.waitForExistence(timeout: 5))
-        openChatWorkspaceMenu(in: app)
-        XCTAssertTrue(workspaceChooser.waitForExistence(timeout: 5))
-        workspaceChooser.tap()
-        XCTAssertTrue(project.waitForExistence(timeout: 15))
-
-        let selected = NSPredicate(format: "value == %@", "Selected")
-        expectation(for: selected, evaluatedWith: project)
-        waitForExpectations(timeout: 20)
-        XCTAssertEqual(
-            project.value as? String,
-            "Selected",
-            "Hermes must confirm the existing project association for this new session."
-        )
-
-        // The row's selected accessibility state is backed by the visible
-        // checkmark in HermesWorkspaceRows. Keep a tree artifact for review
-        // without recording prompts, credentials, or host response content.
-        if let directory = ProcessInfo.processInfo.environment["BIGHELP_REAL_HOST_ARTIFACTS"] {
-            try app.debugDescription.write(
-                to: URL(fileURLWithPath: directory).appendingPathComponent(
-                    "real-project-selection-checkmark-tree.txt"
-                ),
-                atomically: true,
-                encoding: .utf8
-            )
-        }
-        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        screenshot.name = "real-project-selection-checkmark"
-        screenshot.lifetime = .keepAlways
-        add(screenshot)
-        app.buttons["Done"].tap()
-        XCTAssertTrue(composer.waitForExistence(timeout: 5))
-        composer.tap()
-        composer.typeText("Reply with exactly PROJECT2102 OK. Do not call tools or delegate.")
-        let send = app.buttons["chat.send"]
-        let canSend = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND enabled == true"), object: send)
-        XCTAssertEqual(XCTWaiter.wait(for: [canSend], timeout: 20), .completed)
-        send.tap()
-        XCTAssertTrue(app.buttons["chat.voice"].waitForExistence(timeout: 90))
-        app.terminate(); app.launch()
-        XCTAssertTrue(app.buttons["tab.sessions"].waitForExistence(timeout: 20))
-        app.buttons["tab.sessions"].tap()
-        let filters = app.descendants(matching: .any).matching(identifier: "sessions.filters").firstMatch
-        XCTAssertTrue(filters.waitForExistence(timeout: 10)); filters.tap()
-        let projectFilter = app.buttons["sessions.filter.project"]
-        XCTAssertTrue(projectFilter.waitForExistence(timeout: 10)); projectFilter.tap()
-        let home = app.buttons["sessions.filter.project.\(projectID)"].firstMatch
-        XCTAssertTrue(home.waitForExistence(timeout: 10), "The Chats catalog must restore Home as an assigned project.")
-        home.tap()
-        let saved = app.descendants(matching: .any).matching(NSPredicate(
-            format: "label CONTAINS[c] %@", "PROJECT2102"
-        )).firstMatch
-        let visible = saved.waitForExistence(timeout: 15)
-        if let directory = ProcessInfo.processInfo.environment["BIGHELP_REAL_HOST_ARTIFACTS"] {
-            try app.debugDescription.write(to: URL(fileURLWithPath: directory).appendingPathComponent("real-project-filter-state.txt"), atomically: true, encoding: .utf8)
-        }
-        XCTAssertTrue(visible, "The newly created chat must remain inside the Home project filter.")
-        if let directory = ProcessInfo.processInfo.environment["BIGHELP_REAL_HOST_ARTIFACTS"] {
-            try app.debugDescription.write(to: URL(fileURLWithPath: directory).appendingPathComponent("real-project-chats-after-relaunch.txt"), atomically: true, encoding: .utf8)
         }
     }
 }

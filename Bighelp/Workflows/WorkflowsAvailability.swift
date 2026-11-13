@@ -44,7 +44,7 @@ enum WorkflowsSupport: Equatable, Sendable {
         return code
     }
 
-    /// ☰ shows Workflows for a computer that has them or says why it can't run them.
+    /// Work shows Workflows for a computer that has them or says why it can't run them.
     var showsMenuRow: Bool { self != .missing }
     var canEdit: Bool { self == .available(canEdit: true) }
 
@@ -67,7 +67,7 @@ enum WorkflowsSupport: Equatable, Sendable {
     }
 }
 
-/// Whether the connected computer's bighelp plugin has Workflows, for the ☰ menu.
+/// Whether the connected computer's bighelp plugin has Workflows, for Work's door.
 /// Remembered per computer, so reconnecting (every return to the app) doesn't
 /// hide it, and only a clear answer from the host changes it: a check that
 /// fails while the connection settles leaves Workflows where it was.
@@ -85,7 +85,7 @@ final class WorkflowsAvailability {
         self.retryDelays = retryDelays
     }
 
-    /// The ☰ row: shown for a computer that has Workflows or says why it can't run them.
+    /// Work's door: shown for a computer that has Workflows or says why it can't run them.
     var isAvailable: Bool? { support.map(\.showsMenuRow) }
 
     /// Switches to a computer. True when it's a different one; the last answer for it

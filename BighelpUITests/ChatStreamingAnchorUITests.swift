@@ -38,13 +38,9 @@ final class ChatStreamingAnchorUITests: BighelpUITestCase {
     @MainActor
     func testSecondToolTurnRetainsEarlierMessagesAndReturnsToLatest() throws {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3", "-test-companion-disabled", "-test-tool-stream", "-test-tool-stream-two-turns"]
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3", "-test-companion-disabled", "-test-tool-stream", "-test-tool-stream-two-turns"]
         app.launch()
-        let newChat = chatNewChatButton(in: app).waitForExistence(timeout: 5)
-            ? chatNewChatButton(in: app) : app.buttons["root.new-chat"]
-        XCTAssertTrue(newChat.waitForExistence(timeout: 5))
-        newChat.tap()
-        confirmNewChatPicker(in: app)
+        startNewChat(with: "finance", in: app)
         let input = app.textViews["Message"]
         for number in 1...2 {
             XCTAssertTrue(input.waitForExistence(timeout: 5))
@@ -88,18 +84,14 @@ final class ChatStreamingAnchorUITests: BighelpUITestCase {
             Unmanaged<XCTestExpectation>.fromOpaque(observer).release()
         }
         app.launchEnvironment["BIGHELP_TOOL_STREAM_COMPLETION_NOTIFICATION"] = completionName
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3", "-test-companion-disabled", "-test-tool-stream"]
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3", "-test-companion-disabled", "-test-tool-stream"]
         if long { app.launchArguments.append("-test-tool-stream-long") }
         if expanded { app.launchArguments.append("-test-tool-stream-expanded") }
         if backgroundChat { app.launchArguments.append("-test-two-chat-stream") }
         if consecutiveTools { app.launchArguments.append("-test-tool-stream-consecutive") }
         if inspectFullText { app.launchArguments.append("-test-tool-reader") }
         app.launch()
-        let newChat = chatNewChatButton(in: app).waitForExistence(timeout: 5)
-            ? chatNewChatButton(in: app) : app.buttons["root.new-chat"]
-        XCTAssertTrue(newChat.waitForExistence(timeout: 5))
-        newChat.tap()
-        confirmNewChatPicker(in: app)
+        startNewChat(with: "finance", in: app)
         let input = app.otherElements["chat.composer-shell"].textViews["Message"]
         XCTAssertTrue(input.waitForExistence(timeout: 5))
         input.tap()
@@ -217,13 +209,9 @@ final class ChatStreamingAnchorUITests: BighelpUITestCase {
             CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
                 CFNotificationName(resumeSignal as CFString), nil, nil, true)
         }
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3", "-test-companion-disabled", "-test-canvas-stream"]
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3", "-test-companion-disabled", "-test-canvas-stream"]
         app.launch()
-        let newChat = chatNewChatButton(in: app).waitForExistence(timeout: 5)
-            ? chatNewChatButton(in: app) : app.buttons["root.new-chat"]
-        XCTAssertTrue(newChat.waitForExistence(timeout: 5))
-        newChat.tap()
-        confirmNewChatPicker(in: app)
+        startNewChat(with: "finance", in: app)
         let input = app.textViews["Message"]
         XCTAssertTrue(input.waitForExistence(timeout: 5))
         input.tap()
@@ -268,14 +256,10 @@ final class ChatStreamingAnchorUITests: BighelpUITestCase {
         let resumeSignal = "app.loopdy.fixture.canvas-samples.\(UUID().uuidString)"
         app.launchEnvironment["BIGHELP_CANVAS_RESUME_NOTIFICATION"] = resumeSignal
         app.launchEnvironment["BIGHELP_CANVAS_SAMPLE_EACH_BATCH"] = "YES"
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3", "-test-companion-disabled", "-test-canvas-stream", "-test-canvas-hold-open"]
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3", "-test-companion-disabled", "-test-canvas-stream", "-test-canvas-hold-open"]
         app.launch()
         defer { app.terminate() }
-        let newChat = chatNewChatButton(in: app).waitForExistence(timeout: 5)
-            ? chatNewChatButton(in: app) : app.buttons["root.new-chat"]
-        XCTAssertTrue(newChat.waitForExistence(timeout: 5))
-        newChat.tap()
-        confirmNewChatPicker(in: app)
+        startNewChat(with: "finance", in: app)
         let input = app.textViews["Message"]
         XCTAssertTrue(input.waitForExistence(timeout: 5))
         input.tap()

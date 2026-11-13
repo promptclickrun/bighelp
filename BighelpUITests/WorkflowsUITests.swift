@@ -1,11 +1,11 @@
 import XCTest
 
-/// ☰ › Workflows on demo data: home, the run waiting for you, its sign-off and Approve.
+/// Work › Workflows on demo data: home, the run waiting for you, its sign-off and Approve.
 /// BIGHELP_WORKFLOWS_EVIDENCE (TEST_RUNNER_…) saves each screen as a PNG; run once in
 /// light and once in dark appearance for both sets.
 final class WorkflowsUITests: BighelpUITestCase {
     @MainActor
-    func testMenuOpensWorkflowsAndApprovingTheWaitingRunFinishesIt() throws {
+    func testWorkOpensWorkflowsAndApprovingTheWaitingRunFinishesIt() throws {
         let app = launch()
         openWorkflows(app)
         save("01-home", app)
@@ -37,8 +37,7 @@ final class WorkflowsUITests: BighelpUITestCase {
     func testTokenCountsAreNerdModeOnly() throws {
         for nerd in ["NO", "YES"] {
             let app = makeApp()
-            app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES",
-                                   "-loopdy.settings.nerd-mode", nerd]
+            app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.settings.nerd-mode", nerd]
             app.launch()
             openWorkflows(app)
             let running = app.buttons["workflows.run.run-15"]
@@ -102,19 +101,15 @@ final class WorkflowsUITests: BighelpUITestCase {
     @MainActor
     private func launch() -> XCUIApplication {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES"]
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays"]
         app.launch()
         return app
     }
 
     @MainActor
     private func openWorkflows(_ app: XCUIApplication) {
-        let menu = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"])).firstMatch
-        XCTAssertTrue(menu.waitForExistence(timeout: 15))
-        menu.tap()
-        let row = app.buttons["menu.workflows"]
-        XCTAssertTrue(row.waitForExistence(timeout: 8), "☰ lists Workflows after Kanban on a host that has them")
-        row.tap()
+        // Work's Workflows door, on a host that has them.
+        openWorkDoor("workflows", in: app)
         XCTAssertTrue(element("workflows.home", app).waitForExistence(timeout: 8))
         XCTAssertTrue(app.buttons["workflows.waiting.run-14"].waitForExistence(timeout: 8))
     }

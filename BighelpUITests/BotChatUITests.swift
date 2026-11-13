@@ -1,6 +1,6 @@
 import XCTest
 
-/// Settings › Chat › A bot opens decides what tapping an agent on Agents opens,
+/// Settings › Chat › A bot opens decides what tapping a bot on Bots opens,
 /// and an agent's Bot Chat offers This chat › New Bot Chat. On the demo data, whose
 /// finance agent has a Bot Chat. Set BIGHELP_BOT_CHAT_EVIDENCE (TEST_RUNNER_…) to save
 /// screenshots.
@@ -71,84 +71,24 @@ final class BotChatUITests: BighelpUITestCase {
         }
     }
 
-    /// A tab keeps its place: a chat left for Ideas opens again from Chat, not the agent's Bot Chat.
-    /// The chat is another agent's, so Ideas makes that agent the one in use; once the board
-    /// switches back, Chat opens that agent's Bot Chat.
-    @MainActor
-    func testChatOpensTheChatYouLeftForABoard() {
-        let app = launchOnTheAgentsChat()
-        let left = message("Here's the plan for Saturday.", in: app)
-        openListedChat("demo-session-1", in: app)
-        XCTAssertTrue(left.waitForExistence(timeout: 10))
-
-        app.buttons["tab.ideas"].tap()
-        XCTAssertTrue(left.waitForNonExistence(timeout: 5))
-        app.buttons["tab.sessions"].tap()
-        XCTAssertTrue(left.waitForExistence(timeout: 10), "Chat opens the chat you left")
-        XCTAssertFalse(message(botChatText, in: app).exists)
-        save("tab-keeps-chat", app)
-
-        app.buttons["tab.ideas"].tap()
-        let name = app.buttons["agent.hero.name"].firstMatch
-        XCTAssertTrue(name.waitForExistence(timeout: 5))
-        name.tap()
-        let finance = app.buttons["agent.switcher.agent.finance"]
-        XCTAssertTrue(finance.waitForExistence(timeout: 5))
-        finance.tap()
-        XCTAssertTrue(finance.waitForNonExistence(timeout: 5))
-        app.buttons["tab.sessions"].tap()
-        XCTAssertTrue(message(botChatText, in: app).waitForExistence(timeout: 10),
-                      "Chat opens the chat of the agent in use")
-        XCTAssertFalse(left.exists)
-    }
-
-    /// With Sessions in the bar, a chat picked from its list is Sessions': Sessions opens it again,
-    /// a second tap shows the list, and Chat opens the agent's own chat.
-    @MainActor
-    func testSessionsOpensTheChatYouLeftFromItsList() {
-        let app = launchOnTheAgentsChat(layout: "{pinned=(sessions,ideas,feed);menu=();}")
-        let sessions = app.buttons["tab.session-list"].firstMatch
-        XCTAssertTrue(sessions.waitForExistence(timeout: 10))
-        sessions.tap()
-        let left = message(listedChatText, in: app)
-        openListedChat(in: app)
-        XCTAssertTrue(left.waitForExistence(timeout: 10))
-
-        app.buttons["tab.ideas"].tap()
-        XCTAssertTrue(left.waitForNonExistence(timeout: 5))
-        sessions.tap()
-        XCTAssertTrue(left.waitForExistence(timeout: 10), "Sessions opens the chat you left")
-        save("sessions-keeps-chat", app)
-        sessions.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["sessions.screen"].waitForExistence(timeout: 5),
-                      "Sessions again shows the list")
-
-        openListedChat(in: app)
-        XCTAssertTrue(left.waitForExistence(timeout: 10))
-        app.buttons["tab.ideas"].tap()
-        app.buttons["tab.sessions"].tap()
-        XCTAssertTrue(message(botChatText, in: app).waitForExistence(timeout: 10), "Chat is the agent's own chat")
-    }
-
-    /// With several gateways, All sessions' rows have the long-press menu too.
+    /// With several gateways, Chats lists every computer's chats, and their rows have the long-press menu too.
     @MainActor
     func testAllSessionsRowsHaveALongPressMenu() {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-bighelp.hosts.all-hosts", "YES"]
         app.launch()
-        let menu = app.buttons["home.drawer.open"]
-        XCTAssertTrue(menu.waitForExistence(timeout: 10))
-        menu.tap()
-        let chats = app.buttons["menu.chats"].firstMatch
-        XCTAssertTrue(chats.waitForExistence(timeout: 5))
-        chats.tap()
-        let row = app.buttons["fleet.chat.Market scan"].firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "Another computer's chat is listed")
+        showChats(in: app)
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+                                                   "chats.row.", "Market scan")).firstMatch
+        let inbox = app.descendants(matching: .any)["chats.inbox"].firstMatch
+        _ = row.waitForExistence(timeout: 10)
+        for _ in 0..<8 where !(row.exists && row.isHittable) { inbox.swipeUp() }
+        XCTAssertTrue(row.exists, "Another computer's chat is listed")
         row.press(forDuration: 1.0)
-        let rename = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@",
-                                                      "fleet.chat.rename", "Rename")).firstMatch
-        let archive = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@",
-                                                       "fleet.chat.archive", "Archive")).firstMatch
+        let rename = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ OR label == %@",
+                                                      "chats.action.rename.", "Rename")).firstMatch
+        let archive = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ OR label == %@",
+                                                       "chats.action.archive.", "Archive")).firstMatch
         XCTAssertTrue(rename.waitForExistence(timeout: 5), "Rename on long press")
         XCTAssertTrue(archive.exists, "Archive on long press")
         save("all-sessions-menu", app)
@@ -164,49 +104,14 @@ final class BotChatUITests: BighelpUITestCase {
         return app
     }
 
-    /// A finance chat in the list that isn't its Bot Chat.
-    private let listedChatText = "Booked! The details are in your email."
-
-    /// Chat opening the agent's own chat, as people have it, and one computer.
-    @MainActor
-    private func launchOnTheAgentsChat(layout: String? = nil) -> XCUIApplication {
-        let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-canonical-agent-chat",
-                               "-loopdy.home.opens-chat", "YES", "-bighelp.hosts.all-hosts", "NO"]
-        if let layout { app.launchArguments += ["-bighelp.app-layout", layout] }
-        app.launch()
-        XCTAssertTrue(chatIdentity(in: app).waitForExistence(timeout: 30))
-        return app
-    }
-
-    /// A chat from the full list: ☰ › Sessions, or the Sessions tab when it's open. `demo-session-3`
-    /// is the finance agent's, `demo-session-1` the travel agent's.
-    @MainActor
-    private func openListedChat(_ id: String = "demo-session-3", in app: XCUIApplication) {
-        let row = app.buttons["session.row.\(id)"].firstMatch
-        let list = app.descendants(matching: .any)["sessions.screen"]
-        if !list.waitForExistence(timeout: 3) {
-            let menu = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["chat.menu", "home.drawer.open"]))
-                .firstMatch
-            XCTAssertTrue(menu.waitForExistence(timeout: 5))
-            menu.tap()
-            app.buttons["menu.sessions"].tap()
-        }
-        XCTAssertTrue(list.waitForExistence(timeout: 10))
-        for _ in 0..<6 where !(row.exists && row.isHittable) { list.swipeUp() }
-        row.tap()
-    }
-
-    @MainActor
-    private func message(_ text: String, in app: XCUIApplication) -> XCUIElement {
-        app.textViews.matching(NSPredicate(format: "value CONTAINS %@", text)).firstMatch
-    }
-
+    /// Bots › the bot's row, wherever it is: in the list, pinned or the primary bot.
     @MainActor
     private func tapAgent(_ id: String, in app: XCUIApplication) {
-        openRootTab("tab.agents", in: app)
-        let agent = app.buttons["agent.\(id)"].firstMatch
-        XCTAssertTrue(agent.waitForExistence(timeout: 10), "agent.\(id) on Agents")
+        showBots(in: app)
+        let agent = app.buttons.matching(NSPredicate(format: "identifier IN %@", [
+            "simple-bots.bot.\(id)", "simple-bots.pinned.\(id)", "simple-bots.primary.\(id)",
+        ])).firstMatch
+        XCTAssertTrue(agent.waitForExistence(timeout: 10), "\(id) on Bots")
         agent.tap()
     }
 

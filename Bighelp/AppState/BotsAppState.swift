@@ -4,7 +4,7 @@ import Foundation
 struct BotsAppStateHost: Equatable, Sendable {
     /// This phone's own ID for it (the host registry's), different on every device.
     let hostKey: String
-    /// Its sign-ins' cache scopes (`WorkspaceOwner.cacheScopeID`): Bots mode's order and the voices are kept by these.
+    /// Its sign-ins' cache scopes (`WorkspaceOwner.cacheScopeID`): the Bots view's order and the voices are kept by these.
     let scopes: [String]
     /// Where its bots' faces are kept on this phone (`CompanionSurfaceScope.computer`).
     let faceScope: String
@@ -18,10 +18,10 @@ struct BotsPhoneState: Equatable {
     var sections: [FleetSection] = []
     /// A group chat's section, by `FleetGroup.id`.
     var groupSections: [String: String] = [:]
-    /// Group chats pinned on Bots mode's home and ones hidden from it, by `FleetGroup.id`.
+    /// Group chats pinned on the Bots view and ones hidden from it, by `FleetGroup.id`.
     var pinnedGroups: [String] = []
     var hiddenGroups: [String] = []
-    /// Multi-gateway's primary bot (`FleetID`).
+    /// Show every computer's primary bot (`FleetID`).
     var primary: String?
     /// `AgentVoiceChoices`, by its entry keys.
     var voices: [String: AgentVoiceChoices.Choice] = [:]
@@ -33,7 +33,7 @@ struct BotsPhoneState: Equatable {
     var pins: [String: AgentDirectoryStore.SavedPins] = [:]
 }
 
-/// Bots mode's choices as the computers keep them (`native-app-state-v1`), named so every device
+/// The Bots view's choices as the computers keep them (`native-app-state-v1`), named so every device
 /// means the same thing: a bot is `<computer ID>/<profile ID>` and a group chat `<computer ID>/<room
 /// ID>`, by the ID each computer's plugin makes for itself. The host ID this phone makes is its own,
 /// so it never leaves the phone. Hosts without a computer ID (their plugin doesn't keep app state)
@@ -43,7 +43,7 @@ struct BotsPhoneState: Equatable {
 /// `bots.layout` (v1): `sections` [{id, name}], `groupSections` {group: section}, `home` {computer:
 /// {list, top, pinned, unpinned, primary}} for one gateway's home (pins and the primary bot are this
 /// app's own, kept on the phone per sign-in, not on the profiles), `multiGatewayHome` {list, top},
-/// `primary` (Multi-gateway's), and `pinnedGroups` and `hiddenGroups` [`<computer>/<room>`]. List and top items
+/// `primary` (Show every computer's), and `pinnedGroups` and `hiddenGroups` [`<computer>/<room>`]. List and top items
 /// are `bot/<computer>/<profile>` and `group/<computer>/<room>`.
 ///
 /// `bots.settings` (v1): `bots` {bot: {voice, mark, pet, character}}.
@@ -318,7 +318,7 @@ enum BotsAppState {
         }
     }
 
-    /// A Multi-gateway home's item (`bot:<host>/<profile>`, `group:<host>/group/<room>`; on top, bots'
+    /// An item of the Bots view with every computer shown (`bot:<host>/<profile>`, `group:<host>/group/<room>`; on top, bots'
     /// bare `FleetID`s and pinned group chats' items) by the computer. Orders saved before group chats
     /// were named by their gateway have `group:hermes-room:<room>` for the gateway in use.
     static func portableMultiItem(_ item: String, names: Names, top: Bool = false) -> String? {

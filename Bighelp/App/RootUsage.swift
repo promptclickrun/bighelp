@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// ☰ › Usage: one page for plans, limits and what the agents used. With All
-/// hosts on it covers every computer; otherwise the one in use.
+/// Usage (Settings, a chat's ⋯, the sidebar): one page for plans, limits and what the bots used.
+/// With every computer showing it covers them all; otherwise the one in use.
 extension RootShellView {
     /// What the Usage page reads: the sign-in (a reconnect keeps it), demo data
     /// or not, whether All hosts is on, and the shell it opens in.
@@ -14,14 +14,14 @@ extension RootShellView {
         /// The selected host's navigation and agents come with its runtime, which
         /// can arrive after its sign-in (opening the app with All hosts on). Opening
         /// Usage goes through the shell configured last, so a new one configures it
-        /// again; otherwise ☰ › Usage pushed onto a stack nothing showed (#99).
+        /// again; otherwise Usage pushed onto a stack nothing showed (#99).
         let navigation: ObjectIdentifier
     }
 
     var usageReaderKey: UsageReaderKey {
         let fixtures = usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true
         return UsageReaderKey(signIn: currentWorkspaceOwner?.signIn ?? workspaceSignIn, fixtures: fixtures,
-                              allHosts: fleetModeOn, hostID: usageHostID, hostName: workspaceHostName,
+                              allHosts: showsEveryHost, hostID: usageHostID, hostName: workspaceHostName,
                               navigation: ObjectIdentifier(appState))
     }
 
@@ -64,15 +64,10 @@ extension RootShellView {
         }
     }
 
-    /// Usage over whatever is open, so Back returns there; its tab when it's pinned.
+    /// Usage over whatever is open, so Back returns right there.
     func openUsage() {
         guard appState.path.last != .usage else { return }
-        if barTabs.contains(.usage) {
-            appState.select(.usage)
-        } else {
-            // A quick screen: over whatever is open, so Back returns right there.
-            appState.path.append(.usage)
-        }
+        appState.path.append(.usage)
     }
 
     var usageDestination: some View {

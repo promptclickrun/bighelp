@@ -1,9 +1,9 @@
 import XCTest
 
 /// Demo data: a run's stage opens what it used, made and decided; a workflow's trigger goes from
-/// Manual to a schedule; Settings › Notifications has the workflow switches; the all-hosts Agents
-/// screen asks which computer before New agent. BIGHELP_WORKFLOWS_EVIDENCE (TEST_RUNNER_…) saves
-/// screenshots; BIGHELP_WORKFLOWS_APPEARANCE picks light or dark.
+/// Manual to a schedule; Settings › Notifications has the workflow switches; the scheduled task
+/// editor keeps its picker. BIGHELP_WORKFLOWS_EVIDENCE (TEST_RUNNER_…) saves screenshots;
+/// BIGHELP_WORKFLOWS_APPEARANCE picks light or dark.
 final class WorkflowsStagesAndTriggersUITests: BighelpUITestCase {
     @MainActor
     func testARunStageShowsWhatItUsedMadeAndDecided() throws {
@@ -79,31 +79,6 @@ final class WorkflowsStagesAndTriggersUITests: BighelpUITestCase {
         save("35-notification-workflows", app)
     }
 
-    @MainActor
-    func testAllHostsNewAgentAsksWhichComputerFirst() throws {
-        let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-use-multi-host-fixtures",
-                               "-bighelp.hosts.all-hosts", "NO", "-loopdy.demo.appearance", appearance]
-        app.launch()
-        let menu = app.buttons["home.drawer.open"]
-        XCTAssertTrue(menu.waitForExistence(timeout: 10))
-        menu.tap()
-        app.buttons["menu.all-hosts"].tap()
-        XCTAssertTrue(element("fleet.home", app).waitForExistence(timeout: 5))
-        let organize = app.buttons["fleet.organize"]
-        XCTAssertTrue(organize.waitForExistence(timeout: 5))
-        organize.tap()
-        let newAgent = app.buttons["fleet.organize.new-agent"]
-        XCTAssertTrue(newAgent.waitForExistence(timeout: 5))
-        newAgent.tap()
-        let host = app.buttons["fleet.gate.host.Home Hermes"]
-        XCTAssertTrue(host.waitForExistence(timeout: 5), "It asks which computer")
-        save("36-new-agent-which-computer", app)
-        host.tap()
-        XCTAssertTrue(app.buttons["agent.editor.cancel"].waitForExistence(timeout: 15), "That computer's new-agent editor opens")
-        save("37-new-agent-editor", app)
-    }
-
     /// The scheduled task editor's "When?" is the same picker the workflow trigger uses.
     @MainActor
     func testScheduledTaskEditorKeepsItsPicker() throws {
@@ -130,20 +105,14 @@ final class WorkflowsStagesAndTriggersUITests: BighelpUITestCase {
     @MainActor
     private func launch() -> XCUIApplication {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES",
-                               "-loopdy.demo.appearance", appearance]
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance]
         app.launch()
         return app
     }
 
     @MainActor
     private func openWorkflows(_ app: XCUIApplication) {
-        let menu = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"])).firstMatch
-        XCTAssertTrue(menu.waitForExistence(timeout: 15))
-        menu.tap()
-        let row = app.buttons["menu.workflows"]
-        XCTAssertTrue(row.waitForExistence(timeout: 8))
-        row.tap()
+        openWorkDoor("workflows", in: app)
         XCTAssertTrue(app.buttons["workflows.waiting.run-14"].waitForExistence(timeout: 8))
     }
 

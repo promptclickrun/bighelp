@@ -12,9 +12,13 @@ final class AppReviewHostUITests: BighelpUITestCase {
             throw XCTSkip("Set BIGHELP_REVIEW_HOST to the App Review host's address")
         }
         let app = makeApp()
-        app.launchArguments = ["-loopdy.home.opens-chat", "YES"]
         app.launch()
         try onboardOpenHost(app, address: address)
+        // Bots › the primary bot opens its chat.
+        showBots(in: app)
+        let primary = app.primaryBot
+        XCTAssertTrue(primary.waitForExistence(timeout: 30), "Bots has the primary bot")
+        primary.tap()
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 30), "The agent's chat opens")
         save("1-chat", app)

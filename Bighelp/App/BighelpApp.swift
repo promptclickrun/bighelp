@@ -189,6 +189,9 @@ struct BighelpApp: App {
             else { return nil }
             return (scope, demoAgents)
         })
+        Self.wireSpaces(registry: hostRegistry, connections: connections, fleet: fleet,
+                        nativeWorkspaces: nativeWorkspaces, demoHosts: demoHosts, demoAgents: demoAgents,
+                        usesDemoWorkspace: usesDemoWorkspace)
         let nativeWorkspaceKey: @MainActor () -> BighelpShortcutWorkspaceKey? = {
             if usesDemoWorkspace, !connections.isDirectSelected { return nil }
             guard hostRegistry.connectionMode == .independent || connections.isDirectSelected else { return nil }
@@ -576,7 +579,7 @@ struct BighelpApp: App {
                 // Shortcuts) still needs the socket, as RootShellView's closer knows.
                 guard BighelpShortcutService.holdsHostConnection == 0 else { return }
                 nativeWorkspaces.suspend()
-                // Other gateways kept connected for the all-hosts view or Multi-gateway close too.
+                // Other gateways kept connected for Show every computer close too.
                 hostRegistry.keepsOtherHostsConnected = false
             }
         }
@@ -631,6 +634,8 @@ struct BighelpApp: App {
                 #if DEBUG && targetEnvironment(simulator)
                 ConnectorCardFixture.rootView()
                 #endif
+            } else if let oneHomeFixture {
+                oneHomeFixture
             } else if BighelpLoaderGallery.isRequested {
                 BighelpLoaderGallery.rootView()
             } else if isCarPlaySessionFixture {
@@ -715,7 +720,7 @@ struct BighelpApp: App {
             .task(id: nativeWorkspaces.synchronizationKey) {
                 await nativeWorkspaces.synchronize()
             }
-            // Bots mode's order, sections and bot settings from the person's computers.
+            // The Bots view's order, sections and bot settings from the person's computers.
             .task(id: Self.botsAppStateKey(connections: workspaceConnections, registry: hostRegistry,
                                            isActive: scenePhase == .active)) {
                 guard scenePhase == .active else { return }
@@ -805,6 +810,21 @@ struct BighelpApp: App {
                             companionAgentScope: companionAgentScope, permissionCenter: permissionCenter)
         KanbanWindowScene(settings: settings, companion: companion, companionAgentScope: companionAgentScope)
         #endif
+    }
+
+    /// One home's new screens alone on made-up data, each behind its own launch argument, before
+    /// the shell shows them. One home: the wiring step can drop the ones the shell shows.
+    private var oneHomeFixture: AnyView? {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-test-home-chrome") { return AnyView(HomeChromeFixture()) }
+        if arguments.contains(ChatsInboxFixture.launchArgument) { return AnyView(ChatsInboxFixture.view()) }
+        if arguments.contains(NewChatFixture.launchArgument) { return AnyView(NewChatFixture.makeView()) }
+        if arguments.contains(TodayFixture.launchArgument) { return AnyView(TodayFixture()) }
+        if arguments.contains(WorkFixture.launchArgument) { return AnyView(NavigationStack { WorkFixture.view() }) }
+        if arguments.contains(SpacesTodayFixture.launchArgument) { return AnyView(SpacesTodayFixture()) }
+        #endif
+        return nil
     }
 
     private var isModelsPageFixture: Bool {

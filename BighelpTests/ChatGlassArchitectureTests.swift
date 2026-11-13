@@ -3,7 +3,8 @@ import Testing
 
 struct ChatGlassArchitectureTests {
     @Test func chatChromeUsesOnlyBoundedControlGlass() throws {
-        let source = try load("Bighelp/Chat/ChatView.swift")
+        // The chat and its header (`ChatPushedHeader`).
+        let source = try load("Bighelp/Chat/ChatView.swift") + load("Bighelp/Board/AgentHomeChrome.swift")
         #expect(!source.contains("ChatFloatingChromeBackdropLayer"))
         #expect(!source.contains("ChatFloatingChromeBackdropSurface"))
         #expect(source.contains("bighelpNavigationGlass"))

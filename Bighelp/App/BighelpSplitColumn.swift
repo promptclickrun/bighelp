@@ -1,7 +1,7 @@
 import Observation
 import SwiftUI
 
-/// The iPhone Duo open: the list (Bots mode's home, the chat list, or Code's home) as a column
+/// The iPhone Duo open: the list (the Bots view, the Chats view or Work) as a column
 /// beside the page, with its own bar. What it opens is pushed on the app's one navigation stack, as
 /// everywhere else, so it shows beside the list and every rule about the open chat still holds.
 @MainActor

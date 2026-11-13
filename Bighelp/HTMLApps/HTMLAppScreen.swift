@@ -15,9 +15,13 @@ struct HTMLAppScreen: View {
     @Environment(\.scenePhase) private var scenePhase
     @BighelpThemeReader private var theme
 
-    init(app: HTMLAppCard, agentID: String, send: @escaping @MainActor (String) throws -> Void) {
+    /// `connection` is the computer the app is on: the one in use for a chat's card, the space's own
+    /// computer for a space's page (`TodaySpacesModel.pageConnection`).
+    init(app: HTMLAppCard, agentID: String,
+         connection: @escaping @MainActor () -> (scope: String, api: HTMLAppsAPI)? = HTMLAppHost.connection,
+         send: @escaping @MainActor (String) throws -> Void) {
         self.send = send
-        _model = State(initialValue: HTMLAppScreenModel(app: app, agentID: agentID))
+        _model = State(initialValue: HTMLAppScreenModel(app: app, agentID: agentID, connection: connection))
     }
 
     /// Data is read only while the page shows and bighelp is in front.

@@ -13,7 +13,7 @@ final class AIDataConsentGateUITests: BighelpUITestCase {
         let app = makeApp()
         app.launch()
         try onboardOpenHost(app, address: address)
-        XCTAssertTrue(app.buttons["tab.sessions"].waitForExistence(timeout: 20), "Setup is finished")
+        XCTAssertTrue(app.buttons["home.new-chat"].waitForExistence(timeout: 20), "Setup is finished")
         app.terminate()
 
         // The same bighelp, as if it was set up before the agreement existed.
@@ -32,7 +32,7 @@ final class AIDataConsentGateUITests: BighelpUITestCase {
 
         let again = makeApp()
         again.launch()
-        XCTAssertTrue(again.buttons["tab.sessions"].waitForExistence(timeout: 20))
+        XCTAssertTrue(again.buttons["home.new-chat"].waitForExistence(timeout: 20))
         XCTAssertFalse(again.descendants(matching: .any)["onboarding.ai-consent"].firstMatch.waitForExistence(timeout: 5),
                        "Never asked again after agreeing")
     }

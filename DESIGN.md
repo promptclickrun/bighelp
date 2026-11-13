@@ -3,7 +3,7 @@
 ## Authority and scope
 
 The current authority is the **Noodle brand kit** (`BighelpBrand`, the Ember palette) and its blended direction:
-1a "Messages, evolved" structure, in the **Ink** look Bots mode started (#622): white by day, black at night, ink
+1a "Messages, evolved" structure, in the **Ink** look the Bots view started (#622): white by day, black at night, ink
 controls in the person's own color. Cream ("Center stage") and Graphite ("After dark") stay as page choices.
 The app is a simple messaging experience for personal assistant agents. Earlier bighelp/iOS 27 Builder references
 are historical (`docs/ui-v3-design.md`).
@@ -27,7 +27,7 @@ are historical (`docs/ui-v3-design.md`).
   lowercase b and kicks out at the bottom left as a chat-bubble tail. It appears in chrome (root nav bars, icon,
   setup) and as the app's loaders, never as a chat participant and never in an agent color. In the wordmark the mark
   stands in for the b, then "ighelp" in the kit's outlined Nunito: ink by day, cream after dark. See **Noodle** below.
-- **Ink** is the default look, the one Bots mode always had: Classic's Paper page (#FFFFFF) by day and Black at night,
+- **Ink** is the default look, the one the Bots view always had: Classic's Paper page (#FFFFFF) by day and Black at night,
   black bubbles by day (dark gray #3A3A3F after dark), and buttons and tinted text in the page's ink. Its switches
   are green, since an ink switch would be white on white after dark. Every control that acts (New chat, the
   selected tab, buttons, chips, row icons) takes the color picked in Appearance (`theme.action` and
@@ -76,12 +76,12 @@ are historical (`docs/ui-v3-design.md`).
   talking, happy, sleeping) plus extra moves for its current work. The look is saved as the agent's avatar picture.
 - Every surface draws an agent's face in one order (`AgentFace`): its kit character, its petdex pet, its Hermes face
   or shape (the look Hermes keeps in its profile, drawn live and played with the avatar designer's states), its
-  Bots mode mark, then its picture. Each agent's pet companion is that same face (`AgentPet`); Settings › Appearance ›
+  mark, then its picture. Each agent's pet companion is that same face (`AgentPet`); Settings › Appearance ›
   Companion pet holds only Show pet companion, Pet size and Adventurous Pet.
 - Menu and Settings icons are bighelp's own line glyphs (`Design/Glyphs`, `BighelpGlyph`): a 24-pt
   grid, round 2-pt strokes and the brand's dot, with agents drawn as the orb with two eyes. Call sites still name SF
   Symbols; ones without a glyph fall back to the symbol. Edit `glyphs.py`, then run `export_assets.py`.
-- Product type is SF Pro. Root screens use large titles; section captions are small, bold, letterspaced and muted.
+- Product type is SF Pro. Root screens put a bold title (Today, Work) or the Bots | Chats switch in the home header; section captions are small, bold, letterspaced and muted.
 - The message box: + beside it, and one pill inside it at its end: voice mode (a waveform) while it's empty,
   Send once there's text, Stop while the agent works. No other microphone button. Once a draft has three
   lines, a small, quiet rail shows centered above the box: the expand icon and "Expand", in a glass pill
@@ -102,8 +102,8 @@ are historical (`docs/ui-v3-design.md`).
   editable, an app-owned box of what to check (Missing, Check, Guess, You changed beside each field), where it goes
   (iOS's own pop-up menu of accounts or calendars, or the default one until bighelp may list them), anything already
   saved that looks like it (read only), and Discard and Save in the bar. The agent's review note sits at the top as
-  its quote. After a decision the same card says what happened. Each agent's Photo actions page (beside its
-  Instructions in Agent Studio, in What it can use on a bot's profile) sets the offer, how to read each kind, the question for unclear pictures and the review messages,
+  its quote. After a decision the same card says what happened. Each agent's Photo actions page (in What it can use on a
+  bot's profile) sets the offer, how to read each kind, the question for unclear pictures and the review messages,
   with Preview and Reset to defaults ([Image drafts](docs/IMAGE_DRAFTS.md)).
 - Agents' apps: an app an agent made is a card in the chat, never its page: an icon tile in the action color, the
   title, the agent's description, small "Sends answers" and "Live data" tags, and a full-width Open App. Open App
@@ -118,35 +118,71 @@ are historical (`docs/ui-v3-design.md`).
 
 ## Navigation and simplicity
 
-iPhone is an agent home. The bottom bar is **Chat, Feed, New chat, Ideas, Goals**, all for the selected agent; Files
-(the Apps page) is in ☰. It is always open and names each tab under its icon; the current one is a pill in the
-picked color. New chat is a round button in the middle, in the picked color, on every place the bar holds: a tap
-starts a chat with the agent in use, touch and hold (right-click on the Mac) picks agents, one for a 1:1 chat or
-several for a group. The bar holds Chat and three places (Appearance › App layout). In a chat, Chat is the lit tab and tapping it does nothing.
-With Sessions in the bar (App layout), every chat's list and a chat picked from it light Sessions instead, and
-Chat there opens the agent's own chat. A tab keeps its place: leave a chat for another place and the tab it was
-under (Chat, or Sessions for a chat picked from its list) opens that chat again (`HeldChat`), until another chat
-opens. Once another agent is in use, Chat opens that agent's chat instead.
-Chat opens that agent's canonical Bot Chat (the same conversation as Hermes Desktop's bot entry) with its live avatar big at the top: tap the avatar for its profile (This chat's
-model and reasoning, then Activity, Approvals, Schedules, Identity), tap the name to switch agents or open a group
-chat, and ☰ for everything else. ☰'s first screen fits without
-scrolling: the host as one switcher row on top, then New chat (Group beside it), Agents, Sessions (every chat), Projects, Kanban, Workflows
-(where the computer's plugin has them or says why it can't run them; with All hosts on it asks which computer),
-Scheduled tasks, Usage and Settings, then Recent chats with See all. Advanced options' Folder sits under More at the
-bottom; the credential vault is in Settings › Apps & skills, with the apps and Device access.
-Keep it that short: a new destination goes where people already look, not on the first screen. Headers keep their
-own New chat only where there's no bar to hold it: Code mode, the iPhone Duo's side strip, Vision Pro's tab
-ornament, and a board opened with Back. The chat list (and the all-hosts view's All sessions) searches from the system
-glass search bar along the bottom, like All agents; it matches titles and previews, and a scroll puts the keyboard away.
-A chat with something new since it was last read has a bold title and Bots mode's dot after its time, and a chat
-whose message box holds an unsent message shows Draft before its preview. With Settings › Chat › Projects in the chat
-list on (on by default, saved on each device), a chat in a project shows the project's name on a line of its own
-under the preview, never beside it, so the preview stays whole at large text; a list grouped by project leaves it out.
-The row's menu shows the chat's project beside Move to Project…, and the move sheet lists that project first, then
-the rest by name. Projects sorts by Recently used or Name, saved on the device. Where the computer keeps read state, the
-row's menu and leading swipe have Mark Read and Mark Unread. Feed, Ideas, Goals and Apps keep the Chat tab's header: ☰ and ⋯ (the agent's profile,
-then Files, Memory, Skills & tools and Scheduled tasks). The root's edge-swipe zones
-start below that row, so its corner buttons always get the tap. The avatar reacts to what the agent is doing (thinking, writing code, browsing, making
+bighelp is one home with three places and no modes. The bottom bar is the same for everyone: **the first tab, Today and
+Work**, with the round New chat button beside it. The first tab shows the Bots view or the Chats view and takes the name
+of the person's default view; the header's Bots | Chats switch changes the view for this run. The bar is always open and
+names each place under its icon; the current one is a pill in the picked color, and a dot on Today means something
+needs you. New chat is a round button in the picked color. The bar shows on roots only and goes while the keyboard is
+up: a pushed page, a chat included, has Back and no bar. The app opens on Settings › Chat › Opens on (Bots, Chats,
+Today or Work), when it starts and not when it comes back, and a link, widget or notification that opens the app wins.
+No chat opens by itself.
+
+Every root draws the same header and no navigation bar, so nothing moves between places: the person's circle at the
+left, which opens Settings (iPhone has no menu and no sidebar); in the middle the Bots | Chats switch, or the title
+(Today, Work); at the right search, the computer menu (Today and Work, with two or more computers), the place's own
+control (Today's Edit) and +. When the switch or the title doesn't fit beside the buttons (large text), it takes a row
+of its own. The root's edge-swipe zones start below that row, so its corner buttons always get the tap.
+
+**Bots** is one row per bot and group chat (Bots view, below). **Chats** is every chat on every computer in one list,
+newest first, Pinned on top, then Today, Yesterday and Earlier, with search over it and one row of chips: All, Unread
+and, with two or more computers, one for each. Touch and hold a chat for Pin, Mark read or unread, Rename and
+Archive; only the computer in use's chats pin or mark read, while another computer's rename and archive. A chat with
+something new since it was last read has a bold title and a dot after its time, and a chat whose message box holds
+an unsent message shows Draft before its preview. Chats › This computer opens that computer's own Sessions page:
+its projects, imports from other apps and one bot's chats. There, with Settings › Chat › Projects in the chat list on
+(on by default, saved on each device), a chat in a project shows the project's name on a line of its own under the
+preview, never beside it, so the preview stays whole at large text; a list grouped by project leaves it out. The
+row's menu shows the chat's project beside Move to Project…, and the move sheet lists that project first, then the
+rest by name. Projects sorts by Recently used or Name, saved on the device. Where the computer keeps read state, the
+row's menu and leading swipe have Mark Read and Mark Unread.
+
+**Today** is a grid of panels under the header: Needs you on top while something waits (a card with the count and the
+first entry, which opens the Needs you deck), the Shared with bighelp card while a share waits, then the person's
+panels in three sizes (Small, Wide, Tall), and a Make a space box below them that starts a chat with a bot to draft
+one. One panel holds Feed, Ideas and Goals for every bot (See all opens a page with a chip for each bot); each space
+is a panel of its own ([Spaces](docs/SPACES.md)). Edit turns the grid into a list where each panel is moved, hidden
+and sized; hidden panels come back from there. **Work** is one list of what the bots are doing, each row from the
+store that holds it: coding sessions, chats and background work running now, workflow runs, Kanban tasks and
+scheduled tasks. Chips filter it: All, Needs you, Working, Done. Four doors lead on: Projects, Tasks (Kanban),
+Workflows and Schedules, each only where the computer has it. Today and Work show the computer in use; with two or
+more computers the header's computer menu switches it. A project's page is Work filtered to that project, with Back,
+its name and ⋯ (pull requests, worktrees, Dev Factory).
+
+**New chat** is the new chat's own screen: the ordinary chat with a To row under Back and ⋯, where the bot's name
+would be. Picked bots are chips, and a field filters the list of bots and group chats over the empty messages. One
+bot is a chat, two to six are a group chat, and a group chat the person already has can be picked at the end of the
+list. With nobody picked the message box is the primary bot's; picking another single bot makes it that bot's. For one
+bot on a computer that can run coding sessions, one row under the message box scrolls sideways and never wraps:
+Project (none is an ordinary chat), then, once a project is picked, where it runs (a new worktree or local), the
+branch, the mode (Default, Plan, YOLO) and Stage. A project makes Send start a coding session, which Work lists;
+Stage keeps the message as a job, and Send all starts the staged jobs as one batch. A group chat and a coding
+session take text only, so + offers no attachments for them. The To row, the list and the choices row leave once the
+first message is sent.
+
+A chat is a pushed page with one header: Back, the bot (its face and name; a tap opens its bot page) and ⋯. Tapping a
+bot on the Bots view opens what Settings › Chat › A bot opens says: its ongoing Bot Chat (the same conversation as
+Hermes Desktop's bot entry), your last chat with it, or a new chat; Ask and Needs you open the Bot Chat. A group
+chat's name opens its Group Settings (Chat Info for a group Hermes doesn't run). The line under the name says the
+agent's activity while it works, and otherwise the chat's title when Settings › Chat › Chat title is on (off by
+default; never "New chat" or "Bot Chat"). The bot page is the same for every bot from every door: a chat's header,
+Bot Profile in a bot's menu, a bot chip on a Today board.
+
+iPad at regular width works the same way, with a sidebar behind a button in the header: it slides in from the
+leading edge, and chats use the width of the screen. The sidebar lists the three places, Settings, New chat, recent
+chats (See all opens Chats) and More: Needs you while something waits, Shared with bighelp while a share waits, and
+Usage. The Mac and Vision Pro keep that sidebar open as a column beside the page.
+
+A bot's face reacts to what the agent is doing (thinking, writing code, browsing, making
 images…), driven by the running tool (`AgentActivityKind`, shared with the island as `BighelpActivityPose`). On
 phones with a Dynamic Island, the island names the work. In the app it grows into a stage
 (`AgentActivityIsland` + `IslandStage`): the name and the work beside the camera, and underneath, the pet acting
@@ -155,24 +191,20 @@ planes…). The status bar hides while it shows, and the app moves down (root `a
 is covered. Tap for a compact pill, touch and hold to open the chat. Settings › Chat › Dynamic Island
 turns it off. Outside the app, one Live Activity holds the active chats as compact rows: title, agent and a
 fixed status icon. Chats needing attention come first. Each row opens its own chat; extra chats show as a count.
-The expanded Dynamic Island shows three rows, while the compact island keeps a quiet work or attention symbol. Every phone chat uses this big-avatar header and keeps the tab bar under its message box (All
-agents' chats excepted). Every chat has ☰ in the top left, like the other root screens; a chat opened from the
-list, Agents, Feed or a task goes back to it with the edge swipe. A group chat's name opens its Group Settings (Chat Info for a group Hermes doesn't run). The line under
-the name says the agent's activity while it works, and otherwise the
-chat's title when Settings › Chat › Chat title is on (off by default; never "New chat" or "Bot Chat"). iPad works the same way, with no always-open sidebar:
-☰ slides the menu in from the leading edge, and chats use the width of the screen. The iPhone Duo follows how it's
-held (`BighelpScreenPosture`). Folded, the cover screen is wide and short, with the camera and status in a column on
-its trailing edge: the bar's places go down that column as iOS's own toolbar items (`BighelpStripTabs`), under the
-screen's own buttons (☰, the brand, a filter), which iOS moves there too, so chats get their height back, and in Bots and Code mode the column holds the chat switcher instead (`BighelpChatSwitcher`: the bots on top
-of the home, or the running sessions, each with its live state; Settings › Modes › Chat switcher, on by default
-there and opt-in on iPad and Mac in landscape). Open and held wide, the list (Bots mode's home, the chat list, or
-Code's home) sits left of the fold and what it opens sits right of it, like a book (`BighelpSplitColumn`); nothing
-crosses the fold. Held upright it's a big phone, never the cover screen's layout, and half-folded like a small
-laptop a chat keeps its messages above the fold and its message box and keyboard below it. Half of the open screen
-in iOS's Split View gets the cover screen's layout. On Vision Pro bighelp always
-starts in its own window. The tabs sit in a strip beside the window (`VisionTabOrnament`), clear of the system's
-move and close controls under it; ☰ opens the menu as a column inside the window and the page beside it narrows
-(`VisionSideMenu`). Everything you look at and pinch is at least 56pt, and Appearance › Transparency sets how much
+The expanded Dynamic Island shows three rows, while the compact island keeps a quiet work or attention symbol.
+
+The iPhone Duo follows how it's held (`BighelpScreenPosture`). Folded, the cover screen is wide and short, with the
+camera and status in a column on its trailing edge: the places go down that column as iOS's own toolbar items
+(`HomeStripTabs`), under the screen's own buttons, which iOS moves there too, so chats get their height back, and
+a chat's column holds the chat switcher instead (`BighelpChatSwitcher`: the bots on top of the Bots view, or a coding
+session's other sessions, each with its live state; Settings › Chat › Chat switcher, on by default there and opt-in on
+iPad and Mac in landscape). Open and held wide, the first tab's list (the Bots view or the Chats view) sits left of the
+fold and what it opens sits right of it, like a book (`BighelpSplitColumn`); nothing crosses the fold. Held upright
+it's a big phone, never the cover screen's layout, and half-folded like a small laptop a chat keeps its messages
+above the fold and its message box and keyboard below it. Half of the open screen in iOS's Split View gets the cover
+screen's layout. On Vision Pro bighelp always starts in its own window. The three places sit in a strip beside the
+window (`HomeTabOrnament`), clear of the system's move and close controls under it; the sidebar opens as a column
+inside the window and the page beside it narrows. Everything you look at and pinch is at least 56pt, and Appearance › Transparency sets how much
 of the room shows through the window. Titles and toolbar buttons use the app's ink in light mode, since the system
 draws them white. The agent can also stand in the room as a 3D character in its own volume (Settings › In your
 space): kit characters are sculpted from their own art like vinyl toys, round bodies with faces laid on them
@@ -180,7 +212,7 @@ space): kit characters are sculpted from their own art like vinyl toys, round bo
 It opens within reach; pinch it to make it hop, drag to turn it, and drag a corner of its volume to make it
 bigger or smaller. It wears the Agent Studio headwear and pattern and plays the chosen moves. The avatar designer
 shows the same 3D character beside its choices, with moods to try (listening, thinking, talking, happy, sleepy)
-and See it in your room, which puts the look being designed into the room at full size. ☰ › More › Simple mode leaves just
+and See it in your room, which puts the look being designed into the room at full size. The sidebar's More › Simple mode leaves just
 the agent, with Open bighelp under it to come back. The avatar never opens by itself.
 
 Widgets (`BighelpActivityShared`, rendered by the Live Activity extension) use the Colors picks through
@@ -195,14 +227,14 @@ agent or board; tapping a card opens it in the app. **Feed**, **Ideas** and **Go
 agent picked in the widget or Auto (the agent picked in the app). The app reads only the boards widgets are set to
 (`BighelpWidgetBoardLoader`, a few agents at most) and the widget says so until it has. **Pinned Agents** is a
 grid of faces with names under them, like contacts: Current Gateway shows the computer in use's pinned agents,
-Multi Gateway every computer's (All agents' pinned row), with a small computer name under each when they're on
+Multi Gateway every computer's (the Bots view's pinned row), with a small computer name under each when they're on
 more than one. A tap opens that agent's canonical Bot Chat (`loopdy://agent-chat?agent=…&host=…`), switching
-computers first like All agents. Pictures are copied per agent and computer (`BighelpPinnedAvatarStore`), and a
+computers first, as the Bots view does. Pictures are copied per agent and computer (`BighelpPinnedAvatarStore`), and a
 computer called only by its address shows as "Computer 2". **Bots** shows one, two or four chosen bots (small,
 medium, large) on a chosen gateway, on the plain page color: each bot's face (a Simple Bot shape standing free, a
 photo in a circle, its default shape without a picture) over its name, and a tap opens its Bot Chat on that gateway.
 The app writes every gateway's bots and faces into the app group (`BighelpBotsWidgetFeed`, the computer in use live
-and the others from All agents), so the widget keeps them with bighelp closed. **Usage** shows each plan's limits as
+and the others from their all-hosts copies), so the widget keeps them with bighelp closed. **Usage** shows each plan's limits as
 the plugin reports them, for the gateway in use or a chosen one. Each size lists only its own styles: small (Ring,
 Two meters, What's left, Four plans, Closest to limit), medium (One plan, Every plan, Next resets, Side by side),
 large (Every plan, One plan), extra large (a column per plan), Cost and tokens in the first three, and the Lock
@@ -213,11 +245,8 @@ provider's color shows in full color only; tinted, clear and Lock Screen looks d
 carry the meaning. It shows only what Hermes and the plugin report: no pace, no daily share of a limit, no API-rate
 value. On Vision Pro the same widgets sit on a wall or table as glass, without the Lock Screen sizes.
 
-Apps: **Artifacts** lists what the agent made or changed lately, newest first, from one plugin request
-(`files.recent`, plugin 2.15+): its `write_file`/`patch` history and deliveries plus new top-level files. It never
-walks the whole workspace (a real one holds over a million files); older plugins get a shallow, bounded scan that
-skips tooling folders and shows files as it goes. **Media** shows the pictures and videos the agent sent or
-generated (`attachments.recent`), then pictures from its posts; tap one for the native preview.
+**Media** (a bot page's tab) shows the pictures and videos the agent sent or generated (`attachments.recent`), then
+pictures from its posts; tap one for the native preview.
 
 The app icon badge means "something arrived while you were away": pushes set it, opening bighelp clears it
 (`BighelpAppBadge`). The app never sets a count of its own, so it can't get stuck on items the user can't see.
@@ -306,18 +335,18 @@ category with a +, which starts a chat asking the agent to plan a goal in that c
 category's blueprints). Goals carry the category in the plugin (`native-agent-board-goal-categories-v1`); without
 it every goal shows under Other and the page says to update the plugin.
 
-**Projects** (☰ › Projects) are Hermes projects shown the way Claude shows them: cards with the project's emoji
+**Projects** (Work › Projects) are Hermes projects shown the way Claude shows them: cards with the project's emoji
 and color, description and recent use; a project page with **New chat in this project**, its chats and its
 folders. A chat started there runs in the project's folder (Hermes files chats by folder, and the project becomes
 the current one). With Advanced options on, a project's ⋯ menu has Folders and Git for the folder and Git pages. 
 
-**Usage** (☰ › Usage, above Settings) is the one place for what the agents use. Limits come first: each plan,
+**Usage** (the first group of Settings, and the sidebar's More) is the one place for what the agents use. Limits come first: each plan,
 limit and balance the plugin finds (Choose hides one), with what the agents used through it in the range. With
-several computers (All hosts on) a menu beside Choose shows the computer in use, another one, or All computers, where
+several computers (Show every computer on) a menu beside Choose shows the computer in use, another one, or All computers, where
 each computer's plans sit under its own name; it changes only Limits and is remembered on the device. Then 7, 30
 or 90 days of Hermes' own numbers (`/api/analytics/usage` and `/api/analytics/models`, per agent): estimated cost or
 processed tokens per day as bars (tap one for its day), totals with the cache rate, when you use it (weekdays, and
-hours with the plugin's `usage/activity`), and ranked rows by model, by agent and, with All hosts on, by computer.
+hours with the plugin's `usage/activity`), and ranked rows by model, by agent and, with Show every computer on, by computer.
 Tap a row to chart it against everything else. Chat ⋯ › Usage › Usage and the context window open the same page; there is
 no overlay or Settings copy. Subscriptions report no cost, so a host where nothing cost money opens on Tokens.
 Share (top right, beside Refresh) sends the page as a PDF (paged, never cutting a card in two), a PNG (one tall
@@ -325,7 +354,7 @@ picture), a web page (one file, inline styles and SVG charts, nothing loaded) or
 numbers: days, models, agents, computers, totals, limits), always light, in the range, Cost or Tokens and Limits
 computers on screen, with every row listed and the date range and time it was made at the top.
 
-**Kanban** (☰ › Kanban, above Scheduled tasks) is Hermes' Kanban plugin, shown only when the host has it. Five lanes
+**Kanban** (Work › Tasks) is Hermes' Kanban plugin, shown only when the host has it. Five lanes
 in plain words: Later (triage, to-do, scheduled), Ready (an agent picks these up next), Working (only Hermes starts
 work, so nothing is dropped here), Needs you (blocked or waiting for review) and Done. Cards show who has them with
 their avatar, a pulse while they work, and why they need you ("Has a question", "Ready for review", "Got stuck").
@@ -337,11 +366,10 @@ the AI provider. On iPhone the board opens on Needs you as one lane at a time; i
 the board in its own glass window beside bighelp: look at a card, pinch and drag it, and it lifts toward you while
 the lane under it lights up.
 
-**Workflows** (☰ › Workflows, after Kanban) are the bighelp plugin's: stages that agents run one at a time on the
-computer, with your sign-off at the end. The row shows when the computer's plugin has them (`native-workflows-v1`)
+**Workflows** (Work › Workflows) are the bighelp plugin's: stages that agents run one at a time on the
+computer, with your sign-off at the end. The door shows when the computer's plugin has them (`native-workflows-v1`)
 or lists them under `unavailable` with a reason; then the screen says in plain words why this computer can't run
-them and what to do, never the code. Plugins with neither keep the row hidden. With All hosts on the row asks which
-computer first, then opens that one's Workflows. An older plugin gets "Update the bighelp plugin to use Workflows".
+them and what to do, never the code. Plugins with neither keep the door hidden. An older plugin gets "Update the bighelp plugin to use Workflows".
 Home leads with the service line, then Waiting for you (Review or Later), Active runs (All runs), Your workflows
 (pinned first; Run, or Set up while a role has no agent) and Templates: Create from scratch on top, then Built-in
 and Yours. Touch and hold a workflow for Open, Run, Pin or Unpin, Save as template and Archive; Archived workflows
@@ -377,24 +405,22 @@ the top bar stays on one line. Token counts, attempts, full fingerprints, the se
 are Advanced options only, and runs on Hermes' fallback runner (which can't count tokens) show none rather than 0. Stage
 chats (source `workflow`) stay out of Sessions, recents and widgets.
 
-**All hosts** (the stack button beside ☰'s host switcher) turns home into one list of every agent on every
-host, like Messages: pinned agents up top as big pictures with their name and role (no host name; touch and hold
-to drag them into a new order, kept on this device across hosts), host filter chips, then each agent with its host's
-name, its role and its latest chat, newest first. One big round New chat sits bottom right, above the search bar,
-where a thumb rests. A tap opens that agent's canonical Bot Chat (☰ top left, the edge swipe goes back); if it's on another host, the app switches hosts
-first while the list stays up. ☰'s recent chats, All chats and Scheduled tasks then list every host's, each with
-its host's name. Screens that belong to one host (Settings, Agents, Projects, Kanban, Workflows, the credential
-vault, the folder, New group) ask which host first; Usage instead adds up every host, with a row for each; Settings' Your computers group also has **Update every computer** (with two or more), one page
-for every host: Update Hermes (each host's commits behind), Update bighelp Plugin (each host's version → the new
-one) and Restart Hermes Gateway, all at once with each host's live status and its own Restart when it needs one.
-Each host runs the same flows as its own computer page (`HostOperationsStore`, `HostPluginUpdateModel`); hosts that
-are offline or signed out say so and are skipped (`Bighelp/Fleet/FleetMaintenance.swift`). The tab bar hides, ☰ › All agents is home, and the button in the list's top bar
-turns it off. Other hosts are read at most once a minute over their own saved sign-ins (`Bighelp/Fleet`); one
-that can't be reached says so and keeps showing what it had last time. While it's on and the app is open, every
-host stays connected, so a switch opens the agent's chat at once from the copy saved on the phone while that
-host's details finish loading.
+**Show every computer** (Settings › Your computers, on until turned off) puts every computer's bots and chats in the
+Bots view, the Chats view and New chat's list of bots, like Messages with several accounts: each chat says which
+computer it is on, and the Chats view's chips filter by computer. A tap on another computer's bot or chat makes that
+computer the one in use first, while the list stays up (the Bots view shows the Noodle loader, with Cancel, until the
+bot opens). Today and Work show the computer in use, and their header's computer menu switches it. Usage instead adds
+up every host, with a row for each. Settings' Your computers group also has **Update every computer** (with two or
+more), one page for every host: Update Hermes (each host's commits behind), Update bighelp Plugin (each host's
+version → the new one) and Restart Hermes Gateway, all at once with each host's live status and its own Restart when
+it needs one. Each host runs the same flows as its own computer page (`HostOperationsStore`,
+`HostPluginUpdateModel`); hosts that are offline or signed out say so and are skipped
+(`Bighelp/Fleet/FleetMaintenance.swift`). Other hosts are read at most once a minute over their own saved sign-ins
+(`Bighelp/Fleet`); one that can't be reached says so and keeps showing what it had last time. While it's on and the
+app is open, every host stays connected, so a switch opens the agent's chat at once from the copy saved on the phone
+while that host's details finish loading.
 
-Group chats (Hermes hosted rooms / Bot Mode) live in the switcher, ☰ and Agents. A group's **Group Settings**
+Group chats (Hermes hosted rooms / Bot Mode) live in the Bots view and the Chats view. A group's **Group Settings**
 (`GroupSettingsView`, a pushed page any screen can open: `AppRoute.groupSettings`) shows its name and "3 bots",
 its members' faces with a small Lead badge on the lead, then, where Hermes keeps settings for the room
 (`groups.state` has `context`): WHEN A MESSAGE NAMES NOBODY, three radio rows with a hint each (Everyone answers;
@@ -406,14 +432,12 @@ group Hermes doesn't run shows only its name and members. New Group Chat offers 
 In the chat, Hermes' picks are one quiet centered line ("Pixel gave this to Scout", "Assigned to Scout and
 Echo", "Couldn’t choose who answers, so everyone will"), the header says "Lead: Pixel" under the name, and a
 discussion Hermes paused at its cap is a small card ("Paused after 10 messages.") with Continue and Stop until
-something moves it on or it has used every Continue. Agents opens on the
-**Pinned** agents: each shows its role under the name (one line, trailing off), or what it's doing when it's busy.
-Touch and hold lifts an agent: drag it to reorder (the order is kept per host), or let go to see its actions.
+something moves it on or it has used every Continue.
 
-**Settings** is one short list where every row opens one page, and it is the same tree in every mode (Bots mode's
-circle opens it too, with no Settings of its own). The first screen has you (name and photo), Usage and, while a
+**Settings** is one short list where every row opens one page, and the person's circle in every root's header opens
+it. The first screen has you (name and photo), Usage and, while a
 share waits, Shared with bighelp; **Your bots** (Models, Apps & skills, Voice, Personality and the Teamwork
-switch); **This app** (Appearance, Chat, Notifications, Modes); on Vision Pro, In your space; **Your computers**
+switch); **This app** (Appearance, Chat, Notifications); on Vision Pro, In your space; **Your computers**
 (one row per computer, Add a computer, Show every computer, Time zone and, with two or more computers, Update
 every computer); then Help & feedback and the Advanced options switch. Don't add sections that compete with these;
 add to the page a row already opens (Help & feedback also holds Share usage and diagnostics, on by default, and
@@ -421,18 +445,16 @@ the Apple Watch's status).
 Settings › Models is the AI providers first, then **Default model** with one row per bot (its face, its name and
 its model under it); a row opens that bot's own Default Model page, the one its profile opens. Advanced comes last.
 Settings › Chat reads in named groups: **Opening**, **A bot's work**, **In a chat** and **Chat list**, then the
-Advanced groups. Opening has Opens on (Agents, Agents (multi), Last chat, Feed, Ideas, Goals,
-Kanban, Projects; Last chat, the agent's latest chat, until you pick), Start with (Last bot used, or one of this
-computer's agents, kept per computer; Agents (multi) has none) and A bot opens. It applies when the app starts,
-not when it comes back; a link, widget or notification that opens the app wins, and Kanban or Projects where the
-computer can't open them fall back to Last chat (`BighelpLanding`).
+Advanced groups. Opening has Opens on (Bots, Chats, Today, Work; Chats until you pick), First tab shows (Bots or Chats, only
+when Opens on is Today or Work) and A bot opens (Its ongoing chat, Your last chat, A new chat). It applies when the
+app starts, not when it comes back; a link, widget or notification that opens the app wins.
 **Apps & skills** (Settings › Your bots) is for everyone: This device (Device access) first, then Apps (Built-in
 apps and Composio), Skills and plugins (with this week's featured plugin, the pick Hermes' marketplace and Desktop
 show), Talk anywhere (Messaging apps) and Logins (the credential vault); with Advanced options on, an Advanced group
 adds MCP servers and Toolsets. Each bot's profile has its own **Marketplace** with the same pages for that bot, and
 its own Connections. A bot's profile also lists **Core Files** (SOUL.md, USER.md, MEMORY.md and the AGENTS.md Hermes
 loads for its chat, each opening in the Markdown viewer to read or edit) and **Active Project** (the project its new
-chats start in, a checked list; also in Bots mode, where ☰ › Projects isn't). Host administration is hidden until
+chats start in, a checked list). Host administration is hidden until
 **Advanced options** is on, and each part sits on the page it tunes: a computer's page, Chat, Models, Apps & skills
 and a bot's Advanced Options. There is no Hermes tools list and no System page. Pages lead with the action people come
 for (`BighelpActionRow`) and keep explanations to one line. **Your computers** lists each computer (the one in use
@@ -447,21 +469,20 @@ inside everyday screens: the chat Info sheet's visibility toggles and host detai
 Skills/Session rows in the + sheet, Agent Studio's Advanced page and templates, the task editor/detail Advanced groups, and the extra sections on
 Settings › Chat. Everyday controls must never live only behind it.
 
-The chat's ⋯ menu is one list, the same with Advanced options on or off: New Bot Chat in an agent's Bot Chat (Switch agent
-in the home chat); then This chat (a group chat's Group Settings and Chat info, where its members are, Rename…, Move to Project… with
-the chat's project, Files, and File changes when available); then Model (Model & speed, Usage); then More (Edit
-agent, Advanced). Model & speed contains Model settings and Fast Mode. Usage contains provider usage, Context
+The chat's ⋯ menu is one list, the same with Advanced options on or off: New Bot Chat in an agent's Bot Chat; then This chat (a group chat's Group Settings and Chat info, where its members are, Rename…, Move to Project… with
+the chat's project, Files, and File changes when available); then Model (Model & speed, Usage); then More (Bot
+page, Advanced). Model & speed contains Model settings and Fast Mode. Usage contains provider usage, Context
 window and Compact. Existing technical controls stay in Advanced. The groups have lines between them, not titles:
 iOS keeps a menu under about 60% of the screen's height, and titles made the list scroll. Keep every level short
 enough to navigate without scrolling, File changes included (`CompactChatMenuUITests`). iOS draws the menu at the
 device's text size, not bighelp's, and the whole list fits at the default size; from the device's XL, keep the full
 font size and fold the top level into Model (Model & speed), This chat (Rename…, Move…, Files; a group's Chat
-info), Agent (New Bot Chat, Switch agent, Edit agent) and More (File changes, Usage and Advanced). At accessibility
+info), Agent (New Bot Chat, Bot page) and More (File changes, Usage and Advanced). At accessibility
 sizes, Advanced also groups its visibility switches under Display, and secondary summaries are left out and labels
 shortened.
 
-Move to Project… (`MoveChatToProjectSheet`) also sits in a chat's hold menu in Chats and a pinned chat's
-right-click menu on the Mac, wherever the computer can move chats (`sessionWorkspaceEdit`). It lists the agent's
+Move to Project… (`MoveChatToProjectSheet`) also sits in a chat's hold menu on a computer's Sessions page,
+wherever the computer can move chats (`sessionWorkspaceEdit`). It lists the agent's
 projects with a tick on the chat's own, and moves the chat only once Hermes confirms it; then Chats, the open
 chat and File changes show the new project. Chats have no backgrounds of their own: Settings › Appearance sets the
 look of every screen.
@@ -471,11 +492,11 @@ selected agent's default for new chats. Fast Mode may cost more. Read the host's
 unknown modes stay labeled as host-managed. A model/provider without verified support shows Unavailable and a
 reason, not an effective On switch. A running reply locks chat speed changes just like model and reasoning.
 
-Agent entries (including Agents → Message and All hosts) use the canonical Bot Chat resolver. New chat still
+Agent entries (including the Bots view and Show every computer) use the canonical Bot Chat resolver. New chat still
 creates an ordinary conversation, and picking a saved chat still opens that exact conversation. A failed Bot Chat
 lookup offers a retry rather than silently falling back to an unrelated chat; stale navigation results are ignored.
 
-A chat's model and thinking level (`ChatModelSummaryRow`) show in the avatar's profile, at the top of Info and at the top of
+A chat's model and thinking level (`ChatModelSummaryRow`) show at the top of a chat's Info and at the top of
 the context pop-up, each with Change into Model settings. Showing them reads the level once, never while the agent
 is replying. Deleting an agent stops its reply and clears its unsent drafts on this device instead of refusing; only a
 group chat that includes it holds the delete back, by name.
@@ -485,8 +506,7 @@ messages and answers other agents send in) are one quiet centered line in the ch
 (`ChatAgentTalkRail`): the agents' faces stacked, then "4 messages with Nova", "Asking Nova…" or, from the
 plugin's `agents/talk` feed, "Nova is searching the web…". Back-to-back messages share one line. It stays
 out of the finished-turn fold and shows with tool calls and reasoning hidden, because it's conversation. A tap
-opens what they said as a short chat between them, with "What Nova did" from Nova's own chat. Simple Bot
-mode draws the faces as marks. A `message_agent` message and its later answer are two lines, each where it
+opens what they said as a short chat between them, with "What Nova did" from Nova's own chat. A `message_agent` message and its later answer are two lines, each where it
 happened: "Asked Nova" and "Nova answered"; the delivery notice that only repeats the answer stays out. Hermes
 runs some turns on its own (another agent wrote in, a background process finished), and other Hermes processes
 write some messages, so neither streams here: the chat reads what Hermes saved when such a turn ends, and while
@@ -568,14 +588,15 @@ Long instructions (an agent's SOUL, a personality) have an expand icon that open
 form. Present that editor from the form's root: a full-screen cover hung on a list section header never got the
 keyboard.
 
-## Bots mode
+## Bots view
 
-An opt-in calm home (Settings › Modes › Bots mode): just your bots and their chats. No tab bar
-and no ☰. The page is the light and dark theme picked in Appearance, your bubbles are black (ink after dark) unless you
-picked a bubble color in Appearance, and buttons and tinted text are the page's ink (white after dark). The
-text is SF Pro, as everywhere.
+The first tab's calm view: just your bots and their chats (the default for people who pick "With a bot" at first run;
+the header's switch moves between it and Chats). The page is the light and dark theme picked in Appearance, your
+bubbles are black (ink after dark) unless you picked a bubble color in Appearance, and buttons and tinted text are the
+page's ink (white after dark). The text is SF Pro, as everywhere.
 
-- **Home**: your circle top left opens Settings; search and + top right. + is a short menu: New Bot, New Group
+- **Home**: the home header (your circle top left, the Bots | Chats switch, then search, a round button that opens a
+  search page, and +). + is a short menu: New Bot, New Group
   Chat and New Section, each only where it can work (a computer that can't make group chats leaves New Group Chat
   out). The primary bot (no badge), pinned bots and pinned group chats (up to three of their members' faces) share
   the top, all the same size: one large, else two or three across, six at most in two rows. Only pins the top
@@ -611,13 +632,12 @@ text is SF Pro, as everywhere.
   "On Home Mac and Studio Mac" when its members are on more than one computer), ⋯ (Rename, Edit Members, Delete
   Section), a big folder of faces, its members as home rows (their role line names the computer when the section
   spans several), then Add Bots or Group Chats. New Section and Edit Members are one sheet: the name, then every
-  bot and group chat with a check (by computer with Multi-gateway; "In Work", or "Moves from Work" once picked).
+  bot and group chat with a check (by computer with Show every computer; "In Work", or "Moves from Work" once picked).
   A bot is in one section at a time. Edit Sections (a card's menu, search's filter) renames, drags into order
-  and deletes; Done keeps it all, and Delete asks first and keeps every member, in No section. With Multi-gateway
-  a section holds any computer's bots and group chats; with it off (or one gateway filtered) a section shows only
-  that computer's members, and one with all its members elsewhere doesn't show. Bots' sections are Hermes
-  Desktop's own field, so Desktop shows them too; Chat mode's Agents screen shows the same cards under Pinned, and
-  Code mode's agent picker lists agents under their sections.
+  and deletes; Done keeps it all, and Delete asks first and keeps every member, in No section. With Show every
+  computer on, a section holds any computer's bots and group chats; with it off (or one computer filtered) a
+  section shows only that computer's members, and one with all its members elsewhere doesn't show. Bots' sections
+  are Hermes Desktop's own field, so Desktop shows them too.
 - **Marks**: thirteen shapes in eleven colors with two white eyes (`SimpleBotMark`), from before Bot Studio.
   A bot that has one keeps it until another avatar is saved; one with no picture, character or pet shows a
   mark made from its ID.
@@ -626,14 +646,9 @@ text is SF Pro, as everywhere.
   open Bot Studio over it, on Body or Eyes; its Done brings the look back. Templates, top right, fills in the
   role and instructions. Create saves the look as Edit avatar does: the picture on its computer and the Bot
   Studio look beside it (`SimpleBotCreation.use`).
-- **Chat**: Back, the bot's name (its profile) and ⋯; no New chat button. Voice is a bar over the chat, under
-  its header (`SimpleBotVoiceBar`), and the chat stays in use: the bot's face, a visualizer from the real audio
-  levels (your voice in the page's ink, the bot's in its color, dots while nobody speaks), voice choices (Live
-  or Take turns, the bot's voice on or off), the microphone and End. The bot's work shows as Settings › Chat › Agent's
-  work says, as in every one-to-one chat: the notes it writes on the way to its answer go with its steps, in
-  order, and the answer always shows.
-- **Swipes**: from the left edge back to your bots; from the right, this bot's profile (the primary bot's on
-  the home). The full app's swipe choices lead to places this mode hides, so they don't apply here.
+- **Chat**: the one chat header (Back, the bot's name, which opens its bot page, and ⋯; see Navigation). The bot's
+  work shows as Settings › Chat › A bot's work says, as in every one-to-one chat: the notes it writes on the way to
+  its answer go with its steps, in order, and the answer always shows.
 - **Dashboard** opens with **Activities**, one line ("2 running · 4 done today") until it's tapped, so Feed, Ideas
   and Goals stay where they were. Open, it lists the bot's subagents and background commands of the last seven days
   by day (Today, Yesterday, then weekdays), running first, each with how it went and when (`DashboardTodaySection`,
@@ -650,9 +665,12 @@ text is SF Pro, as everywhere.
   password is asked once and kept in this phone's Keychain. Without a VNC server it says how to turn one on. Pinch
   zooms whether watching or in control; zoomed in while in control, two fingers move the view.
 - **Profile**: the mark, name and role over every tab (Dashboard too), then the tabs: Dashboard, Info, Computer (its
-  screen, when the host has one), Files and Media. Info is in named groups: Personality (Character, Instructions,
-  Core Files), Defaults (Default Model, Default Voice, Active Project), What it can use (Connections, Marketplace,
-  Credential Vault, Photo actions) and Routines (Add routine first, then the bot's routines), with Advanced Options
+  screen, when the host has one), Files and Media. It is the same page for every bot, from a chat's header, a bot's
+  menu or a Today board. ⋯ holds what is done to the bot: New chat, Chats with this bot, Pin, Use with Siri,
+  Duplicate, Manage bots and Delete bot (Show routines is on the Dashboard tab). Info is in named groups: About
+  (Name, Role and Summary, each edited in place, and the Handle, which is only read), Personality (Character,
+  Instructions, Core Files), Defaults (Default Model, Default Voice, Active Project), What it can use (Connections,
+  Marketplace, Credential Vault, Photo actions, Approvals) and Routines (Add routine first, then the bot's routines), with Advanced Options
   alone at the end. A group shows only the rows the computer offers. Holding a tab shows a glass bar above it with Set Default (the tab profiles open on;
   Dashboard until one is set; a note confirms it) and Rearrange (the tabs become glass chips to drag where they
   are, the tab below fades, Done in the header). Both are one choice for every bot (`SimpleBotProfileTabs`); the
@@ -672,8 +690,7 @@ text is SF Pro, as everywhere.
   computer, never typed again. If one part doesn't save, the others show Saved and only that part stays open, its
   fields kept. A website's page lists what's there, Add to this website and Remove this website; a card's or
   address's page shows its face, Used on (Stop beside each but the last) and Use on another website.
-- **Settings**: the person's circle opens the same Settings as ☰ does in Chat and Code (see Settings above), so
-  Bots mode has no short Settings of its own. Modes, under This app, switches the homes.
+- **Settings**: the person's circle opens Settings (see Settings above).
 
 ## An agent showing the way
 
@@ -694,27 +711,24 @@ When the person asks where something is, the agent can open it (`iphone_navigati
 - Return to chat puts back exactly the tab and pages the person had; the chat's draft and place
   are its own and never change.
 
-## Code mode
+## Coding sessions
 
-An opt-in second home for coding (Settings › Modes › Code mode; Chat stays the default). Its home is the
-Launchpad: filter chips (All, Running, Needs you, Ready), one card per session (a still status dot, its name, its
-branch in code type, what it's doing now) and a message box pinned at the bottom in place of the bottom bar. Under
-the box, three chips choose the project, where it runs (New worktree, the default, or Local checkout) and the
-branch; they stay set, so each send starts the next session at once and adds its card. Inside the box, the agent's
-face, a model chip (model, reasoning, fast mode; a long name truncates, never the buttons beside it) and a mode
-button (Default, Plan, YOLO) set what new sessions run on. A card opens the session's ordinary
-chat, where steer, queue and approvals work as in every chat; it has no bottom bar while Code mode is the home.
-Touch and hold a card (right-click on the Mac) for Changes: uncommitted files, then the branch's commits, and Ship
-(commit, push, pull request). ☰ keeps one menu: a Chat / Code mode switch on top, then Sessions, Projects, Pull
-requests, Worktrees, Kanban and Settings. Nothing animates on the cards.
+There is no Code mode. A coding session starts from New chat: pick one bot, pick a project in the choices row under the
+message box, and Send starts it. Under the box the row's chips choose the project, where it runs (New worktree, the
+default, or Local checkout), the branch and the mode (Default, Plan, YOLO); they stay set, so each send starts the next
+session at once. The box's own model chip (model, reasoning, fast mode; a long name truncates, never the buttons beside
+it) sets what the new session runs on. Work lists the sessions with the rest of the bots' work: one card per session
+(a still status dot, its name, its branch in code type, what it's doing now), and a card opens the session's ordinary
+chat, where steer, queue and approvals work as in every chat. Touch and hold a card (right-click on the Mac) for
+Changes: uncommitted files, then the branch's commits, and Ship (commit, push, pull request). A project's page is Work
+filtered to that project, with ⋯ for pull requests, worktrees and Dev Factory. Nothing animates on the cards.
 
-Orchestration mode: Stage (beside Send; an icon once something is staged) keeps the message, with the chips as
-they are, in a tray over the box, and Send all with its count starts them all as one batch. A batch is one card
-on the home with a line per session, and opens one chat for all of them: colored pills (each opens that session's
-own chat), your messages on the right, and under each one every session's answer in a single block. `#` lists
-the batch's sessions, then the project's open pull requests; the chip and a line over the box say who gets it.
+Stage (the last chip) keeps the message, with the chips as they are, in a tray above the choices row, and Send all with its count starts them all as one batch. A batch is one card on Work with a line per
+session, and opens one chat for all of them: colored pills (each opens that session's own chat), your messages on the
+right, and under each one every session's answer in a single block. `#` lists the batch's sessions, then the
+project's open pull requests; the chip and a line over the box say who gets it.
 
-Dev Factory (☰ › Dev Factory in Code mode): coding recipes across projects. Its home lists what runs now
+Dev Factory (a project's ⋯ on Work): coding recipes across projects. Its home lists what runs now
 (one card per start, a line per project), the recipes (projects as small code chips, a Run button), then the
 templates new recipes start from. A start's screen has one card per project: its step track, what it does now
 in the computer's own words, and only the buttons it needs (Approve and Look at changes, Try again, the pull
@@ -757,9 +771,9 @@ iPhone, iPad and Vision Pro stay exactly as they are.
 - **Hover.** The highlight shows in plain SwiftUI layouts: the tab bar, headers, cards, chips. List and Form
   rows, menus, toolbar items and views with a `.contextMenu` are UIKit on the Mac and don't report hover; they
   rely on their click area.
-- **Keys.** ⌘N new chat, ⌘, Settings, ⌃⌘S sidebar, ⌘1–⌘5 the bottom bar's tabs (`BighelpMenuCommands`).
+- **Keys.** ⌘N new chat, ⌘, Settings, ⌃⌘S sidebar, ⌘1–⌘3 the three places (`BighelpMenuCommands`).
 - **Sidebar.** A sidebar button sits in the title bar right after the window controls, as in Mail and Finder, so
-  the sidebar opens and closes from every screen, including pages with no ☰. Drag the line between the sidebar
+  the sidebar opens and closes from every screen. Drag the line between the sidebar
   and the page to make it narrower or wider (the page keeps at least 380 points); the width is remembered, and a
   double-click on the line goes back to the usual width.
 

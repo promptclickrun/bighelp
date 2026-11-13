@@ -30,7 +30,7 @@ final class AgentDirectoryStore {
     /// decision rather than a layout accident, so it lives with the store that
     /// owns the pin set, and its copy counterpart in `AgentActionPresentation`
     /// is checked against it by test.
-    static let pinnedAgentLimit = AgentActionPresentation.pinnedAgentLimit
+    static let pinnedAgentLimit = 5
 
     private(set) var profiles: [AgentProfile] = []
     private(set) var selectedAgentID: String?
@@ -346,7 +346,7 @@ final class AgentDirectoryStore {
         pinAgent(id, limit: Self.pinnedAgentLimit, counting: pinnedAgentIDs.count)
     }
 
-    /// Pins `id` while `counting` is under `limit`. Bots mode counts only the
+    /// Pins `id` while `counting` is under `limit`. The Bots view counts only the
     /// pinned bots its home shows (`SimpleBotsHomeProjection.canPin`).
     @discardableResult
     func pinAgent(_ id: String, limit: Int, counting: Int) -> Bool {
@@ -366,7 +366,7 @@ final class AgentDirectoryStore {
         return true
     }
 
-    /// Puts the pinned agents in this order (dragging them on the Agents screen).
+    /// Puts the pinned agents in this order (dragging them on the Bots view).
     /// Pins not named keep their place after the named ones; unknown ids are ignored.
     @discardableResult
     func reorderPinnedAgents(_ ids: [String]) -> Bool {
@@ -584,7 +584,7 @@ private struct RemoteAgentAvatarCache {
 
 extension AgentDirectoryStore {
     /// A sign-in's pinned agents (in order), the ones unpinned on purpose and its primary agent:
-    /// what Bots mode's top shows, kept on the computer too (`BotsAppState`).
+    /// what the Bots view's top shows, kept on the computer too (`BotsAppState`).
     struct SavedPins: Equatable, Sendable {
         var pinned: [String] = []
         var unpinned: [String] = []
@@ -613,7 +613,7 @@ extension AgentDirectoryStore {
                   primary: (defaults.dictionary(forKey: Keys.primaryAgentIDByHost) as? [String: String])?[hostBucket])
     }
 
-    /// Saves a sign-in's pins where its Agents screen reads them, for one that isn't in use.
+    /// Saves a sign-in's pins where its Bots view reads them, for one that isn't in use.
     static func savePins(_ pins: SavedPins, in defaults: UserDefaults, hostBucket: String) {
         var pinned = defaults.dictionary(forKey: Keys.pinnedAgentIDsByHost) as? [String: [String]] ?? [:]
         var unpinned = defaults.dictionary(forKey: Keys.unpinnedAgentIDsByHost) as? [String: [String]] ?? [:]
@@ -638,7 +638,7 @@ extension AgentDirectoryStore {
     }
 
     /// Pins or unpins an agent of a host that isn't selected (from the all-hosts
-    /// view), saved just as the Agents screen saves it while that host is selected.
+    /// view), saved just as the Bots view saves it while that host is selected.
     /// An unpinned agent is remembered as unpinned, so a default agent stays off.
     @discardableResult
     static func savePin(_ pinned: Bool, agentID: String, in defaults: UserDefaults, hostBucket: String) -> Bool {

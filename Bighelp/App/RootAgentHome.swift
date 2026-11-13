@@ -1,15 +1,8 @@
 import OSLog
 import SwiftUI
 
-/// The agent home: the Chat tab opens the selected agent's chat, and Feed,
-/// Ideas, Goals and Apps show that agent's board. The avatar opens its profile,
-/// the name switches agents or groups, and ☰ holds chats and the rest of the app.
-struct NewChatPickerRequest: Identifiable {
-    let id = UUID()
-    let seed: String?
-    let owner: WorkspaceOwner
-}
-
+// The bots' own chats and what follows the connection for the whole home: the shell's board, usage,
+// the Dynamic Island and the sidebar's host.
 extension RootShellView {
     var homeAgent: AgentProfile? { agents.resolvedAgent(explicitID: nil) }
 
@@ -57,105 +50,45 @@ extension RootShellView {
         guard let activity = agentIsland?.activity else { return }
         if case .chat(let id)? = appState.path.last,
            featureStore.preparedChatModel(id: id)?.memberIDs.first == activity.agentID { return }
-        if homeAgent?.id != activity.agentID { agents.select(activity.agentID) }
         if let working = sessionCatalog.recentSummaries(includeCronSessions: false).first(where: {
             $0.kind == .direct && $0.agentIDs.first == activity.agentID
                 && featureStore.preparedChatModel(id: $0.id)?.isSending == true
         }) {
-            openAsHomeChat(working)
+            openSessionSelection(working)
         } else {
-            openHomeChat(replacing: true)
+            openCanonicalAgentChat(activity.agentID)
         }
     }
 
-    /// Every phone chat uses the agent-home look (big live avatar), ☰ in the
-    /// top left and the tab bar. A chat picked from a list or opened about
-    /// something (Feed's Discuss, a task, a deeper page) goes back to it with
-    /// the edge swipe; ☰ reaches everything else.
-    var homeChrome: AgentHomeChrome {
-        // Bots mode: Back, the bot's name (its profile) and options; no ☰ or bar.
-        if simpleBotsOn {
-            return AgentHomeChrome(isSimpleBots: true,
-                                   onProfile: { appState.open(.simpleBotProfile(agentID: $0)) })
-        }
-        return AgentHomeChrome(
-            isEnabled: true,
-            // All hosts too: a chat's agent is on the selected host, so its tabs are that agent's.
-            // Code mode has no bottom bar: its sessions return to its home through ☰ or Back.
-            showsTabBar: settings.experience != .code,
-            onMenu: { isHomeDrawerPresented.toggle() },
-            onProfile: { profileAgentID = $0 },
-            onSwitchAgent: { isAgentSwitcherPresented = true },
-            onNewChat: { presentNewChatPicker(seed: $0) },
-            onStartChat: { startHomeChat(with: $0) },
-            tabSelection: tabSelection,
-            unreadTabs: boardUnreadTabs,
-            barTabs: barTabs
-        )
-    }
-
-    /// A chat's header chrome. The Chat tab's own chat (not one opened from a list, and not a Code
-    /// session) also carries the Header mode switcher.
-    func homeChrome(forChat id: String) -> AgentHomeChrome {
-        var chrome = homeChrome
-        if chrome.isEnabled, settings.currentMode == .chat, !fleetModeOn, !appState.chatOpenedFromList,
-           case .chat(let first)? = appState.path.first, first == id {
-            chrome.modeSwitch = modeSwitch
-        }
-        return chrome
-    }
-
-    /// Feed, Ideas and Goals with items the person hasn't seen yet.
-    var boardUnreadTabs: Set<AppTab> {
-        var tabs: Set<AppTab> = []
-        if agentBoard.unreadCount(.feed) > 0 { tabs.insert(.feed) }
-        if agentBoard.unreadCount(.idea) > 0 { tabs.insert(.ideas) }
-        if agentBoard.unreadCount(.goal) > 0 { tabs.insert(.goals) }
-        return tabs
-    }
-
-    var opensHomeChat: Bool {
-        // The all-hosts view opens on its list of agents.
-        guard !fleetModeOn else { return false }
-        let defaults = UserDefaults.standard
-        return defaults.object(forKey: "loopdy.home.opens-chat") == nil || defaults.bool(forKey: "loopdy.home.opens-chat")
-    }
-
-    /// Opens the same canonical Bot Chat as the agent's entry in Hermes Desktop.
-    func openHomeChat(replacing: Bool = false) {
-        // Already there: tapping Chat again keeps the chat as it is. A chat
-        // with Back (picked from the list) isn't the home chat; Chat leaves it.
-        if !replacing, appState.selectedTab == .sessions, appState.path.count == 1, !appState.chatOpenedFromList,
-           case .chat = appState.path[0] { return }
+    /// The primary bot's own chat, pushed: an old Activity link, or an alert that names no chat
+    /// with nothing waiting. With no bot yet, the first tab.
+    func openPrimaryBotChat() {
         guard let agent = homeAgent else {
-            appState.select(.sessions)
+            appState.select(.conversations)
             return
         }
-        openCanonicalAgentChat(agent.id, fromList: false)
+        openCanonicalAgentChat(agent.id)
     }
 
     /// The tapped agent's Bot Chat; if the host can't give one, its latest chat or a new one.
     /// `startsVoice` opens voice on it. Cancelled only when the person moves on (another
     /// screen, tab or computer).
-    func openCanonicalAgentChat(_ profileID: String, fromList: Bool, startsVoice: Bool = false,
-                                dissolvesOutgoing: Bool = false) {
+    func openCanonicalAgentChat(_ profileID: String, startsVoice: Bool = false, dissolvesOutgoing: Bool = false) {
         let saved = sessionCatalog.records.first(where: { $0.isBotChat && $0.agentIDs == [profileID] })
-        // Bots mode: the opening loader covers the lookup and the chat's first load if they're slow.
-        let opening = simpleBotsOn
-            ? simpleBotsChatOpening.begin(agentID: profileID, name: agents.profiles.first { $0.id == profileID }?.name,
-                                          originPath: appState.path,
-                                          hasCachedContent: saved.map { hasCachedChatContent($0.id) } ?? false)
-            : nil
+        // The opening loader covers the lookup and the chat's first load if they're slow.
+        let opening = simpleBotsChatOpening.begin(
+            agentID: profileID, name: agents.profiles.first { $0.id == profileID }?.name,
+            originPath: appState.path, hasCachedContent: saved.map { hasCachedChatContent($0.id) } ?? false)
         // A Bot Chat opened before is saved here: open it at once (its chat loads from
         // Hermes as usual) rather than wait a second or two on the lookup.
         if let saved {
-            showAgentChat(saved, fromList: fromList, startsVoice: startsVoice, dissolvesOutgoing: dissolvesOutgoing)
-            if let opening { simpleBotsChatOpening.endIfNothingOpened(opening) }
+            showAgentChat(saved, startsVoice: startsVoice, dissolvesOutgoing: dissolvesOutgoing)
+            simpleBotsChatOpening.endIfNothingOpened(opening)
             return
         }
         guard let owner = currentWorkspaceOwner else {
-            if let opening { simpleBotsChatOpening.endIfNothingOpened(opening) }
-            actionErrorMessage = "Connect to this computer to open the agent’s chat."
+            simpleBotsChatOpening.endIfNothingOpened(opening)
+            actionErrorMessage = "Connect to this computer to open the bot’s chat."
             return
         }
         let originTab = appState.selectedTab
@@ -177,30 +110,23 @@ extension RootShellView {
         }, present: { id in
             guard let record = sessionCatalog.session(id: id), record.kind == .direct,
                   record.agentIDs == [profileID] else {
-                openLatestAgentChat(profileID, fromList: fromList, startsVoice: startsVoice, dissolvesOutgoing: dissolvesOutgoing)
+                openLatestAgentChat(profileID, startsVoice: startsVoice, dissolvesOutgoing: dissolvesOutgoing)
                 return
             }
-            showAgentChat(record, fromList: fromList, startsVoice: startsVoice, dissolvesOutgoing: dissolvesOutgoing)
+            showAgentChat(record, startsVoice: startsVoice, dissolvesOutgoing: dissolvesOutgoing)
         }, failed: {
-            openLatestAgentChat(profileID, fromList: fromList, startsVoice: startsVoice, dissolvesOutgoing: dissolvesOutgoing)
+            openLatestAgentChat(profileID, startsVoice: startsVoice, dissolvesOutgoing: dissolvesOutgoing)
         })
-        if let opening {
-            Task { @MainActor in
-                await lookup.value
-                simpleBotsChatOpening.endIfNothingOpened(opening)
-            }
+        Task { @MainActor in
+            await lookup.value
+            simpleBotsChatOpening.endIfNothingOpened(opening)
         }
     }
 
-    private func showAgentChat(_ record: SessionRecord, fromList: Bool, startsVoice: Bool, dissolvesOutgoing: Bool = false) {
+    /// The chat is pushed over where the person is, so Back returns there.
+    private func showAgentChat(_ record: SessionRecord, startsVoice: Bool, dissolvesOutgoing: Bool = false) {
         if dissolvesOutgoing { presentNewChatDissolve(record.id, replacing: appState.activeConversationID) }
-        var instant = Transaction()
-        instant.disablesAnimations = true
-        withTransaction(instant) {
-            appState.select(.sessions)
-            appState.chatOpenedFromList = fromList
-            openSession(record.summary)
-        }
+        openSession(record.summary)
         if startsVoice { appState.requestVoiceMode(for: record.id) }
     }
 
@@ -222,129 +148,15 @@ extension RootShellView {
     /// Some hosts can't give an agent its Bot Chat: one already titled "Bot Chat"
     /// from Hermes' API server is hidden from the app but keeps the title. The
     /// agent still opens, on its latest chat or a new one, never an error.
-    private func openLatestAgentChat(_ profileID: String, fromList: Bool, startsVoice: Bool,
-                                     dissolvesOutgoing: Bool = false) {
-        var instant = Transaction()
-        instant.disablesAnimations = true
-        withTransaction(instant) {
-            if appState.selectedTab != .sessions { appState.select(.sessions) }
-            appState.chatOpenedFromList = fromList
-            if let latest = sessionCatalog.recentSummaries(includeCronSessions: false)
-                .first(where: { $0.kind == .direct && $0.agentIDs == [profileID] }) {
-                if dissolvesOutgoing { presentNewChatDissolve(latest.id, replacing: appState.activeConversationID) }
-                openSession(latest)
-                if startsVoice { appState.requestVoiceMode(for: latest.id) }
-            } else {
-                startNewChat(explicitAgentID: profileID, startsVoice: startsVoice)
-            }
+    private func openLatestAgentChat(_ profileID: String, startsVoice: Bool, dissolvesOutgoing: Bool = false) {
+        if let latest = sessionCatalog.recentSummaries(includeCronSessions: false)
+            .first(where: { $0.kind == .direct && $0.agentIDs == [profileID] }) {
+            if dissolvesOutgoing { presentNewChatDissolve(latest.id, replacing: appState.activeConversationID) }
+            openSession(latest)
+            if startsVoice { appState.requestVoiceMode(for: latest.id) }
+        } else {
+            startNewChat(explicitAgentID: profileID, startsVoice: startsVoice)
         }
-    }
-
-    /// Opens a chat as the Chat tab's home chat.
-    func openAsHomeChat(_ summary: SessionSummary) {
-        appState.select(.sessions)
-        appState.chatOpenedFromList = false
-        openSessionSelection(summary)
-    }
-
-    /// Opens Settings › Chat › Opens on once at launch, with its Start with
-    /// agent, after saved chats and agents have loaded. False while it waits
-    /// for Kanban's first answer.
-    @discardableResult
-    func openLaunchLandingIfNeeded(kanbanWaitIsOver: Bool = false) -> Bool {
-        // Never push under the "Unable to open" alert: iOS drops that push while
-        // the path keeps it, leaving the Chats list with no ☰ or tab bar. A link,
-        // widget or notification opening the app wins (it marks this done).
-        // Bots mode opens on its own home, the list of bots.
-        if simpleBotsOn, !didAutoOpenHomeChat {
-            didAutoOpenHomeChat = true
-            return true
-        }
-        guard !didAutoOpenHomeChat, actionErrorMessage == nil, !hasPendingOutsideOpen,
-              appState.selectedTab == .sessions, appState.path.isEmpty,
-              sessionCatalog.hasLoadedState, let owner = currentWorkspaceOwner, homeAgent != nil else { return true }
-        let choice = settings.launchLanding
-        let kanban = kanbanAvailability.host == owner.cacheScopeID ? kanbanAvailability.isAvailable : nil
-        guard let destination = BighelpLanding.destination(for: choice, kanbanAvailable: kanban,
-                                                           kanbanWaitIsOver: kanbanWaitIsOver,
-                                                           projectsAvailable: canOpenProjects) else { return false }
-        didAutoOpenHomeChat = true
-        // The all-hosts view opens on its list of agents.
-        guard !fleetModeOn else { return true }
-        if let agentID = BighelpLanding.startAgent(stored: settings.startAgentID(scope: owner.cacheScopeID),
-                                                   agentIDs: agents.profiles.map(\.id), choice: choice),
-           homeAgent?.id != agentID {
-            agents.makeHomeAgent(agentID)
-        }
-        switch destination {
-        case .chatList: break
-        case .homeChat, .allAgents: openHomeChat()
-        case .agents: appState.select(.agents)
-        case .board(let tab): appState.select(tab)
-        case .kanban: openKanban()
-        case .projects: openProjects()
-        }
-        return true
-    }
-
-    /// "Ask" and "Discuss": a new chat with this agent, the text ready to send.
-    func askAgent(_ text: String) {
-        appState.leaveComposerText(text)
-        startNewChat(explicitAgentID: homeAgent?.id)
-    }
-
-    /// Let's do it: a new chat with this agent, the message sent at once.
-    func sendToAgent(_ text: String) {
-        appState.leaveComposerText(text, sendsAtOnce: true)
-        startNewChat(explicitAgentID: homeAgent?.id)
-    }
-
-    /// A blueprint: a new chat with it in the message box, its blanks as chips. Nothing is sent.
-    func useBlueprint(_ text: String) {
-        appState.leaveComposerText(text, fillsBlanks: true)
-        startNewChat(explicitAgentID: homeAgent?.id)
-    }
-
-    func switchHomeAgent(to agent: AgentProfile) {
-        if fleetModeOn {
-            // Stay in the all-hosts view: the agent's chat replaces this one,
-            // with Back to All agents.
-            var instant = Transaction()
-            instant.disablesAnimations = true
-            withTransaction(instant) {
-                appState.select(.sessions)
-                performFleetOpen(.agent(profileID: agent.id))
-            }
-            return
-        }
-        // Over the primary agent too: a board opened from a chat makes that chat's agent primary.
-        agents.makeHomeAgent(agent.id)
-        if appState.selectedTab == .sessions { openHomeChat(replacing: true) }
-    }
-
-    /// New chat in the bar, on every place it holds: a chat with the agent in use. On Sessions'
-    /// list it opens over the list, so Back goes back to it; anywhere else (Feed, Kanban…) it's
-    /// the Chat tab's new chat, as the boards' header button was. All agents has its own New
-    /// chat, bottom right, so the bar leaves it out there.
-    var barNewChat: (() -> Void)? {
-        guard !fleetModeOn else { return nil }
-        return {
-            if appState.selectedTab != .sessions, let agent = homeAgent {
-                startHomeChat(with: agent.id)
-            } else {
-                appState.chatOpenedFromList = true
-                startNewChat(explicitAgentID: nil)
-            }
-        }
-    }
-
-    /// New chat's touch and hold: pick one agent for a 1:1 chat or several for a group.
-    func presentNewChatPicker(seed: String?) {
-        guard let owner = currentWorkspaceOwner else {
-            actionErrorMessage = "Connect to your Hermes host to start a chat."
-            return
-        }
-        newChatPicker = NewChatPickerRequest(seed: seed, owner: owner)
     }
 
     /// This chat › New Bot Chat, offered only in an agent's Bot Chat.
@@ -400,38 +212,15 @@ extension RootShellView {
         return made
     }
 
-    /// A 1:1 chat from the New chat picker; that agent becomes the home agent.
-    func startHomeChat(with agentID: String) {
-        agents.select(agentID)
-        if appState.selectedTab != .sessions { appState.select(.sessions) }
-        appState.chatOpenedFromList = false
-        startNewChat(explicitAgentID: agentID)
-    }
-
-    /// An agent tapped on Agents opens what Settings › Chat › A bot opens
-    /// asks for: its Bot Chat, its latest chat, or a new one. The all-hosts view
-    /// keeps its Back navigation (`openFleetAgent` is its version).
+    /// A bot tapped on the Bots view opens what Settings › Chat › A bot opens asks for: its Bot
+    /// Chat, its latest chat, or a new one. The chat is pushed; the primary bot stays who it is.
     func openAgentChat(_ agentID: String) {
         Telemetry.featureUsed(.agentOpened)
-        agents.select(agentID)
         switch settings.botChatExperience {
-        case .botChat:
-            openCanonicalAgentChat(agentID, fromList: fleetModeOn)
-        case .lastChat:
-            openLatestAgentChat(agentID, fromList: fleetModeOn, startsVoice: false)
-        case .newChat:
-            if appState.selectedTab != .sessions { appState.select(.sessions) }
-            appState.chatOpenedFromList = fleetModeOn
-            startNewChat(explicitAgentID: agentID)
+        case .botChat: openCanonicalAgentChat(agentID)
+        case .lastChat: openLatestAgentChat(agentID, startsVoice: false)
+        case .newChat: startNewChat(explicitAgentID: agentID)
         }
-    }
-
-    func inviteToGroup(seed: String?) {
-        guard let owner = groupCreationReadyOwner else {
-            actionErrorMessage = "Group chats need a connected Hermes host."
-            return
-        }
-        handleAgentWorkspaceAction(AgentWorkspaceActionRequest(owner: owner, action: .createGroup(seedProfileID: seed)))
     }
 
     /// The selected host, when it can make group chats.
@@ -440,18 +229,23 @@ extension RootShellView {
         return owner
     }
 
-    /// A group chat with these agents right away, named after them, then
-    /// opened: what New group chat's Create does, minus the form (All agents'
-    /// New chat › Group chat already picked who's in it).
-    func createGroupChat(with profileIDs: [String], peers: [HermesBotModePeerCandidate] = []) {
+    /// A group chat with these bots right away, named after them, then opened: what New Group
+    /// Chat's Create does, minus the form (New chat's To row already picked who's in it).
+    /// `firstMessage` is sent in it once it opens. `ended` is called once, however this ends: with
+    /// the group chat's ID once it is open, or nil when it couldn't be made or opened. New chat
+    /// keeps its text, and holds a second Send, until then.
+    func createGroupChat(with profileIDs: [String], peers: [HermesBotModePeerCandidate] = [],
+                         firstMessage: String? = nil, ended: (@MainActor (String?) -> Void)? = nil) {
         guard let owner = groupCreationReadyOwner else {
             actionErrorMessage = "Group chats need a connected Hermes host."
+            ended?(nil)
             return
         }
         let profiles = profileIDs.compactMap { id in agents.profiles.first { $0.id == id } }
         guard profiles.count == profileIDs.count,
               (2...BotModeRoom.maximumMembers).contains(profiles.count + peers.count) else {
-            actionErrorMessage = "Those agents aren't all on this host anymore. Pick them again from New chat."
+            actionErrorMessage = "Those bots aren't all on this computer anymore. Pick them again from New chat."
+            ended?(nil)
             return
         }
         Task { @MainActor in
@@ -461,13 +255,19 @@ extension RootShellView {
                     name: BotModeCreateRoomView.automaticName(profiles.map(\.name) + peers.map(\.name)),
                     profiles: profiles, peers: peers)
                 // A reconnect meanwhile is still this computer.
-                guard isCurrentSignIn(owner), let current = currentWorkspaceOwner else { return }
-                openHostedGroup(room.id, owner: current, settings: false)
+                guard isCurrentSignIn(owner), let current = currentWorkspaceOwner else {
+                    ended?(nil)
+                    return
+                }
+                openHostedGroup(room.id, owner: current, settings: false, firstMessage: firstMessage, opened: ended)
             } catch is CancellationError {
+                ended?(nil)
             } catch let error as BotModePeerLinkError {
+                ended?(nil)
                 guard isCurrentSignIn(owner) else { return }
                 actionErrorMessage = error.message
             } catch {
+                ended?(nil)
                 // The kind of failure only; never host data.
                 Logger(subsystem: "app.loopdy.mobile", category: "BotMode")
                     .error("Group chat create failed: \(String(reflecting: error), privacy: .public)")
@@ -479,7 +279,7 @@ extension RootShellView {
 
     /// `AppState.openNeedsYou()` (an alert that names no chat). Once the computer is connected it reads
     /// the computer's list, so the question the alert was about is in it, then opens Needs you, or the
-    /// home chat when nothing waits. The request is kept until then: a cold launch can ask before the
+    /// primary bot's chat when nothing waits. The request is kept until then: a cold launch can ask before the
     /// computer answers, so it waits for the connection (the shell's task restarts when
     /// `needsYouListIsReady` changes) and gives up after `NeedsYouRequest.connectionWait`. Settings is
     /// closed first, since a sheet can't show over it.
@@ -490,131 +290,16 @@ extension RootShellView {
             // Cancelled: the connection came up, or the request was settled or replaced.
             guard !Task.isCancelled, appState.isNeedsYouRequested else { return }
             appState.isNeedsYouRequested = false
-            leaveSettings { openHomeChat() }
+            leaveSettings { openPrimaryBotChat() }
             return
         }
         await featureStore.dashboardModel.refreshAfterExternalChange()
         guard !Task.isCancelled, appState.isNeedsYouRequested else { return }
         appState.isNeedsYouRequested = false
         if needsYouEntries.isEmpty {
-            leaveSettings { openHomeChat() }
+            leaveSettings { openPrimaryBotChat() }
         } else {
             leaveSettings { afterClosingHomeSheets { isNeedsYouPresented = true } }
-        }
-    }
-
-    /// Closes the open home sheet, then runs the next step once it is gone.
-    func afterClosingHomeSheets(_ action: @escaping @MainActor () -> Void) {
-        // The Mac's ☰ is a sidebar that stays open; with no sheet over it,
-        // there's nothing to wait for.
-        if BighelpPlatform.isMac, !isAgentSwitcherPresented, profileAgentID == nil {
-            action()
-            return
-        }
-        afterHomeSheet = action
-        isHomeDrawerPresented = false
-        isAgentSwitcherPresented = false
-        profileAgentID = nil
-    }
-
-    func runAfterHomeSheet() {
-        let action = afterHomeSheet
-        afterHomeSheet = nil
-        action?()
-    }
-
-    // MARK: Board tabs
-
-    func boardContext(for agent: AgentProfile, onBack: (() -> Void)? = nil) -> AgentBoardContext {
-        AgentBoardContext(
-            agentID: agent.id, agentName: agent.name, imageURL: agents.avatarURL(for: agent),
-            activity: homeActivity, store: agentBoard,
-            onProfile: { profileAgentID = agent.id },
-            onSwitchAgent: { isAgentSwitcherPresented = true },
-            onAsk: askAgent,
-            onSend: sendToAgent,
-            onBlueprint: useBlueprint,
-            onMenu: { isHomeDrawerPresented.toggle() },
-            onNewChat: { startHomeChat(with: agent.id) },
-            onPickAgents: { presentNewChatPicker(seed: agent.id) },
-            tools: appsTools(for: agent),
-            menuHasUnread: menuHasUnread,
-            onBack: onBack
-        )
-    }
-
-    @ViewBuilder
-    func agentBoardTab(_ tab: AppTab, onBack: (() -> Void)? = nil) -> some View {
-        if let agent = homeAgent {
-            let context = boardContext(for: agent, onBack: onBack)
-            switch tab {
-            case .feed: AgentFeedView(context: context)
-            case .ideas: AgentIdeasView(context: context)
-            case .goals: AgentGoalsView(context: context)
-            default: AgentAppsView(context: context, media: agentMedia) { appsArtifacts(agentID: agent.id) }
-            }
-        } else {
-            ContentUnavailableView("No agent yet", systemImage: "person.crop.circle.badge.questionmark",
-                description: Text("Connect to Hermes to see your agent's feed, ideas and goals."))
-        }
-    }
-
-    /// Feed, Ideas, Goals or Files as a quick screen, from ☰ while the bottom bar doesn't hold
-    /// it: over where you were, with Back where ☰ would be.
-    func agentBoardPage(_ tab: AppTab) -> some View {
-        agentBoardTab(tab, onBack: { [appState] in
-            if case .board? = appState.path.last { appState.path.removeLast() }
-        })
-        .toolbar(.hidden, for: .navigationBar)
-    }
-
-    /// From ☰: its tab when the bottom bar holds it, else a quick screen over where you are.
-    func openBoard(_ tab: AppTab) {
-        if barTabs.contains(tab) {
-            tabSelection.wrappedValue = tab
-        } else if appState.path.last != .board(tab) {
-            appState.path.append(.board(tab))
-        }
-    }
-
-    func appsTools(for agent: AgentProfile) -> [(title: String, systemImage: String, action: () -> Void)] {
-        [
-            ("Files", "folder", { openWorkspaceDestination(.files) }),
-            ("Memory", "brain", { openWorkspaceDestination(.memory) }),
-            ("Skills & tools", "wrench.and.screwdriver", { openWorkspaceDestination(.skills) }),
-            ("Scheduled tasks", "calendar.badge.clock", { openScheduledTasks(filteredTo: agent.id) }),
-        ]
-    }
-
-    /// Where Files finds agents' folders: the bighelp plugin on the selected host, or the demo's.
-    var configuredWorkspaceSource: (any ConfiguredWorkspaceSource)? {
-        if usesWorkspaceFixtures, workspaceConnections?.isDirectSelected != true { return DemoConfiguredWorkspace() }
-        guard let workspace = workspaceConnections?.workspace,
-              let http = workspaceConnections?.hosts.selectedWorkspace?.nativeClient else { return nil }
-        return HostConfiguredWorkspace(http: http, workspace: workspace)
-    }
-
-    /// The Files target on screen now: nil once another connection is in use, another target once
-    /// another agent is, so a late reply for the last one never lands.
-    func currentFilesTarget(agentID: @escaping @MainActor () -> String?) -> @MainActor () -> WorkspaceFilesTarget? {
-        let workspace = workspaceConnections?.workspace
-        return {
-            guard workspaceConnections?.workspace === workspace, let owner = currentWorkspaceOwner else { return nil }
-            return WorkspaceFilesTarget(owner: owner, agentID: agentID())
-        }
-    }
-
-    /// Files in the agent home: the selected agent's own folder, and its folder chooser saves for it.
-    @ViewBuilder
-    func appsArtifacts(agentID: String) -> some View {
-        if let owner = currentWorkspaceOwner, let source = configuredWorkspaceSource {
-            let target = WorkspaceFilesTarget(owner: owner, agentID: agentID)
-            ConfiguredWorkspaceArtifactsView(hostName: workspaceHostName, target: target, source: source,
-                currentTarget: currentFilesTarget { homeAgent?.id }, isEmbedded: true)
-                .id(target)
-        } else {
-            ContentUnavailableView("No artifacts yet", systemImage: "square.on.circle",
-                description: Text("Files, pages and apps your agent makes show up here."))
         }
     }
 
@@ -733,26 +418,6 @@ extension RootShellView {
         }
     }
 
-    /// Attached to the workspace shell only: host setup and onboarding have no
-    /// navigation destinations, so a chat pushed under them would be blank.
-    func homeAutoOpen<Content: View>(_ content: Content) -> some View {
-        content
-            .task(id: HomeAutoOpenKey(loaded: sessionCatalog.hasLoadedState, agentID: homeAgent?.id,
-                                      owner: currentWorkspaceOwner, kanban: kanbanAvailability.isAvailable)) {
-                // Let the shell register its destinations before pushing.
-                await Task.yield()
-                guard !openLaunchLandingIfNeeded() else { return }
-                // Kanban hasn't answered for this computer yet: a new answer
-                // restarts this; none in time opens the default.
-                try? await Task.sleep(for: BighelpLanding.kanbanWait)
-                guard !Task.isCancelled else { return }
-                openLaunchLandingIfNeeded(kanbanWaitIsOver: true)
-            }
-            .onChange(of: actionErrorMessage == nil) { _, cleared in
-                if cleared { openLaunchLandingIfNeeded() }
-            }
-    }
-
     struct BoardPreloadKey: Equatable {
         let client: AgentBoardClientKey
         let agentID: String?
@@ -764,13 +429,6 @@ extension RootShellView {
         let homeAgentID: String?
         let agentIDs: Set<String>
         let isActive: Bool
-    }
-
-    struct HomeAutoOpenKey: Equatable {
-        let loaded: Bool
-        let agentID: String?
-        let owner: WorkspaceOwner?
-        let kanban: Bool?
     }
 
     // MARK: Dynamic Island pictures
@@ -821,8 +479,7 @@ extension RootShellView {
             .task(id: providerUsageKey) { configureProviderUsage(providerUsageKey) }
             .task(id: agentBoardClientKey) { await configureKanban(agentBoardClientKey) }
             .task(id: agentBoardClientKey) { await configureWorkflows(agentBoardClientKey) }
-            // Loads the home agent's board up front, so new Feed, Ideas and Goals
-            // items show as dots on the tab bar before the tab is opened.
+            // Loads the primary bot's board up front: the widgets show it.
             .task(id: BoardPreloadKey(client: agentBoardClientKey, agentID: homeAgent?.id)) {
                 guard agentBoard.isAvailable, let agentID = homeAgent?.id, agentBoard.agentID != agentID else { return }
                 await agentBoard.load(agentID: agentID)
@@ -868,136 +525,23 @@ extension RootShellView {
             }
             .onAppear { agentIsland?.onOpen = { openIslandChat() } }
             .task(id: activityAvatarKey) { await shareActivityAvatars() }
+            // A space's draft card in a chat leads to Today once its space is added. Each computer
+            // has its own navigation, so it's handed over again when that changes.
+            .onChange(of: ObjectIdentifier(appState), initial: true) {
+                SpaceDraftCardHost.openToday = { [appState] in appState.select(.today) }
+            }
             .modifier(PinnedAgentsWidgetHooks(
                 agents: agents, fleet: fleet, isActive: scenePhase == .active,
                 demo: usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true
                     ? (sessionCatalog, featureStore.scheduledTasks) : nil))
-            .bighelpSheet(isPresented: Binding(get: { profileAgentID != nil }, set: { if !$0 { profileAgentID = nil } }),
-                   onDismiss: runAfterHomeSheet) {
-                if let id = profileAgentID, let agent = agents.profiles.first(where: { $0.id == id }) {
-                    agentProfileSheet(agent)
-                }
-            }
-            .bighelpSheet(item: $newChatPicker) { request in
-                BotModeCreateRoomView(rooms: botModeRooms, agents: agents, seedProfileID: request.seed,
-                                      onStartDirect: { startHomeChat(with: $0) }) { roomID in
-                    guard request.owner == currentWorkspaceOwner else { return }
-                    openHostedGroup(roomID, owner: request.owner, settings: false)
-                }
-                .bighelpSheetSize(.standard)
-            }
-            .bighelpSheet(isPresented: $isAgentSwitcherPresented, onDismiss: runAfterHomeSheet) {
-                agentSwitcherSheet
-            }
             .modifier(MacSidebarMemory(isOpen: $isHomeDrawerPresented,
                                        canShow: !presentsFirstRunOnboarding && !needsInitialHostSetup))
             .modifier(HomeMenuPresentation(isPresented: $isHomeDrawerPresented, onDismiss: runAfterHomeSheet,
                                            contentID: ObjectIdentifier(featureStore)) {
-                homeDrawer
+                // The Mac's and Vision Pro's column is kept outside the shell: drawn again from
+                // the stores each time they change, not a copy made when it opened.
+                BighelpLiveColumn { homeSidebar }
             })
-    }
-
-    private func agentProfileSheet(_ agent: AgentProfile) -> some View {
-        let owner = currentWorkspaceOwner
-        let canEdit = owner.map { currentWorkspaceCapabilities.supports(.profilesEdit, owner: $0, profileID: agent.id) } ?? false
-        // From a chat with this agent: that chat's model and reasoning.
-        let chat: ChatModel? = if case .chat(let id)? = appState.path.last,
-                                  let model = featureStore.preparedChatModel(id: id),
-                                  !model.isBotMode, model.memberIDs.first == agent.id { model } else { nil }
-        return AgentProfileSheet(
-            agent: agent, imageURL: agents.avatarURL(for: agent), activity: homeActivity,
-            isConnected: owner != nil, store: agentBoard,
-            schedules: (featureStore.scheduledTasks?.tasks ?? []).filter { $0.agentID == agent.id },
-            onEdit: {
-                guard canEdit, let owner else {
-                    actionErrorMessage = "Connect to this host before editing its agent profile."
-                    return
-                }
-                afterClosingHomeSheets {
-                    workspaceProfileEditor = .editing(agent, store: agents, processor: AvatarImageProcessor(),
-                                                      isCurrent: { currentWorkspaceOwner?.signIn == owner.signIn })
-                }
-            },
-            onOpenSchedule: { task in afterClosingHomeSheets { openScheduledTask(task) } },
-            chatControls: chat?.runtimeControls,
-            onChangeModel: chat.map { chat in { afterClosingHomeSheets { chat.requestSessionControls() } } },
-            screenService: makeBotScreenService(),
-            screenChats: botScreenChats(for: agent)
-        )
-    }
-
-    private var homeGroups: [SessionSummary] {
-        sessionCatalog.recentSummaries(includeCronSessions: false).filter { $0.kind == .botMode }
-    }
-
-    private var agentSwitcherSheet: some View {
-        let groups = homeGroups
-        return AgentSwitcherSheet(
-            agents: agents.profiles,
-            selectedID: homeAgent?.id,
-            imageURL: { agents.avatarURL(for: $0) },
-            groups: groups.map { .init(id: $0.id, name: $0.title, memberCount: $0.agentIDs.count) },
-            onSelect: { agent in afterClosingHomeSheets { switchHomeAgent(to: agent) } },
-            onSelectGroup: { group in
-                guard let summary = groups.first(where: { $0.id == group.id }) else { return }
-                afterClosingHomeSheets { openAsHomeChat(summary) }
-            },
-            onNewGroup: { afterClosingHomeSheets { inviteToGroup(seed: homeAgent?.id) } },
-            onNewAgent: { afterClosingHomeSheets { appState.select(.agents) } },
-            onManageAgents: { afterClosingHomeSheets { appState.select(.agents) } }
-        )
-    }
-
-    private var homeDrawer: some View {
-        AgentHomeDrawer(
-            chats: Array(sessionCatalog.recentSummaries(includeCronSessions: false).prefix(12)),
-            agent: { id in agents.profiles.first { $0.id == id }.map { ($0.name, agents.avatarURL(for: $0)) } },
-            hosts: fleetMenuHosts,
-            destinations: fleetModeOn && settings.experience != .code ? fleetMenuDestinations : menuDestinations,
-            onOpen: { summary in afterClosingHomeSheets { openAsHomeChat(summary) } },
-            fleetChats: fleetModeOn ? fleet.map { fleet in
-                (fleet, { chat in afterClosingHomeSheets { openFleetChat(chat) } })
-            } : nil
-        )
-    }
-
-    /// Where the ☰ menu goes. Every menu entry point opens this one menu.
-    var menuDestinations: BighelpMenuDestinations {
-        BighelpMenuDestinations(
-            newChatTitle: homeAgent.map { String(localized: "New chat with \($0.name)") } ?? String(localized: "New chat"),
-            onNewChat: {
-                afterClosingHomeSheets {
-                    if appState.selectedTab != .sessions { appState.select(.sessions) }
-                    appState.chatOpenedFromList = false
-                    startNewChat(explicitAgentID: homeAgent?.id)
-                }
-            },
-            onAllChats: { afterClosingHomeSheets { openAllSessions() } },
-            onProjects: canOpenProjects ? { afterClosingHomeSheets { openProjects() } } : nil,
-            onAgents: { afterClosingHomeSheets { appState.select(.agents) } },
-            onScheduledTasks: { afterClosingHomeSheets { openScheduledTasks(filteredTo: nil) } },
-            onKanban: canOpenKanban ? { afterClosingHomeSheets { openKanban() } } : nil,
-            onWorkflows: canOpenWorkflows ? { afterClosingHomeSheets { openWorkflows() } } : nil,
-            folder: settings.nerdModeEnabled
-                ? (name: activeHermesWorkspaceName, open: { afterClosingHomeSheets { presentHermesWorkspaces() } })
-                : nil,
-            sharedWithBighelp: pendingSharesMenuRow,
-            onUsage: usage.isAvailable ? { afterClosingHomeSheets { showUsage() } } : nil,
-            onSettings: { afterClosingHomeSheets { openSettingsPage() } },
-            places: settings.appLayout.menuPlaces,
-            onBoard: { tab in afterClosingHomeSheets { openBoard(tab) } },
-            unread: boardUnreadTabs,
-            needsYou: menuNeedsYou,
-            code: settings.experience == .code ? codeMenu : nil,
-            experience: experienceSwitch
-        )
-    }
-
-    /// Something new in Feed, Ideas or Goals while ☰ is the only way there, a share waiting to be
-    /// sent, or something waiting in Needs you: a dot on ☰.
-    var menuHasUnread: Bool {
-        !boardUnreadTabs.subtracting(barTabs).isEmpty || PendingShareCenter.shared.waitingCount > 0
-            || menuNeedsYou != nil
     }
 
 }
@@ -1037,7 +581,7 @@ extension RootShellView {
             return
         }
         projectsStore = ProjectsStore(source: source, profileID: workspaceAgentID)
-        showOneHostPageOnSessions([.projects])
+        showOverWork([.projects])
     }
 
     /// Hermes starts new chats in the current project's folder, so the
@@ -1048,13 +592,11 @@ extension RootShellView {
                 actionErrorMessage = hermesWorkspaces.errorMessage ?? "This project couldn't be opened. Try again."
                 return
             }
-            appState.chatOpenedFromList = true
             startNewChat(explicitAgentID: workspaceAgentID)
         }
     }
 
     func openProjectChat(_ chat: ProjectsStore.Chat) {
-        appState.chatOpenedFromList = true
         if let id = chat.catalogID, let record = sessionCatalog.session(id: id) {
             openSessionSelection(record.summary)
             return
@@ -1077,7 +619,7 @@ extension RootShellView {
                 openSession(record.summary)
             } catch is CancellationError {
             } catch {
-                actionErrorMessage = "This chat couldn't be opened. Try again from All sessions."
+                actionErrorMessage = "This chat couldn't be opened. Try again from Chats."
             }
         }
     }

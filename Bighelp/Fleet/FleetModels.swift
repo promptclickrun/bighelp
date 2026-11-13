@@ -17,18 +17,6 @@ struct FleetSnapshot: Codable, Equatable, Sendable {
     /// Group chats; nil in snapshots saved before groups were listed.
     var groups: [FleetGroup]? = nil
     var refreshedAt: Date
-    /// The newest chats in Codex and Claude Code on that computer, not yet brought
-    /// into Hermes; nil when its Hermes can't list them (or before they were read).
-    var otherAppChats: [FleetOtherAppChat]? = nil
-}
-
-/// A chat in Codex or Claude Code on one computer (Hermes' `session.foreign.list`).
-/// Opening one goes to that computer's own Sessions screen, which brings it in.
-struct FleetOtherAppChat: Codable, Equatable, Sendable, Identifiable {
-    let hostID: UUID
-    let item: HermesForeignSessionItem
-
-    var id: String { FleetID.make(hostID, item.id) }
 }
 
 /// Agent IDs are only unique within one host.
@@ -123,6 +111,9 @@ struct FleetChat: Codable, Equatable, Sendable, Identifiable {
     var isActive: Bool
     /// Hermes' `source` for the chat (where it started); see `SessionOrigin`.
     var origin: String? = nil
+    /// Pinned on its computer, as of the last time that computer was the one in use (only its live
+    /// record says); nil when it was never read live.
+    var isPinned: Bool? = nil
 
     var id: String { FleetID.make(hostID, storedSessionID) }
 }
@@ -131,19 +122,6 @@ struct FleetChat: Codable, Equatable, Sendable, Identifiable {
 enum FleetChatChange: Equatable, Sendable {
     case rename(String)
     case archive
-}
-
-/// All sessions' filters while every computer shows. A computer is picked with its chip.
-struct FleetChatsFilter: Equatable {
-    /// One agent, by its `FleetAgent.id` (its computer and profile).
-    var agentID: String?
-    /// Where the chats started, by `SessionOrigin` label.
-    var origin: String?
-    /// Hermes, Codex or Claude Code, from the choice above the list. Kept apart from
-    /// the menu's filters: it stays when a computer is picked.
-    var app: SessionAppFilter = .all
-
-    var isActive: Bool { agentID != nil || origin != nil }
 }
 
 struct FleetTask: Codable, Equatable, Sendable, Identifiable {
@@ -174,36 +152,15 @@ enum FleetOpen: Equatable, Sendable {
     case task(jobID: String, profileID: String)
     case newChat(profileID: String)
     case group(roomID: String)
-    /// A group chat's settings (Bots mode's Group Settings).
+    /// A group chat's settings (the Bots view's Group Settings).
     case groupSettings(roomID: String)
     /// A new group chat with these agents, from New chat's Group chat. `peers`
     /// are agents on other computers; this host is the group's home.
     case newGroup(profileIDs: [String], peers: [HermesBotModePeerCandidate] = [])
     /// The agent's routines (its scheduled tasks).
     case routines(profileID: String)
-    /// Bots mode's bot profile.
+    /// A bot's page.
     case botProfile(profileID: String)
-    case destination(FleetDestination)
-}
-
-/// Screens that belong to one host. With several hosts, the all-hosts view
-/// asks which one first.
-enum FleetDestination: String, Equatable, Sendable, Identifiable {
-    case settings, agents, newAgent, projects, kanban, workflows, folder
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .settings: "Settings"
-        case .agents: "Agents"
-        case .newAgent: "New agent"
-        case .projects: "Projects"
-        case .kanban: "Kanban"
-        case .workflows: "Workflows"
-        case .folder: "Folder"
-        }
-    }
 }
 
 /// A tap that has to wait for its host to become the selected one.
@@ -218,14 +175,7 @@ struct FleetPendingOpen: Equatable, Sendable {
         switch open {
         case .agent(let id), .newChat(let id), .routines(let id), .botProfile(let id): id
         case .chat(let id, _, _), .task(_, let id): id
-        case .group, .groupSettings, .newGroup, .destination: nil
+        case .group, .groupSettings, .newGroup: nil
         }
     }
-}
-
-/// What a group chat's row can do from the all-hosts list.
-enum FleetGroupAction: Equatable, Sendable {
-    case open
-    case rename(String)
-    case delete
 }

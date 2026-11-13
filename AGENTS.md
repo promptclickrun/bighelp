@@ -35,10 +35,10 @@ change in both repos.
     `HermesWorkspaceStore` of its own (`separateStore()`), so the shell's Projects never move.
   - Everyday controls must never live only behind Advanced options.
 - **One place for each thing.**
-  - There's one ☰ menu (`BighelpMenu`) and one Settings, the same tree in every mode (`SettingsView`). Its first
+  - There's one Settings (`SettingsView`), and the person's circle in the header opens it from every tab. Its first
     screen is a short list of rows that each open one page, in groups: the person's row, Usage and, while a share
     waits, Shared with bighelp; Your bots (Models, Apps & skills, Voice, Personality and the Teamwork switch); This
-    app (Appearance, Chat, Notifications, Modes); on Vision Pro the agent in the room; Your computers (one row per
+    app (Appearance, Chat, Notifications); on Vision Pro the agent in the room; Your computers (one row per
     computer, Add a computer, Show every computer, Time zone, and with two or more, Update every computer); then
     Help & feedback and the Advanced options switch.
   - Settings copy follows DESIGN.md › Simplicity means hierarchy. A row's title is one to three words and its second
@@ -53,41 +53,67 @@ change in both repos.
     credential vault) and, with Advanced options, MCP servers and Toolsets. Models (`ModelsSettingsView`) is the
     providers and each bot's default model on one page. Each computer has one page (`BighelpConfiguredHostView`:
     Use this computer, Updates, Restart, This computer, Access, its Advanced groups, Remove this computer), and
-    Update every computer (`FleetSettingsView`) updates and restarts them together. Modes holds the mode switches,
-    Appearance the companion pet, and Help & feedback the usage-sharing switch and the Apple Watch's status. The
+    Update every computer (`FleetSettingsView`) updates and restarts them together. Appearance holds the
+    companion pet, and Help & feedback the usage-sharing switch and the Apple Watch's status. The
     old Hermes tools list (`WorkspaceHubView`) and Settings › System are gone: their pages open from where they
     belong (skills, plugins, messaging apps, MCP servers and toolsets in Apps & skills; logs, webhooks, tool
     backends, the computer voice test, diagnostics, backups, config.yaml, shell hooks and Kanban boards on a
     computer's page; Clean up chats and Archived chats in Chat; Toolsets and Manage bots in a bot's Advanced
     Options › For experts).
   - Don't add a second menu, drawer or settings copy for a feature. Add a row where people already look.
-  - People choose the bottom bar (Chat plus up to three, around New chat in the middle) and ☰'s order in
-    Appearance › App layout
-    (`BighelpAppLayout`). ☰ lists every place the bar doesn't hold, so nothing is out of reach, and Agents
-    and Settings always (`staysInMenu`): quick screens hide the bar. A new place
-    in ☰ is a `BighelpPlace` case; a page that can be pinned also needs an `AppTab` and a root in `rootTabs`.
-    Sessions' tab (`AppTab.sessionList`) is the Chat tab's own list: `selectedTab` stays `.sessions`, and only
-    the bar lights Sessions (`selectedBarTab`).
-  - Long-stay screens (Chat, Agents, Projects, Kanban, Workflows, Scheduled tasks) open from ☰ as screens of
-    their own, with ☰ in the corner (`AppTab.isLongStay`). Quick ones (Usage; Feed, Ideas, Goals and Files when
-    the bar doesn't hold them) slide in over where you are, with Back. Settings is a sheet: Back steps through
-    it, Done closes it. Whatever the bar holds is a tab. Headers drawn by the app place ☰ with
-    `bighelpHeaderButtonsPlacement()`, so it sits where the top bar puts it on every screen
-    (`MenuButtonPlacementUITests`).
-  - Main screens look the same whichever tab you came from (`SearchPlacementUITests`). Their title is the
-    bar's small one (a large title kept the size of the tab before). The bottom bar never moves. Search is
-    a `BighelpSearchField` as the first row under the title (`bighelpListSearchRow()`), filter chips below
-    it; never `.searchable` on a screen with the bar (iOS 26 puts it along the bottom, on the bar).
+  - There are no modes. One home has three places, the same for everyone: the first shows the Bots view
+    (`SimpleBotsHomeView`) or the Chats view (`ChatsInboxView`), then Today (`TodayView`) and Work (`WorkView`). The
+    first tab takes the name of the person's default view (`settings.homeView`), and the header's Bots | Chats
+    switch (`HomeViewSwitchPill`) changes the view for this run only. `HomeSelection` (`appState.home`, one for the
+    whole app; `AppState()` in tests and previews makes its own) holds the tab, the view, New chat's picks
+    (`NewChatSession`) and Today's layout and boards, so they stay when the computer in use changes. A tab is a root: `AppState.select(_:)` closes whatever was pushed, and
+    `select(_:thenOpen:)` shows a page over a tab for links, widgets and alerts (`showOverWork`, `showOverToday`).
+  - The app opens on Settings › Chat › Opens on (Bots, Chats, Today or Work: `settings.homeLanding`, read once per
+    launch as `launchHomeLanding` and applied by `HomeSelection.land`). With Today or Work, Chat › First tab shows
+    picks the first tab's view. No chat opens by itself. `HomeSettingsMigration` reads the old settings once
+    (marker `bighelp.home.migrated-v1`; it renames no key and removes none): Bots mode opens on Bots, Code mode as
+    the launch home opens on Work, an old Opens on screen maps to its place, the all-hosts view and Multi-gateway
+    become Show every computer, and a mode edge swipe becomes the edge's default (Bots mode's own swipes are
+    written down as the swipes they were).
+  - The bar is the same for everyone (`HomeTabBar`): the three places in a glass capsule, and the round New chat
+    button beside it. It shows on roots only, so a pushed page, a chat included, has Back instead, and the keyboard
+    hides it. Vision Pro puts the places in an ornament (`HomeTabOrnament`), and the iPhone Duo's side strip holds
+    them as toolbar items (`HomeStripTabs`). Today's dot on the bar means Needs you has an entry.
+  - Every root hides the navigation bar and draws one header (`HomeHeaderBar`, from a `HomeHeaderContext`): the
+    person's circle, which opens Settings, then the Bots | Chats switch or the title (Today, Work), search (a
+    button that opens a search page, or a field on a row under the buttons: `HomeHeaderSearch`), the computer menu
+    (Today and Work, with two or more computers; a computer that doesn't answer gives the selection back, as
+    everywhere: `selectFleetHost`), the root's own control (Today's Edit) and +. Place the header's
+    buttons with `bighelpHeaderButtonsPlacement()`, so they sit where a top bar puts them on every screen
+    (`MenuButtonPlacementUITests`). When the switch or the title doesn't fit beside the buttons (large text), it
+    moves to a row of its own instead of being cut.
+  - Search is a `BighelpSearchField` as the first row under the header (`bighelpListSearchRow()`), filter chips
+    below it; never `.searchable` on a screen with the bar (iOS 26 puts it along the bottom, on the bar).
+  - iPhone has no menu and no sidebar. iPad at regular width has a slide-in sidebar behind a header button
+    (`HomeMenuPresentation`). The Mac and Vision Pro have the sidebar column (`BighelpSideMenu` hosts
+    `HomeSidebar`, drawn again from the stores by `BighelpLiveColumn`). It lists the three places, Settings, New
+    chat, up to eight recent chats with See all, and More: Needs you while something waits, Shared with bighelp
+    while a share waits, Usage and, on Vision Pro, Simple mode. A new place goes where people already look (a Work
+    door, a Settings row), not in More.
+  - Every chat is a pushed page (`AppRoute.chat`) with one header (`ChatPushedHeader`, from
+    `AgentHomeChrome.pushedChat`): Back, the bot and ⋯. The bot opens its bot page (`openBotPage(fromChat:)` pushes
+    one run-loop turn later: a push straight from the header's tap was dropped about one time in three). ⋯ ends
+    with Bot page, the same push. No bar sits under a chat.
+  - Work's four doors (Projects, Tasks, Workflows, Schedules) open Projects, Kanban, Workflows and Scheduled tasks as
+    pushed pages, each only where the computer has it. Usage is a pushed page too (Settings' first group, the
+    sidebar's More). Settings is a sheet: Back steps through it, Done closes it.
   - Never show "bighelp account" or "Link" wording. That pairing system is retired.
   - Needs you (`NeedsYouDeckView`) is the one place a waiting approval, question or workflow sign-off is
-    answered outside its own card: a chat's prompts open it (`ChatAttentionPresenter`), and ☰ has its row
-    only while something waits. Each entry is read from where it lives (`RootShellView.needsYouEntries`):
+    answered outside its own card: a chat's prompts open it (`ChatAttentionPresenter`), Today's Needs you card
+    opens it, and the sidebar's More has its row, both only while something waits. Each entry is read from where it lives (`RootShellView.needsYouEntries`):
     prompts on open chats' connections, the Dashboard's list for chats that aren't open, one entry per
     prompt ID (`DashboardAttentionItem.promptID`; Hermes' prompts reach the app both ways), and
-    `WorkflowsStore.waiting`. A bot whose chat isn't open gets only an Open chat row. A long command or
+    `WorkflowsStore.waiting` (the store is made and read as soon as the computer says it has Workflows, so a
+    sign-off shows on Today before Work is ever opened). A bot whose chat isn't open gets only an Open chat row. A long command or
     sign-off file opens in full before Approve works. Prompts answer through `DirectHermesPromptResponseView`
     (its `deck` look), the same code as the card in the chat. There is no Activity screen: an alert that names no
-    chat opens Needs you while something waits (`AppState.openNeedsYou()`), else the home chat. A bot's Dashboard
+    chat opens Needs you while something waits (`AppState.openNeedsYou()`; the request is kept in `HomeSelection`, so
+    the shell on screen gets it whichever computer's `AppState` took it), else Today. A bot's Dashboard
     tab and its Activities list stay.
   - A blueprint is filled in in the message box, nowhere else: a pick anywhere (a board's Blueprints, an
     empty board's starters, a bot's Dashboard) leaves it for the chat with `fillsBlanks`
@@ -103,43 +129,86 @@ change in both repos.
     Discuss puts it in the message box (`ChatModel.boardCardDraft`). Let's do it sends "Let's do it!"
     with the idea at once (`leaveComposerText(sendsAtOnce:)`, `ChatModel.sendFromOutside`), never
     touching the box, and the idea moves to Ideas › Completed (the plugin's `answer`, `answeredAt`).
-  - Code mode is a second home, not a second app: ☰ gets a mode switch on top and Code's places while it's
-    the home (`AppTab.code`, `appState.homeTab`). Chat stays the out-of-box home.
-  - The modes are Bots, Chat and Code (`BighelpMode`; `settings.switchMode`). Settings › Modes has one picker
-    for the home a launch opens in (`settings.homeMode`, `selectHomeMode`; picking Code turns Code mode on)
-    and Code mode's own switch (`setCodeMode`), so Code can stay on beside a Chat or Bots home, or go off.
-    Its Header mode switcher (`unifiedModeToggleEnabled`, off by default) puts the modes in one pill
-    (`BighelpModePill`) at the top of each home: the Chat tab's own chat or its list, Code's home and Bots'
-    home (where Search and the computer filter move to a row under it). ☰ drops its Chat and Code switch
-    then. Edge swipes can switch modes too (Next mode, Bots, Chat, Code), also from Bots mode; on the
-    Mac, ⌃⌘1–⌃⌘3.
-  - Bots mode (Settings › Modes, `settings.simpleBotsEnabled`) is the one exception to ☰ and the bar:
-    its home (`SimpleBotsHomeView`) takes the Chat tab's place with neither, and the person's circle opens the
-    same Settings (`SettingsView`) that ☰ opens in Chat and Code; it has no Settings of its own.
-    Everything in it uses the same stores and chat; `Bighelp/SimpleBots/` holds its screens. It wins over the
-    all-hosts view and Settings › Chat › Opens on (`fleetModeOn` is off while it's on). Its Multi-gateway switch
-    (`simpleBotsMultiGateway`) lists every gateway's bots (`SimpleBotsGateways`, one `SimpleBotsBot` model
-    keyed by `FleetID`): the gateway in use live, the others from the all-hosts copies. Pins live on each
-    bot's own gateway; the primary bot is kept on the device (`simpleBotsMultiPrimary`). Acting on another
-    gateway's bot goes through `openFleet`; the home stays under the Noodle loader (`SimpleBotsOpeningOverlay`,
-    with Cancel) until the bot opens. A computer that doesn't answer gives the selection back to the one the tap
-    came from (`FleetSwitchFallback`), so neither the app nor its next launch is left on it.
-  - Sections are folders of bots and group chats (`Bighelp/SimpleBots/SimpleBotsSections.swift`): cards on
-    Bots mode's home and the Agents screen, a page of their own (`AppRoute.simpleBotsSection`, the home view
-    with a `sectionID`), and Code mode's agent picker lists agents by them. A bot's section is its profile's
-    `AgentListPlacement` (Hermes Desktop's field, saved on its own computer through `SimpleBotsSectionEditor`);
-    the sections list and each group chat's section, pin and hide are `FleetStore`'s, kept on the computers too
-    (`bots.layout`). Same-named sections on two computers are one (`FleetSectioning`). With one gateway shown, a
-    section whose members are all elsewhere stays off (`SimpleBotsSectioning.elsewhere`). + in Bots mode is
-    New Bot, New Group Chat and New Section, each only where it can work (`SimpleBotsNewItem`); the bot and
-    group chat menus come from `SimpleBotsMenuAction`.
+  - New chat is the new chat's own screen, drawn by the ordinary chat (`ChatNewChatSlot`, handed only to the chat
+    whose ID is `NewChatSession.conversationID`, never decided from its messages; from the first message on, staged,
+    sending or sent, it's an ordinary chat). Under Back and ⋯ a To row (`NewChatToRow`) holds the picked bots as
+    chips and a field that filters the people list (`NewChatPeopleList`, over the empty messages): one bot is a
+    chat, two to six (`BotModeRoom.maximumMembers`) a group chat, and a group chat the person already has can be
+    picked at the end of the list. With nobody picked the blank chat is the primary bot's; picking another single
+    bot makes the chat that bot's, replacing the blank chat in one step (`NewChatCoordinator.start(replacingBlankChat:)`).
+    A pick made while a chat starts waits, and the To row is read again when the start ends: the latest pick wins.
+    The message box's Send asks `ChatComposerActions.sendOverride` first (`NewChatSend.decide`): `.chat` sends in
+    this chat, `.group` makes the group chat, `.coding` and `.staged` hand the text to `CodeHomeStore` and go to
+    Work. Send sends everything in the box, or sends nothing, keeps the box and says why in a line under the To
+    row (`NewChatSend.Note`): with nobody picked it says "Pick who gets this" and puts the cursor in the To field.
+    A group chat and a coding session start with text only, so they are refused while the box holds an attachment
+    or a reference, and so is a pick that would replace the chat. A group Send keeps its text in the box until the
+    group chat is open (`NewChatSession.isStartingGroup` holds a second Send), so a group that can't be made loses
+    nothing. Text that goes with a pick to another computer rides in `HomeSelection.newChatHandoff`, dropped when
+    that computer doesn't open. Only a blank chat is ever taken off the stack (`AppState.dropBlankChat`). The
+    override holds a `NewChatSendRelay` and must not capture a view (the box keeps it while the chat is open), and
+    the choices row reads `ChatModel.draftShape` inside its own host view, never in the shell: a key press would
+    redraw the shell. + offers attachments only for a plain one-bot chat, and voice and ⋯ › Bot page show only
+    while the To row is exactly the chat's own bot.
+  - For exactly one bot on a computer that has a coding store, a single row under the message box scrolls sideways
+    (`NewChatChoicesRow`, `Equatable`): Project (none is an ordinary chat), then, once a project is picked, where it
+    runs (a new worktree or local), the branch, the mode (Hermes' Plan and YOLO, `CodeSessionMode`) and Stage. A
+    project makes the chat a coding session (`CodeLauncher`; see Coding sessions below). There is no Code home and no
+    Code message box: Work lists the coding sessions, and Work filtered to a project (`AppRoute.work(projectID:)`)
+    is the project's own page.
+  - Chats (`Bighelp/Home/Chats/`) lists every chat on every computer, newest first, with Pinned on top and the rest
+    by day. Once two or more computers show, one row of chips (All, each computer, Unread) sits under search. The
+    computer in use is read live from its catalog; the others come from their all-hosts copies (`FleetStore`) and
+    open through `openFleet`. Pin and Mark Read or Unread change only the computer in use's chats; another
+    computer's rows rename and archive. "This computer" pushes that computer's own Sessions page (projects,
+    imports from other apps, one bot's chats). The list is a pure function of the stores (`ChatsInboxProjection`),
+    kept until an input changes (`ChatsInboxCache`), so a computer's events don't redo it.
+  - Today (`Bighelp/Today/`) is a grid of panels under the header (`TodayPanelGrid`; Small, Wide or Tall), with the
+    Needs you card and the Shared with bighelp card above it while something waits, and the Make a space box
+    below (`TodayCreateBox`, hidden while the computer in use's plugin has no spaces). A panel is Feed, Ideas and
+    Goals for every bot (`TodayBoardsPanel`; See all pushes `TodayBoardPage` as `AppRoute.board`) or a space
+    (docs/SPACES.md). Edit changes order, hiding and size and deletes a space (`TodayPanelLayoutStore`; a space's
+    own layout belongs to its computer). What a panel's long press offers, VoiceOver gets from the panel's Actions
+    menu. A refusal (Update now too soon, a delete the computer refused) shows as one quiet line under the header
+    (`TodayNotice`). A read where no bot answered is not a read: the boards keep loading rather than say "Nothing
+    yet". One `TodayBoardsStore` and one `TodayPanelLayoutStore` live in `HomeSelection`, above the per-computer
+    `AppState`.
+  - Work (`Bighelp/Work/`) is one list of what the bots are doing, each row read from the store that holds it
+    (`WorkProjection`): coding sessions, chats and background work running now, workflow runs, Kanban tasks and
+    scheduled tasks. Chips: All, Needs you, Working, Done. Four doors lead on: Projects, Tasks, Workflows and
+    Schedules. Work filtered to a project has the navigation bar (Back, the project's name, ⋯ with pull requests,
+    worktrees and Dev Factory), not `HomeHeaderBar`.
+  - One bot page for every bot from every door (`SimpleBotProfileView`, `AppRoute.simpleBotProfile`): a bot's name
+    in a chat header, Bot Profile in a bot's long-press menu, a bot chip on a Today board. Its tabs are Dashboard,
+    Info, Computer, Files and Media. Info's About rows (Name, Role, Summary) edit in place, Handle is read only, and Approvals
+    lists what the bot asked to do. ⋯ holds what is done to the bot: New chat, Chats with this bot, Pin, Use with
+    Siri, Duplicate, Manage bots and Delete bot. The shell fills `SimpleBotProfileContext` in
+    `RootSimpleBots.simpleBotProfileContext(for:)`; a bot on another computer is pushed only once that computer
+    is in use (`openingComputer`). There is no profile sheet, no action sheet and no Agents screen.
+  - Sections are folders of bots and group chats (`Bighelp/SimpleBots/SimpleBotsSections.swift`): cards on the Bots
+    view and a page of their own (`AppRoute.simpleBotsSection`, the home view with a `sectionID`). A bot's section
+    is its profile's `AgentListPlacement` (Hermes Desktop's field, saved on its own computer through
+    `SimpleBotsSectionEditor`); the sections list and each group chat's section, pin and hide are `FleetStore`'s,
+    kept on the computers too (`bots.layout`). Same-named sections on two computers are one (`FleetSectioning`).
+    With one computer shown, a section whose members are all elsewhere stays off (`SimpleBotsSectioning.elsewhere`).
+    + on the Bots view is New Bot, New Group Chat and New Section, each only where it can work
+    (`SimpleBotsNewItem`); the bot and group chat menus come from `SimpleBotsMenuAction`.
+  - Show every computer (Settings › Your computers, `settings.showsEveryComputer`, on until turned off) puts every
+    computer's bots and chats in the Bots view, the Chats view and New chat's people list: the computer in use
+    live, the others from the all-hosts copies (`SimpleBotsGateways`, one `SimpleBotsBot` model keyed by
+    `FleetID`). It is the one switch behind the old all-hosts view and Multi-gateway (the saved key is the old
+    all-hosts one). Pins live on each bot's own computer; the primary bot is kept on the device
+    (`simpleBotsMultiPrimary`). Acting on another computer's bot goes through `openFleet`; the Bots view stays
+    under the Noodle loader (`SimpleBotsOpeningOverlay`, with Cancel) until the bot opens. A computer that
+    doesn't answer gives the selection back to the one the tap came from (`FleetSwitchFallback`), so neither the
+    app nor its next launch is left on it. While it's on, the other computers stay connected
+    (`keepsFleetHostsConnected`), through the background grace too, so opening on one is instant.
   - First run (`FirstRunOnboardingView`) is Welcome (with an optional Appearance step behind Appearance options),
     the AI data agreement if not given yet, Connect, the optional plugin, notifications (only once the plugin is
-    in), then Choose your mode (`FirstRunMode`: Bots, Chat for `.sessions`, Code). Optional steps have a small
-    Skip; Connect and the mode don't. `FirstRunOnboarding.afterConnectKey` keeps it on screen after host setup's own
-    finish. The mode cards show screenshots (`OnboardingMode*` assets); retake them when those homes change.
-  - While every host's data shows (all-hosts view or Multi-gateway), the other hosts stay connected
-    (`keepsFleetHostsConnected`), through the background grace too, so opening on one is instant.
+    in), then "How do you want to start?" (`FirstRunHome`: With a bot opens on Bots, Across chats on Chats; the
+    answer sets Opens on, which Settings › Chat changes later). Optional steps have a small Skip; Connect and the
+    start question don't. `FirstRunOnboarding.afterConnectKey` keeps it on screen after host setup's own finish.
+    The two cards draw a small sketch of the home they open (`FirstRunHomeSketch`), not a screenshot.
 - **Real data only.**
   - Avatars, activity poses and badges must come from what the agent is actually doing.
   - Never fake progress.
@@ -170,20 +239,24 @@ change in both repos.
 
 | Path | What it is |
 |---|---|
-| `Bighelp/App/` | App composition, `RootShellView`, routes (`AppRoute`, `RootDestinations`), ☰ menu, connection keeper, widget/Shortcut entry points |
+| `Bighelp/App/` | App composition, `RootShellView` and its `Root*.swift` extensions (`RootHome` draws the three roots, the bar and the sidebar), routes (`AppRoute`, `RootDestinations`), `AppState`, `BighelpSideMenu`, connection keeper, widget/Shortcut entry points |
+| `Bighelp/Home/` | The one home's parts: `HomeSelection`, `HomeHeaderBar`, `HomeTabBar` (+ `HomeTabOrnament`, `HomeStripTabs`), `HomeSidebar`, `Chats/` (the Chats view) and `NewChat/` (`NewChatSession`, the To row, the people list, the choices row, `NewChatSend`) |
+| `Bighelp/Today/`, `Bighelp/Work/` | The Today and Work tabs: panel grid, layout store, boards panel and page, Needs you card; Work's list, cards and doors (`WorkProjection`) |
+| `Bighelp/Spaces/` | Spaces on Today: the plugin client, stores, panels, the chat's `space_draft` card, the Make a space box ([docs/SPACES.md](docs/SPACES.md)) |
+| `Bighelp/SimpleBots/` | The Bots view (`SimpleBotsHomeView`), sections, the bot page (`SimpleBotProfileView` and its tabs), creating a bot |
 | `Bighelp/Chat/` | Chat screen, composer, `ChatModel` (+ `ChatModel+Submission`), the native chat timeline |
 | `Bighelp/DirectHermes/` | The Hermes client: sign-in, WebSocket JSON-RPC, dashboard REST, plugin routes (`DirectHermesNativeContext.swift`), access credentials |
 | `Bighelp/Workspace/` | `WorkspaceOperation` (every host operation) and workspace stores |
 | `Bighelp/Settings/` | The one Settings tree (`SettingsView` and its `+Menu`, `+NerdMode`, `+Computers` pages: the groups, the Advanced options switch, Your computers) and `SettingsStore`; Models (`ModelsSettingsView`), Voice and Notifications pages. A computer's own page is `BighelpConfiguredHostView` in `Bighelp/Hosts/` |
-| `Bighelp/Agents/`, `Board/`, `Companion/` | Agents, Feed/Ideas/Goals, the avatar kit renderer |
+| `Bighelp/Agents/`, `Board/`, `Companion/` | The bot directory and its editors, Feed/Ideas/Goals boards, the avatar kit renderer |
 | `Bighelp/Kanban/` | Kanban on Hermes' Kanban plugin: board model, lanes, cards, Vision Pro window and pinch-drag |
-| `Bighelp/Code/` | Code mode (Settings › Modes › Code mode): its home (`CodeHomeView`), the message box's chips (project, new worktree or local, branch), `CodeLauncher`, Changes and Ship |
+| `Bighelp/Code/` | Coding sessions, started from New chat's choices row (project, new worktree or local, branch, mode, Stage) and listed on Work: `CodeHomeStore`, `CodeLauncher`, the pickers, Changes and Ship |
 | `BighelpShare/`, `Bighelp/ShareShared/`, `Bighelp/Share/` | The share sheet (#922): the extension saves what's shared into the app group (`PendingShareInbox`, Foundation only and shared with the app), and the app's review puts it in the message box of the chat the person picks (`PendingShareCenter`, `ChatModel.placeShare`) |
 | `Bighelp/Connectors/` | Settings › Apps & skills (`AppsHubView`; a bot's profile has its own Connections): Hermes' connectors as Native App Connections (the inline connect cards in chat, `connection.request`, `ConnectorCardStore`; `ConnectorAppsModel`) and Composio Apps (`Composio/`, [docs/COMPOSIO_APPS.md](docs/COMPOSIO_APPS.md)) |
 | `Bighelp/HTMLApps/` | Agents' HTML apps: the `html_app` card, the full-screen page and its `window.bighelp` bridge, the plugin's `html-apps` routes, the demo's sample apps |
 | `Bighelp/BotScreen/` | Bot Screen: an agent's Linux screen (Hermes `display.*`) and the computer's own desktop (`ComputerScreen.swift`, the plugin's VNC bridge) in its profile's Computer tab, a native RFB client (`RFB/`, with VNC passwords) and the full-screen viewer with take control and hand back |
 | `Bighelp/Driving/` | An agent showing the person a place (`iphone_navigation`, #662): the place catalog and its playbooks (`DriveCatalog`), the navigator that plays one (`DriveNavigator`), and the overlay (island bar, chat dock) in its own window |
-| `Bighelp/Usage/` | The Usage page (☰ › Usage): plans and limits (`ProviderUsageStore`), Hermes' own analytics per agent and computer (`UsageStore`, `HostUsageLoader`), charts |
+| `Bighelp/Usage/` | The Usage page (Settings' first group, the sidebar's More): plans and limits (`ProviderUsageStore`), Hermes' own analytics per agent and computer (`UsageStore`, `HostUsageLoader`), charts |
 | `Bighelp/Voice/` | Turn-based and live voice; on-device voices (`OnDevice/`, Phonon in `Packages/PhononTTS`) |
 | `Bighelp/Spatial/` | Vision Pro: the agent in the room (`SpatialAvatarModel`, its volume and voice panel, its Settings section) |
 | `BighelpWatch/`, `BighelpWatchShared/`, `Bighelp/Watch/` | The Watch app, the Watch–iPhone wire (`WatchWire`), and the iPhone's `WatchRelay` that answers it |
@@ -233,11 +306,19 @@ change in both repos.
 
 ### UI test traps
 
-- `BighelpUITestCase` launches with Advanced options (`settings.nerdModeEnabled`) on and `-loopdy.home.opens-chat NO`. Use its helpers:
-  - `openRootTab`
+- `BighelpUITestCase.makeApp()` returns a `BighelpTestApplication`, which launches with Advanced options on
+  (`-loopdy.settings.nerd-mode YES`), `-bighelp.home.migrated-v1 YES` (the one-time settings migration is past),
+  `-loopdy.home.landing chats` (pin another place with `bots`, `chats`, `today` or `work`, and the first tab's view
+  with `-bighelp.home.view bots|chats` under today or work), `-bighelp.hosts.all-hosts NO` (the computer in use
+  only; a test of every computer opts in) and the bot page's swipe tutorial seen. Use its helpers:
+  - `openRootTab` (the old shell's tab names, through the home's doors: Chats, Bots, a Today panel, a Work door,
+    Settings; any other name fails)
   - `settingsRow`
   - `openChatInfo`
-  - `chatNewChatButton`
+  - `chatNewChatButton` (leaves an open chat through its Back first, then returns the bar's `home.new-chat`)
+  - `chatIdentity` (the pill in a chat's header) and `confirmNewChatPicker` (New chat opens with nobody
+    picked; it picks a bot)
+- The bar's ids are `home.tab.conversations|today|work` and `home.new-chat`; a chat's Back is `chat.back`.
 - Launch arguments pin `@AppStorage` values for the whole run, and taps in the UI can't change them. A `NO` launch
   argument is a string, so read flags with `UserDefaults.bool(forKey:)`.
 - `app.buttons["x"]` matches accessibility identifiers. SwiftUI menu items use their title as the identifier.
@@ -321,7 +402,7 @@ change in both repos.
   `@available`, so never raise the app's minimum for it. Its core has no visionOS or Intel slices, so only
   iPhone and iPad link it (the Mac DMG is universal).
 - **Voice mode per agent** (`AgentVoiceChoices`): Live or Take turns, and the live voice, are kept per computer
-  and agent on the device; Settings › Voice holds the default for agents without their own, and Bots mode's
+  and agent on the device; Settings › Voice holds the default for agents without their own, and a bot page's
   Default Voice sets an agent's. Anything that opens voice for an agent reads its effective mode. Voices and
   models are picked from lists (`VoiceOptions`; ElevenLabs from the account, speech plugins from the plugin's
   `voice-catalog`), with a typed Other only where a provider takes any value.
@@ -365,7 +446,7 @@ change in both repos.
   each time it's read (`BighelpVisibleChats` → `ChatModel.noteRead` → `SessionCatalogStore.noteRead`): as it shows,
   2 s after a turn ends on screen, and as it stops showing or the app leaves the front. A chat that isn't on screen
   is never marked, and one read again with nothing new isn't marked twice. Rows without `unread` mean the host
-  keeps none: Mark Read and Mark Unread hide (`SessionSummary.tracksUnread`). Bots mode shows Hermes' state where
+  keeps none: Mark Read and Mark Unread hide (`SessionSummary.tracksUnread`). The Bots view shows Hermes' state where
   there is one, else the marks kept on the device (`SimpleBotsReadState`). The Chats list's Draft reads the draft
   journal without observing it (`ChatDraftJournal.pendingDraft`).
 - **Archived:** the catalog lists `archived=include` and keeps rows Hermes' idle sweep archived
@@ -385,16 +466,16 @@ change in both repos.
   the host sent something on that socket in the last 5 s (`admissionFreshness`). Coming back to the app or a
   network change (`verifyLiveness`) voids that until a ping sent after it is answered: frames from before can sit
   in a dead socket's buffer. A prompt sent on a socket that dies anyway is journaled as uncertain, never resent.
-- **App state on the computer:** Bots mode's order, the sections, each group chat's section, pin and hide, Multi-gateway's
-  primary bot and each bot's voice, mark, pet and character are also kept for each person on their computers
-  (plugin `native-app-state-v1`, keys `bots.layout` and `bots.settings`; `Bighelp/AppState/`), so a reinstall
+- **App state on the computer:** the Bots view's order, the sections, each group chat's section, pin and hide, the
+  primary bot kept for Show every computer and each bot's voice, mark, pet and character are also kept for each
+  person on their computers (plugin `native-app-state-v1`, keys `bots.layout` and `bots.settings`; `Bighelp/AppState/`), so a reinstall
   or another device gets them back. The stores stay where screens read them; `BotsAppStateSync` turns their
   changes into patches and puts the newest revision from every computer reached back in them. Items are named
   by the computer's own ID (`<computerId>/<profile>`), never by this phone's host ID or sign-in scope. A value
   lists the computers it covers: a computer reached for the first time gets this phone's part, and a value
   already there wins (a fresh install never sends empty choices). Keep JSON fields the app doesn't know. The
   plugin refuses only values shaped like credentials; links and IDs go as they are.
-- **Who's working:** Bots mode's home and the Agents screen show each agent's Bot Chat working or needing
+- **Who's working:** the Bots view, the Chats view, Today and Work show each agent's Bot Chat working or needing
   you from the plugin's `agents/activity` (`native-agents-activity-v1`): Hermes' turn leases in any process
   (the app, `message_agent`, `chat -q`) and the dashboard's open prompts, for up to 64 agents in one read.
   `BotChatActivityStore` reads it while one of those screens shows and the app is active (3 s while something
@@ -433,8 +514,8 @@ change in both repos.
   share with files waits in the list: its words alone would spend files never sent, and Open brings them all
   back, even into a box that has its words already (`PendingShareIntake` places the opened share first). The person
   taking a share's last file or words out of the box lets it go, kept and listed. The saved copy goes only when
-  Hermes takes the message carrying it, or when the person deletes it in ☰ › Shared with bighelp (or Settings' first
-  screen, in every mode), which lists every waiting share; never by itself. `PendingShareInboxTests`, `PendingShareLedgerTests`
+  Hermes takes the message carrying it, or when the person deletes it in the list of waiting shares (Today's Shared with bighelp card, Settings' first
+  screen or the sidebar's More), never by itself. `PendingShareInboxTests`, `PendingShareLedgerTests`
   and `PendingShareWaitTests` run under any Swift (no UIKit); `PendingShareComposerTests` drive the chat.
 - **Plugin routes:**
   - Each route is a `WorkspaceOperation` case plus a `Route(path:feature:isMutation:maximumResponseBytes:)` in
@@ -552,7 +633,9 @@ change in both repos.
   `native-device-permission-request-v1`): its Turn on flips the same switch, without reopening the channel
   that carried the call, and the call goes on. Apple Health is read only and asks once about sharing first. The
   channel runs while bighelp is active, inactive or in the background grace, and in any agent's chat on a plugin with
-  `native-device-tools-agents-v1`; after the grace it closes as `paused` so the host waits for the phone.
+  `native-device-tools-agents-v1`; after the grace it closes as `paused` so the host waits for the phone. It
+  belongs to the chat opened last (`AppState.deviceToolConversationID`), also after Back to a list while its bot
+  still works; `activeConversationID` is only the chat still on the stack.
   A channel the host ended (its 30 s lease ran out while a slow tool ran, the plugin unloaded or started again, a
   lost connection) opens again by itself while the chat keeps its tools, with longer waits each time and a limit
   (`runReopeningWhileHeld`, `reopenWaits`); a late answer the host no longer takes loses only that answer, never
@@ -569,22 +652,43 @@ change in both repos.
   (`ImageDraftStore`): it claims the draft on the host, journals the write (`DeviceToolFileJournal`) and reads it back,
   so a second tap or a relaunch never writes twice; without access it opens Apple's own editor, whose Done is the
   Save. In a chat that holds the person's picture the phone answers `contacts.create` and `calendar.create` with
-  `review_required`. Each agent's Photo actions page sits beside its Instructions in Agent Studio, and in What it
-  can use on a bot's profile.
+  `review_required`. Each agent's Photo actions page is in What it can use on a bot's profile.
 - **Agents' apps** ([docs/HTML_APPS.md](docs/HTML_APPS.md), plugin `native-html-apps-v1`): an agent's HTML app is an
   `html_app` card (title, description, Open App); the chat never draws the HTML. Open App loads the page from its own
   `bighelp-app://<app id>/` origin in a full-screen web view (`HTMLAppWebView`) and renders it as made: any site or
-  library loads, while links and new windows open outside and the camera and microphone are refused. Its only way to
+  library loads, while the camera and microphone are refused. Only a link the person taps, to an `http` or `https`
+  address, opens outside; every other way off the page is dropped (`HTMLAppNavigationPolicy`: a script's own
+  navigation or `window.open`, and every other scheme, bighelp's own links included). Its only way to
   the app is `window.bighelp` (`HTMLAppBridge`): data the plugin serves (read every 5 s while a live app is open) and
   `sendAnswer`, which shows the exact message and sends only on the person's Send, as their next message.
+- **Spaces** ([docs/SPACES.md](docs/SPACES.md), plugin `native-spaces-v1`): a space is a live panel on Today. A bot
+  drafts it in a chat as a `space_draft` card (`SpaceDraftCardView`); only the person's Add to Today makes it a space,
+  and a routine on the computer then keeps it current. Each computer has one `SpacesStore`, kept by its cache scope
+  (`WorkspaceAuthority.cacheScopeID`), so a reconnect keeps it. `TodaySpacesModel` reads them all: the computer in
+  use and the ones Show every computer keeps connected live, the rest from the phone's copy. A read sends the card
+  hashes the phone has (`known`), so the computer leaves unchanged cards out. A space's size, hiding and place belong
+  to its computer (`TodayPanelLayoutStore.ownedChanges` → `SpacesTodayBridge`): a change shows at once
+  (`SpacesStore.stage`) and goes with `update`. One still waiting for its answer repeats with the same
+  `operationId`; a change on top of it gets a new one, because the plugin refuses an `operationId` it saw with
+  another body. A delete the computer hasn't finished stays off Today and repeats at each read, across launches.
+  Only the plugin's own context says the feature is missing ("Update the plugin"); a refused route during a
+  reconnect never does. A space's page opens in `HTMLAppScreen` on its own computer and never sends a message,
+  whatever the plugin says the page may do. Changes to one space go one at a time (`SpacesStore.send`), so the
+  computer ends on the last choice. A read asks about every bot the phone holds spaces for, and only the computer
+  saying a bot is gone takes its spaces off: a bot list that is short for a moment never does. Removing a computer
+  erases its spaces from the phone (`TodaySpacesModel.forget`). A bot's title and description are cut to the wire
+  maximums as they are read.
 - **Hermes versions never gate connections or features.** Older, newer, custom and absent version strings are
   metadata, not an allowlist. Check actual host capabilities and route responses instead.
   - Hosts differ, so parse leniently: ignore unknown keys and treat most parts as optional.
   - A missing part should hide one row, not break a screen.
 
-### Code mode
+### Coding sessions
 
-- Each Send runs `CodeLauncher`: the host's stock git makes the worktree (`/api/git/worktree/add` through
+A coding session starts from New chat (one bot, a project picked in its choices row) and lists on Work. There is no
+Code mode.
+
+- Each Send of one runs `CodeLauncher`: the host's stock git makes the worktree (`/api/git/worktree/add` through
   `StockGitManaging` prepare/execute) or switches the local branch, then `session.create` starts the session in
   exactly that folder with a title (`createSession(agentID:folder:title:)`, no fallback folder), then the first
   message goes out the way Shortcuts sends (`submitWithoutWaiting`). Nothing opens, so sends can go back to back.
@@ -598,26 +702,28 @@ change in both repos.
 - Back-to-back sends make their folders and sessions one at a time (`CodeHomeStore.setupTail`): Hermes starts one
   new chat per agent at a time, and each worktree changes the repository the next send reads. Sending and the
   agents' work still run side by side.
-- Hermes doesn't remove a worktree when its session ends; ☰ › Worktrees does. Its `create-pr` route takes no
-  title or description (they come from the commits); "Ask the agent to open it" sends the session a message.
-- Cards show only what the live chat or the session list says (`CodeChatStatusReader`): waiting prompts are
-  "Needs you", running work shows its tool. Demo mode uses `DemoCodeProjectSource` and `DemoCodeGit`.
-- The mode button (`CodeSessionMode`) uses Hermes' own options: Plan sends the first message as `/plan …` (Hermes
+- Hermes doesn't remove a worktree when its session ends; Worktrees does (a project's ⋯ on Work, and New chat's
+  choices row). Its `create-pr` route takes no title or description (they come from the commits); "Ask the
+  agent to open it" sends the session a message.
+- Work's coding rows show only what the live chat, the session list or the Dashboard's waiting list says
+  (`CodeChatStatusReader`): waiting prompts are "Needs you", also for a session whose chat isn't open, and running
+  work shows its tool. Demo mode uses `DemoCodeProjectSource` and `DemoCodeGit`.
+- The mode chip (`CodeSessionMode`) uses Hermes' own options: Plan sends the first message as `/plan …` (Hermes
   writes `.hermes/plans/<date>-<slug>.md` and changes no code); YOLO sets the session's `yolo` config (session
-  scope, `setYOLO`) before the first message. A refused YOLO sends nothing and keeps the card.
+  scope, `setYOLO`) before the first message. A refused YOLO sends nothing and says so (`CodeStartError.yoloRefused`).
 - A first message that starts with `/` takes the chat's own send path, which runs it as a command (`/plan` expands
   to its planning prompt there); `submitWithoutWaiting` (`prompt.submit`) would send it as plain text. The `/` list
   loads before the session exists: `commands.catalog` with `profile` and `cwd`, no `session_id`.
 - Markdown files open in `MarkdownFileSheet` through Hermes' `/api/fs/read-text` and `/api/fs/write-text`
   (`HostTextFileAccess`; demo: `DemoHostTextFiles`). Save re-reads first and never overwrites a file that changed
   without asking. IDE chats link Markdown paths (`HostFileLink`, `opensHostFiles`) against the session's folder.
-- Orchestration mode: Stage keeps a job with its chips (`CodeStagedJob`, saved per computer), and Send all
-  starts the staged jobs as one `CodeBatch` through the same one-at-a-time setup. The app combines the batch's
+- Stage (the last chip of New chat's choices row) keeps a job with its chips (`CodeStagedJob`, saved per
+  computer), and Send all starts the staged jobs as one `CodeBatch` through the same one-at-a-time setup. The app combines the batch's
   sessions (`CodeBatchChatView`): a message goes to each through `sendCardReply` (it steers a running turn), and
   each session's answer shows under the message by time. `#` mentions route (`CodeBatchRouting`): a session
   mention picks it and drops out of the text; a pull request mention is spelled out with its branch and goes
   to the session on that branch.
-- Dev Factory (☰ › Dev Factory) is Workflows with `schemaVersion: 3` recipes (plugin `native-workflows-code-v1`,
+- Dev Factory (a project's ⋯ on Work) is Workflows with `schemaVersion: 3` recipes (plugin `native-workflows-code-v1`,
   contract in bighelp-plugin's docs/DEV_FACTORY.md; vectors in `BighelpTests/Fixtures/Workflows/*-code.json`).
   A recipe lists git projects; `startCodeRun` makes one run per project under a `group_id`, each in its own
   worktree. New stage kinds `command` and `pullRequest`, and sign-off on the changes (`signsChanges`,
@@ -743,8 +849,8 @@ change in both repos.
   the files that use it and rebuild before chasing it.
 - **Live properties read outside `body`:** calling another view's computed property (a section of
   `SettingsView`, say) from elsewhere reads its `@Environment` and `@BighelpThemeReader` with their defaults,
-  the light theme, so Bots mode's pages drew white rows and light-mode grays at night. Build such a page
-  in the view's own `body` (`opening(_:)`, `simpleBotsPage(_:)`).
+  the light theme, so a page built that way drew white rows and light-mode grays at night. Build such a page
+  in the view's own `body`.
 - **Light and Dark on open sheets:** `.preferredColorScheme` gives a sheet its style when it opens and doesn't
   change it after, so a switch in Settings left the open sheet's text fields and pickers in the old style.
   `BighelpWindowAppearance` sets every window and presented controller, and each `bighelpSheet` and
@@ -755,7 +861,7 @@ change in both repos.
   two steps.
 - **One long-press menu per List row:** a List row shows the first `.contextMenu` in it for every item, so a grid of
   tiles in one row acted on the wrong item (holding a pinned chat offered another chat's Delete). Give each tile a
-  `Menu(primaryAction:)` or its own gesture (`AgentPinnedGrid`).
+  `Menu(primaryAction:)` or its own gesture.
 - **Owners change on every reconnect:** `WorkspaceOwner` includes the connection generation, so returning to the app
   makes a new one. Keep per-computer state (like "this host has Kanban") by `cacheScopeID`, and don't turn a failed
   check during a reconnect into "unavailable" (`KanbanAvailability`; New Group Chat:
@@ -778,8 +884,8 @@ sections can crash only on devices ("Thread stack size exceeded").
 
 ### iPad layout
 
-- iPad has no always-open sidebars. ☰ opens the one menu, which slides in from the leading edge
-  (`HomeMenuPresentation`); iPhone shows the same menu as a sheet. The bottom tab bar shows on iPad too.
+- iPad has no always-open sidebar. At regular width the header's sidebar button slides `HomeSidebar` in from the
+  leading edge (`HomeMenuPresentation`); iPhone has no sidebar. The bottom bar (`HomeTabBar`) shows on iPad too.
 - The chat lane (messages, message box, status rail) is `ChatCanvasLayout.regularLaneMaximumWidth` wide on iPad
   and Vision Pro. Bubbles take their share of it; don't reintroduce a fixed narrow column.
 
@@ -792,9 +898,9 @@ sections can crash only on devices ("Thread stack size exceeded").
   isn't for layout).
 - Cover (466 × 678, or half of the open screen in Split View) and open wide (`usesSideBar`): built with the iOS 27.1
   SDK, iOS lays a screen's navigation bar buttons down the 84-pt status column under its 174-pt camera area. The bar's
-  places are toolbar items (`BighelpStripTabs`, `.bottomBar`), so iOS stacks them there too; a column of our own
-  drawn over the strip lay on top of ☰ and the brand. The brand shows only the Noodle there. Chats in Bots and Code
-  mode, which have no bar, get `BighelpChatSwitcher` in the strip instead.
+  places are toolbar items (`HomeStripTabs`, `.bottomBar`), so iOS stacks them there too; a column of our own
+  drawn over the strip lay on top of the screen's own buttons. A chat has no bar, so
+  `BighelpChatSwitcher` (Settings › Chat › Chat switcher) takes the strip there.
 - Open wide: `BighelpSplitColumn` shows the tab's list in its own `NavigationStack` up to the fold
   (`splitColumnWidth`), and what it opens is pushed on the app's one stack beside it, so `path`, the active chat
   and every top-of-stack rule work as on iPhone. The list is the shell's own view, drawn again from its stores
@@ -831,13 +937,15 @@ sections can crash only on devices ("Thread stack size exceeded").
 - Present with `.bighelpSheet` and `.bighelpFullScreenCover`, never `.sheet` or `.fullScreenCover`. After a few
   sheets, Catalyst stops closing them: Done runs and the state says closed, but the sheet stays, stops updating
   and blocks the window until Esc. The bighelp versions close it through UIKit (`MacSheetPresentationTests`).
-- ☰ is the window's sidebar (`BighelpSideMenu`, shared with Vision Pro): it stays open while you pick, and the Mac
-  remembers it. The title bar's sidebar button (`MacTitlebarItems`, on every screen), ☰ and ⌃⌘S toggle it. Drag
-  its divider to resize it (remembered; double-click for the default width).
+- `HomeSidebar` is the window's sidebar (`BighelpSideMenu`, shared with Vision Pro): it stays open while you pick,
+  and the Mac remembers it. The title bar's sidebar button (`MacTitlebarItems`, on every screen), the header's
+  sidebar button and ⌃⌘S toggle it. Drag its divider to resize it (remembered; double-click for the default
+  width). The bar shows on the Mac too.
 - Title bar items are an `NSToolbar` on `scene.titlebar`. An `NSToolbarItem` made from a `UIBarButtonItem` fires
   only the button's target/action; a `primaryAction` closure never runs.
 - Keys: Return sends (Settings › Chat › Return sends), Shift-Return adds a line, Command-Return shows the send
-  choices while the agent works. ⌘N starts a chat and ⌘, opens Settings (`BighelpMenuCommands`).
+  choices while the agent works. ⌘N starts a chat, ⌘, opens Settings and ⌘1–⌘3 pick the three places
+  (`BighelpMenuCommands`).
 - `BighelpMac` (`BighelpMac/`) is a separate, fixture-only desktop prototype. It isn't the shipping Mac app.
 - Mouse and keyboard: plain buttons take clicks only where they draw, toolbar icons only on their glyph and form
   fields only on their line of text. Use the helpers in DESIGN.md › Mac pointer and keyboard.
@@ -879,9 +987,9 @@ sections can crash only on devices ("Thread stack size exceeded").
   it anyway: pass `prompt: Text("…").bighelpFieldHint(theme)`. Light-mode theme greys are darkened there too. Unselected segment labels ignore every color setting,
   so use `bighelpSegmentedPicker()`, which keeps a dark track there. Don't use `toolbarColorScheme` there: it
   overrides the appearance and turns titles white again.
-- Tabs sit in a leading ornament (`VisionTabOrnament`), not a bar along the bottom by the system's window
-  controls. A screen covered by a pushed one hides its ornaments, so the pushed home chat carries its own.
-  ☰ opens as a column beside the page (`BighelpSideMenu`), not a sheet; the Mac uses the same column as its sidebar.
+- The three places sit in a leading ornament (`HomeTabOrnament`), not a bar along the bottom by the system's window
+  controls. A screen covered by a pushed one hides its ornaments, and a pushed chat has Back instead.
+  The sidebar opens as a column beside the page (`BighelpSideMenu`), not a sheet; the Mac uses the same column.
 - Eye targets: controls are 56pt or more (`BighelpTokens.hitTarget`), header buttons 52pt glass plus margin.
 - Forms on visionOS: section headers don't grow to fit (Agent Studio's hero lives in a row there), a row of
   plain buttons can be laid out zero points tall (pin it with `.fixedSize(horizontal: false, vertical: true)`),
@@ -1177,9 +1285,9 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
   catalogs for demo mode and first launch; refresh them before a release.
 - Only first-party or permissively licensed art can ship in this Apache-2.0 repo.
 - The maintainer approves new character art before it ships.
-- An agent's face (`AgentFace`, drawn by `AgentLiveAvatar`, Bots mode's `SimpleBotFace` and its pet
+- An agent's face (`AgentFace`, drawn by `AgentLiveAvatar`, the Bots view's `SimpleBotFace` and its pet
   companion `AgentPet`) is, in order: its saved character (`CompanionStore` override), its petdex pet's moves
-  (`PetAvatarStore`), its Hermes face, shape or Bot Studio avatar (`AgentLookStore`, from the profiles' looks), its Bots mode mark
+  (`PetAvatarStore`), its Hermes face, shape or Bot Studio avatar (`AgentLookStore`, from the profiles' looks), its mark
   (`SimpleBotMarkStore`), then its picture. The first two live on the device, so saving any other kind of
   avatar must clear them (`AgentEditorModel.applySavedLook`), or chats keep the old one. There is no app-wide
   pet: each agent's pet is its own face.
@@ -1228,7 +1336,7 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
   (`HostSignInMatrixUITests`).
 - `Scripts/NativeWorkspaceAcceptanceProbe.py` covers the workspace and chat acceptance flows.
 - `Scripts/RoomLinkProbe.py` starts two isolated hosts and checks a group chat with an agent from each
-  (Hermes RoomLink); `--simulator-id` runs the app's own UI test against them. The scratch Hermes needs
+  (Hermes RoomLink) through the protocol calls. The scratch Hermes needs
   Python 3.14 and its `messaging` extra (the API server serves RoomLink).
 - `Scripts/AppStoreScreenshots.sh` takes the App Store screenshots from the real app on an isolated host whose
   agents really run their tools on made-up files. No demo chats in store screenshots.

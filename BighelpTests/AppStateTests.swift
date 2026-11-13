@@ -5,45 +5,73 @@ import Testing
 struct AppStateTests {
     @Test @MainActor func hostSwitchKeepsTheConnectionsScreenButClearsChatOwnership() {
         let state = AppState()
-        state.selectedTab = .agents
+        state.selectedTab = .work
         state.activateConversation(id: "old-host-chat", source: .newChat)
         state.requestVoiceMode(for: "old-host-chat")
         state.path = [.workspaceConnections]
         state.resetForHostBoundary()
-        #expect(state.selectedTab == .agents)
+        #expect(state.selectedTab == .work)
         #expect(state.path == [.workspaceConnections])
         #expect(state.activeConversationID == nil)
         #expect(state.pendingVoiceConversationID == nil)
     }
 
-
-    @Test func ordinaryHostSwitchPreservesTheCodexSessionsLanding() {
+    /// Another computer or account: the old one's pages close, and the person stays on their tab.
+    @Test func aComputerOrAccountSwitchKeepsTheTabAndClosesItsPages() {
         let state = AppState()
-        state.select(.profile)
-        state.path = [.sessions]
-
+        state.select(.today)
+        state.path = [.projects, .chat(conversationID: "old")]
         state.resetForHostBoundary()
+        #expect(state.selectedTab == .today)
+        #expect(state.path.isEmpty)
 
-        #expect(state.selectedTab == .sessions)
+        state.path = [.sessions]
+        state.resetForAccountBoundary()
+        #expect(state.selectedTab == .today)
         #expect(state.path.isEmpty)
     }
 
-    /// With every computer showing, its lists stay put when the working computer changes;
-    /// the old computer's own pages above them go.
-    @Test func aComputerSwitchInAllHostsKeepsItsLists() {
+    /// Every computer has its own `AppState`. The tab and the first tab's view are the whole app's,
+    /// so a chat opened on another computer lands on the place the person was on; each keeps its
+    /// own pages.
+    @Test func everyComputersStateSharesTheTabAndTheView() {
+        let home = HomeSelection()
+        let first = AppState(home: home), second = AppState(home: home)
+        first.select(.bots)
+        first.select(.work)
+        first.open(.projects)
+
+        #expect(second.selectedTab == .work)
+        #expect(second.home.view == .bots)
+        #expect(second.path.isEmpty)
+    }
+
+    @Test func aLaunchLandsOnThePlaceThePersonPicked() {
+        let home = HomeSelection()
+        home.land(on: .bots, view: .chats)
+        #expect(home.tab == .conversations)
+        #expect(home.view == .bots)
+        home.land(on: .chats, view: .bots)
+        #expect(home.view == .chats)
+        home.land(on: .today, view: .bots)
+        #expect(home.tab == .today)
+        #expect(home.view == .bots, "Today and Work keep the first tab on the person's own view")
+        home.land(on: .work, view: .chats)
+        #expect(home.tab == .work)
+        #expect(home.view == .chats)
+    }
+
+    /// A page that belongs to another tab (Kanban from a link) opens over that tab, so Back goes there.
+    @Test func aPageOfAnotherTabOpensOverIt() async {
         let state = AppState()
-        state.path = [.allHostsChats, .projects, .chat(conversationID: "old")]
-        state.resetForHostBoundary(keepsAllHostsScreens: true)
-        #expect(state.selectedTab == .sessions)
-        #expect(state.path == [.allHostsChats])
+        state.activateConversation(id: "current", source: .sessions)
 
-        state.select(.scheduledTasks)
-        state.resetForHostBoundary(keepsAllHostsScreens: true)
-        #expect(state.selectedTab == .scheduledTasks, "Every computer's tasks stay up")
+        state.select(.work, thenOpen: [.kanban])
+        // The Mac pushes a moment after the switch.
+        try? await Task.sleep(for: .milliseconds(400))
 
-        state.path = [.allHostsChats]
-        state.resetForHostBoundary()
-        #expect(state.path.isEmpty, "One computer: nothing of the old one stays")
+        #expect(state.selectedTab == .work)
+        #expect(state.path == [.kanban])
     }
 
     @Test func conversationActivationTracksTheCanonicalSessionID() {
@@ -55,27 +83,17 @@ struct AppStateTests {
         #expect(state.path == [.chat(conversationID: "session-1")])
     }
 
-    @Test func newChatReplacesTrailingChatButSessionsChatPushesFromItsRootTab() {
+    @Test func newChatReplacesTrailingChatButAChatFromAListIsPushed() {
         let state = AppState()
         state.path = [.chat(conversationID: "old")]
         state.activateConversation(id: "new", source: .newChat)
         #expect(state.path == [.chat(conversationID: "new")])
 
-        state.openSessions()
+        state.select(.chats)
         state.activateConversation(id: "saved", source: .sessions)
-        #expect(state.selectedTab == .sessions)
+        #expect(state.selectedTab == .conversations)
+        #expect(state.home.view == .chats)
         #expect(state.path == [.chat(conversationID: "saved")])
-    }
-
-    @Test func openingSessionsFromChatReplacesChat() {
-        let state = AppState()
-        state.activateConversation(id: "current", source: .newChat)
-
-        state.openSessions()
-
-        #expect(state.selectedTab == .sessions)
-        #expect(state.path.isEmpty)
-        #expect(state.activeConversationID == "current")
     }
 
     @Test func quickSwitchFromShellAppendsButReplacesTrailingChat() {
@@ -120,137 +138,27 @@ struct AppStateTests {
 
     @Test func anAlertWithoutAChatAsksForNeedsYouAndLeavesThePlaceAlone() {
         let state = AppState()
-        state.select(.agents)
+        state.select(.work)
         state.path = [.sessions, .chat(conversationID: "current")]
 
         state.openNeedsYou()
 
         #expect(state.isNeedsYouRequested)
-        #expect(state.selectedTab == .agents)
+        #expect(state.selectedTab == .work)
         #expect(state.path == [.sessions, .chat(conversationID: "current")])
     }
 
-    @Test func legacyInboxTabSelectionOpensChat() {
-        let state = AppState()
-        state.select(.agents)
-        state.path = [.sessions]
-
-        state.select(.inbox)
-
-        #expect(state.selectedTab == .sessions)
-        #expect(state.path.isEmpty)
-        #expect(AppTab.allCases == [.sessions, .feed, .ideas, .goals, .apps])
-    }
-
-    @Test func selectingARootTabClearsAnyStaleNavigationPath() {
+    /// A tab is a root: picking one (the bar, the sidebar, ⌘1–⌘3) closes whatever was pushed.
+    @Test func selectingATabClosesWhatWasPushed() {
         let state = AppState()
         state.path = [
             .sessions,
             .chat(conversationID: "stale-session")
         ]
 
-        state.select(.agents)
+        state.select(.today)
 
-        #expect(state.selectedTab == .agents)
+        #expect(state.selectedTab == .today)
         #expect(state.path.isEmpty)
-    }
-
-    @Test func drawerHighlightsOnlyTheRootDestinationThatIsActuallyVisible() {
-        let state = AppState()
-        state.select(.agents)
-
-        #expect(state.drawerSelectedTab == .agents)
-
-        state.activateConversation(id: "session-current", source: .newChat)
-
-        #expect(state.selectedTab == .agents)
-        #expect(state.drawerSelectedTab == nil)
-    }
-
-    @Test func rootRouteOpenersReplaceAnyStaleNavigationStack() {
-        let state = AppState()
-
-        state.path = [
-            .scheduledTasks,
-            .scheduledTask(id: "stale-task")
-        ]
-        state.openSessions()
-        #expect(state.selectedTab == .sessions)
-        #expect(state.path.isEmpty)
-
-        state.path = [
-            .sessions,
-            .chat(conversationID: "stale-chat")
-        ]
-        state.openScheduledTasks()
-        #expect(state.selectedTab == .scheduledTasks)
-        #expect(state.path.isEmpty)
-    }
-
-    /// Leaving a chat for any other place holds it, as it was opened, for the tab it was under.
-    @Test func leavingAChatForAnotherPlaceHoldsIt() {
-        for tab in [AppTab.ideas, .feed, .apps, .agents, .kanban, .projects] {
-            let state = AppState()
-            state.chatOpenedFromList = true
-            state.activateConversation(id: "chat-1", source: .sessions)
-            #expect(state.heldChat == nil)
-
-            state.select(tab)
-
-            #expect(state.path.isEmpty)
-            #expect(state.heldChat == HeldChat(conversationID: "chat-1", openedFromList: true), "\(tab)")
-        }
-    }
-
-    /// Chat and Sessions share a root: moving between them, or opening a chat, holds nothing.
-    @Test func chatAndSessionsAndOpeningAChatHoldNothing() {
-        let state = AppState()
-        state.activateConversation(id: "chat-1", source: .sessions)
-        state.select(.sessionList)
-        #expect(state.heldChat == nil)
-
-        state.activateConversation(id: "chat-1", source: .sessions)
-        state.select(.ideas)
-        #expect(state.heldChat != nil)
-        state.select(.feed)
-        #expect(state.heldChat?.conversationID == "chat-1", "Board to board keeps it")
-        state.select(.sessions)
-        state.activateConversation(id: "chat-2", source: .sessions)
-        #expect(state.heldChat == nil, "The chat on screen is the one held next")
-    }
-
-    /// The held chat belongs to this computer and this account.
-    @Test func hostAndAccountBoundariesForgetTheHeldChat() {
-        let state = AppState()
-        state.activateConversation(id: "chat-1", source: .sessions)
-        state.select(.goals)
-        state.resetForHostBoundary()
-        #expect(state.heldChat == nil)
-
-        state.select(.sessions)
-        state.activateConversation(id: "chat-1", source: .sessions)
-        state.select(.goals)
-        state.resetForAccountBoundary()
-        #expect(state.heldChat == nil)
-    }
-
-    /// Chat opens its own chat and, without Sessions in the bar, a chat from the list too. With
-    /// Sessions in the bar, a chat from the list is Sessions'.
-    @Test func theTabAChatWasUnderOpensItAgain() {
-        let own = HeldChat(conversationID: "own", openedFromList: false)
-        let listed = HeldChat(conversationID: "listed", openedFromList: true)
-        #expect(own.tab(sessionsInBar: false) == .sessions)
-        #expect(own.tab(sessionsInBar: true) == .sessions)
-        #expect(listed.tab(sessionsInBar: false) == .sessions)
-        #expect(listed.tab(sessionsInBar: true) == .sessionList)
-    }
-
-    /// Chat opens a 1:1 chat again only while its agent is the one in use; a group chat always.
-    @Test func chatHoldsAOneToOneChatOnlyForItsAgent() {
-        #expect(HeldChat.fitsChat(members: ["finance"], agentInUse: "finance"),
-                "A board from a 1:1 chat makes its agent the one in use")
-        #expect(!HeldChat.fitsChat(members: ["finance"], agentInUse: "travel"))
-        #expect(!HeldChat.fitsChat(members: ["finance"], agentInUse: nil))
-        #expect(HeldChat.fitsChat(members: ["finance", "travel"], agentInUse: "home"))
     }
 }

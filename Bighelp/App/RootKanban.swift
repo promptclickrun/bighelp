@@ -51,8 +51,9 @@ extension RootShellView {
 
     var canOpenKanban: Bool { kanbanAvailability.isAvailable == true }
 
+    /// Its page is open, or Work, which lists its cards.
     private var isKanbanPageOpen: Bool {
-        appState.selectedTab == .kanban || appState.path.contains { route in
+        appState.selectedTab == .work || appState.path.contains { route in
             if case .kanban = route { true } else { false }
         }
     }
@@ -79,7 +80,7 @@ extension RootShellView {
             return
         }
         #endif
-        showOneHostPageOnSessions([.kanban])
+        showOverWork([.kanban])
     }
 
     @ViewBuilder
@@ -92,7 +93,7 @@ extension RootShellView {
                 .accessibilityIdentifier("kanban.connecting")
         } else {
             ContentUnavailableView("Kanban isn't available", systemImage: "rectangle.split.3x1",
-                description: Text("Connect to your computer, then open Kanban from the menu."))
+                description: Text("Connect to your computer, then open Tasks from Work."))
         }
     }
 }

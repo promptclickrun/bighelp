@@ -218,12 +218,11 @@ extension RootShellView {
             guard let owner = currentWorkspaceOwner,
                   let profile = agents.resolvedAgent(explicitID: nil),
                   currentWorkspaceCapabilities.supports(.profilesEdit, owner: owner, profileID: profile.id) else {
-                actionErrorMessage = "Connect to this host before editing its agent profile."
+                actionErrorMessage = "Connect to this computer before editing its bot."
                 return false
             }
-            // A reconnect to the same computer keeps the editor usable.
-            workspaceProfileEditor = .editing(profile, store: agents, processor: AvatarImageProcessor(),
-                                               isCurrent: { currentWorkspaceOwner?.signIn == owner.signIn })
+            // Every door to a bot opens its page.
+            appState.open(.simpleBotProfile(agentID: profile.id))
         case .instances:
             appState.open(.workspaceConnections)
         case .voice, .permissions:
@@ -314,18 +313,8 @@ extension RootShellView {
         return nil
     }
 
-    /// Deleting from the Agents screen or the agent editor. Same lifecycle path
-    /// as Profiles, with no navigation beyond leaving a chat that was retired.
-    /// Lets other screens (the Chats rail) offer the Agents list's hold menu.
-    var agentActionsConfig: AgentActionsConfig {
-        AgentActionsConfig(
-            store: agents, runtimeDefaultsClient: agentRuntimeDefaults, owner: currentWorkspaceOwner,
-            capabilities: currentWorkspaceCapabilities, cloneClient: workspaceConnections?.cloneClient,
-            shortcutsAvailable: usesWorkspaceFixtures || (nativeRuntime != nil && currentWorkspaceOwner != nil),
-            onAction: handleAgentWorkspaceAction, agentDeletion: agentDeletionAction
-        )
-    }
-
+    /// Deleting from a bot's page. Same lifecycle path as Profiles, with no navigation beyond leaving a
+    /// chat that was retired.
     var agentDeletionAction: AgentDeletionAction? {
         if usesWorkspaceFixtures, nativeRuntime == nil {
             // The demo has no computer: the agent leaves its own list, and its screens close the same way.
@@ -371,7 +360,7 @@ extension RootShellView {
                     sessionRestoreTask?.cancel()
                     sessionRestoreTask = nil
                     sessionRestoreRequest = nil
-                    appState.openSessions()
+                    appState.select(.chats)
                 }
             })
         do {
@@ -392,11 +381,9 @@ extension RootShellView {
         closeScreens(ofDeletedAgent: profileID, chats: retired.ids)
     }
 
-    /// The deleted agent's editor, profile and chats leave the screen, so the person lands where
-    /// they were before them (Bots mode's home, the Agents list) instead of on a page for an agent
-    /// that isn't there.
+    /// The deleted bot's page and chats leave the screen, so the person lands where they were before
+    /// them instead of on a page for a bot that isn't there.
     func closeScreens(ofDeletedAgent profileID: String, chats: Set<String>) {
-        if workspaceProfileEditor?.editingAgentID == profileID { workspaceProfileEditor = nil }
         appState.path.removeAll { route in
             switch route {
             case .simpleBotProfile(let agentID, _): agentID == profileID
@@ -406,7 +393,9 @@ extension RootShellView {
         }
     }
 
-    func openLifecycleDestination(_ destination: WorkspaceDestination, reattaching: Bool) -> Bool {
+    /// `profileID`: Manage bots from a bot's page opens on that bot; else the bot in use.
+    func openLifecycleDestination(_ destination: WorkspaceDestination, reattaching: Bool,
+                                  profileID: String? = nil) -> Bool {
         let presentationID = UUID()
         do {
             guard let coordinator = try makeLifecycleCoordinator(isShown: { lifecyclePresentationID == presentationID })
@@ -417,7 +406,7 @@ extension RootShellView {
                 return false
             }
             lifecycleCoordinator = coordinator
-            lifecycleProfileID = workspaceAgentID
+            lifecycleProfileID = profileID ?? (reattaching ? (lifecycleProfileID ?? workspaceAgentID) : workspaceAgentID)
             lifecyclePresentationID = presentationID
             if !reattaching { appState.open(.workspaceManagement(destination)) }
             return true
@@ -459,7 +448,7 @@ extension RootShellView {
                 guard currentWorkspaceOwner == owner else { throw WorkspaceClientError.ownerChanged }
                 if isShown() {
                     switch result.change {
-                    case .renamed, .deleted: appState.openSessions()
+                    case .renamed, .deleted: appState.select(.conversations)
                     default: break
                     }
                 }
@@ -470,7 +459,7 @@ extension RootShellView {
                     sessionRestoreTask?.cancel()
                     sessionRestoreTask = nil
                     sessionRestoreRequest = nil
-                    appState.openSessions()
+                    appState.select(.chats)
                 }
             })
     }
@@ -481,17 +470,6 @@ extension RootShellView {
             return
         }
         switch request.action {
-        case .openAgentSessions(let id):
-            openSessions(filteredTo: id)
-        case .openAgentGroups(let id):
-            agentGroupFilterRequest = id
-            appState.select(.agents)
-        case .openAgentScheduledTasks(let id):
-            openScheduledTasks(filteredTo: id)
-        case .openHostStatus:
-            isHostStatusPresented = true
-        case .openAgentChat(let id):
-            openAgentChat(id)
         case .openGroup(let id):
             openHostedGroup(id, owner: request.owner, settings: false)
         case .openGroupSettings(let id):
@@ -532,9 +510,15 @@ extension RootShellView {
         }
     }
 
-    func openHostedGroup(_ id: String, owner: WorkspaceOwner, settings: Bool) {
+    /// `firstMessage`: New chat's text for a group chat it just made, sent there once it opens.
+    /// `opened` is called once: with the chat's ID when it is on screen, else nil.
+    func openHostedGroup(_ id: String, owner: WorkspaceOwner, settings: Bool, firstMessage: String? = nil,
+                         opened: (@MainActor (String?) -> Void)? = nil) {
         Task { @MainActor in
-            guard currentWorkspaceOwner == owner else { return }
+            guard currentWorkspaceOwner == owner else {
+                opened?(nil)
+                return
+            }
             do {
                 let room = try await botModeRooms.openNativeRoom(roomID: id)
                 guard currentWorkspaceOwner == owner else { throw WorkspaceClientError.ownerChanged }
@@ -543,14 +527,26 @@ extension RootShellView {
                                   title: room.title, remoteSource: "hermes-room", botModeRoomID: room.id),
                     ownerIsCurrent: { currentWorkspaceOwner == owner }
                 )
+                if let firstMessage, !firstMessage.isEmpty {
+                    sessionCatalog.updateDraft(firstMessage, for: record.id)
+                    appState.sendsDraftOnOpen.insert(record.id)
+                }
                 let route = AppRoute.chat(conversationID: record.id)
                 guard featureStore.prepare(route),
                       case .chat(let model)? = featureStore.preparedModel(for: route) else {
                     throw WorkspaceClientError.unavailable(.unsupportedOperation)
                 }
-                if settings { appState.open(.groupSettings(roomID: room.id, conversationID: model.conversationID)) }
-                else { appState.activateConversation(id: record.id, source: .sessions) }
+                if settings {
+                    appState.open(.groupSettings(roomID: room.id, conversationID: model.conversationID))
+                    opened?(nil)
+                } else {
+                    appState.activateConversation(id: record.id, source: .sessions)
+                    // New chat's own paths take its blank chat off the stack here (`dropNewChatBlank`).
+                    // A group chat opened any other way (a link, an alert, Chats) leaves the stack as it is.
+                    opened?(record.id)
+                }
             } catch {
+                opened?(nil)
                 guard currentWorkspaceOwner == owner else { return }
                 actionErrorMessage = "Hermes could not open this group. "
                     + (HermesRefusalMessage.sentence(in: error) ?? "Check the host and try again.")

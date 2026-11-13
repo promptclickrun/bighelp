@@ -174,103 +174,6 @@ extension BighelpHeaderActionPresentation {
     )
 }
 
-struct SpectrumActionHitTargetPresentation: Equatable, Sendable {
-    let visualSize: CGFloat
-    let minimumHeight: CGFloat
-    let expandsHorizontally: Bool
-}
-
-struct SpectrumAction: View {
-    static let hitTargetPresentation = SpectrumActionHitTargetPresentation(
-        visualSize: BighelpTokens.primaryActionSize,
-        minimumHeight: BighelpTokens.primaryActionSize,
-        expandsHorizontally: true
-    )
-
-    let accessibilityLabel: String
-    let isAvailable: Bool
-    let action: () -> Void
-
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    init(
-        accessibilityLabel: String,
-        isAvailable: Bool = true,
-        action: @escaping () -> Void
-    ) {
-        self.accessibilityLabel = accessibilityLabel
-        self.isAvailable = isAvailable
-        self.action = action
-    }
-
-    var body: some View {
-        let presentation = FloatingTabBar.newChatPresentation(for: theme.themeID)
-        let hitTarget = Self.hitTargetPresentation
-        Button(action: action) {
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
-                Image(systemName: "square.and.pencil")
-                    .font(.system(size: 22, weight: .semibold))
-                    .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(presentation.foreground == .themeAccent
-                        ? theme.action
-                        : theme.primaryText)
-                    .frame(width: hitTarget.visualSize, height: hitTarget.visualSize)
-                    .modifier(
-                        FloatingTabBarActionSurfaceModifier(
-                            theme: theme,
-                            reduceTransparency: reduceTransparency
-                        )
-                    )
-                    .opacity(isAvailable ? 1 : 0.48)
-                Spacer(minLength: 0)
-            }
-            .frame(
-                maxWidth: hitTarget.expandsHorizontally ? .infinity : hitTarget.visualSize,
-                minHeight: hitTarget.minimumHeight
-            )
-            .contentShape(.rect)
-        }
-        .buttonStyle(SpectrumPressStyle())
-        .frame(
-            maxWidth: hitTarget.expandsHorizontally ? .infinity : hitTarget.visualSize,
-            minHeight: hitTarget.minimumHeight
-        )
-        .contentShape(.rect)
-        .disabled(!isAvailable)
-        .bighelpIconLabel(accessibilityLabel)
-        .accessibilityValue(isAvailable ? "Available" : "Unavailable")
-    }
-
-    @BighelpThemeReader private var theme
-}
-
-struct FloatingTabBarActionSurfaceModifier: ViewModifier {
-    @Environment(\.bighelpUIV2Enabled) private var uiV2Enabled
-    let theme: BighelpTheme
-    let reduceTransparency: Bool
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if uiV2Enabled {
-            content.bighelpSurface(.circularControl, isInteractive: true)
-        } else if reduceTransparency {
-            content.background(theme.raisedSurface, in: .circle)
-        } else {
-            #if os(visionOS)
-            content.glassBackgroundEffect(in: .circle)
-            #else
-            if #available(iOS 26, *) {
-                content
-                    .glassEffect(.regular.interactive(), in: .circle)
-            } else {
-                content.background(.ultraThinMaterial, in: .circle)
-            }
-            #endif
-        }
-    }
-}
-
 private struct SpectrumPressStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -1017,7 +920,7 @@ struct BighelpIconTile: View {
     var body: some View {
         let color = tint ?? theme.action
         let solid = colorSchemeContrast == .increased
-        // Round, as Bots mode draws its rows: a soft wash of the person's color with the icon in it.
+        // Round, as the Bots view draws its rows: a soft wash of the person's color with the icon in it.
         // Increased Contrast keeps a solid circle with the color's own ink.
         BighelpSymbolImage(systemName: systemName)
             .frame(width: side * 0.62, height: side * 0.62)

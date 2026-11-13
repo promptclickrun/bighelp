@@ -352,7 +352,7 @@ struct SpatialAvatarVolume: View {
                 agentImageURL: model.agent?.imageURL,
                 permissionCenter: permissionCenter,
                 onEnded: { model.endVoice() },
-                onWorkspaceTap: openChat,
+                onOpenChat: openChat,
                 onUseTurnBased: useTurnBasedVoice,
                 onTryAgain: tryLiveVoiceAgain,
                 chatActivity: { model.activity }
@@ -377,7 +377,7 @@ struct SpatialAvatarVolume: View {
 
 /// Hooks on the main window: Settings and the menu find the avatar, and the
 /// avatar knows whether it must offer to reopen this window. The avatar never
-/// opens by itself; the person chooses it (☰ › Simple mode, or Settings).
+/// opens by itself; the person chooses it (the sidebar's Simple mode, or Settings).
 struct SpatialAvatarMainWindowHooks: ViewModifier {
     let model: SpatialAvatarModel
 

@@ -56,9 +56,7 @@ struct SessionsView: View {
     /// Starts a Hermes hosted group chat (Bot Mode). Nil when the host can't create rooms.
     let onNewGroupChat: (() -> Void)?
     let onSelect: (SessionSummary) -> Void
-    /// The Agents list's hold menu for the "Your agents" rail.
-    var agentActionsConfig: AgentActionsConfig? = nil
-    @State private var agentActions = AgentActions()
+
     /// Codex and Claude Code chats on this computer, and what identifies that list; nil hides them.
     let otherApps: (source: any OtherAppChatsSource, id: String)?
     /// Opens a chat brought in from another app, by its Hermes session ID.
@@ -82,7 +80,7 @@ struct SessionsView: View {
         onStartChat: ((String?) -> Void)? = nil,
         onNewGroupChat: (() -> Void)? = nil,
         onSelect: @escaping (SessionSummary) -> Void,
-        agentActionsConfig: AgentActionsConfig? = nil,
+
         otherApps: (source: any OtherAppChatsSource, id: String)? = nil,
         onOpenBroughtIn: ((String) -> Void)? = nil,
         appFilter: Binding<SessionAppFilter>? = nil,
@@ -104,17 +102,6 @@ struct SessionsView: View {
         self.sessionOrganizationHostID = sessionOrganizationHostID
         self.onStartChat = onStartChat
         self.onSelect = onSelect
-        self.agentActionsConfig = agentActionsConfig
-    }
-
-    /// Same as holding an agent in Agents; "Group chats" opens that list filtered.
-    private func performAgentAction(_ action: AgentRowMenuAction, agent: AgentProfile, config: AgentActionsConfig) {
-        guard action == .groups else {
-            agentActions.perform(action, agent: agent, config: config)
-            return
-        }
-        guard let owner = config.owner, let onAction = config.onAction else { return }
-        onAction(AgentWorkspaceActionRequest(owner: owner, action: .openAgentGroups(profileID: agent.id)))
     }
 
     var body: some View {
@@ -233,7 +220,7 @@ struct SessionsView: View {
                 Text(message)
             }
         }
-        .agentActionsPresentation(agentActions, config: agentActionsConfig)
+
         .bighelpSheet(item: $projectMoveTarget) { session in
             if let projectMove, let agentID = session.agentIDs.first {
                 MoveChatToProjectSheet(move: projectMove, chatTitle: session.title, agentID: agentID,
@@ -574,13 +561,6 @@ struct SessionsView: View {
                                 }
                             }
                             .buttonStyle(.bighelpTilePress)
-                            .contextMenu {
-                                if let agentActionsConfig {
-                                    AgentActionMenuItems(actions: agentActions, agent: profile, config: agentActionsConfig) { action in
-                                        performAgentAction(action, agent: profile, config: agentActionsConfig)
-                                    }
-                                }
-                            }
                             .accessibilityLabel("New chat with \(profile.name)")
                             .accessibilityValue(state == .idle ? "" : state.label)
                             .accessibilityIdentifier("sessions.start-with.\(profile.id)")
@@ -775,7 +755,7 @@ struct SessionsView: View {
                 } label: {
                     VStack(spacing: 5) {
                         SessionIdentityView(session: session, agents: agents, size: 64, state: state)
-                        // As Bots mode's top bots: the dot after the name.
+                        // As the Bots view's top bots: the dot after the name.
                         HStack(spacing: BighelpTokens.space4) {
                             Text(session.title)
                                 .font(.system(size: pinnedTitleSize, weight: session.isUnread ? .bold : .semibold))

@@ -10,10 +10,9 @@ final class CompanionSettingsUITests: BighelpUITestCase {
             let app = makeApp()
             app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance]
             app.launch()
-            _ = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu", "tab.profile"]))
-                .firstMatch.waitForExistence(timeout: 60)
+            _ = app.buttons["simple-bots.settings"].firstMatch.waitForExistence(timeout: 60)
             openSettings(in: app)
-            // The pet is a row in Appearance, under Chat layout and App layout.
+            // The pet is a row in Appearance.
             settingsRow("settings.themes", in: app).tap()
             let entry = app.buttons["companion-settings-entry"].firstMatch
             for _ in 0..<8 where !(entry.exists && entry.isHittable) { app.swipeUp() }

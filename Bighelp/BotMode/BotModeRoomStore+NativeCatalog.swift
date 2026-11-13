@@ -83,6 +83,14 @@ extension BotModeRoomStore {
         return nativeCapabilities != nil ? nativeExecutionAvailable : groupChatsBeforeReconnect
     }
 
+    /// Whether this computer makes group chats, for a list that marks who can join one. Nil until its
+    /// Hermes has answered on this connection: not knowing yet is no reason to mark a bot as unable.
+    var makesGroupChats: Bool? {
+        guard nativeClient is any HermesBotModeCatalogClient else { return false }
+        if nativeCapabilities == nil, !groupChatsBeforeReconnect { return nil }
+        return offersNewGroupChat
+    }
+
     func nativeRoomIsWorking(roomID: String) -> Bool {
         nativeDriverWorkingByRoom[roomID] == true || room(id: roomID)?.isRunning == true
     }

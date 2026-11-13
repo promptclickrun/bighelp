@@ -62,14 +62,16 @@ final class TextSizeDefaultUITests: BighelpUITestCase {
         app.launch()
         let name = "text-size-\(pinsTextSize ? "pinned" : "default")"
 
-        let chat = app.buttons["session.row.demo-finance"].firstMatch
+        let chat = chatRow("demo-finance", in: app)
         XCTAssertTrue(chat.waitForExistence(timeout: 15))
         chat.tap()
-        XCTAssertTrue(app.buttons["chat.menu"].firstMatch.waitForExistence(timeout: 10), "The chat opened")
+        XCTAssertTrue(app.buttons["chat.back"].firstMatch.waitForExistence(timeout: 10), "The chat opened")
         XCTAssertTrue(app.descendants(matching: .any)["chat.message.inline-selection"].firstMatch
             .waitForExistence(timeout: 10), "The chat shows its messages")
         capture("\(name)-chat-\(appearance)", in: app)
 
+        // Settings opens from the home's circle.
+        goBackFromChat(in: app)
         openSettings(in: app)
         settingsRow("settings.themes", in: app).tap()
         let studio = app.descendants(matching: .any)["appearance.studio"].firstMatch

@@ -22,7 +22,7 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
     /// "loopdy://voice?agent=…&host=…": the agent's Bot Chat in voice, from Start voice chat.
     /// No agent is the home agent of that computer.
     case voice(agentID: String?, hostID: UUID?)
-    /// "loopdy://agents", "loopdy://projects", "loopdy://settings": ☰'s pages.
+    /// "loopdy://agents", "loopdy://projects", "loopdy://settings": pages of the home.
     case agents
     case projects
     case settings
@@ -32,7 +32,7 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
     case workflow(id: String, hostID: UUID?, startsRun: Bool)
     /// "loopdy://workflow-run/<id>": one run, from the Workflows widget.
     case workflowRun(id: String)
-    /// "loopdy://usage": ☰ › Usage, from the Usage widget.
+    /// "loopdy://usage": Usage, from the Usage widget.
     case usage
 
     static func parse(_ url: URL) -> BighelpIncomingURLRoute? {

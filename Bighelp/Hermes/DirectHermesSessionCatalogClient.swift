@@ -658,7 +658,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         try await createOrdinarySession(profileID: profileID, folder: nil, title: nil, runtime: .init())
     }
 
-    /// Code mode: a new chat in exactly `folder` (a project's worktree or checkout),
+    /// A coding session: a new chat in exactly `folder` (a project's worktree or checkout),
     /// named `title`. Unlike a chat in the selected project, it never falls back to
     /// another folder: work meant for a worktree must not land somewhere else.
     func createSession(agentID: String, folder: String, title: String,

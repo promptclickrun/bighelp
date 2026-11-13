@@ -60,15 +60,9 @@ final class NotificationErrorCodeUITests: BighelpUITestCase {
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-host-setup", "connected",
                                "-test-notification-failure", failure, "-loopdy.demo.appearance", appearance]
         app.launch()
-        let menu = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu"])).firstMatch
-        XCTAssertTrue(menu.waitForExistence(timeout: 15), "☰ menu")
-        menu.tap()
-        let hosts = app.buttons["menu.hosts"]
-        XCTAssertTrue(hosts.waitForExistence(timeout: 5))
-        hosts.tap()
-        let add = app.buttons["menu.host.add"]
-        XCTAssertTrue(add.waitForExistence(timeout: 5))
-        add.tap()
+        // Settings › Your computers › Add a computer.
+        openSettings(in: app)
+        settingsRow("settings.add-computer", in: app).tap()
         return app
     }
 

@@ -12,13 +12,8 @@ extension RootShellView {
 
     /// A tapped scheduled task alert's job, where Scheduled tasks shows it with its runs.
     func openScheduledAlertTask(_ task: ScheduledTask) {
-        guard simpleBotsOn else {
-            performFleetOpen(.task(jobID: task.id, profileID: task.agentID))
-            return
-        }
-        // Bots mode has no tab bar: the bot's routines open over its home, and the task over them.
-        openSimpleBotRoutines(task.agentID)
-        openPrepared(.scheduledTask(id: task.id, agentID: task.agentID))
+        // The bot's routines open over where the person is, and the task over them.
+        performFleetOpen(.task(jobID: task.id, profileID: task.agentID))
     }
 
     /// A tapped scheduled task alert whose job is gone, or whose job the phone can't find: the

@@ -1,6 +1,6 @@
 import XCTest
 
-/// Settings › Fleet settings in the all-hosts demo: every host's plugin
+/// Settings › Update every computer in the multi-host demo: every host's plugin
 /// updates at once, each host that needs it shows Restart, and a restart
 /// ends in done. Demo hosts: Home Hermes and Studio Mac (both a plugin
 /// release behind) and Office Linux (out of reach, skipped).
@@ -35,26 +35,7 @@ final class FleetSettingsUITests: BighelpUITestCase {
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-use-multi-host-fixtures",
                                "-bighelp.hosts.all-hosts", "NO", "-loopdy.demo.appearance", appearance]
         app.launch()
-
-        let menu = app.buttons["home.drawer.open"]
-        XCTAssertTrue(menu.waitForExistence(timeout: 10))
-        menu.tap()
-        let allHosts = app.buttons["menu.all-hosts"]
-        XCTAssertTrue(allHosts.waitForExistence(timeout: 5))
-        allHosts.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["fleet.home"].waitForExistence(timeout: 5))
-
-        // Settings asks which host, and offers settings for every host first.
-        menu.tap()
-        let settings = app.buttons["menu.settings"]
-        XCTAssertTrue(settings.waitForExistence(timeout: 5))
-        settings.tap()
-        let fleetSettings = app.buttons["fleet.gate.fleet-settings"]
-        XCTAssertTrue(fleetSettings.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["fleet.gate.host.Home Hermes"].exists, "The hosts are still listed")
-        save("settings-popup-\(appearance)", app)
-        fleetSettings.tap()
-        XCTAssertTrue(app.navigationBars["Update every computer"].waitForExistence(timeout: 5))
+        openUpdateEveryComputer(in: app)
 
         let homePlugin = status("fleet.settings.plugin.Home Hermes", in: app)
         XCTAssertTrue(wait(for: homePlugin, toRead: "2.19.0 → 2.20.1"), homePlugin.label)
@@ -99,28 +80,14 @@ final class FleetSettingsUITests: BighelpUITestCase {
         save("hermes-done-\(appearance)", app)
     }
 
-    /// One host at a time, from its own row, and this app's Appearance and Chat from the same page.
+    /// One host at a time, from its own row.
     @MainActor
-    func testOneHostAtATimeAndThisAppsPages() throws {
+    func testOneHostAtATime() throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-use-multi-host-fixtures",
                                "-bighelp.hosts.all-hosts", "NO"]
         app.launch()
-        let menu = app.buttons["home.drawer.open"]
-        XCTAssertTrue(menu.waitForExistence(timeout: 10))
-        menu.tap()
-        let allHosts = app.buttons["menu.all-hosts"]
-        XCTAssertTrue(allHosts.waitForExistence(timeout: 5))
-        allHosts.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["fleet.home"].waitForExistence(timeout: 5))
-        menu.tap()
-        let settings = app.buttons["menu.settings"]
-        XCTAssertTrue(settings.waitForExistence(timeout: 5))
-        settings.tap()
-        let fleetSettings = app.buttons["fleet.gate.fleet-settings"]
-        XCTAssertTrue(fleetSettings.waitForExistence(timeout: 5))
-        fleetSettings.tap()
-        XCTAssertTrue(app.navigationBars["Update every computer"].waitForExistence(timeout: 5))
+        openUpdateEveryComputer(in: app)
 
         let homeHermes = status("fleet.settings.hermes.Home Hermes", in: app)
         XCTAssertTrue(wait(for: homeHermes, toRead: "12 commits behind"), homeHermes.label)
@@ -140,15 +107,13 @@ final class FleetSettingsUITests: BighelpUITestCase {
         confirm.tap()
         XCTAssertTrue(wait(for: homeHermes, toRead: "Updated · 0.21.5", timeout: 15), homeHermes.label)
         XCTAssertTrue(app.buttons["fleet.settings.hermes.Studio Mac.action"].exists, "Only that host updated")
+    }
 
-        let appearanceLink = app.buttons["fleet.settings.app.appearance"]
-        for _ in 0..<6 where !(appearanceLink.exists && appearanceLink.isHittable) { list.swipeUp() }
-        XCTAssertTrue(appearanceLink.exists, "Appearance is here")
-        XCTAssertTrue(app.buttons["fleet.settings.app.chat"].exists, "Chat is here")
-        save("this-app", app)
-        appearanceLink.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["appearance.studio"].waitForExistence(timeout: 5))
-        save("appearance-from-fleet", app)
+    /// Settings › Your computers › Update every computer.
+    @MainActor private func openUpdateEveryComputer(in app: XCUIApplication) {
+        openSettings(in: app)
+        settingsRow("settings.update-every-computer", in: app).tap()
+        XCTAssertTrue(app.navigationBars["Update every computer"].waitForExistence(timeout: 5))
     }
 
     @MainActor private func status(_ row: String, in app: XCUIApplication) -> XCUIElement {

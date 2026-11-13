@@ -11,14 +11,18 @@ extension RootShellView {
         } else {
         switch (route, featureStore.preparedModel(for: route)) {
         case (.workspaceSettings, _):
-            routeWithWorkspaceMenu { workspaceSettings() }
+            workspaceSettings()
         case (.projects, _):
             if let context = projectsContext {
                 ProjectsHomeView(context: context)
             } else {
                 ContentUnavailableView("Projects aren't available", systemImage: "folder",
-                    description: Text("Connect to your computer, then open Projects from the menu."))
+                    description: Text("Connect to your computer, then open Projects from Work."))
             }
+        case (.sessions, let prepared):
+            sessionsDestination({ if case .sessions(let model)? = prepared { model } else { nil } }())
+        case (.work(let projectID), _):
+            workProjectPage(projectID)
         case (.kanban, _):
             kanbanDestination
         case (.workflows, _), (.workflow, _), (.workflowRun, _), (.workflowSignoff, _), (.workflowRuns, _):
@@ -38,82 +42,73 @@ extension RootShellView {
                               chat: conversationID.flatMap(featureStore.preparedChatModel(id:)))
         case (.simpleBotsSection(let id), _):
             SimpleBotsHomeView(context: simpleBotsContext, sectionID: id)
-        case (.board(let tab), _):
-            agentBoardPage(tab)
-        case (.allHostsChats, _):
-            if let fleet {
-                fleetChats(fleet)
-            } else {
-                ContentUnavailableView("All sessions", systemImage: "bubble.left.and.bubble.right")
-            }
+        case (.board(let kind, let agentID), _):
+            todayBoardPage(kind, agentID: agentID)
         case (.project(let id), _):
             if let context = projectsContext {
                 ProjectDetailView(projectID: id, context: context)
             } else {
                 ContentUnavailableView("Projects aren't available", systemImage: "folder",
-                    description: Text("Connect to your computer, then open Projects from the menu."))
+                    description: Text("Connect to your computer, then open Projects from Work."))
             }
         case (.workspaceConnections, _):
-            routeWithWorkspaceMenu {
-                if let hostRegistry {
-                    BighelpHostsPage(registry: hostRegistry)
-                        .accessibilityIdentifier("workspace.connections")
-                } else {
-                    WorkspaceUnavailableView(destination: .instances, hostName: workspaceHostName,
-                                             reason: "Host selection is unavailable in this presentation.")
-                }
+            if let hostRegistry {
+                BighelpHostsPage(registry: hostRegistry)
+                    .accessibilityIdentifier("workspace.connections")
+            } else {
+                WorkspaceUnavailableView(destination: .instances, hostName: workspaceHostName,
+                                         reason: "Host selection is unavailable in this presentation.")
             }
         case (.workspaceManagement(let destination), _):
-            routeWithWorkspaceMenu {
-                if destination == .logs {
-                    if let connections = workspaceConnections, let owner = currentWorkspaceOwner,
-                       connections.owner == owner, let workspace = connections.workspace,
-                       workspace.owner == owner, let direct = connections.hosts.selectedWorkspace?.nativeClient {
-                        HermesLogsDestinationView(hostName: workspaceHostName, owner: owner,
-                            http: direct, workspace: workspace, currentOwner: {
-                                guard connections.workspace === workspace else { return nil }
-                                return currentWorkspaceOwner
-                            })
-                            .id(owner)
+            if destination == .logs {
+                if let connections = workspaceConnections, let owner = currentWorkspaceOwner,
+                   connections.owner == owner, let workspace = connections.workspace,
+                   workspace.owner == owner, let direct = connections.hosts.selectedWorkspace?.nativeClient {
+                    HermesLogsDestinationView(hostName: workspaceHostName, owner: owner,
+                        http: direct, workspace: workspace, currentOwner: {
+                            guard connections.workspace === workspace else { return nil }
+                            return currentWorkspaceOwner
+                        })
+                        .id(owner)
+                } else {
+                    WorkspaceUnavailableView(destination: .logs, hostName: workspaceHostName,
+                        reason: "Logs require an available direct authenticated Hermes connection.")
+                }
+            } else if destination == .voice {
+                VoiceSettingsView(settings: settings, agents: agents.profiles,
+                                  selectedAgentID: workspaceAgentID,
+                                  client: voiceSettingsClient, scope: voiceSettingsScope,
+                                  isCurrent: voiceSettingsIsCurrent)
+            } else if destination == .permissions {
+                PermissionsSettingsView(center: permissionCenter)
+            } else if destination == .sessionMaintenance || destination == .profileLifecycle {
+                if let coordinator = lifecycleCoordinator,
+                   isCurrentSignIn(coordinator.owner), let profileID = lifecycleProfileID,
+                   agents.profiles.contains(where: { $0.id == profileID }) {
+                    if destination == .sessionMaintenance {
+                        coordinator.sessionMaintenanceView(profileID: profileID)
                     } else {
-                        WorkspaceUnavailableView(destination: .logs, hostName: workspaceHostName,
-                            reason: "Logs require an available direct authenticated Hermes connection.")
+                        coordinator.profileLifecycleView(selectedProfileID: profileID)
                     }
-                } else if destination == .voice {
-                    VoiceSettingsView(settings: settings, agents: agents.profiles,
-                                      selectedAgentID: workspaceAgentID,
-                                      client: voiceSettingsClient, scope: voiceSettingsScope,
-                                      isCurrent: voiceSettingsIsCurrent)
-                } else if destination == .permissions {
-                    PermissionsSettingsView(center: permissionCenter)
-                } else if destination == .sessionMaintenance || destination == .profileLifecycle {
-                    if let coordinator = lifecycleCoordinator,
-                       isCurrentSignIn(coordinator.owner), let profileID = lifecycleProfileID,
-                       profileID == workspaceAgentID {
-                        if destination == .sessionMaintenance {
-                            coordinator.sessionMaintenanceView(profileID: profileID)
-                        } else {
-                            coordinator.profileLifecycleView(selectedProfileID: profileID)
-                        }
-                    } else {
-                        WorkspaceUnavailableView(destination: destination, hostName: workspaceHostName,
-                            reason: "Reopen this feature for the selected host and profile.")
-                    }
-                } else if let kind = CapabilitiesManagementKind(destination: destination), opensNativeCapabilities(kind) {
-                    nativeCapabilitiesDestination(kind, destination: destination)
-                } else if opensHostAdministration(destination) {
-                    hostAdministrationDestination(destination)
-                } else if let managementStore {
-                    WorkspaceManagementView(store: managementStore, destination: destination,
-                                            onOpenExisting: openWorkspaceDestination)
                 } else {
                     WorkspaceUnavailableView(destination: destination, hostName: workspaceHostName,
-                                             reason: "This feature requires an available native host connection.")
+                        reason: "Reopen this feature for the selected host and profile.")
                 }
+            } else if let kind = CapabilitiesManagementKind(destination: destination), opensNativeCapabilities(kind) {
+                nativeCapabilitiesDestination(kind, destination: destination)
+            } else if opensHostAdministration(destination) {
+                hostAdministrationDestination(destination)
+            } else if let managementStore {
+                WorkspaceManagementView(store: managementStore, destination: destination,
+                                        onOpenExisting: openWorkspaceDestination)
+            } else {
+                WorkspaceUnavailableView(destination: destination, hostName: workspaceHostName,
+                                         reason: "This feature requires an available native host connection.")
             }
         case (.chat(let conversationID), .chat(let model)?):
             let switcher = chatSwitcherColumn(for: conversationID,
                                               agentID: model.memberIDs.count == 1 ? model.memberIDs.first : nil)
+            let newChat = newChatSlot(forChat: conversationID, model: model)
             ChatDestinationView(
                 model: model,
                 appState: appState,
@@ -121,7 +116,6 @@ extension RootShellView {
                 featureStore: featureStore,
                 catalog: sessionCatalog,
                 agents: agents,
-                agentEditorPresentation: chatAgentEditorPresentation(for: model),
                 botModeRooms: botModeRooms,
                 skillsAndTools: skillsAndTools,
                 hermesWorkspaces: hermesWorkspaces,
@@ -129,17 +123,15 @@ extension RootShellView {
                 projectGitClient: projectGitClient,
                 userIdentity: userIdentity,
                 permissionCenter: permissionCenter,
-                selectedTab: appState.drawerSelectedTab,
                 responseHapticsCoveredByRoot: isHomeDrawerPresented
-                    || isHostStatusPresented
-                    || isHermesWorkspacePresented || actionErrorMessage != nil,
-                onNewChat: { startNewChat(explicitAgentID: nil) },
+                    || isHostStatusPresented || actionErrorMessage != nil,
+                onNewChat: { openNewChat() },
                 onOpenProviderAccounts: { openWorkspaceDestination(.keys) },
                 onNewBotChat: botChatRestart(conversationID),
                 onContinueInBranch: { continueInBranch(from: model, $0) },
                 consumesSendOnOpen: { appState.sendsDraftOnOpen.remove($0) != nil },
                 onEdgeAction: { performWorkspaceAction($0) },
-                onOpenAgentSessions: { openAllSessions(filteredTo: $0) },
+                onOpenAgentSessions: { openSessions(filteredTo: $0) },
                 onOpenApproval: {
                     openApproval(request: $0)
                 },
@@ -148,32 +140,28 @@ extension RootShellView {
                 },
                 appearanceAuthority: currentWorkspaceOwner?.authority,
                 hostFiles: codeFileLinks(sessionID: conversationID),
-                chatFolders: { chatFolders(for: model) }
+                chatFolders: { chatFolders(for: model) },
+                newChat: newChat
             )
+            // New chat's Worktrees sheet presents from its own chat: the root is covered.
+            .modifier(CodeSheetsIfShown(isShown: newChat != nil, root: self))
             .environment(\.chatCardInteractions, cardInteractions(for: model))
-            .environment(\.agentHomeChrome, homeChrome(forChat: conversationID))
+            // Every chat is a pushed page: Back, the bot (its page) and ⋯.
+            .environment(\.agentHomeChrome, .pushedChat(onProfile: { openBotPage(fromChat: $0) }))
             .environment(\.chatDissolveTransition, chatDissolve)
             .environment(connectionKeeper)
             .bighelpSideColumn(screen, isShown: switcher != nil) { switcher }
         case (.scheduledTasks, .scheduledTasks(let store)?):
-            routeWithWorkspaceMenu {
-                ScheduledTasksView(store: store, agents: agents, onOpen: openScheduledTask)
-            }
+            ScheduledTasksView(store: store, agents: agents, onOpen: openScheduledTask)
         case (.scheduledTask(let id, let agentID), .scheduledTasks(let store)?):
-            routeWithWorkspaceMenu {
-                ScheduledTaskDetailView(store: store, taskID: id, agents: agents, agentID: agentID)
-            }
+            ScheduledTaskDetailView(store: store, taskID: id, agents: agents, agentID: agentID)
         case (.skillsAndTools, _):
-            routeWithWorkspaceMenu {
-                SkillsAndToolsCatalogView(
-                    store: skillsAndTools,
-                    agentID: agents.resolvedAgent(explicitID: nil)?.id ?? "default"
-                )
-            }
+            SkillsAndToolsCatalogView(
+                store: skillsAndTools,
+                agentID: agents.resolvedAgent(explicitID: nil)?.id ?? "default"
+            )
         case (.approval, .approval(let model)?):
-            routeWithWorkspaceMenu {
-                ApprovalDestinationView(model: model)
-            }
+            ApprovalDestinationView(model: model)
         case (.chat(let conversationID), nil) where appState.suspendedChat?.chatID == conversationID
             || featureStore.hasRetiredUnsentChat(id: conversationID):
             // An unsent chat on screen lost its session (Hermes dropped it while the app was away
@@ -197,4 +185,15 @@ extension RootShellView {
         }
     }
 
+}
+
+/// New chat's project sheets, only on the chat that is New chat: two chats in the stack must not
+/// both present the same sheet.
+private struct CodeSheetsIfShown: ViewModifier {
+    let isShown: Bool
+    let root: RootShellView
+
+    func body(content: Content) -> some View {
+        if isShown { root.codeSheets(content) } else { content }
+    }
 }

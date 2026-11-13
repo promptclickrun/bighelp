@@ -7,23 +7,8 @@ import UIKit
 @MainActor
 struct DesignSystemTests {
     @Test func newChatTabUsesTheRequiredVisibleAndAccessibilityLabels() {
-        #expect(FloatingTabBar.newChatVisibleLabel == "New chat")
-        #expect(FloatingTabBar.newChatAccessibilityLabel == "New chat")
-    }
-
-    @Test func primaryNavigationUsesRegularUntintedGlassOrSemanticAccessibilityFallbacks() {
-        #expect(FloatingTabBar.backgroundSurface(supportsLiquidGlass: true,
-            reduceTransparency: false, increasedContrast: false) == .regularLiquidGlass)
-        #expect(FloatingTabBar.backgroundSurface(supportsLiquidGlass: true,
-            reduceTransparency: false, increasedContrast: true) == .regularLiquidGlass)
-        #expect(FloatingTabBar.backgroundSurface(supportsLiquidGlass: false,
-            reduceTransparency: false, increasedContrast: false) == .regularMaterial)
-        #expect(FloatingTabBar.backgroundSurface(supportsLiquidGlass: false,
-            reduceTransparency: false, increasedContrast: true) == .thickMaterial)
-        for supportsGlass in [false, true] {
-            #expect(FloatingTabBar.backgroundSurface(supportsLiquidGlass: supportsGlass,
-                reduceTransparency: true, increasedContrast: true) == .opaque)
-        }
+        #expect(HomeTabBar.newChatVisibleLabel == "New chat")
+        #expect(HomeTabBar.newChatAccessibilityLabel == "New chat")
     }
 
     @Test func primaryNavigationRowMeasuresFiniteUniformCellsForEveryLayoutProposal() {
@@ -37,11 +22,6 @@ struct DesignSystemTests {
         }
         #expect(NavigationRowLayout.fittingSize(proposedWidth: 620, itemSizes: items)
             == CGSize(width: 620, height: 56))
-    }
-
-    @Test func rootNavigationDoesNotDuplicatePushedDestinationBars() {
-        #expect(FloatingTabBar.isRootBarVisible(for: []))
-        #expect(!FloatingTabBar.isRootBarVisible(for: [.chat(conversationID: "current")]))
     }
 
     @Test func expandedNavigationRowsRespectTheWidthReservedBesideNewChat() {
@@ -359,16 +339,6 @@ struct DesignSystemTests {
 
         #expect(presentation.iconPointSize == 22)
         #expect(presentation.hitTarget == 48)
-    }
-
-    @Test func primaryNavigationActionUsesNeutralGlassAndThemeAccentWithoutAnOutline() {
-        let presentation = FloatingTabBar.newChatPresentation(for: .bighelp)
-
-        #expect(presentation.surface == .neutralGlass)
-        #expect(presentation.foreground == .themeAccent)
-        #expect(!presentation.usesGradient)
-        #expect(!presentation.showsBorder)
-        #expect(!presentation.usesGlow)
     }
 
     @Test func primitiveSpectrumAndStatusColorsMatchTheApprovedPalette() {

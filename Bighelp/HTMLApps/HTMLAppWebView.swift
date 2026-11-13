@@ -8,7 +8,7 @@ import WebKit
 /// safe: links and new windows open outside, the page can't move itself elsewhere, the camera and
 /// microphone are refused, and `window.bighelp` is the page's one way to reach the app.
 struct HTMLAppWebView: UIViewRepresentable {
-    static let scheme = "bighelp-app"
+    static let scheme = HTMLAppNavigationPolicy.appScheme
     /// Every app's storage (each origin keeps its own), apart from the rest of bighelp's web views.
     static let dataStoreID = UUID(uuidString: "6B1F3C2A-8D4E-4F5A-9B6C-2E7D8A9F0B1C")!
 
@@ -113,17 +113,19 @@ struct HTMLAppWebView: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
             guard let url = action.request.url else { return .cancel }
-            if url.scheme == HTMLAppWebView.scheme {
-                return url.host() == appID ? .allow : .cancel
-            }
-            // Frames inside the page, and blank documents, load as the page asks.
-            if action.targetFrame?.isMainFrame == false || url.scheme == "about" || url.scheme == "data"
-                || url.scheme == "blob" {
+            let decision = HTMLAppNavigationPolicy.decide(
+                url: url, appID: appID, isMainFrame: action.targetFrame?.isMainFrame != false,
+                navigationType: action.navigationType)
+            switch decision {
+            case .allowInPage:
                 return .allow
+            case .openOutside:
+                // The page stays the app: a web link the person tapped opens outside bighelp.
+                openURL?(url)
+                return .cancel
+            case .drop:
+                return .cancel
             }
-            // The page stays the app: anything that would replace it opens outside bighelp.
-            openURL?(url)
-            return .cancel
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -141,7 +143,11 @@ struct HTMLAppWebView: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                      for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-            if let url = action.request.url { openURL?(url) }
+            if let url = action.request.url,
+               HTMLAppNavigationPolicy.decide(url: url, appID: appID, isMainFrame: true,
+                                              navigationType: action.navigationType) == .openOutside {
+                openURL?(url)
+            }
             return nil
         }
 

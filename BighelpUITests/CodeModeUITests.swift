@@ -1,225 +1,90 @@
 import XCTest
 
-/// Code mode on the demo data: chosen as the start mode it is the home, each send
-/// starts its own session card without leaving the screen, and ☰ switches back to
-/// Chat. Set BIGHELP_CODE_MODE_EVIDENCE (TEST_RUNNER_BIGHELP_CODE_MODE_EVIDENCE)
-/// to a folder to save screenshots; BIGHELP_CODE_MODE_APPEARANCE picks light or dark.
+/// Coding from New chat on the demo data (`DemoCodeProjectSource`, `DemoCodeGit`): with one bot
+/// picked, the choices row under the message box picks a project, where it runs, the branch and the
+/// mode; a coding send opens the project on Work, staged jobs go out with Send all as one batch,
+/// and the project's ⋯ opens Dev Factory. Set BIGHELP_CODE_MODE_EVIDENCE
+/// (TEST_RUNNER_BIGHELP_CODE_MODE_EVIDENCE) to a folder to save screenshots;
+/// BIGHELP_CODE_MODE_APPEARANCE picks light or dark.
 final class CodeModeUITests: BighelpUITestCase {
     @MainActor
-    func testSendsStartSessionsBackToBackAndMenuSwitchesModes() throws {
-        let app = makeApp()
-        let appearance = ProcessInfo.processInfo.environment["BIGHELP_CODE_MODE_APPEARANCE"] ?? "dark"
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays",
-                               "-bighelp.settings.code-mode", "YES", "-bighelp.settings.code-mode.open-in", "code",
-                               "-loopdy.demo.appearance", appearance]
-        app.launch()
+    func testNewChatChoicesPickProjectWhereItRunsBranchAndMode() throws {
+        let app = launch()
+        pickProject("bighelp", in: app)
+        save("01-project", app)
 
-        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 10), "Code mode opens as the home.")
-        XCTAssertTrue(app.buttons["code.chip.project"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["code.chip.project"].label.contains("bighelp"), "The first project is picked.")
-        save("01-home", app)
-
-        // Two sends in a row: each one is its own session, and the screen stays.
-        send("Fix the widget tap when the host is asleep", in: app)
-        send("Tighten the Usage chart spacing", in: app)
-        let cards = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "code.session."))
-        let deadline = Date().addingTimeInterval(10)
-        while cards.count < 2, Date() < deadline { usleep(200_000) }
-        XCTAssertEqual(cards.count, 2, "Each send adds its own session card.")
-        XCTAssertTrue(element("code.screen", in: app).exists, "Sending doesn't leave the Code home.")
-        // A tap in the list puts the keyboard away, so the shot shows the message box and its chips. The
-        // chosen filter chip is in it and stays chosen; the cards would open their chats.
-        app.buttons["code.filter.all"].tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "A tap in the list closes the keyboard.")
-        sleep(1)
-        save("02-two-sessions", app)
-
-        app.buttons["code.chip.placement"].tap()
-        // A menu item's name is its title and subtitle together.
-        let local = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Local checkout")).firstMatch
-        XCTAssertTrue(local.waitForExistence(timeout: 3), "Where it runs offers the local checkout.")
+        app.buttons["new-chat.chip.placement"].tap()
+        XCTAssertTrue(menuItem("new-chat.placement.local", title: "Local checkout", in: app).waitForExistence(timeout: 3),
+                      "Where it runs offers the local checkout.")
         save("03-where-it-runs", app)
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "New worktree")).firstMatch.tap()
+        menuItem("new-chat.placement.newWorktree", title: "New worktree", in: app).tap()
 
-        app.buttons["code.chip.branch"].tap()
+        app.buttons["new-chat.chip.branch"].tap()
         XCTAssertTrue(element("code.branches", in: app).waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons["code.branch.main"].exists, "Worktrees start from the default branch.")
         save("04-branch", app)
         app.buttons["code.branch.done"].tap()
 
-        app.buttons["code.chip.project"].tap()
+        // The mode button: Plan for a plain message.
+        reveal("new-chat.chip.mode", in: app).tap()
+        let plan = menuItem("new-chat.mode.plan", title: "Plan", in: app)
+        XCTAssertTrue(plan.waitForExistence(timeout: 3))
+        save("04b-mode", app)
+        plan.tap()
+        // The chip takes the pick once the menu has closed.
+        let picked = expectation(for: NSPredicate(format: "label == %@", "Mode: Plan"),
+                                 evaluatedWith: app.buttons["new-chat.chip.mode"])
+        wait(for: [picked], timeout: 5)
+
+        app.buttons["new-chat.chip.project"].tap()
+        let moreProjects = menuItem("new-chat.project.more", title: "More projects", in: app)
+        XCTAssertTrue(moreProjects.waitForExistence(timeout: 3))
+        moreProjects.tap()
         XCTAssertTrue(element("code.projects", in: app).waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons["code.project.bighelp-plugin"].exists)
-        save("05-project", app)
+        save("05-project-picker", app)
         app.buttons["Done"].firstMatch.tap()
+    }
 
-        // A card opens its session's chat, with no bottom bar; ☰ › Sessions returns to the Code mode home.
-        cards.element(boundBy: 0).tap()
+    /// A coding send starts its session without a chat of its own: the project's Work shows its card,
+    /// and the card opens the session's chat.
+    @MainActor
+    func testACodingSendOpensItsProjectOnWork() throws {
+        let app = launch()
+        pickProject("bighelp", in: app)
+        send("Fix the widget tap when the host is asleep", in: app)
+        let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "work.item.coding:")).firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "The send shows as its session's card.")
+        save("02-session-card", app)
+        card.tap()
         XCTAssertTrue(element("chat.composer-shell", in: app).waitForExistence(timeout: 8), "The card opens its chat.")
-        XCTAssertFalse(app.buttons["tab.feed"].exists, "Code mode's chats have no bottom bar.")
         save("06-session", app)
-        app.buttons["chat.menu"].tap()
-        app.buttons["menu.code.sessions"].tap()
-        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 5))
-
-        // ☰: the mode switch on top and Code's places; Chat brings the chat home back.
-        app.buttons["home.drawer.open"].tap()
-        XCTAssertTrue(element("menu.experience", in: app).waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["menu.code.pull-requests"].exists)
-        XCTAssertTrue(app.buttons["menu.code.worktrees"].exists)
-        XCTAssertFalse(app.buttons["menu.agents"].exists, "Code mode's ☰ lists its own places.")
-        save("07-menu", app)
-        app.segmentedControls.buttons["Chat"].tap()
-        XCTAssertTrue(element("code.screen", in: app).waitForNonExistence(timeout: 5), "Chat leaves Code.")
     }
 
-    /// A tap outside the message box puts the keyboard away, on an empty home and
-    /// between session cards (it used to stay up until you scrolled just right).
-    @MainActor
-    func testTappingOutsideTheMessageBoxClosesTheKeyboard() throws {
-        let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays",
-                               "-bighelp.settings.code-mode", "YES", "-bighelp.settings.code-mode.open-in", "code"]
-        app.launch()
-        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 10))
-        let field = element("code.composer.field", in: app)
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-
-        field.tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)).tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 3), "The empty home closes the keyboard.")
-
-        send("Fix the widget tap", in: app)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42)).tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 3), "Space under the cards closes the keyboard.")
-    }
-
-    /// `/` lists the new session's commands, a picked command starts the session as one,
-    /// and the plan it writes opens rendered from the chat and from Changes. The mode
-    /// button's Plan does the same for a plain message.
-    @MainActor
-    func testSlashCommandsModesAndPlansOpenRendered() throws {
-        let app = makeApp()
-        let appearance = ProcessInfo.processInfo.environment["BIGHELP_CODE_MODE_APPEARANCE"] ?? "dark"
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays",
-                               "-bighelp.settings.code-mode", "YES", "-bighelp.settings.code-mode.open-in", "code",
-                               "-loopdy.demo.appearance", appearance]
-        app.launch()
-        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 10))
-
-        let field = element("code.composer.field", in: app)
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-        field.tap()
-        field.typeText("/")
-        XCTAssertTrue(element("code.slash", in: app).waitForExistence(timeout: 5), "/ opens the commands list.")
-        XCTAssertTrue(element("code.slash.row.plan", in: app).waitForExistence(timeout: 5))
-        XCTAssertTrue(element("code.slash.row.review", in: app).exists, "Skills list too.")
-        save("08-slash", app)
-        element("code.slash.row.plan", in: app).tap()
-        XCTAssertTrue(element("code.slash", in: app).waitForNonExistence(timeout: 3), "A pick closes the list.")
-        XCTAssertEqual(field.value as? String, "/plan ")
-        field.typeText("Add a loading state to Usage")
-        app.buttons["code.composer.send"].tap()
-
-        let cards = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "code.session."))
-        XCTAssertTrue(cards.firstMatch.waitForExistence(timeout: 10))
-        cards.firstMatch.tap()
-        XCTAssertTrue(element("chat.composer-shell", in: app).waitForExistence(timeout: 8))
-        let planLink = app.links.matching(NSPredicate(format: "label CONTAINS %@", "usage-loading-state.md")).firstMatch
-        XCTAssertTrue(planLink.waitForExistence(timeout: 10), "The plan's path in the reply is a link.")
-        planLink.tap()
-        XCTAssertTrue(element("markdown-file.rendered", in: app).waitForExistence(timeout: 5), "The plan opens rendered.")
-        XCTAssertTrue(app.staticTexts["Usage loading state"].exists, "Its heading shows as a heading, not as # text.")
-        save("09-plan-from-chat", app)
-        app.buttons["markdown-file.edit"].tap()
-        XCTAssertTrue(element("markdown-file.editor", in: app).waitForExistence(timeout: 3), "Edit shows the text.")
-        app.buttons["markdown-file.cancel"].tap()
-        app.buttons["markdown-file.done"].tap()
-        app.buttons["chat.menu"].tap()
-        app.buttons["menu.code.sessions"].tap()
-        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 5))
-
-        XCTAssertTrue(cards.firstMatch.label.contains("Add a loading state to Usage"))
-        XCTAssertFalse(cards.firstMatch.label.contains("/plan"), "The command isn't part of the card's name.")
-
-        // The mode button: Plan for a plain message.
-        app.buttons["code.composer.mode"].tap()
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Plan")).firstMatch.tap()
-        XCTAssertEqual(app.buttons["code.composer.mode"].label, "Mode: Plan")
-
-        // The agent chip opens the model, reasoning and fast mode; Send sits beside the text, and the
-        // agent, mode and Stage each keep a full-size place on the line under it.
-        app.buttons["code.composer.agent"].tap()
-        app.buttons["code.runtime.model"].tap()
-        let mini = app.buttons["code.runtime.model.openai.gpt-5.6-mini"]
-        XCTAssertTrue(mini.waitForExistence(timeout: 5))
-        mini.tap()
-        app.navigationBars["Model"].buttons.element(boundBy: 0).tap()
-        app.buttons["code.runtime.reasoning"].tap()
-        app.buttons["X-High"].firstMatch.tap()
-        app.buttons["code.runtime.fast"].tap()
-        app.buttons["On"].firstMatch.tap()
-        app.buttons["Done"].firstMatch.tap()
-        let agent = app.buttons["code.composer.agent"]
-        let mode = app.buttons["code.composer.mode"]
-        let stageButton = app.buttons["code.composer.stage"]
-        let sendButton = app.buttons["code.composer.send"]
-        XCTAssertTrue(agent.waitForExistence(timeout: 3))
-        XCTAssertTrue(agent.label.hasSuffix("GPT-5.6 Mini · X-High · Fast"), agent.label)
-        XCTAssertLessThan(sendButton.frame.maxY, agent.frame.minY + 1, "Send sits beside the text, above the chips.")
-        XCTAssertLessThanOrEqual(agent.frame.maxX, mode.frame.minX - 4, "The agent stops before the mode.")
-        XCTAssertLessThanOrEqual(mode.frame.maxX, stageButton.frame.minX - 4)
-        for control in [agent, mode, stageButton, sendButton] {
-            XCTAssertGreaterThanOrEqual(control.frame.height, 44, "\(control.identifier) is a full-size target")
-        }
-        save("10-mode", app)
-
-        // Changes: the plan file opens on its rendered preview.
-        cards.firstMatch.press(forDuration: 1.0)
-        app.buttons["Changes"].firstMatch.tap()
-        XCTAssertTrue(element("code.changes", in: app).waitForExistence(timeout: 5))
-        let planFile = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "usage-loading-state.md")).firstMatch
-        XCTAssertTrue(planFile.waitForExistence(timeout: 5))
-        planFile.tap()
-        XCTAssertTrue(element("markdown-file.rendered", in: app).waitForExistence(timeout: 5), "Changes opens the preview.")
-        XCTAssertTrue(app.buttons["Changes"].exists || element("code.diff.mode", in: app).exists)
-        save("11-plan-in-changes", app)
-    }
-
-    /// Orchestration mode: two staged jobs and the one in the box go out with Send all as
-    /// one batch; its chat sends to every session, `#` lists the sessions and the project's
-    /// open pull requests, and a mention sends to that session only.
+    /// Orchestration: two staged jobs and the one in the box go out with Send all as one batch; its
+    /// chat sends to every session, `#` lists the sessions and the project's open pull requests, and
+    /// a mention sends to that session only.
     @MainActor
     func testStagedJobsSendAllAndTheBatchChat() throws {
-        let app = makeApp()
-        let appearance = ProcessInfo.processInfo.environment["BIGHELP_CODE_MODE_APPEARANCE"] ?? "dark"
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays",
-                               "-bighelp.settings.code-mode", "YES", "-bighelp.settings.code-mode.open-in", "code",
-                               "-loopdy.demo.appearance", appearance]
-        app.launch()
-        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 10))
+        let app = launch()
+        pickProject("bighelp", in: app)
 
         stage("Fix the widget tap when the host is asleep", in: app)
-        XCTAssertTrue(element("code.staged", in: app).waitForExistence(timeout: 3), "Stage keeps it in the tray.")
+        XCTAssertTrue(element("new-chat.staged", in: app).waitForExistence(timeout: 3), "Stage keeps it in the tray.")
         stage("Add a loading state to the Usage page", in: app)
-        XCTAssertTrue(element("code.staged.job.2", in: app).exists)
-        let field = element("code.composer.field", in: app)
+        XCTAssertTrue(element("new-chat.staged.job.2", in: app).exists)
+        let field = app.textViews["chat.composer.text"]
         field.tap()
         field.typeText("Write tests for the branch name helper")
-        let sendAll = app.buttons["code.composer.send-all"]
+        let sendAll = app.buttons["new-chat.staged.send-all"]
         XCTAssertEqual(sendAll.label, "Send all 3")
-        XCTAssertGreaterThanOrEqual(sendAll.frame.minX, element("code.composer.field", in: app).frame.maxX,
-                                    "Send all sits beside the text.")
-        XCTAssertLessThanOrEqual(sendAll.frame.maxX, app.windows.firstMatch.frame.maxX - 12,
-                                 "Send all stays inside the message box.")
         save("12-staged", app)
         sendAll.tap()
 
-        let card = app.buttons["code.batch-card"]
+        // Send all opens the project's Work, with the batch as one card.
+        let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "work.item.batch:")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 10), "The batch shows as one card.")
-        XCTAssertFalse(element("code.staged", in: app).exists, "Send all empties the tray.")
+        XCTAssertFalse(element("new-chat.staged", in: app).exists, "Send all empties the tray.")
         let deadline = Date().addingTimeInterval(15)
         while card.label.contains("Starting"), Date() < deadline { usleep(300_000) }
         save("13-batch-card", app)
@@ -255,22 +120,20 @@ final class CodeModeUITests: BighelpUITestCase {
         save("17-sent", app)
     }
 
-    /// Dev Factory on the demo data: ☰ opens it; the sample start shows one card per
-    /// project, and you approve one project's changes there; a template makes a new recipe,
-    /// and Run starts it on the projects you pick.
+    /// Dev Factory on the demo data: the project's ⋯ on Work opens it; the sample start shows one card
+    /// per project, and you approve one project's changes there; a template makes a new recipe, and
+    /// Run starts it on the projects you pick.
     @MainActor
     func testDevFactoryRecipesRunsAndSignOff() throws {
-        let app = makeApp()
-        let appearance = ProcessInfo.processInfo.environment["BIGHELP_CODE_MODE_APPEARANCE"] ?? "dark"
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays",
-                               "-bighelp.settings.code-mode", "YES", "-bighelp.settings.code-mode.open-in", "code",
-                               "-loopdy.demo.appearance", appearance]
-        app.launch()
-        XCTAssertTrue(element("code.screen", in: app).waitForExistence(timeout: 10))
-
-        app.buttons["home.drawer.open"].tap()
-        let menuRow = app.buttons["menu.code.dev-factory"]
-        XCTAssertTrue(menuRow.waitForExistence(timeout: 5), "☰ in Code mode lists Dev Factory.")
+        let app = launch()
+        pickProject("bighelp", in: app)
+        // A coding send opens the project's Work, whose ⋯ has Dev Factory.
+        send("Fix the widget tap when the host is asleep", in: app)
+        let more = app.buttons["work.project.more"]
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        more.tap()
+        let menuRow = app.buttons["work.project.dev-factory"]
+        XCTAssertTrue(menuRow.waitForExistence(timeout: 5), "The project's ⋯ lists Dev Factory.")
         menuRow.tap()
         XCTAssertTrue(element("devfactory.home", in: app).waitForExistence(timeout: 8))
         let group = app.buttons["devfactory.group-row"].firstMatch
@@ -312,34 +175,75 @@ final class CodeModeUITests: BighelpUITestCase {
         save("22-new-run", app)
     }
 
-    /// Out of the box there's no Code mode: no switch in ☰.
     @MainActor
-    func testCodeModeIsOffByDefault() throws {
+    private func launch() -> XCUIApplication {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays"]
+        let appearance = ProcessInfo.processInfo.environment["BIGHELP_CODE_MODE_APPEARANCE"] ?? "dark"
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance]
         app.launch()
-        app.buttons["home.drawer.open"].firstMatch.tap()
-        XCTAssertTrue(element("navigation.menu", in: app).waitForExistence(timeout: 5))
-        XCTAssertFalse(element("menu.experience", in: app).exists)
-        XCTAssertTrue(app.buttons["menu.agents"].exists)
+        return app
+    }
+
+    /// New chat with the demo's default bot, then a project from its chip: the choices row grows the rest.
+    @MainActor
+    private func pickProject(_ id: String, in app: XCUIApplication) {
+        startNewChat(with: "finance", in: app)
+        let chip = app.buttons["new-chat.chip.project"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 10), "One bot picked: the choices row shows")
+        XCTAssertEqual(chip.label, "Project: none")
+        chip.tap()
+        let project = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@",
+                                                       "new-chat.project.\(id)", id)).firstMatch
+        XCTAssertTrue(project.waitForExistence(timeout: 5))
+        project.tap()
+        XCTAssertEqual(chip.label, "Project: \(id)")
+        XCTAssertTrue(app.buttons["new-chat.chip.placement"].waitForExistence(timeout: 3))
+    }
+
+    /// A menu item reports its title (and subtitle) instead of its identifier, so look for both.
+    @MainActor
+    private func menuItem(_ identifier: String, title: String, in app: XCUIApplication) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "identifier == %@ OR label BEGINSWITH %@", identifier, title)).firstMatch
+    }
+
+    /// One of the last chips of the choices row (the mode, Stage), scrolled into view: the choices
+    /// are one row that scrolls sideways, and its last chips start past its right edge. The row is
+    /// always dragged left once, along the chips' own line: `isHittable` says yes for a chip that is
+    /// only partly in view, and the tap then lands beside it. The row stops at its end, so a chip
+    /// that was in view stays there.
+    @MainActor
+    private func reveal(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+        let chip = app.buttons[identifier]
+        XCTAssertTrue(chip.waitForExistence(timeout: 3), "\(identifier) is in the choices row")
+        let rail = element("new-chat.choices", in: app)
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        for attempt in 0..<3 {
+            let bounds = rail.frame
+            if attempt > 0, chip.frame.minX >= bounds.minX, chip.frame.maxX <= bounds.maxX { break }
+            // The staged jobs sit over the chips in the same container, so its middle isn't the row.
+            let line = chip.frame.midY
+            origin.withOffset(CGVector(dx: bounds.maxX - 24, dy: line))
+                .press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: bounds.minX + 24, dy: line)))
+        }
+        return chip
     }
 
     @MainActor
     private func stage(_ message: String, in app: XCUIApplication) {
-        let field = element("code.composer.field", in: app)
+        let field = app.textViews["chat.composer.text"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
         field.typeText(message)
-        app.buttons["code.composer.stage"].tap()
+        reveal("new-chat.chip.stage", in: app).tap()
     }
 
     @MainActor
     private func send(_ message: String, in app: XCUIApplication) {
-        let field = element("code.composer.field", in: app)
+        let field = app.textViews["chat.composer.text"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
         field.typeText(message)
-        app.buttons["code.composer.send"].tap()
+        app.buttons["chat.send"].tap()
     }
 
     @MainActor

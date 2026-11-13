@@ -13,13 +13,11 @@ final class CompactHostUITests: BighelpUITestCase {
         let probe = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
         guard probe["mode"] == "features" else { throw XCTSkip("This host runs the \(probe["mode"] ?? "?") mode") }
         let app = makeApp()
-        app.launchArguments = ["-loopdy.home.opens-chat", "YES"]
         app.launch()
         try onboardOpenHost(app, address: try XCTUnwrap(probe["address"]))
         let composer = app.textViews["chat.composer.text"]
-        XCTAssertTrue(composer.waitForExistence(timeout: 45), "A chat opens")
         let newChat = chatNewChatButton(in: app)
-        XCTAssertTrue(newChat.waitForExistence(timeout: 15))
+        XCTAssertTrue(newChat.waitForExistence(timeout: 45), "The home opens with New chat")
         newChat.tap()
         confirmNewChatPicker(in: app)
         XCTAssertTrue(composer.waitForExistence(timeout: 30))

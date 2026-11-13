@@ -119,22 +119,3 @@ extension RootShellView {
                                                 currentOwner: current, actionStatusClient: status))
     }
 }
-
-/// Makes the Marketplace once, when its page first shows, and keeps it while the page is on the
-/// stack: `navigationDestination` builds its view again on every update.
-struct MarketplaceHost: View {
-    let make: @MainActor () -> MarketplaceContext
-
-    @State private var context: MarketplaceContext?
-
-    var body: some View {
-        Group {
-            if let context {
-                MarketplaceView(context: context)
-            } else {
-                Color.clear
-            }
-        }
-        .onAppear { if context == nil { context = make() } }
-    }
-}

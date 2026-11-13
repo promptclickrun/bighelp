@@ -31,7 +31,7 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
     @MainActor
     func testOpeningALongChatFromTheList() throws {
         let app = launch()
-        let row = app.descendants(matching: .any)["session.row.\(Self.longChat)"].firstMatch
+        let row = chatRow(Self.longChat, in: app)
         measureOpening(app) {
             XCTAssertTrue(row.waitForExistence(timeout: 20))
             row.tap()
@@ -41,7 +41,7 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
     @MainActor
     func testOpeningALongChatFromALink() throws {
         let app = launch()
-        let row = app.descendants(matching: .any)["session.row.\(Self.longChat)"].firstMatch
+        let row = chatRow(Self.longChat, in: app)
         measureOpening(app) {
             XCTAssertTrue(row.waitForExistence(timeout: 20))
             app.open(URL(string: "loopdy://chat/\(Self.longChat)")!)
@@ -64,7 +64,7 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
     @MainActor
     func testOpeningALongRealisticChatFromTheList() throws {
         let app = launchRealistic(label: "open")
-        let row = app.descendants(matching: .any)["session.row.\(Self.realisticChat)"].firstMatch
+        let row = chatRow(Self.realisticChat, in: app)
         let options = XCTMeasureOptions()
         options.invocationOptions = [.manuallyStart, .manuallyStop]
         options.iterationCount = 5
@@ -262,12 +262,12 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
         app.launchEnvironment["BIGHELP_PERF_LABEL"] = "memory-\(Self.turns)"
         app.launchArguments = realisticArguments(opensChat: false) + ["-test-long-chat-count", "4"]
         app.launch()
-        XCTAssertTrue(app.descendants(matching: .any)["session.row.\(Self.realisticChat)"].firstMatch
+        XCTAssertTrue(chatRow(Self.realisticChat, in: app)
             .waitForExistence(timeout: 20))
         settle()
         post(ChatPerformance.read)
         for index in 1...4 {
-            let row = app.descendants(matching: .any)["session.row.demo-long-chat-\(index)"].firstMatch
+            let row = chatRow("demo-long-chat-\(index)", in: app)
             XCTAssertTrue(row.waitForExistence(timeout: 20))
             row.tap()
             XCTAssertTrue(realisticLatest(in: app).waitForExistence(timeout: 30))
@@ -360,7 +360,7 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
             XCTAssertTrue(latest(in: app).waitForExistence(timeout: 20))
             stopMeasuring()
             app.open(sessions)
-            XCTAssertTrue(app.descendants(matching: .any)["session.row.\(Self.longChat)"].firstMatch
+            XCTAssertTrue(chatRow(Self.longChat, in: app)
                 .waitForExistence(timeout: 20))
         }
     }
@@ -400,8 +400,8 @@ final class ChatLoadSpeedUITests: BighelpUITestCase {
     @MainActor
     private func launch() -> XCUIApplication {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-loopdy.home.opens-chat", "NO"]
+        // Opens on the Chats list (the base launch's place).
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3"]
         app.launch()
         return app
     }

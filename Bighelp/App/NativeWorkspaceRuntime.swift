@@ -70,7 +70,8 @@ final class NativePluginStateRecord {
 @Observable
 final class NativeWorkspaceRuntime {
     let authority: WorkspaceAuthority
-    let appState = AppState()
+    /// This computer's own pages; the tab and the first tab's view are the whole app's.
+    let appState = AppState(home: .shared)
     let agents: AgentDirectoryStore
     let defaults: any AgentRuntimeDefaultsClient
     let sessions: SessionCatalogStore

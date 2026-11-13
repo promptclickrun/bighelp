@@ -9,8 +9,7 @@ final class ComposioAppsUITests: BighelpUITestCase {
             let app = makeApp()
             app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance]
             app.launch()
-            _ = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu", "tab.profile"]))
-                .firstMatch.waitForExistence(timeout: 60)
+            _ = app.buttons["simple-bots.settings"].firstMatch.waitForExistence(timeout: 60)
             openSettings(in: app)
             settingsRow("settings.apps", in: app).tap()
 

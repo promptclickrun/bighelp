@@ -401,6 +401,8 @@ final class BighelpHostRegistry {
         guard host.accountScope == accountScope, hosts.contains(where: { $0.id == host.id }) else {
             throw DirectHermesError.secureStorageChanged
         }
+        // Its saved sign-in names the scope its Spaces are kept by; read it before the vault goes.
+        let spacesScope = workspace(for: host).savedConnection?.workspaceAuthority?.cacheScopeID
         // Stop local activity before deletion; never mutate or delete host sessions.
         generation = UUID()
         workspaces[host.id]?.suspendForPresentationExit()
@@ -423,6 +425,9 @@ final class BighelpHostRegistry {
         // Agents' apps: their pages kept on the phone and what each page stored for itself.
         HTMLAppCache().eraseAll()
         Task { await HTMLAppWebView.eraseStorage() }
+        // Its Spaces: the panels leave Today and the phone's copy of them is erased, with their
+        // waiting changes. Other computers keep theirs.
+        TodaySpacesModel.shared.forget(hostKey: host.id.uuidString, scope: spacesScope)
         vault.invalidate(); draftStores[host.id]?.invalidate()
         hosts = remaining; selectedHostID = selection
         selectedWorkspace = selectedHost.map { workspace(for: $0) }

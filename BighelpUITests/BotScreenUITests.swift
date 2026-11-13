@@ -1,6 +1,6 @@
 import XCTest
 
-/// An agent's screen in demo mode, with the real controls: the profile's Screen tab,
+/// An agent's screen in demo mode, with the real controls: the bot page's Computer tab,
 /// Open screen, Take control, the keyboard and pointer buttons, Hand back and Close.
 /// Demo mode's screen is a small RFB server in the app, so the real client draws it.
 /// Set BIGHELP_BOT_SCREEN_EVIDENCE (TEST_RUNNER_BIGHELP_BOT_SCREEN_EVIDENCE) to a folder
@@ -11,19 +11,15 @@ final class BotScreenUITests: BighelpUITestCase {
         let folder = ProcessInfo.processInfo.environment["BIGHELP_BOT_SCREEN_EVIDENCE"]
         for appearance in ["light", "dark"] {
             let app = makeApp()
-            app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES",
+            // Avery Park's chat (demo-finance), then her page's Computer tab.
+            app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat",
                                    "-loopdy.settings.nerd-mode", "NO", "-loopdy.demo.appearance", appearance]
             app.launch()
-            let avatar = app.buttons["agent.hero.avatar"].firstMatch
-            XCTAssertTrue(avatar.waitForExistence(timeout: 25))
-            avatar.tap()
-            XCTAssertTrue(element("agent.profile", in: app).waitForExistence(timeout: 10))
+            XCTAssertTrue(app.buttons["chat.identity"].firstMatch.waitForExistence(timeout: 25))
+            openBotPage(fromChatIn: app)
 
-            let screenTab = app.buttons["agent.profile.tab.screen"]
+            let screenTab = app.buttons["simple-bots.profile.tab.computer"]
             XCTAssertTrue(screenTab.waitForExistence(timeout: 10), "The demo host has screens")
-            let order = ["activity", "approvals", "screen", "schedules", "identity"]
-                .map { app.buttons["agent.profile.tab.\($0)"].frame.minX }
-            XCTAssertEqual(order, order.sorted(), "Screen is third, between Approvals and Schedules")
             screenTab.tap()
             let preview = app.buttons["agent.screen.preview"]
             XCTAssertTrue(preview.waitForExistence(timeout: 10))
@@ -92,10 +88,10 @@ final class BotScreenUITests: BighelpUITestCase {
         let folder = ProcessInfo.processInfo.environment["BIGHELP_BOT_SCREEN_EVIDENCE"]
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", "light"]
+                               "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", "light"]
         app.launch()
-        // Bots mode: the primary bot's chat, then its profile's Computer tab.
-        let primary = app.buttons["simple-bots.primary"]
+        // Bots: the primary bot's chat, then its profile's Computer tab.
+        let primary = app.primaryBot
         XCTAssertTrue(primary.waitForExistence(timeout: 20))
         primary.tap()
         let identity = app.buttons["chat.identity"]

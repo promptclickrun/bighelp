@@ -61,8 +61,7 @@ final class DefaultModelUITests: BighelpUITestCase {
             let app = makeApp()
             app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance]
             app.launch()
-            _ = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu", "tab.profile"]))
-                .firstMatch.waitForExistence(timeout: 60)
+            _ = app.buttons["simple-bots.settings"].firstMatch.waitForExistence(timeout: 60)
             openSettings(in: app)
             settingsRow("settings.default-model", in: app).tap()
             XCTAssertTrue(app.navigationBars["Models"].waitForExistence(timeout: 8))
@@ -89,8 +88,7 @@ final class DefaultModelUITests: BighelpUITestCase {
             let app = makeApp()
             app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance]
             app.launch()
-            _ = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu", "tab.profile"]))
-                .firstMatch.waitForExistence(timeout: 60)
+            _ = app.buttons["simple-bots.settings"].firstMatch.waitForExistence(timeout: 60)
             openSettings(in: app)
             settingsRow("settings.default-model", in: app).tap()
             XCTAssertTrue(app.navigationBars["Models"].waitForExistence(timeout: 8))
@@ -156,8 +154,7 @@ final class DefaultModelUITests: BighelpUITestCase {
     @MainActor
     func openDefaultModel(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         // A busy simulator can take a while to show the first screen.
-        _ = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu", "tab.profile"]))
-            .firstMatch.waitForExistence(timeout: 60)
+        _ = app.buttons["simple-bots.settings"].firstMatch.waitForExistence(timeout: 60)
         openSettings(in: app, file: file, line: line)
         settingsRow("settings.default-model", in: app, file: file, line: line).tap()
         XCTAssertTrue(firstBotRow(in: app).waitForExistence(timeout: 10),
@@ -180,9 +177,10 @@ final class DefaultModelUITests: BighelpUITestCase {
                       file: file, line: line)
     }
 
+    /// The Settings sheet's own Back: the home behind the sheet has a bar of its own.
     @MainActor
     private func goBack(in app: XCUIApplication) {
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["BackButton"].firstMatch.tap()
     }
 
     @MainActor

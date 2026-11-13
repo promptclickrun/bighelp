@@ -45,20 +45,14 @@ struct RootShellView: View {
     @State var actionErrorMessage: String?
     /// The tap (a Live Activity, an alert) whose new computer is still connecting; its timer runs once.
     @State private var externalOpenWaitID: UUID?
-    /// Feed, Ideas, Goals and Apps fold the bottom menu while scrolled down.
-    /// All hosts: the chat you left for Feed, Ideas or Goals, which the Chat tab goes back to.
-    @State var fleetLastChatID: String?
     @State var isHostStatusPresented = false
     @State private var actionErrorShowsHostStatus = false
     @State var hostRuntime: HostRuntimeStore?
     /// A widget or notification link that arrived before the host answered.
     @State private var pendingIncomingURL: URL?
-    /// Opens Agents filtered to one agent's group chats (from the Chats rail's menu).
-    @State var agentGroupFilterRequest: String?
-    @State var agentCreateRequest = false
     /// Offered as "Try Again" in the error alert.
     @State var actionErrorRetry: (@MainActor () -> Void)?
-    @State var isHermesWorkspacePresented = false
+
     @State var sessionRestoreRequest: SessionRestoreRequest?
     @State var sessionRestoreTask: Task<Void, Never>?
     @State var canonicalChatCoordinator = CanonicalChatCoordinator()
@@ -71,27 +65,19 @@ struct RootShellView: View {
     @State var lifecycleCoordinator: NativeWorkspaceLifecycleCoordinator?
     @State var lifecycleProfileID: String?
     @State var lifecyclePresentationID: UUID?
-    @State var workspaceProfileEditor: AgentEditorModel?
+
     @State var isGroupCreationPresented = false
     @State var groupCreationSeed: String?
     @State var groupCreationOwner: WorkspaceOwner?
-    /// The chat header's New chat: one agent starts a 1:1 chat, several a group.
-    @State var newChatPicker: NewChatPickerRequest?
-    @State private var isStartingNewChat = false
+    @State var isStartingNewChat = false
     @State private var newChatStartID: UUID?
+    /// A New chat pick that came while a chat was starting (`newChatStartEnded`).
+    @State var newChatPickGate = NewChatPickGate()
     @State private var fixtureCanonicalSessions: [String: String] = [:]
     @State var workspaceFixtureGeneration = UUID()
     /// Demo runs' connection; `-demo-reconnects-on-return` makes each return a reconnect.
     @State var workspaceFixtureConnection = UUID()
     @State private var cardInteractionStore = BighelpCardInteractionStore()
-    /// The all-hosts view asking which host a one-host screen is for.
-    @State var fleetGateRequest: FleetDestination?
-    /// All hosts narrowed to one computer (its chips, or ☰'s computer row); nil shows every computer.
-    @State var fleetFocus: UUID?
-    @State var fleetChatsFilter = FleetChatsFilter()
-    /// A Codex or Claude Code chat picked on All sessions, previewed once its computer's Sessions shows.
-    @State var requestedOtherAppChat: HermesForeignSessionItem?
-    @State var isFleetNewChatPresented = false
     @Environment(\.workspaceConnections) var workspaceConnections
     @Environment(\.scenePhase) var scenePhase
     @Environment(\.bighelpScreen) var screen
@@ -110,38 +96,41 @@ struct RootShellView: View {
     @State private var isKeyboardVisible = false
     @State private var rootBottomSafeArea: CGFloat = 0
     @State private var afterSettingsDismiss: (() -> Void)?
-    // Agent home (Muse-style): board data, the profile, the switcher and the ☰ drawer.
+    /// Today's Edit, a space's page and the space Delete asks about.
+    @State var isEditingToday = false
+    @State var spacePage: TodaySpace?
+    @State var deletingSpace: TodayPanelDescriptor?
+    /// The connection the shell's board follows; Today's boards and a bot's Dashboard read through it.
     @State var agentBoard = AgentBoardStore()
-    /// Provider Usage for the connected host; opened from chat ⋯, ☰ and the context window.
+    /// Provider Usage for the connected host; opened from chat ⋯, Settings and the context window.
     @State var providerUsage = ProviderUsageStore()
     @State var usage = UsageStore()
     @State var agentMedia = AgentMediaStore()
-    /// Which bots are working or need you, for Bots mode and the Agents screen.
+    /// Which bots are working or need you, for the home's three roots.
     @State var botChatActivity = BotChatActivityStore()
-    @State var profileAgentID: String?
-    @State var isAgentSwitcherPresented = false
+    /// The sidebar: iPad's slide-in panel, the Mac's and Vision Pro's column. iPhone has none.
     @State var isHomeDrawerPresented = false
     /// This shell, for the open Duo's list: a new shell replaces the list the last one showed.
     @State var splitColumnShellID = UUID()
-    @State var didAutoOpenHomeChat = false
     /// The connection the shell's Feed, Ideas and Goals were last set up for (`configureAgentBoard`).
     @State var agentBoardConfiguredKey: AgentBoardClientKey?
     /// The open Projects screens' chats and project details.
     @State var projectsStore: ProjectsStore?
-    /// Code mode's home for the selected computer (`cacheScopeID`), kept through reconnects.
+    /// Coding sessions on the selected computer (`cacheScopeID`), kept through reconnects.
     @State var codeHome: CodeHomeStore?
     @State var codeSheet: CodeSheet?
     @State var devFactory: DevFactoryStore?
     @State var kanbanModel: KanbanBoardModel?
     @State var kanbanAvailability = KanbanAvailability()
     @State var kanbanTaskToOpen: String?
-    /// The connected computer's Workflows (☰ › Workflows), when its plugin has them.
+    /// The connected computer's Workflows, when its plugin has them.
     @State var workflowsStore: WorkflowsStore?
     @State var workflowsAvailability = WorkflowsAvailability()
     @State var isNeedsYouPresented = false
     @State var didPresentDemoNeedsYou = false
     #if os(visionOS)
     @Environment(\.openWindow) var openWindow
+    @Environment(\.spatialAvatar) var spatialAvatar
     #endif
     /// Runs after a home sheet closes, so the next sheet can open.
     @State var afterHomeSheet: (@MainActor () -> Void)?
@@ -158,30 +147,6 @@ struct RootShellView: View {
     var usesWorkspaceFixtures: Bool {
         ProcessInfo.processInfo.arguments.contains("-use-demo-fixtures")
             || ProcessInfo.processInfo.arguments.contains("-disable-demo-delays")
-    }
-
-    func chatAgentEditorPresentation(for model: ChatModel) -> ChatAgentEditorPresentation? {
-        guard !model.isBotMode, let owner = currentWorkspaceOwner,
-              let profileID = model.memberIDs.first,
-              agents.profiles.contains(where: { $0.id == profileID }) else { return nil }
-        let capabilities = currentWorkspaceCapabilities
-        guard capabilities.supports(.profilesEdit, owner: owner, profileID: profileID) else { return nil }
-        let canReadDefaults = capabilities.supports(.modelsRead, owner: owner, profileID: profileID)
-        let canEditDefaults = capabilities.supports(.agentDefaultsEdit, owner: owner, profileID: profileID)
-        let unavailable: WorkspaceCapability? = canReadDefaults
-            ? (canEditDefaults ? nil : .agentDefaultsEdit) : .modelsRead
-        let readOnlyReason = unavailable.flatMap {
-            AgentActionsPresentation.unavailableMessage(capabilities.availability(for: $0, owner: owner, profileID: profileID))
-                ?? WorkspaceUnavailableReason.unsupportedOperation.message
-        }
-        return ChatAgentEditorPresentation(profileID: profileID, store: agents,
-            runtimeDefaultsClient: canReadDefaults ? agentRuntimeDefaults : nil,
-            runtimeDefaultsReadOnlyReason: readOnlyReason,
-            isCurrent: {
-                currentWorkspaceOwner == owner && model.memberIDs.first == profileID
-                    && agents.profiles.contains(where: { $0.id == profileID })
-                    && currentWorkspaceCapabilities.supports(.profilesEdit, owner: owner, profileID: profileID)
-            })
     }
 
     func cardInteractions(for model: ChatModel) -> ChatCardInteractionHandler? {
@@ -225,12 +190,6 @@ struct RootShellView: View {
         .modifier(AIDataConsentGate(inFirstSetup: presentsFirstRunOnboarding || hostRegistry?.isWorkspaceReady != true,
                                     usesDemoData: usesWorkspaceFixtures))
         .modifier(pendingShareReview)
-        .modifier(FleetSheets(
-            fleet: fleet, gate: $fleetGateRequest, isNewChatPresented: $isFleetNewChatPresented,
-            onGate: { destination, hostID in openFleet(.destination(destination), on: hostID) },
-            onNewChat: startFleetChat,
-            onNewGroup: newGroupChatAction == nil ? nil : { startFleetGroupChat(with: $0) },
-            appPage: fleetAppPage))
         .modifier(FleetHooks(
             liveKey: liveFleetKey, readiness: fleetOpenReadiness, hostsKey: fleetHostsKey, scenePhase: scenePhase,
             keepsConnected: keepsFleetHostsConnected,
@@ -260,10 +219,7 @@ struct RootShellView: View {
             isHostSettled: nativeRuntime.map { $0.isReady && !$0.isSuspended && !$0.isRefreshing } ?? true,
             signIn: $workspaceSignIn, close: closeWorkspacePresentations,
             reattach: reattachWorkspacePresentations))
-        .bighelpSheet(item: $workspaceProfileEditor) { editor in
-            AgentEditorView(model: editor, runtimeDefaultsClient: agentRuntimeDefaults, onCompleted: { _ in })
-                .environment(\.agentDeletion, agentDeletionAction)
-        }
+
         .bighelpSheet(isPresented: $isGroupCreationPresented) {
             BotModeCreateRoomView(rooms: botModeRooms, agents: agents, seedProfileID: groupCreationSeed,
                                   sectionChoice: groupSectionChoice) { roomID in
@@ -278,7 +234,7 @@ struct RootShellView: View {
         .modifier(HostSetupSheet(registry: hostRegistry, isActive: !isUnifiedSettingsPresented))
         .onChange(of: hostRegistry?.selectedHostID) { _, _ in
             chatDissolve.cancel()
-            appState.resetForHostBoundary(keepsAllHostsScreens: fleetModeOn)
+            appState.resetForHostBoundary()
         }
         .task(id: hostRegistry?.selectedHostID) {
             connectionKeeper.bind { [hostRegistry] in
@@ -360,11 +316,11 @@ struct RootShellView: View {
         .onChange(of: actionErrorMessage != nil) { _, failed in if failed { VoiceLaunchState.shared.finish() } }
         .modifier(LostChatHooks(featureStore: featureStore, attach: watchForLostChats))
         .modifier(DriveShellHooks(appState: appState, featureStore: featureStore, agents: agents,
-                                  settings: settings, usesDemoFixtures: usesDemoFixtures))
+                                  usesDemoFixtures: usesDemoFixtures))
         .modifier(BighelpShortcutParameterUpdates(agents: agents, scheduledTasks: featureStore.scheduledTasks,
                                                   rooms: botModeRooms, catalog: sessionCatalog))
         .modifier(PendingLinkRetry(acceptsLinks: acceptsIncomingLinks, acceptsChatStarts: acceptsChatStarts,
-                                   retry: openPendingIncomingChatIfNeeded))
+                                   hasNavigation: hasOwnNavigation, retry: openPendingIncomingChatIfNeeded))
         .onChange(of: BighelpExternalSessionOpenCenter.shared.pending, initial: true) { _, open in
             if let open { openExternalSession(open) }
         }
@@ -400,15 +356,9 @@ struct RootShellView: View {
                 HostSetupView(registry: registry, allowsDismiss: false)
             } else if nativeWorkspaceStore != nil {
                 if nativeRuntime != nil, !signInEndedBeforeOpening { workspace }
-                // Multi-gateway: the bots stay on screen while the tapped one's gateway connects.
-                else if simpleBotsMultiGatewayOn, let pending = fleet?.pendingOpen { simpleBotsSwitching(to: pending.hostID) }
-                else if fleetModeOn, let fleet {
-                    FleetConnectingView(
-                        fleet: fleet, hostFilter: fleetFocusBinding, onOpen: openFleetAgent,
-                        isConnecting: nativeWorkspaceStore?.isConnecting == true || nativeRuntime?.isRefreshing == true
-                            || nativeWorkspaceStore?.isConnected == true,
-                        retry: { Task { await nativeWorkspaceStore?.reconnect() } })
-                }
+                // Every computer shows: the home stays on screen, from the computers' saved copies,
+                // while the tapped one's computer connects.
+                else if showsEveryHost, fleet?.pendingOpen != nil { conversationsRoot }
                 else if nativeWorkspaceHasProblem { nativeWorkspace }
                 // A moment, as the app starts: the saved workspace opens once iOS lets its files be read.
                 else { theme.canvas.ignoresSafeArea().accessibilityIdentifier("native-workspace.opening") }
@@ -453,7 +403,6 @@ struct RootShellView: View {
         managementStore = nil
         _ = capabilitiesPresentations.removeAll()
         for page in administrationPresentations.removeAll() { page.retire() }
-        workspaceProfileEditor = nil
         lifecycleCoordinator = nil
         lifecycleProfileID = nil
         lifecyclePresentationID = nil
@@ -462,6 +411,8 @@ struct RootShellView: View {
     }
 
     private func completeFirstRunOnboarding() {
+        // "How do you want to start?" was just answered: this run opens there too.
+        home.land(on: settings.homeLanding, view: settings.homeView)
         didCompleteForcedFirstRunOnboarding = true
         #if DEBUG
         guard !isForcedFirstRunOnboarding else { return }
@@ -532,9 +483,7 @@ struct RootShellView: View {
                                     isConnecting: isWorking, isFirstConnection: !connectionKeeper.hasConnected)
     }
 
-    var workspace: some View {
-        homeAutoOpen(workspaceShell)
-    }
+    var workspace: some View { workspaceShell }
 
     private var workspaceShell: some View {
         GeometryReader { geometry in
@@ -588,125 +537,17 @@ struct RootShellView: View {
         .accessibilityIdentifier("session.restore.loading")
     }
 
-    @ViewBuilder
-    private var hostAwareAgentsTab: some View {
-            AgentsShellView(
-                agents: agents,
-                runtimeDefaultsClient: agentRuntimeDefaults,
-                onSelect: { openAgentChat($0.id) },
-                onOpenSessions: { openSessions(filteredTo: $0.id) },
-                onOpenHostStatus: { isHostStatusPresented = true },
-                hostRuntime: currentHostRuntime,
-                workspaceOwner: currentWorkspaceOwner,
-                capabilities: currentWorkspaceCapabilities,
-                botModeRooms: botModeRooms,
-                cloneClient: workspaceConnections?.cloneClient,
-                shortcutsAvailable: usesWorkspaceFixtures
-                    || (nativeRuntime != nil && currentWorkspaceOwner != nil)
-,
-                onAction: handleAgentWorkspaceAction,
-                groupFilterRequest: $agentGroupFilterRequest,
-                createRequest: $agentCreateRequest,
-                botChatActivity: botChatActivity,
-                botChatActivitySource: botChatActivitySource,
-                sectionCards: AnyView(SimpleBotsSectionsArea(context: simpleBotsContext))
-            )
-            // The one main action, where a thumb rests, as on All agents.
-            .overlay(alignment: .bottomTrailing) {
-                if appState.path.isEmpty {
-                    RootComposeButton(identifier: "agents.new-chat", size: 72) {
-                        if currentWorkspaceOwner != nil { presentNewChatPicker(seed: nil) }
-                        else { startNewChat(explicitAgentID: nil) }
-                    }
-                        .padding(.trailing, BighelpTokens.space20)
-                        .padding(.bottom, BighelpTokens.space12)
-                }
-            }
-    }
-
-    /// The Header mode switcher in the root bar, in place of the brand: on the Chat tab's list (when it
-    /// opens on a list, or on all hosts) and on Code's home. The Chat tab's own chat and Bots' home
-    /// draw their own headers with it.
-    var barModeSwitch: BighelpModeSwitch? {
-        [.sessions, .code].contains(appState.selectedTab) && !simpleBotsOn ? modeSwitch : nil
-    }
-
-    /// Feed, Ideas, Goals and Apps draw their own header (the agent's avatar).
-    private var showsAgentBoard: Bool {
-        appState.path.isEmpty && showsAgentBoard(appState.selectedTab)
-    }
-
-    func showsAgentBoard(_ tab: AppTab) -> Bool { tab.isAgentBoard }
-
     private var shell: some View {
         rootTabs
         .toolbar(.hidden, for: .tabBar)
-        // Boards and Bots mode's home draw their own header. The home's stays hidden while a
-        // chat is pushed over it too: its bar (with ☰) showed through for the length of Back.
-        .toolbar(showsAgentBoard || simpleBotsHomeIsRoot || splitList != nil ? .hidden : .automatic, for: .navigationBar)
-        .navigationTitle(showsAgentBoard || simpleBotsHomeIsRoot ? "" : rootNavigationTitle)
-        // One title size on every tab: the bar's. A large title kept the size of the tab before
-        // (small after Feed or Kanban, large after Chat), so the same screen looked different.
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            // ☰ always opens chats, agents, tasks and settings, on iPad too. Always part of the
-            // root screen's bar (a pushed chat has its own, and boards hide it): added only once
-            // a chat closed, it was sometimes dropped mid-switch, and Agents had no ☰.
-            ToolbarItem(placement: .topBarLeading) { rootMenuButton }
-            if let barModeSwitch {
-                // The Header mode switcher takes the bar's middle on the Chat list; hosts stay in ☰.
-                ToolbarItem(placement: .principal) { BighelpModePill(modeSwitch: barModeSwitch) }
-            } else {
-                // Ember lives only in chrome: the brand bar on root screens.
-                // Touch and hold it to switch hosts.
-                BighelpBrandToolbarItem(demoHosts: demoHosts)
-            }
-            // All agents has its own options there instead (☰ switches back to one host).
-            if fleetModeOn, appState.path.isEmpty, appState.selectedTab == .scheduledTasks { fleetToolbar }
-        }
-        #if os(visionOS)
-        // Beside the window, not along its bottom edge by the close control.
-        .ornament(visibility: visionTabsVisible ? .visible : .hidden,
-                  attachmentAnchor: .scene(.leading), contentAlignment: .trailing) {
-            VisionTabOrnament(selection: tabSelection, tabs: barTabs, unread: boardUnreadTabs,
-                              onNewChat: appState.path.isEmpty ? barNewChat : nil)
-        }
-        #endif
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if showsBottomNavigation && !BighelpPlatform.usesTabOrnament && !screen.usesSideBar {
-                FloatingTabBar(selection: tabSelection, tabs: barTabs,
-                               onNewChat: barNewChat,
-                               onPickAgents: { presentNewChatPicker(seed: homeAgent?.id) },
-                               homeIndicatorSink: FloatingTabBar.homeIndicatorSink(forBottomInset: rootBottomSafeArea),
-                               unread: boardUnreadTabs)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
+        // Every root draws its own header (`HomeHeaderBar`); a pushed page has the bar's or its own.
+        .toolbar(.hidden, for: .navigationBar)
+        .modifier(HomeBars(isAtRoot: appState.path.isEmpty, isKeyboardVisible: isKeyboardVisible,
+                           selection: tabSelection, items: homeTabItems, onNewChat: { openNewChat() },
+                           bottomInset: rootBottomSafeArea, selectedTint: theme.action, tint: theme.secondaryText))
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { rootBottomSafeArea = $0 }
-        // The iPhone Duo: the bar's places go down the side strip with the screen's own buttons.
-        .toolbar {
-            if showsBottomNavigation && screen.usesSideBar {
-                BighelpStripTabs(selection: tabSelection, tabs: barTabs, unread: boardUnreadTabs,
-                                 onNewChat: barNewChat,
-                                 selectedTint: theme.action, tint: theme.secondaryText)
-            }
-        }
         // The iPhone Duo open: the list beside the page.
         .onChange(of: splitColumnKey, initial: true) { updateSplitColumn() }
-        // Chat or Code mode: the launch's choice, then ☰'s switch.
-        .onChange(of: settings.experience, initial: true) { applyExperience() }
-        // Bots mode on or off: back to that mode's home, whatever was open.
-        .onChange(of: settings.simpleBotsEnabled) {
-            appState.path.removeAll()
-            appState.homeTab = .sessions
-            applyExperience()
-            appState.select(appState.homeTab)
-        }
-        // It has no ☰: the Mac's sidebar, kept open between launches, closes too.
-        .onChange(of: simpleBotsOn, initial: true) { _, on in
-            if on { isHomeDrawerPresented = false }
-        }
-        .animation(reduceMotion ? nil : .snappy(duration: BighelpTokens.transitionDuration), value: showsBottomNavigation)
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             isKeyboardVisible = true
         }
@@ -737,15 +578,7 @@ struct RootShellView: View {
         }) {
             settingsSheetContent
         }
-        .bighelpSheet(isPresented: $isHermesWorkspacePresented) {
-            HermesWorkspacePickerView(
-                store: hermesWorkspaces,
-                agentID: workspaceAgentID
-            )
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .bighelpSheetSize(.standard)
-        }
+
         .onChange(of: appState.path) { previousPath, path in
             let bindsPendingCanvas: Bool = {
                 guard case .chat(let previousID)? = previousPath.last,
@@ -784,7 +617,7 @@ struct RootShellView: View {
         }
     }
 
-    /// The Settings sheet, the same one in every mode. Its stack's path lives in `AppState`, and
+    /// The Settings sheet, from the person's circle on every root. Its stack's path lives in `AppState`, and
     /// `SettingsDestination` values pushed on it draw here.
     private var settingsSheetContent: some View {
         // Done on every page closes Settings; Back steps through its pages.
@@ -799,92 +632,12 @@ struct RootShellView: View {
         .modifier(HostSetupSheet(registry: hostRegistry, isActive: true))
     }
 
-    private var showsBottomNavigation: Bool {
-        appState.path.isEmpty && !isKeyboardVisible && showsTabsOnRoot
-    }
-
-    /// Vision Pro's tab strip on root screens. The agent's own chat draws its
-    /// own: a screen covered by a pushed one doesn't show its ornaments.
-    private var visionTabsVisible: Bool {
-        appState.path.isEmpty && showsTabsOnRoot
-    }
-
-    /// The bottom bar: Chat, then what the person pinned (Appearance › App layout).
-    var barTabs: [AppTab] { settings.appLayout.barTabs }
-
-    /// The all-hosts view is just its list. Feed, Ideas and Goals keep the bar if
-    /// something opens them, so its Chat tab always leads back, and so do the pages
-    /// pinned to it. Not on Agents unless it's pinned: pick an agent first, so Feed,
-    /// Ideas and Goals are clearly its own.
-    private var showsTabsOnRoot: Bool {
-        let tab = appState.selectedTab
-        // Code mode's message box sits where the bar would; ☰ goes everywhere else.
-        // Bots mode has no bar: its home is the whole app.
-        guard tab != .code, !simpleBotsOn else { return false }
-        let pinned = tab != .sessions && barTabs.contains(tab)
-        return (tab != .agents || pinned) && (!fleetModeOn || tab.isAgentBoard || pinned)
-    }
-
+    /// The three places. The shell switches the root itself: a hidden TabView creates a UIKit
+    /// containment boundary that drops feature search and toolbar actions. On the open iPhone Duo a
+    /// list shows left of the fold instead, and the page beside it waits for a pick.
     @ViewBuilder
     var rootTabs: some View {
-        // The conversation shell owns navigation. A hidden TabView creates a
-        // UIKit containment boundary that drops feature search and toolbar actions.
-        switch appState.selectedTab {
-        case .agents:
-            hostAwareAgentsTab
-        case .scheduledTasks:
-            scheduledTasksRootTab
-        case .profile:
-            workspaceSettings()
-        // Home and Inbox were the Activity screen; they open Chat now.
-        case .sessions, .sessionList, .home, .inbox:
-            if let splitList, splitList.isList { splitPlaceholder(splitList) } else if simpleBotsOn { simpleBotsHome } else { sessionsRootTab }
-        case .feed, .ideas, .goals, .apps:
-            agentBoardTab(appState.selectedTab)
-        // Pinned to the bottom bar: the page ☰ opens, as a tab.
-        case .projects:
-            routeDestination(.projects)
-        case .kanban:
-            routeDestination(.kanban)
-        case .workflows:
-            routeDestination(.workflows)
-        case .usage:
-            routeDestination(.usage)
-        case .code:
-            if let splitList, splitList.isList { splitPlaceholder(splitList) } else { codeRootTab }
-        }
-    }
-
-    /// ☰: chats, places, agents and Settings. The root's bar has it, and the open Duo's list.
-    var rootMenuButton: some View {
-        Button {
-            isHomeDrawerPresented.toggle()
-        } label: {
-            Image(systemName: "line.3.horizontal").bighelpToolbarIcon()
-                .bighelpMenuDot(menuHasUnread)
-        }
-        .bighelpIconLabel(String(localized: "Chats and menu"), shortcut: "⌃⌘S")
-        .accessibilityIdentifier("home.drawer.open")
-    }
-
-    var rootNavigationTitle: String {
-        switch appState.selectedTab {
-        case .sessions, .sessionList, .home, .inbox:
-            fleetModeOn ? String(localized: "All agents") : String(localized: "Sessions")
-        case .agents: String(localized: "Agents")
-        // Its tab's name: the long one didn't fit beside its buttons.
-        case .scheduledTasks: String(localized: "Tasks")
-        case .profile: String(localized: "Settings")
-        case .feed: String(localized: "Feed")
-        case .ideas: String(localized: "Ideas")
-        case .goals: String(localized: "Goals")
-        case .apps: String(localized: "Apps")
-        case .projects: String(localized: "Projects")
-        case .kanban: String(localized: "Kanban")
-        case .workflows: String(localized: "Workflows")
-        case .usage: String(localized: "Usage")
-        case .code: String(localized: "Code")
-        }
+        if let splitList, splitList.isList { splitPlaceholder(splitList) } else { homeRoot(appState.selectedTab) }
     }
 
     @ViewBuilder
@@ -918,13 +671,11 @@ struct RootShellView: View {
 
     @ViewBuilder
     private func edgeGestureSurface(side: EdgeSide, containerWidth: CGFloat) -> some View {
-        let action = side == .left
-            ? settings.effectiveLeftEdgeSwipeAction
-            : settings.effectiveRightEdgeSwipeAction
+        let action = side == .left ? settings.leftEdgeSwipeAction : settings.rightEdgeSwipeAction
         Color.clear
             .frame(width: WorkspaceEdgeSwipeResolver.activationEdgeWidth)
             .contentShape(Rectangle())
-            // Below the header row, so ☰ and ⋯ in the corners (Feed, Ideas, Goals, Apps) keep their taps.
+            // Below the header row, so the buttons in its corners keep their taps.
             .padding(.top, HeaderButtonMetrics.glass + 2 * HeaderButtonMetrics.slop + BighelpTokens.space8)
             .allowsHitTesting(action != .none && !isHomeDrawerPresented
                 && (side == .left || WorkspaceEdgeSwipeResolver.trailingEdgeIsActive(
@@ -939,8 +690,8 @@ struct RootShellView: View {
                             start: CGPoint(x: startX, y: value.startLocation.y),
                             translation: value.translation,
                             containerWidth: containerWidth,
-                            leftAction: settings.effectiveLeftEdgeSwipeAction,
-                            rightAction: settings.effectiveRightEdgeSwipeAction
+                            leftAction: settings.leftEdgeSwipeAction,
+                            rightAction: settings.rightEdgeSwipeAction
                         ) else { return }
                         performWorkspaceAction(resolved)
                     }
@@ -948,165 +699,41 @@ struct RootShellView: View {
             .accessibilityHidden(true)
     }
 
-    /// Every way into the menu (☰, edge swipes, inner pages) opens the same ☰ sheet.
-    private func presentMenu() {
-        BighelpKeyboard.dismiss()
-        // ☰ toggles: the Mac and Vision Pro sidebar stays reachable while open.
-        isHomeDrawerPresented.toggle()
-    }
-
-    /// Where an edge swipe goes, from any screen (a chat included) and in either mode.
+    /// Where an edge swipe goes, from any screen (a chat included).
     func performWorkspaceAction(_ action: WorkspaceSwipeAction) {
         BighelpKeyboard.dismiss()
-        if simpleBotsOn, performSimpleBotsSwipe(action) { return }
         switch action {
         case .quickWorkspace:
-            presentMenu()
+            // The sidebar where there is one; the phone has none, so its chats.
+            if sidebarIsAvailable { isHomeDrawerPresented.toggle() } else { appState.select(.chats) }
         case .newChat:
-            if fleetModeOn { isFleetNewChatPresented = true } else { startNewChat(explicitAgentID: nil) }
+            openNewChat()
         case .sessions:
-            if fleetModeOn {
-                // Back to the list the chat came from: All sessions, else All agents.
-                appState.chatOpenedFromList = false
-                if appState.path.first?.isAllHosts == true {
-                    appState.path = Array(appState.path.prefix { $0.isAllHosts })
-                } else {
-                    appState.select(.sessions)
-                }
-            } else {
-                openAllSessions()
-            }
+            appState.select(.chats)
         case .agents:
-            openAgentsList()
-        case .home, .inbox:
-            // All hosts has no home chat; its home is All agents.
-            if fleetModeOn { openAgentsList() } else { openHomeChat() }
+            appState.select(.bots)
+        case .home:
+            appState.select(.conversations)
         case .profile:
-            openSettingsPage()
-        case .nextMode:
-            settings.switchMode(settings.nextMode)
-        case .botsMode, .chatMode, .codeMode:
-            if let mode = action.mode { settings.switchMode(mode) }
+            openBotPageOrSettings()
         case .none:
             break
         }
     }
 
-    /// The bar's lit tab. With Sessions in the bar, every chat's list, and a chat picked
-    /// from it, is Sessions; Chat is the agent's own chat.
-    private var selectedBarTab: AppTab {
-        guard appState.selectedTab == .sessions, !fleetModeOn, barTabs.contains(.sessionList) else {
-            return appState.selectedTab
-        }
-        if appState.path.isEmpty { return .sessionList }
-        if appState.chatOpenedFromList, appState.path.count == 1, case .chat = appState.path[0] { return .sessionList }
-        return .sessions
-    }
-
-    var tabSelection: Binding<AppTab> {
-        Binding(
-            get: { selectedBarTab },
-            set: { tab in
-                // Chat from a chat is where you already are, not a trip to the list.
-                if tab == .sessions, selectedBarTab == .sessions, case .chat? = appState.path.last { return }
-                // From a chat, its agent's Feed, Ideas and Goals; and the switch is a swap like
-                // Feed to Ideas, not the chat sliding away.
-                if fleetModeOn, case .chat(let id)? = appState.path.last { fleetLastChatID = id }
-                if tab.isAgentBoard, case .chat(let id)? = appState.path.last,
-                   let members = featureStore.preparedChatModel(id: id)?.memberIDs, members.count == 1,
-                   members[0] != homeAgent?.id {
-                    _ = agents.setPrimaryAgent(members[0])
-                }
-                var transaction = Transaction()
-                // Chat opens its chat as a page under the hood; from any tab it swaps in like
-                // the others instead of sliding in like a page turn.
-                transaction.disablesAnimations = !appState.path.isEmpty || tab == .sessions
-                withTransaction(transaction) { selectTab(tab) }
-            }
-        )
-    }
-
-    private func selectTab(_ tab: AppTab) {
-        if tab == .sessionList {
-            if openHeldChat(under: tab) { return }
-            openAllSessions()
-            return
-        }
-        // All hosts has no home chat: Chat goes back to the chat you were in, else to All agents.
-        if tab == .sessions, fleetModeOn, appState.path.isEmpty, let id = fleetLastChatID,
-           let record = sessionCatalog.session(id: id) {
-            appState.chatOpenedFromList = true
-            openSession(record.summary)
-            return
-        }
-        if tab == .sessions, opensHomeChat {
-            // The chat you left under Chat opens again; otherwise Chat is the agent's own chat.
-            // ☰ and swipe-back reach the full list either way.
-            if openHeldChat(under: tab) { return }
-            openHomeChat()
-        } else if tab == .sessions {
-            openSessions(filteredTo: nil)
-        } else if tab == .scheduledTasks {
-            openScheduledTasks(filteredTo: nil)
-        } else if tab.isHostPage {
-            openHostPageTab(tab)
+    /// In a chat with one bot, that bot's page; anywhere else, Settings.
+    private func openBotPageOrSettings() {
+        if case .simpleBotProfile? = appState.path.last { return }
+        if case .chat(let id)? = appState.path.last, let model = featureStore.preparedChatModel(id: id),
+           !model.isBotMode, let botID = model.memberIDs.first {
+            appState.open(.simpleBotProfile(agentID: botID))
         } else {
-            appState.select(tab)
+            isUnifiedSettingsPresented = true
         }
     }
 
-    /// The chat the person left under `tab` (Chat or Sessions) for another place, while this
-    /// computer still lists it. False when there's none, and the tab opens as it always has. Chat
-    /// skips a 1:1 chat whose agent is no longer the one in use: it opens that agent's chat instead.
-    private func openHeldChat(under tab: AppTab) -> Bool {
-        guard !fleetModeOn, let held = appState.heldChat,
-              held.tab(sessionsInBar: barTabs.contains(.sessionList)) == tab,
-              let record = sessionCatalog.session(id: held.conversationID),
-              tab == .sessionList || HeldChat.fitsChat(members: record.agentIDs, agentInUse: homeAgent?.id)
-        else { return false }
-        appState.select(.sessions)
-        // A chat from the list keeps Back to the list.
-        appState.chatOpenedFromList = held.openedFromList
-        // A group chat opens its room, as it did from the list.
-        openSessionSelection(record.summary)
-        return true
-    }
-
-    /// Projects, Kanban, Workflows or Usage from the bottom bar: opened the way ☰ opens
-    /// them (which makes a pinned one a tab), without ☰'s wait for its sheet to close.
-    /// Where this computer has none, the tab says so.
-    private func openHostPageTab(_ tab: AppTab) {
-        switch tab {
-        case .projects where canOpenProjects:
-            if fleetModeOn { fleetGate(.projects) } else { openProjects() }
-        case .kanban where canOpenKanban:
-            if fleetModeOn { fleetGate(.kanban) } else { openKanban() }
-        case .workflows:
-            if fleetModeOn { fleetGate(.workflows) } else { openWorkflows() }
-        case .usage where usage.isAvailable:
-            showUsage()
-        default:
-            appState.select(tab)
-        }
-    }
-
-    @ViewBuilder
-    var sessionsRootTab: some View {
-        if fleetModeOn, let fleet {
-            fleetHome(fleet)
-        } else if case .sessions(let model)? = featureStore.preparedModel(for: .sessions) {
-            oneHostSessions(model)
-        } else {
-            ProgressView("Loading sessions")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .task {
-                    _ = featureStore.prepareSessions(filteredTo: nil)
-                }
-        }
-    }
-
-    /// One computer's Sessions screen: the Chat list in one-computer mode, and a picked
-    /// computer's chip on All sessions.
+    /// One computer's Sessions page, pushed from Chats: projects, imports from other apps, one
+    /// bot's chats.
     func oneHostSessions(_ model: SessionsModel) -> SessionsView {
         SessionsView(
             model: model,
@@ -1115,15 +742,11 @@ struct RootShellView: View {
             organizeByProjects: settings.organizeChatsByProjects,
             sessionOrganizationAccountID: sessionOrganizationAccountID,
             sessionOrganizationHostID: sessionOrganizationHostID,
-            onStartChat: { appState.chatOpenedFromList = true; startNewChat(explicitAgentID: $0) },
-            onNewGroupChat: newGroupChatAction.map { action in { appState.chatOpenedFromList = true; action() } },
-            onSelect: { appState.chatOpenedFromList = true; openSessionSelection($0) },
-            agentActionsConfig: agentActionsConfig,
+            onStartChat: { startNewChat(explicitAgentID: $0) },
+            onNewGroupChat: newGroupChatAction,
+            onSelect: { openSessionSelection($0) },
             otherApps: otherAppChats,
             onOpenBroughtIn: { openBroughtInChat($0) },
-            // All sessions and a picked computer's Sessions share the Hermes, Codex, Claude Code choice.
-            appFilter: fleetModeOn ? $fleetChatsFilter.app : nil,
-            requestedOtherAppChat: $requestedOtherAppChat,
             projectMove: chatProjectMove
         )
     }
@@ -1149,7 +772,6 @@ struct RootShellView: View {
     /// A chat brought in from Codex or Claude Code opens like any other, once Hermes lists it.
     func openBroughtInChat(_ storedSessionID: String) {
         if let record = sessionCatalog.session(id: storedSessionID) {
-            appState.chatOpenedFromList = true
             openSession(record.summary)
             return
         }
@@ -1158,36 +780,21 @@ struct RootShellView: View {
             do {
                 let record = try await sessionCatalog.resolveStoredSession(profileID: profileID,
                                                                            storedSessionID: storedSessionID)
-                appState.chatOpenedFromList = true
                 openSession(record.summary)
             } catch is CancellationError {
             } catch {
-                actionErrorMessage = "The chat is in Hermes now, but it couldn't be opened. Find it in Sessions."
+                actionErrorMessage = "The chat is in Hermes now, but it couldn't be opened. Find it in Chats."
             }
         }
     }
 
-    /// Group chats use Hermes' hosted rooms, the same path as Agents › New group chat.
+    /// + › New Group Chat: Hermes' hosted rooms, made in the New Group Chat sheet.
     var newGroupChatAction: (() -> Void)? {
         // The room store's own answer, not the published capability: that comes only after the whole
         // connection's refresh, so New Group Chat took 10 seconds or more after every return to the app.
         guard let owner = currentWorkspaceOwner, botModeRooms.offersNewGroupChat else { return nil }
         return {
             handleAgentWorkspaceAction(AgentWorkspaceActionRequest(owner: owner, action: .createGroup(seedProfileID: nil)))
-        }
-    }
-
-    @ViewBuilder
-    private var scheduledTasksRootTab: some View {
-        if fleetModeOn, let fleet {
-            FleetTasksView(fleet: fleet, hostFilter: fleetFocusBinding, onOpen: openFleetTask)
-                // This host's own tasks, as its Scheduled tasks screen would load them.
-                .task { if featureStore.scheduledTasks?.loadState == .idle { await featureStore.scheduledTasks?.load() } }
-        } else if let store = featureStore.scheduledTasks {
-            ScheduledTasksView(store: store, agents: agents, showsInlineHeading: true, onOpen: openScheduledTask)
-        } else {
-            ContentUnavailableView("Scheduled Tasks", systemImage: "calendar.badge.clock",
-                                   description: Text("Scheduled work is unavailable for this connection."))
         }
     }
 
@@ -1200,17 +807,12 @@ struct RootShellView: View {
         }
     }
 
-    /// Settings' Appearance or Chat page alone, for Fleet settings.
-    func fleetAppPage(_ section: SettingsMenuSection) -> AnyView {
-        AnyView(workspaceSettings().opening(section))
-    }
-
     func workspaceSettings() -> SettingsView {
         SettingsView(
             settings: settings, userIdentity: userIdentity,
             agents: agents.profiles, personalities: personalities,
             permissionCenter: permissionCenter,
-            onOpenSessions: { leaveSettings { openSessions(filteredTo: nil) } },
+            onOpenSessions: { leaveSettings { appState.select(.chats) } },
             onOpenScheduledTasks: { leaveSettings { openScheduledTasks(filteredTo: nil) } },
             onClearLocalCache: {
                 if let nativeRuntime { return await nativeRuntime.refreshLocalCache() }
@@ -1219,7 +821,6 @@ struct RootShellView: View {
             voiceSettingsScope: voiceSettingsScope, voiceSettingsClient: voiceSettingsClient,
             voiceSettingsIsCurrent: voiceSettingsIsCurrent,
             agentDirectory: agents,
-            landingScope: currentWorkspaceOwner?.cacheScopeID,
             onOpenWorkspaceDestination: { destination in
                 leaveSettings { openWorkspaceDestination(destination) }
             },
@@ -1237,8 +838,7 @@ struct RootShellView: View {
             usage: providerUsage,
             pendingShares: settingsPendingShareContext,
             archivedChats: settingsArchivedChats,
-            computerTimeZone: computerTimeZoneSettings(),
-            onSetAllHosts: fleet == nil ? nil : { (on: Bool) in setAllHostsMode(on) }
+            computerTimeZone: computerTimeZoneSettings()
         )
     }
 
@@ -1249,10 +849,7 @@ struct RootShellView: View {
             catalog: sessionCatalog,
             agentName: { id in agents.profiles.first { $0.id == id }?.name ?? id },
             onOpen: { summary in
-                leaveSettings {
-                    appState.chatOpenedFromList = true
-                    openSession(summary)
-                }
+                leaveSettings { openSession(summary) }
             })
     }
 
@@ -1342,51 +939,41 @@ struct RootShellView: View {
         )
     }
 
-    func routeWithWorkspaceMenu<Content: View>(
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        content()
-            .toolbar {
-                if settings.nerdModeEnabled {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        // The native toolbar supplies its own Liquid Glass surface.
-                        Button {
-                            presentMenu()
-                        } label: {
-                            Image(systemName: "line.3.horizontal").bighelpToolbarIcon()
-                        }
-                        .bighelpIconLabel(String(localized: "Menu"))
-                        .accessibilityIdentifier("workspace.menu")
-                    }
-                }
-            }
-    }
 
-    /// The menu bar's New Chat (⌘N), Settings (⌘,), sidebar (⌃⌘S), modes (⌃⌘1–⌃⌘3, with the Unified
-    /// Mode Toggle on) and, on the Mac, tabs (⌘1–⌘5).
+
+    /// The menu bar's New Chat (⌘N), Settings (⌘,), sidebar (⌃⌘S) and, on the Mac, the three
+    /// places (⌘1–⌘3).
     private var menuCommandActions: BighelpShellActions {
-        var actions = BighelpShellActions(
-            newChat: { startNewChat(explicitAgentID: nil) },
+        let selection = tabSelection
+        return BighelpShellActions(
+            newChat: { openNewChat() },
             openSettings: { isUnifiedSettingsPresented = true },
             isSidebarOpen: isHomeDrawerPresented,
             toggleSidebar: { isHomeDrawerPresented.toggle() },
-            modeSwitch: modeSwitch
+            selectTab: { selection.wrappedValue = $0 },
+            tabs: homeTabItems
         )
-        if appState.path.isEmpty, !fleetModeOn {
-            let selection = tabSelection
-            actions.selectTab = { tab in selection.wrappedValue = tab }
-            actions.tabs = barTabs
-        }
-        return actions
     }
 
     /// `opened` gets the chat Hermes made, after the local canvas it showed first has passed it on.
-    func startNewChat(explicitAgentID: String?, startsVoice: Bool = false,
+    /// `tracksNewChat`: this is New chat's own blank chat, so each ID it shows under (the canvas,
+    /// then Hermes' chat) is the one that draws the To row (`newChatSlot(forChat:model:)`). When
+    /// New chat's blank chat is already on top (another bot was picked for it), the new one takes
+    /// its place in one step.
+    func startNewChat(explicitAgentID: String?, startsVoice: Bool = false, tracksNewChat: Bool = false,
                       opened: (@MainActor (String) -> Void)? = nil) {
+        let replacesBlankChat = tracksNewChat && newChatSession.conversationID != nil
+            && appState.path.last == newChatSession.conversationID.map { .chat(conversationID: $0) }
+        // New chat's choices row reads this computer's projects.
+        if tracksNewChat { prepareCodeHome() }
         runNewChatStart(retry: { startNewChat(explicitAgentID: explicitAgentID, startsVoice: startsVoice,
-                                              opened: opened) }) {
-            let outcome = try await newChatCoordinator.start(explicitAgentID: explicitAgentID,
-                                                             beforePresentation: presentNewChatDissolve)
+                                              tracksNewChat: tracksNewChat, opened: opened) }) {
+            let outcome = try await newChatCoordinator.start(
+                explicitAgentID: explicitAgentID, replacingBlankChat: replacesBlankChat,
+                beforePresentation: { next, previous in
+                    presentNewChatDissolve(next, replacing: previous)
+                    if tracksNewChat { newChatSession.conversationID = next }
+                })
             guard case .opened(let id, _) = outcome else { return }
             if startsVoice { appState.requestVoiceMode(for: id) }
             opened?(id)
@@ -1450,23 +1037,16 @@ struct RootShellView: View {
         withAnimation(reduceMotion ? nil : .easeInOut(duration: BighelpTokens.stateDuration)) {
             isStartingNewChat = false
         }
+        newChatStartEnded()
     }
 
-    var activeHermesWorkspaceName: String {
-        hermesWorkspaces.catalog?.workspaces.first(where: \.isActive)?.name
-            ?? "Workspace"
-    }
+
 
     var workspaceAgentID: String {
         agents.resolvedAgent(explicitID: nil)?.id ?? "default"
     }
 
-    func presentHermesWorkspaces() {
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(180))
-            isHermesWorkspacePresented = true
-        }
-    }
+
 
     func openApproval(requestID: String) {
         Task {
@@ -1487,14 +1067,16 @@ struct RootShellView: View {
         appState.open(.approval(requestID: request.id))
     }
 
+    /// The computer in use's Sessions page over where the person is; `agentID` shows one bot's chats.
     func openSessions(filteredTo agentID: String?) {
         guard featureStore.prepareSessions(filteredTo: agentID) else { return }
-        appState.openSessions()
+        if appState.path.last != .sessions { appState.open(.sessions) }
     }
 
+    /// Scheduled tasks over where the person is; `agentID` shows one bot's routines.
     func openScheduledTasks(filteredTo agentID: String?) {
         guard featureStore.prepareScheduledTasks(filteredTo: agentID) else { return }
-        appState.openScheduledTasks()
+        if appState.path.last != .scheduledTasks { appState.open(.scheduledTasks) }
     }
 
     fileprivate func openErrorPresentations<Content: View>(_ content: Content) -> some View {
@@ -1551,9 +1133,6 @@ struct RootShellView: View {
         // The way back from Shortcuts to a phone-tool call: not a screen to open.
         if DeviceToolHandoff.shared.handleCallback(url) { return }
         guard let route = BighelpIncomingURLRoute.parse(url) else { return }
-        // A link opening the app wins over Settings › Chat › Opens on, and keeps the mode you were in.
-        didAutoOpenHomeChat = true
-        settings.restoreAllHostsModeForOutsideOpen()
         if holdsLinkForItsComputer(url) { return }
         // Opened while the app starts or comes back, a link found no workspace
         // ("host unavailable") or opened its chat under an alert. It waits for
@@ -1562,22 +1141,31 @@ struct RootShellView: View {
             pendingIncomingURL = url
             return
         }
+        // A page or Settings opens in the computer's own navigation, which isn't here yet as the
+        // app starts: opened now, it went into one that is then replaced, and never showed.
+        if route.opensAPage, !hasOwnNavigation {
+            pendingIncomingURL = url
+            return
+        }
         switch route {
         case .home:
             // Notifications and older links named the Activity inbox. Updates,
-            // approvals and questions now live in the agent's chat.
-            openHomeChat()
+            // approvals and questions now live in the bot's chat.
+            openPrimaryBotChat()
         case .chat(let sessionID):
             openIncomingChat(sessionID: sessionID)
         case .agent(let tab, let agentID):
-            // From the Watch: that agent's Feed, Ideas or Goals.
-            if let agentID { _ = agents.setPrimaryAgent(agentID) }
+            // From the Watch and the widgets: that bot's Feed, Ideas or Goals over Today. The
+            // primary bot stays who it is.
             switch tab {
-            case "feed": appState.select(.feed)
-            case "ideas": appState.select(.ideas)
-            case "goals": appState.select(.goals)
-            case "apps": appState.select(.apps)
-            default: openHomeChat()
+            case "feed": showOverToday(.feed, agentID: agentID)
+            case "ideas": showOverToday(.idea, agentID: agentID)
+            case "goals": showOverToday(.goal, agentID: agentID)
+            case "apps":
+                if let id = agentID ?? homeAgent?.id {
+                    appState.open(.simpleBotProfile(agentID: id, opening: BotProfileOpening(tab: .files)))
+                }
+            default: openPrimaryBotChat()
             }
         case .newChat(let agentID):
             startIncomingNewChat(agentID: agentID)
@@ -1586,12 +1174,14 @@ struct RootShellView: View {
         case .voice(let agentID, let hostID):
             openIncomingAgentChat(agentID: agentID, hostID: hostID, startsVoice: true)
         case .scheduledTasks:
-            appState.select(.scheduledTasks)
+            guard featureStore.prepareScheduledTasks(filteredTo: nil) else { return }
+            showOverWork([.scheduledTasks])
         case .scheduledTask(let id):
-            appState.select(.scheduledTasks)
-            openPrepared(.scheduledTask(id: id, agentID: nil))
+            guard featureStore.prepareScheduledTasks(filteredTo: nil),
+                  (try? featureStore.prepareForUserNavigation(.scheduledTask(id: id, agentID: nil))) == true else { return }
+            showOverWork([.scheduledTasks, .scheduledTask(id: id, agentID: nil)])
         case .sessions:
-            appState.select(.sessions)
+            appState.select(.chats)
         case .kanban(let board, let task):
             openKanban(board: board, task: task)
         case .approval(let id):
@@ -1603,11 +1193,11 @@ struct RootShellView: View {
             }
             openHostedGroup(roomID, owner: owner, settings: false)
         case .agents:
-            appState.select(.agents)
+            appState.select(.bots)
         case .projects:
             openProjects()
         case .settings:
-            openSettingsPage()
+            isUnifiedSettingsPresented = true
         case .workflows:
             openWorkflows()
         case .workflow(let id, _, let startsRun):
@@ -1633,9 +1223,8 @@ struct RootShellView: View {
             actionErrorMessage = "\(host.name) is a sample host in this demo."
             return true
         }
-        if fleetModeOn { recordLiveFleet() }
+        recordLiveFleet()
         pendingIncomingURL = url
-        appState.chatOpenedFromList = false
         fleet.select(hostID)
         return true
     }
@@ -1723,10 +1312,6 @@ struct RootShellView: View {
     /// Managed notifications and Live Activities verify a durable Hermes
     /// coordinate; resolve it through the visible catalog and open that row.
     func openExternalSession(_ open: BighelpExternalSessionOpen) {
-        // A notification opening the app wins over Settings › Chat › Opens on, and keeps the mode
-        // you were in: All hosts stays All hosts, so ☰ matches it.
-        didAutoOpenHomeChat = true
-        settings.restoreAllHostsModeForOutsideOpen()
         switch open.target {
         case .catalog(let sessionID):
             guard BighelpExternalSessionOpenCenter.shared.consume(open) else { return }
@@ -1851,13 +1436,6 @@ struct RootShellView: View {
         }
     }
 
-    /// A link, widget, Shortcut or notification waiting for the host: the
-    /// launch's landing screen gives way to it.
-    var hasPendingOutsideOpen: Bool {
-        pendingIncomingURL != nil || BighelpIncomingLinkCenter.shared.pending != nil
-            || BighelpExternalSessionOpenCenter.shared.pending != nil
-    }
-
     /// Widgets, notifications and Shortcuts open once the host answers: its
     /// workspace is loaded and not suspended or reconnecting.
     private var acceptsIncomingLinks: Bool {
@@ -1877,7 +1455,19 @@ struct RootShellView: View {
         return nativeRuntime.chatsOwner == owner
     }
 
+    /// The navigation that pushed pages and Settings show in is the one on screen. Each computer has
+    /// its own (`NativeWorkspaceRuntime.appState`); until its workspace opens, the shell is handed
+    /// the app's first one, which the computer's then replaces. The demo has only the first.
+    private var hasOwnNavigation: Bool {
+        usesDemoFixtures || nativeRuntime != nil
+    }
+
     private func openPendingIncomingChatIfNeeded() {
+        // A page link waited only for the navigation it shows in, never for the computer to answer.
+        if hasOwnNavigation, let url = pendingIncomingURL, BighelpIncomingURLRoute.parse(url)?.opensAPage == true {
+            pendingIncomingURL = nil
+            handleIncomingURL(url)
+        }
         // A link that only starts a chat goes first; handling it again holds it if it came too soon.
         if !acceptsIncomingLinks, acceptsChatStarts, let url = pendingIncomingURL,
            BighelpIncomingURLRoute.parse(url)?.startsAChat == true {
@@ -1900,7 +1490,7 @@ struct RootShellView: View {
     func openSession(_ session: SessionSummary) {
         let route = AppRoute.chat(conversationID: session.id)
         let simpleBotsOpening = beginSimpleBotsChatOpening(session)
-        defer { if let simpleBotsOpening { noteSimpleBotsChatOpened(simpleBotsOpening, route: route) } }
+        defer { noteSimpleBotsChatOpened(simpleBotsOpening, route: route) }
         // On screen already (a notification or link about it): keep it as it is, any load it
         // has under way included, and catch up from the host.
         if appState.path.last == route, featureStore.preparedModel(for: route) != nil {
@@ -2069,9 +1659,19 @@ private extension BighelpIncomingURLRoute {
         switch self {
         case .home, .chat, .newChat, .agentChat, .voice, .kanban, .approval, .group, .projects, .workflows, .workflow,
              .workflowRun: true
-        // Feed, Ideas, Goals and Agents show their saved items and refresh themselves; waiting for
+        // Today, Bots and Chats show their saved items and refresh themselves; waiting for
         // the host before even switching tabs made these links feel broken.
         case .agent, .agents, .scheduledTasks, .scheduledTask, .sessions, .settings, .usage: false
+        }
+    }
+
+    /// Routes that push a page or open Settings. They need nothing from the computer, only the
+    /// navigation they show in (`RootShellView.hasOwnNavigation`). A link that only picks a tab or
+    /// a view needs neither: those are the whole app's.
+    var opensAPage: Bool {
+        switch self {
+        case .agent, .scheduledTasks, .scheduledTask, .settings, .usage: true
+        default: false
         }
     }
 
@@ -2089,12 +1689,15 @@ private extension BighelpIncomingURLRoute {
 private struct PendingLinkRetry: ViewModifier {
     let acceptsLinks: Bool
     let acceptsChatStarts: Bool
+    /// The computer's own navigation is on screen: a link to a page can open in it.
+    let hasNavigation: Bool
     let retry: () -> Void
 
     func body(content: Content) -> some View {
         content
             .onChange(of: acceptsLinks) { _, ready in if ready { retry() } }
             .onChange(of: acceptsChatStarts) { _, ready in if ready { retry() } }
+            .onChange(of: hasNavigation) { _, ready in if ready { retry() } }
     }
 }
 

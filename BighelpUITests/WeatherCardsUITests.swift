@@ -94,7 +94,7 @@ final class WeatherCardsUITests: BighelpUITestCase {
     private func launch(appearance: String, extra: [String] = []) -> XCUIApplication {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-weather-cards",
-                               "-loopdy.home.opens-chat", "YES", "-loopdy.settings.nerd-mode", "NO",
+                               "-start-chat", "-loopdy.settings.nerd-mode", "NO",
                                "-loopdy.demo.appearance", appearance] + extra
         app.launch()
         return app

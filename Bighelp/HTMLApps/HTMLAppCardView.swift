@@ -80,9 +80,9 @@ struct HTMLAppCardView: View {
         .onAppear(perform: readAnswered)
         .bighelpFullScreenCover(isPresented: $isOpen, onDismiss: readAnswered) {
             if let interactions, let identity {
-                HTMLAppScreen(app: app, agentID: interactions.scope.profileID) { message in
+                HTMLAppScreen(app: app, agentID: interactions.scope.profileID, send: { message in
                     try interactions.reply(message, for: identity)
-                }
+                })
             }
         }
     }

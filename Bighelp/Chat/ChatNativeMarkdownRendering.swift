@@ -13,7 +13,7 @@ struct ChatNativeMarkdownStyle {
     /// Interim agent messages render slightly smaller than the answer.
     var textScale: CGFloat = 1
     var mentionIdentities: [ChatMentionIdentity] = []
-    /// Markdown file paths become links that open the viewer (Code mode chats).
+    /// Markdown file paths become links that open the viewer (coding sessions).
     var linksMarkdownFiles = false
     var citationLinks: [Int: URL] = [:]
 }

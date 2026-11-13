@@ -43,7 +43,8 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
             ["host-setup.connect-host", "host-setup.screen"], ["Continue", "Connect"])).firstMatch.tap()
         XCTAssertTrue(continueAfterConnecting(app), "Connected")
 
-        // Juno, the everyday agent, opens first.
+        // Juno, the everyday agent (`default`), opens first.
+        try openAgent("default", in: app)
         try ask("Put this week's highlights on my Feed, and keep track of my goals.",
                 until: "two ideas waiting", in: app)
         try newChat(in: app)
@@ -74,13 +75,13 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
         revealCardTop("Lisbon packing list", in: app)
         save("02-packing", app)
 
-        // Bots mode's home on the same host, after the agents' chats above. The same app
+        // Bots on the same host, after the agents' chats above. The same app
         // (and run ID) relaunched, so it stays connected.
         app.terminate()
-        app.launchArguments += ["-bighelp.settings.simple-bots", "YES"]
+        app.launchArguments += ["-loopdy.home.landing", "bots"]
         app.launch()
         let home = app.descendants(matching: .any)["simple-bots.home"]
-        XCTAssertTrue(home.waitForExistence(timeout: 60), "Bots mode opens on its home")
+        XCTAssertTrue(home.waitForExistence(timeout: 60), "The app opens on Bots")
         for id in ["penny", "atlas"] {
             let bot = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@",
                 ["simple-bots.bot.\(id)", "simple-bots.pinned.\(id)"])).firstMatch
@@ -104,17 +105,12 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
         app.terminate()
         app.launchArguments.removeLast(2)
         app.launch()
-        // The home chat opens over the launch screen: let it settle before reaching for ☰.
-        sleep(4)
 
-        openMenu(in: app)
-        save("06-menu", app)
-        tapMenuRow("menu.kanban", in: app)
+        // Work › Tasks (Kanban) and Work › Schedules.
+        openWorkDoor("tasks", in: app)
         sleep(3)
         save("07-kanban", app)
-        goBack(app)
-        openMenu(in: app)
-        tapMenuRow("menu.scheduled-tasks", in: app)
+        openWorkDoor("schedules", in: app)
         sleep(3)
         save("09-scheduled", app)
     }
@@ -136,7 +132,6 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
             return false
         }
         let app = makeApp()
-        app.launchArguments = ["-loopdy.home.opens-chat", "YES"]
         if let zone = environment("BIGHELP_STORE_TZ") { app.launchEnvironment["TZ"] = zone }
         app.launch()
         return app
@@ -159,57 +154,27 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
         BighelpKeyboardDismissal.dismiss(in: app)
     }
 
+    /// New chat with Juno (`default`).
     @MainActor
     private func newChat(in app: XCUIApplication) throws {
-        let new = app.buttons.matching(NSPredicate(format: "identifier IN %@",
-            ["chat.new-chat", "chat.home.new-chat", "root.new-chat"])).firstMatch
-        XCTAssertTrue(new.waitForExistence(timeout: 10))
-        new.tap()
-        confirmNewChatPicker(in: app)
+        startNewChat(with: "default", in: app)
         sleep(2)
     }
 
+    /// Bots › the agent's row (in the list, pinned or the primary bot) opens its chat.
     @MainActor
     private func openAgent(_ id: String, in app: XCUIApplication) throws {
-        openMenu(in: app)
-        tapMenuRow("menu.agents", in: app)
-        let row = app.buttons["agent.\(id)"].firstMatch
+        showBots(in: app, timeout: 30)
+        let row = app.buttons.matching(NSPredicate(format: "identifier IN %@", [
+            "simple-bots.bot.\(id)", "simple-bots.pinned.\(id)", "simple-bots.primary.\(id)",
+        ])).firstMatch
         // A short screen (the Duo's cover) draws the rows below the fold once scrolled to.
-        let list = app.descendants(matching: .any)["agents.screen"].firstMatch
+        let list = app.descendants(matching: .any)["simple-bots.home"].firstMatch
         for _ in 0..<4 where !row.waitForExistence(timeout: 3) || !row.isHittable { list.swipeUp() }
-        XCTAssertTrue(row.waitForExistence(timeout: 15), "\(id) is in Agents")
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "\(id) is on Bots")
         row.tap()
         sleep(2)
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 20), "\(id)'s chat opens")
-    }
-
-    @MainActor
-    private func openMenu(in app: XCUIApplication) {
-        let menu = [app.buttons["home.drawer.open"].firstMatch, app.buttons["chat.menu"].firstMatch]
-        let deadline = Date().addingTimeInterval(15)
-        while Date() < deadline {
-            // A button that's in the tree but not laid out yet has no frame to hit-test.
-            if let button = menu.first(where: { $0.exists && $0.frame.minX.isFinite && !$0.frame.isEmpty && $0.isHittable }) {
-                button.tap()
-                break
-            }
-            // The board tabs have no ☰; it's on the chat tab and pushed screens.
-            let chatTab = app.buttons["tab.sessions"].firstMatch
-            if chatTab.exists, chatTab.isHittable { chatTab.tap() } else { goBack(app) }
-            sleep(1)
-        }
-        _ = app.descendants(matching: .any)["navigation.menu"].waitForExistence(timeout: 10)
-        sleep(1)
-    }
-
-    @MainActor
-    private func tapMenuRow(_ identifier: String, in app: XCUIApplication) {
-        let row = app.buttons[identifier].firstMatch
-        let list = app.descendants(matching: .any)["navigation.menu"].firstMatch
-        for _ in 0..<6 where !(row.exists && row.isHittable) { list.swipeUp() }
-        XCTAssertTrue(row.waitForExistence(timeout: 10), identifier)
-        row.tap()
-        sleep(2)
     }
 
     @MainActor
@@ -233,14 +198,15 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
         XCTAssertTrue(post.exists, "\(text) is on the page")
     }
 
-    /// The reply's card, reopening the chat from ☰ once if the card hasn't drawn.
+    /// The reply's card, reopening the chat from Chats once if the card hasn't drawn.
     @MainActor
     private func expectCard(_ title: String, chat: String, in app: XCUIApplication) throws {
         let card = app.staticTexts[title].firstMatch
         if card.waitForExistence(timeout: 10) { return }
-        openMenu(in: app)
-        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", chat)).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "\(chat) is in Recent chats")
+        showChats(in: app)
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+                                                   "chats.row.", chat)).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "\(chat) is in Chats")
         row.tap()
         XCTAssertTrue(card.waitForExistence(timeout: 20), "The \(title) card shows")
     }
@@ -272,16 +238,6 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
         from.press(forDuration: 0.1, thenDragTo: from.withOffset(CGVector(dx: 0, dy: below)),
                    withVelocity: .slow, thenHoldForDuration: 0.6)
         sleep(2)
-    }
-
-    @MainActor
-    private func goBack(_ app: XCUIApplication) {
-        // Chats have ☰, not Back: leave them with an edge swipe.
-        if app.buttons["chat.menu"].firstMatch.exists {
-            swipeBackFromLeadingEdge(in: app); sleep(1); return
-        }
-        let back = app.navigationBars.buttons.firstMatch
-        if back.exists, back.frame.minX.isFinite, !back.frame.isEmpty, back.isHittable { back.tap(); sleep(1) }
     }
 
     private func environment(_ name: String) -> String? {

@@ -95,7 +95,7 @@ final class FleetStore {
     var sections: [FleetSection] = []
     /// Which section each group chat is in, by its list ID. Kept on this device.
     var groupSectionIDs: [String: String] = [:]
-    /// Group chats pinned on Bots mode's home, and ones hidden from it, by list ID. Hermes keeps
+    /// Group chats pinned on the Bots view, and ones hidden from it, by list ID. Hermes keeps
     /// neither for group chats, so the app does (and the computers, `bots.layout`).
     var pinnedGroupIDs: [String] = []
     var hiddenGroupIDs: [String] = []
@@ -317,41 +317,6 @@ final class FleetStore {
         hosts.filter { hostID == nil || $0.id == hostID }
             .flatMap { snapshots[$0.id]?.chats ?? [] }
             .sorted { $0.updatedAt > $1.updatedAt }
-    }
-
-    /// The chats whose title or preview has the search text. An empty search keeps them all.
-    func chats(on hostID: UUID? = nil, matching query: String) -> [FleetChat] {
-        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return chats(on: hostID) }
-        return chats(on: hostID).filter {
-            $0.title.localizedCaseInsensitiveContains(query) || $0.preview.localizedCaseInsensitiveContains(query)
-        }
-    }
-
-    /// All sessions' list: the search and filters on top of one computer or all of them.
-    func chats(on hostID: UUID? = nil, matching query: String, filter: FleetChatsFilter) -> [FleetChat] {
-        chats(on: hostID, matching: query).filter { chat in
-            (filter.agentID.map { $0 == FleetID.make(chat.hostID, chat.profileID) } ?? true)
-                && (filter.origin.map { $0 == SessionOrigin.label(chat.origin) } ?? true)
-                && filter.app.includes(source: chat.origin)
-        }
-    }
-
-    /// Chats still in Codex or Claude Code on the computers read, newest first.
-    /// The selected computer's come from its live connection instead (Sessions).
-    func otherAppChats(on hostID: UUID? = nil, matching query: String = "",
-                       app: SessionAppFilter = .all) -> [FleetOtherAppChat] {
-        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        return hosts.filter { (hostID == nil || $0.id == hostID) && $0.id != selectedHostID }
-            .flatMap { snapshots[$0.id]?.otherAppChats ?? [] }
-            .filter { app.showsOtherAppChats && app.includes(source: $0.item.source) }
-            .filter { query.isEmpty || $0.item.title.localizedCaseInsensitiveContains(query) }
-            .sorted { ($0.item.modifiedAt ?? .distantPast) > ($1.item.modifiedAt ?? .distantPast) }
-    }
-
-    /// Where the listed chats started, by name, for All sessions' Started in filter.
-    func origins(on hostID: UUID? = nil) -> [String] {
-        Array(Set(chats(on: hostID).compactMap { SessionOrigin.label($0.origin) })).sorted()
     }
 
     /// Every scheduled task, the next to run first.

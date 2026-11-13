@@ -28,9 +28,13 @@ final class HermesGroupsHostUITests: BighelpUITestCase {
         app.launch()
         try connect(app)
 
-        // New group chat with both agents.
-        openRootTab("tab.agents", in: app, timeout: 30)
-        let create = app.buttons["agents.groups.create"]
+        // New group chat with both agents: Bots › + › New Group Chat.
+        showBots(in: app, timeout: 30)
+        let add = app.buttons["simple-bots.new"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 30))
+        add.tap()
+        let create = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@",
+                                                      "simple-bots.new.group", "New Group Chat")).firstMatch
         XCTAssertTrue(create.waitForExistence(timeout: 30), "Group chats are offered")
         create.tap()
         let title = app.textFields["bot-mode.create.title"]
@@ -98,17 +102,17 @@ final class HermesGroupsHostUITests: BighelpUITestCase {
             save("\(label)-6-recovered", app)
         }
 
-        // Delete the group.
-        swipeBackFromLeadingEdge(in: app)
-        openRootTab("tab.agents", in: app, timeout: 20)
+        // Delete the group: its row on Bots, held, › Delete Group Chat.
+        goBackFromChat(in: app)
+        showBots(in: app, timeout: 20)
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
-                                                   "agents.group.", "Paths \(label)")).firstMatch
+                                                   "simple-bots.group.", "Paths \(label)")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 20))
-        row.swipeLeft()
-        let delete = app.buttons["Delete"].firstMatch
+        row.press(forDuration: 1.2)
+        let delete = app.buttons["Delete Group Chat"].firstMatch
         XCTAssertTrue(delete.waitForExistence(timeout: 5))
         delete.tap()
-        let confirm = app.buttons["Delete group"].firstMatch
+        let confirm = app.buttons["simple-bots.group.delete.confirm"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         confirm.tap()
         XCTAssertTrue(row.waitForNonExistence(timeout: 30), "The group is gone")

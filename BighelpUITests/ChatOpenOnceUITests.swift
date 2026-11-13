@@ -7,10 +7,10 @@ final class ChatOpenOnceUITests: BighelpUITestCase {
     func testOpeningTheOpenChatAgainKeepsOneCopy() throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-bighelp.settings.simple-bots", "YES", "-start-chat"]
+                               "-loopdy.home.landing", "bots", "-start-chat"]
         app.launch()
         let back = app.buttons["chat.back"]
-        XCTAssertTrue(back.waitForExistence(timeout: 15), "Bots mode's chat has Back")
+        XCTAssertTrue(back.waitForExistence(timeout: 15), "The chat has Back")
 
         // The chat on screen, opened again from outside.
         let chat = URL(string: "loopdy://chat/demo-finance")!

@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// The stores that keep Bots mode's choices on this phone.
+/// The stores that keep the Bots view's choices on this phone.
 @MainActor
 struct BotsAppStateStores {
     let order: SimpleBotsOrderStore
@@ -55,7 +55,7 @@ struct BotsAppStateStores {
     }
 }
 
-/// Keeps Bots mode's choices (the order of the home, sections, the primary bot and each bot's
+/// Keeps the Bots view's choices (the order of the home, sections, the primary bot and each bot's
 /// voice, mark, pet and character) on the person's computers, and the newest of them on this phone.
 /// A change in any of those stores becomes patches (`BotsAppState` shapes) and goes to every
 /// computer reached; each sync reads them all and puts the newest on this phone. The stores stay

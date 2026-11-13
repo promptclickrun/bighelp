@@ -67,6 +67,11 @@ final class DeviceAccessHostUITests: BighelpUITestCase {
         sleep(3)
         save("sleep-1-device-access", app)
         closeSettings(in: app)
+        // Settings opens from the home, so the chat closed under it: it's the newest in Chats.
+        let chat = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "chats.row.")).firstMatch
+        XCTAssertTrue(chat.waitForExistence(timeout: 10), "The chat is in Chats")
+        chat.tap()
+        XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 20))
 
         send("How did I sleep this week?", in: app)
         let card = element("device-access.card.health", in: app)
@@ -126,19 +131,17 @@ final class DeviceAccessHostUITests: BighelpUITestCase {
         let app = makeApp()
         // Every data-sharing switch off for this run, and Apple Health's note not yet agreed to, whatever the
         // simulator saved before.
-        app.launchArguments = ["-loopdy.home.opens-chat", "YES", "-bighelp.device-tools.grants", "()",
+        app.launchArguments = ["-bighelp.device-tools.grants", "()",
                                "-bighelp.device-tools.health-sharing", "NO"]
         app.launch()
         let composer = app.textViews["chat.composer.text"]
-        if !composer.waitForExistence(timeout: 10) {
+        let newChat = app.buttons["home.new-chat"].firstMatch
+        if !newChat.waitForExistence(timeout: 10) {
             try onboardOpenHost(app, address: try XCTUnwrap(probe["address"]))
         }
-        XCTAssertTrue(composer.waitForExistence(timeout: 30), "The agent's chat opens")
-        let newChat = chatNewChatButton(in: app)
-        if newChat.waitForExistence(timeout: 5) {
-            newChat.tap()
-            confirmNewChatPicker(in: app)
-        }
+        XCTAssertTrue(newChat.waitForExistence(timeout: 30), "The home opens")
+        newChat.tap()
+        confirmNewChatPicker(in: app)
         XCTAssertTrue(composer.waitForExistence(timeout: 20))
         // A new chat has no session until its first message, and the phone opens the chat's channel only
         // then. A person's agent takes seconds to call a tool; the scripted one calls at once, so say hi first.

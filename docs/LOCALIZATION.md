@@ -9,37 +9,35 @@ not a claim that the whole app is translated.
 
 - First-run welcome, optional appearance controls, AI data consent, connection
   headings and sign-in controls, plugin introduction, notification introduction,
-  and mode selection.
-- Main bottom-bar labels, menu destinations, host-switcher controls, recent-chat
-  controls, and the equivalent Mac menu-bar tab names.
+  and how to start.
+- Main bottom-bar labels, host-switcher controls, recent-chat controls, and the
+  equivalent Mac menu-bar place names.
 - Core chat composer placeholders and accessibility labels, send/stop/voice
   controls, mid-turn send choices, and attachment/action-menu labels.
-- Top-level Settings rows, identity controls, experience switches, appearance
-  summary, assistant rows, and the Advanced options entry (Nerd Mode in code).
+- Top-level Settings rows, identity controls, appearance
+  summary, bot rows, and the Advanced options entry (the code name is Nerd Mode).
 
 The second stage (#527) adds:
 
-- Bots mode (Simple Bot mode before 2.6.11): the home (pinned bots, the list, search,
-  the + menu, a bot's long-press menu, Rearrange, the gateway filter), New Bot and its
+- The Bots view (the first tab's view, once called Bots mode): the home (pinned bots, the list, search,
+  the + menu, a bot's long-press menu, Rearrange, the computer filter), New Bot and its
   Templates sheet, New Group Chat, a bot's profile (Info, Computer, Files and Media tabs,
-  Instructions, Default Model, Routines), the voice bar, the opening loader, and its
-  Settings entry (the person's circle, which now opens the one Settings).
+  Instructions, Default Model, Routines), the voice bar, the opening loader, and the person's
+  circle, which opens the one Settings.
 - Teamwork: the line where agents talk to each other ("Asked …", "… answered",
   "N messages with …"), its sheet, the working and typing states, and the Teamwork
-  switch with its line. In Bots mode the switch says bots in sentences of its own.
-- The Settings pages these lead to: Experience, Assistants, Notifications (topics,
+  switch with its line. Where the Bots view reaches it, the switch says bots in sentences of its own.
+- The Settings pages these lead to: Models, Voice, Notifications (topics,
   "Bots messaging each other", channels, workflows, Quiet hours, test and turn-off),
-  Chat (with the Advanced options sections), and Appearance with Chat layout and App layout.
-- The modes after their 2.6.11 rename: Bots, Chat and Code, Settings › Modes (its picker and the
-  Header mode switcher), and the mode edge swipes.
+  Chat (with the Advanced options sections), and Appearance with Chat layout.
 - Needs you and a blueprint's chips in the message box.
 
 The Chinese text is an AI-assisted draft and remains `needs_review` in
 the catalog. It has not received professional or fluent-speaker approval. Screenshots
 and automated checks establish rendering and lookup, not linguistic certification.
 Keep `bighelp`, `Hermes`, provider/model names, and product names intact. Terminology:
-the modes are Bots = 机器人, Chat = 聊天 and Code = 代码 (Bots mode = 机器人模式,
-Code mode = 代码模式; the Chat mode was called Sessions before 2.6.11). A list of
+Bots = 机器人 and Chat = 聊天 (the first tab's two views; they were the modes Bots mode = 机器人模式
+and Chat mode, which was called Sessions before 2.6.11). A list of
 chats is still Sessions = 会话. Agents = 智能体, Feed = 动态, Ideas = 灵感,
 Goals = 目标, host/computer = 电脑, Teamwork = 团队协作, primary bot = 主机器人,
 gateway = 网关, template = 模板, routine = 例行任务, pin = 置顶, Quiet Hours = 勿扰时段,
@@ -50,7 +48,7 @@ channel = 渠道, Live Activities = 实时活动, Dynamic Island = 灵动岛.
 Use a SwiftUI localized literal where the API accepts one:
 
 ```swift
-Text("Choose your mode")
+Text("How do you want to start?")
 Button("Continue", action: next)
 ```
 
@@ -84,7 +82,7 @@ existing "A, B and C" without a serial comma.
 A word swap can't be translated. When one screen says bots where another says
 agents, give it whole sentences of its own (Teamwork's `detail(saysBots:)`).
 When the same English means two things, give one of them its own key and keep the
-English with `defaultValue:` (the Bots mode + button's "New" is not the unread
+English with `defaultValue:` (the Bots view's + button's "New" is not the unread
 badge's "New").
 
 ## Catalog and build workflow
@@ -134,9 +132,9 @@ Notifications › Advanced › Provider details and the notification setup's sta
 and error messages, catalog template text, and chat tool phrases (so a running
 agent-talk line reads "Nova：searching the web…"). The notification service names
 its topics in English; every language, English too, shows the app's own words for
-those topics (Replies, Questions and approvals, Helper results). Onboarding mode-preview images still contain English
-demo text; localize those assets in a later screenshot pass. A translated menu
-entry does not imply its entire destination is translated.
+those topics (Replies, Questions and approvals, Helper results). The one home's own screens (the Chats view,
+Today, Work, New chat's To row and choices, spaces) are English until their copy is added to the catalog. A translated
+menu entry does not imply its entire destination is translated.
 
 Watch, widgets, Live Activities, notification extension copy, Shortcuts, CarPlay,
 spatial-only controls, privacy usage descriptions in Info.plist, and App Store

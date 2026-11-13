@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-// A bot's Dashboard (the first tab of its profile in Bots mode): Feed, Ideas and Goals as piles of
+// A bot's Dashboard (the first tab of its page): Feed, Ideas and Goals as piles of
 // the boards' color blocks. Swipe the top card right to act on it, left to put it away; Undo shows
 // after each swipe. Touch and hold (right-click on the Mac) has the card's usual menu, and VoiceOver
 // has both swipes as actions, so swiping is never the only way. Rules: `BoardDashboard.swift`.
@@ -410,8 +410,7 @@ struct BoardDashboardView: View {
             onAsk: { text in after { context.onAsk(text) } },
             onSend: { text in after { context.onSend(text) } },
             onBlueprint: { text in after { context.onBlueprint(text) } },
-            onMenu: {}, onNewChat: { after { context.onNewChat() } }, onPickAgents: {},
-            tools: [], onBack: { model.sheet = nil })
+            onNewChat: { after { context.onNewChat() } }, onBack: { model.sheet = nil })
     }
 }
 

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// ☰ › Usage: plans and limits, then what the agents used. Cost or tokens over
+/// Usage: plans and limits, then what the agents used. Cost or tokens over
 /// 7, 30 or 90 days, totals, when you use it, and the models, agents and (with
 /// All hosts) computers behind it. Tap a bar for its day, a row to chart it.
 struct UsageView: View {

@@ -10,6 +10,7 @@ final class AgentAppearanceUITests: BighelpUITestCase {
         expectAppearance(mode: "Dark", color: "rose", in: app)
         capture("agent-appearance-studio-dark-rose", in: app)
         closeSettings(in: app)
+        openDemoChat(in: app)
         capture("agent-appearance-chat-dark-rose", in: app)
     }
 
@@ -20,6 +21,7 @@ final class AgentAppearanceUITests: BighelpUITestCase {
         expectAppearance(mode: "Light", color: "ocean", in: app)
         capture("agent-appearance-studio-light-ocean", in: app)
         closeSettings(in: app)
+        openDemoChat(in: app)
         capture("agent-appearance-chat-light-ocean", in: app)
     }
 
@@ -77,13 +79,14 @@ final class AgentAppearanceUITests: BighelpUITestCase {
 
     @MainActor
     private func openDemoChat(in app: XCUIApplication) {
-        let chat = app.buttons["session.row.demo-finance"].firstMatch
+        let chat = chatRow("demo-finance", in: app)
         XCTAssertTrue(chat.waitForExistence(timeout: 15))
         chat.tap()
-        XCTAssertTrue(app.buttons["chat.menu"].firstMatch.waitForExistence(timeout: 10), "The chat opened")
+        XCTAssertTrue(app.buttons["chat.back"].firstMatch.waitForExistence(timeout: 10), "The chat opened")
     }
 
-    /// Settings › Appearance shows the agent's change like one made there.
+    /// Settings › Appearance shows the agent's change like one made there. Settings opens from the
+    /// home, so this leaves the chat.
     @MainActor
     private func expectAppearance(mode: String, color: String, in app: XCUIApplication,
                                   file: StaticString = #filePath, line: UInt = #line) {

@@ -183,8 +183,7 @@ chat_stress_args=(
   -destination "platform=iOS Simulator,id=$CHAT_SIMULATOR_ID"
   -derivedDataPath "$CHAT_DERIVED_DATA" -parallel-testing-enabled NO
   -only-testing:BighelpTests/ChatTimelineRenderPartitionTests
-  -only-testing:BighelpUITests/ChatStreamingAnchorUITests/testExpandedLongToolStreamKeepsMainThreadResponsive
-  -only-testing:BighelpUITests/ChatStreamingAnchorUITests/testLongToolStreamKeepsMainThreadResponsive
+  -only-testing:BighelpUITests/ChatStreamingAnchorUITests/testConsecutiveLargeToolsKeepMainThreadResponsive
   -only-testing:BighelpUITests/ChatStreamingAnchorUITests/testShortToolStreamKeepsMainThreadResponsive
 )
 xcodebuild build-for-testing "${chat_stress_args[@]}" && \
@@ -291,6 +290,14 @@ The app can run without production services:
 
 Additional launch arguments used by UI tests can select an initial screen. Keep
 fixture content synthetic and never copy production data into tests.
+
+- `-loopdy.home.landing bots|chats|today|work` sets where the app opens, and `-bighelp.home.view bots|chats` sets the
+  first tab's view when it is today or work. Demo runs also take `-initial-tab` with a place's name.
+- `-bighelp.home.migrated-v1 YES` skips the one-time read of the older mode settings (`NO` runs it at every launch).
+- `-bighelp.hosts.all-hosts YES|NO` sets Show every computer.
+- DEBUG builds with `-use-demo-fixtures` show one new screen alone on made-up data: `-test-home-chrome`,
+  `-test-chats-inbox`, `-test-new-chat`, `-test-today-home`, `-test-work-screen` (add `-test-work-project` for a
+  project's page), `-test-spaces-today`, and `-test-spaces` for a chat with a space draft.
 
 ## Runtime configuration
 
@@ -482,7 +489,7 @@ in portrait/landscape/accessibility sizes, Hosts and long-press instance switchi
 from immediate selection. Preserve the chat performance gate alongside this work.
 
 
-## Draft, account recovery and drawer regression checks
+## Draft, account recovery and sidebar regression checks
 
 For composer ownership or account recovery changes, run these actual suites:
 `ReferenceDeliveryAcceptanceTests`, `ReferenceNativeEditorAcceptanceTests`,
@@ -505,9 +512,10 @@ Native row alongside an existing phone and Hermes host. Verify that v1 returns
 its supported kinds and that all persisted rows, grants and schema are unchanged.
 Do not fix this by revoking devices, changing keys or coercing Native to Hermes.
 
-For drawer changes, run `BighelpMenuUITests` and look at the drawer on screen, light and
-dark, checking hit targets as well as layout. Keep navigation before the bounded pinned-agent preview and sessions;
-verify the full Agents route remains reachable with more pins than the preview.
+For changes to the home shell or the sidebar, run `HomeShellUITests` (the places, the header, a pushed chat, New chat,
+Today and Work) and look at the sidebar on screen on iPad, light and dark, checking hit targets as well as layout.
+Keep the three places before the bounded list of recent chats; verify See all still reaches every chat with more
+chats than the sidebar lists.
 
 For scheduler compatibility, run the bighelp plugin contract, workspace-control
 and portability suites with the installed Hermes source on `PYTHONPATH`, followed

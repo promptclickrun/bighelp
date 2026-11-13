@@ -8,12 +8,6 @@ struct LiquidOrbPresentationTests {
         #expect(VoiceViewPresentation.controlMinimumHeight == 64)
     }
 
-    @Test func agentRowsGiveLongRoleAndSummaryCopyRoomToWrap() {
-        #expect(AgentRowPresentation.roleLineLimit == 2)
-        #expect(AgentRowPresentation.summaryLineLimit == 2)
-        #expect(AgentRowPresentation.textColumnCanShrink)
-    }
-
     @Test func voiceStatusesMapToTheirPurposeBuiltThinkingOrbAnimations() {
         #expect(VoiceOrbPresentation.scenario(for: .listening) == .listening)
         #expect(VoiceOrbPresentation.scenario(for: .working) == .reasoning)

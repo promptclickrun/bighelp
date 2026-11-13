@@ -24,8 +24,6 @@ struct ChatDestinationView: View {
     @State private var isHapticsSurfaceVisible = false
     @State private var projectChanges: ProjectChangesStore
     @State var voicePresentation: VoicePresentation?
-    /// Bots mode's voice: a bar over the chat instead of the voice screen.
-    @State var voiceBar: VoicePresentation?
     @State var attachmentFlow = ChatAttachmentFlowState()
     @State var isPhotoPickerPresented = false
     @State var isFilePickerPresented = false
@@ -37,8 +35,6 @@ struct ChatDestinationView: View {
     @State var photoSelections: [PhotosPickerItem] = []
     @State var attachmentErrorMessage: String?
     @State var attachmentRecoveryKind: PermissionKind?
-    /// ☰ from the voice screen: the menu opens once voice has closed.
-    @State private var opensMenuAfterVoice = false
     @State private var modelPickerRequest = 0
     @State private var isProjectChangesPresented = false
     @State private var projectChangesPanelWidth: CGFloat = ProjectChangesPanelWidthPolicy.minimum
@@ -49,7 +45,6 @@ struct ChatDestinationView: View {
     let featureStore: ShellFeatureStore
     let catalog: SessionCatalogStore
     let agents: AgentDirectoryStore
-    let agentEditorPresentation: ChatAgentEditorPresentation?
     let botModeRooms: BotModeRoomStore
     let skillsAndTools: SkillsAndToolsStore
     let hermesWorkspaces: HermesWorkspaceStore
@@ -57,7 +52,6 @@ struct ChatDestinationView: View {
     let projectMove: ChatProjectMove?
     let userIdentity: UserIdentityStore
     let permissionCenter: PermissionCenter
-    let selectedTab: AppTab?
     let responseHapticsCoveredByRoot: Bool
     let appearanceAuthority: WorkspaceAuthority?
     let headerActions: ChatHeaderActions
@@ -72,11 +66,14 @@ struct ChatDestinationView: View {
     let onOpenAgentSessions: (String) -> Void
     let onOpenApproval: (ApprovalRequest) -> Void
     let onForkMessage: ((String) -> Void)?
-    /// Code mode sessions: Markdown paths in messages open the viewer.
+    /// Coding sessions: Markdown paths in messages open the viewer.
     let hostFiles: HostFileLinkContext?
     /// ••• › Files: the chat's working folder on the computer. Asked for when Files opens, so it
     /// reads the connection there is then; nil (a group chat) lists the chat's own attachments.
     let chatFolders: (() -> ChatFolderContext?)?
+    /// One home: New chat's parts, for its blank chat only. The shell decides that from the chat's
+    /// id; this view only hands them on, and never reads the chat's messages to decide.
+    let newChat: ChatNewChatSlot?
 
     private var nativeSessionControls: NativeSessionControlsPresentation? {
         guard let native = model.nativeConversationClient else { return nil }
@@ -107,7 +104,6 @@ struct ChatDestinationView: View {
         featureStore: ShellFeatureStore,
         catalog: SessionCatalogStore,
         agents: AgentDirectoryStore,
-        agentEditorPresentation: ChatAgentEditorPresentation?,
         botModeRooms: BotModeRoomStore,
         skillsAndTools: SkillsAndToolsStore,
         hermesWorkspaces: HermesWorkspaceStore,
@@ -115,7 +111,6 @@ struct ChatDestinationView: View {
         projectGitClient: any ProjectGitClient,
         userIdentity: UserIdentityStore,
         permissionCenter: PermissionCenter,
-        selectedTab: AppTab?,
         responseHapticsCoveredByRoot: Bool,
         onNewChat: @escaping () -> Void,
         onOpenProviderAccounts: @escaping () -> Void,
@@ -128,7 +123,8 @@ struct ChatDestinationView: View {
         onForkMessage: ((String) -> Void)?,
         appearanceAuthority: WorkspaceAuthority? = nil,
         hostFiles: HostFileLinkContext? = nil,
-        chatFolders: (() -> ChatFolderContext?)? = nil
+        chatFolders: (() -> ChatFolderContext?)? = nil,
+        newChat: ChatNewChatSlot? = nil
     ) {
         self.model = model
         self.appState = appState
@@ -136,7 +132,6 @@ struct ChatDestinationView: View {
         self.featureStore = featureStore
         self.catalog = catalog
         self.agents = agents
-        self.agentEditorPresentation = agentEditorPresentation
         self.botModeRooms = botModeRooms
         self.skillsAndTools = skillsAndTools
         self.hermesWorkspaces = hermesWorkspaces
@@ -144,11 +139,11 @@ struct ChatDestinationView: View {
         _projectChanges = State(initialValue: ProjectChangesStore(client: projectGitClient))
         self.userIdentity = userIdentity
         self.permissionCenter = permissionCenter
-        self.selectedTab = selectedTab
         self.responseHapticsCoveredByRoot = responseHapticsCoveredByRoot
         self.appearanceAuthority = appearanceAuthority
         self.hostFiles = hostFiles
         self.chatFolders = chatFolders
+        self.newChat = newChat
         self.headerActions = ChatHeaderActions(newChat: onNewChat)
         self.onNewChat = onNewChat
         self.onOpenProviderAccounts = onOpenProviderAccounts
@@ -172,7 +167,7 @@ struct ChatDestinationView: View {
             .accessibilityIdentifier("chat.canvas")
             .background {
                 ChatReplyReading(model: model, reader: replyReader,
-                                 isOn: settings.autoSpeakRepliesEnabled && voicePresentation == nil && voiceBar == nil,
+                                 isOn: settings.autoSpeakRepliesEnabled && voicePresentation == nil,
                                  rate: settings.voiceSpeed.hermesTTSSpeed,
                                  makeOutput: { featureStore.makeReplySpeech(for: model.conversationID) })
             }
@@ -281,20 +276,13 @@ struct ChatDestinationView: View {
         )
     }
 
-    /// Opens voice here, in the bar over a Bots mode chat when `inBar`. Live voice needs the chat's
-    /// session on the computer, and a chat that opened a moment ago (a cold Start voice chat, a tap
-    /// right after opening) is still getting it. Voice waits for it under the starting cover; it
-    /// once asked at once and showed "This chat is still opening" a second before it could start.
-    func openVoice(inBar: Bool = false) async {
+    /// Opens voice here. Live voice needs the chat's session on the computer, and a chat that opened a
+    /// moment ago (a cold Start voice chat, a tap right after opening) is still getting it. Voice
+    /// waits for it under the starting cover; it once asked at once and showed "This chat is still
+    /// opening" a second before it could start.
+    func openVoice() async {
         guard await waitForChatBeforeLiveVoice() else { return }
-        let presentation = makeVoice(agentVoice.mode)
-        if inBar {
-            withAnimation(.snappy(duration: 0.25)) { voiceBar = presentation }
-            // The cover's own end follows the full-screen voice; the bar ends it here.
-            VoiceLaunchState.shared.finish()
-        } else {
-            voicePresentation = presentation
-        }
+        voicePresentation = makeVoice(agentVoice.mode)
     }
 
     /// False when the wait was cancelled (the person moved on), so nothing opens.
@@ -314,30 +302,6 @@ struct ChatDestinationView: View {
             return false
         }
         return true
-    }
-
-    /// The voice bar over a Bots mode chat, under its header.
-    @ViewBuilder
-    private var voiceBarOverlay: some View {
-        if let voiceBar, let agentID = model.memberIDs.first {
-            let profile = agents.profiles.first { $0.id == agentID }
-            SimpleBotVoiceBar(
-                presentation: voiceBar, agentID: agentID, agentName: profile?.name ?? "Your bot",
-                imageURL: profile.flatMap { agents.avatarURL(for: $0) }, permissionCenter: permissionCenter,
-                onSwitchMode: { mode in
-                    // The bar is over one bot's chat: the switch is that bot's own choice.
-                    settings.setVoiceConversationMode(mode, computer: voiceComputer, agentID: voiceAgentID)
-                    self.voiceBar = makeVoice(mode)
-                },
-                onEnded: { withAnimation(.snappy(duration: 0.25)) { self.voiceBar = nil } }
-            )
-            .id(voiceBar.id)
-            .onChange(of: model.isSending, initial: true) { _, active in
-                voiceBar.model.reconcileAgentRun(isActive: active)
-            }
-            .padding(.top, 72)
-            .transition(.move(edge: .top).combined(with: .opacity))
-        }
     }
 
     /// Live voice couldn't start: remember turn-based voice (listens on the
@@ -369,7 +333,6 @@ struct ChatDestinationView: View {
             agentRole: identity?.role ?? "Hermes agent",
             agentStatus: model.nativeConversationClient == nil ? "Hermes" : "Direct Hermes",
             agents: agents,
-            agentEditorPresentation: agentEditorPresentation,
             dashboardModel: featureStore.dashboardModel,
             sessionCatalog: catalog,
             senderResolver: TimelineSenderResolver(userIdentity: userIdentity, agents: agents),
@@ -384,10 +347,7 @@ struct ChatDestinationView: View {
                     isProjectChangesPresented = true
                 }
             },
-            onVoiceTap: {
-                let inBar = homeChrome.isSimpleBots && model.memberIDs.count == 1
-                Task { @MainActor in await openVoice(inBar: inBar) }
-            },
+            onVoiceTap: { Task { @MainActor in await openVoice() } },
             onApprovalTap: onOpenApproval,
             onPeopleTap: { isPeopleAndChatPresented = true },
             onGroupSettingsTap: model.botModeRoomID == nil ? nil : {
@@ -412,7 +372,8 @@ struct ChatDestinationView: View {
             onReferenceSend: sendReferences.action,
             foldCompletedTurns: settings.foldCompletedTurns,
             workStyle: settings.chatWorkStyle,
-            onForceRefresh: forceRefreshAction
+            onForceRefresh: forceRefreshAction,
+            newChat: newChat
         )
         }
     }
@@ -457,8 +418,6 @@ struct ChatDestinationView: View {
                 }
             }
         }
-        // Over the edge-swipe strips, so they never take a tap meant for the bar.
-        .overlay(alignment: .top) { voiceBarOverlay }
         .overlay(alignment: .trailing) {
             if horizontalSizeClass == .regular, isProjectChangesPresented {
                 GeometryReader { geometry in
@@ -587,11 +546,7 @@ struct ChatDestinationView: View {
         .onChange(of: voicePresentation != nil) { _, isPresented in
             if isPresented { VoiceLaunchState.shared.finish() }
         }
-        .bighelpFullScreenCover(item: $voicePresentation, onDismiss: {
-            guard opensMenuAfterVoice else { return }
-            opensMenuAfterVoice = false
-            homeChrome.onMenu()
-        }) { presentation in
+        .bighelpFullScreenCover(item: $voicePresentation) { presentation in
             VoicePresentationContainer(
                 presentation: presentation,
                 agentID: model.memberIDs.first,
@@ -600,7 +555,6 @@ struct ChatDestinationView: View {
                     .flatMap { agents.avatarURL(for: $0) },
                 permissionCenter: permissionCenter,
                 onEnded: { voicePresentation = nil },
-                onWorkspaceTap: openMenuFromVoice,
                 onUseTurnBased: useTurnBasedVoice,
                 onTryAgain: tryLiveVoiceAgain,
                 chatActivity: { [model] in model.liveActivityKind },
@@ -878,9 +832,7 @@ struct ChatDestinationView: View {
         side: ChatEdgeSide,
         containerWidth: CGFloat
     ) -> some View {
-        let action = side == .left
-            ? settings.effectiveLeftEdgeSwipeAction
-            : settings.effectiveRightEdgeSwipeAction
+        let action = side == .left ? settings.leftEdgeSwipeAction : settings.rightEdgeSwipeAction
         Color.clear
             .frame(width: WorkspaceEdgeSwipeResolver.activationEdgeWidth)
             .contentShape(Rectangle())
@@ -900,8 +852,8 @@ struct ChatDestinationView: View {
                             ),
                             translation: value.translation,
                             containerWidth: containerWidth,
-                            leftAction: settings.effectiveLeftEdgeSwipeAction,
-                            rightAction: settings.effectiveRightEdgeSwipeAction
+                            leftAction: settings.leftEdgeSwipeAction,
+                            rightAction: settings.rightEdgeSwipeAction
                         ) else { return }
                         performChatEdgeAction(resolved)
                     }
@@ -912,12 +864,6 @@ struct ChatDestinationView: View {
     private func performChatEdgeAction(_ action: WorkspaceSwipeAction) {
         BighelpKeyboard.dismiss()
         onEdgeAction(action)
-    }
-
-    /// ☰ on the voice screen: the one menu, once voice has closed.
-    private func openMenuFromVoice() {
-        opensMenuAfterVoice = true
-        voicePresentation = nil
     }
 
     private var identity: ChatDestinationAgentIdentity? {
@@ -968,7 +914,6 @@ struct ChatDestinationView: View {
     @Environment(\.reflectiveVisionEnabled) var reflectiveVisionEnabled
     @Environment(\.reflectiveVisionCamera) var reflectiveVisionCamera
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.agentHomeChrome) private var homeChrome
 
     private func armAttentionAutoOpen() {
         attentionAutoOpenUntil = .now.addingTimeInterval(8)

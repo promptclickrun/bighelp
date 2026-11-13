@@ -1,52 +1,32 @@
 import SwiftUI
 
-// Bots mode (Settings › Bots mode): its home in place of the Chat
-// tab, its short Settings, bot profiles, and how its chats look.
+// The Bots view of the first tab, the bot page, and the loader that covers a chat while it opens.
 extension RootShellView {
-    /// Bots mode wins over the all-hosts view and Opens on (`fleetModeOn`).
-    var simpleBotsOn: Bool { settings.simpleBotsEnabled }
-
-    /// The home is the tab's root, whatever is pushed over it: no bar, no ☰; the person's circle opens Settings.
-    var simpleBotsHomeIsRoot: Bool {
-        simpleBotsOn && appState.selectedTab == .sessions
-    }
-
-    var simpleBotsHome: some View {
-        SimpleBotsHomeView(context: simpleBotsContext)
-    }
-
-    /// Multi-gateway while the gateway of a tapped bot connects: the home, from every gateway's copy,
-    /// under the opening loader. What was tapped opens once it's connected (`openPendingFleetIfReady`).
-    func simpleBotsSwitching(to hostID: UUID) -> some View {
-        simpleBotsHome
-    }
-
-    /// Multi-gateway: a bot on another gateway opens once that gateway is connected and its chats
+    /// Every computer shown: a bot on another gateway opens once that gateway is connected and its chats
     /// are loaded, often a few seconds. The Noodle loader covers the whole wait, from the tap to
     /// the chat, so the screen never looks stuck; Cancel goes back to where the tap came from.
     @ViewBuilder var simpleBotsOpeningLoader: some View {
         #if DEBUG
         // Demo hosts can't be switched to; this shows the loader for screenshots.
-        if settings.simpleBotsEnabled, ProcessInfo.processInfo.arguments.contains("-test-simple-bots-opening") {
+        if ProcessInfo.processInfo.arguments.contains("-test-simple-bots-opening") {
             SimpleBotsOpeningOverlay(botName: "Mina Shah", gatewayName: "Studio Mac", onCancel: {})
         }
         #endif
-        if simpleBotsMultiGatewayOn, let fleet, let pending = fleet.pendingOpen {
+        if showsEveryHost, let fleet, let pending = fleet.pendingOpen {
             SimpleBotsOpeningOverlay(
                 botName: pending.profileID.flatMap { fleet.agent(hostID: pending.hostID, profileID: $0)?.name },
                 gatewayName: fleet.hostName(pending.hostID),
                 onCancel: cancelPendingFleetOpen)
             .transition(.opacity)
-        } else if simpleBotsOn {
+        } else {
             SimpleBotsChatOpeningLayer(opening: simpleBotsChatOpening,
                                        readiness: { simpleBotsChatOpeningReadiness },
                                        onCancel: cancelSimpleBotsChatOpening)
         }
     }
 
-    /// Bots mode: a chat opening from a list, a search, a profile or a link. Nil outside it.
-    func beginSimpleBotsChatOpening(_ session: SessionSummary) -> UUID? {
-        guard simpleBotsOn else { return nil }
+    /// A chat opening from a list, a search, a bot page or a link.
+    func beginSimpleBotsChatOpening(_ session: SessionSummary) -> UUID {
         let agentID = session.kind == .direct && session.agentIDs.count == 1 ? session.agentIDs[0] : nil
         let name = agentID.flatMap { id in agents.profiles.first { $0.id == id }?.name } ?? session.title
         return simpleBotsChatOpening.begin(agentID: agentID, name: name, originPath: appState.path,
@@ -103,24 +83,19 @@ extension RootShellView {
             personName: userIdentity.identity.displayName, personImageURL: userIdentity.avatarURL(),
             scope: owner?.cacheScopeID ?? "local",
             canCreateBots: usesWorkspaceFixtures || supports(.profilesCreate),
-            onOpenBot: { openSimpleBotChat($0) },
-            onOpenSession: { summary in
-                appState.chatOpenedFromList = true
-                openSession(summary)
-            },
+            onOpenBot: { openAgentChat($0) },
+            onOpenSession: { openSession($0) },
             onOpenSettings: { isUnifiedSettingsPresented = true },
             onOpenProfile: { appState.open(.simpleBotProfile(agentID: $0)) },
-            onNewChat: { agentID in
-                appState.chatOpenedFromList = true
-                startNewChat(explicitAgentID: agentID)
-            },
+            onNewChat: { startNewChat(explicitAgentID: $0) },
             makeCreator: { makeSimpleBotCreator() },
             gateways: simpleBotsGateways,
             activity: botChatActivity,
             activitySource: botChatActivitySource,
-            modeSwitch: modeSwitch,
+            viewSwitch: homeViewSwitch,
+            onToggleSidebar: sidebarIsAvailable ? { isHomeDrawerPresented.toggle() } : nil,
             fleet: fleet,
-            onNewGroupChat: newGroupChatAction.map { action in { appState.chatOpenedFromList = true; action() } },
+            onNewGroupChat: newGroupChatAction,
             onGroupSettings: { roomID in
                 guard let owner else { return }
                 handleAgentWorkspaceAction(.init(owner: owner, action: .openGroupSettings(roomID: roomID)))
@@ -134,22 +109,21 @@ extension RootShellView {
             rooms: botModeRooms.catalogRooms,
             onOpenGroup: { roomID in
                 guard let owner else { return }
-                appState.chatOpenedFromList = true
                 handleAgentWorkspaceAction(.init(owner: owner, action: .openGroup(roomID: roomID)))
             }
         )
     }
 
-    /// New Group Chat's Section row in Bots mode: the group chat goes in the picked section once it's made.
+    /// New Group Chat's Section row: the group chat goes in the picked section once it's made.
     var groupSectionChoice: BotModeCreateSectionChoice? {
-        guard simpleBotsOn, let fleet, let hostID = fleet.selectedHostID, !fleet.sections.isEmpty else { return nil }
+        guard let fleet, let hostID = fleet.selectedHostID, !fleet.sections.isEmpty else { return nil }
         return BotModeCreateSectionChoice(sections: fleet.sections) { roomID, sectionID in
             fleet.file(groupKey: FleetID.make(hostID, "group/" + roomID), in: sectionID)
         }
     }
 
     /// Where the bots' working states come from: the gateway in use's plugin route, else what stock
-    /// Hermes tells the app of its Bot Chats; with Multi-gateway, also the other gateways' fresh
+    /// Hermes tells the app of its Bot Chats; with every computer shown, also the other gateways' fresh
     /// all-hosts copies. The closures hold only stores, so each tick reads what's current.
     var botChatActivitySource: BotChatActivitySource {
         let agents = agents, catalog = sessionCatalog, connections = workspaceConnections
@@ -179,20 +153,20 @@ extension RootShellView {
                              fallback: { BotChatActivitySignals.botChats(catalog.records) })
             },
             others: {
-                guard settings.simpleBotsEnabled, settings.simpleBotsMultiGateway, let fleet else { return [:] }
+                guard settings.showsEveryComputer, let fleet else { return [:] }
                 return BotChatActivitySignals.fleet(fleet.snapshots, now: Date())
             },
             refreshOthers: {
-                guard settings.simpleBotsEnabled, settings.simpleBotsMultiGateway else { return }
+                guard settings.showsEveryComputer else { return }
                 fleet?.refresh()
             })
     }
 
-    /// Multi-gateway: every gateway's bots. The one in use is live, or its all-hosts copy until its agents
+    /// Show every computer: every computer's bots. The one in use is live, or its all-hosts copy until its agents
     /// are known (the home stays on screen while it connects); the others come from their copies, which
     /// stay current because those gateways stay connected (`keepsFleetHostsConnected`).
-    private var simpleBotsGateways: SimpleBotsGateways? {
-        guard simpleBotsMultiGatewayOn, let fleet else { return nil }
+    var simpleBotsGateways: SimpleBotsGateways? {
+        guard showsEveryHost, let fleet else { return nil }
         let selected = fleet.selectedHostID
         let liveKnown = nativeRuntime != nil && agents.knowsProfiles
         var bots: [SimpleBotsBot] = [], latest: [String: SimpleBotsLatest] = [:], pinned: [String] = []
@@ -236,7 +210,7 @@ extension RootShellView {
             ?? shown.first { $0.hostID == selected && $0.isDefault }?.id ?? shown.first(where: \.isDefault)?.id
         return SimpleBotsGateways(
             selectedHostID: selected, bots: bots, latest: latest, pinnedIDs: pinned, primaryID: primaryID,
-            filter: settings.simpleBotsGatewayFilter ? fleet.hosts : nil,
+            filter: fleet.hosts.count > 1 ? fleet.hosts : nil,
             open: { open, hostID in openFleet(open, on: hostID) },
             setPinned: { bot, pin in
                 if bot.profile != nil, bot.hostID == fleet.selectedHostID {
@@ -265,37 +239,21 @@ extension RootShellView {
             groups: groups)
     }
 
-    /// The edge swipes in Bots mode (`effectiveLeftEdgeSwipeAction`): from the left back to your
-    /// bots, from the right this bot's profile (the primary bot's on the home). False for anything else.
-    func performSimpleBotsSwipe(_ action: WorkspaceSwipeAction) -> Bool {
-        switch action {
-        case .agents:
-            appState.select(.sessions)
-            appState.path.removeAll()
-            return true
-        case .profile:
-            let chatBot: String? = if case .chat(let id)? = appState.path.last {
-                featureStore.preparedChatModel(id: id)?.memberIDs.first
-            } else { nil }
-            guard let botID = chatBot ?? agents.primaryAgentID ?? agents.profiles.first(where: \.isDefault)?.id
-            else { return true }
-            if case .simpleBotProfile(let shown, _)? = appState.path.last, shown == botID { return true }
-            appState.open(.simpleBotProfile(agentID: botID))
-            return true
-        default:
-            return false
+    /// The bot's page over its chat, from its name in the chat's header or ⋯ › Bot page. It is pushed
+    /// one turn of the run loop after the tap: pushed inside the tap's own update, the navigation
+    /// stack sometimes kept the new path and showed nothing (the page never drew; about one tap in
+    /// three in `HomeShellUITests`).
+    func openBotPage(fromChat agentID: String) {
+        DispatchQueue.main.async { [appState] in
+            if case .simpleBotProfile(agentID, _)? = appState.path.last { return }
+            appState.open(.simpleBotProfile(agentID: agentID))
         }
     }
 
-    /// A bot's chat over the home, with Back: its Bot Chat, like everywhere else.
+    /// A bot's own Bot Chat, pushed with Back, whatever Settings › Chat › A bot opens says: what a
+    /// Dashboard's Ask, Needs you and Work's background row lead to.
     func openSimpleBotChat(_ agentID: String) {
-        openCanonicalAgentChat(agentID, fromList: true)
-    }
-
-    /// Its scheduled tasks as a page with Back, not the Tasks tab Bots mode doesn't show.
-    func openSimpleBotRoutines(_ agentID: String) {
-        guard featureStore.prepareScheduledTasks(filteredTo: agentID) else { return }
-        appState.open(.scheduledTasks)
+        openCanonicalAgentChat(agentID)
     }
 
     /// A new bot, made the way New agent makes one: a copy of the default bot's setup where the host can.
@@ -320,19 +278,21 @@ extension RootShellView {
         let canEdit = usesWorkspaceFixtures
             || (owner.map { currentWorkspaceCapabilities.supports(.profilesEdit, owner: $0, profileID: agentID) } ?? false)
         let agent = agents.profiles.first { $0.id == agentID }
+        let capabilities = currentWorkspaceCapabilities
+        let editReason: String? = canEdit ? nil : owner.map {
+            AgentActionsPresentation.unavailableMessage(
+                capabilities.availability(for: .profilesEdit, owner: $0, profileID: agentID))
+                ?? WorkspaceUnavailableReason.unsupportedOperation.message
+        } ?? WorkspaceUnavailableReason.notConnected.message
+        let canDuplicate = workspaceConnections?.cloneClient != nil
+            && owner.map { capabilities.supports(.profilesClone, owner: $0, profileID: agentID) } == true
         return SimpleBotProfileContext(
             agents: agents, scheduledTasks: featureStore.scheduledTasks,
             screenService: makeBotScreenService(), screenChats: agent.map(botScreenChats(for:)) ?? [],
             canEdit: canEdit,
             onOpenChat: { openSimpleBotChat($0) },
             onOpenRoutine: { openScheduledTask($0) },
-            onEditDetails: { profile in
-                // The demo has no computer, and its editor opens all the same.
-                guard owner != nil || usesWorkspaceFixtures else { return }
-                let signIn = owner?.signIn
-                workspaceProfileEditor = .editing(profile, store: agents, processor: AvatarImageProcessor(),
-                                                  isCurrent: { currentWorkspaceOwner?.signIn == signIn })
-            },
+
             makeModelDefaults: { id in
                 let capabilities = currentWorkspaceCapabilities
                 guard usesWorkspaceFixtures || owner.map({
@@ -359,7 +319,28 @@ extension RootShellView {
                 configureShellBoard: { await configureAgentBoard($0) },
                 onAsk: { id, text in askSimpleBot(id, text, fillsBlanks: false) },
                 onSend: { id, text in askSimpleBot(id, text, fillsBlanks: false, sendsAtOnce: true) },
-                onBlueprint: { id, text in askSimpleBot(id, text, fillsBlanks: true) })
+                onBlueprint: { id, text in askSimpleBot(id, text, fillsBlanks: true) }),
+            editUnavailableReason: editReason,
+            makeEditor: { profile in
+                guard owner != nil || usesWorkspaceFixtures else { return nil }
+                let signIn = owner?.signIn
+                return .editing(profile, store: agents, processor: AvatarImageProcessor(),
+                                isCurrent: { currentWorkspaceOwner?.signIn == signIn })
+            },
+            // The page is pushed only once its computer is the one in use (`performFleetOpen`).
+            openingComputer: nil,
+            onNewChat: { startNewChat(explicitAgentID: $0) },
+            onOpenChats: { openSessions(filteredTo: $0) },
+            pinning: BotProfilePinning(isPinned: { agents.isPinned($0) }, canPin: { agents.canPin($0) },
+                                       setPinned: { id, pin in _ = pin ? agents.pinAgent(id) : agents.unpinAgent(id) }),
+            offersShortcuts: usesWorkspaceFixtures || (nativeRuntime != nil && owner != nil),
+            makeDuplicate: canDuplicate ? { profile in
+                guard let owner, let client = workspaceConnections?.cloneClient else { return nil }
+                return AgentDuplicateModel(source: profile, owner: owner, client: client,
+                                           isCurrent: { currentWorkspaceOwner == owner })
+            } : nil,
+            onManageBots: { id in _ = openLifecycleDestination(.profileLifecycle, reattaching: false, profileID: id) },
+            deletion: agentDeletionAction
         )
     }
 

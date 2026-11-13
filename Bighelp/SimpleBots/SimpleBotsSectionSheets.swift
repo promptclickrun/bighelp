@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// New Section, or a section's Edit Members: its name, and every bot and group chat to pick, by
-/// computer with Multi-gateway. A bot is in one section at a time, so picking one from another
+/// computer with every computer shown. A bot is in one section at a time, so picking one from another
 /// section moves it here.
 struct SimpleBotsSectionMembersSheet: View {
     let model: SimpleBotsSectionsModel
@@ -27,7 +27,7 @@ struct SimpleBotsSectionMembersSheet: View {
         let items: [SimpleBotsItem]
     }
 
-    /// One list, or one per computer (the gateway in use first) with Multi-gateway.
+    /// One list, or one per computer (the gateway in use first) with every computer shown.
     private var computers: [Computer] {
         guard let hostNames = model.hostNames else {
             return [Computer(id: "all", title: nil, items: model.candidates)]

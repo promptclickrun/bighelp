@@ -150,7 +150,7 @@ final class ProviderUsageStore {
     }
 
     /// Opens the Usage page; the app sets it. Screens that offer Usage (chat ⋯,
-    /// the context window, ☰) call `show(agentID:)` and stay out of navigation.
+    /// the context window, the sidebar) call `show(agentID:)` and stay out of navigation.
     @ObservationIgnored var onOpen: (@MainActor () -> Void)?
 
     /// Opens Usage with an agent's view of the plans (its provider first) and

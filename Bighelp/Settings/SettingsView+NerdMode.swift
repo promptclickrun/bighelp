@@ -121,7 +121,7 @@ extension SettingsView {
 
 extension View {
     /// A Settings row with an icon tile that runs an action. On the Mac it takes the click
-    /// across the row and lights up under the pointer, with the ☰ menu's row layout;
+    /// across the row and lights up under the pointer, with the sidebar's row layout;
     /// elsewhere it's a plain button with the page's row insets.
     func bighelpSettingsButton() -> some View {
         bighelpPlainButtonStyle(BighelpMenuRowLayout.outline, padding: BighelpMenuRowLayout.highlightPadding)
@@ -148,14 +148,14 @@ extension View {
         bighelpPointer(BighelpMenuRowLayout.outline, padding: BighelpMenuRowLayout.highlightPadding)
     }
 
-    /// The row insets of a Settings row with an icon tile; on the Mac, the ☰ menu's.
+    /// The row insets of a Settings row with an icon tile; on the Mac, the sidebar's.
     func bighelpSettingsRowInsets() -> some View {
         listRowInsets(BighelpPlatform.isMac
             ? BighelpMenuRowLayout.insets
             : EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
     }
 
-    /// The ☰ menu's row insets on the Mac, so a toggle's or the profile row's icon lines up
+    /// The sidebar's row insets on the Mac, so a toggle's or the profile row's icon lines up
     /// with the other rows'. Elsewhere the row keeps the List's own: these labels set no
     /// height, and without the List's room their wrapped text touched the card's edges.
     @ViewBuilder

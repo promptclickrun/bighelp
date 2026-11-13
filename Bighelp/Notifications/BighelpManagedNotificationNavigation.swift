@@ -15,7 +15,7 @@ extension BighelpManagedNotificationService {
     /// Activity links identify a local scoped mapping, not a host supplied by URL. The tap hands
     /// the shell its computer, agent and exact chat; the shell opens it from its saved chats.
     /// Asking `session.list` first failed every Bot Chat (Hermes leaves them out) and so every
-    /// tap in Bots mode (#571).
+    /// tap on the Bots view (#571).
     @MainActor
     func openActivity(opaqueSessionID: String, opens: BighelpExternalSessionOpenCenter = .shared) throws {
         guard let owner = activityRuntime?.destination(opaqueSessionID: opaqueSessionID),

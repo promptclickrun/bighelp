@@ -79,7 +79,7 @@ enum BighelpShortcutLinks {
     }
 }
 
-/// The places "Open in bighelp" goes: the bottom bar's tabs and ☰'s rows.
+/// The places "Open in bighelp" goes: the bar's three places and Work's doors.
 /// Group chats aren't here: they're listed on Agents, and Open group chat
 /// opens one directly.
 enum BighelpShortcutDestination: String, CaseIterable, Sendable {

@@ -318,119 +318,45 @@ enum ChatReasoningPlacement: String, CaseIterable, Identifiable, Sendable {
     static let staysOpenByDefault = true
 }
 
-/// Which home bighelp shows: the everyday agent chat, or Code mode's coding
-/// sessions (Settings › Code mode; ☰ switches between them).
-enum BighelpExperience: String, CaseIterable, Identifiable, Sendable {
-    case bighelp
-    case code
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .bighelp: String(localized: "Chat")
-        case .code: String(localized: "Code")
-        }
-    }
-}
-
-/// The three ways bighelp opens: Bots mode (`simpleBotsEnabled`), Chat, and Code
-/// (`experience`, once Settings › Code mode is on). The Header mode switcher and the
-/// mode edge swipes switch between them.
-enum BighelpMode: String, CaseIterable, Identifiable, Sendable {
-    case bots
-    case chat
-    case code
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .bots: String(localized: "Bots")
-        case .chat: String(localized: "Chat")
-        case .code: String(localized: "Code")
-        }
-    }
-
-    var shortDetail: String {
-        switch self {
-        case .bots: String(localized: "Calm home, just your bots")
-        case .chat: String(localized: "Chats, Feed, Ideas & Goals")
-        case .code: String(localized: "Worktrees, diffs & PRs")
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .bots: "bubble.left.and.bubble.right.fill"
-        case .chat: "square.grid.2x2.fill"
-        case .code: "chevron.left.forwardslash.chevron.right"
-        }
-    }
-}
-
-/// The Header mode switcher in a home's header: the modes on offer, the one showing, and the switch.
-struct BighelpModeSwitch {
-    let modes: [BighelpMode]
-    let current: BighelpMode
-    let select: @MainActor (BighelpMode) -> Void
-}
-
+/// What a swipe from the screen's left or right edge does (Settings › Chat › Advanced › Edge swipes).
 enum WorkspaceSwipeAction: String, CaseIterable, Identifiable, Sendable {
     case quickWorkspace
     case newChat
     case sessions
     case agents
     case home
-    case inbox
     case profile
-    case nextMode
-    case botsMode
-    case chatMode
-    case codeMode
     case none
 
+    /// In the picker's order. "Bot page or Settings" is this bot's page in a chat and Settings elsewhere;
+    /// "Sidebar" opens it where there is one, else Chats.
     static let allCases: [WorkspaceSwipeAction] = [
-        .quickWorkspace,
-        .newChat,
-        .sessions,
-        .agents,
-        .home,
-        .profile,
-        .nextMode,
-        .botsMode,
-        .chatMode,
-        .codeMode,
-        .none,
+        .newChat, .sessions, .agents, .home, .profile, .quickWorkspace, .none,
     ]
 
-    /// Switches mode instead of opening a place, so it works in Bots mode too.
-    var mode: BighelpMode? {
-        switch self {
-        case .botsMode: .bots
-        case .chatMode: .chat
-        case .codeMode: .code
-        default: nil
+    /// Saved values no action has any more: Inbox, and the swipes that switched between the three modes.
+    static let retiredRawValues: Set<String> = ["inbox", "nextMode", "botsMode", "chatMode", "codeMode"]
+
+    /// What a saved value does now. Inbox is Home and Bots mode is Bots; the other mode swipes, and
+    /// anything unknown, are the edge's default.
+    static func saved(_ raw: String?, edgeDefault: WorkspaceSwipeAction) -> WorkspaceSwipeAction {
+        switch raw {
+        case "inbox": .home
+        case "botsMode": .agents
+        default: raw.flatMap(WorkspaceSwipeAction.init(rawValue:)) ?? edgeDefault
         }
     }
-
-    var switchesMode: Bool { self == .nextMode || mode != nil }
 
     var id: Self { self }
 
     var title: String {
         switch self {
-        case .quickWorkspace: String(localized: "Menu")
-        case .newChat: String(localized: "New Chat")
-        case .sessions: String(localized: "Sessions")
-        case .agents: String(localized: "Agents")
+        case .quickWorkspace: String(localized: "Sidebar")
+        case .newChat: String(localized: "New chat")
+        case .sessions: String(localized: "Chats")
+        case .agents: String(localized: "Bots")
         case .home: String(localized: "Home")
-        case .inbox: String(localized: "Inbox")
-        case .profile: String(localized: "Profile & Settings")
-        case .nextMode: String(localized: "Next mode")
-        case .botsMode: String(localized: "Bots mode")
-        case .chatMode: String(localized: "Chat mode")
-        case .codeMode: String(localized: "Code mode")
+        case .profile: String(localized: "Bot page or Settings")
         case .none: String(localized: "Off")
         }
     }
@@ -442,12 +368,7 @@ enum WorkspaceSwipeAction: String, CaseIterable, Identifiable, Sendable {
         case .sessions: "clock.arrow.circlepath"
         case .agents: "person.2"
         case .home: "house"
-        case .inbox: "tray"
         case .profile: "person.crop.circle"
-        case .nextMode: "arrow.left.arrow.right"
-        case .botsMode: "bubble.left.and.bubble.right"
-        case .chatMode: "message"
-        case .codeMode: "chevron.left.forwardslash.chevron.right"
         case .none: "hand.raised.slash"
         }
     }

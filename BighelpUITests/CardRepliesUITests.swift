@@ -7,7 +7,7 @@ final class CardRepliesUITests: BighelpUITestCase {
     @MainActor
     func testPickingAnOptionAndSendingAFormReachTheAgent() throws {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-card-replies", "-loopdy.home.opens-chat", "YES",
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-card-replies", "-start-chat",
                                "-loopdy.settings.nerd-mode", "NO"]
         app.launch()
 
@@ -67,7 +67,7 @@ final class CardRepliesUITests: BighelpUITestCase {
     @MainActor
     private func checkFormLimits(appearance: String) throws {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-card-replies", "-loopdy.home.opens-chat", "YES",
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-card-replies", "-start-chat",
                                "-loopdy.settings.nerd-mode", "NO", "-loopdy.demo.appearance", appearance]
         app.launch()
 

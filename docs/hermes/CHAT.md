@@ -220,9 +220,9 @@ The response consumed here has `pairs:[["/name","description"],...]` (at most 2,
 
 A dispatcher may return `{type:"skill"|"send",message:<expanded text>}`. That is an instruction to the client, not proof that a turn started. Submit those exact bytes once through `prompt.submit` with `queued:true`, then use normal admission/terminal rules. `/plan` and skills can depend on this expansion. If a command returns `output` and is not `streaming`/`queued`, show that output once as a command result and settle immediately. A command whose expansion/submit outcome is unknown must not be rerun.
 
-The first message in Code mode must use the same command router; sending a leading slash directly as `prompt.submit.text` bypasses command expansion. The menu selection is validated against the current text before dispatch, so editing the command cannot execute a stale selected entry.
+The first message of a coding session (New chat with a project) must use the same command router; sending a leading slash directly as `prompt.submit.text` bypasses command expansion. The menu selection is validated against the current text before dispatch, so editing the command cannot execute a stale selected entry.
 
-Sources: [catalog decoder](../../Bighelp/Chat/SlashCommands.swift), [command dispatcher and fallback](../../Bighelp/DirectHermes/DirectHermesConversationClient+Submission.swift), [command tests](../../BighelpTests/DirectHermesConversationTests.swift), [Code mode guidance](../../AGENTS.md).
+Sources: [catalog decoder](../../Bighelp/Chat/SlashCommands.swift), [command dispatcher and fallback](../../Bighelp/DirectHermes/DirectHermesConversationClient+Submission.swift), [command tests](../../BighelpTests/DirectHermesConversationTests.swift), [coding sessions guidance](../../AGENTS.md).
 
 ## 7. Live event envelopes and payloads
 

@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// Bots mode: a bot's chat can take a few seconds to open when the computer has to find or
+/// The Bots view: a bot's chat can take a few seconds to open when the computer has to find or
 /// resume its Bot Chat and read its history first. After a short grace, so a quick open never
 /// flashes it, the opening loader covers the wait until the chat can show its messages, or fails
 /// with its own error. Cancel goes back to where the tap came from.
@@ -30,7 +30,7 @@ final class SimpleBotsChatOpening {
 
     private(set) var current: Opening?
     private(set) var isShowing = false
-    /// Set while Multi-gateway's loader hands over to this one, so the home never shows between them.
+    /// Set while Show every computer's loader hands over to this one, so the home never shows between them.
     @ObservationIgnored var showsNextAtOnce = false
     @ObservationIgnored private var graceTask: Task<Void, Never>?
     @ObservationIgnored private let grace: Duration

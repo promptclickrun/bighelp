@@ -6,7 +6,7 @@ struct SettingsDestinationTests {
     @Test func openingSettingsAtPagesPresentsThemInOrder() {
         let state = AppState()
 
-        state.openSettings(at: [.section(.appearance), .appLayout])
+        state.openSettings(at: [.section(.appearance), .thinking])
 
         #expect(state.isSettingsPresented)
         #expect(state.settingsPath.count == 2)
@@ -23,7 +23,7 @@ struct SettingsDestinationTests {
 
     @Test func openingAgainReplacesThePagesOfTheOpenSettings() {
         let state = AppState()
-        state.openSettings(at: [.section(.appearance), .appLayout])
+        state.openSettings(at: [.section(.appearance), .thinking])
 
         state.openSettings(at: [.section(.chat)])
 

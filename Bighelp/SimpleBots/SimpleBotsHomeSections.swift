@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// What Bots mode's + offers, in this order, each only where it can work: nothing is gray.
+/// What the Bots view's + offers, in this order, each only where it can work: nothing is gray.
 enum SimpleBotsNewItem: String, Identifiable, CaseIterable {
     case bot, groupChat = "group", section
 
@@ -63,7 +63,7 @@ extension SimpleBotsContext {
                 : Dictionary(fleet.hosts.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first }))
     }
 
-    /// The gateway in use's bots and group chats (hidden ones too), as one-gateway Bots mode lists them.
+    /// The gateway in use's bots and group chats (hidden ones too), as the Bots view lists them with one computer shown.
     var oneGatewayBots: [SimpleBotsBot] {
         agents.profiles.map { SimpleBotsBot($0, imageURL: agents.avatarURL(for: $0)) }
     }
@@ -74,7 +74,7 @@ extension SimpleBotsContext {
     }
 }
 
-// Sections and group chats on Bots mode's home, and a section's own page.
+// Sections and group chats on the Bots view, and a section's own page.
 extension SimpleBotsHomeView {
     // MARK: Sections
 
@@ -402,12 +402,12 @@ struct SimpleBotsGroupPreview: View {
             .padding(BighelpTokens.space20)
         }
         .frame(width: 320, alignment: .leading)
-        // A preview is drawn outside the app's own colors; the system's match Bots mode.
+        // A preview is drawn outside the app's own colors; the system's match the Bots view.
         .background(Color(uiColor: .systemBackground))
     }
 }
 
-/// Delete Group Chat asks first, in the words the Agents screen uses.
+/// Delete Group Chat asks first.
 struct SimpleBotsGroupDeletion: ViewModifier {
     @Binding var group: SimpleBotsGroup?
     let delete: ((String) -> Void)?
@@ -424,49 +424,6 @@ struct SimpleBotsGroupDeletion: ViewModifier {
             Button("Cancel", role: .cancel) { group = nil }
         } message: {
             Text("This permanently deletes the group on Hermes and stops its active work.")
-        }
-    }
-}
-
-/// Chat mode's Agents screen: the gateway in use's sections, as Bots mode's home shows them. A card
-/// opens the same section page. Nothing shows while there are no sections.
-struct SimpleBotsSectionsArea: View {
-    let context: SimpleBotsContext
-    @State private var prompt: SimpleBotsSectionPrompt?
-    private let unread = SimpleBotsUnreadStore.shared
-    private let order = SimpleBotsOrderStore.shared
-
-    var body: some View {
-        let host = context.fleet?.selectedHostID
-        let home = SimpleBotsHomeProjection.home(
-            profiles: context.agents.profiles, primaryID: context.agents.primaryAgentID,
-            pinnedIDs: context.agents.pinnedAgentIDs,
-            summaries: context.catalog.recentSummaries(includeCronSessions: false),
-            order: order.order(scope: context.scope), picture: { context.agents.avatarURL(for: $0) },
-            groupHost: host, rooms: context.rooms,
-            sectioning: SimpleBotsSectioning(fleet: context.fleet, shown: Set([host].compactMap { $0 })))
-        if !home.sections.isEmpty {
-            SimpleBotsSectionGrid(cards: home.sections, isUnread: isUnread, open: { context.onOpenSection?($0.id) },
-                                  prompt: { prompt = $0 })
-                .modifier(SimpleBotsSectionPrompts(
-                    prompt: $prompt,
-                    model: context.sectionsModel(bots: context.oneGatewayBots, groups: context.oneGatewayGroups)))
-        }
-    }
-
-    /// Hermes' read state where its rows carry one (a bot's Bot Chat, a group chat's row), else this device's mark.
-    private func isUnread(_ card: SimpleBotsSectionCard) -> Bool {
-        card.members.contains { item in
-            switch item.kind {
-            case .bot(let bot):
-                if let chat = SimpleBotsReadState.botChat(bot.profileID, in: context.catalog.records) {
-                    return chat.isUnread == true
-                }
-                return unread.isUnread(bot.profileID, scope: context.scope)
-            case .group(let group):
-                if let summary = group.summary, summary.tracksUnread { return summary.isUnread }
-                return unread.isUnread(group.summary?.id ?? SimpleBotsGroup.catalogID(group.roomID), scope: context.scope)
-            }
         }
     }
 }

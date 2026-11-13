@@ -1,0 +1,21 @@
+{
+  "schema": "loopdy.card",
+  "version": 1,
+  "title": "Commute",
+  "spoken_summary": "A space to add to Today: Commute. Updates every 15 minutes, without AI.",
+  "data_sources": [],
+  "root": "space",
+  "elements": {
+    "space": {
+      "type": "space_draft",
+      "props": {
+        "space_id": "s_0123456789abcdef0123456789abcdef",
+        "description": "Drive time to work, from live traffic.",
+        "updates": "Every 15 minutes",
+        "uses_ai": false,
+        "revision": 1
+      },
+      "children": []
+    }
+  }
+}

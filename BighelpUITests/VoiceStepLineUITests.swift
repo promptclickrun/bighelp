@@ -9,7 +9,7 @@ final class VoiceStepLineUITests: BighelpUITestCase {
     func testVoiceShowsTheAgentsStepOneAtATime() throws {
         let app = makeApp()
         app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-test-voice-steps",
-                                "-test-voice-partial", "-loopdy.home.opens-chat", "YES",
+                                "-test-voice-partial", "-start-chat",
                                 "-loopdy.voice.conversation-mode", "turnBased",
                                 "-bighelp.voice.transcription", "hermes"]
         app.launch()

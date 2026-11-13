@@ -17,7 +17,9 @@ enum DriveScroll {
 
 /// Where the person was before a drive, for Return to chat.
 struct DriveSnapshot: Equatable {
-    var tab: AppTab
+    var tab: HomeTab
+    /// The first tab's view (Bots or Chats).
+    var view: HomeConversationsView
     var path: [AppRoute]
 }
 
@@ -310,11 +312,14 @@ final class AppDriveRouter: DriveRouting {
 
     init(appState: AppState) { self.appState = appState }
 
-    func snapshot() -> DriveSnapshot { DriveSnapshot(tab: appState.selectedTab, path: appState.path) }
+    func snapshot() -> DriveSnapshot {
+        DriveSnapshot(tab: appState.selectedTab, view: appState.home.view, path: appState.path)
+    }
 
     func restore(_ snapshot: DriveSnapshot) async {
         await closeSettings()
         appState.selectedTab = snapshot.tab
+        appState.home.view = snapshot.view
         appState.path = snapshot.path
     }
 
@@ -325,8 +330,9 @@ final class AppDriveRouter: DriveRouting {
         case .push(let route):
             await closeSettings()
             if appState.path.last != route { appState.open(route) }
-        case .tab(let tab):
+        case .tab(let tab, let view):
             await closeSettings()
+            if let view { appState.home.view = view }
             appState.select(tab)
         case .botProfile(let opening):
             guard let bot else { return }

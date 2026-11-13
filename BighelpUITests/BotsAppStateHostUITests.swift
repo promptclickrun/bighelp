@@ -1,7 +1,7 @@
 import XCTest
 
-/// #857 on a real host with the bighelp plugin (`native-app-state-v1`): the order of Bots mode's
-/// home comes back after bighelp is deleted and installed again. Scripts/HostSignInMatrixProbe.py
+/// #857 on a real host with the bighelp plugin (`native-app-state-v1`): the order of Bots
+/// comes back after bighelp is deleted and installed again. Scripts/HostSignInMatrixProbe.py
 /// (`--modes appstate`) runs it twice against one isolated host: `save` pins a bot, drags it before
 /// the primary bot and saves; the probe deletes the app; `restore` connects the new install to the
 /// same host and finds the same top, pinned bot first.
@@ -18,11 +18,11 @@ final class BotsAppStateHostUITests: BighelpUITestCase {
         let (address, phase, profile) = (parts[0], parts[1], parts[2])
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-no-configured-hosts",
-                               "-bighelp.settings.simple-bots", "YES"]
+                               "-loopdy.home.landing", "bots"]
         app.launch()
         try addHost(app, address: address)
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 30))
-        let primary = app.buttons["simple-bots.primary"]
+        let primary = app.primaryBot
         XCTAssertTrue(primary.waitForExistence(timeout: 30), "The primary bot is on top")
         let pinned = app.buttons["simple-bots.pinned.\(profile)"]
 
@@ -39,7 +39,7 @@ final class BotsAppStateHostUITests: BighelpUITestCase {
             let saveButton = app.buttons["simple-bots.rearrange.save"]
             XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
             let dragged = app.descendants(matching: .any)["simple-bots.pinned.\(profile)"]
-            let first = app.descendants(matching: .any)["simple-bots.primary"]
+            let first = app.primaryBotTile
             dragged.press(forDuration: 0.1, thenDragTo: first, withVelocity: .slow, thenHoldForDuration: 0.3)
             XCTAssertTrue(waitUntil(timeout: 5) { dragged.frame.minX < first.frame.minX }, "Dragged before the primary bot")
             saveButton.tap()

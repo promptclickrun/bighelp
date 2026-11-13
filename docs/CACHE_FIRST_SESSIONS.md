@@ -74,7 +74,7 @@ scoped and defaults to empty for clients without this native provenance.
 
 ## Document scanning
 
-`Scan document` in the attachment drawer uses Apple's
+`Scan document` in the attachment menu uses Apple's
 `VNDocumentCameraViewController`. Camera access is requested only on explicit use;
 unsupported devices show an unavailable action. The system scanner handles capture,
 page correction and ordering. Saving creates one local PDF containing all selected

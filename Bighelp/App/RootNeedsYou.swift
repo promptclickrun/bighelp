@@ -58,17 +58,14 @@ extension RootShellView {
             currentConversationID: { appState.chatOnScreen },
             entries: { needsYouEntries },
             openConversation: { conversationID in
-                if let record = sessionCatalog.session(id: conversationID) {
-                    appState.chatOpenedFromList = true
-                    openSession(record.summary)
-                }
+                if let record = sessionCatalog.session(id: conversationID) { openSession(record.summary) }
             },
             openAgentChat: { agentID in
-                openCanonicalAgentChat(agentID, fromList: true)
+                openCanonicalAgentChat(agentID)
             },
             openWorkflowSignoff: { runID in
                 guard prepareWorkflowsStore() != nil else { return }
-                showOneHostPageOnSessions([.workflows, .workflowSignoff(runID: runID)])
+                showOverWork([.workflows, .workflowSignoff(runID: runID)])
             },
             refresh: {
                 // Both read what the app already has from the computer; neither asks an agent anything.
@@ -93,12 +90,6 @@ extension RootShellView {
         NeedsYouRequestKey(isRequested: appState.isNeedsYouRequested, listIsReady: needsYouListIsReady)
     }
 
-    /// ☰'s Needs you row, only while something waits.
-    var menuNeedsYou: (count: Int, open: () -> Void)? {
-        let count = needsYouEntries.count
-        guard count > 0 else { return nil }
-        return (count: count, open: { afterClosingHomeSheets { isNeedsYouPresented = true } })
-    }
 }
 
 struct NeedsYouRequestKey: Equatable {
@@ -108,6 +99,6 @@ struct NeedsYouRequestKey: Equatable {
 
 enum NeedsYouRequest {
     /// How long a request waits for the computer's connection before it gives up and opens the
-    /// home chat (a cold launch from an alert can ask before the computer answers).
+    /// primary bot's chat (a cold launch from an alert can ask before the computer answers).
     static let connectionWait = Duration.seconds(10)
 }

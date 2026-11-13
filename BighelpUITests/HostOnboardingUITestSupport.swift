@@ -31,7 +31,7 @@ extension BighelpUITestCase {
         XCTAssertTrue(continueAfterConnecting(app), "Connected")
     }
 
-    /// Connected: the step says so, and its button goes on through the plugin and mode steps. The
+    /// Connected: the step says so, and its button goes on through the plugin and home steps. The
     /// button reads Continue in first setup, like Connect's, so the step's own line tells them apart.
     @MainActor @discardableResult
     func continueAfterConnecting(_ app: XCUIApplication, timeout: TimeInterval = 45) -> Bool {
@@ -45,8 +45,8 @@ extension BighelpUITestCase {
         return true
     }
 
-    /// After Connect: skips the optional plugin (and notifications) and chooses Sessions, the app as it
-    /// comes, which these tests expect.
+    /// After Connect: skips the optional plugin (and notifications) and answers "How do you want to
+    /// start?" with Chats, the list these tests expect.
     /// BIGHELP_FIRST_SETUP_EVIDENCE (TEST_RUNNER_…) saves the plugin step as the host shows it.
     @MainActor func finishFirstSetup(_ app: XCUIApplication) {
         let skip = app.buttons["onboarding.skip"]
@@ -60,11 +60,10 @@ extension BighelpUITestCase {
             skip.tap()
         }
         if app.buttons["onboarding.notifications.enable"].waitForExistence(timeout: 2) { skip.tap() }
-        let sessions = app.buttons["onboarding.mode.sessions"]
-        guard sessions.waitForExistence(timeout: 10) else { return }
-        app.buttons["onboarding.mode.bots"].swipeLeft()
-        sessions.tap()
-        let use = app.buttons["onboarding.mode.preview.use"]
-        if use.waitForExistence(timeout: 5) { use.tap() }
+        let chats = app.buttons["onboarding.mode.chats"]
+        guard chats.waitForExistence(timeout: 10) else { return }
+        chats.tap()
+        let next = app.buttons["onboarding.mode.continue"]
+        if next.waitForExistence(timeout: 5) { next.tap() }
     }
 }

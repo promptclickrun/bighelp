@@ -15,7 +15,7 @@ struct PendingShareReviewContext {
 }
 
 /// Offers a share another app saved for bighelp each time bighelp comes to the front, so the person
-/// picks the agent and chat it goes to, and shows every waiting share when asked (☰ › Shared with
+/// picks the agent and chat it goes to, and shows every waiting share when asked (Shared with
 /// bighelp). It waits for whatever has to come first: the AI data agreement, first setup, adding a
 /// computer, Settings, or, for a review on its own, no computer at all.
 @MainActor
@@ -101,8 +101,8 @@ struct PendingShareReview: ViewModifier {
     }
 }
 
-/// Every share waiting, put off ones too: open one to send it, or delete it. Reached from ☰ ›
-/// Shared with bighelp, or Bots mode's Settings, while any wait.
+/// Every share waiting, put off ones too: open one to send it, or delete it. Reached from
+/// Shared with bighelp, or Settings' first screen, while any wait.
 struct PendingShareListView: View {
     let center: PendingShareCenter
     let context: PendingShareReviewContext

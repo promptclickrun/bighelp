@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Bots mode's New Group Chat: a section to put the new group chat in.
+/// The Bots view's New Group Chat: a section to put the new group chat in.
 struct BotModeCreateSectionChoice {
     let sections: [FleetSection]
     /// Files the made group chat (its room ID) in the picked section.
@@ -13,26 +13,22 @@ struct BotModeCreateRoomView: View {
     let agents: AgentDirectoryStore
     let seedProfileID: String?
     let onCreated: (String) -> Void
-    /// New chat mode: one agent starts a 1:1 chat, two or more a group.
-    let onStartDirect: ((String) -> Void)?
-    /// Bots mode: an optional Section row.
+    /// An optional Section row.
     let sectionChoice: BotModeCreateSectionChoice?
     @State private var presentationOwnerID: String
 
     init(rooms: BotModeRoomStore, agents: AgentDirectoryStore, seedProfileID: String?,
          sectionChoice: BotModeCreateSectionChoice? = nil,
-         onStartDirect: ((String) -> Void)? = nil,
          onCreated: @escaping (String) -> Void) {
         self.rooms = rooms
         self.agents = agents
         self.seedProfileID = seedProfileID
         self.sectionChoice = sectionChoice
-        self.onStartDirect = onStartDirect
+
         self.onCreated = onCreated
         _presentationOwnerID = State(initialValue: rooms.nativePresentationOwnerID)
     }
 
-    private var startsDirectChat: Bool { onStartDirect != nil && selected.count == 1 }
     private var isGroupSelection: Bool { selected.count >= 2 }
 
     @Environment(\.bighelpUIV3Enabled) private var uiV3Enabled
@@ -62,7 +58,7 @@ struct BotModeCreateRoomView: View {
                 }
             }
             .background(theme.canvas)
-            .navigationTitle(onStartDirect == nil ? "New group chat" : "New chat")
+            .navigationTitle("New group chat")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).bighelpToolbarText() } }
             .onAppear {
@@ -135,8 +131,7 @@ struct BotModeCreateRoomView: View {
     private var nativeForm: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: BighelpTokens.space24) {
-                if onStartDirect == nil || isGroupSelection {
-                TextField(onStartDirect == nil ? "Group name" : "Group name (optional)", text: $name)
+                TextField("Group name", text: $name)
                     .textInputAutocapitalization(.words)
                     .bighelpFont(.body)
                     .foregroundStyle(theme.primaryText)
@@ -149,7 +144,6 @@ struct BotModeCreateRoomView: View {
                     }
                     .disabled(isSubmitting || hasPendingCreation || ownerChanged)
                     .accessibilityIdentifier("bot-mode.create.title")
-                }
 
                 VStack(alignment: .leading, spacing: BighelpTokens.space12) {
                     HStack(alignment: .firstTextBaseline) {
@@ -174,16 +168,14 @@ struct BotModeCreateRoomView: View {
                             }
                         }
                     }
-                    Text(onStartDirect == nil
-                         ? "Pick 2 to \(BotModeRoom.maximumMembers) agents. Members are fixed once the group is created."
-                         : "Pick one agent to chat 1:1, or up to \(BotModeRoom.maximumMembers) for a group chat.")
+                    Text("Pick 2 to \(BotModeRoom.maximumMembers) agents. Members are fixed once the group is created.")
                         .bighelpFont(.metadata)
                         .foregroundStyle(theme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 if offersRoomSettings { roomSettings }
-                if let sectionChoice, onStartDirect == nil {
+                if let sectionChoice {
                     sectionPicker(sectionChoice)
                         .padding(.horizontal, BighelpTokens.space16)
                         .frame(minHeight: 52)
@@ -194,7 +186,7 @@ struct BotModeCreateRoomView: View {
                         }
                 }
 
-                if !rooms.canCreateNativeRoom, onStartDirect == nil || isGroupSelection {
+                if !rooms.canCreateNativeRoom {
                     Label("This host isn’t ready for group chats yet.", systemImage: "info.circle")
                         .bighelpFont(.label)
                         .foregroundStyle(theme.secondaryText)
@@ -226,7 +218,7 @@ struct BotModeCreateRoomView: View {
                         .accessibilityIdentifier("bot-mode.create.error")
                 }
 
-                if onStartDirect == nil || isGroupSelection { advancedDisclosure }
+                advancedDisclosure
             }
             .padding(.horizontal, BighelpTokens.space20)
             .padding(.vertical, BighelpTokens.space16)
@@ -246,7 +238,7 @@ struct BotModeCreateRoomView: View {
             Button {
                 Task { await create() }
             } label: {
-                Text(hasPendingCreation ? "Check room" : createTitle)
+                Text(hasPendingCreation ? "Check room" : "Create")
                     .bighelpFont(.body, weight: .semibold)
                     .foregroundStyle(theme.actionForeground)
                     .frame(maxWidth: .infinity, minHeight: 52)
@@ -269,7 +261,7 @@ struct BotModeCreateRoomView: View {
     /// Hermes keeps a group's settings where it advertises `groups.context`; they're saved
     /// right after the room exists.
     private var offersRoomSettings: Bool {
-        rooms.nativeCapabilities?.supports("groups.context") == true && (onStartDirect == nil || isGroupSelection)
+        rooms.nativeCapabilities?.supports("groups.context") == true
     }
 
     private var selectedProfiles: [AgentProfile] {
@@ -509,25 +501,17 @@ struct BotModeCreateRoomView: View {
         .accessibilityIdentifier("bot-mode.create.participant.\(profile.id)")
     }
 
-    private var createTitle: String {
-        guard onStartDirect != nil else { return "Create" }
-        return isGroupSelection ? "Start group chat" : "Start chat"
-    }
-
     private var isCreateDisabled: Bool {
-        if startsDirectChat { return isSubmitting || ownerChanged }
-        return isSubmitting || ownerChanged || !rooms.canCreateNativeRoom
+        isSubmitting || ownerChanged || !rooms.canCreateNativeRoom
             || !(2...BotModeRoom.maximumMembers).contains(selected.count)
             || unseatableNote != nil
-            || (onStartDirect == nil && name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || name.count > 200
     }
 
-    /// Hermes says which agents it can seat in a group (`seatable_profiles`). New group chat
-    /// lists only those; New chat keeps every agent for 1:1 chats and holds back a group
-    /// that includes one it can't seat.
+    /// Hermes says which agents it can seat in a group (`seatable_profiles`): only those are listed.
     private var pickableProfiles: [AgentProfile] {
-        guard onStartDirect == nil, let capabilities = rooms.nativeCapabilities else { return agents.profiles }
+        guard let capabilities = rooms.nativeCapabilities else { return agents.profiles }
         return agents.profiles.filter { capabilities.canSeat(profile: $0.id) }
     }
 
@@ -541,14 +525,8 @@ struct BotModeCreateRoomView: View {
             : "\(ListFormatter.localizedString(byJoining: names)) can’t join group chats on this host."
     }
 
-    /// New-chat groups may skip the name.
-    private var groupName: String {
-        let typed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard typed.isEmpty else { return typed }
-        return Self.automaticName(agents.profiles.filter { selected.contains($0.id) }.map(\.name))
-    }
-
-    /// A group named after its agents: "Juno & Alfie", "Juno, Alfie & Nova".
+    /// A group named after its agents: "Juno & Alfie", "Juno, Alfie & Nova". New chat names the group
+    /// it makes this way.
     static func automaticName(_ names: [String]) -> String {
         guard let last = names.last else { return "Group chat" }
         let joined = names.count == 1 ? last : names.dropLast().joined(separator: ", ") + " & " + last
@@ -567,11 +545,6 @@ struct BotModeCreateRoomView: View {
 
     private func create() async {
         guard !isSubmitting else { return }
-        if startsDirectChat, let agentID = selected.first, let onStartDirect {
-            dismiss()
-            onStartDirect(agentID)
-            return
-        }
         guard !ownerChanged else {
             errorMessage = "The selected host changed. Reopen this form before creating a room."
             return
@@ -580,7 +553,7 @@ struct BotModeCreateRoomView: View {
         defer { isSubmitting = false }
         do {
             let room = try await rooms.createNativeRoom(
-                roomID: roomID, name: onStartDirect == nil ? name : groupName,
+                roomID: roomID, name: name,
                 profiles: agents.profiles.filter { selected.contains($0.id) }
             )
             guard !ownerChanged, !Task.isCancelled else { throw WorkspaceClientError.ownerChanged }

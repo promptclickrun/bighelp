@@ -18,26 +18,32 @@ makes work with your agents feel like texting a friend.
 
 ## What it does
 
-- **Three ways to use it.** You choose one at the end of setup, and you can change it later in Settings:
-  - **Bots:** a calm home with only your bots, like a messaging app.
-  - **Chat:** the full app, with every chat, tool and setting.
-  - **Code:** each message starts a coding session in its own worktree. Then you look at the changes and ship
-    them.
-- **Chat** with one agent, or with a group of agents, also agents on your other computers. Replies stream in
+- **One home with three places,** the same for everyone:
+  - **Bots or Chats:** the first place shows your bots like a messaging app, or every chat from every computer.
+    You pick the view at the end of setup, and a switch in the header changes it.
+  - **Today:** your Feed, Ideas and Goals, and Spaces. A space is a live panel that an agent makes and keeps
+    current, after you add it.
+  - **Work:** what your agents do now: coding sessions, running chats, workflows, tasks and scheduled
+    tasks.
+- **Chat** with one agent, or with a group of agents, also agents on your other computers. A new chat can also
+  start a coding session in its own worktree. Then you look at the changes and ship them. Replies stream in
   live. You can react to messages, see the agent's reasoning and tool use, and send files and photos.
 - **Agents** that you make from templates, or save as templates. Each agent has an avatar from the catalog or your
   own design, and a profile with its files and media.
 - **Approvals and questions,** so an agent asks before it acts.
 - **Feed, Ideas and Goals.** Your agent fills them, but only after you ask it to.
-- **Projects, Kanban, Workflows and Scheduled tasks** for longer work, and **Usage** for your AI plans and limits.
+- **Projects, Kanban, Workflows and Scheduled tasks** for longer work (Work opens them), and **Usage** for your AI
+  plans and limits.
 - **Voice:** talk in turns, or live.
-- **Apps:** connect apps for your agents through Composio or Hermes' own connectors (Settings › Connections).
+- **Apps and skills:** connect apps for your agents through Composio or Hermes' own connectors (Settings › Apps &
+  skills).
 - **Device tools:** let agents use Calendar, Reminders, Contacts, Photos, Health, Location and more (Settings ›
-  Connections › Device access). Each one is off until you turn it on.
-- **Several computers:** see the agents of all your computers in one list.
+  Apps & skills › Device access). Each one is off until you turn it on.
+- **Several computers:** Show every computer puts the bots and chats of all your computers in one list.
 - **Notifications, Live Activities, widgets, Shortcuts, CarPlay and an Apple Watch app.**
 - **Apple Vision Pro:** your agent can stand in the room with you, in 3D.
-- **Themes** with light and dark modes, and **Nerd Mode** for host tools such as files, plugins, MCP and logs.
+- **Themes** with light and dark modes. One Settings holds everything, and **Advanced options** adds host tools
+  such as files, MCP servers and logs.
 
 ## How it works
 

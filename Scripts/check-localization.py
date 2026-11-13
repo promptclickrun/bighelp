@@ -12,7 +12,7 @@ CATALOG = ROOT / "Bighelp/Resources/Localizable.xcstrings"
 # Representative boundaries; this is intentionally not a whole-app coverage claim.
 REQUIRED = {
     "Your agents, right at home.", "Get Started", "Connect your computer",
-    "Add the bighelp plugin", "Choose your mode", "Use %@", "Chat", "Feed",
+    "Add the bighelp plugin", "Use %@", "Chat", "Feed",
     "Ideas", "Goals", "Files", "Agents", "Settings", "New chat", "Send message",
     "Stop response", "Message %@", "Ask %@", "Appearance", "Your name", "Done",
     "Advanced options", "Default model", "AI providers", "Help & feedback",
@@ -21,35 +21,54 @@ REQUIRED = {
     "PDF pages require a current native Hermes conversation.",
     "hermes.example.com or 192.168.1.20",
 }
-# Simple Bot mode, Teamwork and the Settings pages they open (#527).
+# The Bots view, Teamwork and the Settings pages they open (#527).
 SIMPLE_BOTS_AND_TEAMWORK = {
     "Search bots", "New Bot", "New Group Chat", "Mark Unread", "Mark Read", "Pin", "Unpin",
     "Make Primary Bot", "Replace Primary Bot…", "Rearrange", "Hide", "Bot Profile", "Templates",
     "Drag your bots and group chats into the order you want, then tap Save.", "No bots yet",
     "Create New Bot", "Instructions", "Default Model", "Routines", "Computer", "Media", "Character",
-    "Your computer isn't connected", "Saved. This is how %@ looks everywhere.", "End voice",
-    "Auto-review", "Multi-gateway", "Your computers", "Your bots see your name.",
+    "Your computer isn't connected", "Saved. This is how %@ looks everywhere.",
+    "Auto-review", "Your computers", "Your bots see your name.",
     "Asked %@", "%@ answered", "%@ didn't answer", "Asking %@…", "Waiting for %@",
     "%@ is working on it…", "%lld messages with %@", "%@ and %@", "%@, %@ and %@",
     "What %@ did", "Bots ask each other for help",
     "The computer didn't save it for %@. Try again.",
     "Bots messaging each other", "Quiet hours", "Notify me about", "Send a test",
     "Turn off notifications", "Channels", "Opens on", "Return sends", "A bot opens",
-    "Chat layout", "App layout", "Light mode", "Dark mode", "Text and buttons", "Bottom bar",
-    # The modes after their 2.6.11 rename (#528).
-    "Bots", "Chat", "Code", "Bots mode", "Chat mode", "Code mode", "Next mode", "Header mode switcher",
-    "Switch between Bots, Chat and Code from the top of each home.",
+    "Chat layout", "Light mode", "Dark mode", "Text and buttons",
+    "Bots", "Chat", "Code",
+}
+# The one home's screens: the header and bar, Chats, New chat, Today, Work, spaces, the bot page
+# and the first-run question (#977).
+ONE_HOME = {
+    "Today", "Work", "Chats", "Sidebar", "Recent chats", "Bot page", "Pick a chat, or start a new one.",
+    "Search chats", "Chat name", "Mark unread", "Archive", "No chats yet", "No chats on %@",
+    "%@ isn't connected. Showing its last chats.",
+    "Add a bot", "Group chats", "Where should this chat run?", "How should this chat work?", "Stage",
+    "Send all %lld", "Group chat · %lld bots", "%lld coding sessions in %@",
+    "Group chats start with text only", "Starting the chat…",
+    "How do you want to start?", "With a bot", "Across chats", "First tab shows",
+    "Approvals", "Handle", "Delete bot", "Chats with this bot",
+    "Make a space", "Add to Today", "Delete this space?", "Updated %@", "Try again in a minute",
+    "Hide from Today", "Every panel is hidden. Tap Edit to show one.",
+    "Nothing needs you", "Open a board", "Pull requests (%lld)", "step %lld of %lld",
+    "Open Work, then try again.",
 }
 PLURALS = {"%lld messages with %@"}
 # These screens' plain-String parameters show text verbatim, so app copy handed to them has to be
 # resolved with String(localized:) first. A bare English literal here never reaches the catalog.
 SCOPED_SOURCES = [
     *sorted((ROOT / "Bighelp/SimpleBots").glob("*.swift")),
+    *sorted((ROOT / "Bighelp/Home").rglob("*.swift")),
+    *sorted((ROOT / "Bighelp/Today").glob("*.swift")),
+    *sorted((ROOT / "Bighelp/Work").glob("*.swift")),
+    *sorted((ROOT / "Bighelp/Spaces").glob("*.swift")),
+    ROOT / "Bighelp/Chat/ChatNewChatSlot.swift", ROOT / "Bighelp/Hosts/FirstRunOnboardingSteps.swift",
     ROOT / "Bighelp/App/RootSimpleBots.swift", ROOT / "Bighelp/Agents/Teamwork.swift",
     ROOT / "Bighelp/Chat/ChatAgentTalkRail.swift", ROOT / "Bighelp/Settings/SettingsView.swift",
     ROOT / "Bighelp/Settings/SettingsView+Preferences.swift", ROOT / "Bighelp/Settings/SettingsView+Identity.swift",
     ROOT / "Bighelp/Settings/ChatLayoutSettingsView.swift", ROOT / "Bighelp/Settings/AppearanceStudioView.swift",
-    ROOT / "Bighelp/Settings/AppearanceSizeControls.swift", ROOT / "Bighelp/Settings/AppLayoutSettingsView.swift",
+    ROOT / "Bighelp/Settings/AppearanceSizeControls.swift",
     ROOT / "Bighelp/Settings/BighelpNotificationSettingsView.swift",
 ]
 VERBATIM = re.compile(
@@ -61,7 +80,9 @@ VERBATIM = re.compile(
     r'|\?\?\s*"[A-Z][a-z]+[ .…’\']'
     r'|\breplacingOccurrences\(of:\s*"agents?"', re.S)
 # A new bot's fallback role and instructions are saved on the host as the bot's own words, not shown as app copy.
-SAVED_DATA = {("SimpleBotTemplates.swift", '?? "You '), ("SimpleBotTemplates.swift", '?? "Everyday ')}
+# New chat's `note(_:)` takes a LocalizedStringKey, unlike the Settings helper of the same name.
+SAVED_DATA = {("SimpleBotTemplates.swift", '?? "You '), ("SimpleBotTemplates.swift", '?? "Everyday '),
+              ("NewChatView.swift", 'note("')}
 
 
 def units(node):
@@ -97,6 +118,14 @@ class LocalizationCatalogChecks(unittest.TestCase):
 
     def test_simple_bots_teamwork_and_their_settings_have_chinese(self):
         for key in SIMPLE_BOTS_AND_TEAMWORK:
+            with self.subTest(key=key):
+                self.assertTrue(key in self.strings, f"{key!r} is missing from the catalog")
+                values = list(units(self.strings[key]["localizations"]["zh-Hans"]))
+                self.assertTrue(values)
+                self.assertTrue(all(unit["value"].strip() for unit in values))
+
+    def test_one_home_screens_have_chinese(self):
+        for key in ONE_HOME:
             with self.subTest(key=key):
                 self.assertTrue(key in self.strings, f"{key!r} is missing from the catalog")
                 values = list(units(self.strings[key]["localizations"]["zh-Hans"]))

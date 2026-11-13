@@ -1,6 +1,40 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    " · %lld jobs": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · %lld jobs"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": " · %lld 个任务"
+          }
+        }
+      }
+    },
+    " · 1 job": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " · 1 job"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": " · 1 个任务"
+          }
+        }
+      }
+    },
     "%@\n\nSelected host: %@": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -99,6 +133,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "%@气泡 · %@ · %@"
+          }
+        }
+      }
+    },
+    "%@ can’t join group chats on this computer.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ can’t join group chats on this computer."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@无法加入这台电脑上的群聊。"
           }
         }
       }
@@ -354,6 +405,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "%@正在处理…"
+          }
+        }
+      }
+    },
+    "%@ isn't connected. Showing its last chats.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ isn't connected. Showing its last chats."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@未连接。正在显示它最近的聊天。"
           }
         }
       }
@@ -629,6 +697,40 @@
         }
       }
     },
+    "%lld chats are already working here.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld chats are already working here."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已有 %lld 个聊天正在这里工作。"
+          }
+        }
+      }
+    },
+    "%lld coding sessions in %@": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld coding sessions in %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%2$@中的 %1$lld 个编程会话"
+          }
+        }
+      }
+    },
     "%lld connected": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -749,6 +851,23 @@
         }
       }
     },
+    "%lld running": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld running"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%lld 个正在运行"
+          }
+        }
+      }
+    },
     "%lld saved templates couldn't be opened, so they're hidden.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -852,6 +971,23 @@
         }
       }
     },
+    "1 chat is already working here.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 chat is already working here."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已有 1 个聊天正在这里工作。"
+          }
+        }
+      }
+    },
     "1 group chat": {
       "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
       "localizations": {
@@ -950,6 +1086,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "聊天可以在自己的 ••• 菜单中更改这些设置。"
+          }
+        }
+      }
+    },
+    "A group chat holds up to %lld bots.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A group chat holds up to %lld bots."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "群聊最多可包含 %lld 个机器人。"
           }
         }
       }
@@ -1086,6 +1239,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "AI 服务商"
+          }
+        }
+      }
+    },
+    "About": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "关于"
           }
         }
       }
@@ -1243,6 +1413,23 @@
         }
       }
     },
+    "Across chats": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Across chats"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "按聊天"
+          }
+        }
+      }
+    },
     "Actions beside each message": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
@@ -1260,6 +1447,23 @@
         }
       }
     },
+    "Actions for %@": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actions for %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@的操作"
+          }
+        }
+      }
+    },
     "Active preset": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -1273,6 +1477,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "当前预设"
+          }
+        }
+      }
+    },
+    "Activities": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activities"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "活动"
           }
         }
       }
@@ -1311,23 +1532,6 @@
         }
       }
     },
-    "Add %@ to the bottom bar": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Add %@ to the bottom bar"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "将%@添加到底部栏"
-          }
-        }
-      }
-    },
     "Add Bots or Group Chats": {
       "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
       "localizations": {
@@ -1341,6 +1545,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "添加机器人或群聊"
+          }
+        }
+      }
+    },
+    "Add a bot": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a bot"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "添加机器人"
           }
         }
       }
@@ -1396,23 +1617,6 @@
         }
       }
     },
-    "Add host": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Add host"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "添加电脑"
-          }
-        }
-      }
-    },
     "Add reference model": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -1464,19 +1668,36 @@
         }
       }
     },
-    "Add this project in Code to read its changes here.": {
-      "comment": "Simplified Chinese draft for the renamed modes (#527 after #528); fluent-speaker review pending.",
+    "Add this project in Work to read its changes here.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Add this project in Code to read its changes here."
+            "value": "Add this project in Work to read its changes here."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "在代码模式中添加此项目后，即可在这里查看它的改动。"
+            "value": "在“工作”中添加此项目后，即可在这里查看它的改动。"
+          }
+        }
+      }
+    },
+    "Add to Today": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add to Today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "添加到“今天”"
           }
         }
       }
@@ -1515,23 +1736,6 @@
         }
       }
     },
-    "Add to the bottom bar": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Add to the bottom bar"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "添加到底部栏"
-          }
-        }
-      }
-    },
     "Add your name": {
       "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
       "localizations": {
@@ -1545,6 +1749,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "添加你的名字"
+          }
+        }
+      }
+    },
+    "Adding…": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adding…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在添加…"
           }
         }
       }
@@ -1596,6 +1817,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "高级"
+          }
+        }
+      }
+    },
+    "Advanced Options": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Advanced Options"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "高级选项"
           }
         }
       }
@@ -1817,23 +2055,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "智能体与个性"
-          }
-        }
-      }
-    },
-    "Agents (multi)": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Agents (multi)"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "智能体（多台电脑）"
           }
         }
       }
@@ -2093,23 +2314,6 @@
         }
       }
     },
-    "All hosts": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "All hosts"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "所有电脑"
-          }
-        }
-      }
-    },
     "All visible preset fields are round-tripped together. Hidden computer overrides outside this typed document are not cleared.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -2229,6 +2433,23 @@
         }
       }
     },
+    "Answer a question": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answer a question"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "回答问题"
+          }
+        }
+      }
+    },
     "Answers stay open": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
@@ -2276,23 +2497,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "App"
-          }
-        }
-      }
-    },
-    "App layout": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "App layout"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "App 布局"
           }
         }
       }
@@ -2399,6 +2603,23 @@
         }
       }
     },
+    "Approvals": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Approvals"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "审批"
+          }
+        }
+      }
+    },
     "Approvals are off on this computer: risky actions run without asking.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -2429,6 +2650,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "批准"
+          }
+        }
+      }
+    },
+    "Approve a command": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Approve a command"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "批准命令"
           }
         }
       }
@@ -2480,6 +2718,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "应用与技能"
+          }
+        }
+      }
+    },
+    "Archive": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archive"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "归档"
+          }
+        }
+      }
+    },
+    "Archived": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archived"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已归档"
           }
         }
       }
@@ -2790,6 +3062,23 @@
         }
       }
     },
+    "Background work": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background work"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "后台工作"
+          }
+        }
+      }
+    },
     "Backups": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -2858,6 +3147,23 @@
         }
       }
     },
+    "Board": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Board"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "栏目"
+          }
+        }
+      }
+    },
     "Bot": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -2905,6 +3211,57 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "机器人默认"
+          }
+        }
+      }
+    },
+    "Bot page": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bot page"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "机器人页面"
+          }
+        }
+      }
+    },
+    "Bot page or Settings": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bot page or Settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "机器人页面或设置"
+          }
+        }
+      }
+    },
+    "Bot's model": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bot's model"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "机器人的模型"
           }
         }
       }
@@ -2977,23 +3334,6 @@
         }
       }
     },
-    "Bots mode": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bots mode"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "机器人模式"
-          }
-        }
-      }
-    },
     "Bots see reactions": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
@@ -3028,53 +3368,36 @@
         }
       }
     },
-    "Bots, Chat and Code": {
-      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
+    "Branch": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bots, Chat and Code"
+            "value": "Branch"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "机器人、聊天和代码"
+            "value": "分支"
           }
         }
       }
     },
-    "Bottom bar": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+    "Branch: %@": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bottom bar"
+            "value": "Branch: %@"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "底部栏"
-          }
-        }
-      }
-    },
-    "Bottom bar and menu order": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bottom bar and menu order"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "底部栏和菜单顺序"
+            "value": "分支：%@"
           }
         }
       }
@@ -3232,23 +3555,6 @@
         }
       }
     },
-    "Calm home, just your bots": {
-      "comment": "Simplified Chinese draft for Needs you, blueprints in the message box and Settings › Modes; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Calm home, just your bots"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "安静的主页，只有你的机器人"
-          }
-        }
-      }
-    },
     "Camera": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -3296,6 +3602,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "开会前能帮我看看笔记吗？"
+          }
+        }
+      }
+    },
+    "Can't show this": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't show this"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法显示"
           }
         }
       }
@@ -3504,6 +3827,23 @@
         }
       }
     },
+    "Changes aren't available": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes aren't available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法查看改动"
+          }
+        }
+      }
+    },
     "Channels": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -3589,23 +3929,6 @@
         }
       }
     },
-    "Chat and Code": {
-      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Chat and Code"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "聊天和代码"
-          }
-        }
-      }
-    },
     "Chat appearance": {
       "localizations": {
         "en": {
@@ -3671,23 +3994,6 @@
         }
       }
     },
-    "Chat is always first. Drag to change the order. What you remove goes to the menu.": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Chat is always first. Drag to change the order. What you remove goes to the menu."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "聊天始终排在第一位。拖动可更改顺序。移除的项目会放到菜单中。"
-          }
-        }
-      }
-    },
     "Chat layout": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -3722,19 +4028,19 @@
         }
       }
     },
-    "Chat mode": {
-      "comment": "Simplified Chinese draft for the renamed modes (#527 after #528); fluent-speaker review pending.",
+    "Chat name": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Chat mode"
+            "value": "Chat name"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "聊天模式"
+            "value": "聊天名称"
           }
         }
       }
@@ -3806,19 +4112,19 @@
         }
       }
     },
-    "Chats and menu": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "Chats": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Chats and menu"
+            "value": "Chats"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "聊天和菜单"
+            "value": "聊天"
           }
         }
       }
@@ -3857,19 +4163,19 @@
         }
       }
     },
-    "Chats, Feed, Ideas & Goals": {
-      "comment": "Simplified Chinese draft for Needs you, blueprints in the message box and Settings › Modes; fluent-speaker review pending.",
+    "Chats with this bot": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Chats, Feed, Ideas & Goals"
+            "value": "Chats with this bot"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "聊天、动态、想法和目标"
+            "value": "与这个机器人的聊天"
           }
         }
       }
@@ -4027,6 +4333,23 @@
         }
       }
     },
+    "Checked out in the local folder": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checked out in the local folder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已在本地文件夹中检出"
+          }
+        }
+      }
+    },
     "Checking notification setup…": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -4095,19 +4418,19 @@
         }
       }
     },
-    "Choose a host": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "Choose a project first": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Choose a host"
+            "value": "Choose a project first"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "选择电脑"
+            "value": "请先选择项目"
           }
         }
       }
@@ -4159,23 +4482,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "选择相机、扫描、照片、文件或绘图。"
-          }
-        }
-      }
-    },
-    "Choose your mode": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Choose your mode"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "选择使用模式"
           }
         }
       }
@@ -4451,40 +4757,6 @@
         }
       }
     },
-    "Code mode": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Code mode"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "代码模式"
-          }
-        }
-      }
-    },
-    "Code needs your computer": {
-      "comment": "Simplified Chinese draft for the renamed modes (#527 after #528); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Code needs your computer"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "代码模式需要你的电脑"
-          }
-        }
-      }
-    },
     "Coding": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -4498,6 +4770,74 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "编程"
+          }
+        }
+      }
+    },
+    "Coding session": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coding session"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "编程会话"
+          }
+        }
+      }
+    },
+    "Coding session in %@": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coding session in %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@中的编程会话"
+          }
+        }
+      }
+    },
+    "Coding sessions can’t start right now": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coding sessions can’t start right now"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "现在无法开始编程会话"
+          }
+        }
+      }
+    },
+    "Coding sessions start with text only": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coding sessions start with text only"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "编程会话只能以文字开头"
           }
         }
       }
@@ -4651,23 +4991,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "电脑"
-          }
-        }
-      }
-    },
-    "Computer filter": {
-      "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Computer filter"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "电脑筛选"
           }
         }
       }
@@ -4872,6 +5195,57 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "连接到你的电脑后即可打开。"
+          }
+        }
+      }
+    },
+    "Connect to your computer, then open Projects from Work.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to your computer, then open Projects from Work."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请先连接电脑，再从“工作”中打开“项目”。"
+          }
+        }
+      }
+    },
+    "Connect to your computer, then open Tasks from Work.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to your computer, then open Tasks from Work."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请先连接电脑，再从“工作”中打开“任务”。"
+          }
+        }
+      }
+    },
+    "Connect to your computer, then open Workflows from Work.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to your computer, then open Workflows from Work."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请先连接电脑，再从“工作”中打开“工作流”。"
           }
         }
       }
@@ -5108,6 +5482,74 @@
         }
       }
     },
+    "Could not add this space. Try again.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not add this space. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法添加这个空间。请重试。"
+          }
+        }
+      }
+    },
+    "Could not delete it. Try again.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not delete it. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法删除。请重试。"
+          }
+        }
+      }
+    },
+    "Could not reach your computer. Try again.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not reach your computer. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法连接到你的电脑。请重试。"
+          }
+        }
+      }
+    },
+    "Could not update it. Try again.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not update it. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法更新。请重试。"
+          }
+        }
+      }
+    },
     "Couldn't confirm the change. Refresh before trying again.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -5138,6 +5580,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "无法确认测试结果。重试前请先查看你的通知。"
+          }
+        }
+      }
+    },
+    "Couldn't delete this bot": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't delete this bot"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法删除这个机器人"
           }
         }
       }
@@ -5189,6 +5648,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "无法刷新你的偏好设置。"
+          }
+        }
+      }
+    },
+    "Couldn't start": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't start"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法开始"
           }
         }
       }
@@ -5397,6 +5873,23 @@
         }
       }
     },
+    "Dashboard": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dashboard"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "仪表盘"
+          }
+        }
+      }
+    },
     "Dashboard session token": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -5461,6 +5954,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "默认模型"
+          }
+        }
+      }
+    },
+    "Default Voice": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default Voice"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "默认语音"
           }
         }
       }
@@ -5567,6 +6077,23 @@
         }
       }
     },
+    "Delete %@": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "删除%@"
+          }
+        }
+      }
+    },
     "Delete Group Chat": {
       "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
       "localizations": {
@@ -5597,6 +6124,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "删除分组"
+          }
+        }
+      }
+    },
+    "Delete bot": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete bot"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "删除机器人"
+          }
+        }
+      }
+    },
+    "Delete this space?": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this space?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "要删除这个空间吗？"
           }
         }
       }
@@ -5699,6 +6260,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "开发工厂"
+          }
+        }
+      }
+    },
+    "Dev Factory isn't open": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dev Factory isn't open"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "开发工厂未打开"
           }
         }
       }
@@ -5839,6 +6417,23 @@
         }
       }
     },
+    "Draft": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Draft"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "草稿"
+          }
+        }
+      }
+    },
     "Drag a tab to move it, then tap Done.": {
       "comment": "Simplified Chinese draft for a bot profile's tabs in Bots mode (Set Default, Rearrange); fluent-speaker review pending.",
       "localizations": {
@@ -5958,6 +6553,23 @@
         }
       }
     },
+    "Duplicate": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duplicate"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "复制"
+          }
+        }
+      }
+    },
     "Dynamic Island": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
@@ -5975,6 +6587,40 @@
         }
       }
     },
+    "Earlier": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earlier"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "更早"
+          }
+        }
+      }
+    },
+    "Edit": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "编辑"
+          }
+        }
+      }
+    },
     "Edit Members": {
       "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
       "localizations": {
@@ -5988,23 +6634,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "编辑成员"
-          }
-        }
-      }
-    },
-    "Edit Name and Role": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Edit Name and Role"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "编辑名字和角色"
           }
         }
       }
@@ -6179,19 +6808,19 @@
         }
       }
     },
-    "End voice": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+    "Enter a name up to %lld characters.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "End voice"
+            "value": "Enter a name up to %lld characters."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "结束语音"
+            "value": "请输入不超过 %lld 个字符的名称。"
           }
         }
       }
@@ -6281,19 +6910,19 @@
         }
       }
     },
-    "Every chat, tool and setting in the full bighelp app.": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "Every evening, post the top three AI stories to my feed.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Every chat, tool and setting in the full bighelp app."
+            "value": "Every evening, post the top three AI stories to my feed."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "使用 bighelp 的全部聊天、工具和设置。"
+            "value": "每天晚上，把最重要的三条 AI 新闻发到我的动态里。"
           }
         }
       }
@@ -6311,6 +6940,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "所有密钥设置"
+          }
+        }
+      }
+    },
+    "Every panel is hidden. Tap Edit to show one.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every panel is hidden. Tap Edit to show one."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "所有面板都已隐藏。轻点“编辑”可显示一个。"
           }
         }
       }
@@ -6345,6 +6991,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "全部"
+          }
+        }
+      }
+    },
+    "Examples": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Examples"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "示例"
           }
         }
       }
@@ -6498,6 +7161,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "动态、灵感和目标"
+          }
+        }
+      }
+    },
+    "Feed, Ideas, Goals": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feed, Ideas, Goals"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "动态、灵感、目标"
           }
         }
       }
@@ -6689,19 +7369,19 @@
         }
       }
     },
-    "Fire off coding chats against your projects.": {
-      "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
+    "First tab shows": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fire off coding chats against your projects."
+            "value": "First tab shows"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "针对你的项目发起编程聊天。"
+            "value": "第一个标签显示"
           }
         }
       }
@@ -6804,6 +7484,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "为你推荐"
+          }
+        }
+      }
+    },
+    "Found on your computer": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Found on your computer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在你的电脑上找到"
           }
         }
       }
@@ -6923,6 +7620,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "智能体回复、完成工作或有问题要问你时，收到提醒。"
+          }
+        }
+      }
+    },
+    "Give your bot a name": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Give your bot a name"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "给机器人起个名字"
           }
         }
       }
@@ -7063,6 +7777,91 @@
         }
       }
     },
+    "Group chat · %lld bots": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Group chat · %lld bots"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "群聊 · %lld 个机器人"
+          }
+        }
+      }
+    },
+    "Group chats": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Group chats"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "群聊"
+          }
+        }
+      }
+    },
+    "Group chats need a newer Hermes on this computer.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Group chats need a newer Hermes on this computer."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这台电脑上的 Hermes 需要更新，才能使用群聊。"
+          }
+        }
+      }
+    },
+    "Group chats start with text only": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Group chats start with text only"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "群聊只能以文字开头"
+          }
+        }
+      }
+    },
+    "Handle": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Handle"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "用户名"
+          }
+        }
+      }
+    },
     "Haptics": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
@@ -7076,23 +7875,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "触感反馈"
-          }
-        }
-      }
-    },
-    "Header mode switcher": {
-      "comment": "Simplified Chinese draft for Needs you, blueprints in the message box and Settings › Modes; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Header mode switcher"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "顶部模式切换"
           }
         }
       }
@@ -7178,6 +7960,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "帮助与反馈"
+          }
+        }
+      }
+    },
+    "Help me set one goal for this month, and track it on my Goals.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Help me set one goal for this month, and track it on my Goals."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "帮我设定一个本月目标，并记在我的目标里。"
           }
         }
       }
@@ -7403,6 +8202,40 @@
         }
       }
     },
+    "Hide %@": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "隐藏%@"
+          }
+        }
+      }
+    },
+    "Hide from Today": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide from Today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "从“今天”隐藏"
+          }
+        }
+      }
+    },
     "Hides the steps.": {
       "comment": "Simplified Chinese draft for Settings › Chat › Agent's work and the chat's work block (#564); fluent-speaker review pending.",
       "localizations": {
@@ -7488,23 +8321,6 @@
         }
       }
     },
-    "Home experience": {
-      "comment": "Simplified Chinese draft for Needs you, blueprints in the message box and Settings › Modes; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Home experience"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "主页体验"
-          }
-        }
-      }
-    },
     "Host URL or IP address": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -7522,19 +8338,19 @@
         }
       }
     },
-    "Host: %@": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "How do you want to start?": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Host: %@"
+            "value": "How do you want to start?"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "电脑：%@"
+            "value": "你想怎么开始？"
           }
         }
       }
@@ -7552,6 +8368,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "透过 bighelp 能看到多少周围空间"
+          }
+        }
+      }
+    },
+    "How should this chat work?": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How should this chat work?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个聊天要怎么工作？"
           }
         }
       }
@@ -7586,6 +8419,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "如何创建服务令牌"
+          }
+        }
+      }
+    },
+    "How to start": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How to start"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "开始方式"
           }
         }
       }
@@ -7692,6 +8542,40 @@
         }
       }
     },
+    "In a worktree": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In a worktree"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在工作树中"
+          }
+        }
+      }
+    },
+    "In the background": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In the background"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在后台"
+          }
+        }
+      }
+    },
     "In the car": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -7705,23 +8589,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "在车上"
-          }
-        }
-      }
-    },
-    "Inbox": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Inbox"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "收件箱"
           }
         }
       }
@@ -8015,6 +8882,23 @@
         }
       }
     },
+    "It stops its updates and removes its page.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It stops its updates and removes its page."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "它会停止更新，并移除它的页面。"
+          }
+        }
+      }
+    },
     "It's behind Cloudflare Access": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -8083,6 +8967,23 @@
         }
       }
     },
+    "Its update failed": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its update failed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "它的更新失败了"
+          }
+        }
+      }
+    },
     "Just your bots and their chats, nothing else.": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -8130,6 +9031,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "看板"
+          }
+        }
+      }
+    },
+    "Kanban isn't available": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kanban isn't available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法使用看板"
           }
         }
       }
@@ -8219,36 +9137,19 @@
         }
       }
     },
-    "Last bot used": {
-      "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
+    "Last run failed": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Last bot used"
+            "value": "Last run failed"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "上次使用的机器人"
-          }
-        }
-      }
-    },
-    "Last chat": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Last chat"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "上次的聊天"
+            "value": "上次运行失败"
           }
         }
       }
@@ -8457,23 +9358,6 @@
         }
       }
     },
-    "Listening to you": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Listening to you"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在聆听"
-          }
-        }
-      }
-    },
     "Listens with": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -8525,23 +9409,6 @@
         }
       }
     },
-    "Live couldn't start in this chat, so this chat takes turns.": {
-      "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Live couldn't start in this chat, so this chat takes turns."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "实时模式无法在此聊天中启动，因此此聊天改为轮流说话。"
-          }
-        }
-      }
-    },
     "Live voice": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -8559,19 +9426,19 @@
         }
       }
     },
-    "Loading Code": {
-      "comment": "Simplified Chinese draft for the renamed modes (#527 after #528); fluent-speaker review pending.",
+    "Loading": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Loading Code"
+            "value": "Loading"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "正在载入代码模式"
+            "value": "正在载入"
           }
         }
       }
@@ -8593,6 +9460,23 @@
         }
       }
     },
+    "Loading chats": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading chats"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在载入聊天"
+          }
+        }
+      }
+    },
     "Loading notification topics…": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -8606,6 +9490,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "正在载入通知类别…"
+          }
+        }
+      }
+    },
+    "Loading sessions": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading sessions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在载入会话"
           }
         }
       }
@@ -8712,6 +9613,23 @@
         }
       }
     },
+    "Look through my week and suggest a few things you could take off my plate.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Look through my week and suggest a few things you could take off my plate."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "看看我这一周的安排，建议几件你可以帮我分担的事。"
+          }
+        }
+      }
+    },
     "Make Primary Bot": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -8725,6 +9643,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "设为主机器人"
+          }
+        }
+      }
+    },
+    "Make a space": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make a space"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "创建空间"
           }
         }
       }
@@ -8759,6 +9694,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "设为机器人默认"
+          }
+        }
+      }
+    },
+    "Make me a space for Today: %@": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make me a space for Today: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "帮我为“今天”做一个空间：%@"
+          }
+        }
+      }
+    },
+    "Make space": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make space"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "创建空间"
           }
         }
       }
@@ -8814,6 +9783,40 @@
         }
       }
     },
+    "Manage worktrees": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage worktrees"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "管理工作树"
+          }
+        }
+      }
+    },
+    "Many chats, newest first.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Many chats, newest first."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "多个聊天，最新的排在前面。"
+          }
+        }
+      }
+    },
     "Mark Read": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -8838,6 +9841,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mark Unread"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "标为未读"
+          }
+        }
+      }
+    },
+    "Mark read": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mark read"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "标为已读"
+          }
+        }
+      }
+    },
+    "Mark unread": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mark unread"
           }
         },
         "zh-Hans": {
@@ -8929,23 +9966,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "中"
-          }
-        }
-      }
-    },
-    "Menu": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Menu"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "菜单"
           }
         }
       }
@@ -9239,6 +10259,23 @@
         }
       }
     },
+    "Mode: %@": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mode: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "模式：%@"
+          }
+        }
+      }
+    },
     "Model & reasoning": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -9290,23 +10327,6 @@
         }
       }
     },
-    "Modes": {
-      "comment": "Simplified Chinese draft for the simpler Settings (Connections, Modes); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Modes"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "模式"
-          }
-        }
-      }
-    },
     "More": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -9354,6 +10374,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "更多选项"
+          }
+        }
+      }
+    },
+    "More projects…": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More projects…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "更多项目…"
           }
         }
       }
@@ -9528,23 +10565,6 @@
         }
       }
     },
-    "Multi-gateway": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Multi-gateway"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "多网关"
-          }
-        }
-      }
-    },
     "Mute %@": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -9694,6 +10714,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "给机器人取个名字"
+          }
+        }
+      }
+    },
+    "Named from your message unless you type a name.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Named from your message unless you type a name."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "除非你自己输入，否则会根据你的消息命名。"
           }
         }
       }
@@ -9867,6 +10904,23 @@
         }
       }
     },
+    "New bot": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New bot"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "新建机器人"
+          }
+        }
+      }
+    },
     "New bot or group chat": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -9880,6 +10934,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "新建"
+          }
+        }
+      }
+    },
+    "New branch": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New branch"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "新分支"
           }
         }
       }
@@ -9951,23 +11022,6 @@
         }
       }
     },
-    "New items": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "New items"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "有新内容"
-          }
-        }
-      }
-    },
     "New section": {
       "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
       "localizations": {
@@ -9981,23 +11035,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "新分组"
-          }
-        }
-      }
-    },
-    "New session": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "New session"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "新会话"
           }
         }
       }
@@ -10036,19 +11073,36 @@
         }
       }
     },
-    "Next mode": {
-      "comment": "Simplified Chinese draft for the renamed modes (#527 after #528); fluent-speaker review pending.",
+    "No AI": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Next mode"
+            "value": "No AI"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "下一个模式"
+            "value": "不使用 AI"
+          }
+        }
+      }
+    },
+    "No approvals yet": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No approvals yet"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "还没有审批"
           }
         }
       }
@@ -10066,6 +11120,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "未找到机器人"
+          }
+        }
+      }
+    },
+    "No bots on this computer yet.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No bots on this computer yet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这台电脑上还没有机器人。"
+          }
+        }
+      }
+    },
+    "No bots or group chats match.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No bots or group chats match."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "没有匹配的机器人或群聊。"
           }
         }
       }
@@ -10104,6 +11192,40 @@
         }
       }
     },
+    "No chats on %@": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No chats on %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@上没有聊天"
+          }
+        }
+      }
+    },
+    "No chats yet": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No chats yet"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "还没有聊天"
+          }
+        }
+      }
+    },
     "No computer is connected.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -10138,6 +11260,23 @@
         }
       }
     },
+    "No goals from any bot yet.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No goals from any bot yet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "还没有任何机器人设定的目标。"
+          }
+        }
+      }
+    },
     "No hidden bots": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -10151,6 +11290,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "没有隐藏的机器人"
+          }
+        }
+      }
+    },
+    "No ideas from any bot yet.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No ideas from any bot yet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "还没有任何机器人提出的灵感。"
           }
         }
       }
@@ -10240,6 +11396,57 @@
         }
       }
     },
+    "No posts from any bot yet.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No posts from any bot yet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "还没有任何机器人发布的动态。"
+          }
+        }
+      }
+    },
+    "No project": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No project"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无项目"
+          }
+        }
+      }
+    },
+    "No projects on this computer yet. Add a folder below.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No projects on this computer yet. Add a folder below."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这台电脑上还没有项目。请在下方添加文件夹。"
+          }
+        }
+      }
+    },
     "No routines yet": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -10287,6 +11494,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "无需登录"
+          }
+        }
+      }
+    },
+    "No unread chats": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No unread chats"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "没有未读聊天"
           }
         }
       }
@@ -10372,6 +11596,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "不支持"
+          }
+        }
+      }
+    },
+    "Not connected": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not connected"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未连接"
           }
         }
       }
@@ -10495,6 +11736,23 @@
         }
       }
     },
+    "Not set": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not set"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "未设置"
+          }
+        }
+      }
+    },
     "Not signed in": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -10508,6 +11766,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "未登录"
+          }
+        }
+      }
+    },
+    "Nothing done yet": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing done yet"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "还没有完成的事项"
           }
         }
       }
@@ -10546,6 +11821,23 @@
         }
       }
     },
+    "Nothing in progress": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing in progress"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "没有进行中的事项"
+          }
+        }
+      }
+    },
     "Nothing matches %@.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -10563,6 +11855,40 @@
         }
       }
     },
+    "Nothing needs you": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing needs you"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "没有需要你处理的事项"
+          }
+        }
+      }
+    },
+    "Nothing runs until you add it.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing runs until you add it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "添加之前不会运行任何内容。"
+          }
+        }
+      }
+    },
     "Nothing to show here": {
       "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
       "localizations": {
@@ -10576,6 +11902,74 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "这里没有可显示的内容"
+          }
+        }
+      }
+    },
+    "Nothing working": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing working"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "没有正在工作的事项"
+          }
+        }
+      }
+    },
+    "Nothing yet. Ask a bot for a goal.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing yet. Ask a bot for a goal."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "暂无内容。可以让机器人设定一个目标。"
+          }
+        }
+      }
+    },
+    "Nothing yet. Ask a bot for ideas.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing yet. Ask a bot for ideas."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "暂无内容。可以让机器人提出灵感。"
+          }
+        }
+      }
+    },
+    "Nothing yet. Ask a bot for posts.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing yet. Ask a bot for posts."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "暂无内容。可以让机器人发布动态。"
           }
         }
       }
@@ -10835,6 +12229,40 @@
         }
       }
     },
+    "On GitHub": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On GitHub"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在 GitHub 上"
+          }
+        }
+      }
+    },
+    "On Today": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On Today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "显示在“今天”"
+          }
+        }
+      }
+    },
     "On it. Three things…": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -10971,6 +12399,40 @@
         }
       }
     },
+    "One line about what it does": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One line about what it does"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "用一句话介绍它的作用"
+          }
+        }
+      }
+    },
+    "One ongoing chat with each bot.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One ongoing chat with each bot."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "与每个机器人保持一个持续的聊天。"
+          }
+        }
+      }
+    },
     "One saved template couldn't be opened, so it's hidden.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -11090,6 +12552,57 @@
         }
       }
     },
+    "Open Today": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "打开“今天”"
+          }
+        }
+      }
+    },
+    "Open Work, then try again.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Work, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请先打开“工作”，然后重试。"
+          }
+        }
+      }
+    },
+    "Open a board": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a board"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "打开看板"
+          }
+        }
+      }
+    },
     "Open chat": {
       "comment": "Simplified Chinese draft for Needs you, blueprints in the message box and Settings › Modes; fluent-speaker review pending.",
       "localizations": {
@@ -11158,19 +12671,19 @@
         }
       }
     },
-    "Open it from the menu in Code.": {
-      "comment": "Simplified Chinese draft for the renamed modes (#527 after #528); fluent-speaker review pending.",
+    "Open it from a project in Work.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open it from the menu in Code."
+            "value": "Open it from a project in Work."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "请在代码模式的菜单中打开它。"
+            "value": "请从“工作”中的项目打开它。"
           }
         }
       }
@@ -11361,22 +12874,6 @@
         }
       }
     },
-    "Opens agent and chat details": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Opens agent and chat details"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "打开智能体和聊天详情"
-          }
-        }
-      }
-    },
     "Opens its chat": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -11458,6 +12955,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "打开此文件夹"
+          }
+        }
+      }
+    },
+    "Opens what's waiting": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens what's waiting"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "打开等待处理的内容"
           }
         }
       }
@@ -11564,19 +13078,19 @@
         }
       }
     },
-    "Other agents": {
-      "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
+    "Other bots": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Other agents"
+            "value": "Other bots"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "其他智能体"
+            "value": "其他机器人"
           }
         }
       }
@@ -11751,6 +13265,23 @@
         }
       }
     },
+    "Paused": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已暂停"
+          }
+        }
+      }
+    },
     "Paused for new messages": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -11764,6 +13295,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "已暂停接收新消息"
+          }
+        }
+      }
+    },
+    "Paused in Scheduled tasks": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused in Scheduled tasks"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已在“定时任务”中暂停"
           }
         }
       }
@@ -11921,6 +13469,23 @@
         }
       }
     },
+    "Photo actions": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photo actions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "照片操作"
+          }
+        }
+      }
+    },
     "Photos and videos from your chats with %@.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -11951,6 +13516,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "电脑恢复连接后，照片和视频会显示在这里。"
+          }
+        }
+      }
+    },
+    "Pick a bot to chat with.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a bot to chat with."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "选择要聊天的机器人。"
+          }
+        }
+      }
+    },
+    "Pick a chat, or start a new one.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a chat, or start a new one."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "选择一个聊天，或开始新的聊天。"
           }
         }
       }
@@ -12006,6 +13605,23 @@
         }
       }
     },
+    "Pick something to open.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick something to open."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "选择要打开的内容。"
+          }
+        }
+      }
+    },
     "Pick the channels": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
@@ -12019,6 +13635,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "选择渠道"
+          }
+        }
+      }
+    },
+    "Pick who gets this": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick who gets this"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "选择发给谁"
           }
         }
       }
@@ -12429,23 +14062,6 @@
         }
       }
     },
-    "Profile & Settings": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Profile & Settings"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "个人资料与设置"
-          }
-        }
-      }
-    },
     "Profiles now open on %@": {
       "comment": "Simplified Chinese draft for a bot profile's tabs in Bots mode (Set Default, Rearrange); fluent-speaker review pending.",
       "localizations": {
@@ -12476,6 +14092,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "资料页从此标签打开"
+          }
+        }
+      }
+    },
+    "Project": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Project"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "项目"
           }
         }
       }
@@ -12514,6 +14147,40 @@
         }
       }
     },
+    "Project: %@": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Project: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "项目：%@"
+          }
+        }
+      }
+    },
+    "Project: none": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Project: none"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "项目：无"
+          }
+        }
+      }
+    },
     "Projects": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -12527,6 +14194,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "项目"
+          }
+        }
+      }
+    },
+    "Projects aren't available": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Projects aren't available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法使用项目"
           }
         }
       }
@@ -12667,6 +14351,23 @@
         }
       }
     },
+    "Pull requests (%lld)": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pull requests (%lld)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "拉取请求（%lld）"
+          }
+        }
+      }
+    },
     "Purple": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -12680,23 +14381,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "紫色"
-          }
-        }
-      }
-    },
-    "Puts the bottom bar and the menu back the way bighelp recommends.": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Puts the bottom bar and the menu back the way bighelp recommends."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "将底部栏和菜单恢复为 bighelp 推荐的样子。"
           }
         }
       }
@@ -12905,19 +14589,19 @@
         }
       }
     },
-    "Recent sessions": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "Recent chats": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Recent sessions"
+            "value": "Recent chats"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "最近的会话"
+            "value": "最近的聊天"
           }
         }
       }
@@ -13109,19 +14793,36 @@
         }
       }
     },
-    "Remove %@ from the bottom bar": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+    "Remove attachments to pick another bot": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Remove %@ from the bottom bar"
+            "value": "Remove attachments to pick another bot"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "从底部栏移除%@"
+            "value": "移除附件后才能选择其他机器人"
+          }
+        }
+      }
+    },
+    "Remove from list": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove from list"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "从列表中移除"
           }
         }
       }
@@ -13194,6 +14895,23 @@
         }
       }
     },
+    "Removed": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已移除"
+          }
+        }
+      }
+    },
     "Removing this device from your computers…": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -13256,6 +14974,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "重命名聊天"
+          }
+        }
+      }
+    },
+    "Renamed, this becomes a regular chat, and tapping the bot starts a new Bot Chat.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renamed, this becomes a regular chat, and tapping the bot starts a new Bot Chat."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "重命名后，它会变成普通聊天，轻点机器人将开始新的机器人聊天。"
           }
         }
       }
@@ -13464,23 +15199,6 @@
         }
       }
     },
-    "Reset to Default Layout": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reset to Default Layout"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重置为默认布局"
-          }
-        }
-      }
-    },
     "Reset to default": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -13515,19 +15233,19 @@
         }
       }
     },
-    "Reset to the default layout?": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+    "Resize": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reset to the default layout?"
+            "value": "Resize"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "重置为默认布局？"
+            "value": "调整大小"
           }
         }
       }
@@ -13817,6 +15535,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "查看 Mixture of Agents 更改"
+          }
+        }
+      }
+    },
+    "Role": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Role"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "角色"
           }
         }
       }
@@ -14296,6 +16031,23 @@
         }
       }
     },
+    "Schedules": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schedules"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "定时任务"
+          }
+        }
+      }
+    },
     "Scheduling": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -14394,6 +16146,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "搜索机器人"
+          }
+        }
+      }
+    },
+    "Search branches": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search branches"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "搜索分支"
+          }
+        }
+      }
+    },
+    "Search chats": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search chats"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "搜索聊天"
           }
         }
       }
@@ -14500,19 +16286,19 @@
         }
       }
     },
-    "See all sessions": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "See all chats": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "See all sessions"
+            "value": "See all chats"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "查看所有会话"
+            "value": "查看全部聊天"
           }
         }
       }
@@ -14564,6 +16350,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "发送测试通知"
+          }
+        }
+      }
+    },
+    "Send all %lld": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send all %lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "全部发送（%lld）"
           }
         }
       }
@@ -14649,23 +16452,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "发送备注"
-          }
-        }
-      }
-    },
-    "Send what you said": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Send what you said"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "发送你说的话"
           }
         }
       }
@@ -14959,6 +16745,23 @@
         }
       }
     },
+    "Setting up": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Setting up"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在设置"
+          }
+        }
+      }
+    },
     "Settings": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -15112,23 +16915,6 @@
         }
       }
     },
-    "Show all hosts": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Show all hosts"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "显示所有电脑"
-          }
-        }
-      }
-    },
     "Show conversation": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -15197,23 +16983,6 @@
         }
       }
     },
-    "Show one host": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Show one host"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "显示一台电脑"
-          }
-        }
-      }
-    },
     "Show reasoning": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -15227,6 +16996,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "显示推理"
+          }
+        }
+      }
+    },
+    "Show routines": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show routines"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "显示例行任务"
           }
         }
       }
@@ -15282,22 +17068,6 @@
         }
       }
     },
-    "Shows a preview": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Shows a preview"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "显示预览"
-          }
-        }
-      }
-    },
     "Shows as": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
@@ -15315,23 +17085,6 @@
         }
       }
     },
-    "Shows every agent on every host in one list.": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Shows every agent on every host in one list."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "在一个列表中显示所有电脑上的智能体。"
-          }
-        }
-      }
-    },
     "Shows every step.": {
       "comment": "Simplified Chinese draft for Settings › Chat › Agent's work and the chat's work block (#564); fluent-speaker review pending.",
       "localizations": {
@@ -15345,23 +17098,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "显示每个步骤。"
-          }
-        }
-      }
-    },
-    "Shows the selected host's agents and chats again.": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Shows the selected host's agents and chats again."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "重新显示所选电脑的智能体和聊天。"
           }
         }
       }
@@ -15396,6 +17132,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "显示智能体之间说了什么。"
+          }
+        }
+      }
+    },
+    "Sidebar": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sidebar"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "侧边栏"
           }
         }
       }
@@ -15498,6 +17251,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "使用 %@ 在 %@ 中登录，然后回到这里。"
+          }
+        }
+      }
+    },
+    "Sign off": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign off"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "签核"
           }
         }
       }
@@ -15621,23 +17391,6 @@
         }
       }
     },
-    "Simple chats with your bots, like texting friends.": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Simple chats with your bots, like texting friends."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "轻松和机器人聊天，就像给朋友发消息。"
-          }
-        }
-      }
-    },
     "Simple mode": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -15651,6 +17404,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "简易模式"
+          }
+        }
+      }
+    },
+    "Size": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Size"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "尺寸"
           }
         }
       }
@@ -15825,6 +17595,23 @@
         }
       }
     },
+    "Space": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Space"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "空间"
+          }
+        }
+      }
+    },
     "Spacing": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -15893,6 +17680,40 @@
         }
       }
     },
+    "Stage": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stage"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "暂存"
+          }
+        }
+      }
+    },
+    "Staged": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Staged"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已暂存"
+          }
+        }
+      }
+    },
     "Star": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -15927,6 +17748,23 @@
         }
       }
     },
+    "Start a coding session from New chat.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a coding session from New chat."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "从“新聊天”开始一个编程会话。"
+          }
+        }
+      }
+    },
     "Start chatting": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -15944,23 +17782,6 @@
         }
       }
     },
-    "Start coding tasks on your projects and review the changes.": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Start coding tasks on your projects and review the changes."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "为项目启动编程任务，并查看改动。"
-          }
-        }
-      }
-    },
     "Start fresh with %@": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -15974,6 +17795,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "与%@开始新聊天"
+          }
+        }
+      }
+    },
+    "Start from": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start from"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "起始分支"
           }
         }
       }
@@ -16029,6 +17867,23 @@
         }
       }
     },
+    "Start one with New chat.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start one with New chat."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "点“新聊天”开始一个。"
+          }
+        }
+      }
+    },
     "Start right at the edge of the screen.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -16046,19 +17901,19 @@
         }
       }
     },
-    "Start with": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+    "Starting the chat…": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Start with"
+            "value": "Starting the chat…"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "开始时使用"
+            "value": "正在开始聊天…"
           }
         }
       }
@@ -16165,19 +18020,19 @@
         }
       }
     },
-    "Step 4 of 4 · Your mode": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "Step 4 of 4 · How to start": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Step 4 of 4 · Your mode"
+            "value": "Step 4 of 4 · How to start"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "第 4 步，共 4 步 · 选择模式"
+            "value": "第 4 步，共 4 步 · 开始方式"
           }
         }
       }
@@ -16284,6 +18139,40 @@
         }
       }
     },
+    "Stopped updating": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopped updating"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已停止更新"
+          }
+        }
+      }
+    },
+    "Stopped: its script changed": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopped: its script changed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已停止：它的脚本已更改"
+          }
+        }
+      }
+    },
     "Stopping": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -16348,6 +18237,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "建议"
+          }
+        }
+      }
+    },
+    "Summary": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summary"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "简介"
           }
         }
       }
@@ -16437,57 +18343,6 @@
         }
       }
     },
-    "Switch between Bots, Chat and Code from the top of each home.": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Switch between Bots, Chat and Code from the top of each home."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "在每个主页顶部切换机器人、聊天和代码。"
-          }
-        }
-      }
-    },
-    "Switch host": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Switch host"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "切换电脑"
-          }
-        }
-      }
-    },
-    "Switch hosts or add one.": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Switch hosts or add one."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "切换或添加电脑。"
-          }
-        }
-      }
-    },
     "System": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -16569,6 +18424,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "改用轮流说话"
+          }
+        }
+      }
+    },
+    "Takes this bot out of the chat.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Takes this bot out of the chat."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "将这个机器人移出聊天。"
           }
         }
       }
@@ -16675,6 +18547,23 @@
         }
       }
     },
+    "Tall": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tall"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "高"
+          }
+        }
+      }
+    },
     "Tangerine": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -16738,6 +18627,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "轻点会以“%@”方式发送。你可以在下方选择仅用于本次的其他方式。"
+          }
+        }
+      }
+    },
+    "Task": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Task"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "任务"
           }
         }
       }
@@ -16997,6 +18903,23 @@
         }
       }
     },
+    "The bot changed this space. Check it, then add it.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The bot changed this space. Check it, then add it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "机器人修改了这个空间。请先检查，再添加。"
+          }
+        }
+      }
+    },
     "The bot couldn't be made. Check the computer, then try again.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -17014,23 +18937,6 @@
         }
       }
     },
-    "The bottom bar becomes Chat, Feed, Ideas, Goals and Files again, and the menu returns to its standard order.": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The bottom bar becomes Chat, Feed, Ideas, Goals and Files again, and the menu returns to its standard order."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "底部栏会恢复为聊天、动态、灵感、目标和文件，菜单也会恢复为标准顺序。"
-          }
-        }
-      }
-    },
     "The bottom bar holds Chat and up to %lld more.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -17044,23 +18950,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "底部栏可放置聊天和最多另外 %lld 项。"
-          }
-        }
-      }
-    },
-    "The bottom bar is full. Remove one to add another.": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The bottom bar is full. Remove one to add another."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "底部栏已满。请先移除一项再添加。"
           }
         }
       }
@@ -17320,23 +19209,6 @@
         }
       }
     },
-    "The menu shows everything that isn't in the bottom bar, and always Agents and Settings. Drag to change the order.": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The menu shows everything that isn't in the bottom bar, and always Agents and Settings. Drag to change the order."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "菜单会显示底部栏以外的所有项目，并始终包含智能体和设置。拖动可更改顺序。"
-          }
-        }
-      }
-    },
     "The one in use": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -17503,6 +19375,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "此 App"
+          }
+        }
+      }
+    },
+    "This batch isn't here anymore": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This batch isn't here anymore"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个批次已不存在"
+          }
+        }
+      }
+    },
+    "This bot has as many spaces as it can keep. Delete one on Today first.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This bot has as many spaces as it can keep. Delete one on Today first."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个机器人的空间数量已达上限。请先在“今天”中删除一个。"
           }
         }
       }
@@ -17778,6 +19684,40 @@
         }
       }
     },
+    "This space's script is missing. Ask the bot to make it again.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This space's script is missing. Ask the bot to make it again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个空间的脚本丢失了。请让机器人重新制作。"
+          }
+        }
+      }
+    },
+    "Time my commute": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time my commute"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "统计我的通勤时间"
+          }
+        }
+      }
+    },
     "Time zone": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -17829,19 +19769,19 @@
         }
       }
     },
-    "Together or one by one": {
-      "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
+    "Today": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Together or one by one"
+            "value": "Today"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "一起更新或逐台更新"
+            "value": "今天"
           }
         }
       }
@@ -17910,6 +19850,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "主题"
+          }
+        }
+      }
+    },
+    "Track my workouts": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Track my workouts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "记录我的锻炼"
           }
         }
       }
@@ -17995,6 +19952,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "重试通知设置"
+          }
+        }
+      }
+    },
+    "Try again": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "重试"
+          }
+        }
+      }
+    },
+    "Try again in a minute": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again in a minute"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请一分钟后重试"
           }
         }
       }
@@ -18339,6 +20330,23 @@
         }
       }
     },
+    "Update now": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update now"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "立即更新"
+          }
+        }
+      }
+    },
     "Update plugin": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -18441,6 +20449,57 @@
         }
       }
     },
+    "Update the plugin on %@ to see its spaces.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update the plugin on %@ to see its spaces."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "更新%@上的插件即可查看它的空间。"
+          }
+        }
+      }
+    },
+    "Update the plugin on your computer to add this.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update the plugin on your computer to add this."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "更新电脑上的插件后即可添加。"
+          }
+        }
+      }
+    },
+    "Updated %@": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Updated %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "更新于%@"
+          }
+        }
+      }
+    },
     "Updates": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -18471,6 +20530,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "智能体为你准备的进展和计划。"
+          }
+        }
+      }
+    },
+    "Updating…": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Updating…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在更新…"
           }
         }
       }
@@ -18556,6 +20632,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "使用此参考模型"
+          }
+        }
+      }
+    },
+    "Use with Siri": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use with Siri"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "与 Siri 搭配使用"
           }
         }
       }
@@ -18663,6 +20756,40 @@
         }
       }
     },
+    "Uses AI": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uses AI"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "使用 AI"
+          }
+        }
+      }
+    },
+    "Uses AI each update": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uses AI each update"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "每次更新都会使用 AI"
+          }
+        }
+      }
+    },
     "Using tools": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -18731,6 +20858,23 @@
         }
       }
     },
+    "View": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "视图"
+          }
+        }
+      }
+    },
     "Voice": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -18761,40 +20905,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "语音聊天"
-          }
-        }
-      }
-    },
-    "Voice choices": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Voice choices"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "语音选项"
-          }
-        }
-      }
-    },
-    "Voice is on": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Voice is on"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "语音已开启"
           }
         }
       }
@@ -18935,6 +21045,23 @@
         }
       }
     },
+    "Watch my garden": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Watch my garden"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "关注我的花园"
+          }
+        }
+      }
+    },
     "Weather, tasks, budgets and approvals": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
@@ -18986,6 +21113,23 @@
         }
       }
     },
+    "What %@ asks to do shows up here.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What %@ asks to do shows up here."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@请求执行的操作会显示在这里。"
+          }
+        }
+      }
+    },
     "What %@ did": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -18999,6 +21143,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "%@做了什么"
+          }
+        }
+      }
+    },
+    "What do you want to see?": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What do you want to see?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你想看到什么？"
           }
         }
       }
@@ -19173,6 +21334,40 @@
         }
       }
     },
+    "Where it runs: %@": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where it runs: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "运行位置：%@"
+          }
+        }
+      }
+    },
+    "Where should this chat run?": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where should this chat run?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个聊天在哪里运行？"
+          }
+        }
+      }
+    },
     "Where you are": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
@@ -19203,6 +21398,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "机器人工作时"
+          }
+        }
+      }
+    },
+    "Wide": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wide"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "宽"
           }
         }
       }
@@ -19241,6 +21453,23 @@
         }
       }
     },
+    "With a bot": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "With a bot"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "按机器人"
+          }
+        }
+      }
+    },
     "With a keyboard attached": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
@@ -19254,6 +21483,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "连接键盘时"
+          }
+        }
+      }
+    },
+    "Work": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Work"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "工作"
           }
         }
       }
@@ -19275,6 +21521,23 @@
         }
       }
     },
+    "Workflow": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workflow"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "工作流"
+          }
+        }
+      }
+    },
     "Workflows": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -19288,6 +21551,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "工作流"
+          }
+        }
+      }
+    },
+    "Workflows aren't available": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workflows aren't available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法使用工作流"
           }
         }
       }
@@ -19394,23 +21674,6 @@
         }
       }
     },
-    "Worktrees, diffs & PRs": {
-      "comment": "Simplified Chinese draft for Needs you, blueprints in the message box and Settings › Modes; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Worktrees, diffs & PRs"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "工作树、差异和 PR"
-          }
-        }
-      }
-    },
     "Writing code": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -19496,19 +21759,19 @@
         }
       }
     },
-    "You can change this later": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "You can change this in Settings › Chat.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "You can change this later"
+            "value": "You can change this in Settings › Chat."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "之后可以更改"
+            "value": "之后可在“设置 › 聊天”中更改。"
           }
         }
       }
@@ -19852,6 +22115,23 @@
         }
       }
     },
+    "Your computer can't run scheduled tasks right now.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your computer can't run scheduled tasks right now."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的电脑现在无法运行定时任务。"
+          }
+        }
+      }
+    },
     "Your computer isn't connected": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -19865,6 +22145,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "你的电脑未连接"
+          }
+        }
+      }
+    },
+    "Your computer isn't connected.": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your computer isn't connected."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的电脑未连接。"
           }
         }
       }
@@ -20260,6 +22557,40 @@
         }
       }
     },
+    "default": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "default"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "默认"
+          }
+        }
+      }
+    },
+    "e.g. Travel planner": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "e.g. Travel planner"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "例如：旅行规划师"
+          }
+        }
+      }
+    },
     "group": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -20341,6 +22672,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "现在"
+          }
+        }
+      }
+    },
+    "step %lld of %lld": {
+      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "step %lld of %lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "第 %lld 步，共 %lld 步"
           }
         }
       }

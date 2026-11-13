@@ -15,7 +15,9 @@ struct VoiceView: View {
     let transcriptRows: [VoiceTranscriptRow]?
     let permissionCenter: PermissionCenter?
     let onEnded: () -> Void
-    let onWorkspaceTap: () -> Void
+    /// Opens the chat this voice is for, where it isn't on screen already (the agent in the room on
+    /// Vision Pro). Nil leaves the button out: over a chat, closing voice shows it.
+    let onOpenChat: (() -> Void)?
     /// The chat's live work (a running tool, thinking), for the avatar's moves.
     var chatActivity: () -> AgentActivityKind = { .idle }
     /// The step the agent is on, in plain words, for the line under the bars.
@@ -29,7 +31,7 @@ struct VoiceView: View {
         showsTranscript: Bool = false,
         permissionCenter: PermissionCenter? = nil,
         onEnded: @escaping () -> Void = {},
-        onWorkspaceTap: @escaping () -> Void = {},
+        onOpenChat: (() -> Void)? = nil,
         chatActivity: @escaping () -> AgentActivityKind = { .idle },
         chatStep: @escaping () -> String? = { nil }
     ) {
@@ -42,7 +44,7 @@ struct VoiceView: View {
         _isTranscriptExpanded = State(initialValue: showsTranscript)
         self.permissionCenter = permissionCenter
         self.onEnded = onEnded
-        self.onWorkspaceTap = onWorkspaceTap
+        self.onOpenChat = onOpenChat
     }
 
     var body: some View {
@@ -96,13 +98,30 @@ struct VoiceView: View {
 
     }
 
+    @ViewBuilder
+    private var openChatButton: some View {
+        if let onOpenChat {
+            Button(action: onOpenChat) {
+                Image(systemName: "bubble.left")
+                    .font(.bighelp(.body).weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(.circle)
+            }
+            .buttonStyle(.plain)
+            .bighelpNavigationGlass(in: Circle(), isInteractive: true)
+            .accessibilityLabel("Open chat")
+            .accessibilityIdentifier("voice.open-chat")
+        }
+    }
+
     private var voiceLayout: some View {
         VStack(spacing: 0) {
             HStack(alignment: .center, spacing: BighelpTokens.space8) {
-                WorkspaceMenuButton(accessibilityIdentifier: "voice.workspace-menu", action: onWorkspaceTap)
+                // The same width on both sides, so the status pill stays centered with or without it.
+                openChatButton.frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
                 authoritativeStatus
                     .frame(maxWidth: .infinity)
-                // Balances the menu button so the status pill stays centered.
                 Color.clear.frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
             }
             .padding(.horizontal, BighelpTokens.space16)

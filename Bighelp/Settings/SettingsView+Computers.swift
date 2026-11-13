@@ -9,7 +9,8 @@ struct SettingsArchivedChats {
 }
 
 /// Settings' Your computers: each computer opens its own page, then Add a computer, Show every
-/// computer, the time zone of the computer in use and, with two or more, Update every computer.
+/// computer (with two or more), the time zone of the computer in use and, with two or more, Update
+/// every computer.
 extension SettingsView {
     @ViewBuilder
     var computersSection: some View {
@@ -30,18 +31,11 @@ extension SettingsView {
                     Text(error).bighelpFont(.metadata).foregroundStyle(theme.secondaryText)
                 }
             }
-            if offersEveryComputer, let everyComputer = everyComputerBinding {
+            if offersEveryComputer {
                 tileToggle(String(localized: "Show every computer"), symbol: "square.stack.3d.up.fill",
-                           isOn: everyComputer)
+                           isOn: everyComputerBinding)
                     .accessibilityIdentifier("simple-bots.settings.multi-gateway")
                     .driveTarget("simple-bots.settings.multi-gateway")
-                // Bots mode's home: a filter button beside Search, for one computer's bots.
-                if settings.simpleBotsEnabled, settings.simpleBotsMultiGateway {
-                    tileToggle(String(localized: "Computer filter"), symbol: "line.3.horizontal.decrease",
-                               isOn: $settings.simpleBotsGatewayFilter)
-                        .accessibilityIdentifier("simple-bots.settings.gateway-filter")
-                        .driveTarget("simple-bots.settings.gateway-filter")
-                }
             }
             if let computerTimeZone, hostRegistry?.selectedHostID != nil || usesDemoComputer {
                 SettingsTimeZoneRow(make: computerTimeZone,
@@ -121,16 +115,9 @@ extension SettingsView {
         }
     }
 
-    /// Show every computer, by `SettingsEveryComputer.choice`. Nil when there is no setting to change.
-    private var everyComputerBinding: Binding<Bool>? {
-        switch SettingsEveryComputer.choice(botsModeOn: settings.simpleBotsEnabled,
-                                            canSetAllHosts: onSetAllHosts != nil) {
-        case .botsMultiGateway: return $settings.simpleBotsMultiGateway
-        case .allHosts:
-            guard let onSetAllHosts else { return nil }
-            return Binding(get: { settings.allHostsMode }, set: { onSetAllHosts($0) })
-        case nil: return nil
-        }
+    /// Show every computer: one setting for everyone.
+    private var everyComputerBinding: Binding<Bool> {
+        Binding(get: { settings.showsEveryComputer }, set: { settings.showsEveryComputer = $0 })
     }
 
     /// Demo mode's made-up computer has no row in the registry, but its time zone still saves.
@@ -155,19 +142,6 @@ extension SettingsView {
     }
 }
 
-/// Which stored setting Show every computer changes: Bots mode's Multi-gateway while Bots mode is
-/// on (its home lists every computer's bots), the all-hosts view elsewhere, which only the shell
-/// can turn on and off.
-enum SettingsEveryComputer: Equatable {
-    case botsMultiGateway
-    case allHosts
-
-    static func choice(botsModeOn: Bool, canSetAllHosts: Bool) -> SettingsEveryComputer? {
-        if botsModeOn { return .botsMultiGateway }
-        return canSetAllHosts ? .allHosts : nil
-    }
-}
-
 /// Your computers › Time zone: the time zone every bot on the computer in use works in, or
 /// Automatic, which follows this device's (also after travel, when bighelp comes back).
 @MainActor
@@ -183,7 +157,7 @@ struct SettingsTimeZoneRow<Label: View>: View {
     /// Whether a store was asked for yet; before that the row says nothing.
     @State private var asked = false
     @State private var isPickerPresented = false
-    // Kept under Bots mode's key, so the choice made there stays.
+    // Kept under the Bots view's key, so the choice made there stays.
     @AppStorage("bighelp.simple-bots.automatic-time-zone") private var automatic = false
     @Environment(\.scenePhase) private var scenePhase
     @BighelpThemeReader private var theme

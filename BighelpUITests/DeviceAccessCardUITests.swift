@@ -111,10 +111,10 @@ final class DeviceAccessCardUITests: BighelpUITestCase {
 
     @MainActor
     private func openDemoChat(in app: XCUIApplication) {
-        let chat = app.buttons["session.row.demo-finance"].firstMatch
+        let chat = chatRow("demo-finance", in: app)
         XCTAssertTrue(chat.waitForExistence(timeout: 15))
         chat.tap()
-        XCTAssertTrue(app.buttons["chat.menu"].firstMatch.waitForExistence(timeout: 10), "The chat opened")
+        XCTAssertTrue(app.buttons["chat.back"].firstMatch.waitForExistence(timeout: 10), "The chat opened")
     }
 
     @MainActor

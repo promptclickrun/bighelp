@@ -5,11 +5,11 @@ import XCTest
 final class BotsWidgetUITests: BighelpUITestCase {
     private static let link = URL(string: "loopdy://agent-chat?agent=travel&host=0D0D0D0D-0000-4000-8000-000000000001")!
 
-    /// Bots mode, bighelp in the background: the bot's chat, with Back to the bots.
+    /// Bots, bighelp in the background: the bot's chat, with Back to the bots.
     @MainActor
     func testABotOpensItsChatInSimpleBotMode() throws {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-bighelp.settings.simple-bots", "YES"]
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.landing", "bots"]
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
         XCUIDevice.shared.press(.home)
@@ -24,7 +24,7 @@ final class BotsWidgetUITests: BighelpUITestCase {
     @MainActor
     func testABotOpensItsChatWhenBighelpWasClosed() throws {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-bighelp.settings.simple-bots", "YES"]
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.landing", "bots"]
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].waitForExistence(timeout: 15))
         app.terminate()

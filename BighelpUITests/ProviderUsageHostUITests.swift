@@ -2,9 +2,8 @@ import XCTest
 
 /// Provider usage against a real, isolated Hermes host with the bighelp plugin
 /// (Scripts/HostSignInMatrixProbe.py --modes features), set up as on a phone:
-/// no demo fixtures, and the agent's chat opens at launch, covering the home
-/// screen. Usage must load from that chat now, after a reconnect, and after a
-/// relaunch. Skipped without the probe.
+/// no demo fixtures, and the primary bot's chat opened from Bots. Usage must load
+/// from that chat now, after a reconnect, and after a relaunch. Skipped without the probe.
 final class ProviderUsageHostUITests: BighelpUITestCase {
     @MainActor func testUsageLoadsFromTheChatTheAppOpensWith() throws {
         guard let path = ProcessInfo.processInfo.environment["BIGHELP_SIGNIN_PROBE"] else {
@@ -13,10 +12,10 @@ final class ProviderUsageHostUITests: BighelpUITestCase {
         let probe = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
         guard probe["mode"] == "features" else { throw XCTSkip("This host runs the \(probe["mode"] ?? "?") mode") }
         let app = makeApp()
-        app.launchArguments = ["-loopdy.home.opens-chat", "YES"]
         app.launch()
         try onboardOpenHost(app, address: try XCTUnwrap(probe["address"]))
-        XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 30), "The agent's chat opens")
+        openPrimaryBotChat(in: app)
+        XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 30), "The bot's chat opens")
         try expectUsage(in: app, "usage-1-after-setup")
 
         // Past the grace period the app closes its host connection; coming back reconnects.
@@ -27,10 +26,11 @@ final class ProviderUsageHostUITests: BighelpUITestCase {
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 30))
         try expectUsage(in: app, "usage-2-after-reconnect")
 
-        // A relaunch opens the agent's chat over the home screen before the host is ready.
+        // After a relaunch, the chat opened again as soon as the home shows, before the host is ready.
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 45), "The chat opens at launch")
+        openPrimaryBotChat(in: app)
+        XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 45), "The chat opens after a relaunch")
         try expectUsage(in: app, "usage-3-after-relaunch")
     }
 
@@ -58,7 +58,15 @@ final class ProviderUsageHostUITests: BighelpUITestCase {
         XCTAssertTrue(loaded.exists, "Usage shows when it was updated (\(name))")
         // The host's own analytics fill the page too.
         XCTAssertTrue(app.descendants(matching: .any)["usage.hero"].waitForExistence(timeout: 30), "Hermes usage loads (\(name))")
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.navigationBars["Usage"].buttons.element(boundBy: 0).tap()
+    }
+
+    /// Bots › the primary bot: its Bot Chat (Settings › Chat › A bot opens, out of the box).
+    @MainActor private func openPrimaryBotChat(in app: XCUIApplication) {
+        showBots(in: app)
+        let primary = app.primaryBot
+        XCTAssertTrue(primary.waitForExistence(timeout: 45), "Bots shows the primary bot")
+        primary.tap()
     }
 
     @MainActor private func save(_ name: String, _ app: XCUIApplication) {

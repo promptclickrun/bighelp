@@ -43,8 +43,7 @@ final class ConnectorCardUITests: BighelpUITestCase {
             let app = makeApp()
             app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance]
             app.launch()
-            _ = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu", "tab.profile"]))
-                .firstMatch.waitForExistence(timeout: 60)
+            _ = app.buttons["simple-bots.settings"].firstMatch.waitForExistence(timeout: 60)
             openSettings(in: app)
             settingsRow("settings.apps", in: app).tap()
             let native = app.buttons["apps.native"]
@@ -93,12 +92,11 @@ final class ConnectorCardUITests: BighelpUITestCase {
             throw XCTSkip("Set BIGHELP_CONNECTOR_HOST and BIGHELP_CONNECTOR_TOOL")
         }
         let app = makeApp()
-        app.launchArguments = ["-loopdy.home.opens-chat", "YES"]
         app.launch()
         try onboardOpenHost(app, address: host)
         let composer = app.textViews["chat.composer.text"]
-        XCTAssertTrue(composer.waitForExistence(timeout: 30), "The agent's chat opens")
-        // A new chat: the home chat is the person's own, and /model pins the chat it runs in.
+        // A new chat: the Bot Chat is the person's own, and /model pins the chat it runs in.
+        XCTAssertTrue(chatNewChatButton(in: app).waitForExistence(timeout: 30), "The home opens with New chat")
         chatNewChatButton(in: app).tap()
         confirmNewChatPicker(in: app)
         XCTAssertTrue(composer.waitForExistence(timeout: 30), "A new chat opens")

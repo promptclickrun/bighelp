@@ -16,7 +16,7 @@ final class ChatInfoUITests: BighelpUITestCase {
     @MainActor
     private func launchHomeChat(extra: [String] = []) -> XCUIApplication {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES"] + extra
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat"] + extra
         app.launch()
         XCTAssertTrue(app.buttons["chat.identity"].waitForExistence(timeout: 20), "A one-on-one chat")
         return app

@@ -14,8 +14,7 @@ struct SettingsView: View {
     let onOpenScheduledTasks: () -> Void
     let onClearLocalCache: @MainActor () async -> Bool
     let agentDirectory: AgentDirectoryStore?
-    /// The computer Start with is kept for (`cacheScopeID`).
-    let landingScope: String?
+
     let voiceSettingsScope: String?
     let voiceSettingsClient: (any VoiceSettingsClient)?
     let voiceSettingsIsCurrent: @MainActor () -> Bool
@@ -51,13 +50,11 @@ struct SettingsView: View {
     var archivedChats: SettingsArchivedChats?
     /// Your computers › Time zone, for the computer in use; nil (or nil from it) has no row to change.
     var computerTimeZone: (@MainActor () -> SimpleBotHostSettings?)?
-    /// Show every computer outside Bots mode: the all-hosts view, which the shell turns on and off.
-    var onSetAllHosts: ((Bool) -> Void)?
+
     @State var teamworkModel: TeamworkModel?
     /// The computer `teamworkModel` was made for (`cacheScopeID`).
     @State var teamworkScope: String?
-    /// Shows just this page (Fleet settings links Appearance and Chat here, so there's one copy of each).
-    private var openSection: SettingsMenuSection?
+
     /// Shows just this pushed page (the Settings sheet's stack pushes `SettingsDestination` values).
     private var pushedPage: SettingsDestination?
     /// The Settings sheet's stack takes value links; the main stack, typed `[AppRoute]`, ignores
@@ -129,7 +126,7 @@ struct SettingsView: View {
         registerNotificationDevice _: (@MainActor () async throws -> BighelpNotificationRuntimeSnapshot)? = nil,
         notificationIsCurrent: @escaping @MainActor () -> Bool = { false },
         agentDirectory: AgentDirectoryStore? = nil,
-        landingScope: String? = nil,
+
         onOpenWorkspaceDestination: ((WorkspaceDestination) -> Void)? = nil,
         onOpenRoute: ((AppRoute) -> Void)? = nil,
         connectorApps: (@MainActor () -> ConnectorAppsModel?)? = nil,
@@ -141,8 +138,7 @@ struct SettingsView: View {
         usage: ProviderUsageStore? = nil,
         pendingShares: PendingShareReviewContext? = nil,
         archivedChats: SettingsArchivedChats? = nil,
-        computerTimeZone: (@MainActor () -> SimpleBotHostSettings?)? = nil,
-        onSetAllHosts: ((Bool) -> Void)? = nil
+        computerTimeZone: (@MainActor () -> SimpleBotHostSettings?)? = nil
     ) {
         self.onOpenWorkspaceDestination = onOpenWorkspaceDestination
         self.onOpenRoute = onOpenRoute
@@ -156,7 +152,7 @@ struct SettingsView: View {
         self.pendingShares = pendingShares
         self.archivedChats = archivedChats
         self.computerTimeZone = computerTimeZone
-        self.onSetAllHosts = onSetAllHosts
+
         _settings = Bindable(wrappedValue: settings)
         _userIdentity = Bindable(wrappedValue: userIdentity)
         _displayNameDraft = State(initialValue: userIdentity.identity.name)
@@ -168,7 +164,7 @@ struct SettingsView: View {
         self.onOpenScheduledTasks = onOpenScheduledTasks
         self.onClearLocalCache = onClearLocalCache
         self.agentDirectory = agentDirectory
-        self.landingScope = landingScope
+
         self.voiceSettingsScope = voiceSettingsScope
         self.voiceSettingsClient = voiceSettingsClient
         self.voiceSettingsIsCurrent = voiceSettingsIsCurrent
@@ -182,20 +178,12 @@ struct SettingsView: View {
     var body: some View {
         Group {
             if let pushedPage { settingsDone(page(for: pushedPage)) }
-            else if let openSection { destination(for: openSection) }
             else { menuPage }
         }
     }
 
-    /// This settings page alone.
-    func opening(_ section: SettingsMenuSection) -> Self {
-        var page = self
-        page.openSection = section
-        return page
-    }
-
-    /// This pushed page alone, for the Settings sheet's `navigationDestination`. Built in `body`,
-    /// like `opening(_:)`, so the page reads the theme live.
+    /// This pushed page alone, for the Settings sheet's `navigationDestination`. Built in `body`, so
+    /// the page reads the theme live.
     func showing(_ destination: SettingsDestination) -> Self {
         var page = self
         page.pushedPage = destination
@@ -226,7 +214,7 @@ struct SettingsView: View {
         case .section(let section): self.destination(for: section)
         case .you: settingsPage(title: String(localized: "You")) { localIdentity }
         case .chatLayout: ChatLayoutSettingsView()
-        case .appLayout: AppLayoutSettingsView(settings: settings)
+
         case .thinking: ThinkingLookSettingsView()
         case .apps: connectionsPage
         case .connection: connectionPage
@@ -265,7 +253,7 @@ struct SettingsView: View {
             BighelpDeferredSection { yourBotsSection }
             BighelpDeferredSection {
                 settingsMenuGroup(header: String(localized: "This app"),
-                                  sections: [.appearance, .chat, .notifications, .modes])
+                                  sections: [.appearance, .chat, .notifications])
             }
             #if os(visionOS)
             BighelpDeferredSection { SpatialAvatarSettingsSection(settings: settings) }
@@ -274,7 +262,7 @@ struct SettingsView: View {
             BighelpDeferredSection { helpAndAdvancedSection }
         }
         .animation(.snappy(duration: BighelpTokens.transitionDuration), value: settings.nerdModeEnabled)
-        .animation(.snappy(duration: BighelpTokens.transitionDuration), value: settings.simpleBotsMultiGateway)
+        .animation(.snappy(duration: BighelpTokens.transitionDuration), value: settings.showsEveryComputer)
         .bighelpFormSurface()
         .listSectionSpacing(20)
         .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
@@ -403,8 +391,7 @@ struct SettingsView: View {
     @ViewBuilder
     func destination(for section: SettingsMenuSection) -> some View {
         switch section {
-        case .modes:
-            settingsPage(title: section.title) { experienceSection }
+
         case .chat:
             chatPage
         case .voice:

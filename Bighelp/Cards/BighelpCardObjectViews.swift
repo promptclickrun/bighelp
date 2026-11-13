@@ -30,7 +30,7 @@ struct BighelpCardObjectAction: Identifiable {
 
 // MARK: - Shared layout
 
-/// Bots mode's row: a round or square picture, a title and one quiet line,
+/// The Bots view's row: a round or square picture, a title and one quiet line,
 /// and round buttons at the end. When they don't fit on one line (a long
 /// name, five buttons, large text) the buttons go under the picture.
 private struct BighelpCardObjectRow<Picture: View>: View {
@@ -90,7 +90,7 @@ private struct BighelpCardObjectRow<Picture: View>: View {
     }
 }
 
-/// A round glass button with one symbol, like Bots mode's header buttons.
+/// A round glass button with one symbol, like the Bots view's header buttons.
 private struct BighelpCardObjectButton: View {
     let action: BighelpCardObjectAction
     @BighelpThemeReader private var theme

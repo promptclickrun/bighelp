@@ -44,7 +44,7 @@ struct SessionRow: View {
                         .foregroundStyle(theme.secondaryText)
                         .lineLimit(1)
                         .layoutPriority(1)
-                    // Bots mode's dot, in the same place: after the time, clear of the live dot below.
+                    // The Bots view's dot, in the same place: after the time, clear of the live dot below.
                     if session.isUnread {
                         Circle()
                             .fill(theme.information)

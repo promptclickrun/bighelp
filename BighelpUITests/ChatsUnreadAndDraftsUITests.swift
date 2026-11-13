@@ -38,17 +38,16 @@ final class ChatsUnreadAndDraftsUITests: BighelpUITestCase {
         XCTAssertFalse(finance.label.contains("Unread"))
 
         finance.press(forDuration: 1.2)
-        let markUnread = app.buttons["session.action.unread.demo-finance"].firstMatch
+        let markUnread = app.buttons["chats.action.unread.here/demo-finance"].firstMatch
         XCTAssertTrue(markUnread.waitForExistence(timeout: 5))
-        XCTAssertEqual(markUnread.label, "Mark Unread")
+        XCTAssertEqual(markUnread.label, "Mark unread")
         markUnread.tap()
         XCTAssertTrue(waitForLabel(of: finance, containing: "Unread", true))
         shot("marked-unread", app)
 
         finance.tap()
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 10))
-        // A chat from the list goes back with the edge swipe.
-        swipeBackFromLeadingEdge(in: app)
+        goBackFromChat(in: app)
         XCTAssertTrue(finance.waitForExistence(timeout: 10))
         XCTAssertTrue(waitForLabel(of: finance, containing: "Unread", false), "Reading the chat marks it read")
     }
@@ -56,15 +55,16 @@ final class ChatsUnreadAndDraftsUITests: BighelpUITestCase {
     @MainActor
     private func launch(_ arguments: [String]) -> XCUIApplication {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-bighelp.hosts.all-hosts", "NO"] + arguments
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.landing", "chats",
+                               "-bighelp.hosts.all-hosts", "NO"] + arguments
         app.launch()
-        XCTAssertTrue(app.descendants(matching: .any)["sessions.screen"].firstMatch.waitForExistence(timeout: 15))
+        XCTAssertTrue(app.descendants(matching: .any)["chats.inbox"].firstMatch.waitForExistence(timeout: 15))
         return app
     }
 
     @MainActor
     private func row(_ id: String, in app: XCUIApplication) -> XCUIElement {
-        app.buttons["session.row.\(id)"].firstMatch
+        chatRow(id, in: app)
     }
 
     /// Until the row sits in the middle of the screen, clear of the header and the bar.

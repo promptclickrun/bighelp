@@ -3,7 +3,7 @@ import SwiftUI
 
 /// What an agent's face is, from what this device and its computer know, in the order every
 /// surface draws them: a kit character, a petdex pet, a Hermes face or shape or a Bot Studio
-/// avatar (both saved in Hermes' profile), a Bots mode mark, then its picture. One order, so the chat, Bots mode and its pet companion show the same face.
+/// avatar (both saved in Hermes' profile), a mark, then its picture. One order, so the chat, the Bots view and its pet companion show the same face.
 enum AgentFace: Equatable {
     case character(CompanionAppearance)
     case pet(key: String)

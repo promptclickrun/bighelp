@@ -1,42 +1,13 @@
 import XCTest
 
-/// One computer and all computers work alike: ☰ is one menu from anywhere, See all opens
-/// the chat list, project folders fold, and All sessions has the same tags and filters, with
-/// a computer's chip opening that computer's own Sessions screen without leaving all hosts.
+/// The computer in use's own Sessions page, pushed from Chats › This computer: project folders fold,
+/// and chats other apps (Codex, Claude Code) made on the computer show and open.
 /// Set BIGHELP_PARITY_EVIDENCE (TEST_RUNNER_…) to save screenshots.
 final class SessionsParityUITests: BighelpUITestCase {
     @MainActor
-    func testOneMenuFromAChatAndSeeAllOpensSessions() throws {
-        let app = launch(allHosts: false)
-        let menu = chatMenu(app)
-        XCTAssertTrue(menu.waitForExistence(timeout: 15))
-
-        // A chat's ⋯ has no second menu of its own.
-        XCTAssertTrue(chatMenuItem("chat.rename", in: app).waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["chat.workspace-menu"].exists, "Go to… is gone: ☰ is the menu")
-        // Close it with a tap on the chat, away from the menu.
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.6)).tap()
-        XCTAssertTrue(chatMenuElement("chat.rename", in: app).waitForNonExistence(timeout: 3))
-
-        menu.tap()
-        let seeAll = app.buttons["menu.chats"].firstMatch
-        XCTAssertTrue(seeAll.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.descendants(matching: .any)["quick-workspace.drawer"].exists)
-        save("one-host-menu", app)
-        seeAll.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["sessions.screen"].waitForExistence(timeout: 8),
-                      "See all opens Sessions")
-        save("one-host-sessions", app)
-    }
-
-    @MainActor
     func testProjectFolderFoldsItsChats() throws {
-        let app = launch(allHosts: false, extra: ["-loopdy.sessions.organizeByProjects", "YES"])
-        let menu = chatMenu(app)
-        XCTAssertTrue(menu.waitForExistence(timeout: 15))
-        menu.tap()
-        app.buttons["menu.chats"].firstMatch.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["sessions.screen"].waitForExistence(timeout: 8))
+        let app = launch(extra: ["-loopdy.sessions.organizeByProjects", "YES"])
+        openThisComputerSessions(in: app)
 
         let folder = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'sessions.section-toggle.'")).firstMatch
         XCTAssertTrue(folder.waitForExistence(timeout: 8), "Group by Project shows project folders")
@@ -61,12 +32,8 @@ final class SessionsParityUITests: BighelpUITestCase {
 
     @MainActor
     func testCodexAndClaudeCodeChatsShowAndOpen() throws {
-        let app = launch(allHosts: false)
-        let menu = chatMenu(app)
-        XCTAssertTrue(menu.waitForExistence(timeout: 15))
-        menu.tap()
-        app.buttons["menu.chats"].firstMatch.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["sessions.screen"].waitForExistence(timeout: 8))
+        let app = launch()
+        openThisComputerSessions(in: app)
 
         let codex = app.buttons["sessions.other-app.Polish the Mac menus"]
         for _ in 0..<6 where !codex.exists { app.swipeUp() }
@@ -81,117 +48,13 @@ final class SessionsParityUITests: BighelpUITestCase {
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 8), "Open opens it as a chat")
     }
 
-    /// As on one computer's list, chats running now come first under Active Sessions, from every
-    /// computer: the demo's other computer has a review running. The Chat tab's home (All agents)
-    /// lists them too.
-    @MainActor
-    func testAllSessionsListsActiveSessionsAcrossComputers() throws {
-        for appearance in ["light", "dark"] {
-            let app = launch(allHosts: true, extra: ["-loopdy.demo.appearance", appearance])
-            let menu = app.buttons["home.drawer.open"].firstMatch
-            XCTAssertTrue(menu.waitForExistence(timeout: 15))
-            XCTAssertTrue(app.descendants(matching: .any)["fleet.sessions.section.active"].waitForExistence(timeout: 8),
-                          "All agents shows Active Sessions")
-            let onHome = app.buttons["fleet.active.Pull request review"]
-            XCTAssertTrue(onHome.exists, "The other computer's running chat, on the home")
-            save("all-agents-active-\(appearance)", app)
-            menu.tap()
-            app.buttons["menu.chats"].firstMatch.tap()
-            XCTAssertTrue(app.navigationBars["All sessions"].waitForExistence(timeout: 8))
-            let active = app.descendants(matching: .any)["fleet.sessions.section.active"]
-            XCTAssertTrue(active.waitForExistence(timeout: 8), "Active Sessions shows with every computer")
-            let running = app.buttons["fleet.chat.Pull request review"]
-            XCTAssertTrue(running.exists, "The other computer's running chat is listed")
-            let recent = app.descendants(matching: .any)["fleet.sessions.section.recent"]
-            XCTAssertTrue(recent.exists)
-            XCTAssertLessThan(running.frame.minY, recent.frame.minY, "Running chats come before the rest")
-            save("all-sessions-active-\(appearance)", app)
-            app.terminate()
-        }
-    }
-
-    @MainActor
-    func testAllSessionsHasTagsFiltersAndAComputersOwnScreen() throws {
-        let app = launch(allHosts: true)
-        let menu = app.buttons["home.drawer.open"].firstMatch
-        XCTAssertTrue(menu.waitForExistence(timeout: 15))
-        menu.tap()
-        app.buttons["menu.chats"].firstMatch.tap()
-        XCTAssertTrue(app.navigationBars["All sessions"].waitForExistence(timeout: 8), "See all opens All sessions")
-
-        let tagged = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Started in'"))
-        // Active Sessions comes first, so the chat brought in from Codex can sit below the fold.
-        if tagged.count == 0 { app.swipeUp() }
-        XCTAssertGreaterThan(tagged.count, 0, "Rows say where each chat started")
-        app.swipeDown()
-        let filters = app.buttons["fleet.chats.filters"]
-        XCTAssertTrue(filters.exists, "The same filter menu as one computer")
-        filters.tap()
-        // Each filter is its own labeled choice, not one long list.
-        let agentChoice = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Agent,'")).firstMatch
-        XCTAssertTrue(agentChoice.waitForExistence(timeout: 3), "Agent, to filter by")
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Started in,'")).firstMatch.exists,
-                      "Started in, to filter by")
-        save("all-sessions-filters", app)
-        agentChoice.tap()
-        let allAgents = app.buttons.matching(NSPredicate(format: "label == 'All agents' AND identifier != 'BackButton'"))
-            .firstMatch
-        XCTAssertTrue(allAgents.waitForExistence(timeout: 3), "Agents to filter by")
-        save("all-sessions-filter-agent", app)
-        allAgents.tap()
-        XCTAssertTrue(agentChoice.waitForNonExistence(timeout: 3), "The menu closes")
-
-        // A computer's chip opens its own Sessions screen (folders, agents), still in all hosts.
-        app.buttons["fleet.filter.Home Hermes"].tap()
-        let folder = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'sessions.section-toggle.'")).firstMatch
-        XCTAssertTrue(folder.waitForExistence(timeout: 10), "That computer's own Sessions screen, with its folders")
-        XCTAssertTrue(app.buttons["fleet.filter.all"].exists, "Its chips stay, to go back to every computer")
-        save("all-sessions-one-computer", app)
-
-        // Back on All agents, ☰ still says all hosts, focused on that computer; Projects opens there.
-        let back = app.navigationBars.buttons["BackButton"].firstMatch
-        if back.exists { back.tap() } else { swipeBackFromLeadingEdge(in: app) }
-        XCTAssertTrue(menu.waitForExistence(timeout: 8))
-        save("all-agents-focused", app)
-        menu.tap()
-        XCTAssertEqual(app.buttons["menu.all-hosts"].label, "Show one host", "Still in all hosts")
-        XCTAssertTrue(app.buttons["menu.hosts"].label.contains("Home Hermes"), app.buttons["menu.hosts"].label)
-        let projects = app.buttons["menu.projects"]
-        XCTAssertTrue(projects.waitForExistence(timeout: 3), "Projects is in the all-hosts menu")
-        save("all-hosts-menu-focused", app)
-        projects.tap()
-        XCTAssertFalse(app.buttons["fleet.gate.host.Home Hermes"].waitForExistence(timeout: 2),
-                       "The focused computer doesn't need asking")
-        XCTAssertTrue(app.navigationBars["Projects"].waitForExistence(timeout: 8))
-        // Projects is a screen people stay on: ☰ in the corner, no Back. ☰ leads to All agents.
-        XCTAssertFalse(app.navigationBars.buttons["BackButton"].exists, "Projects is a screen of its own")
-        menu.tap()
-        let allAgentsRow = app.buttons["menu.all-agents"]
-        XCTAssertTrue(allAgentsRow.waitForExistence(timeout: 5))
-        allAgentsRow.tap()
-        let homeChip = app.buttons["fleet.filter.Home Hermes"]
-        XCTAssertTrue(homeChip.waitForExistence(timeout: 8))
-        XCTAssertTrue(homeChip.isSelected, "All agents shows the focused computer too")
-
-        // Every computer again.
-        app.buttons["fleet.filter.all"].tap()
-        XCTAssertTrue(app.buttons["fleet.filter.all"].isSelected)
-    }
-
     // MARK: Helpers
 
-    @MainActor private func launch(allHosts: Bool, extra: [String] = []) -> XCUIApplication {
+    @MainActor private func launch(extra: [String] = []) -> XCUIApplication {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays",
-                               "-bighelp.hosts.all-hosts", allHosts ? "YES" : "NO",
-                               "-loopdy.home.opens-chat", allHosts ? "NO" : "YES"] + extra
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.landing", "chats"] + extra
         app.launch()
         return app
-    }
-
-    /// ☰ in the chat header, or on a list.
-    @MainActor private func chatMenu(_ app: XCUIApplication) -> XCUIElement {
-        app.buttons.matching(NSPredicate(format: "identifier IN %@", ["chat.menu", "home.drawer.open"])).firstMatch
     }
 
     @MainActor private func save(_ name: String, _ app: XCUIApplication) {
@@ -203,5 +66,22 @@ final class SessionsParityUITests: BighelpUITestCase {
         try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
         try? XCUIScreen.main.screenshot().pngRepresentation
             .write(to: URL(fileURLWithPath: folder).appendingPathComponent("\(name).png"))
+    }
+}
+
+extension BighelpUITestCase {
+    /// Chats › This computer: the computer in use's own Sessions page (projects, filters, other apps'
+    /// chats), pushed from the More section at the end of the Chats list.
+    @MainActor
+    func openThisComputerSessions(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        showChats(in: app)
+        let list = app.descendants(matching: .any)["chats.inbox"].firstMatch
+        XCTAssertTrue(list.waitForExistence(timeout: 20), "Chats shows", file: file, line: line)
+        let row = app.buttons["chats.more.this-computer"].firstMatch
+        for _ in 0..<20 where !(row.exists && row.isHittable) { list.swipeUp(velocity: .fast) }
+        XCTAssertTrue(row.exists && row.isHittable, "This computer is at the end of Chats", file: file, line: line)
+        row.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["sessions.screen"].firstMatch.waitForExistence(timeout: 10),
+                      "This computer opens its Sessions page", file: file, line: line)
     }
 }

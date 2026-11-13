@@ -19,8 +19,7 @@ final class SettingsStore {
     private(set) var sessionSectionPreferencesRevision = 0
 
     var appearanceContext: BighelpAppearanceContext {
-        // Bots mode takes the themes and bubbles picked in Appearance, like the rest of the app.
-        var context = BighelpAppearanceContext(
+        BighelpAppearanceContext(
             appearance: appearance,
             lightBackground: lightBackground,
             darkBackground: darkBackground,
@@ -29,8 +28,6 @@ final class SettingsStore {
             bubbleFollowsTheme: bubbleFollowsTheme,
             windowTransparency: windowTransparency
         )
-        context.simpleBots = simpleBotsEnabled
-        return context
     }
 
     /// Appearance studio: light and dark page colors and the bubble color.
@@ -215,107 +212,10 @@ final class SettingsStore {
         didSet { defaults.set(rightEdgeSwipeAction.rawValue, forKey: Keys.rightEdgeSwipeAction) }
     }
 
-    /// What the edge swipes do. Bots mode hides most places they lead to, so there they're its
-    /// own: from the left, your bots; from the right, this bot's profile. A mode swipe stays a mode
-    /// swipe, so it can bring you back out of Bots mode.
-    var effectiveLeftEdgeSwipeAction: WorkspaceSwipeAction {
-        Self.effective(leftEdgeSwipeAction, botsMode: .agents, isBotsMode: simpleBotsEnabled, codeModeEnabled: codeModeEnabled)
-    }
-    var effectiveRightEdgeSwipeAction: WorkspaceSwipeAction {
-        Self.effective(rightEdgeSwipeAction, botsMode: .profile, isBotsMode: simpleBotsEnabled, codeModeEnabled: codeModeEnabled)
-    }
-
-    nonisolated static func effective(_ action: WorkspaceSwipeAction, botsMode: WorkspaceSwipeAction,
-                                      isBotsMode: Bool, codeModeEnabled: Bool) -> WorkspaceSwipeAction {
-        // Code mode switched off later: its swipe does nothing rather than open Chat.
-        if action == .codeMode, !codeModeEnabled { return .none }
-        if action.switchesMode { return action }
-        return isBotsMode ? botsMode : action
-    }
-
-    /// Settings › Modes › Header mode switcher: Bots, Chat and Code in a pill at the top of each
-    /// home. Off by default; ☰ keeps its Chat and Code switch while it's off.
-    var unifiedModeToggleEnabled: Bool {
-        didSet { defaults.set(unifiedModeToggleEnabled, forKey: Keys.unifiedModeToggle) }
-    }
-
-    /// Settings › Modes › Chat switcher: the bots (Bots mode) or running sessions (Code mode)
-    /// beside a chat. On by default on phones, where only the iPhone Duo folded shows it; iPad and
+    /// Settings › Chat › Chat switcher: the bots, or a coding chat's running sessions, beside a chat. On by default on phones, where only the iPhone Duo folded shows it; iPad and
     /// Mac show it in landscape once it's turned on (`BighelpChatSwitcher`).
     var chatSwitcherEnabled: Bool {
         didSet { defaults.set(chatSwitcherEnabled, forKey: Keys.chatSwitcher) }
-    }
-
-    /// The modes on offer: Code only while Settings › Code mode is on.
-    var availableModes: [BighelpMode] { codeModeEnabled ? [.bots, .chat, .code] : [.bots, .chat] }
-
-    /// The mode showing now. Bots mode wins over Chat and Code, as its home does.
-    var currentMode: BighelpMode {
-        if simpleBotsEnabled { return .bots }
-        return codeModeEnabled && experience == .code ? .code : .chat
-    }
-
-    /// The mode after this one, for the Next mode swipe: Bots, Chat, Code, then Bots again.
-    var nextMode: BighelpMode {
-        let modes = availableModes
-        let index = modes.firstIndex(of: currentMode) ?? 0
-        return modes[(index + 1) % modes.count]
-    }
-
-    /// Switches to `mode`. The shell follows `experience` and `simpleBotsEnabled` to that mode's home.
-    func switchMode(_ mode: BighelpMode) {
-        guard availableModes.contains(mode), mode != currentMode else { return }
-        Telemetry.featureUsed(.modeSwitched)
-        switch mode {
-        case .bots:
-            simpleBotsEnabled = true
-        case .chat:
-            experience = .bighelp
-            simpleBotsEnabled = false
-        case .code:
-            experience = .code
-            simpleBotsEnabled = false
-        }
-    }
-
-    /// The home a launch opens in, which Settings › Modes' picker shows. Bots mode is its own switch;
-    /// between Chat and Code it's `startExperience`, not the home showing now (☰ and the pill switch that).
-    var homeMode: BighelpMode {
-        if simpleBotsEnabled { return .bots }
-        return codeModeEnabled && startExperience == .code ? .code : .chat
-    }
-
-    /// Settings › Modes' picker: makes `mode` the home, now and at each launch. Picking Code turns
-    /// Code mode on; picking Chat or Bots leaves it as it is (its own switch turns it off).
-    /// Settings › Modes in one line: "Bots mode", "Code", "Chat and Code" or "Chat".
-    var modesSummary: String {
-        if simpleBotsEnabled { return String(localized: "Bots mode") }
-        if currentMode == .code { return String(localized: "Code") }
-        return codeModeEnabled ? String(localized: "Chat and Code") : String(localized: "Chat")
-    }
-
-    func selectHomeMode(_ mode: BighelpMode) {
-        let changed = mode != currentMode
-        switch mode {
-        case .bots:
-            simpleBotsEnabled = true
-        case .chat:
-            simpleBotsEnabled = false
-            startExperience = .bighelp
-            experience = .bighelp
-        case .code:
-            simpleBotsEnabled = false
-            codeModeEnabled = true
-            startExperience = .code
-            experience = .code
-        }
-        if changed { Telemetry.featureUsed(.modeSwitched) }
-    }
-
-    /// Settings › Modes › Code mode. Off while Code is the home goes back to Chat, now and at launch.
-    func setCodeMode(_ isOn: Bool) {
-        codeModeEnabled = isOn
-        if !isOn { startExperience = .bighelp }
     }
 
     var preferredBrowser: ChatBrowserPreference {
@@ -360,18 +260,6 @@ final class SettingsStore {
         didSet { defaults.set(showCronSessions, forKey: Keys.showCronSessions) }
     }
 
-    /// The bottom bar's tabs after Chat and the order of ☰ (Appearance › App layout).
-    var appLayout: BighelpAppLayout {
-        didSet {
-            guard appLayout != oldValue else { return }
-            if appLayout == .standard {
-                defaults.removeObject(forKey: Keys.appLayout)
-            } else {
-                defaults.set(appLayout.saved, forKey: Keys.appLayout)
-            }
-        }
-    }
-
     /// Reveals host administration (files, gateways, plugins, logs, ...) in Settings.
     /// Off by default so everyday use stays a simple messaging app.
     var nerdModeEnabled: Bool {
@@ -382,72 +270,79 @@ final class SettingsStore {
         }
     }
 
-    /// The all-hosts view: every agent on every host in one list.
-    var allHostsMode: Bool {
-        didSet { defaults.set(allHostsMode, forKey: Keys.allHostsMode) }
+    /// Settings › Your computers › Show every computer: every computer's bots and chats in the home,
+    /// and the other computers kept connected. Unset (a new install) is on; the migration writes what an
+    /// existing install had.
+    var showsEveryComputer: Bool {
+        get { everyComputer ?? true }
+        set { everyComputer = newValue }
     }
 
-    /// Settings › Code mode: a second home for coding sessions on the host's
-    /// projects. Off by default; Chat stays the out-of-box home.
-    var codeModeEnabled: Bool {
+    /// `bighelp.hosts.all-hosts` as saved; nil until something sets it.
+    private var everyComputer: Bool? {
         didSet {
-            defaults.set(codeModeEnabled, forKey: Keys.codeMode)
-            if !codeModeEnabled { experience = .bighelp }
+            if let everyComputer { defaults.set(everyComputer, forKey: Keys.allHostsMode) }
+            else { defaults.removeObject(forKey: Keys.allHostsMode) }
         }
     }
 
-    /// Settings › Bots mode: a calm home with just your bots, in place of
-    /// the tab bar and ☰. Its own Settings sheet turns it off again.
-    /// Bots mode's Multi-gateway: the home lists every gateway's bots, not only the selected one's.
-    var simpleBotsMultiGateway: Bool {
-        didSet { defaults.set(simpleBotsMultiGateway, forKey: Keys.simpleBotsMultiGateway) }
-    }
-
-    /// Multi-gateway's Filter by Gateway: a filter button on the home that shows one gateway's bots.
-    var simpleBotsGatewayFilter: Bool {
-        didSet { defaults.set(simpleBotsGatewayFilter, forKey: Keys.simpleBotsGatewayFilter) }
-    }
-
-    /// Multi-gateway's primary bot (gateway and bot, `FleetID`), kept on this device so it stays put
-    /// whichever gateway is in use.
+    /// The primary bot while every computer shows (computer and bot, `FleetID`), kept on this device so
+    /// it stays put whichever computer is in use.
     var simpleBotsMultiPrimary: String? {
         didSet { defaults.set(simpleBotsMultiPrimary, forKey: Keys.simpleBotsMultiPrimary) }
     }
 
-    var simpleBotsEnabled: Bool {
-        didSet { defaults.set(simpleBotsEnabled, forKey: Keys.simpleBots) }
+    /// Settings › Chat › Opens on: Bots, Chats, Today or Work. Saved under the old key; a screen saved
+    /// before maps to its place (`BighelpLanding.homeLanding(stored:)`), and nothing saved is Chats.
+    /// Bots and Chats also set the first tab's view.
+    var homeLanding: HomeLanding {
+        get { BighelpLanding.homeLanding(stored: savedLanding) ?? .chats }
+        set {
+            savedLanding = newValue.rawValue
+            switch newValue {
+            case .bots: savedHomeView = .bots
+            case .chats: savedHomeView = .chats
+            case .today, .work: break
+            }
+        }
     }
 
-    /// Settings › Open in: the home a launch starts on while Code mode is on.
-    var startExperience: BighelpExperience {
-        didSet { defaults.set(startExperience.rawValue, forKey: Keys.startExperience) }
+    /// The first tab's view: the one Opens on names, or Settings › Chat › First tab shows when the home
+    /// opens on Today or Work (default Chats).
+    var homeView: HomeConversationsView {
+        get {
+            switch homeLanding {
+            case .bots: .bots
+            case .chats: .chats
+            case .today, .work: savedHomeView ?? .chats
+            }
+        }
+        set { savedHomeView = newValue }
     }
 
-    /// The home on screen now. ☰ switches it; each launch starts on `startExperience`.
-    var experience: BighelpExperience
+    /// Where this launch opens, read once: a new pick applies next time.
+    let launchHomeLanding: HomeLanding
 
-    /// Settings › Chat › Opens on; nil until picked (the agent's latest chat).
-    var landingScreen: BighelpLandingScreen? {
-        didSet { defaults.set(landingScreen?.rawValue, forKey: BighelpLanding.screenKey) }
+    /// `loopdy.home.landing` as saved: one of the four, an old screen, or nil.
+    private var savedLanding: String? {
+        didSet { defaults.set(savedLanding, forKey: BighelpLanding.screenKey) }
     }
 
-    /// What this launch opens on, read once: a new pick applies next time.
-    let launchLanding: BighelpLandingChoice
-
-    /// Settings › Chat › Start with, per computer (`cacheScopeID` → agent ID).
-    private(set) var startAgentIDs: [String: String]
+    private var savedHomeView: HomeConversationsView? {
+        didSet { defaults.set(savedHomeView?.rawValue, forKey: Keys.homeView) }
+    }
 
     private let defaults: UserDefaults
 
     init(
         defaults: UserDefaults = .standard,
-        legacyThemeLogoDirectory: URL? = nil,
-        now: @escaping () -> Date = Date.init
+        legacyThemeLogoDirectory: URL? = nil
     ) {
         self.defaults = defaults
-        self.now = now
         Self.removeRetiredThemes(defaults: defaults,
                                  logoDirectory: legacyThemeLogoDirectory ?? Self.defaultLegacyThemeLogoDirectory)
+        // Before anything below reads the keys it may write.
+        HomeSettingsMigration.runIfNeeded(defaults: defaults)
         let recoveredReflectiveVisionActivation = ReflectiveVisionRecoveryMarker(
             defaults: defaults
         ).consumePendingActivation()
@@ -522,24 +417,10 @@ final class SettingsStore {
             reflectiveVisionEnabled = false
             defaults.set(false, forKey: Keys.reflectiveVision)
         }
-        let storedLeftEdgeSwipeAction = WorkspaceSwipeAction(
-            rawValue: defaults.string(forKey: Keys.leftEdgeSwipeAction) ?? ""
-        ) ?? .sessions
-        let storedRightEdgeSwipeAction = WorkspaceSwipeAction(
-            rawValue: defaults.string(forKey: Keys.rightEdgeSwipeAction) ?? ""
-        ) ?? .newChat
-        leftEdgeSwipeAction = storedLeftEdgeSwipeAction == .inbox
-            ? .home
-            : storedLeftEdgeSwipeAction
-        rightEdgeSwipeAction = storedRightEdgeSwipeAction == .inbox
-            ? .home
-            : storedRightEdgeSwipeAction
-        if storedLeftEdgeSwipeAction == .inbox {
-            defaults.set(WorkspaceSwipeAction.home.rawValue, forKey: Keys.leftEdgeSwipeAction)
-        }
-        if storedRightEdgeSwipeAction == .inbox {
-            defaults.set(WorkspaceSwipeAction.home.rawValue, forKey: Keys.rightEdgeSwipeAction)
-        }
+        leftEdgeSwipeAction = Self.savedEdgeSwipe(Keys.leftEdgeSwipeAction,
+                                                  edgeDefault: HomeSettingsMigration.defaultLeftEdge, in: defaults)
+        rightEdgeSwipeAction = Self.savedEdgeSwipe(Keys.rightEdgeSwipeAction,
+                                                   edgeDefault: HomeSettingsMigration.defaultRightEdge, in: defaults)
         preferredBrowser = ChatBrowserPreference(
             rawValue: defaults.string(forKey: Keys.preferredBrowser) ?? ""
         ) ?? .systemDefault
@@ -573,68 +454,31 @@ final class SettingsStore {
             forKey: Keys.showCronSessions,
             default: false
         )
-        appLayout = BighelpAppLayout(savedObject: defaults.object(forKey: Keys.appLayout))
         nerdModeEnabled = defaults.bool(forKey: Keys.nerdMode, default: false)
         if defaults === UserDefaults.standard {
             BighelpActivityDetailLevel.showsNerdLine = defaults.bool(forKey: Keys.nerdMode, default: false)
         }
-        allHostsMode = defaults.bool(forKey: Keys.allHostsMode, default: false)
-        let codeMode = defaults.bool(forKey: Keys.codeMode, default: false)
-        let start = defaults.string(forKey: Keys.startExperience).flatMap(BighelpExperience.init(rawValue:)) ?? .bighelp
-        codeModeEnabled = codeMode
-        simpleBotsEnabled = defaults.bool(forKey: Keys.simpleBots, default: false)
-        unifiedModeToggleEnabled = defaults.bool(forKey: Keys.unifiedModeToggle, default: false)
+        everyComputer = defaults.object(forKey: Keys.allHostsMode) == nil
+            ? nil : defaults.bool(forKey: Keys.allHostsMode)
         chatSwitcherEnabled = defaults.bool(forKey: Keys.chatSwitcher, default: BighelpChatSwitcher.isOnByDefault)
-        simpleBotsMultiGateway = defaults.bool(forKey: Keys.simpleBotsMultiGateway, default: false)
-        simpleBotsGatewayFilter = defaults.bool(forKey: Keys.simpleBotsGatewayFilter, default: false)
         simpleBotsMultiPrimary = defaults.string(forKey: Keys.simpleBotsMultiPrimary)
-        startExperience = start
-        experience = codeMode ? start : .bighelp
-        let landing = defaults.string(forKey: BighelpLanding.screenKey).flatMap(BighelpLandingScreen.init(rawValue:))
-        landingScreen = landing
-        let legacyOpensChat = defaults.object(forKey: BighelpLanding.legacyOpensChatKey) == nil
-            ? nil : defaults.bool(forKey: BighelpLanding.legacyOpensChatKey)
-        launchLanding = BighelpLanding.choice(screen: landing, legacyOpensChat: legacyOpensChat)
-        startAgentIDs = (defaults.dictionary(forKey: BighelpLanding.startAgentKey) as? [String: String] ?? [:])
-            .filter { $0.key.utf8.count <= Self.maximumStartAgentKeyLength && $0.value.utf8.count <= Self.maximumStartAgentKeyLength }
+        let savedLanding = defaults.string(forKey: BighelpLanding.screenKey)
+        self.savedLanding = savedLanding
+        savedHomeView = defaults.string(forKey: Keys.homeView).flatMap(HomeConversationsView.init(rawValue:))
+        launchHomeLanding = BighelpLanding.homeLanding(stored: savedLanding) ?? .chats
     }
 
-    private static let maximumStartAgentKeyLength = 256
-
-    /// The agent this computer opens with; nil is Automatic.
-    func startAgentID(scope: String?) -> String? {
-        scope.flatMap { startAgentIDs[$0] }
+    /// An edge's swipe as saved. An action that is gone (Inbox, the mode swipes) is saved again as what
+    /// took its place, so the picker shows what the swipe does.
+    private static func savedEdgeSwipe(_ key: String, edgeDefault: WorkspaceSwipeAction,
+                                       in defaults: UserDefaults) -> WorkspaceSwipeAction {
+        let raw = defaults.string(forKey: key)
+        let action = WorkspaceSwipeAction.saved(raw, edgeDefault: edgeDefault)
+        if let raw, WorkspaceSwipeAction.retiredRawValues.contains(raw) {
+            defaults.set(action.rawValue, forKey: key)
+        }
+        return action
     }
-
-    func setStartAgentID(_ id: String?, scope: String) {
-        guard scope.utf8.count <= Self.maximumStartAgentKeyLength,
-              (id?.utf8.count ?? 0) <= Self.maximumStartAgentKeyLength else { return }
-        startAgentIDs[scope] = id
-        defaults.set(startAgentIDs, forKey: BighelpLanding.startAgentKey)
-    }
-
-    /// A picked Opens on decides, at launch, whether every computer's agents show. Bots mode
-    /// opens on its own home and ignores Opens on (its Multi-gateway switch shows every computer).
-    func applyLaunchLandingToAllHostsMode() {
-        guard !simpleBotsEnabled,
-              let on = BighelpLanding.allHostsMode(for: launchLanding), allHostsMode != on else { return }
-        modeBeforeLaunchLanding = (allHostsMode, now())
-        allHostsMode = on
-    }
-
-    /// A notification, widget or link that opened the app goes where it points, in the mode you
-    /// were in: Opens on decides only for a launch you started yourself. Only right after launch.
-    func restoreAllHostsModeForOutsideOpen() {
-        guard let before = modeBeforeLaunchLanding else { return }
-        modeBeforeLaunchLanding = nil
-        guard now().timeIntervalSince(before.at) < Self.outsideOpenWindow, allHostsMode != before.on else { return }
-        allHostsMode = before.on
-    }
-
-    /// The switch as it was before Opens on changed it at this launch.
-    @ObservationIgnored private var modeBeforeLaunchLanding: (on: Bool, at: Date)?
-    @ObservationIgnored private let now: () -> Date
-    private static let outsideOpenWindow: TimeInterval = 30
 
     /// Themes (Nous, Superpilot and your own, with their logos) were replaced by
     /// bubble colors and light and dark backgrounds. Picking a bubble color
@@ -896,16 +740,10 @@ private extension SettingsStore {
         static let showProjectChanges = "loopdy.chat.showProjectChanges"
         static let organizeChatsByProjects = "loopdy.sessions.organizeByProjects"
         static let showCronSessions = "loopdy.sessions.showCronSessions"
-        static let appLayout = "bighelp.app-layout"
         static let nerdMode = "loopdy.settings.nerd-mode"
-        static let allHostsMode = "bighelp.hosts.all-hosts"
-        static let codeMode = "bighelp.settings.code-mode"
-        static let startExperience = "bighelp.settings.code-mode.open-in"
-        static let simpleBots = "bighelp.settings.simple-bots"
-        static let unifiedModeToggle = "bighelp.settings.unified-mode-toggle"
+        static let allHostsMode = HomeSettingsMigration.Keys.everyComputer
+        static let homeView = HomeSettingsMigration.Keys.homeView
         static let chatSwitcher = "bighelp.settings.chat-switcher"
-        static let simpleBotsMultiGateway = "bighelp.simple-bots.multi-gateway"
-        static let simpleBotsGatewayFilter = "bighelp.simple-bots.gateway-filter"
         static let simpleBotsMultiPrimary = "bighelp.simple-bots.multi-gateway.primary"
         static let sessionSectionPreferences = "loopdy.sessions.section-preferences.v1"
     }

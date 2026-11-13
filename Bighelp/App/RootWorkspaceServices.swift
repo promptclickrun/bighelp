@@ -113,8 +113,8 @@ extension RootShellView {
     }
 
     var nativeDeviceToolTrigger: String {
-        let coordinate = appState.activeConversationID.flatMap { nativeRuntime?.bridge.currentCoordinate(for: $0) }
-        return "\(nativeWorkspaceStore?.nativeClient?.isConnected == true):\(voiceSettingsScope ?? "none"):\(appState.activeConversationID ?? "none"):\(coordinate?.storedSessionID ?? "none"):\(coordinate?.runtimeSessionID ?? "none"):\(permissionCenter.deviceTools.revision):\(hostRegistry?.deviceToolFeatureReadinessToken ?? 0):\(deviceToolsOpen):\(UIApplication.shared.isProtectedDataAvailable)"
+        let coordinate = appState.deviceToolConversationID.flatMap { nativeRuntime?.bridge.currentCoordinate(for: $0) }
+        return "\(nativeWorkspaceStore?.nativeClient?.isConnected == true):\(voiceSettingsScope ?? "none"):\(appState.deviceToolConversationID ?? "none"):\(coordinate?.storedSessionID ?? "none"):\(coordinate?.runtimeSessionID ?? "none"):\(permissionCenter.deviceTools.revision):\(hostRegistry?.deviceToolFeatureReadinessToken ?? 0):\(deviceToolsOpen):\(UIApplication.shared.isProtectedDataAvailable)"
     }
 
     /// Whether the phone's channel runs: while bighelp is active or inactive (a notification pulled
@@ -128,16 +128,16 @@ extension RootShellView {
     func runNativeDeviceTools() async {
         #if DEBUG
         if usesDemoFixtures, let call = permissionCenter.demoAppearanceCall, let scope = currentDeviceToolScope,
-           let conversationID = appState.activeConversationID, scenePhase == .active {
+           let conversationID = appState.deviceToolConversationID, scenePhase == .active {
             await call.send(scope: scope, isCurrent: {
-                appState.activeConversationID == conversationID && scenePhase == .active
+                appState.deviceToolConversationID == conversationID && scenePhase == .active
             })
             return
         }
         if usesDemoFixtures, let call = permissionCenter.demoAccessCall, let scope = currentDeviceToolScope,
-           let conversationID = appState.activeConversationID, scenePhase == .active {
+           let conversationID = appState.deviceToolConversationID, scenePhase == .active {
             await call.send(scope: scope, conversationID: conversationID, isCurrent: {
-                appState.activeConversationID == conversationID && Self.deviceToolsOpenNow
+                appState.deviceToolConversationID == conversationID && Self.deviceToolsOpenNow
             })
             return
         }
@@ -154,7 +154,7 @@ extension RootShellView {
         // Off, but a card in the chat can turn it on when an agent asks for it.
         let askable = DeviceAccessAsk.askable(permissions)
         guard !enabled.isEmpty || !askable.isEmpty else { permissionCenter.nativeDeviceToolStatus = nil; return }
-        guard let conversationID = appState.activeConversationID,
+        guard let conversationID = appState.deviceToolConversationID,
               let coordinate = nativeRuntime?.bridge.currentCoordinate(for: conversationID),
               coordinate.owner == owner else {
             NativeDeviceToolSession.log.notice("no channel: the chat has no session yet")
@@ -180,7 +180,7 @@ extension RootShellView {
                     enabled: enabled, askable: askable, isAvailable: {
                         permissions.scope == scope && permissions.revision == revision
                             && Self.deviceToolsOpenNow && UIApplication.shared.isProtectedDataAvailable
-                            && appState.activeConversationID == conversationID
+                            && appState.deviceToolConversationID == conversationID
                     }, isPaused: { !Self.deviceToolsOpenNow },
                     isAnswering: { features.preparedChatModel(id: conversationID)?.isSending == true },
                     handle: guarded)
@@ -250,32 +250,6 @@ extension RootShellView {
     /// This iPhone's or iPad's own voices, where it can run them.
     private static func withOnDeviceVoices(_ client: any VoiceSettingsClient, computer: String) -> any VoiceSettingsClient {
         OnDeviceSpeechEngine.isSupported ? OnDeviceVoiceSettingsClient(host: client, computer: computer) : client
-    }
-
-    var pluginUpdateScope: String? {
-        guard nativeWorkspaceStore == nil else { return nil }
-        #if DEBUG
-        if usesDemoFixtures, ProcessInfo.processInfo.arguments.contains("-plugin-update-fixture") {
-            return "fixture-plugin-update"
-        }
-        #endif
-        return nil
-    }
-
-    var pluginUpdateIsCurrent: @MainActor () -> Bool {
-        #if DEBUG
-        if usesDemoFixtures, ProcessInfo.processInfo.arguments.contains("-plugin-update-fixture") { return { true } }
-        #endif
-        return { false }
-    }
-
-    var pluginUpdateClient: (any PluginUpdateClient)? {
-        #if DEBUG
-        if usesDemoFixtures, ProcessInfo.processInfo.arguments.contains("-plugin-update-fixture") {
-            return PluginUpdatePreviewClient()
-        }
-        #endif
-        return nil
     }
 
     var hostRuntimeScope: String? {

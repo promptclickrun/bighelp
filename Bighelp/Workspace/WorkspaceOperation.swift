@@ -251,6 +251,14 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     /// Agents' HTML apps: an app's page and its latest data (plugin `native-html-apps-v1`, docs/HTML_APPS.md).
     case htmlAppsGet = "html-apps.get"
     case htmlAppsData = "html-apps.data"
+    /// Spaces: live panels on Today that a bot makes and a routine on the computer updates
+    /// (plugin `native-spaces-v1`, docs/SPACES.md).
+    case spacesList = "spaces.list"
+    case spacesGet = "spaces.get"
+    case spacesAdd = "spaces.add"
+    case spacesUpdate = "spaces.update"
+    case spacesRefresh = "spaces.refresh"
+    case spacesDelete = "spaces.delete"
     /// Composio Connect in Hermes, for Settings › Connections › Composio Apps (plugin `native-composio-v1`).
     case composioStatus = "composio.status"
     case composioInstall = "composio.install"

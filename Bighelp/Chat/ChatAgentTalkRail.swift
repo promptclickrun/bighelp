@@ -554,26 +554,17 @@ struct ChatAgentFaceStack: View {
     }
 }
 
-/// One agent's face: its Bots mode mark while that mode is on, else the
-/// face the rest of the app draws (character, pet or picture).
+/// One agent's face, as the rest of the app draws it (character, pet, mark or picture).
 struct ChatAgentTalkFace: View {
     let agentID: String
     let name: String
     let imageURL: URL?
     let size: CGFloat
 
-    @Environment(\.appAppearance) private var appearance
-
     var body: some View {
-        Group {
-            if appearance.simpleBots {
-                SimpleBotFace(agentID: agentID, name: name, imageURL: imageURL, size: size)
-            } else {
-                AgentLiveAvatar(agentID: agentID, displayName: name, imageURL: imageURL, size: size, showsBadge: false)
-            }
-        }
-        .frame(width: size, height: size)
-        .accessibilityHidden(true)
+        SimpleBotFace(agentID: agentID, name: name, imageURL: imageURL, size: size)
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
     }
 }
 

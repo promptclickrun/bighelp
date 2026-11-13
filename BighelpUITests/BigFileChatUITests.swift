@@ -65,7 +65,7 @@ final class BigFileChatUITests: BighelpUITestCase {
 
     @MainActor private func launch(_ hold: String, appearance: String) -> XCUIApplication {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.opens-chat", "YES",
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat",
                                "-loopdy.demo.appearance", appearance, "-test-draft-attachments", hold]
         app.launch()
         return app

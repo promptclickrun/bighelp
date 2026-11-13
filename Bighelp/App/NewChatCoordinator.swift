@@ -40,8 +40,11 @@ final class NewChatCoordinator {
     typealias Creation = @MainActor (AgentProfile) async throws -> SessionRecord
 
     /// `creating` makes the chat on the computer in place of a plain new one. Either way the blank
-    /// canvas shows first, before any round trip.
-    func start(explicitAgentID: String? = nil, creating: Creation? = nil,
+    /// canvas shows first, before any round trip. `replacingBlankChat`: New chat's blank chat is on
+    /// top and another bot was picked for it, so the chat on screen is already a blank canvas; the
+    /// new chat takes its place once the computer has made it, in one step. A second canvas between
+    /// them replaced the top of the stack twice in a moment, and the stack sometimes kept the first.
+    func start(explicitAgentID: String? = nil, creating: Creation? = nil, replacingBlankChat: Bool = false,
                beforePresentation: @escaping @MainActor (String, String?) -> Void = { _, _ in }) async throws -> NewChatOutcome {
         if let inFlightStart {
             return try await inFlightStart.task.value
@@ -50,7 +53,7 @@ final class NewChatCoordinator {
         let startID = UUID()
         let task = Task { @MainActor [self] in
             try await performStart(explicitAgentID: explicitAgentID, creating: creating,
-                                   beforePresentation: beforePresentation)
+                                   replacingBlankChat: replacingBlankChat, beforePresentation: beforePresentation)
         }
         inFlightStart = InFlightStart(id: startID, task: task)
         defer {
@@ -61,7 +64,7 @@ final class NewChatCoordinator {
         return try await task.value
     }
 
-    private func performStart(explicitAgentID: String?, creating: Creation?,
+    private func performStart(explicitAgentID: String?, creating: Creation?, replacingBlankChat: Bool,
                               beforePresentation: @escaping @MainActor (String, String?) -> Void) async throws -> NewChatOutcome {
         // Link may be reconnecting while the shell is already usable. Resolve
         // an active/default agent from the last known directory immediately so
@@ -71,7 +74,8 @@ final class NewChatCoordinator {
         // cache remains a hard failure: Hermes must always receive an explicit
         // agent ID for a new session.
         if let cachedAgent = agents.resolvedAgent(explicitID: explicitAgentID) {
-            return try await openSession(for: cachedAgent, creating: creating, beforePresentation: beforePresentation)
+            return try await open(for: cachedAgent, creating: creating, replacingBlankChat: replacingBlankChat,
+                                  beforePresentation: beforePresentation)
         }
 
         try await agents.load()
@@ -79,7 +83,25 @@ final class NewChatCoordinator {
             return .needsAgentSelection
         }
 
-        return try await openSession(for: agent, creating: creating, beforePresentation: beforePresentation)
+        return try await open(for: agent, creating: creating, replacingBlankChat: replacingBlankChat,
+                              beforePresentation: beforePresentation)
+    }
+
+    private func open(for agent: AgentProfile, creating: Creation?, replacingBlankChat: Bool,
+                      beforePresentation: @MainActor (String, String?) -> Void) async throws -> NewChatOutcome {
+        guard replacingBlankChat, case .chat? = appState.path.last else {
+            return try await openSession(for: agent, creating: creating, beforePresentation: beforePresentation)
+        }
+        // The blank chat on screen stays until the computer has made this bot's.
+        let origin = appState.path
+        let session: SessionRecord
+        if let creating { session = try await creating(agent) } else { session = try await catalog.createDirect(agentID: agent.id) }
+        // The person moved on meanwhile: that navigation stands.
+        guard appState.path == origin else { return .opened(sessionID: session.id, agentID: agent.id) }
+        guard prepare(.chat(conversationID: session.id)) else { return .needsAgentSelection }
+        present(session.id, beforePresentation: beforePresentation)
+        if creating == nil { await placeInActiveProject(session, agent: agent) }
+        return .opened(sessionID: session.id, agentID: agent.id)
     }
 
     private func openSession(for agent: AgentProfile, creating: Creation?,
@@ -155,39 +177,33 @@ final class NewChatCoordinator {
         }
 
         // A Bot Chat is made by the agent's own gateway, where Hermes puts it; it isn't moved.
-        if creating == nil, let hermesWorkspaces {
-            if hermesWorkspaces.catalogAgentID != agent.id || hermesWorkspaces.catalog == nil {
-                await hermesWorkspaces.load(agentID: agent.id)
-            }
-            guard hermesWorkspaces.catalogAgentID == agent.id,
-                  let workspaceCatalog = hermesWorkspaces.catalog else {
-                return .opened(sessionID: session.id, agentID: agent.id)
-            }
-            if let workspaceID = workspaceCatalog.activeWorkspaceID {
-                guard await hermesWorkspaces.select(
-                    id: workspaceID,
-                    agentID: agent.id,
-                    sessionID: session.id
-                ) else {
-                    return .opened(sessionID: session.id, agentID: agent.id)
-                }
-                // The workspace client has already confirmed the move with
-                // Hermes' session.workspace.move and projects.for_cwd
-                // readback. Keep the catalog summary in sync immediately;
-                // the next authoritative session list will rehydrate the
-                // same association from the session's persisted cwd.
-                let workspaceName = HermesWorkspaceSelectionPresentation.selectedName(
-                    store: hermesWorkspaces, sessionID: session.id
-                )
-                catalog.reconcileSessionWorkspace(
-                    id: hermesWorkspaces.workspaceID(forSessionID: session.id),
-                    name: workspaceName,
-                    sessionID: session.id
-                )
-            }
-        }
-
+        if creating == nil { await placeInActiveProject(session, agent: agent) }
         return .opened(sessionID: session.id, agentID: agent.id)
+    }
+
+    /// Hermes starts a new chat in the bot's active project: the chat is moved there, and the chat
+    /// list says so at once.
+    private func placeInActiveProject(_ session: SessionRecord, agent: AgentProfile) async {
+        guard let hermesWorkspaces else { return }
+        if hermesWorkspaces.catalogAgentID != agent.id || hermesWorkspaces.catalog == nil {
+            await hermesWorkspaces.load(agentID: agent.id)
+        }
+        guard hermesWorkspaces.catalogAgentID == agent.id, let workspaceCatalog = hermesWorkspaces.catalog,
+              let workspaceID = workspaceCatalog.activeWorkspaceID,
+              await hermesWorkspaces.select(id: workspaceID, agentID: agent.id, sessionID: session.id) else { return }
+        // The workspace client has already confirmed the move with
+        // Hermes' session.workspace.move and projects.for_cwd
+        // readback. Keep the catalog summary in sync immediately;
+        // the next authoritative session list will rehydrate the
+        // same association from the session's persisted cwd.
+        let workspaceName = HermesWorkspaceSelectionPresentation.selectedName(
+            store: hermesWorkspaces, sessionID: session.id
+        )
+        catalog.reconcileSessionWorkspace(
+            id: hermesWorkspaces.workspaceID(forSessionID: session.id),
+            name: workspaceName,
+            sessionID: session.id
+        )
     }
 
     private func present(_ id: String, beforePresentation: @MainActor (String, String?) -> Void) {

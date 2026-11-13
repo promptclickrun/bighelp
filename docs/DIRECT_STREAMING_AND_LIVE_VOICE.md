@@ -78,8 +78,8 @@ cut itself off and the player stopped. Each call keeps a call audio report: what
 scheduled and finished, the main mixer's output level, the engine, the session and the route, and each change
 with its time (`GeminiLiveAudioDiagnostics`, also in the `LiveVoiceAudio` log every 10 s). Settings › Voice ›
 Advanced, with Advanced options (`settings.nerdModeEnabled`) on, has a switch for each part the call screen shows (`LiveVoiceDebug`, both off at
-first): Call sound report shows it once a second, and Copy report button puts Copy report there and in
-Bots mode's voice bar menu. Its Restart sound stops and starts the player of the Gemini Live call in progress
+first): Call sound report shows it once a second, and Copy report button puts Copy report there.
+Restart sound, on the same page, stops and starts the player of the Gemini Live call in progress
 only (`LiveVoiceCurrentCall`, a weak reference the call clears as it ends).
 
 When Gemini interrupts a reply, the report keeps the last ten microphone-gate decisions at that moment:

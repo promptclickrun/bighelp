@@ -16,11 +16,8 @@ probe also opens its "who is writing" feeds during the reply: on the home for
 the home's agent, and on the second host for its agent in a room homed
 elsewhere (native-room-peer-typing-v1).
 
-With --simulator-id it runs the app's own UI test instead
-(AllHostsHostUITests/testGroupChatWithAnAgentFromEachHostAnswers): the app adds
-both hosts, starts the group from All agents and gets both answers. Then the
-probe reads the home's room to show the link and both replies. Build the app
-for testing first (into --derived-data).
+The app has no UI test for a group chat across two computers, so this probe
+makes the protocol calls only.
 
 Run it with the Hermes checkout's own Python (it needs `websockets`).
 HERMES_DISABLE_LAZY_INSTALLS=1 keeps Hermes from "finishing a source update"
@@ -98,7 +95,7 @@ def free_port() -> int:
 class Host:
     """One isolated Hermes: dashboard and gateway sharing a throwaway home."""
 
-    def __init__(self, label: str, root: Path, hermes: str, model_port: int, logs: Path, display: str | None = None,
+    def __init__(self, label: str, root: Path, hermes: str, model_port: int, logs: Path,
                  plugin: Path | None = None):
         self.label = label
         self.home = root / label / "home"
@@ -132,9 +129,6 @@ class Host:
             API_SERVER_KEY=secrets.token_urlsafe(48), API_SERVER_HOST="127.0.0.1", API_SERVER_PORT=str(self.api_port),
             # Plain http is allowed only on this machine's loopback, as here.
             HERMES_ROOM_LINK_URL=f"http://127.0.0.1:{self.api_port}")
-        if display:
-            subprocess.run([hermes, "profile", "rename", "default", display], cwd=self.project, env=self.env,
-                           check=True, timeout=120, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.logs = [(logs / f"{label}-serve.log").open("w"), (logs / f"{label}-gateway.log").open("w")]
         self.processes = [
             subprocess.Popen([hermes, "serve", "--host", "127.0.0.1", "--port", str(self.dashboard_port),
@@ -328,56 +322,13 @@ async def exercise(home_host: Host, peer_host: Host, reply_timeout: float, plugi
     return evidence
 
 
-async def read_back(home_host: Host) -> dict:
-    """What the home recorded for the group the app made: its link and its replies."""
-    async with RPC(home_host) as home:
-        rooms = (await home("groups.list", {"limit": 50}))["rooms"]
-        mixed = [room for room in rooms if any(m.get("target", {}).get("kind") == "peer" for m in room["members"])]
-        assert len(mixed) == 1, f"expected one group with an agent from the other host, found {len(mixed)}"
-        room = mixed[0]
-        state = await home("groups.state", {"room_id": room["room_id"]})
-        page = await home("groups.log", {"room_id": room["room_id"], "since_seq": 0, "limit": 100})
-        return {"members": [(m["member_id"], m["target"]["kind"]) for m in room["members"]],
-                "peer_routes": [r["status"] for r in state.get("driver_status", {}).get("peer_routes", [])],
-                "replies_from": sorted({e["payload"]["member_id"] for e in page["events"]
-                                        if e["kind"] == "message.member"})}
-
-
-def run_ui(args, hosts: list[Host], root: Path) -> int:
-    repo = Path(__file__).resolve().parent.parent
-    probe = root / "probe.json"
-    probe.write_text(json.dumps({"mode": "roomlink", "address_a": hosts[0].origin.removeprefix("http://"),
-                                 "address_b": hosts[1].origin.removeprefix("http://"),
-                                 "plugin": "yes" if args.plugin else "no"}))
-    probe.chmod(0o600)
-    args.results.mkdir(parents=True, exist_ok=True)
-    env = dict(os.environ, TEST_RUNNER_BIGHELP_SIGNIN_PROBE=str(probe),
-               TEST_RUNNER_BIGHELP_SIGNIN_EVIDENCE=str(args.results / "roomlink"))
-    command = ["xcodebuild", "test-without-building", "-project", str(repo / "Bighelp.xcodeproj"),
-               "-scheme", "Bighelp", "-destination", f"platform=iOS Simulator,id={args.simulator_id}",
-               "-derivedDataPath", str(args.derived_data), "-parallel-testing-enabled", "NO",
-               "-resultBundlePath", str(args.results / "roomlink.xcresult"),
-               "-only-testing:BighelpUITests/AllHostsHostUITests/testGroupChatWithAnAgentFromEachHostAnswers"]
-    with (args.results / "xcodebuild-roomlink.log").open("w") as output:
-        result = subprocess.run(command, env=env, cwd=repo, stdout=output, stderr=subprocess.STDOUT, timeout=1500)
-    print(json.dumps({"ui_test_exit_code": result.returncode}), flush=True)
-    if result.returncode == 0:
-        print(json.dumps(asyncio.run(read_back(hosts[1])), indent=2), flush=True)
-    return result.returncode
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--hermes", required=True, help="the separate Hermes checkout's hermes launcher")
     parser.add_argument("--logs", type=Path, help="keep both hosts' logs in this folder")
     parser.add_argument("--reply-timeout", type=float, default=240)
     parser.add_argument("--plugin", type=Path, help="the bighelp plugin folder to run on both hosts")
-    parser.add_argument("--simulator-id", help="run the app's UI test on this simulator instead of the RPC calls")
-    parser.add_argument("--derived-data", type=Path, help="where the app was built for testing")
-    parser.add_argument("--results", type=Path, default=Path("/private/tmp/roomlink-results"))
     args = parser.parse_args()
-    if args.simulator_id and not args.derived_data:
-        parser.error("--simulator-id needs --derived-data")
     model = ThreadingHTTPServer(("127.0.0.1", 0), ScriptedModel)
     threading.Thread(target=model.serve_forever, daemon=True).start()
     with tempfile.TemporaryDirectory(prefix="roomlink-", dir="/private/tmp") as temporary:
@@ -386,13 +337,10 @@ def main() -> int:
         logs.mkdir(parents=True, exist_ok=True)
         hosts = []
         try:
-            for label, display in (("desk", "Desk agent"), ("lab", "Lab agent")):
-                hosts.append(Host(label, root, args.hermes, model.server_port, logs,
-                                  display=display if args.simulator_id else None, plugin=args.plugin))
+            for label in ("desk", "lab"):
+                hosts.append(Host(label, root, args.hermes, model.server_port, logs, plugin=args.plugin))
             for host in hosts:
                 host.wait_ready()
-            if args.simulator_id:
-                return run_ui(args, hosts, root)
             evidence = asyncio.run(exercise(hosts[0], hosts[1], args.reply_timeout, plugin=args.plugin is not None))
             evidence["model_calls"] = ScriptedModel.calls
             print(json.dumps(evidence, indent=2))

@@ -6,14 +6,10 @@ final class MusicCardStreamUITests: BighelpUITestCase {
     @MainActor
     func testMusicCardStreamsInAndStaysResponsive() throws {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-start-chat", "-preview-ui-v3",
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
                                "-test-companion-disabled", "-test-music-card-reply"]
         app.launch()
-        let newChat = chatNewChatButton(in: app).waitForExistence(timeout: 5)
-            ? chatNewChatButton(in: app) : app.buttons["root.new-chat"]
-        XCTAssertTrue(newChat.waitForExistence(timeout: 5))
-        newChat.tap()
-        confirmNewChatPicker(in: app)
+        startNewChat(with: "finance", in: app)
         let input = app.textViews["Message"]
         XCTAssertTrue(input.waitForExistence(timeout: 5))
         input.tap()

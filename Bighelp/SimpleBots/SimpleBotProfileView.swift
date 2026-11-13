@@ -10,7 +10,7 @@ struct SimpleBotProfileContext {
     let canEdit: Bool
     let onOpenChat: (String) -> Void
     let onOpenRoutine: (ScheduledTask) -> Void
-    let onEditDetails: (AgentProfile) -> Void
+
     /// The bot's default model and reasoning, where the computer lets the app read and change them.
     var makeModelDefaults: ((String) -> AgentRuntimeDefaultsEditorModel?)? = nil
     /// The bot's helper task models (Default Model › Advanced); nil where the computer can't list them.
@@ -38,8 +38,41 @@ struct SimpleBotProfileContext {
     var makeMediaClient: (() -> (any AgentMediaClient)?)? = nil
     /// Nerd Mode shows hidden files (names starting with ".").
     var showsHiddenFiles = false
-    /// Feed, Ideas and Goals as piles (Dashboard); nil hides the tab.
+    /// Feed, Ideas and Goals as piles (Dashboard); nil hides the tab. Its shell board also reads
+    /// the bot's approvals for Info's Approvals row.
     var dashboard: SimpleBotDashboardHooks? = nil
+    /// Why the computer won't let the app edit this bot, shown on About's rows; nil uses a general reason.
+    var editUnavailableReason: String? = nil
+    /// The model About saves a field through, with the shell's check that the computer is still the
+    /// same; nil makes one with no check. A closure that returns nil opens nothing.
+    var makeEditor: ((AgentProfile) -> AgentEditorModel?)? = nil
+    /// The name of the bot's computer while it isn't the one in use yet (a door pushed the page before
+    /// the switch finished). The page then shows "Opening <name>…" and reads nothing, so a bot with
+    /// the same ID on the computer in use never shows in its place. Nil once it's in use.
+    var openingComputer: String? = nil
+    /// ⋯ › New chat with the bot (its ID); nil hides it.
+    var onNewChat: ((String) -> Void)? = nil
+    /// ⋯ › Chats with this bot; nil hides it.
+    var onOpenChats: ((String) -> Void)? = nil
+    /// ⋯ › Pin and Unpin, by the rules of the screen the bot is pinned on; nil hides them.
+    var pinning: BotProfilePinning? = nil
+    /// ⋯ › Use with Siri: its Shortcuts, which need a computer that can run them.
+    var offersShortcuts = false
+    /// ⋯ › Duplicate: a copy of the bot made on its computer; nil where it can't clone.
+    var makeDuplicate: ((AgentProfile) -> AgentDuplicateModel?)? = nil
+    /// ⋯ › Manage bots: export, import and the computer's default, opened on this bot; nil hides it.
+    var onManageBots: ((String) -> Void)? = nil
+    /// ⋯ › Delete bot; nil where the computer can't delete bots. The page closes once its bot is gone.
+    var deletion: AgentDeletionAction? = nil
+}
+
+/// Pinning from a bot page: the screen whose pins they are decides the limit.
+@MainActor
+struct BotProfilePinning {
+    let isPinned: (String) -> Bool
+    /// Room for this bot's pin.
+    let canPin: (String) -> Bool
+    let setPinned: (String, Bool) -> Void
 }
 
 /// What a bot's Dashboard needs from the shell.
@@ -58,11 +91,12 @@ struct SimpleBotDashboardHooks {
     let onBlueprint: (String, String) -> Void
 }
 
-/// A bot's profile in Bots mode: its mark, name and role over every tab, then Dashboard (its
-/// Feed, Ideas and Goals as piles to swipe), Info (Character, instructions and routines),
+/// A bot's page, from every door: its mark, name and role over every tab, then Dashboard (its
+/// Feed, Ideas and Goals as piles to swipe), Info (About, Character, instructions and routines),
 /// Computer (its screen, when the host has one), Files (its folder on the computer) and Media
 /// (photos and videos from its chats). Holding a tab offers Set Default (the tab profiles open
-/// on; Dashboard until one is set) and Rearrange, both the same for every bot.
+/// on; Dashboard until one is set) and Rearrange, both the same for every bot. ⋯ holds what's
+/// done to the bot itself (`BotProfileMenu`).
 @MainActor
 struct SimpleBotProfileView: View {
     let agentID: String
@@ -116,6 +150,17 @@ struct SimpleBotProfileView: View {
     @State private var files: SimpleBotFilesModel?
     @State private var media = AgentMediaStore()
     @State private var isMediaConnected = false
+    /// About: the field being edited and the model it saves through.
+    @State private var aboutEditing: AboutEditing?
+    /// The bot's approvals, on the shell board's connection; read once Info shows.
+    @State private var approvals = AgentBoardStore()
+    @State private var approvalsClient: ObjectIdentifier?
+    @State private var isApprovalsPresented = false
+    @State private var isShortcutsPresented = false
+    @State private var duplicate: AgentDuplicateModel?
+    @State private var isDeleteConfirmationPresented = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -139,13 +184,37 @@ struct SimpleBotProfileView: View {
     }
 
     var body: some View {
-        Group {
+        if let computer = context.openingComputer {
+            // Nothing below runs until the bot's computer is in use: every task and sheet starts then.
+            BotProfileOpeningView(computerName: computer)
+                .safeAreaInset(edge: .top, spacing: 0) { openingHeader }
+                .background(theme.canvas.ignoresSafeArea())
+                .toolbar(.hidden, for: .navigationBar)
+        } else {
+            page
+        }
+    }
+
+    private var openingHeader: some View {
+        HStack {
+            SimpleBotsCircleButton(systemImage: "chevron.left", label: "Back", identifier: "simple-bots.profile.back") {
+                dismiss()
+            }
+            Spacer()
+        }
+        .padding(.horizontal, BighelpTokens.space16)
+        .padding(.vertical, BighelpTokens.space8)
+        .background { SimpleBotsHeaderFade() }
+    }
+
+    private var page: some View {
+        actionPresentations(Group {
             if let profile {
                 content(profile)
             } else {
                 ContentUnavailableView("This bot isn't here anymore", systemImage: "questionmark.circle")
             }
-        }
+        })
         .safeAreaInset(edge: .top, spacing: 0) { header }
         .background(theme.canvas.ignoresSafeArea())
         // Deleted, here or on another device: back to where it opened from. Only once the agent
@@ -191,6 +260,24 @@ struct SimpleBotProfileView: View {
             // The row says how many websites the bot has: read once Info shows, not on every open.
             guard shownTab == .info, let vault, vault.state == .loading else { return }
             await vault.load()
+        }
+        .task(id: approvalsKey) {
+            // The row's count: read once Info shows, and again only on a new connection.
+            guard shownTab == .info, let hooks = context.dashboard else { return }
+            guard let connection = hooks.shellBoard.followableConnection else {
+                // The shell sets its board up in a root task, which waits while this page covers the
+                // root; as the Dashboard does, bring it to the connection of the moment. Its own task,
+                // so this one ending for the new connection never cuts it short.
+                let key = hooks.shellBoardKey()
+                await Task { await hooks.configureShellBoard(key) }.value
+                return
+            }
+            let client = ObjectIdentifier(connection.client)
+            guard approvalsClient != client || approvals.logState != .loaded else { return }
+            await approvals.connect(client: connection.client, scope: connection.scope)
+            await approvals.loadLogs(agentID: agentID)
+            guard !Task.isCancelled else { return }
+            approvalsClient = client
         }
         .task(id: agentID) {
             if context.dashboard != nil, dashboard?.agentID != agentID {
@@ -400,17 +487,7 @@ struct SimpleBotProfileView: View {
                                        identifier: "simple-bots.profile.template") { isSavingTemplate = true }
                     .driveTarget("simple-bots.profile.template")
                 Menu {
-                    Button("Message", systemImage: "message") { context.onOpenChat(profile.id) }
-                    if !isPrimary {
-                        Button("Make Primary Bot", systemImage: "star") { _ = context.agents.setPrimaryAgent(profile.id) }
-                    }
-                    if context.canEdit {
-                        Button("Edit Name and Role", systemImage: "pencil") { context.onEditDetails(profile) }
-                    }
-                    if shownTab == .dashboard {
-                        Toggle("Show routines", systemImage: "calendar.badge.clock", isOn: $showsRoutines)
-                            .accessibilityIdentifier("simple-bots.profile.show-routines")
-                    }
+                    moreMenuItems(profile)
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.bighelp(.title3, weight: .medium))
@@ -429,11 +506,130 @@ struct SimpleBotProfileView: View {
         .background { SimpleBotsHeaderFade() }
     }
 
+    private func moreMenuItems(_ profile: AgentProfile) -> some View {
+        BotProfileMoreMenuItems(actions: BotProfileMenu.actions(menuCapabilities(profile)),
+                                showsRoutines: $showsRoutines) { perform($0, on: profile) }
+    }
+
+    private func menuCapabilities(_ profile: AgentProfile) -> BotProfileMenuCapabilities {
+        BotProfileMenuCapabilities(
+            isOnComputerInUse: context.openingComputer == nil,
+            isPrimary: isPrimary,
+            offersNewChat: context.onNewChat != nil,
+            offersChats: context.onOpenChats != nil,
+            offersPinning: context.pinning != nil,
+            isPinned: context.pinning?.isPinned(profile.id) == true,
+            canPinAnother: context.pinning?.canPin(profile.id) == true,
+            offersShortcuts: context.offersShortcuts,
+            offersDuplicate: context.makeDuplicate != nil,
+
+            showsRoutinesToggle: shownTab == .dashboard,
+            offersManage: context.onManageBots != nil,
+            offersDelete: context.deletion != nil,
+            isDefaultBot: !AgentDeletionPresentation.canDelete(profile),
+            isDeleting: isDeleting)
+    }
+
+    private func perform(_ action: BotProfileAction, on profile: AgentProfile) {
+        let id = profile.id
+        switch action {
+        case .message: context.onOpenChat(id)
+        case .newChat: context.onNewChat?(id)
+        case .chats: context.onOpenChats?(id)
+        case .makePrimary: _ = context.agents.setPrimaryAgent(id)
+        case .pin, .unpin: context.pinning?.setPinned(id, action == .pin)
+        case .shortcuts: isShortcutsPresented = true
+        case .duplicate: duplicate = context.makeDuplicate?(profile)
+
+        case .showRoutines: showsRoutines.toggle()
+        case .manageBots: context.onManageBots?(id)
+        case .delete: isDeleteConfirmationPresented = true
+        }
+    }
+
+    /// What ⋯ and About open: an About field's editor, Use with Siri, Duplicate, the Approvals page
+    /// and Delete bot's confirmation, progress and error. Kept apart from `page`'s own modifiers,
+    /// which are already as many as the type checker takes in one expression.
+    private func actionPresentations(_ content: some View) -> some View {
+        content
+            .bighelpSheet(item: $aboutEditing) { editing in
+                BotProfileFieldEditor(field: editing.field, model: editing.model)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                    .bighelpSheetSize(.compact)
+            }
+            .bighelpSheet(isPresented: $isShortcutsPresented) {
+                if let profile {
+                    AgentShortcutsView(agent: profile)
+                        .bighelpSheetSize(.standard)
+                }
+            }
+            .bighelpSheet(item: $duplicate) { model in
+                AgentDuplicateView(model: model) {
+                    duplicate = nil
+                    let agents = context.agents
+                    Task { await agents.loadReportingErrors() }
+                }
+                .bighelpSheetSize(.standard)
+            }
+            .navigationDestination(isPresented: $isApprovalsPresented) {
+                BotApprovalsPage(store: approvals, botName: profile?.name ?? "")
+                    .toolbar(.visible, for: .navigationBar)
+            }
+            .confirmationDialog(profile.map(AgentDeletionPresentation.title) ?? "",
+                                isPresented: $isDeleteConfirmationPresented,
+                                titleVisibility: .visible, presenting: profile) { profile in
+                Button("Delete bot", role: .destructive) { delete(profile) }
+                    .accessibilityIdentifier("simple-bots.profile.delete.confirm")
+            } message: { profile in
+                // Says what goes from the computer, at the control, every time.
+                Text(AgentDeletionPresentation.message(profile))
+            }
+            .alert("Couldn't delete this bot", isPresented: Binding(get: { deleteError != nil },
+                                                                    set: { if !$0 { deleteError = nil } })) {
+                Button("OK") { deleteError = nil }
+            } message: { Text(deleteError ?? "") }
+            .overlay(alignment: .bottom) {
+                if isDeleting, let profile {
+                    // Still: the computer takes up to ten seconds, and nothing here needs to move meanwhile.
+                    Text(AgentDeletionPresentation.progress(profile))
+                        .font(.bighelp(.subheadline, weight: .medium))
+                        .foregroundStyle(theme.primaryText)
+                        .padding(.horizontal, BighelpTokens.space20)
+                        .frame(minHeight: BighelpTokens.hitTarget)
+                        .bighelpNavigationGlass(in: Capsule())
+                        .padding(.bottom, BighelpTokens.space24)
+                        .accessibilityIdentifier("simple-bots.profile.deleting")
+                }
+            }
+    }
+
+    /// After the confirmation. On success the shell closes the page (`closeScreens(ofDeletedAgent:)`),
+    /// and the page closes itself once its bot leaves the list anyway.
+    private func delete(_ profile: AgentProfile) {
+        guard let deletion = context.deletion, !isDeleting else { return }
+        isDeleting = true
+        Task { @MainActor in
+            defer { isDeleting = false }
+            do {
+                try await deletion.run(profile.id)
+            } catch {
+                deleteError = AgentDeletionPresentation.errorMessage(error)
+            }
+        }
+    }
+
     private func content(_ profile: AgentProfile) -> some View {
         ScrollView {
             VStack(spacing: BighelpTokens.space24) {
-                face(profile)
-                identityCard(profile)
+                VStack(spacing: BighelpTokens.space24) {
+                    face(profile)
+                    identityCard(profile)
+                }
+                #if targetEnvironment(macCatalyst)
+                // The Mac's way to ⋯: a right-click on the bot's face or name.
+                .contextMenu { moreMenuItems(profile) }
+                #endif
                 tabBar
                 Group {
                     switch shownTab {
@@ -741,27 +937,99 @@ struct SimpleBotProfileView: View {
                                       : String(localized: "This computer doesn't let the app change this bot."))
     }
 
-    /// Info: Personality, Defaults and What it can use, then Routines and, last, Advanced Options.
-    /// A group shows only the rows this computer offers, and none of a group that has none.
+    /// Info: About, Personality, Defaults and What it can use, then Routines and, last, Advanced
+    /// Options. A group shows only the rows this computer offers, and none of a group that has none.
     private func info(_ profile: AgentProfile) -> some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
+            about(profile)
             infoGroup(String(localized: "Personality"), [.character, .instructions, .coreFiles], profile: profile)
             infoGroup(String(localized: "Defaults"), [.defaultModel, .defaultVoice, .activeProject], profile: profile)
-            infoGroup(String(localized: "What it can use"), [.connections, .marketplace, .credentialVault, .photoActions],
-                      profile: profile)
+            infoGroup(String(localized: "What it can use"),
+                      [.connections, .marketplace, .credentialVault, .photoActions, .approvals], profile: profile)
             routines(profile)
             infoGroup(nil, [.advancedOptions], profile: profile)
         }
     }
 
+    /// Name, Role, Summary and Handle, each with its value as its second line. A tap edits that one
+    /// field in a small sheet; a computer that won't take edits says why instead.
+    private func about(_ profile: AgentProfile) -> some View {
+        let rows = BotProfileAbout.rows(
+            name: profile.name, role: profile.role, summary: profile.summary,
+            handle: AgentHandle.unique(base: profile.name, excluding: profile.id, profiles: context.agents.profiles),
+            canEdit: context.canEdit, unavailableReason: context.editUnavailableReason)
+        return VStack(alignment: .leading, spacing: BighelpTokens.space12) {
+            SimpleBotsSectionLabel(title: String(localized: "About"))
+            SimpleBotsCard {
+                ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                    if index > 0 { SimpleBotsDivider() }
+                    aboutRow(row, profile: profile)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func aboutRow(_ row: BotProfileAboutRow, profile: AgentProfile) -> some View {
+        if case .field(let field) = row.kind {
+            Button { editAbout(field, of: profile) } label: {
+                SimpleBotsRow(title: row.title, detail: row.detail) {
+                    if row.isEditable { SimpleBotsDisclosure() }
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(!row.isEditable)
+            .driveTarget(row.identifier)
+            .accessibilityIdentifier(row.identifier)
+        } else {
+            SimpleBotsRow(title: row.title, detail: row.detail) { EmptyView() }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier(row.identifier)
+        }
+    }
+
+    private func editAbout(_ field: BotProfileAboutField, of profile: AgentProfile) {
+        let model: AgentEditorModel?
+        if let makeEditor = context.makeEditor {
+            model = makeEditor(profile)
+        } else {
+            model = AgentEditorModel.editing(profile, store: context.agents, processor: AvatarImageProcessor())
+        }
+        guard let model else { return }
+        aboutEditing = AboutEditing(field: field, model: model)
+    }
+
+    private struct AboutEditing: Identifiable {
+        let field: BotProfileAboutField
+        let model: AgentEditorModel
+        var id: ObjectIdentifier { ObjectIdentifier(model) }
+    }
+
+    /// Info's Approvals load again for a new connection, never for each look at the tab.
+    private struct ApprovalsKey: Hashable {
+        let isInfo: Bool
+        let client: ObjectIdentifier?
+    }
+
+    private var approvalsKey: ApprovalsKey {
+        ApprovalsKey(isInfo: shownTab == .info,
+                     client: context.dashboard?.shellBoard.followableConnection.map { ObjectIdentifier($0.client) })
+    }
+
+    /// How many approvals the bot has asked for, once read.
+    private var approvalsCount: String? {
+        approvals.logState == .loaded && approvalsClient != nil ? approvals.approvals.count.formatted() : nil
+    }
+
     private enum InfoRow: Hashable {
         case character, instructions, coreFiles, defaultModel, defaultVoice, activeProject
-        case connections, marketplace, credentialVault, photoActions, advancedOptions
+        case connections, marketplace, credentialVault, photoActions, approvals, advancedOptions
     }
 
     private func offers(_ row: InfoRow) -> Bool {
         switch row {
         case .character, .instructions, .photoActions: true
+        case .approvals: context.dashboard != nil
         case .coreFiles: context.makeCoreFiles != nil
         case .defaultModel: modelDefaults != nil
         case .defaultVoice: voice != nil
@@ -892,6 +1160,14 @@ struct SimpleBotProfileView: View {
             .disabled(!context.canEdit)
             .driveTarget("simple-bots.profile.photo-actions")
             .accessibilityIdentifier("simple-bots.profile.photo-actions")
+        case .approvals:
+            Button { isApprovalsPresented = true } label: {
+                SimpleBotsRow(title: String(localized: "Approvals"), leading: Image(systemName: "checkmark.shield"),
+                              value: approvalsCount)
+            }
+            .buttonStyle(.plain)
+            .driveTarget("simple-bots.profile.approvals")
+            .accessibilityIdentifier("simple-bots.profile.approvals")
         case .advancedOptions:
             Button { isAdvancedPresented = true } label: {
                 SimpleBotsRow(title: String(localized: "Advanced Options"),
@@ -984,8 +1260,7 @@ struct SimpleBotProfileView: View {
         }
     }
 
-    /// The bot's board as the Feed, Ideas and Goals pages take it. Bots mode has no menu or agent
-    /// switcher, so those do nothing; the chat is always this bot's own.
+    /// The bot's board as the Feed, Ideas and Goals pages take it. The chat is always this bot's own.
     private func boardContext(_ profile: AgentProfile, hooks: SimpleBotDashboardHooks,
                               store: AgentBoardStore) -> AgentBoardContext {
         let id = profile.id
@@ -994,7 +1269,7 @@ struct SimpleBotProfileView: View {
             activity: .idle, store: store,
             onProfile: {}, onSwitchAgent: {},
             onAsk: { hooks.onAsk(id, $0) }, onSend: { hooks.onSend(id, $0) }, onBlueprint: { hooks.onBlueprint(id, $0) },
-            onMenu: {}, onNewChat: { context.onOpenChat(id) }, onPickAgents: {}, tools: [])
+            onNewChat: { context.onOpenChat(id) })
     }
 
     private func mediaTab(_ profile: AgentProfile) -> some View {

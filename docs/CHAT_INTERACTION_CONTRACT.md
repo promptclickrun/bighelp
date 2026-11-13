@@ -48,7 +48,7 @@ canonical data, reader state, and disposable views:
 | Reader choices and drafts | The prepared chat's disclosure store owns explicit tool/fold choices. `DashboardModel` owns clarification drafts by item, session, and request; removal/account reset prunes them. These are local presentation state, not a new transcript authority. |
 | Hosted SwiftUI content | `HostedRow.body` preserves Observation, and `.id(row.id)` scopes recycled local state. Propagate public presentation values and app dependencies without replacing the hosting configuration's private layout/accessibility environment. |
 | Persistence | Existing bounded checkpoints coalesce draft/tool writes. A pause in typing writes the plain draft to `ChatDraftJournal`, never the catalog; the chat's next save takes it, and a relaunch restores it only while the saved draft is one the journal saw. Reference drafts keep their own checkpoint. Live final-turn, stop, navigation, and lifecycle paths retain explicit flushes. Historical final answers and subagent lifecycle updates share the catch-up checkpoint; a terminal tool must not synchronously rewrite the entire retained session. |
-| Idle startup | Home, sidebar and Sessions hold stable presentation during catch-up and publish the accumulated state once. Routing and actions continue to resolve canonical records. See [idle startup reliability](IDLE_STARTUP_RELIABILITY.md). |
+| Idle startup | The Chats view, sidebar and Sessions page hold stable presentation during catch-up and publish the accumulated state once. Routing and actions continue to resolve canonical records. See [idle startup reliability](IDLE_STARTUP_RELIABILITY.md). |
 
 Tail following occurs after UIKit layout and yields during tracking, dragging,
 and deceleration. The deferred publication of the bottom-state Boolean is for
@@ -117,7 +117,7 @@ cover these boundaries:
 | Typed drafts survive a relaunch without catalog writes | `ChatDraftJournalTests` |
 
 Run [ChatStreamingAnchorUITests](../BighelpUITests/ChatStreamingAnchorUITests.swift)
-for the three short/long/expanded stress scenarios, growing-tail following,
+for the short and large-tool stress scenarios, growing-tail following,
 reading during a stream, consecutive tool turns, sending from history, and first
 short-response placement. Run
 [ToolDisclosureUITests](../BighelpUITests/ToolDisclosureUITests.swift) for expanded
@@ -176,6 +176,27 @@ or successful TestFlight processing cannot replace interaction evidence.
 The user's acceptance of build 2.0.1 (8) establishes the product baseline;
 physical-device frame-rate claims still require device measurements.
 
+## What surrounds the message box
+
+A chat is a pushed page. Its header is Back, the bot (a tap opens its bot page) and ⋯ (`ChatPushedHeader`). No bar
+sits under the message box. None of this changes scrolling, drafts, streaming, keyboard control or history. The chat
+table stays full height, and the header and the message box overlay it as described below.
+
+New chat's own blank chat adds three parts through `ChatNewChatSlot`. A To row sits in the header, where the bot's
+name would be. A people list sits over the empty messages. For one bot, one row of coding choices sits under the
+message box.
+
+These parts draw only while nothing is sent in that chat. From its first message on (staged, sending or sent) the chat
+is an ordinary chat. The shell decides which chat gets the parts from the chat's ID, never from its messages. Each part
+is the shell's own view with its own state, so a change in one redraws that part and not the chat.
+
+The Send hook (`ChatComposerActions.sendOverride`) is asked before the chat's own send. True means the message went
+elsewhere (a group chat, a coding session), and whoever took it empties the box. False sends in this chat as usual.
+The hook must not capture a view, because `ChatComposerHost` keeps it for as long as the chat is open. The message box
+must not redraw for it. `ChatComposer` is `Equatable`: a new input that changes how the box looks goes in its `==`.
+The choices row is `Equatable` too. It reads `ChatModel.draftShape` in a small host view of its own, never in the
+shell or the route, or every key press redraws the shell.
+
 ## Glass, startup and suggested prompts
 
 Native Liquid Glass controls need the scrolling content behind them. Keep the
@@ -191,11 +212,11 @@ the available width. Verify default and accessibility Dynamic Type; a label in
 the accessibility tree does not prove the title is visibly rendered. Selecting
 a prompt retains the established quick-action behavior.
 
-Home may appear from cached admission before the host is ready. Dashboard loads
+The home may appear from cached admission before the host is ready. Dashboard loads
 must wait for the verified connection and reject results from a replaced
 connection. Navigation cancellation must not become a visible load failure.
 
-Long-pressing the bighelp logo in every workspace sidebar presents the same
+The header's computer menu on Today and Work switches the computer in use through the same
 loaded host selection state.
 
 
@@ -235,9 +256,8 @@ the canonical byte-preservation, uncertain-delivery and failed-checkpoint cases.
 
 ## Sidebar and optional project context
 
-Home, Scratchpad, Wiki, Scheduled Tasks, Skills & Tools and Settings form one
-continuous navigation group: do not add a divider after Wiki. Pinned agent previews
-follow the navigation, with sessions below; preserve the existing bounded previews
+The three places and Settings form one continuous navigation group: do not add a divider
+between them. Recent chats follow, bounded to eight, then More; preserve the bounded list
 so navigation and some content remain visible together.
 
 A selected non-repository folder remains valid chat context. Its Changes rail reads

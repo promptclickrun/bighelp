@@ -69,8 +69,7 @@ final class FirstRunOnboardingUITests: BighelpUITestCase {
         ocean.tap()
         XCTAssertTrue(ocean.isSelected)
         capture("Chosen bubble color in dark appearance")
-        app.terminate()
-        app.launch()
+        relaunch(app)
         XCTAssertTrue(app.buttons["onboarding.appearance.continue"].waitForExistence(timeout: 15))
         let restored = app.buttons["appearance.bubble.ocean"]
         for _ in 0..<4 where !restored.isHittable { app.swipeUp() }
@@ -90,8 +89,7 @@ final class FirstRunOnboardingUITests: BighelpUITestCase {
         XCTAssertTrue(app.buttons["onboarding.ai-consent.privacy"].exists, "It links the privacy policy.")
         agree.tap()
         XCTAssertTrue(app.textFields["host-setup.address"].waitForExistence(timeout: 5))
-        app.terminate()
-        app.launch()
+        relaunch(app)
         let back = app.buttons["onboarding.back"]
         XCTAssertTrue(back.waitForExistence(timeout: 15))
         back.tap()
@@ -105,13 +103,13 @@ final class FirstRunOnboardingUITests: BighelpUITestCase {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays"]
         app.launch()
-        XCTAssertTrue(app.buttons["home.drawer.open"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["home.new-chat"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["onboarding.get-started"].exists)
     }
 
-    /// After Connect: the plugin and notifications can be skipped, the mode can't, and the
-    /// mode chosen is the home onboarding ends on.
-    func testOptionalStepsSkipAndTheChosenModeOpens() {
+    /// After Connect: the plugin and notifications can be skipped, "How do you want to start?" can't,
+    /// and the home opens on the place chosen.
+    func testOptionalStepsSkipAndTheChosenHomeOpens() {
         let app = launchAfterConnect(at: 3)
         XCTAssertTrue(app.buttons["onboarding.plugin.install"].waitForExistence(timeout: 15))
         let skip = app.buttons["onboarding.skip"]
@@ -120,20 +118,16 @@ final class FirstRunOnboardingUITests: BighelpUITestCase {
         skip.tap()
 
         XCTAssertTrue(app.staticTexts["onboarding.mode.later"].waitForExistence(timeout: 5))
-        XCTAssertFalse(skip.exists, "Choosing a mode can't be skipped.")
-        XCTAssertTrue(app.buttons["onboarding.mode.bots"].exists)
-        capture("Choose your mode")
-        app.buttons["onboarding.mode.bots"].swipeLeft()
-        app.buttons["onboarding.mode.sessions"].swipeLeft()
-        let code = app.buttons["onboarding.mode.code"]
-        XCTAssertTrue(code.waitForExistence(timeout: 5))
-        code.tap()
-        let use = app.buttons["onboarding.mode.preview.use"]
-        XCTAssertTrue(use.waitForExistence(timeout: 5), "A card shows its mode's preview.")
-        capture("Code preview")
-        use.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["code.screen"].firstMatch.waitForExistence(timeout: 10),
-                      "Code opens as the home.")
+        XCTAssertFalse(skip.exists, "How to start can't be skipped.")
+        XCTAssertTrue(app.buttons["onboarding.mode.chats"].exists)
+        capture("How do you want to start")
+        // The run's own landing is Chats (the base class pins it): Bots must come from the answer.
+        let bots = app.buttons["onboarding.mode.bots"]
+        XCTAssertTrue(bots.waitForExistence(timeout: 5))
+        bots.tap()
+        app.buttons["onboarding.mode.continue"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["simple-bots.home"].firstMatch.waitForExistence(timeout: 10),
+                      "The home opens on Bots.")
     }
 
     func testNotificationsCanBeSkipped() {
@@ -153,11 +147,23 @@ final class FirstRunOnboardingUITests: BighelpUITestCase {
         return app
     }
 
+    /// A first launch: nobody has agreed to share data yet, whatever an earlier run on this
+    /// simulator left saved.
     private func launchFresh() -> XCUIApplication {
         let app = makeApp()
-        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-no-configured-hosts", "-force-signed-out-onboarding"]
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-test-no-configured-hosts",
+                               "-force-signed-out-onboarding", Self.forgetsAgreement]
         app.launch()
         return app
+    }
+
+    private static let forgetsAgreement = "-test-forget-ai-data-agreement"
+
+    /// Closes the app and opens it again, keeping what the first launch saved.
+    private func relaunch(_ app: XCUIApplication) {
+        app.terminate()
+        app.launchArguments.removeAll { $0 == Self.forgetsAgreement }
+        app.launch()
     }
 
     private func capture(_ name: String) {

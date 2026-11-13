@@ -83,7 +83,7 @@ gzip-compressed when that is smaller, with a 5-second timeout. It holds:
   | Event | What it carries |
   |---|---|
   | `app.opened`, `app.backgrounded`, `session.ended` | whether it was a cold start; time in the foreground; session length |
-  | `feature.used` | which of 14 fixed features was used: chat sent, card drawn, card answered, voice turn, live voice, workflow run, mode switched, agent opened, file opened, Shortcut run (counted after the AI-data agreement), widget opened (any `loopdy://` link the system opens: mostly widgets, also Live Activity and alert links), CarPlay voice, Watch chat, notification opened |
+  | `feature.used` | which of 13 fixed features was used: chat sent, card drawn, card answered, voice turn, live voice, workflow run, agent opened, file opened, Shortcut run (counted after the AI-data agreement), widget opened (any `loopdy://` link the system opens: mostly widgets, also Live Activity and alert links), CarPlay voice, Watch chat, notification opened |
   | `perf.first_token_ms`, `perf.reconnect` | milliseconds from Send to the first streamed word; how long a reconnect took and whether it worked |
   | `perf.launch` | MetricKit's launch histograms: the middle bucket and how many launches |
   | `hang`, `crash` | MetricKit's reports: exception type, code and signal as numbers, and up to 64 stack frames as a binary UUID, an offset and the binary's name |
@@ -419,8 +419,8 @@ Nothing leaves the device until the person opens bighelp, picks the agent and
 chat, and taps Send there: the share goes into that chat's message box, and the
 usual AI data agreement, computer and attachment checks apply. bighelp deletes a
 share from the device only once Hermes takes the message that carries it, or when
-the person deletes it (☰ › Shared with bighelp, or the first screen of Settings, lists
-every waiting share). Before a message carrying a share goes, bighelp saves that
+the person deletes it (Today's Shared with bighelp card, the first screen of Settings and the
+sidebar's More open the list of every waiting share). Before a message carrying a share goes, bighelp saves that
 it's being sent; if it can't, the message isn't sent. Once Hermes takes it, the
 share is marked spent first, so it's never offered again even if deleting it has
 to wait. A message still waiting for its connection or refused keeps the share as
@@ -627,8 +627,8 @@ Authorized Wiki metadata can disclose the chosen absolute source folder to the a
 
 ## Group presentation preferences
 
-The Agents screen keeps pinned and archived group preferences locally on this
-device, scoped to the authenticated workspace. Archiving here hides the group
-from the active Agents list; Archived groups can restore it. This does not stop
-Hermes work or delete its transcript. Delete is a separate confirmed action through Hermes' native
+The Bots view keeps each group chat's pin, hidden state and section on this device, by
+computer, and also on the person's computers (`bots.layout`, plugin `native-app-state-v1`).
+Hiding a group removes it from the Bots view's list, and search's filter can show it again.
+This does not stop Hermes work or delete its transcript. Delete is a separate confirmed action through Hermes' native
 `groups.disband` operation, which stops the room and permanently retires its ID.

@@ -55,11 +55,10 @@ final class HostSignInMatrixUITests: BighelpUITestCase {
         try connect(app)
         app.buttons["host-setup.continue"].tap()
         // A new host has no chats yet: start the first one.
-        let firstChat = app.buttons["sessions.empty.new-chat"]
-        if firstChat.waitForExistence(timeout: 10) {
-            firstChat.tap()
-            confirmNewChatPicker(in: app)
-        }
+        let firstChat = app.buttons["home.new-chat"].firstMatch
+        XCTAssertTrue(firstChat.waitForExistence(timeout: 20), "The home opens")
+        firstChat.tap()
+        confirmNewChatPicker(in: app)
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 20), "A chat opens after connecting")
         composer.tap()
@@ -232,10 +231,10 @@ final class HostSignInMatrixUITests: BighelpUITestCase {
         XCTAssertFalse(text("MEDIA:", in: app).exists, "No raw MEDIA line in its place")
         save("media-1-after-turn", app)
 
-        swipeBackFromLeadingEdge(in: app)
+        goBackFromChat(in: app)
         let row = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "session.row.")).firstMatch
-        if !row.waitForExistence(timeout: 5) { openRootTab("tab.sessions", in: app) }
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "chats.row.")).firstMatch
+        if !row.waitForExistence(timeout: 5) { showChats(in: app) }
         XCTAssertTrue(row.waitForExistence(timeout: 15), "The chat is listed")
         row.tap()
         XCTAssertTrue(picture.waitForExistence(timeout: 30), "The picture is there after reopening the chat")
@@ -260,10 +259,10 @@ final class HostSignInMatrixUITests: BighelpUITestCase {
         XCTAssertFalse(text("MEDIA:", in: app).exists, "No raw MEDIA line in their place")
         save("media-11-saved-pictures", app)
 
-        swipeBackFromLeadingEdge(in: app)
+        goBackFromChat(in: app)
         let row = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "session.row.")).firstMatch
-        if !row.waitForExistence(timeout: 5) { openRootTab("tab.sessions", in: app) }
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "chats.row.")).firstMatch
+        if !row.waitForExistence(timeout: 5) { showChats(in: app) }
         XCTAssertTrue(row.waitForExistence(timeout: 15), "The chat is listed")
         row.tap()
         XCTAssertTrue(pictures.waitForExistence(timeout: 30), "The pictures are there after reopening the chat")
@@ -277,8 +276,8 @@ final class HostSignInMatrixUITests: BighelpUITestCase {
         let app = try beginSetup(mode: "media")
         try connect(app)
         app.buttons["host-setup.continue"].tap()
-        openRootTab("tab.agents", in: app)
-        let agent = app.buttons["agent.default"].firstMatch
+        showBots(in: app)
+        let agent = app.buttons["simple-bots.bot.default"].firstMatch
         XCTAssertTrue(agent.waitForExistence(timeout: 30), "The agent is listed")
         agent.tap()
         let composer = app.textViews["chat.composer.text"]
@@ -311,7 +310,7 @@ final class HostSignInMatrixUITests: BighelpUITestCase {
 
         app.terminate()
         app.launch()
-        openRootTab("tab.agents", in: app)
+        showBots(in: app)
         XCTAssertTrue(agent.waitForExistence(timeout: 30))
         agent.tap()
         XCTAssertTrue(pictures.waitForExistence(timeout: 45), "The pictures are there after a relaunch")
@@ -326,8 +325,8 @@ final class HostSignInMatrixUITests: BighelpUITestCase {
         let app = try beginSetup(mode: "media")
         try connect(app)
         app.buttons["host-setup.continue"].tap()
-        openRootTab("tab.agents", in: app)
-        let agent = app.buttons["agent.default"].firstMatch
+        showBots(in: app)
+        let agent = app.buttons["simple-bots.bot.default"].firstMatch
         XCTAssertTrue(agent.waitForExistence(timeout: 30), "The agent is listed")
         agent.tap()
         let composer = app.textViews["chat.composer.text"]
@@ -447,7 +446,7 @@ final class HostSignInMatrixUITests: BighelpUITestCase {
         let app = try beginSetup(mode: "media", extraArguments: ["-test-vault-import"])
         try connect(app)
         app.buttons["host-setup.continue"].tap()
-        XCTAssertTrue(app.buttons["home.drawer.open"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["home.new-chat"].waitForExistence(timeout: 20))
         openConnectionsRow("settings.connections.vault", in: app)
         XCTAssertTrue(app.staticTexts["vault.empty"].waitForExistence(timeout: 20), "A new host's vault is empty")
         app.buttons["vault.add"].tap()
@@ -482,13 +481,11 @@ final class HostSignInMatrixUITests: BighelpUITestCase {
     @MainActor private func openFirstChat(_ app: XCUIApplication) throws -> XCUIElement {
         try connect(app)
         app.buttons["host-setup.continue"].tap()
-        // A new host has no chats yet; one used by an earlier test opens its latest.
-        let newChat = app.buttons.matching(NSPredicate(format: "identifier IN %@",
-            ["sessions.empty.new-chat", "chat.home.new-chat", "chat.new-chat", "root.new-chat"])).firstMatch
-        if newChat.waitForExistence(timeout: 10) {
-            newChat.tap()
-            confirmNewChatPicker(in: app)
-        }
+        // The home's New chat, beside the bar; it opens with nobody picked.
+        let newChat = app.buttons["home.new-chat"].firstMatch
+        XCTAssertTrue(newChat.waitForExistence(timeout: 20), "The home opens")
+        newChat.tap()
+        confirmNewChatPicker(in: app)
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 20), "A chat opens after connecting")
         return composer

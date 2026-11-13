@@ -38,11 +38,11 @@ BLACK = dict(page="#000000", ink="#FFFFFF", ink2="rgba(255,255,255,.62)", pill="
 PANELS = [
     ("01-chat", "01-spending", "Chat", ("Your bots.", "One simple chat."),
      ("Text your own AI agents like you'd text a friend.", "Answers come back as clear cards.")),
-    ("02-bots", "11-bots", "Bots mode", ("Just your bots.", "A text away."),
+    ("02-bots", "11-bots", "Bots", ("Just your bots.", "A text away."),
      ("A calm home for the bots you talk to most.", "Tap one and chat.")),
     ("03-feed", "03-feed", "Feed", ("A Feed that fills", "when you ask."),
      ("Your bots post what you asked for.", "Nothing runs until you say so.")),
-    ("04-code", "12-code", "Code mode", ("Code anywhere.", "Just describe it."),
+    ("04-code", "12-code", "Work", ("Code anywhere.", "Just describe it."),
      ("Each message starts its own coding session.", "Check the changes when it's done.")),
     ("05-ideas", "08-ideas", "Ideas", ("Ideas it noticed.", "You decide."),
      ("Your bot offers to take things off your plate.", "Tap Let's do it, or don't.")),

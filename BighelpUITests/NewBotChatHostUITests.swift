@@ -15,9 +15,9 @@ final class NewBotChatHostUITests: BighelpUITestCase {
         let app = makeApp()
         app.launch()
         try onboardOpenHost(app, address: try XCTUnwrap(probe["address"]))
-        openRootTab("tab.agents", in: app)
-        let row = app.buttons["agent.\(agent)"].firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 30), "agent.\(agent) on Agents")
+        showBots(in: app)
+        let row = botRow(agent, in: app)
+        XCTAssertTrue(row.waitForExistence(timeout: 30), "\(agent) on Bots")
         row.tap()
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 45), "Its Bot Chat opens")
@@ -66,9 +66,11 @@ final class NewBotChatHostUITests: BighelpUITestCase {
         app.launch()
         try onboardOpenHost(app, address: try XCTUnwrap(probe["address"]))
         func openAgent() {
-            openRootTab("tab.agents", in: app)
-            let row = app.buttons["agent.\(agent)"].firstMatch
-            XCTAssertTrue(row.waitForExistence(timeout: 30), "agent.\(agent) on Agents")
+            // From a chat: Back to the home first.
+            if app.buttons["chat.back"].firstMatch.exists { goBackFromChat(in: app) }
+            showBots(in: app)
+            let row = botRow(agent, in: app)
+            XCTAssertTrue(row.waitForExistence(timeout: 30), "\(agent) on Bots")
             row.tap()
         }
         func send(_ text: String) -> XCUIElement {
@@ -118,11 +120,18 @@ final class NewBotChatHostUITests: BighelpUITestCase {
         let newChat = chatNewChatButton(in: app)
         XCTAssertTrue(newChat.waitForExistence(timeout: 10), "New chat is there")
         newChat.tap()
-        confirmNewChatPicker(in: app)
+        confirmNewChatPicker(in: app, botID: agent)
         XCTAssertFalse(failed.waitForExistence(timeout: 20),
                        "A new chat starts: \(failed.staticTexts.allElementsBoundByIndex.map(\.label))")
         save("new-chat", app)
         app.terminate()
+    }
+
+    /// The agent on Bots, in the list or among the pinned ones. A bot tapped there opens its Bot Chat
+    /// (Settings › Chat › A bot opens, as it is out of the box).
+    @MainActor private func botRow(_ agent: String, in app: XCUIApplication) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "identifier IN %@",
+                                         ["simple-bots.bot.\(agent)", "simple-bots.pinned.\(agent)"])).firstMatch
     }
 
     @MainActor private func save(_ name: String, _ app: XCUIApplication) {

@@ -198,7 +198,7 @@ final class SessionCatalogStore {
         return record
     }
 
-    /// Code mode: a new chat with `agentID` working in exactly `folder`.
+    /// A coding session: a new chat with `agentID` working in exactly `folder`.
     func createDirect(agentID: String, folder: String, title: String,
                       runtime: SessionStartRuntime = .init()) async throws -> SessionRecord {
         let generation = accountGeneration

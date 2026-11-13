@@ -17,11 +17,11 @@ final class BotDashboardUITests: BighelpUITestCase {
     private func checkProfileTabs(textSize: String) throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", "dark",
+                               "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", "dark",
                                "-UIPreferredContentSizeCategoryName", textSize]
         app.launch()
         defer { app.terminate() }
-        let primary = app.buttons["simple-bots.primary"]
+        let primary = app.primaryBot
         XCTAssertTrue(primary.waitForExistence(timeout: 15))
         primary.tap()
         let identity = app.buttons["chat.identity"]
@@ -58,9 +58,9 @@ final class BotDashboardUITests: BighelpUITestCase {
     func testProfileOpensOnTheDashboardAndASwipeClearsAPost() throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                               "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", "light"]
+                               "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", "light"]
         app.launch()
-        let primary = app.buttons["simple-bots.primary"]
+        let primary = app.primaryBot
         XCTAssertTrue(primary.waitForExistence(timeout: 15))
         primary.tap()
         let identity = app.buttons["chat.identity"]
@@ -87,13 +87,14 @@ final class BotDashboardUITests: BighelpUITestCase {
         app.buttons["dashboard.undo"].tap()
         XCTAssertTrue(top.waitForExistence(timeout: 5), "Undo brings it back")
 
-        // Right: the bot's own chat (history and all) with the post in its message box, not sent.
+        // Right: the bot's own chat (history and all) with the post as a card in its message box, not sent.
         top.swipeRight(velocity: .fast)
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 10), "The bot's chat opens")
-        let draft = NSPredicate(format: "value BEGINSWITH %@", "About “Lisbon fares dropped 18% for October”")
-        expectation(for: draft, evaluatedWith: composer)
-        waitForExpectations(timeout: 5)
+        let card = app.descendants(matching: .any)["chat.board-card-draft"].firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 5), "The post waits in the message box as a card")
+        let title = app.descendants(matching: .any)["chat.board-card-draft.title"].firstMatch
+        XCTAssertTrue(title.label.contains("Lisbon fares dropped 18% for October"), "It is the post that was swiped")
     }
 
     /// Screenshots for design review, only when `BIGHELP_DASHBOARD_SHOTS` names a folder: the
@@ -110,7 +111,7 @@ final class BotDashboardUITests: BighelpUITestCase {
         for appearance in ["light", "dark"] {
             let app = makeApp()
             app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                                   "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", appearance,
+                                   "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", appearance,
                                    "-bighelp.dashboard.swipe-tutorial-seen", "YES",
                                    "-bighelp.dashboard.activities.show-routines", "YES"]
             app.launch()
@@ -164,7 +165,7 @@ final class BotDashboardUITests: BighelpUITestCase {
         for appearance in ["light", "dark"] {
             let app = makeApp()
             app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
-                                   "-bighelp.settings.simple-bots", "YES", "-loopdy.demo.appearance", appearance,
+                                   "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", appearance,
                                    "-bighelp.dashboard.swipe-tutorial-seen", "NO"]
             app.launch()
             openProfile(app, bot: "simple-bots.primary")
@@ -232,7 +233,7 @@ final class BotDashboardUITests: BighelpUITestCase {
 
     @MainActor
     private func openProfile(_ app: XCUIApplication, bot: String) {
-        let button = app.buttons[bot]
+        let button = bot == "simple-bots.primary" ? app.primaryBot : app.buttons[bot]
         XCTAssertTrue(button.waitForExistence(timeout: 15))
         button.tap()
         let identity = app.buttons["chat.identity"]

@@ -67,13 +67,6 @@ struct BotChatActivityTests {
         #expect(BotChatActivity.merged(nil, nil) == nil)
     }
 
-    @Test func theAgentsScreenShowsBotChatsAndAGroupApprovalWins() throws {
-        let states = AgentLiveStatePresentation.agentStates(
-            rooms: [], pendingApprovals: { _ in [] },
-            botChats: ["nova": .working(tool: "web_search"), "pip": .waiting, "rio": .idle])
-        #expect(states == ["nova": .thinking, "pip": .nudge], "Idle stays idle: nothing invented")
-    }
-
     // MARK: Signals without the route
 
     @Test func withoutTheRouteOnlyARunningBotChatCounts() {

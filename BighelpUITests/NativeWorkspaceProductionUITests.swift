@@ -268,9 +268,9 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         openRootTab("tab.sessions", in: app)
         record("chat-list")
 
-        // Settings › Default model and AI providers load from this host.
+        // Settings › Models (the providers and each bot's default model) loads from this host.
         let invalid = NSPredicate(format: "label CONTAINS[c] %@", "unsupported or invalid")
-        for (row, name) in [("settings.default-model", "default-model"), ("settings.providers", "providers")] {
+        for (row, name) in [("settings.default-model", "models")] {
             openRootTab("tab.profile", in: app)
             let button = app.descendants(matching: .any)[row].firstMatch
             let form = app.descendants(matching: .any)["settings.screen"].firstMatch
@@ -590,13 +590,14 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = []; app.launchEnvironment = [:]; app.launch()
-        XCTAssertTrue(app.buttons["tab.workspace"].waitForExistence(timeout: 20))
-        app.buttons["tab.workspace"].tap()
-        let connections = app.buttons["workspace.open.instances"]
-        for _ in 0..<6 where !connections.isHittable { app.swipeUp() }
-        XCTAssertTrue(connections.waitForExistence(timeout: 10)); connections.tap()
+        openSettings(in: app)
         let host = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "hosts.host.")).firstMatch
+        for _ in 0..<8 where !(host.exists && host.isHittable) { app.swipeUp() }
         XCTAssertTrue(host.waitForExistence(timeout: 15)); host.tap()
+        // Notifications is a page of the computer's own page.
+        let notifications = app.buttons["hosts.notifications"]
+        for _ in 0..<8 where !(notifications.exists && notifications.isHittable) { app.swipeUp() }
+        XCTAssertTrue(notifications.waitForExistence(timeout: 10)); notifications.tap()
         let enable = app.buttons["host-setup.enable-notifications"]
         XCTAssertTrue(enable.waitForExistence(timeout: 10)); enable.tap()
         let install = app.buttons["host-setup.install-plugin"]
@@ -1241,24 +1242,21 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             return
         }
         if ProcessInfo.processInfo.environment["NATIVE_PROBE_VERIFY_MANAGEMENT"] == "1" {
-            for (key, title) in [("projects", "Projects"), ("files", "Files"), ("artifacts", "Artifacts"),
-                                 ("toolsets", "Toolsets"), ("memory", "Memory"),
+            // Each page opens from where it lives: Projects and Files from ☰, the rest from Settings.
+            for (key, title) in [("projects", "Projects"), ("files", "Files"), ("toolsets", "Toolsets"),
                                  ("plugins", "Plugins"), ("mcp", "MCP Servers"), ("logs", "Logs")] {
-                openRootDestination("workspace", sidebarIdentifier: "menu.hermes-tools", in: app)
-                let destination = app.buttons["workspace.open.\(key)"]
-                for _ in 0..<8 where !destination.isHittable { app.swipeUp() }
-                guard destination.waitForExistence(timeout: 10), destination.isHittable else {
-                    capture("native-management-missing-\(key)", app)
-                    XCTFail("The \(title) entry was not reachable in the Workspace list.")
-                    return
+                let fromMenu = key == "projects" || key == "files"
+                if fromMenu {
+                    openRootDestination(key, sidebarIdentifier: "menu.\(key)", in: app)
+                } else {
+                    openHostPage(key, in: app)
                 }
-                destination.tap()
                 guard app.navigationBars[title].waitForExistence(timeout: 20) else {
                     capture("native-management-failed-\(key)", app)
                     XCTFail("The \(title) destination did not open on first tap.")
                     return
                 }
-                if key == "files" || key == "artifacts" {
+                if key == "files" {
                     let root = try XCTUnwrap(config["workspace_path"])
                     let rootText = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", root)).firstMatch
                     XCTAssertTrue(rootText.waitForExistence(timeout: 20), "The confirmed host workspace must be visible.")
@@ -1288,9 +1286,13 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
                         capture("native-logs-rendered-line", app)
                     }
                 }
-                let back = app.navigationBars.buttons.element(boundBy: 0)
-                XCTAssertTrue(back.isHittable)
-                back.tap()
+                if fromMenu {
+                    let back = app.navigationBars.buttons.element(boundBy: 0)
+                    XCTAssertTrue(back.isHittable)
+                    back.tap()
+                } else {
+                    leaveSettings(in: app)
+                }
                 XCTAssertTrue(app.buttons["home.drawer.open"].waitForExistence(timeout: 10))
             }
         }
@@ -1466,11 +1468,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             openChatWorkspaceMenu(in: app)
             openSidebarDestination("menu.chats", in: app)
             XCTAssertTrue(app.buttons["home.drawer.open"].waitForExistence(timeout: 10))
-            openRootDestination("workspace", sidebarIdentifier: "menu.hermes-tools", in: app)
-            let maintenance = app.buttons["workspace.open.sessionMaintenance"]
-            for _ in 0..<10 where !maintenance.isHittable { app.swipeUp() }
-            XCTAssertTrue(maintenance.isHittable)
-            maintenance.tap()
+            openHostPage("sessionMaintenance", in: app)
             XCTAssertTrue(app.navigationBars["Session Maintenance"].waitForExistence(timeout: 15))
             let mostRecent = app.buttons["session-maintenance.most-recent"]
             for _ in 0..<6 where !mostRecent.isHittable { app.swipeUp() }

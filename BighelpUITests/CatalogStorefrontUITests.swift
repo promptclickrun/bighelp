@@ -10,7 +10,7 @@ final class CatalogStorefrontUITests: BighelpUITestCase {
         for appearance in ["light", "dark"] {
             let app = launch(appearance: appearance)
 
-            openHermesTool("plugins", in: app)
+            openHostPage("plugins", in: app)
             let hero = app.buttons["plugins.hero"]
             XCTAssertTrue(hero.waitForExistence(timeout: 10), "Plugins opens on its featured plugin")
             XCTAssertTrue(app.descendants(matching: .any)["plugins.shelf.trusted"].exists,
@@ -44,7 +44,9 @@ final class CatalogStorefrontUITests: BighelpUITestCase {
             let confirm = app.buttons["Install and turn on"]
             XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Install confirms before anything changes")
             let cancel = app.buttons["Cancel"]
-            if cancel.exists { cancel.tap() } else { app.tap() }
+            // Without Cancel, a tap outside closes it: the sheet's title, not the middle, where the question is.
+            if cancel.exists { cancel.tap() } else { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap() }
+            XCTAssertTrue(confirm.waitForNonExistence(timeout: 5), "The question closes")
             goBack(in: app)
 
             // Installed plugins: the app list, a switch on each row.
@@ -56,7 +58,7 @@ final class CatalogStorefrontUITests: BighelpUITestCase {
 
             app.terminate()
             let skillsApp = launch(appearance: appearance)
-            openHermesTool("skills", in: skillsApp)
+            openHostPage("skills", in: skillsApp)
             XCTAssertTrue(skillsApp.buttons["skills.hero"].waitForExistence(timeout: 10),
                           "The Skills Hub opens on Hermes' official collection")
             XCTAssertTrue(skillsApp.descendants(matching: .any)["skills.shelf.official"].exists)
@@ -86,7 +88,7 @@ final class CatalogStorefrontUITests: BighelpUITestCase {
     func testMarketplaceFactsAndAnUpdateThatAsksFirst() {
         for appearance in ["light", "dark"] {
             let app = launch(appearance: appearance)
-            openHermesTool("plugins", in: app)
+            openHostPage("plugins", in: app)
             XCTAssertTrue(app.buttons["plugins.hero"].waitForExistence(timeout: 10))
             XCTAssertTrue(app.descendants(matching: .any)["plugins.shelf.popular"].exists, "Most stars have a shelf")
             XCTAssertTrue(app.descendants(matching: .any)["plugins.shelf.recent"].exists, "New plugins have a shelf")
@@ -127,7 +129,7 @@ final class CatalogStorefrontUITests: BighelpUITestCase {
     @MainActor
     func testBlockedSkillCannotBeAdded() {
         let app = launch(appearance: "light")
-        openHermesTool("skills", in: app)
+        openHostPage("skills", in: app)
         let search = app.descendants(matching: .any)["skills.search"].firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 10))
         search.tap()
@@ -144,7 +146,7 @@ final class CatalogStorefrontUITests: BighelpUITestCase {
     func testChipsStayInsideThePageAtLargestText() {
         let app = launch(appearance: "light",
                          extra: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXXL"])
-        openHermesTool("plugins", in: app)
+        openHostPage("plugins", in: app)
         XCTAssertTrue(app.buttons["plugins.hero"].waitForExistence(timeout: 10))
         assertWholeCards("plugins.card.", in: app)
         evidence("plugins-home-xxxl", app)
@@ -156,7 +158,7 @@ final class CatalogStorefrontUITests: BighelpUITestCase {
 
         let skills = launch(appearance: "light",
                             extra: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXXL"])
-        openHermesTool("skills", in: skills)
+        openHostPage("skills", in: skills)
         let search = skills.descendants(matching: .any)["skills.search"].firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 10))
         search.tap()
@@ -199,7 +201,8 @@ final class CatalogStorefrontUITests: BighelpUITestCase {
 
     @MainActor
     private func goBack(in app: XCUIApplication) {
-        let back = app.navigationBars.buttons.element(boundBy: 0)
+        // The pages are in the Settings sheet; the screen behind it has a navigation bar of its own.
+        let back = app.buttons["BackButton"].firstMatch
         if back.waitForExistence(timeout: 3) { back.tap() }
     }
 

@@ -1,15 +1,13 @@
 import SwiftUI
 
-/// Settings › Fleet settings, with every host shown: Update Hermes, update
-/// the bighelp plugin and restart the gateway everywhere at once, or on one
-/// host from its own row, each with its own live status. This app's
-/// Appearance and Chat are here too.
+/// Settings › Your computers › Update every computer, with every computer shown: update Hermes,
+/// update the bighelp plugin and restart messaging everywhere at once, or on one computer from its
+/// own row, each with its own live status. From the all-hosts view, this app's Appearance and Chat
+/// are here too.
 struct FleetSettingsView: View {
     let store: FleetMaintenanceStore
     /// This app's own pages (Appearance, Chat), the same ones Settings opens.
     var appPage: ((SettingsMenuSection) -> AnyView)?
-    /// A section above the rest (Settings › System's Manage all gateways).
-    var leading: AnyView?
     @State private var confirmation: Confirmation?
 
     private enum Confirmation: Identifiable {
@@ -34,7 +32,6 @@ struct FleetSettingsView: View {
 
     var body: some View {
         List {
-            if let leading { leading }
             hermesSection
             pluginSection
             gatewaySection
@@ -42,7 +39,7 @@ struct FleetSettingsView: View {
         }
         .listStyle(.insetGrouped)
         .bighelpFormSurface()
-        .navigationTitle("Fleet settings")
+        .navigationTitle("Update every computer")
         .navigationBarTitleDisplayMode(.inline)
         .bighelpRefreshable { await store.refresh(force: true) }
         .task { await store.refreshIfNeeded() }

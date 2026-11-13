@@ -19,9 +19,11 @@ final class PluginReleaseUpdateHostUITests: BighelpUITestCase {
         XCTAssertTrue(app.textViews["chat.composer.text"].waitForExistence(timeout: 30), "The agent's chat opens")
 
         openSettings(in: app)
-        let hosts = settingsRow("settings.menu.connectivityAndNotifications", in: app)
-        // Settings flags the host once the check finds a newer release.
-        let flagged = app.descendants(matching: .any)["settings.menu.plugin-update"]
+        // Your computers: the computer's row says so once the check finds a newer release.
+        let hosts = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'hosts.host.'")).firstMatch
+        for _ in 0..<6 where !(hosts.exists && hosts.isHittable) { app.swipeUp() }
+        let flagged = app.buttons.matching(NSPredicate(
+            format: "identifier BEGINSWITH 'hosts.host.' AND label CONTAINS 'plugin update available'")).firstMatch
         let flaggedInTime = flagged.waitForExistence(timeout: 30)
         save("update-0-settings", app)
         hosts.tap()

@@ -10,8 +10,6 @@ extension RootShellView {
                 description: Text("This capability is not connected through the selected native host."))
         } else {
         switch (route, featureStore.preparedModel(for: route)) {
-        case (.workspaceActivity, _):
-            routeWithWorkspaceMenu { workspaceActivity }
         case (.workspaceSettings, _):
             routeWithWorkspaceMenu { workspaceSettings() }
         case (.projects, _):
@@ -55,14 +53,6 @@ extension RootShellView {
                 ContentUnavailableView("Projects aren't available", systemImage: "folder",
                     description: Text("Connect to your computer, then open Projects from the menu."))
             }
-        case (.workspaceHub, _):
-            routeWithWorkspaceMenu {
-                WorkspaceHubView(
-                    hostName: workspaceHostName,
-                    profileName: workspaceProfileName,
-                    onOpen: openWorkspaceDestination
-                )
-            }
         case (.workspaceConnections, _):
             routeWithWorkspaceMenu {
                 if let hostRegistry {
@@ -75,25 +65,7 @@ extension RootShellView {
             }
         case (.workspaceManagement(let destination), _):
             routeWithWorkspaceMenu {
-                if destination == .tasks {
-                    let owner = currentWorkspaceOwner
-                    WorkspaceSessionContentView(destination: destination, catalog: sessionCatalog,
-                        profileID: workspaceAgentID, isCurrent: { currentWorkspaceOwner == owner }, onOpenChat: openSession)
-                } else if destination == .artifacts {
-                    if let owner = currentWorkspaceOwner, let source = configuredWorkspaceSource {
-                        // The host's own Artifacts: the serving agent's folder, whichever agent is selected.
-                        let target = WorkspaceFilesTarget(owner: owner, agentID: nil)
-                        ConfiguredWorkspaceArtifactsView(hostName: workspaceHostName, target: target, source: source,
-                            currentTarget: currentFilesTarget { nil })
-                            .id(target)
-                    } else {
-                        WorkspaceUnavailableView(
-                            destination: .artifacts,
-                            hostName: workspaceHostName,
-                            reason: "Artifacts require an available direct native Hermes connection."
-                        )
-                    }
-                } else if destination == .logs {
+                if destination == .logs {
                     if let connections = workspaceConnections, let owner = currentWorkspaceOwner,
                        connections.owner == owner, let workspace = connections.workspace,
                        workspace.owner == owner, let direct = connections.hosts.selectedWorkspace?.nativeClient {
@@ -107,12 +79,6 @@ extension RootShellView {
                         WorkspaceUnavailableView(destination: .logs, hostName: workspaceHostName,
                             reason: "Logs require an available direct authenticated Hermes connection.")
                     }
-                } else if destination == .keys, let store = demoProviderKeysStore {
-                    ProviderAccountsView(store: store)
-                } else if [.security, .appearance, .tabBar, .caching, .contact, .watch].contains(destination) {
-                    workspaceSettings(destination: destination)
-                } else if destination == .documentation {
-                    WorkspaceDocumentationView()
                 } else if destination == .voice {
                     VoiceSettingsView(settings: settings, agents: agents.profiles,
                                       selectedAgentID: workspaceAgentID,

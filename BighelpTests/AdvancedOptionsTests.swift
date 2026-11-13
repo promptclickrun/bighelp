@@ -45,6 +45,14 @@ struct AdvancedOptionsTests {
         #expect(AdvancedOptionsCatalog.groups.last?.id == "experts", "Expert pages come last")
     }
 
+    @Test func expertsHoldTheBotsToolsetsAndManageBots() {
+        #expect(AdvancedPage.toolsets.destination == .toolsets)
+        #expect(AdvancedPage.manageBots.destination == .profileLifecycle)
+        let experts = AdvancedOptionsCatalog.groups.last?.rows ?? []
+        #expect(experts.contains(.page(.toolsets)))
+        #expect(experts.contains(.page(.manageBots)))
+    }
+
     @Test func approvalsOffersSmartManualAndOffAndOnlyOffAsksFirst() throws {
         guard case .choice(let choices, _) = try option("approvals.mode").kind else {
             Issue.record("Approvals should be a choice")

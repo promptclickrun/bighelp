@@ -38,7 +38,6 @@ struct BighelpAppComposition {
     ) {
         let usesFixtures = arguments.contains("-disable-demo-delays")
             || arguments.contains("-use-demo-fixtures")
-        let usesCardGallery = usesFixtures && arguments.contains("-use-loopdy-card-gallery")
         bighelpCardDataClient = BighelpCardStaticDataClient()
         let timing: DemoFixtureTiming = .immediate
         let appState = AppState()
@@ -496,11 +495,7 @@ struct BighelpAppComposition {
                 return client
             }
             : { _, _ in unavailable }
-        var dashboardSource: any DashboardDataSource = usesFixtures
-            ? DashboardFixtureSource(
-                bighelpCards: usesCardGallery ? BighelpCardDemoFixtures.documents : []
-            )
-            : unavailable
+        var dashboardSource: any DashboardDataSource = usesFixtures ? DashboardFixtureSource() : unavailable
         #if DEBUG
         if let clarificationFixture { dashboardSource = clarificationFixture }
         if let homeWorkFixture { dashboardSource = homeWorkFixture }
@@ -630,16 +625,12 @@ struct BighelpAppComposition {
         homeWorkFixture?.attach(catalog: sessionCatalog, featureStore: featureStore)
         #endif
         BighelpProactiveNotificationOpenCenter.shared.install {
-            [weak appState, weak featureStore] open in
+            [weak appState] open in
             if let sessionID = open.sessionID, !sessionID.isEmpty {
                 BighelpExternalSessionOpenCenter.shared.request(catalogSessionID: sessionID)
                 return
             }
-            appState?.openInbox()
-            await featureStore?.dashboardModel.openNotification(
-                eventID: open.eventID,
-                eventType: open.eventType
-            )
+            appState?.openNeedsYou()
         }
         #if DEBUG
         // A tapped scheduled task alert that names a sample job ("job") or one that's gone ("gone"),

@@ -1,87 +1,60 @@
 import XCTest
 
-/// Settings › Default model on demo data. It used to turn into "Reopen this
-/// feature after connecting to the selected host and profile." after a trip to
-/// Provider Keys and back, or after leaving the app and coming back.
+/// Settings › Models (Default model and AI providers both open it) on demo data: the providers, a row
+/// for each bot's default model that opens its Default Model page, and with Advanced options Refresh
+/// model lists. It used to turn into "Reopen this feature after connecting to the selected host and
+/// profile." after leaving the app and coming back.
 /// Screenshots go to BIGHELP_UI_EVIDENCE (TEST_RUNNER_BIGHELP_UI_EVIDENCE) when set.
 final class DefaultModelUITests: BighelpUITestCase {
     @MainActor
-    func testDefaultModelSurvivesProviderKeysAndComingBack() {
+    func testModelsSurvivesABotsPageAndComingBack() {
         let app = makeApp()
         app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-demo-reconnects-on-return"]
         app.launch()
         openDefaultModel(in: app)
 
-        openProviderKeysFromDefaultModel(in: app)
+        openBotDefaultModel(in: app)
         goBack(in: app)
-        assertDefaultModelWorks(in: app, "after Provider Keys and back")
+        assertModelsWorks(in: app, "after a bot's Default Model page and back")
 
         // Leaving the app reconnects; the page is still there when you're back.
         leaveAndComeBack(app)
-        assertDefaultModelWorks(in: app, "after leaving the app and coming back")
+        assertModelsWorks(in: app, "after leaving the app and coming back")
 
-        // And from Provider Keys, which is on top when you leave.
-        openProviderKeysFromDefaultModel(in: app)
+        // And from a bot's page, which is on top when you leave.
+        openBotDefaultModel(in: app)
         leaveAndComeBack(app)
-        XCTAssertTrue(app.navigationBars["Provider Keys"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["default-models"].firstMatch.waitForExistence(timeout: 5))
         goBack(in: app)
-        assertDefaultModelWorks(in: app, "after leaving from Provider Keys and going back")
+        assertModelsWorks(in: app, "after leaving from a bot's page and going back")
     }
 
-    /// Pick an agent from the rail of cards to see and change its own default.
+    /// Each bot has its own row, with its model under its name, and opens its own Default Model page.
     @MainActor
-    func testEachAgentsDefaultModelFromTheAgentRail() {
+    func testEachBotsDefaultModelHasItsOwnRow() {
         for appearance in ["light", "dark"] {
             let app = makeApp()
             app.launchArguments += ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.demo.appearance", appearance]
             app.launch()
             openDefaultModel(in: app)
 
-            let picker = app.buttons["models.agent"]
-            XCTAssertTrue(picker.waitForExistence(timeout: 5), "Default model leads with the agent")
-            XCTAssertEqual(picker.value as? String, "Avery Park")
-            XCTAssertFalse(app.staticTexts["Profile"].exists, "Plain words: Agent, not Profile")
-            picker.tap()
-            let travel = app.buttons["models.agent.travel"]
-            XCTAssertTrue(travel.waitForExistence(timeout: 5), "Every agent has a card")
-            XCTAssertTrue(app.buttons["models.agent.finance"].isSelected)
-            XCTAssertTrue(app.buttons["models.agent.home"].exists)
-            evidence("agent-rail-\(appearance)", app)
-
-            let main = app.buttons["models.main"]
-            XCTAssertTrue(main.label.contains("Avery Park"), main.label)
-            XCTAssertTrue((main.value as? String)?.contains("GPT") == true, String(describing: main.value))
-            travel.tap()
-            XCTAssertTrue(app.buttons["models.agent.travel"].isSelected)
-            XCTAssertTrue(main.waitForExistence(timeout: 5))
-            XCTAssertTrue(NSPredicate(format: "label CONTAINS %@", "Mina Shah")
-                .evaluate(with: main), "The page shows the chosen agent's default: \(main.label)")
-            XCTAssertTrue((main.value as? String)?.contains("Sonnet") == true, String(describing: main.value))
-            evidence("agent-rail-travel-\(appearance)", app)
+            let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "models.bot."))
+            XCTAssertGreaterThanOrEqual(rows.count, 2, "Every bot has a row")
+            XCTAssertTrue(NSPredicate(format: "label CONTAINS %@", "Mina Shah").evaluate(with: app.buttons["models.bot.travel"]),
+                          app.buttons["models.bot.travel"].label)
+            evidence("models-\(appearance)", app)
 
             guard appearance == "light" else { app.terminate(); continue }
-            // Change Mina's default; Avery's stays as it was.
-            // The models open under the row, in the page; a pick saves at once.
-            main.tap()
-            let nous = app.buttons["models.choices.main.provider.nous"]
-            XCTAssertTrue(nous.waitForExistence(timeout: 5))
-            nous.tap()
-            let hermes = app.buttons["models.choices.main.nous.Hermes-4-405B"]
-            if !hermes.waitForExistence(timeout: 2) { app.swipeUp() }
-            XCTAssertTrue(hermes.waitForExistence(timeout: 3))
-            hermes.tap()
-            XCTAssertTrue(hermes.waitForNonExistence(timeout: 5), "The list closes once Hermes saved it")
-            if !main.exists { app.swipeDown() }
-            XCTAssertTrue((main.value as? String)?.contains("405B") == true, String(describing: main.value))
-            app.buttons["models.agent.finance"].tap()
-            let backToAvery = NSPredicate(format: "label CONTAINS %@ AND value CONTAINS %@", "Avery Park", "GPT")
-            expectation(for: backToAvery, evaluatedWith: main)
-            waitForExpectations(timeout: 5)
+            app.buttons["models.bot.travel"].tap()
+            XCTAssertTrue(app.descendants(matching: .any)["default-models"].firstMatch.waitForExistence(timeout: 10),
+                          "The row opens the bot's Default Model page")
+            XCTAssertTrue(app.navigationBars["Default Model"].exists)
+            evidence("models-bot-page", app)
             app.terminate()
         }
     }
 
-    /// Settings › AI providers › Refresh model catalogs.
+    /// Settings › Models › Advanced › Refresh model lists.
     @MainActor
     func testRefreshModelCatalogsFromAIProviders() {
         for appearance in ["light", "dark"] {
@@ -91,23 +64,24 @@ final class DefaultModelUITests: BighelpUITestCase {
             _ = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu", "tab.profile"]))
                 .firstMatch.waitForExistence(timeout: 60)
             openSettings(in: app)
-            settingsRow("settings.providers", in: app).tap()
-            XCTAssertTrue(app.navigationBars["AI providers"].waitForExistence(timeout: 8))
-            let more = app.buttons["providers.more"]
-            XCTAssertTrue(more.waitForExistence(timeout: 10), "In the top bar, beside Your providers")
+            settingsRow("settings.default-model", in: app).tap()
+            XCTAssertTrue(app.navigationBars["Models"].waitForExistence(timeout: 8))
+            let refresh = app.buttons["providers.refresh-model-catalogs"]
+            let list = app.collectionViews.firstMatch
+            for _ in 0..<6 where !(refresh.exists && refresh.isHittable) { list.swipeUp() }
+            XCTAssertTrue(refresh.waitForExistence(timeout: 10), "Last, in Advanced")
             evidence("provider-keys-\(appearance)", app)
-            more.tap()
-            let refresh = app.buttons["Refresh model lists"]
-            XCTAssertTrue(refresh.waitForExistence(timeout: 5))
             refresh.tap()
-            XCTAssertTrue(app.descendants(matching: .any)["providers.confirmed"].waitForExistence(timeout: 10),
-                          "Hermes refreshed the catalogs")
+            // The page says so at its top, above the providers.
+            let confirmed = app.descendants(matching: .any)["providers.confirmed"].firstMatch
+            for _ in 0..<8 where !confirmed.exists { list.swipeDown() }
+            XCTAssertTrue(confirmed.waitForExistence(timeout: 10), "Hermes refreshed the catalogs")
             evidence("provider-keys-refreshed-\(appearance)", app)
             app.terminate()
         }
     }
 
-    /// Settings › AI providers: your providers, each with Sign in again and Remove, and one
+    /// Settings › Models › Providers: your providers, each with Sign in again and Remove, and one
     /// Connect a provider button for the rest.
     @MainActor
     func testAIProvidersListsYoursAndConnectsNewOnes() {
@@ -118,8 +92,8 @@ final class DefaultModelUITests: BighelpUITestCase {
             _ = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["home.drawer.open", "chat.menu", "tab.profile"]))
                 .firstMatch.waitForExistence(timeout: 60)
             openSettings(in: app)
-            settingsRow("settings.providers", in: app).tap()
-            XCTAssertTrue(app.navigationBars["AI providers"].waitForExistence(timeout: 8))
+            settingsRow("settings.default-model", in: app).tap()
+            XCTAssertTrue(app.navigationBars["Models"].waitForExistence(timeout: 8))
             let nous = app.buttons["providers.connected.account:nous"]
             XCTAssertTrue(nous.waitForExistence(timeout: 10), "The demo host is signed in to Nous Portal")
             XCTAssertTrue(app.buttons["providers.connected.key:OPENROUTER_API_KEY"].exists, "and has an OpenRouter key")
@@ -168,8 +142,8 @@ final class DefaultModelUITests: BighelpUITestCase {
         app.launch()
         try onboardOpenHost(app, address: address)
         openSettings(in: app)
-        settingsRow("settings.providers", in: app).tap()
-        XCTAssertTrue(app.navigationBars["AI providers"].waitForExistence(timeout: 15))
+        settingsRow("settings.default-model", in: app).tap()
+        XCTAssertTrue(app.navigationBars["Models"].waitForExistence(timeout: 15))
         for id in expected {
             XCTAssertTrue(app.buttons["providers.connected.account:\(id)"].waitForExistence(timeout: 30),
                           "\(id) is signed in on the host")
@@ -186,19 +160,24 @@ final class DefaultModelUITests: BighelpUITestCase {
             .firstMatch.waitForExistence(timeout: 60)
         openSettings(in: app, file: file, line: line)
         settingsRow("settings.default-model", in: app, file: file, line: line).tap()
-        XCTAssertTrue(app.buttons["models.main"].waitForExistence(timeout: 10),
-                      "Default model must load", file: file, line: line)
+        XCTAssertTrue(firstBotRow(in: app).waitForExistence(timeout: 10),
+                      "Models must list the bots", file: file, line: line)
     }
 
     @MainActor
-    private func openProviderKeysFromDefaultModel(in app: XCUIApplication,
-                                                  file: StaticString = #filePath, line: UInt = #line) {
-        let open = app.buttons["models.open-provider-keys"]
-        let list = app.descendants(matching: .any)["models.administration"].firstMatch
-        for _ in 0..<6 where !(open.exists && open.isHittable) { list.swipeUp() }
-        XCTAssertTrue(open.isHittable, "Default model offers Provider Keys", file: file, line: line)
-        open.tap()
-        XCTAssertTrue(app.navigationBars["Provider Keys"].waitForExistence(timeout: 8), file: file, line: line)
+    private func firstBotRow(in app: XCUIApplication) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "models.bot.")).firstMatch
+    }
+
+    @MainActor
+    private func openBotDefaultModel(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let row = firstBotRow(in: app)
+        let list = app.collectionViews.firstMatch
+        for _ in 0..<6 where !(row.exists && row.isHittable) { list.swipeUp() }
+        XCTAssertTrue(row.isHittable, "Models lists each bot", file: file, line: line)
+        row.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["default-models"].firstMatch.waitForExistence(timeout: 8),
+                      file: file, line: line)
     }
 
     @MainActor
@@ -215,17 +194,17 @@ final class DefaultModelUITests: BighelpUITestCase {
     }
 
     @MainActor
-    private func assertDefaultModelWorks(in app: XCUIApplication, _ when: String,
-                                         file: StaticString = #filePath, line: UInt = #line) {
+    private func assertModelsWorks(in app: XCUIApplication, _ when: String,
+                                   file: StaticString = #filePath, line: UInt = #line) {
         let reopen = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label CONTAINS[c] %@", "Reopen this feature")).firstMatch
-        let main = app.buttons["models.main"]
-        let list = app.descendants(matching: .any)["models.administration"].firstMatch
-        for _ in 0..<6 where list.exists && !(main.exists && main.isHittable) { list.swipeDown() }
-        XCTAssertTrue(main.waitForExistence(timeout: 10), "Default model must still work \(when)", file: file, line: line)
+        let row = firstBotRow(in: app)
+        let list = app.collectionViews.firstMatch
+        for _ in 0..<6 where list.exists && !(row.exists && row.isHittable) { list.swipeDown() }
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "Models must still work \(when)", file: file, line: line)
         XCTAssertFalse(reopen.exists, "No \"Reopen this feature\" \(when)", file: file, line: line)
-        XCTAssertTrue(main.isEnabled, "Its model can still be changed \(when)", file: file, line: line)
-        evidence("default-model-\(when.replacingOccurrences(of: " ", with: "-"))", app)
+        XCTAssertTrue(row.isEnabled, "A bot's model can still be changed \(when)", file: file, line: line)
+        evidence("models-\(when.replacingOccurrences(of: " ", with: "-"))", app)
     }
 
     @MainActor

@@ -5,7 +5,6 @@ import WatchConnectivity
 
 @MainActor
 struct SettingsView: View {
-    let focusedDestination: WorkspaceDestination?
     @Bindable var settings: SettingsStore
     @Bindable var userIdentity: UserIdentityStore
     let agents: [AgentProfile]
@@ -14,16 +13,12 @@ struct SettingsView: View {
     let onOpenSessions: () -> Void
     let onOpenScheduledTasks: () -> Void
     let onClearLocalCache: @MainActor () async -> Bool
-    let hostRuntime: HostRuntimeStore?
     let agentDirectory: AgentDirectoryStore?
     /// The computer Start with is kept for (`cacheScopeID`).
     let landingScope: String?
     let voiceSettingsScope: String?
     let voiceSettingsClient: (any VoiceSettingsClient)?
     let voiceSettingsIsCurrent: @MainActor () -> Bool
-    let pluginUpdateScope: String?
-    let pluginUpdateClient: (any PluginUpdateClient)?
-    let pluginUpdateIsCurrent: @MainActor () -> Bool
     let notificationScope: String?
     let notificationPreferencesClient: BighelpBuzzKitPreferencesClient
     let notificationRuntimeSource: @MainActor () -> BighelpNotificationRuntimeSnapshot
@@ -37,7 +32,7 @@ struct SettingsView: View {
     var connectorApps: (@MainActor () -> ConnectorAppsModel?)?
     /// Connections › Composio Apps (one Composio sign-in for every computer); nil hides it.
     var composioApps: (@MainActor () -> ComposioAppsModel?)?
-    /// Settings › Marketplace for the agent in use; nil hides the row.
+    /// Marketplace for the bot in use, on Apps & skills.
     var marketplace: (@MainActor () -> MarketplaceContext)?
     /// Connections › Secure credential vault: nil hides the row (no computer chosen), and nil from
     /// the closure means the computer isn't connected right now.
@@ -46,12 +41,23 @@ struct SettingsView: View {
     @State private var vaultNeedsComputer = false
     /// Settings › Teamwork for the computer in use; nil hides the row.
     var teamwork: (@MainActor () -> TeamworkModel?)?
-    /// Every gateway, for Settings › System's Manage all gateways; nil hides that switch.
+    /// Every computer: Show every computer and Update every computer; nil hides them.
     var fleet: SettingsFleetAccess?
+    /// The first group's Usage row (the tightest plan's percent); nil hides it.
+    var usage: ProviderUsageStore?
+    /// Shares from other apps waiting to be sent (`PendingShareListView`); its row shows while any wait.
+    var pendingShares: PendingShareReviewContext?
+    /// Settings › Chat › Archived chats; nil hides the row.
+    var archivedChats: SettingsArchivedChats?
+    /// Your computers › Time zone, for the computer in use; nil (or nil from it) has no row to change.
+    var computerTimeZone: (@MainActor () -> SimpleBotHostSettings?)?
+    /// Show every computer outside Bots mode: the all-hosts view, which the shell turns on and off.
+    var onSetAllHosts: ((Bool) -> Void)?
     @State var teamworkModel: TeamworkModel?
+    /// The computer `teamworkModel` was made for (`cacheScopeID`).
+    @State var teamworkScope: String?
     /// Shows just this page (Fleet settings links Appearance and Chat here, so there's one copy of each).
     private var openSection: SettingsMenuSection?
-    private var simplePage: SimpleBotsSettingsPage?
     /// Shows just this pushed page (the Settings sheet's stack pushes `SettingsDestination` values).
     private var pushedPage: SettingsDestination?
     /// The Settings sheet's stack takes value links; the main stack, typed `[AppRoute]`, ignores
@@ -59,8 +65,7 @@ struct SettingsView: View {
     /// the sheet has a Done.
     private var pushesByValue = false
     @Environment(\.bighelpNotificationContext) private var notificationContext
-    @State private var pluginUpdates: PluginUpdateStore?
-    /// Held in state so this screen redraws when the check finishes; the shared
+    /// Held in state so the computer rows redraw when the check finishes; the shared
     /// per-host models live in a plain dictionary SwiftUI can't observe.
     @State private var hostPluginUpdate: HostPluginUpdateModel?
     @State var photoSelection: PhotosPickerItem?
@@ -105,7 +110,6 @@ struct SettingsView: View {
 
     init(
         settings: SettingsStore,
-        focusedDestination: WorkspaceDestination? = nil,
         userIdentity: UserIdentityStore = UserIdentityStore(),
         agents: [AgentProfile] = [],
         personalities: PersonalityStore = PersonalityStore(client: FixturePersonalityClient()),
@@ -116,9 +120,6 @@ struct SettingsView: View {
         voiceSettingsScope: String? = nil,
         voiceSettingsClient: (any VoiceSettingsClient)? = nil,
         voiceSettingsIsCurrent: @escaping @MainActor () -> Bool = { false },
-        pluginUpdateScope: String? = nil,
-        pluginUpdateClient: (any PluginUpdateClient)? = nil,
-        pluginUpdateIsCurrent: @escaping @MainActor () -> Bool = { false },
         notificationScope: String? = nil,
         notificationPreferencesClient: BighelpBuzzKitPreferencesClient = BighelpBuzzKitPreferencesClient(),
         notificationRuntimeSource: @escaping @MainActor () -> BighelpNotificationRuntimeSnapshot = {
@@ -127,7 +128,6 @@ struct SettingsView: View {
         refreshNotificationRuntime: (@MainActor () async throws -> BighelpNotificationRuntimeSnapshot)? = nil,
         registerNotificationDevice _: (@MainActor () async throws -> BighelpNotificationRuntimeSnapshot)? = nil,
         notificationIsCurrent: @escaping @MainActor () -> Bool = { false },
-        hostRuntime: HostRuntimeStore? = nil,
         agentDirectory: AgentDirectoryStore? = nil,
         landingScope: String? = nil,
         onOpenWorkspaceDestination: ((WorkspaceDestination) -> Void)? = nil,
@@ -137,7 +137,12 @@ struct SettingsView: View {
         marketplace: (@MainActor () -> MarketplaceContext)? = nil,
         credentialVault: (@MainActor () -> CredentialVaultModel?)? = nil,
         teamwork: (@MainActor () -> TeamworkModel?)? = nil,
-        fleet: SettingsFleetAccess? = nil
+        fleet: SettingsFleetAccess? = nil,
+        usage: ProviderUsageStore? = nil,
+        pendingShares: PendingShareReviewContext? = nil,
+        archivedChats: SettingsArchivedChats? = nil,
+        computerTimeZone: (@MainActor () -> SimpleBotHostSettings?)? = nil,
+        onSetAllHosts: ((Bool) -> Void)? = nil
     ) {
         self.onOpenWorkspaceDestination = onOpenWorkspaceDestination
         self.onOpenRoute = onOpenRoute
@@ -147,7 +152,11 @@ struct SettingsView: View {
         self.credentialVault = credentialVault
         self.teamwork = teamwork
         self.fleet = fleet
-        self.focusedDestination = focusedDestination
+        self.usage = usage
+        self.pendingShares = pendingShares
+        self.archivedChats = archivedChats
+        self.computerTimeZone = computerTimeZone
+        self.onSetAllHosts = onSetAllHosts
         _settings = Bindable(wrappedValue: settings)
         _userIdentity = Bindable(wrappedValue: userIdentity)
         _displayNameDraft = State(initialValue: userIdentity.identity.name)
@@ -158,15 +167,11 @@ struct SettingsView: View {
         self.onOpenSessions = onOpenSessions
         self.onOpenScheduledTasks = onOpenScheduledTasks
         self.onClearLocalCache = onClearLocalCache
-        self.hostRuntime = hostRuntime
         self.agentDirectory = agentDirectory
         self.landingScope = landingScope
         self.voiceSettingsScope = voiceSettingsScope
         self.voiceSettingsClient = voiceSettingsClient
         self.voiceSettingsIsCurrent = voiceSettingsIsCurrent
-        self.pluginUpdateScope = pluginUpdateScope
-        self.pluginUpdateClient = pluginUpdateClient
-        self.pluginUpdateIsCurrent = pluginUpdateIsCurrent
         self.notificationScope = notificationScope
         self.notificationPreferencesClient = notificationPreferencesClient
         self.notificationRuntimeSource = notificationRuntimeSource
@@ -177,9 +182,7 @@ struct SettingsView: View {
     var body: some View {
         Group {
             if let pushedPage { settingsDone(page(for: pushedPage)) }
-            else if let simplePage { simpleBotsPageContent(simplePage) }
             else if let openSection { destination(for: openSection) }
-            else if let focusedDestination { focusedPage(focusedDestination) }
             else { menuPage }
         }
     }
@@ -226,30 +229,12 @@ struct SettingsView: View {
         case .appLayout: AppLayoutSettingsView(settings: settings)
         case .thinking: ThinkingLookSettingsView()
         case .apps: connectionsPage
-        case .nativeAppConnections:
-            if let apps = connectorApps?() {
-                ConnectorAppsView(model: apps)
-            } else {
-                appsUnavailable
-            }
-        case .composioApps:
-            if let composio = composioApps?() {
-                ComposioAppsView(model: composio)
-            } else {
-                appsUnavailable
-            }
-        case .marketplace:
-            if let marketplace {
-                MarketplaceHost(make: marketplace)
-            }
         case .connection: connectionPage
-        case .bots(let botsPage): simpleBotsPageContent(botsPage)
-        case .allSettings: menuPage
         }
     }
 
-    /// Settings › Connections: what this device lets agents use, the apps they can use, and the
-    /// vault of logins their browser can use. One page for all of it, also in Bots mode.
+    /// Settings › Apps & skills (`SettingsDestination.apps`): what this device lets bots use, the apps
+    /// they can use, and the vault of logins their browser can use. One page for all of it.
     private var connectionsPage: some View {
         AppsHubView(native: connectorApps?() ?? nil, composio: composioApps?() ?? nil,
                     onOpenVault: credentialVault.map { make in
@@ -258,7 +243,7 @@ struct SettingsView: View {
                             vaultNeedsComputer = openVault == nil
                         }
                     },
-                    vaultNeedsComputer: vaultNeedsComputer) {
+                    vaultNeedsComputer: vaultNeedsComputer, marketplace: marketplace) {
             settingsLink(to: .section(.permissions)) {
                 DeviceAccessRowLabel()
                     .bighelpSettingsLinkLabel()
@@ -270,37 +255,26 @@ struct SettingsView: View {
         .modifier(CredentialVaultSheet(model: $openVault))
     }
 
-    private var appsUnavailable: some View {
-        ContentUnavailableView("Apps need your computer", systemImage: "app.connected.to.app.below.fill",
-                               description: Text("Connect to your computer, then come back."))
-    }
-
     private var menuPage: some View {
         // Each section is deferred and type-erased: inlined together they overflow
         // the device's main-thread stack in Release builds (see BighelpDeferredSection).
-        // Every row opens one page, so the first screen stays a short list: you, your agents and
-        // what they can use (Device access is in Connections), the app, then the computers,
-        // other devices and help.
+        // One Settings in every mode. Every row opens one page, so the first screen stays a short
+        // list: you, your bots and what they use, this app, your computers, then help.
         Form {
-            BighelpDeferredSection { youRow }
-            BighelpDeferredSection { assistantBasics }
+            BighelpDeferredSection { youSection }
+            BighelpDeferredSection { yourBotsSection }
             BighelpDeferredSection {
-                settingsMenuGroup(header: String(localized: "App"),
-                                  sections: [.modes, .appearance, .chat, .voice, .notifications])
+                settingsMenuGroup(header: String(localized: "This app"),
+                                  sections: [.appearance, .chat, .notifications, .modes])
             }
             #if os(visionOS)
             BighelpDeferredSection { SpatialAvatarSettingsSection(settings: settings) }
             #endif
-            BighelpDeferredSection {
-                settingsMenuGroup(sections: [.connectivityAndNotifications] + Self.watchSection + Self.carPlaySection + [.help])
-            }
-            BighelpDeferredSection { nerdModeToggle }
-            if settings.nerdModeEnabled {
-                BighelpDeferredSection { hermesSection }
-            }
+            BighelpDeferredSection { computersSection }
+            BighelpDeferredSection { helpAndAdvancedSection }
         }
         .animation(.snappy(duration: BighelpTokens.transitionDuration), value: settings.nerdModeEnabled)
-        .animation(.snappy(duration: BighelpTokens.transitionDuration), value: settings.codeModeEnabled)
+        .animation(.snappy(duration: BighelpTokens.transitionDuration), value: settings.simpleBotsMultiGateway)
         .bighelpFormSurface()
         .listSectionSpacing(20)
         .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
@@ -315,16 +289,8 @@ struct SettingsView: View {
             .presentationDragIndicator(.visible)
         }
         .accessibilityIdentifier("settings.screen")
-        .task(id: pluginUpdateScope) {
-            pluginUpdates?.invalidate()
-            guard let scope = pluginUpdateScope, let client = pluginUpdateClient else {
-                pluginUpdates = nil
-                return
-            }
-            let store = PluginUpdateStore(scope: scope, client: client, isCurrent: pluginUpdateIsCurrent)
-            pluginUpdates = store
-            await store.refreshStatus()
-        }
+        // An agent's drive points at rows low on this page (Add a computer).
+        .driveScrolls()
         .task(id: selectedHostPluginCheckKey) {
             // One quiet check per host per app session, once it's connected.
             guard hostRegistry?.selectedWorkspace?.isConnected == true,
@@ -333,38 +299,6 @@ struct SettingsView: View {
             hostPluginUpdate = model
             await model.checkIfNeeded()
         }
-    }
-
-    @ViewBuilder
-    private func focusedPage(_ destination: WorkspaceDestination) -> some View {
-        if destination == .appearance {
-            appearancePage
-                .accessibilityIdentifier("settings.detail.appearance")
-        } else if destination == .tabBar {
-            // One place for the bottom bar: Appearance › App layout.
-            AppLayoutSettingsView(settings: settings)
-        } else {
-            focusedFormPage(destination)
-        }
-    }
-
-    private func focusedFormPage(_ destination: WorkspaceDestination) -> some View {
-        settingsPage(title: destination.title) {
-            switch destination {
-            case .caching:
-                localCache
-                Section { Text("Agents, groups and chat history stay on this device between connections. Hermes remains the source for changes.").foregroundStyle(.secondary) }
-            case .security:
-                currentConnection
-            case .contact:
-                helpAndFeedback
-                signatureSection
-            case .watch:
-                appleWatch
-            default: EmptyView()
-            }
-        }
-        .accessibilityIdentifier("settings.detail.\(destination.rawValue)")
     }
 
     private var currentConnection: some View {
@@ -376,87 +310,32 @@ struct SettingsView: View {
                     .font(.bighelp(.footnote))
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("settings.connection.status")
-            } else { Text("No host is connected.").foregroundStyle(.secondary) }
+            } else { Text("No computer is connected.").foregroundStyle(.secondary) }
         } header: {
-            Text("Connection details")
+            Text("This computer")
         } footer: {
             Text("Sign-ins stay in this device's Keychain.")
         }
     }
 
-    /// Settings › Hosts: your computers, then the selected one's plugin with
-    /// Update as the obvious button. Connection details are for Nerd Mode.
-    /// Settings › System: the computer in use's System screen (its computers, update Hermes and
-    /// the plugin, restart the gateway, Additional settings); its computers alone while it's
-    /// offline, so another can still be picked or added.
-    @ViewBuilder
-    private var systemPage: some View {
-        if let hostRegistry {
-            SystemSettingsPage(registry: hostRegistry, managesAllGateways: $settings.systemManagesAllGateways,
-                               fleet: fleet) {
-                hostsPage
-            } extras: {
-                if settings.nerdModeEnabled {
-                    settingsLink(to: .connection) {
-                        Label("Connection & plugin features", systemImage: "point.3.connected.trianglepath.dotted")
-                    }
-                    .accessibilityIdentifier("settings.system.connection")
-                    .driveTarget("settings.system.connection")
-                }
-            }
-        } else {
-            hostsPage
-        }
-    }
-
-    /// System › Connection & plugin features, which Nerd Mode adds to the System screen.
+    /// Connection details: the computer in use's address and sign-in, and which plugin features
+    /// each part of the app found. Its computer's page links it with Advanced options on.
     private var connectionPage: some View {
-        settingsPage(title: String(localized: "Connection")) {
+        settingsPage(title: String(localized: "Connection details")) {
             currentConnection
             BighelpPluginCapabilitiesSection(connections: workspaceConnections,
                                              permissionCenter: permissionCenter,
                                              showsPluginSummary: false)
-            localCache
         }
     }
 
-    private var hostsPage: some View {
-        let pluginUpdate = selectedHostPluginUpdate.flatMap { $0.state == .notInstalled ? nil : $0 }
-        return settingsPage(title: SettingsMenuSection.connectivityAndNotifications.title) {
-            // Also while the computer in use is offline: the other gateways may still answer.
-            if fleet?.offersAllGateways == true {
-                SystemAllGatewaysSwitch(isOn: $settings.systemManagesAllGateways)
-            }
-            if let hostRegistry {
-                BighelpConfiguredHostsSection(registry: hostRegistry)
-                if let pluginUpdate {
-                    HostPluginUpdateSection(model: pluginUpdate)
-                }
-                if settings.nerdModeEnabled, hostRegistry.selectedHostID != nil {
-                    currentConnection
-                }
-            } else {
-                HostRuntimeSection(store: hostRuntime, agents: agentDirectory, theme: theme)
-                PluginUpdateSection(store: pluginUpdates, theme: theme)
-                connectivity
-            }
-            // Which plugin features each part of the app found: technical, so Nerd Mode only.
-            if settings.nerdModeEnabled {
-                BighelpPluginCapabilitiesSection(
-                    connections: workspaceConnections,
-                    permissionCenter: permissionCenter,
-                    showsPluginSummary: pluginUpdate == nil
-                )
-                localCache
-            }
-        }
-    }
-
-    /// Settings › Help & feedback, with the switch for sharing usage and crash reports.
+    /// Settings › Help & feedback: where to ask and read, the switch for sharing usage and crash
+    /// reports, then this device's Apple Watch and the app's version.
     private var helpPage: some View {
         settingsPage(title: SettingsMenuSection.help.title) {
             helpAndFeedback
             TelemetrySettingsSection()
+            aboutThisDevice
             signatureSection
         }
         .accessibilityIdentifier("settings.help")
@@ -469,7 +348,21 @@ struct SettingsView: View {
     private var helpAndFeedback: some View {
         Section {
             Link("Report a problem", destination: URL(string: "https://github.com/promptclickrun/bighelp/issues")!)
-            Link("Hermes documentation", destination: URL(string: "https://hermes-agent.nousresearch.com/docs")!)
+            Link("Documentation", destination: URL(string: "https://hermes-agent.nousresearch.com/docs")!)
+        } header: {
+            Text("Help")
+        }
+    }
+
+    /// The Watch's state in one row where a Watch can pair, then the version.
+    private var aboutThisDevice: some View {
+        Section {
+            #if !targetEnvironment(macCatalyst) // Only an iPhone pairs with an Apple Watch.
+            if WCSession.isSupported() {
+                LabeledContent("Apple Watch", value: watchStatus)
+                    .accessibilityIdentifier("settings.help.apple-watch")
+            }
+            #endif
             #if targetEnvironment(macCatalyst)
             BighelpMacUpdatesRow()
             #else
@@ -477,25 +370,24 @@ struct SettingsView: View {
             LabeledContent("Build", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "")
             #endif
         } header: {
-            Text("Help & feedback")
+            Text("This device")
         }
     }
 
-    private var appleWatch: some View {
-        Section("Apple Watch") {
-            if WCSession.isSupported() {
-                LabeledContent("Paired", value: WCSession.default.isPaired ? "Yes" : "No")
-                LabeledContent("App installed", value: WCSession.default.isWatchAppInstalled ? "Yes" : "No")
-                LabeledContent("Connection", value: WCSession.default.isReachable ? "Reachable" : "Not currently reachable")
-            } else { Text("Apple Watch connectivity is unavailable on this device.") }
-        }
+    /// "Not paired", "App not installed", "Connected" or "Not reachable".
+    private var watchStatus: String {
+        let session = WCSession.default
+        if !session.isPaired { return String(localized: "Not paired") }
+        if !session.isWatchAppInstalled { return String(localized: "App not installed") }
+        return session.isReachable ? String(localized: "Connected") : String(localized: "Not reachable")
     }
 
     private func authenticationTitle(_ authentication: DirectHermesStoredAuthentication) -> String {
         switch authentication {
-        case .dashboardSession(_, let automatic): automatic ? "No sign-in" : "Session token"
-        case .bearer: "Host account"
-        case .legacyLoopbackToken: "Session token"
+        case .dashboardSession(_, let automatic):
+            automatic ? String(localized: "No sign-in") : String(localized: "Session token")
+        case .bearer: String(localized: "Account on this computer")
+        case .legacyLoopbackToken: String(localized: "Session token")
         }
     }
 
@@ -504,41 +396,8 @@ struct SettingsView: View {
         String(localized: "\(settings.bubbleColorName) bubbles · \(settings.lightBackground.name) · \(settings.darkBackground.name)")
     }
 
-    var selectedHostPluginUpdate: HostPluginUpdateModel? {
-        guard let hostID = hostRegistry?.selectedHostID else { return nil }
-        if let hostPluginUpdate, hostPluginUpdate.hostID == hostID { return hostPluginUpdate }
-        return HostPluginUpdateModel.existingModel(for: hostID)
-    }
-
     private var selectedHostPluginCheckKey: String {
         "\(hostRegistry?.selectedHostID?.uuidString ?? "none"):\(hostRegistry?.selectedWorkspace?.isConnected == true)"
-    }
-
-    /// One page of Settings on its own, for Bots mode's short Settings. Built in `body`, like
-    /// `opening(_:)`: the page reads the theme live there. Built outside it, it drew the light theme's
-    /// rows and grays in dark mode (a white name box, gray text).
-    func simpleBotsPage(_ page: SimpleBotsSettingsPage) -> Self {
-        var copy = self
-        copy.simplePage = page
-        return copy
-    }
-
-    @ViewBuilder
-    private func simpleBotsPageContent(_ page: SimpleBotsSettingsPage) -> some View {
-        switch page {
-        case .you:
-            settingsDone(settingsPage(title: String(localized: "You")) { localIdentity })
-        case .appearance:
-            settingsDone(destination(for: .appearance))
-        case .notifications:
-            settingsDone(destination(for: .notifications))
-        case .chat:
-            settingsDone(destination(for: .chat))
-        case .apps:
-            settingsDone(connectionsPage)
-        case .modes:
-            settingsDone(destination(for: .modes))
-        }
     }
 
     @ViewBuilder
@@ -546,15 +405,6 @@ struct SettingsView: View {
         switch section {
         case .modes:
             settingsPage(title: section.title) { experienceSection }
-        case .workspace:
-            settingsPage(title: section.title) {
-                workspace
-                edgeGestures
-            }
-        case .agentsAndPersonalities:
-            settingsPage(title: section.title) {
-                agentBehavior
-            }
         case .chat:
             chatPage
         case .voice:
@@ -586,16 +436,6 @@ struct SettingsView: View {
             PermissionsSettingsView(center: permissionCenter)
         case .help:
             helpPage
-        case .watch:
-            settingsPage(title: section.title) { appleWatch }
-        case .carPlay:
-            #if os(iOS) && !targetEnvironment(macCatalyst)
-            settingsPage(title: section.title) { CarPlaySettingsSection() }
-            #else
-            EmptyView()
-            #endif
-        case .connectivityAndNotifications:
-            systemPage
         }
     }
 
@@ -623,24 +463,6 @@ struct SettingsView: View {
         #endif
     }
 
-    /// Only an iPhone connects to CarPlay.
-    private static var carPlaySection: [SettingsMenuSection] {
-        #if os(iOS) && !targetEnvironment(macCatalyst)
-        UIDevice.current.userInterfaceIdiom == .phone ? [.carPlay] : []
-        #else
-        []
-        #endif
-    }
-
-    /// Only an iPhone pairs with an Apple Watch.
-    private static var watchSection: [SettingsMenuSection] {
-        #if targetEnvironment(macCatalyst)
-        []
-        #else
-        WCSession.isSupported() ? [.watch] : []
-        #endif
-    }
-
     func settingsPage<Content: View>(
         title: String,
         @ViewBuilder content: () -> Content
@@ -655,7 +477,6 @@ struct SettingsView: View {
         .driveScrolls()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .modifier(ClearCacheConfirmation(isPresented: $isClearCacheConfirmationPresented, onConfirm: clearLocalCache))
     }
 
     /// A row's title alone. Its second line, when it has one, is the control's own value.
@@ -697,17 +518,17 @@ struct SettingsView: View {
     .dynamicTypeSize(.accessibility3)
 }
 
-/// Every page that shows "Clear Local Cache" confirms it the same way.
+/// A computer's page confirms Clear local cache before it runs.
 struct ClearCacheConfirmation: ViewModifier {
     @Binding var isPresented: Bool
     let onConfirm: @MainActor () -> Void
 
     func body(content: Content) -> some View {
         content.alert("Clear local cache?", isPresented: $isPresented) {
-            Button("Clear Cache and Refresh", role: .destructive, action: onConfirm)
+            Button("Clear and refresh", role: .destructive, action: onConfirm)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("bighelp will keep your account and preferences, clear cached data for the selected host, then pull fresh agents, sessions, and account data.")
+            Text("bighelp keeps your sign-in and preferences, clears what it saved from this computer, then downloads your bots and chats again.")
         }
     }
 }

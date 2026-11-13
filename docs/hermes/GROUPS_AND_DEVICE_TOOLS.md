@@ -891,7 +891,7 @@ are a related but separate owner surface.
 
 ### Account-scoped app management
 
-Settings › Connections › Native App Connections opens straight on the list: it reads
+Settings › Apps & skills › Built-in apps (the Native App Connections page) opens straight on the list: it reads
 the catalog and the accounts, which Hermes (0.22.5 and later) answers without
 creating the host's free connector identity; only the first Connect makes it.
 A computer with no identity answers no accounts (or `4032` on accounts, read as

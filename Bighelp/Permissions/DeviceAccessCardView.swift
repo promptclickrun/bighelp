@@ -122,7 +122,7 @@ struct DeviceAccessInlineCard: View {
 
     private var footnote: String {
         let minutes = max(1, Int((card.deadline.timeIntervalSinceNow / 60).rounded()))
-        return "This turns on \(kind.title) in Settings › Connections › Device access, where you can turn it off at any time. "
+        return "This turns on \(kind.title) in Settings › Apps & skills › Device access, where you can turn it off at any time. "
             + "Your agent waits up to \(minutes) minute\(minutes == 1 ? "" : "s")."
     }
 
@@ -151,7 +151,7 @@ struct DeviceToolIcon: View {
 /// 5.1.3): where the data goes and that it can be turned off.
 enum HealthSharingNote {
     static let title = String(localized: "Share Health data with your agent?")
-    static let body = String(localized: "Health data you share goes to your Hermes computer and the AI provider on it, so your agent can answer you. It is not used for advertising. You can turn it off at any time in Settings › Connections › Device access. Next, iOS asks which kinds of Health data to share.")
+    static let body = String(localized: "Health data you share goes to your Hermes computer and the AI provider on it, so your agent can answer you. It is not used for advertising. You can turn it off at any time in Settings › Apps & skills › Device access. Next, iOS asks which kinds of Health data to share.")
 }
 
 /// Settings › Device access's sheet for the same note.

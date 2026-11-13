@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Settings › Modes: the home a launch opens in (Bots, Chat or Code), Code mode's own switch, and
-/// the switcher that puts the modes at the top of each home.
+/// the switcher that puts the modes at the top of each home. The chat switcher is in Settings › Chat.
 extension SettingsView {
     @ViewBuilder
     var experienceSection: some View {
@@ -23,7 +23,7 @@ extension SettingsView {
             Toggle(isOn: Binding(get: { settings.codeModeEnabled }, set: { settings.setCodeMode($0) })) {
                 HStack(spacing: BighelpTokens.space12) {
                     BighelpIconTile(systemName: "chevron.left.forwardslash.chevron.right")
-                    settingLabel(String(localized: "Code mode"), detail: String(localized: "Fire off coding sessions against your projects."))
+                    settingLabel(String(localized: "Code mode"), detail: String(localized: "Fire off coding chats against your projects."))
                 }
                 .padding(.horizontal, BighelpMenuRowLayout.labelInset)
             }
@@ -40,26 +40,8 @@ extension SettingsView {
             }
             .bighelpMacSettingsRowInsets()
             .accessibilityIdentifier("settings.unified-mode-toggle")
-
-            if (settings.simpleBotsEnabled || settings.codeModeEnabled), BighelpChatSwitcher.isOffered(screen: screen) {
-                chatSwitcherToggle
-            }
         }
         .listRowBackground(theme.surface)
-    }
-
-    /// The Duo folded, and iPad and Mac in landscape: the bots or sessions beside a chat.
-    var chatSwitcherToggle: some View {
-        Toggle(isOn: $settings.chatSwitcherEnabled) {
-            HStack(spacing: BighelpTokens.space12) {
-                BighelpIconTile(systemName: "rectangle.righthalf.inset.filled")
-                settingLabel(String(localized: "Chat switcher"),
-                             detail: String(localized: "Your bots, or your running sessions in Code, beside each chat."))
-            }
-            .padding(.horizontal, BighelpMenuRowLayout.labelInset)
-        }
-        .bighelpMacSettingsRowInsets()
-        .accessibilityIdentifier("settings.chat-switcher")
     }
 }
 

@@ -58,7 +58,7 @@ enum LiveVoiceUnavailable: String, Error, Equatable, Sendable {
         case .chatOpening:
             "bighelp is still opening this chat on your computer. Try again in a moment."
         case .groupChat:
-            "Live voice talks with one agent, and this chat has more than one."
+            "Live voice talks with one bot, and this chat has more than one."
         case .pluginNotInstalled:
             "Live voice needs the bighelp plugin on your computer. Set it up in Settings › Voice, then try again."
         case .pluginNotLoaded:
@@ -66,7 +66,7 @@ enum LiveVoiceUnavailable: String, Error, Equatable, Sendable {
         case .pluginUnreachable:
             "bighelp couldn't reach the bighelp plugin on your computer just now. Try again in a moment."
         case .voiceNotOffered:
-            "The Hermes on your computer doesn't offer live voice. Update Hermes and the bighelp plugin in Settings › System, then try again."
+            "The Hermes on your computer doesn't offer live voice. Update Hermes and the bighelp plugin in Settings, on your computer's page, then try again."
         case .demo:
             "Demo mode has no computer for live voice."
         }

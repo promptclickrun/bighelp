@@ -472,7 +472,6 @@ extension AppTab {
         case .inbox: String(localized: "Inbox")
         case .profile: String(localized: "Settings")
         case .scheduledTasks: String(localized: "Tasks")
-        case .workspace: String(localized: "Workspace")
         case .feed: String(localized: "Feed")
         case .ideas: String(localized: "Ideas")
         case .goals: String(localized: "Goals")
@@ -499,8 +498,6 @@ extension AppTab {
         case (.profile, true): "gearshape.fill"
         case (.profile, false): "gearshape"
         case (.scheduledTasks, _): "calendar.badge.clock"
-        case (.workspace, true): "square.grid.2x2.fill"
-        case (.workspace, false): "square.grid.2x2"
         case (.feed, true): "newspaper.fill"
         case (.feed, false): "newspaper"
         case (.ideas, true): "lightbulb.fill"
@@ -528,7 +525,6 @@ extension AppTab {
         case .inbox: "tab.inbox"
         case .profile: "tab.profile"
         case .scheduledTasks: "tab.scheduled-tasks"
-        case .workspace: "tab.workspace"
         case .feed: "tab.feed"
         case .ideas: "tab.ideas"
         case .goals: "tab.goals"

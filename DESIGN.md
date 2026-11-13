@@ -18,8 +18,8 @@ are historical (`docs/ui-v3-design.md`).
 - Keep consequences for credentials, recipients, spending, destructive changes and uncertain saves at the relevant decision. Simplification must not conceal them.
 - Aim for understanding setup and ordinary chat in roughly 30 seconds. This is a comprehension target, not a measured authentication-time promise.
 - A Settings row's title is the thing, in one to three words. Its second line is the control's value; a hint only when the title can't carry it, six words at most (`settingTitle`, `settingLabel`).
-- A section has a header, two to seven rows where it can, and one footer of one sentence. Longer detail goes behind a tap on the row (Device access's info button), never under it.
-- Advanced groups come last on the page they belong to, with headers that start "Advanced ·", and show only with Nerd Mode on.
+- A section has a sentence-case header, two to seven rows where it can, and one footer of one sentence. Longer detail goes behind a tap on the row (Device access's info button), never under it.
+- Advanced groups come last on the page they belong to, with the header "Advanced" or "Advanced · <name>", and show only with Advanced options (`settings.nerdModeEnabled`) on. The setting's code name is still Nerd Mode; people read Advanced options.
 
 ## Visual language
 
@@ -76,9 +76,9 @@ are historical (`docs/ui-v3-design.md`).
   talking, happy, sleeping) plus extra moves for its current work. The look is saved as the agent's avatar picture.
 - Every surface draws an agent's face in one order (`AgentFace`): its kit character, its petdex pet, its Hermes face
   or shape (the look Hermes keeps in its profile, drawn live and played with the avatar designer's states), its
-  Bots mode mark, then its picture. Each agent's pet companion is that same face (`AgentPet`); Settings › Companion
-  pet holds only Show pet companion, Pet size and Adventurous Pet.
-- Menu, Hermes tools and Settings icons are bighelp's own line glyphs (`Design/Glyphs`, `BighelpGlyph`): a 24-pt
+  Bots mode mark, then its picture. Each agent's pet companion is that same face (`AgentPet`); Settings › Appearance ›
+  Companion pet holds only Show pet companion, Pet size and Adventurous Pet.
+- Menu and Settings icons are bighelp's own line glyphs (`Design/Glyphs`, `BighelpGlyph`): a 24-pt
   grid, round 2-pt strokes and the brand's dot, with agents drawn as the orb with two eyes. Call sites still name SF
   Symbols; ones without a glyph fall back to the symbol. Edit `glyphs.py`, then run `export_assets.py`.
 - Product type is SF Pro. Root screens use large titles; section captions are small, bold, letterspaced and muted.
@@ -132,8 +132,8 @@ model and reasoning, then Activity, Approvals, Schedules, Identity), tap the nam
 chat, and ☰ for everything else. ☰'s first screen fits without
 scrolling: the host as one switcher row on top, then New chat (Group beside it), Agents, Sessions (every chat), Projects, Kanban, Workflows
 (where the computer's plugin has them or says why it can't run them; with All hosts on it asks which computer),
-Scheduled tasks, Usage and Settings, then Recent chats with See all. Nerd Mode's folder sits under More at the
-bottom; the Secure credential vault is in Settings › Connections, with the apps and Device access.
+Scheduled tasks, Usage and Settings, then Recent chats with See all. Advanced options' Folder sits under More at the
+bottom; the credential vault is in Settings › Apps & skills, with the apps and Device access.
 Keep it that short: a new destination goes where people already look, not on the first screen. Headers keep their
 own New chat only where there's no bar to hold it: Code mode, the iPhone Duo's side strip, Vision Pro's tab
 ornament, and a board opened with Back. The chat list (and the all-hosts view's All sessions) searches from the system
@@ -230,7 +230,7 @@ with each item's full text. Change agent sits at the bottom. **Open on iPhone** 
 open, or taps through from a notification; Handoff offers it too. Anything too big for the Watch says to answer on
 the iPhone.
 
-**CarPlay** is voice first: opening bighelp in the car starts a new chat with the agent from Settings › CarPlay
+**CarPlay** is voice first: opening bighelp in the car starts a new chat with the agent from Settings › Voice › In the car
 (else the last one picked in the car, else the default) and listens. The home shows that agent's face, what it's
 doing in one line and its last steps, with Talk (and End while you talk), and the other agents under it. Talk, or
 tapping the agent you talk to, opens the voice screen: a new conversation, or back to the one that's on. The voice
@@ -309,7 +309,7 @@ it every goal shows under Other and the page says to update the plugin.
 **Projects** (☰ › Projects) are Hermes projects shown the way Claude shows them: cards with the project's emoji
 and color, description and recent use; a project page with **New chat in this project**, its chats and its
 folders. A chat started there runs in the project's folder (Hermes files chats by folder, and the project becomes
-the current one). Folder and Git management stay in Settings › Hermes tools (Nerd Mode). 
+the current one). With Advanced options on, a project's ⋯ menu has Folders and Git for the folder and Git pages. 
 
 **Usage** (☰ › Usage, above Settings) is the one place for what the agents use. Limits come first: each plan,
 limit and balance the plugin finds (Choose hides one), with what the agents used through it in the range. With
@@ -374,7 +374,7 @@ Ask for changes or Approve, stacked on iPhone and side by side on iPad. Approvin
 fingerprint (4f1c…9a2e) and never publishes anything: the file comes to you with Share and Save to Files. The Mac
 shows all runs as a three-column monitor (runs with filters, the run, and an inspector); the computer's name in
 the top bar stays on one line. Token counts, attempts, full fingerprints, the service's heartbeat and the events log
-are Nerd Mode only, and runs on Hermes' fallback runner (which can't count tokens) show none rather than 0. Stage
+are Advanced options only, and runs on Hermes' fallback runner (which can't count tokens) show none rather than 0. Stage
 chats (source `workflow`) stay out of Sessions, recents and widgets.
 
 **All hosts** (the stack button beside ☰'s host switcher) turns home into one list of every agent on every
@@ -384,10 +384,10 @@ name, its role and its latest chat, newest first. One big round New chat sits bo
 where a thumb rests. A tap opens that agent's canonical Bot Chat (☰ top left, the edge swipe goes back); if it's on another host, the app switches hosts
 first while the list stays up. ☰'s recent chats, All chats and Scheduled tasks then list every host's, each with
 its host's name. Screens that belong to one host (Settings, Agents, Projects, Kanban, Workflows, the credential
-vault, the folder, New group) ask which host first; Usage instead adds up every host, with a row for each; Settings' pop-up also leads with **Fleet settings**, one page
+vault, the folder, New group) ask which host first; Usage instead adds up every host, with a row for each; Settings' Your computers group also has **Update every computer** (with two or more), one page
 for every host: Update Hermes (each host's commits behind), Update bighelp Plugin (each host's version → the new
 one) and Restart Hermes Gateway, all at once with each host's live status and its own Restart when it needs one.
-Each host runs the same flows as its own System page (`HostOperationsStore`, `HostPluginUpdateModel`); hosts that
+Each host runs the same flows as its own computer page (`HostOperationsStore`, `HostPluginUpdateModel`); hosts that
 are offline or signed out say so and are skipped (`Bighelp/Fleet/FleetMaintenance.swift`). The tab bar hides, ☰ › All agents is home, and the button in the list's top bar
 turns it off. Other hosts are read at most once a minute over their own saved sign-ins (`Bighelp/Fleet`); one
 that can't be reached says so and keeps showing what it had last time. While it's on and the app is open, every
@@ -410,37 +410,44 @@ something moves it on or it has used every Continue. Agents opens on the
 **Pinned** agents: each shows its role under the name (one line, trailing off), or what it's doing when it's busy.
 Touch and hold lifts an agent: drag it to reorder (the order is kept per host), or let go to see its actions.
 
-**Settings** is one short list where every row opens one page: you, Assistants (default model, providers,
-personalities), then Appearance, Chat, Voice and Notifications, then Hosts, Permissions, Apple
-Watch, Companion pet and Help. Don't add sections that compete with these; add to the page a row already opens
-(Permissions' page, Device access, also holds Share usage and diagnostics, on by default).
-Settings › Default model leads with **Agent**: tap it for a rail of cards, one per agent (picture and name, the
-chosen one filled with the accent, `BighelpRailCard`), and the page shows and changes that agent's own default.
-Settings › Chat reads in named groups: **Opening**, **A bot's work**, **In a chat** and **Chat list**, then Nerd Mode's
+**Settings** is one short list where every row opens one page, and it is the same tree in every mode (Bots mode's
+circle opens it too, with no Settings of its own). The first screen has you (name and photo), Usage and, while a
+share waits, Shared with bighelp; **Your bots** (Models, Apps & skills, Voice, Personality and the Teamwork
+switch); **This app** (Appearance, Chat, Notifications, Modes); on Vision Pro, In your space; **Your computers**
+(one row per computer, Add a computer, Show every computer, Time zone and, with two or more computers, Update
+every computer); then Help & feedback and the Advanced options switch. Don't add sections that compete with these;
+add to the page a row already opens (Help & feedback also holds Share usage and diagnostics, on by default, and
+the Apple Watch's status).
+Settings › Models is the AI providers first, then **Default model** with one row per bot (its face, its name and
+its model under it); a row opens that bot's own Default Model page, the one its profile opens. Advanced comes last.
+Settings › Chat reads in named groups: **Opening**, **A bot's work**, **In a chat** and **Chat list**, then the
 Advanced groups. Opening has Opens on (Agents, Agents (multi), Last chat, Feed, Ideas, Goals,
 Kanban, Projects; Last chat, the agent's latest chat, until you pick), Start with (Last bot used, or one of this
 computer's agents, kept per computer; Agents (multi) has none) and A bot opens. It applies when the app starts,
 not when it comes back; a link, widget or notification that opens the app wins, and Kanban or Projects where the
 computer can't open them fall back to Last chat (`BighelpLanding`).
-**Marketplace** (Settings › Agents, and a row on each bot's profile for that bot) is for everyone: this week's
-featured plugin (the pick Hermes' marketplace and Desktop show), four ways in (Apps, Skills, Plugins, Talk anywhere
-for messaging apps) and the plugins with the most stars; a bot's adds MCP servers. A bot's profile also lists
-Connections, **Core Files** (SOUL.md, USER.md, MEMORY.md and the AGENTS.md Hermes loads for its chat, each opening
-in the Markdown viewer to read or edit) and **Active Project** (the project its new chats start in, a checked list;
-also in Bots mode, where ☰ › Projects isn't). Host administration — files, MCP, memory, logs,
-activity — is hidden until **Nerd Mode** is on, which adds a Hermes section at the bottom: **System** (Update Hermes with how many commits behind,
-Restart Hermes Gateway, the plugin's Update button, then everything else folded away) and **Hermes tools** (the
-searchable list of the host's tools). There's no separate Hermes Tools entry in ☰. Pages lead with the action
-people come for (`BighelpActionRow`) and keep explanations to one line. **Hosts** lists your computers (the one in
-use checked) and Add a computer; a computer's page leads with Use this computer, Rename and Sign in again, then its
-plugin and notifications, with its address and access folded away and Remove at the bottom.
+**Apps & skills** (Settings › Your bots) is for everyone: This device (Device access) first, then Apps (Built-in
+apps and Composio), Skills and plugins (with this week's featured plugin, the pick Hermes' marketplace and Desktop
+show), Talk anywhere (Messaging apps) and Logins (the credential vault); with Advanced options on, an Advanced group
+adds MCP servers and Toolsets. Each bot's profile has its own **Marketplace** with the same pages for that bot, and
+its own Connections. A bot's profile also lists **Core Files** (SOUL.md, USER.md, MEMORY.md and the AGENTS.md Hermes
+loads for its chat, each opening in the Markdown viewer to read or edit) and **Active Project** (the project its new
+chats start in, a checked list; also in Bots mode, where ☰ › Projects isn't). Host administration is hidden until
+**Advanced options** is on, and each part sits on the page it tunes: a computer's page, Chat, Models, Apps & skills
+and a bot's Advanced Options. There is no Hermes tools list and no System page. Pages lead with the action people come
+for (`BighelpActionRow`) and keep explanations to one line. **Your computers** lists each computer (the one in use
+says so) and Add a computer. A computer's page leads with Use this computer, when it isn't the one in use, then
+Updates (Hermes and the bighelp plugin, with how far behind each is), Restart (messaging and the dashboard), This
+computer (its name, AI providers and notifications), Access (its address and Sign in again), the Advanced groups
+(Messaging, Upkeep and Setup: logs, backups, diagnostics, webhooks, tool backends, config.yaml, shell hooks,
+Kanban boards and the computer voice test) and, last, Remove this computer.
 
-Nerd Mode (`settings.nerdModeEnabled`, also the `nerdModeEnabled` environment value) also gates technical detail
+Advanced options (`settings.nerdModeEnabled`, also the `nerdModeEnabled` environment value; the code name is still Nerd Mode) also gates technical detail
 inside everyday screens: the chat Info sheet's visibility toggles and host details, a background command's output,
 Skills/Session rows in the + sheet, Agent Studio's Advanced page and templates, the task editor/detail Advanced groups, and the extra sections on
 Settings › Chat. Everyday controls must never live only behind it.
 
-The chat's ⋯ menu is one list, the same with Nerd Mode on or off: New Bot Chat in an agent's Bot Chat (Switch agent
+The chat's ⋯ menu is one list, the same with Advanced options on or off: New Bot Chat in an agent's Bot Chat (Switch agent
 in the home chat); then This chat (a group chat's Group Settings and Chat info, where its members are, Rename…, Move to Project… with
 the chat's project, Files, and File changes when available); then Model (Model & speed, Usage); then More (Edit
 agent, Advanced). Model & speed contains Model settings and Fast Mode. Usage contains provider usage, Context
@@ -459,7 +466,7 @@ projects with a tick on the chat's own, and moves the chat only once Hermes conf
 chat and File changes show the new project. Chats have no backgrounds of their own: Settings › Appearance sets the
 look of every screen.
 
-Fast Mode is explicit about scope: the chat menu changes only this chat; Settings › Default model changes the
+Fast Mode is explicit about scope: the chat menu changes only this chat; Settings › Models › Default model changes the
 selected agent's default for new chats. Fast Mode may cost more. Read the host's current value and verify saves;
 unknown modes stay labeled as host-managed. A model/provider without verified support shows Unavailable and a
 reason, not an effective On switch. A running reply locks chat speed changes just like model and reasoning.
@@ -485,7 +492,7 @@ runs some turns on its own (another agent wrote in, a background process finishe
 write some messages, so neither streams here: the chat reads what Hermes saved when such a turn ends, and while
 an answer is due. When another Hermes process runs the open chat (an agent another one asked, in its Bot Chat),
 the plugin's `chat/activity` says so: the agent shows typing, with Stop (`chat/stop`, Ctrl-C to that process).
-Settings › Assistants › Teamwork (opt-in, plugin `native-team-v1`) tells every agent who the others are and to
+Settings › Teamwork (opt-in, plugin `native-team-v1`) tells every agent who the others are and to
 hand them the work their roles cover, without being asked.
 
 An opened "Worked for…" fold shows its tools directly, never a "Called N tools" folder inside it.
@@ -538,7 +545,7 @@ before and after for two seconds before it shrinks away. Hermes' own status star
 Model settings (`ChatModelSettingsSheet`) is a short sheet: the chat's model, the Thinking control, how full the
 context window is and, when the model has it, Fast Mode. The context window is one meter with plain words
 ("34% used", "Plenty of room left"), in the warning color from 85%, and it shows only once Hermes reports the
-window. Nerd Mode swaps the words for the token counts and makes the line open the Context page. The model chip in the message box opens it (the provider's mark and a chevron, before the
+window. Advanced options swaps the words for the token counts and makes the line open the Context page. The model chip in the message box opens it (the provider's mark and a chevron, before the
 microphone), and so do ⋯ › Model & speed and Change beside a chat's model. Every choice is sent as it's made; there
 is no Apply, and a refused choice falls back with the reason on top. The model row opens All models
 (`ChatAllModelsView`): search, Starred, then one folding section per provider with its plan, a star on every model
@@ -621,8 +628,8 @@ text is SF Pro, as everywhere.
   Studio look beside it (`SimpleBotCreation.use`).
 - **Chat**: Back, the bot's name (its profile) and ⋯; no New chat button. Voice is a bar over the chat, under
   its header (`SimpleBotVoiceBar`), and the chat stays in use: the bot's face, a visualizer from the real audio
-  levels (your voice in the page's ink, the bot's in its color, dots while nobody speaks), voice choices (live
-  or TTS, the bot's voice on or off), the microphone and End. The bot's work shows as Settings › Chat › Agent's
+  levels (your voice in the page's ink, the bot's in its color, dots while nobody speaks), voice choices (Live
+  or Take turns, the bot's voice on or off), the microphone and End. The bot's work shows as Settings › Chat › Agent's
   work says, as in every one-to-one chat: the notes it writes on the way to its answer go with its steps, in
   order, and the answer always shows.
 - **Swipes**: from the left edge back to your bots; from the right, this bot's profile (the primary bot's on
@@ -652,11 +659,11 @@ text is SF Pro, as everywhere.
   Mac also offers them on a right-click. Character is Info's first row, with the bot's face at its end; it opens Edit avatar at once
   (`AvatarChooserView`: Bot Studio, PetDex or a photo), and Save applies the pick at once. An avatar starts Calm:
   a move plays only once the person picks one, and Surprise me never adds one. Default Model is the
-  model and reasoning picker, saved as the bot's default for chats. Default Voice picks this bot's TTS or GPT Live
+  model and reasoning picker, saved as the bot's default for chats. Default Voice picks this bot's Live or Take turns
   and its provider, model and voice from lists (saved per bot). Advanced Options is the bot's one simple doorway
-  to its Nerd Mode settings: plain rows with a tip each (Approvals: Smart, Manual or Off), and links to its Nerd
-  Mode pages under For experts, without Nerd Mode turned on.
-- **Credential Vault** (a bot's Info, with how many websites; Settings › Connections › Secure credential vault opens the same screens
+  to its expert settings: plain rows with a tip each (Approvals: Smart, Manual or Off), and links to its
+  Advanced pages under For experts, without Advanced options turned on.
+- **Credential Vault** (a bot's Info, with how many websites; Settings › Apps & skills › Credential vault opens the same screens
   for any agent): the Wallet on top, a row of saved cards (small dark cards with their last digits) and addresses
   (gray tiles), each once however many websites use it; then Websites, each with its letter, its login and small
   icons for what's saved there; Password managers and Import from a file under them; Add a Website at the bottom.
@@ -665,9 +672,8 @@ text is SF Pro, as everywhere.
   computer, never typed again. If one part doesn't save, the others show Saved and only that part stays open, its
   fields kept. A website's page lists what's there, Add to this website and Remove this website; a card's or
   address's page shows its face, Used on (Stop beside each but the last) and Use on another website.
-- **Settings**: you and Usage (your tightest plan limit); Connect apps; the primary bot's Approvals (opens its
-  Advanced Options, the one place approvals are set) and the time zone every bot works in (or this device's,
-  automatically); Teamwork; Bot Computer; Notifications and Appearance; then the switch back and All Settings.
+- **Settings**: the person's circle opens the same Settings as ☰ does in Chat and Code (see Settings above), so
+  Bots mode has no short Settings of its own. Modes, under This app, switches the homes.
 
 ## An agent showing the way
 
@@ -769,7 +775,7 @@ Mode and in the background. The loader gallery (`-bighelp-loader-gallery`, Noodl
 | thinking | Reasoning: the chat's active thinking row, a folder between calls, voice while the agent works |
 | listening, talking, resting | The voice pill: the microphone is open, the agent speaks, the call is paused or muted |
 | launch | Connecting (host setup, live voice), restoring a session |
-| spring | Reconnecting (Hosts, a plugin update waiting for Hermes) |
+| spring | Reconnecting (Your computers, a plugin update waiting for Hermes) |
 | lasso | Searching (models, skills, chats) |
 | infinity | Helper agents running in the chat's active folder |
 | squiggle | Sending from the message box |

@@ -1,16 +1,22 @@
 # Workspace management
 
-Workspace is a native, task-grouped entry point. `WorkspaceDestination` is a
-finite navigation contract; the shell routes existing Activity, Sessions,
-Scheduled Tasks, Skills, Voice, agent profiles and device settings to
-their existing owners. Tasks means session goals and task controls, not a
-second scheduler. Artifacts means files in their originating sessions, not
+Workspace management is a set of native tool pages for one computer.
+`WorkspaceDestination` is a finite navigation contract. The shell opens a page
+with `RootShellView.openWorkspaceDestination(_:)` from where it belongs, and the
+shell routes Sessions, Scheduled Tasks, Skills, Voice, agent profiles and device
+settings to their existing owners. Tasks means session goals and task controls,
+not a second scheduler. Artifacts means files in their originating sessions, not
 an invented universal host catalog.
 
-Scratchpad, GitHub and Wiki remain retired from app navigation. The Workspace
-menu (Hermes Tools) and its search use `appMenuCases`, not the complete backend
-destination catalog: it also leaves out Tasks, Usage (☰ › Usage) and the
-destinations for this app's own settings, which live in Settings. Native Wiki
+There is no Hermes tools list. Each page opens from the screen it tunes: AI providers
+and default models in Settings › Models; Skills, Plugins, Messaging, MCP and
+Toolsets in Settings › Apps & skills;
+logs, webhooks, tool backends, diagnostics, backups and the other host pages on a
+computer's page (Advanced groups, with Advanced options on); Clean up chats in
+Settings › Chat; Toolsets and Manage bots in a bot's Advanced Options. Scratchpad,
+GitHub and Wiki remain retired from app navigation, and the contract also leaves
+out Usage (☰ › Usage) and the destinations for this app's own settings, which
+live in Settings. Native Wiki
 contracts and clients remain for older hosts that still list `native-wiki-v1`
 (current plugin releases no longer have the Wiki routes), without adding a
 visible Wiki menu entry.

@@ -56,7 +56,7 @@ final class NativeWorkspaceManagementClient: WorkspaceManagementClient {
     var editableDestinations: Set<WorkspaceDestination> {
         guard isCurrent(), performer.owner == owner else { return [] }
         let candidates: [(WorkspaceDestination, WorkspaceCapability)] = [
-            (.projects, .projectsEdit), (.config, .configEdit), (.keys, .keysEdit), (.webhooks, .webhooksEdit)
+            (.projects, .projectsEdit), (.keys, .keysEdit), (.webhooks, .webhooksEdit)
         ]
         return Set(candidates.compactMap { destination, capability in
             guard performer.capabilities.supports(capability, owner: owner, profileID: profileID) else { return nil }
@@ -113,14 +113,6 @@ final class NativeWorkspaceManagementClient: WorkspaceManagementClient {
             let payload = try await perform(.logsList, ["file": .string("agent"), "lines": .integer(100)])
             guard payload["file"]?.string == "agent" else { throw WorkspaceManagementError.invalidResponse }
             return try .logs(WorkspaceManagementDecoder.logs(payload))
-        case .config:
-            let payload = try await perform(.configGet, profile.merging(["key": .string("reasoning")]) { _, new in new })
-            guard let value = payload["value"]?.string,
-                  let effort = WorkspaceReasoningConfiguration.Effort(hostValue: value),
-                  let display = payload["display"]?.string, ["show", "hide"].contains(display) else {
-                throw WorkspaceManagementError.invalidResponse
-            }
-            return .configuration(.init(effort: effort, showsReasoning: display == "show"))
         case .files:
             if let fileClient {
                 try checkOwner()
@@ -168,15 +160,6 @@ final class NativeWorkspaceManagementClient: WorkspaceManagementClient {
             guard let row = response["project"]?.object else { throw WorkspaceManagementError.unconfirmedMutation }
             let project = try WorkspaceManagementDecoder.project(row)
             guard project.id == id, project.name == name else { throw WorkspaceManagementError.unconfirmedMutation }
-        case .reasoning(let effort):
-            let response = try await perform(.configSet, profile.merging([
-                "key": .string("reasoning"), "value": .string(effort.rawValue), "scope": .string("global")
-            ]) { _, new in new })
-            guard response["key"]?.string == "reasoning", response["value"]?.string == effort.rawValue else {
-                throw WorkspaceManagementError.unconfirmedMutation
-            }
-            guard case .configuration(let confirmed) = try await load(.config),
-                  confirmed.effort == effort else { throw WorkspaceManagementError.unconfirmedMutation }
         case .replaceCredential(let key, let value):
             guard WorkspaceInventoryDecoder.validKey(key), !value.isEmpty, value.utf8.count <= 8_192,
                   !value.contains("\n"), !value.contains("\r"), !value.contains("\0") else {

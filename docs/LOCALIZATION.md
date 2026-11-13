@@ -15,7 +15,7 @@ not a claim that the whole app is translated.
 - Core chat composer placeholders and accessibility labels, send/stop/voice
   controls, mid-turn send choices, and attachment/action-menu labels.
 - Top-level Settings rows, identity controls, experience switches, appearance
-  summary, assistant rows, and Nerd Mode entry.
+  summary, assistant rows, and the Advanced options entry (Nerd Mode in code).
 
 The second stage (#527) adds:
 
@@ -23,13 +23,13 @@ The second stage (#527) adds:
   the + menu, a bot's long-press menu, Rearrange, the gateway filter), New Bot and its
   Templates sheet, New Group Chat, a bot's profile (Info, Computer, Files and Media tabs,
   Instructions, Default Model, Routines), the voice bar, the opening loader, and its
-  short Settings.
+  Settings entry (the person's circle, which now opens the one Settings).
 - Teamwork: the line where agents talk to each other ("Asked …", "… answered",
   "N messages with …"), its sheet, the working and typing states, and the Teamwork
   switch with its line. In Bots mode the switch says bots in sentences of its own.
 - The Settings pages these lead to: Experience, Assistants, Notifications (topics,
   "Bots messaging each other", channels, workflows, Quiet hours, test and turn-off),
-  Chat (with Nerd Mode's sections), and Appearance with Chat layout and App layout.
+  Chat (with the Advanced options sections), and Appearance with Chat layout and App layout.
 - The modes after their 2.6.11 rename: Bots, Chat and Code, Settings › Modes (its picker and the
   Header mode switcher), and the mode edge swipes.
 - Needs you and a blueprint's chips in the message box.

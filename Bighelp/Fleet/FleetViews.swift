@@ -986,10 +986,10 @@ struct FleetHostPicker: View {
                             HStack(spacing: BighelpTokens.space12) {
                                 BighelpIconTile(systemName: "square.stack.3d.up.fill")
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Fleet settings")
+                                    Text("Update every computer")
                                         .font(.bighelp(.body).weight(.semibold))
                                         .foregroundStyle(theme.primaryText)
-                                    Text("Update and restart every host, together or one by one")
+                                    Text("Together or one by one")
                                         .font(.bighelp(.footnote))
                                         .foregroundStyle(theme.secondaryText)
                                 }

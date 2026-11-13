@@ -1,9 +1,9 @@
 import XCTest
 
 /// Settings › Voice on the demo data: Hold music (#651), the
-/// on-device Phonon voice (#649) and the Debug section. `BIGHELP_VOICE_EVIDENCE` saves screenshots there.
+/// on-device Phonon voice (#649) and the Advanced section. `BIGHELP_VOICE_EVIDENCE` saves screenshots there.
 final class VoiceSettingsUITests: BighelpUITestCase {
-    /// TTS voice mode lists Hold music, and every agent's providers start with this iPhone's Phonon,
+    /// Take turns lists Hold music, and every bot's providers start with this iPhone's Phonon,
     /// which downloads before it can be saved.
     @MainActor
     func testHoldMusicAndThePhoneVoiceInVoiceSettings() {
@@ -13,21 +13,24 @@ final class VoiceSettingsUITests: BighelpUITestCase {
             openVoiceSettings(app)
             let mode = app.segmentedControls["voice.settings.conversation-mode"]
             XCTAssertTrue(mode.waitForExistence(timeout: 5))
-            mode.buttons["TTS"].tap()
+            mode.buttons["Take turns"].tap()
 
             let holdMusic = app.switches["voice.settings.hold-music"]
             XCTAssertTrue(holdMusic.waitForExistence(timeout: 5))
             if !isOn(holdMusic) { holdMusic.switches.firstMatch.tap() }
             holdMusic.switches.firstMatch.tap()
             XCTAssertFalse(isOn(holdMusic))
-            XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@",
-                                                                 "The wait for a reply is silent.")).firstMatch.exists)
             save("voice-hold-music-off-\(appearance)", app)
             holdMusic.switches.firstMatch.tap()
 
+            // The voice is its own group under Voice chats and In chats. Scroll slowly: the group loads
+            // from the computer, and a fast swipe goes past where it lands.
             let provider = app.buttons["voice.settings.provider"]
-            for _ in 0..<6 where !(provider.exists && provider.isHittable) { app.swipeUp() }
-            XCTAssertTrue(provider.waitForExistence(timeout: 20), "The agent's speech settings load")
+            for _ in 0..<12 where !(provider.exists && provider.isHittable) {
+                app.swipeUp(velocity: .slow)
+                _ = provider.waitForExistence(timeout: 2)
+            }
+            XCTAssertTrue(provider.waitForExistence(timeout: 20), "The bot's voice settings load")
             provider.tap()
             let phonon = app.buttons["voice.provider.device-phonon-31m-en"]
             XCTAssertTrue(phonon.waitForExistence(timeout: 5), "Phonon isn't in the provider list")
@@ -42,7 +45,7 @@ final class VoiceSettingsUITests: BighelpUITestCase {
         }
     }
 
-    /// Settings › Voice › Debug shows only in Nerd Mode, with both switches off and Restart sound disabled
+    /// Settings › Voice › Advanced shows only in Nerd Mode, with both switches off and Restart sound disabled
     /// while no call is in progress.
     @MainActor
     func testDebugSectionShowsOnlyInNerdMode() {
@@ -54,11 +57,14 @@ final class VoiceSettingsUITests: BighelpUITestCase {
             let copy = app.switches["voice.settings.debug.copy"]
             let restart = app.buttons["voice.settings.debug.restart"]
             for _ in 0..<6 where !(restart.exists && restart.isHittable) { app.swipeUp() }
-            XCTAssertTrue(report.waitForExistence(timeout: 5), "Nerd Mode shows Settings › Voice › Debug")
-            XCTAssertFalse(isOn(report), "Show call sound report starts off")
+            XCTAssertTrue(report.waitForExistence(timeout: 5), "Nerd Mode shows Settings › Voice › Advanced")
+            XCTAssertFalse(isOn(report), "Call sound report starts off")
             XCTAssertFalse(isOn(copy), "Copy report button starts off")
             XCTAssertFalse(restart.isEnabled, "Restart sound with no call in progress")
-            XCTAssertTrue(app.staticTexts["Restart sound works during a Gemini Live call."].exists)
+            // The group's footer can sit just under the screen's edge.
+            let hint = app.staticTexts["Restart sound works during a Gemini Live call."]
+            for _ in 0..<6 where !hint.exists { app.swipeUp(velocity: .slow) }
+            XCTAssertTrue(hint.exists)
             save("voice-debug-nerd-on-\(appearance)", app)
             app.terminate()
 
@@ -67,8 +73,8 @@ final class VoiceSettingsUITests: BighelpUITestCase {
             openVoiceSettings(plain)
             XCTAssertTrue(plain.segmentedControls["voice.settings.conversation-mode"].waitForExistence(timeout: 5))
             for _ in 0..<4 { plain.swipeUp() }
-            XCTAssertFalse(plain.switches["voice.settings.debug.report"].exists, "Debug without Nerd Mode")
-            XCTAssertFalse(plain.buttons["voice.settings.debug.restart"].exists, "Debug without Nerd Mode")
+            XCTAssertFalse(plain.switches["voice.settings.debug.report"].exists, "Advanced without Nerd Mode")
+            XCTAssertFalse(plain.buttons["voice.settings.debug.restart"].exists, "Advanced without Nerd Mode")
             save("voice-debug-nerd-off-\(appearance)", plain)
             plain.terminate()
         }

@@ -477,6 +477,32 @@ extension RootShellView {
         }
     }
 
+    /// `AppState.openNeedsYou()` (an alert that names no chat). Once the computer is connected it reads
+    /// the computer's list, so the question the alert was about is in it, then opens Needs you, or the
+    /// home chat when nothing waits. The request is kept until then: a cold launch can ask before the
+    /// computer answers, so it waits for the connection (the shell's task restarts when
+    /// `needsYouListIsReady` changes) and gives up after `NeedsYouRequest.connectionWait`. Settings is
+    /// closed first, since a sheet can't show over it.
+    func settleNeedsYouRequest() async {
+        guard appState.isNeedsYouRequested else { return }
+        guard needsYouListIsReady else {
+            try? await Task.sleep(for: NeedsYouRequest.connectionWait)
+            // Cancelled: the connection came up, or the request was settled or replaced.
+            guard !Task.isCancelled, appState.isNeedsYouRequested else { return }
+            appState.isNeedsYouRequested = false
+            leaveSettings { openHomeChat() }
+            return
+        }
+        await featureStore.dashboardModel.refreshAfterExternalChange()
+        guard !Task.isCancelled, appState.isNeedsYouRequested else { return }
+        appState.isNeedsYouRequested = false
+        if needsYouEntries.isEmpty {
+            leaveSettings { openHomeChat() }
+        } else {
+            leaveSettings { afterClosingHomeSheets { isNeedsYouPresented = true } }
+        }
+    }
+
     /// Closes the open home sheet, then runs the next step once it is gone.
     func afterClosingHomeSheets(_ action: @escaping @MainActor () -> Void) {
         // The Mac's ☰ is a sidebar that stays open; with no sheet over it,
@@ -818,6 +844,7 @@ extension RootShellView {
                     .bighelpSheetSize(.standard)
             }
             .environment(\.needsYouDeckContext, needsYouDeckContext)
+            .task(id: needsYouRequestKey) { await settleNeedsYouRequest() }
             #if DEBUG
             .task {
                 guard !didPresentDemoNeedsYou,

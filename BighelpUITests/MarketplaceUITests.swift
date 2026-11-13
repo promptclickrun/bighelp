@@ -1,28 +1,26 @@
 import XCTest
 
-/// The Marketplace on the demo data with Nerd Mode off: Settings › Marketplace and a bot's own from its
-/// profile, each with this week's featured plugin and the four ways in, every one opening its page.
+/// The Marketplace on the demo data with Advanced options off: Settings › Apps & skills and a bot's own
+/// from its profile, each with Skills, Plugins, this week's featured plugin and Messaging apps, every one
+/// opening its page. Apps & skills lists the apps once.
 /// Screenshots go to BIGHELP_UI_EVIDENCE (TEST_RUNNER_BIGHELP_UI_EVIDENCE) when set.
 final class MarketplaceUITests: BighelpUITestCase {
     @MainActor
-    func testSettingsMarketplaceOpensEveryWayInWithoutNerdMode() {
+    func testAppsAndSkillsOpensEveryWayInWithoutAdvancedOptions() {
         for appearance in ["light", "dark"] {
             let app = launch(appearance: appearance)
             openSettings(in: app)
-            let row = settingsRow("settings.marketplace", in: app)
-            XCTAssertTrue(row.exists, "Settings lists the Marketplace without Nerd Mode")
-            row.tap()
+            settingsRow("settings.apps", in: app).tap()
             XCTAssertTrue(app.buttons["marketplace.featured"].waitForExistence(timeout: 10),
-                          "The Marketplace opens on this week's featured plugin")
-            XCTAssertTrue(app.buttons["marketplace.popular.local-models"].exists, "The most starred plugins show")
-            evidence("marketplace-settings-\(appearance)", app)
+                          "Apps & skills has this week's featured plugin")
+            XCTAssertTrue(app.buttons["apps.native"].exists || app.buttons["apps.composio"].exists,
+                          "Apps & skills lists the apps bots can use")
+            XCTAssertLessThanOrEqual(app.buttons.matching(identifier: "apps.native").count, 1, "The apps show once")
+            XCTAssertFalse(app.buttons["marketplace.mcp"].exists, "MCP servers wait for Advanced options")
+            evidence("apps-and-skills-\(appearance)", app)
 
             open("plugins", expecting: "plugins.hero", in: app)
             open("skills", expecting: "skills.hero", in: app)
-            open("apps", expecting: "marketplace.apps.page", in: app)
-            XCTAssertTrue(app.buttons["apps.native"].exists || app.buttons["apps.composio"].exists,
-                          "Apps lists the apps agents can use")
-            goBack(in: app)
             open("messaging", expecting: nil, in: app)
 
             app.buttons["marketplace.featured"].tap()
@@ -43,7 +41,8 @@ final class MarketplaceUITests: BighelpUITestCase {
         XCTAssertTrue(app.buttons["marketplace.featured"].waitForExistence(timeout: 10))
         evidence("marketplace-bot-light", app)
         open("skills", expecting: "skills.hero", in: app)
-        open("mcp", expecting: nil, in: app)
+        open("messaging", expecting: nil, in: app)
+        XCTAssertFalse(app.buttons["marketplace.apps"].exists, "The bot's apps are in its Connections")
         app.buttons["marketplace.done"].tap()
         XCTAssertTrue(app.buttons["marketplace.done"].waitForNonExistence(timeout: 5))
 
@@ -94,23 +93,6 @@ final class MarketplaceUITests: BighelpUITestCase {
         }
     }
 
-    /// The Popular plugins were squeezed together: their rows had no height or padding of their own, so the
-    /// names, stars and icons touched. Each is as tall as a section row now, and none overlaps the next.
-    @MainActor
-    func testPopularPluginsHaveRoomAtLargeText() {
-        for size in ["L", "XXXL"] {
-            let app = launch(appearance: "light", extra: ["-UIPreferredContentSizeCategoryName",
-                                                          "UICTContentSizeCategory\(size)"])
-            openSettings(in: app)
-            settingsRow("settings.marketplace", in: app).tap()
-            XCTAssertTrue(app.buttons["marketplace.featured"].waitForExistence(timeout: 10))
-            for _ in 0..<3 { app.swipeUp() }
-            evidence("marketplace-popular-\(size.lowercased())", app)
-            assertPopularRowsHaveRoom(in: app)
-            app.terminate()
-        }
-    }
-
     /// A bot's profile sets the project its new chats start in, for that bot (also in Bots mode).
     @MainActor
     func testABotsProfileChoosesItsActiveProject() {
@@ -134,17 +116,6 @@ final class MarketplaceUITests: BighelpUITestCase {
             app.buttons["bot-project.done"].tap()
             XCTAssertTrue(waitUntil { row.label.contains("Home") }, "The row names the new project: \(row.label)")
             app.terminate()
-        }
-    }
-
-    @MainActor
-    private func assertPopularRowsHaveRoom(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
-        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "marketplace.popular."))
-            .allElementsBoundByIndex.filter(\.isHittable).map(\.frame).sorted { $0.minY < $1.minY }
-        XCTAssertGreaterThanOrEqual(rows.count, 2, "Popular plugins show", file: file, line: line)
-        for (above, below) in zip(rows, rows.dropFirst()) {
-            XCTAssertGreaterThanOrEqual(above.height, 60, "A popular plugin row is as tall as a section row", file: file, line: line)
-            XCTAssertLessThanOrEqual(above.maxY, below.minY + 0.5, "Popular plugin rows don't overlap", file: file, line: line)
         }
     }
 
@@ -184,16 +155,15 @@ final class MarketplaceUITests: BighelpUITestCase {
             let opened = app.descendants(matching: .any)[identifier].firstMatch.waitForExistence(timeout: 10)
             if !opened { evidence("marketplace-\(section)-missing", app); print(app.debugDescription) }
             XCTAssertTrue(opened, "\(section) opens its page", file: file, line: line)
-            if identifier != "marketplace.apps.page" { goBack(in: app) }
+            goBack(in: app)
         } else {
             XCTAssertTrue(row.waitForNonExistence(timeout: 5), "\(section) opens its page", file: file, line: line)
             evidence("marketplace-\(section)", app)
             goBack(in: app)
         }
-        if identifier != "marketplace.apps.page" {
-            XCTAssertTrue(app.descendants(matching: .any)["marketplace.screen"].firstMatch.waitForExistence(timeout: 5),
-                          "Back returns to the Marketplace", file: file, line: line)
-        }
+        let back = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@",
+                                                                         ["marketplace.screen", "apps.hub"])).firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: 5), "Back returns to the page", file: file, line: line)
     }
 
     @MainActor

@@ -555,11 +555,11 @@ struct VoiceView: View {
 
     private var agentAudioControl: some View {
         voiceControl(
-            title: "Agent audio",
+            title: "Bot audio",
             actionName: model.isAgentAudioMuted ? "Unmute" : "Mute",
             systemImage: model.isAgentAudioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
             isSelected: model.isAgentAudioMuted,
-            accessibilityLabel: model.isAgentAudioMuted ? "Unmute agent audio" : "Mute agent audio",
+            accessibilityLabel: model.isAgentAudioMuted ? "Unmute bot audio" : "Mute bot audio",
             accessibilityValue: model.isAgentAudioMuted ? "Muted" : "Unmuted",
             action: model.toggleAgentAudio
         )

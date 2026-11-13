@@ -42,9 +42,7 @@ extension RootShellView {
             if let presentation {
                 NativeAdministrationDestination(presentation: presentation,
                     permissionCenter: permissionCenter, agents: modelAdministrationAgents,
-                    reasoningDefaults: agentRuntimeDefaults,
-                    onOpenProviderAccounts: { openWorkspaceDestination(.keys) },
-                    onOpenAgentDefaults: { openWorkspaceDestination(.profiles) })
+                    reasoningDefaults: agentRuntimeDefaults, demoProviderAccounts: demoProviderKeysStore)
             }
         case .reconnecting:
             WorkspaceReconnectingView(destination: destination, hostName: workspaceHostName,
@@ -204,12 +202,8 @@ extension RootShellView {
         }
         if reattaching { return true }
         switch destination {
-        case .activity:
-            appState.open(.workspaceActivity)
         case .scheduledTasks:
             openScheduledTasks(filteredTo: nil)
-        case .tasks, .artifacts:
-            appState.open(.workspaceManagement(destination))
         case .logs:
             managementStore?.retire()
             managementStore = nil
@@ -232,9 +226,7 @@ extension RootShellView {
                                                isCurrent: { currentWorkspaceOwner?.signIn == owner.signIn })
         case .instances:
             appState.open(.workspaceConnections)
-        case .security, .appearance, .tabBar, .caching, .contact, .watch:
-            appState.open(.workspaceManagement(destination))
-        case .voice, .permissions, .documentation:
+        case .voice, .permissions:
             managementStore?.retire()
             managementStore = nil
             appState.open(.workspaceManagement(destination))
@@ -415,57 +407,15 @@ extension RootShellView {
     }
 
     func openLifecycleDestination(_ destination: WorkspaceDestination, reattaching: Bool) -> Bool {
-        guard let connections = workspaceConnections, let owner = currentWorkspaceOwner,
-              connections.owner == owner, let runtime = nativeRuntime else {
-            if !reattaching {
-                actionErrorMessage = "Connect to a native Hermes host before managing sessions or profiles."
-            }
-            return false
-        }
-        // Renaming an agent refuses while one of its chats has a draft; drafts typed since a chat
-        // last saved (`ChatDraftJournal`) reach the chat first.
-        featureStore.flushChatPersistence()
         let presentationID = UUID()
         do {
-            let coordinator = try NativeWorkspaceLifecycleCoordinator(
-                owner: owner, connections: connections, catalog: sessionCatalog, agents: agents, bridge: runtime.bridge,
-                adoptedSession: { summary in
-                    guard currentWorkspaceOwner == owner, lifecyclePresentationID == presentationID else {
-                        throw CancellationError()
-                    }
-                    openSession(summary)
-                },
-                retiredProfile: { _, retiredSessionIDs in
-                    guard currentWorkspaceOwner == owner else { throw WorkspaceClientError.ownerChanged }
-                    if let active = appState.activeConversationID, retiredSessionIDs.contains(active) {
-                        sessionRestoreTask?.cancel()
-                        sessionRestoreTask = nil
-                        sessionRestoreRequest = nil
-                        appState.resetForHostBoundary()
-                    }
-                },
-                reconciledProfile: { result in
-                    guard currentWorkspaceOwner == owner else { throw WorkspaceClientError.ownerChanged }
-                    guard await runtime.refreshLocalCache() else { throw NativeWorkspaceLifecycleError.sharedStateMismatch }
-                    guard currentWorkspaceOwner == owner else { throw WorkspaceClientError.ownerChanged }
-                    if lifecyclePresentationID == presentationID {
-                        switch result.change {
-                        case .renamed, .deleted: appState.openSessions()
-                        default: break
-                        }
-                    }
-                },
-                reconciledClosedRuntime: { visibleID, _ in
-                    guard currentWorkspaceOwner == owner, lifecyclePresentationID == presentationID else {
-                        throw WorkspaceClientError.ownerChanged
-                    }
-                    if appState.activeConversationID == visibleID {
-                        sessionRestoreTask?.cancel()
-                        sessionRestoreTask = nil
-                        sessionRestoreRequest = nil
-                        appState.openSessions()
-                    }
-                })
+            guard let coordinator = try makeLifecycleCoordinator(isShown: { lifecyclePresentationID == presentationID })
+            else {
+                if !reattaching {
+                    actionErrorMessage = "Connect to a native Hermes host before managing sessions or profiles."
+                }
+                return false
+            }
             lifecycleCoordinator = coordinator
             lifecycleProfileID = workspaceAgentID
             lifecyclePresentationID = presentationID
@@ -477,6 +427,52 @@ extension RootShellView {
             }
             return false
         }
+    }
+
+    /// Manage Sessions' and Manage Profiles' connection to the computer in use; nil without one.
+    /// `isShown` says whether the page that asked still shows: only then may an import open its
+    /// chat, or a rename or delete go back to the chats.
+    func makeLifecycleCoordinator(isShown: @escaping @MainActor () -> Bool) throws -> NativeWorkspaceLifecycleCoordinator? {
+        guard let connections = workspaceConnections, let owner = currentWorkspaceOwner,
+              connections.owner == owner, let runtime = nativeRuntime else { return nil }
+        // Renaming an agent refuses while one of its chats has a draft; drafts typed since a chat
+        // last saved (`ChatDraftJournal`) reach the chat first.
+        featureStore.flushChatPersistence()
+        return try NativeWorkspaceLifecycleCoordinator(
+            owner: owner, connections: connections, catalog: sessionCatalog, agents: agents, bridge: runtime.bridge,
+            adoptedSession: { summary in
+                guard currentWorkspaceOwner == owner, isShown() else { throw CancellationError() }
+                openSession(summary)
+            },
+            retiredProfile: { _, retiredSessionIDs in
+                guard currentWorkspaceOwner == owner else { throw WorkspaceClientError.ownerChanged }
+                if let active = appState.activeConversationID, retiredSessionIDs.contains(active) {
+                    sessionRestoreTask?.cancel()
+                    sessionRestoreTask = nil
+                    sessionRestoreRequest = nil
+                    appState.resetForHostBoundary()
+                }
+            },
+            reconciledProfile: { result in
+                guard currentWorkspaceOwner == owner else { throw WorkspaceClientError.ownerChanged }
+                guard await runtime.refreshLocalCache() else { throw NativeWorkspaceLifecycleError.sharedStateMismatch }
+                guard currentWorkspaceOwner == owner else { throw WorkspaceClientError.ownerChanged }
+                if isShown() {
+                    switch result.change {
+                    case .renamed, .deleted: appState.openSessions()
+                    default: break
+                    }
+                }
+            },
+            reconciledClosedRuntime: { visibleID, _ in
+                guard currentWorkspaceOwner == owner, isShown() else { throw WorkspaceClientError.ownerChanged }
+                if appState.activeConversationID == visibleID {
+                    sessionRestoreTask?.cancel()
+                    sessionRestoreTask = nil
+                    sessionRestoreRequest = nil
+                    appState.openSessions()
+                }
+            })
     }
 
     func handleAgentWorkspaceAction(_ request: AgentWorkspaceActionRequest) {

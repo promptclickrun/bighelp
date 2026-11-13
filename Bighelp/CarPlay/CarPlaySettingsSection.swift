@@ -1,8 +1,8 @@
 #if os(iOS)
 import SwiftUI
 
-/// Settings › CarPlay: the computer and the agent bighelp talks to in the car. Picking another
-/// agent in the car changes the agent here too.
+/// Settings › Voice › In the car: the computer and the agent bighelp talks to in the car. Picking
+/// another agent in the car changes the agent here too.
 struct CarPlaySettingsSection: View {
     @State private var gateways: [BighelpShortcutGateway] = []
     @State private var hostID: UUID?
@@ -17,31 +17,31 @@ struct CarPlaySettingsSection: View {
         Section {
             if gateways.count > 1 {
                 Picker("Computer", selection: $hostID) {
-                    Text("The one bighelp is using").tag(UUID?.none)
+                    Text("The one in use").tag(UUID?.none)
                     ForEach(gateways) { gateway in
                         Text(gateway.name).tag(UUID?.some(gateway.id))
                     }
                 }
                 .accessibilityIdentifier("settings.carplay.computer")
             }
-            Picker("Agent", selection: $agentID) {
-                Text("Default agent").tag(String?.none)
+            Picker("Bot", selection: $agentID) {
+                Text("Default bot").tag(String?.none)
                 ForEach(agents) { agent in
                     Text(agent.name).tag(String?.some(agent.id))
                 }
                 // A saved agent the list doesn't have (yet), so the picker never goes blank.
                 if let agentID, !agents.contains(where: { $0.id == agentID }) {
-                    Text(isLoadingAgents ? "Loading…" : "Saved agent").tag(String?.some(agentID))
+                    Text(isLoadingAgents ? "Loading…" : "Saved bot").tag(String?.some(agentID))
                 }
             }
             .accessibilityIdentifier("settings.carplay.agent")
         } header: {
-            Text("CarPlay")
+            Text("In the car")
         } footer: {
             VStack(alignment: .leading, spacing: 4) {
-                Text("When you open bighelp in CarPlay, it starts a voice chat with this agent.")
+                Text("CarPlay starts a voice chat with this bot.")
                 if agentsFailed {
-                    Text("bighelp couldn't read this computer's agents. Check that it's on.")
+                    Text("bighelp couldn't read this computer's bots. Check that it's on.")
                 }
             }
         }

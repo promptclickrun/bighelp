@@ -71,7 +71,7 @@ struct CoreFilesTests {
             return nil
         }
         #expect(!pages.contains(.skillsHub) && !pages.contains(.toolServers) && !pages.contains(.plugins))
-        #expect(MarketplaceSection.allCases == [.apps, .skills, .plugins, .mcp, .messaging])
+        #expect(MarketplaceSection.allCases == [.skills, .plugins, .mcp, .messaging, .toolsets])
     }
 }
 

@@ -9,7 +9,7 @@ struct LiveVoiceOwner: Equatable, Hashable, Sendable {
     let sessionID: String
 }
 
-/// Who runs a Full Duplex call. Each agent can have its own (`AgentVoiceChoices`).
+/// Who runs a Live call. Each agent can have its own (`AgentVoiceChoices`).
 enum LiveVoiceProvider: String, CaseIterable, Identifiable, Sendable {
     case codexSubscription = "codex_subscription"
     case apiKey = "api_key"
@@ -70,9 +70,9 @@ enum LiveVoiceControlError: Error, LocalizedError, Sendable {
         switch self {
         case .invalidResponse: "Your computer sent back a voice answer the app couldn't use. Try again."
         case .wrongOwner: "This voice call no longer belongs to this chat. Close voice and open it again."
-        case .unavailable: "Live voice isn't available on your computer right now. Try again, or use TTS voice mode."
+        case .unavailable: "Live voice isn't available on your computer right now. Try again, or take turns instead."
         case .timedOut: "Your computer didn't answer in time. Try again."
-        case .geminiKeyMissing: "This agent has no Gemini API key on your computer. Add one as GEMINI_API_KEY, then try again."
+        case .geminiKeyMissing: "This bot has no Gemini API key on your computer. Add one as GEMINI_API_KEY, then try again."
         }
     }
 }

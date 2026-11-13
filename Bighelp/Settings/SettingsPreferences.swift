@@ -46,8 +46,8 @@ enum VoiceMode: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .pressToTalk: "Press to Talk"
-        case .walkieTalkie: "Walkie Talkie"
+        case .pressToTalk: String(localized: "Press to talk")
+        case .walkieTalkie: String(localized: "Walkie-talkie")
         }
     }
 
@@ -96,21 +96,21 @@ enum VoiceConversationMode: String, CaseIterable, Identifiable, Sendable {
 
     var id: Self { self }
 
-    /// Stored raw values predate these names: `codexLive` is Full Duplex (GPT-Live or
-    /// Gemini Live, `LiveVoiceProvider`) and `turnBased` is TTS.
+    /// Stored raw values predate these names: `codexLive` is Live (GPT-Live or
+    /// Gemini Live, `LiveVoiceProvider`) and `turnBased` is Take turns.
     var title: String {
         switch self {
-        case .codexLive: "Full Duplex"
-        case .turnBased: "TTS"
+        case .codexLive: String(localized: "Live")
+        case .turnBased: String(localized: "Take turns")
         }
     }
 
     var detail: String {
         switch self {
         case .codexLive:
-            "A natural conversation, like a phone call: you can talk over each other, and the agent keeps talking while it works. Each agent can use its own live voice provider."
+            "A natural conversation, like a phone call: you can talk over each other, and the bot keeps talking while it works. Each bot can use its own live voice provider."
         case .turnBased:
-            "This device turns your words into text on its own, and your agent's speech provider reads each reply aloud. The provider can run on your own computer."
+            "This device turns your words into text on its own, and your bot's speech provider reads each reply aloud. The provider can run on your own computer."
         }
     }
 }

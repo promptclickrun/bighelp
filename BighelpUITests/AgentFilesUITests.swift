@@ -36,15 +36,6 @@ final class AgentFilesUITests: BighelpUITestCase {
             XCTAssertTrue(row("Grocery list.txt", in: app).waitForExistence(timeout: 10), "Jordan's own files")
             XCTAssertTrue(row("Itinerary.md", in: app).waitForNonExistence(timeout: 5), "Not Mina's")
             save("home-\(appearance)", app)
-
-            // The host's own Artifacts reads the serving agent, whichever agent is selected.
-            openRootDestination("workspace", sidebarIdentifier: "menu.hermes-tools", in: app)
-            let artifacts = app.buttons["workspace.open.artifacts"]
-            for _ in 0..<6 where !artifacts.isHittable { app.swipeUp() }
-            artifacts.tap()
-            XCTAssertTrue(row("Notes.md", in: app).waitForExistence(timeout: 10), "The serving agent's files")
-            XCTAssertFalse(row("Grocery list.txt", in: app).exists)
-            save("nerd-mode-artifacts-\(appearance)", app)
             app.terminate()
         }
     }

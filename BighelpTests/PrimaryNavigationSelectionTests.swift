@@ -15,7 +15,7 @@ final class PrimaryNavigationSelectionTests: XCTestCase {
     @MainActor
     func testAllRootSelectionsRenderThroughTheSameSurface() async throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
-        let tabs: [(AppTab, String)] = [(.agents, "agents"), (.sessions, "sessions"), (.scheduledTasks, "tasks"), (.workspace, "workspace")]
+        let tabs: [(AppTab, String)] = [(.agents, "agents"), (.sessions, "sessions"), (.scheduledTasks, "tasks")]
         for (tab, name) in tabs {
             let content = FloatingTabBar(selection: .constant(tab), onNewChat: {})
                 .frame(width: 402, height: 110)

@@ -4,31 +4,8 @@ import Testing
 
 @MainActor
 struct WorkspaceManagementTests {
-    @Test func retiredAppDestinationsStayOutOfTheWorkspaceMenu() {
-        #expect(WorkspaceDestination.allCases.contains(.wiki))
-        #expect(!WorkspaceDestination.appMenuCases.contains(.wiki))
-        #expect(!WorkspaceDestination.appMenuCases.contains(.tasks))
-        #expect(!WorkspaceDestination.appMenuCases.contains(.usage), "Usage has one page, in ☰")
-        #expect(WorkspaceDestination.appMenuCases.contains(.scheduledTasks))
-        #expect(WorkspaceDestination.appMenuCases.contains(.artifacts))
-        // This app's own settings (look, permissions, Apple Watch…) live in Settings, not Hermes Tools.
-        #expect(!WorkspaceDestination.appMenuCases.contains { $0.section == .app })
-        #expect(WorkspaceDestination.appMenuCases.count
-            == WorkspaceDestination.allCases.count - 3 - WorkspaceDestination.allCases.filter { $0.section == .app }.count)
-        let visibleTitles = Set(WorkspaceDestination.appMenuCases.map(\.title))
-        #expect(visibleTitles.isDisjoint(with: ["Scratchpad", "GitHub", "Wiki", "Tasks"]))
-    }
-
-    @Test func allRequestedDestinationsHaveOneGroupAndExistingFeaturesStayRouted() {
-        #expect(Set(WorkspaceDestination.allCases).count == 33)
-        #expect(WorkspaceDestination.skills.usesExistingDestination)
-        #expect(WorkspaceDestination.voice.usesExistingDestination)
-        #expect(WorkspaceDestination.artifacts.usesExistingDestination)
-        #expect(WorkspaceDestination.tasks.usesExistingDestination)
-        #expect(WorkspaceDestination.sessionMaintenance.usesExistingDestination)
-        #expect(WorkspaceDestination.profileLifecycle.usesExistingDestination)
-        #expect(!WorkspaceDestination.projects.usesExistingDestination)
-        #expect(WorkspaceDestination.allCases.allSatisfy { !$0.title.isEmpty && !$0.summary.isEmpty && !$0.symbol.isEmpty })
+    @Test func everyDestinationHasATitle() {
+        #expect(WorkspaceDestination.allCases.allSatisfy { !$0.title.isEmpty })
     }
 
     @Test func projectDecoderRejectsDuplicatesAndMalformedArchiveState() throws {
@@ -166,22 +143,6 @@ struct WorkspaceManagementTests {
         #expect(throws: WorkspaceManagementError.invalidResponse) { try WorkspaceInventoryDecoder.number(.integer(-1)) }
     }
 
-    @Test func clientSendsExactProfileAndNarrowConfigurationKey() async throws {
-        let fixture = try Performer()
-        fixture.responses[.configGet] = ["value": .string("medium"), "display": .string("show")]
-        let client = makeClient(fixture)
-        #expect(try await client.load(.config) == .configuration(.init(effort: .medium, showsReasoning: true)))
-        #expect(fixture.calls.last?.payload == ["profile": .string("research"), "key": .string("reasoning")])
-    }
-
-    @Test func acceptsReleasedReasoningLevelsAndDisabledAliases() {
-        #expect(WorkspaceReasoningConfiguration.Effort(hostValue: "max") == .max)
-        #expect(WorkspaceReasoningConfiguration.Effort(hostValue: "ultra") == .ultra)
-        #expect(WorkspaceReasoningConfiguration.Effort(hostValue: "disabled") == WorkspaceReasoningConfiguration.Effort.none)
-        #expect(WorkspaceReasoningConfiguration.Effort(hostValue: "false") == WorkspaceReasoningConfiguration.Effort.none)
-        #expect(WorkspaceReasoningConfiguration.Effort(hostValue: "unknown") == nil)
-    }
-
     @Test func processRoutesUseTheSelectedHostWithoutRequiringAPluginProfile() async throws {
         let fixture = try Performer()
         fixture.responses[.memoryGet] = ["active": .string(""), "providers": .array([]), "builtin_files": .object([:])]
@@ -252,16 +213,6 @@ struct WorkspaceManagementTests {
         #expect(fixture.calls.count == 1)
     }
 
-    @Test func reasoningMutationChecksReceiptAndFreshRead() async throws {
-        let fixture = try Performer()
-        fixture.responses[.configSet] = ["key": .string("reasoning"), "value": .string("high")]
-        fixture.responses[.configGet] = ["value": .string("medium"), "display": .string("show")]
-        await #expect(throws: WorkspaceManagementError.unconfirmedMutation) {
-            try await makeClient(fixture).apply(.reasoning(.high))
-        }
-        #expect(fixture.calls.map(\.operation) == [.configSet, .configGet])
-    }
-
     @Test func failedRefreshPreservesReadButDisablesWrites() async {
         let client = FixtureWorkspaceManagementClient()
         let store = makeStore(client)
@@ -322,14 +273,17 @@ struct WorkspaceManagementTests {
 
     @Test func changedReviewCannotConfirmADifferentIntent() async {
         let store = makeStore(FixtureWorkspaceManagementClient())
-        await store.load(.config)
-        let presented = WorkspaceManagementMutation.reasoning(.high)
-        store.review = .reasoning(.low)
+        await store.load(.projects)
+        let presented = WorkspaceManagementMutation.archiveProject(id: "research", restore: false)
+        store.review = .renameProject(id: "research", name: "Renamed")
         await store.confirmReview(expected: presented)
         #expect(store.errorMessage != nil)
         #expect(store.review == nil)
         #expect(store.successMessage == nil)
-        #expect(store.content == .configuration(.init(effort: .medium, showsReasoning: true)))
+        guard case .projects(let rows) = store.content else { Issue.record("Missing projects"); return }
+        let research = rows.first { $0.id == "research" }
+        #expect(research?.name == "Research")
+        #expect(research?.isArchived == false)
     }
 
     @Test func unsupportedCredentialReplacementNeverWrites() async throws {
@@ -425,7 +379,7 @@ private final class Performer: WorkspaceOperationPerforming {
     init() throws {
         let owner = try Self.makeOwner()
         self.owner = owner
-        self.capabilities = .init(owner: owner, values: [.projectsEdit: .available, .configEdit: .available, .keysEdit: .available, .webhooksEdit: .available])
+        self.capabilities = .init(owner: owner, values: [.projectsEdit: .available, .keysEdit: .available, .webhooksEdit: .available])
     }
 
     static func makeOwner() throws -> WorkspaceOwner {

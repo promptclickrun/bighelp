@@ -19,29 +19,47 @@ change in both repos.
 
 - **Simple for normal people.**
   - Everyday screens use plain words and short sentences.
-  - Anything that looks like host administration goes behind Settings › Nerd Mode: files, MCP, logs, raw IDs,
-    token counts. Nerd Mode is `settings.nerdModeEnabled`, also the `nerdModeEnabled` environment value.
-  - What agents can add is for everyone: Settings › Marketplace (`MarketplaceView`) opens Apps, Skills, Plugins and
-    Talk anywhere (messaging apps) with this week's featured plugin, and each bot's profile has its own for that
-    bot, with MCP servers too. They're the same pages Hermes tools lists; a bot's Advanced Options no longer lists
-    the Skills Hub, Plugins or MCP servers. A bot's profile also has Connections (Device access and its apps),
+  - Anything that looks like host administration goes behind Settings › Advanced options: files, MCP, logs, raw
+    IDs, token counts. The switch is `settings.nerdModeEnabled`, also the `nerdModeEnabled` environment value and
+    the id `settings.nerd-mode`. The code name is still Nerd Mode: only what a person reads changed. Its sections
+    sit last on the page they tune, headed "Advanced" or "Advanced · <name>".
+  - What agents can add is for everyone: Settings › Apps & skills (`AppsHubView`) lists Skills, Plugins (with this
+    week's featured plugin) and Talk anywhere (Messaging apps), and with Advanced options on, MCP servers and
+    Toolsets. Each bot's profile has its own Marketplace (`MarketplaceView`) for that bot, with the same pages. A
+    bot's Advanced Options no longer lists the Skills Hub, Plugins or MCP servers. A bot's profile also has
+    Connections (Device access and its apps),
     Core Files and Active Project. Core Files: its SOUL.md, USER.md, MEMORY.md and the AGENTS.md Hermes loads for
     its chat (the chat's folder: the open chat when it's this bot's, else its Bot Chat; plugin
     `native-core-files-chat-v1`), read and saved whole through the plugin's `core-files/*` in the Markdown viewer
     (`CoreFilesView`). Active Project (`BotActiveProjectView`) sets the project the bot's new chats start in, in a
     `HermesWorkspaceStore` of its own (`separateStore()`), so the shell's Projects never move.
-  - Everyday controls must never live only behind Nerd Mode.
+  - Everyday controls must never live only behind Advanced options.
 - **One place for each thing.**
-  - There's one ☰ menu (`BighelpMenu`) and one Settings. Settings is a short list of rows that each open one page,
-    in groups: You (one row), Agents (Default model, AI providers, Marketplace, Connections, Teamwork, Personalities), App
-    (Modes, Appearance, Chat, Voice, Notifications), then System, Apple Watch, CarPlay and Help & feedback.
-    Nerd Mode adds its Hermes section (Hermes tools) at the bottom.
+  - There's one ☰ menu (`BighelpMenu`) and one Settings, the same tree in every mode (`SettingsView`). Its first
+    screen is a short list of rows that each open one page, in groups: the person's row, Usage and, while a share
+    waits, Shared with bighelp; Your bots (Models, Apps & skills, Voice, Personality and the Teamwork switch); This
+    app (Appearance, Chat, Notifications, Modes); on Vision Pro the agent in the room; Your computers (one row per
+    computer, Add a computer, Show every computer, Time zone, and with two or more, Update every computer); then
+    Help & feedback and the Advanced options switch.
+  - Settings copy follows DESIGN.md › Simplicity means hierarchy. A row's title is one to three words and its second
+    line is its current value (a hint of at most six words, only when needed). Every section has a sentence-case
+    header and at most one footer. Advanced groups come last and show only with Advanced options on. Consequences
+    for data, cost and deletion stay at the control.
   - Appearance › Thinking (`ThinkingLookSettingsView`) picks the look of the Thinking control
     (`BighelpThinkingLook`, kept on the device) that a chat's Model settings shows (`ChatModelSettingsSheet`,
     from the model chip in the message box). Model settings sends each choice as it's made; there is no Apply.
-  - Connections (`AppsHubView`) is everything agents can use: This device (Device access, every phone tool and
-    iOS permission) first, then the apps, then the credential vault. Modes holds the mode switches, Appearance
-    the companion pet, and Help & feedback the usage-sharing switch.
+  - Apps & skills (`AppsHubView`) is everything agents can use: This device (Device access, every phone tool and
+    iOS permission) first, then Apps (Built-in apps, Composio), Skills and plugins, Talk anywhere, Logins (the
+    credential vault) and, with Advanced options, MCP servers and Toolsets. Models (`ModelsSettingsView`) is the
+    providers and each bot's default model on one page. Each computer has one page (`BighelpConfiguredHostView`:
+    Use this computer, Updates, Restart, This computer, Access, its Advanced groups, Remove this computer), and
+    Update every computer (`FleetSettingsView`) updates and restarts them together. Modes holds the mode switches,
+    Appearance the companion pet, and Help & feedback the usage-sharing switch and the Apple Watch's status. The
+    old Hermes tools list (`WorkspaceHubView`) and Settings › System are gone: their pages open from where they
+    belong (skills, plugins, messaging apps, MCP servers and toolsets in Apps & skills; logs, webhooks, tool
+    backends, the computer voice test, diagnostics, backups, config.yaml, shell hooks and Kanban boards on a
+    computer's page; Clean up chats and Archived chats in Chat; Toolsets and Manage bots in a bot's Advanced
+    Options › For experts).
   - Don't add a second menu, drawer or settings copy for a feature. Add a row where people already look.
   - People choose the bottom bar (Chat plus up to three, around New chat in the middle) and ☰'s order in
     Appearance › App layout
@@ -68,7 +86,9 @@ change in both repos.
     prompt ID (`DashboardAttentionItem.promptID`; Hermes' prompts reach the app both ways), and
     `WorkflowsStore.waiting`. A bot whose chat isn't open gets only an Open chat row. A long command or
     sign-off file opens in full before Approve works. Prompts answer through `DirectHermesPromptResponseView`
-    (its `deck` look), the same code as the card in the chat.
+    (its `deck` look), the same code as the card in the chat. There is no Activity screen: an alert that names no
+    chat opens Needs you while something waits (`AppState.openNeedsYou()`), else the home chat. A bot's Dashboard
+    tab and its Activities list stay.
   - A blueprint is filled in in the message box, nowhere else: a pick anywhere (a board's Blueprints, an
     empty board's starters, a bot's Dashboard) leaves it for the chat with `fillsBlanks`
     (`AppState.leaveComposerText`), and its [blanks] show as chips (`ChatBlueprintDraft`,
@@ -90,13 +110,12 @@ change in both repos.
     and Code mode's own switch (`setCodeMode`), so Code can stay on beside a Chat or Bots home, or go off.
     Its Header mode switcher (`unifiedModeToggleEnabled`, off by default) puts the modes in one pill
     (`BighelpModePill`) at the top of each home: the Chat tab's own chat or its list, Code's home and Bots'
-    home (where Search and Filter by Gateway move to a row under it). ☰ drops its Chat and Code switch
+    home (where Search and the computer filter move to a row under it). ☰ drops its Chat and Code switch
     then. Edge swipes can switch modes too (Next mode, Bots, Chat, Code), also from Bots mode; on the
     Mac, ⌃⌘1–⌃⌘3.
   - Bots mode (Settings › Modes, `settings.simpleBotsEnabled`) is the one exception to ☰ and the bar:
-    its home (`SimpleBotsHomeView`) takes the Chat tab's place with neither, and the person's circle opens its
-    short Settings (`SimpleBotsSettingsView`), whose All Settings row and Modes row (the same Modes page
-    as All Settings') lead back.
+    its home (`SimpleBotsHomeView`) takes the Chat tab's place with neither, and the person's circle opens the
+    same Settings (`SettingsView`) that ☰ opens in Chat and Code; it has no Settings of its own.
     Everything in it uses the same stores and chat; `Bighelp/SimpleBots/` holds its screens. It wins over the
     all-hosts view and Settings › Chat › Opens on (`fleetModeOn` is off while it's on). Its Multi-gateway switch
     (`simpleBotsMultiGateway`) lists every gateway's bots (`SimpleBotsGateways`, one `SimpleBotsBot` model
@@ -155,12 +174,12 @@ change in both repos.
 | `Bighelp/Chat/` | Chat screen, composer, `ChatModel` (+ `ChatModel+Submission`), the native chat timeline |
 | `Bighelp/DirectHermes/` | The Hermes client: sign-in, WebSocket JSON-RPC, dashboard REST, plugin routes (`DirectHermesNativeContext.swift`), access credentials |
 | `Bighelp/Workspace/` | `WorkspaceOperation` (every host operation) and workspace stores |
-| `Bighelp/Settings/` | Settings screens and `SettingsStore` |
+| `Bighelp/Settings/` | The one Settings tree (`SettingsView` and its `+Menu`, `+NerdMode`, `+Computers` pages: the groups, the Advanced options switch, Your computers) and `SettingsStore`; Models (`ModelsSettingsView`), Voice and Notifications pages. A computer's own page is `BighelpConfiguredHostView` in `Bighelp/Hosts/` |
 | `Bighelp/Agents/`, `Board/`, `Companion/` | Agents, Feed/Ideas/Goals, the avatar kit renderer |
 | `Bighelp/Kanban/` | Kanban on Hermes' Kanban plugin: board model, lanes, cards, Vision Pro window and pinch-drag |
 | `Bighelp/Code/` | Code mode (Settings › Modes › Code mode): its home (`CodeHomeView`), the message box's chips (project, new worktree or local, branch), `CodeLauncher`, Changes and Ship |
 | `BighelpShare/`, `Bighelp/ShareShared/`, `Bighelp/Share/` | The share sheet (#922): the extension saves what's shared into the app group (`PendingShareInbox`, Foundation only and shared with the app), and the app's review puts it in the message box of the chat the person picks (`PendingShareCenter`, `ChatModel.placeShare`) |
-| `Bighelp/Connectors/` | Settings › Connections (`AppsHubView`): Hermes' connectors as Native App Connections (the inline connect cards in chat, `connection.request`, `ConnectorCardStore`; `ConnectorAppsModel`) and Composio Apps (`Composio/`, [docs/COMPOSIO_APPS.md](docs/COMPOSIO_APPS.md)) |
+| `Bighelp/Connectors/` | Settings › Apps & skills (`AppsHubView`; a bot's profile has its own Connections): Hermes' connectors as Native App Connections (the inline connect cards in chat, `connection.request`, `ConnectorCardStore`; `ConnectorAppsModel`) and Composio Apps (`Composio/`, [docs/COMPOSIO_APPS.md](docs/COMPOSIO_APPS.md)) |
 | `Bighelp/HTMLApps/` | Agents' HTML apps: the `html_app` card, the full-screen page and its `window.bighelp` bridge, the plugin's `html-apps` routes, the demo's sample apps |
 | `Bighelp/BotScreen/` | Bot Screen: an agent's Linux screen (Hermes `display.*`) and the computer's own desktop (`ComputerScreen.swift`, the plugin's VNC bridge) in its profile's Computer tab, a native RFB client (`RFB/`, with VNC passwords) and the full-screen viewer with take control and hand back |
 | `Bighelp/Driving/` | An agent showing the person a place (`iphone_navigation`, #662): the place catalog and its playbooks (`DriveCatalog`), the navigator that plays one (`DriveNavigator`), and the overlay (island bar, chat dock) in its own window |
@@ -214,7 +233,7 @@ change in both repos.
 
 ### UI test traps
 
-- `BighelpUITestCase` launches with Nerd Mode on and `-loopdy.home.opens-chat NO`. Use its helpers:
+- `BighelpUITestCase` launches with Advanced options (`settings.nerdModeEnabled`) on and `-loopdy.home.opens-chat NO`. Use its helpers:
   - `openRootTab`
   - `settingsRow`
   - `openChatInfo`
@@ -265,7 +284,7 @@ change in both repos.
   the saved history after this device's own turn. A reply segment Hermes completes live takes the time it
   arrived (`DirectHermesProjection.accept(_:arrivedAt:)`); a replay takes none, since it ended at a time the
   phone doesn't know. A reread puts the host's saved time on the same row (#856).
-- **Live voice is Full Duplex, and it is the agent:** each agent picks its provider (GPT-Live on the Codex
+- **Live voice is the agent:** each agent picks its provider (GPT-Live on the Codex
   subscription or an API key, or Gemini Live) and voice (`AgentVoiceChoices`). The plugin's brief names the
   agent, so the voice model speaks as it, never about "your agent". Gemini's media and events stay between the
   phone and Gemini (`GeminiLiveAudioPeer`, a single-use token from the plugin); its work still goes through the
@@ -273,7 +292,7 @@ change in both repos.
   a configuration change right after the engine starts: every restart stops the player first
   (`GeminiLiveAudioPeer.restart`), or it takes Gemini's voice and plays none. A test that only counts bytes
   received can't see that; check what finished playing. The call audio report (`GeminiLiveAudioDiagnostics`,
-  log category `LiveVoiceAudio`) shows where the sound stops on a device; Settings › Voice › Debug (Nerd Mode)
+  log category `LiveVoiceAudio`) shows where the sound stops on a device; Settings › Voice › Advanced (with Advanced options on)
   shows it on the call screen and has Restart sound. Gemini refuses a call by closing the socket with a code
   and its reason; the call screen shows Gemini's words (`GeminiLiveClose`), never a bare "Gemini ended the
   call" (#888).
@@ -301,12 +320,12 @@ change in both repos.
   models. Phonon needs iOS 18 or later: `Packages/PhononTTS` keeps the app's minimum and marks its API
   `@available`, so never raise the app's minimum for it. Its core has no visionOS or Intel slices, so only
   iPhone and iPad link it (the Mac DMG is universal).
-- **Voice mode per agent** (`AgentVoiceChoices`): TTS or GPT Live, and the GPT Live voice, are kept per computer
+- **Voice mode per agent** (`AgentVoiceChoices`): Live or Take turns, and the live voice, are kept per computer
   and agent on the device; Settings › Voice holds the default for agents without their own, and Bots mode's
   Default Voice sets an agent's. Anything that opens voice for an agent reads its effective mode. Voices and
   models are picked from lists (`VoiceOptions`; ElevenLabs from the account, speech plugins from the plugin's
   `voice-catalog`), with a typed Other only where a provider takes any value.
-- **Auto TTS** (`ChatReplyReader`): Settings › Voice › Use TTS on every response. A chat reads a reply once its
+- **Auto TTS** (`ChatReplyReader`): Settings › Voice › Read replies aloud. A chat reads a reply once its
   turn ends, never what it held when it opened, and stops on a new
   message, voice mode or leaving the chat.
 - **Browser sign-ins stay signed in:** a Nous Portal sign-in's access token lasts 15 minutes and its refresh
@@ -387,8 +406,8 @@ change in both repos.
   rows carry `background` (how many run now, in any chat and any Hermes process, and the newest one's title);
   an idle bot then shows `BotChatActivity.background`, and a turn wins over it. The open chat reads Hermes' own
   `process.list` over its socket (`ChatBackgroundCommandsWatch`; `process.kill` stops one), and its "In the
-  background" chip counts its subagents and running commands for everyone; a command's output shows with Nerd
-  Mode on. A bot's Dashboard lists the last week's work by day as Activities from `agents/today`
+  background" chip counts its subagents and running commands for everyone; a command's output shows with Advanced
+  options on. A bot's Dashboard lists the last week's work by day as Activities from `agents/today`
   (`native-agents-today-v1`, `AgentTodayModel`), asked from the start of the phone's day six days ago (plugin
   3.47.0 takes 48 hours: then today and yesterday). Routines show only with ⋯ › Show routines. A tap opens the
   item's read-out from `agents/today/detail` (`native-agents-today-detail-v1`, `AgentTodayDetail`). In a chat, a
@@ -414,8 +433,8 @@ change in both repos.
   share with files waits in the list: its words alone would spend files never sent, and Open brings them all
   back, even into a box that has its words already (`PendingShareIntake` places the opened share first). The person
   taking a share's last file or words out of the box lets it go, kept and listed. The saved copy goes only when
-  Hermes takes the message carrying it, or when the person deletes it in ☰ › Shared with bighelp (Bots mode: its
-  Settings), which lists every waiting share; never by itself. `PendingShareInboxTests`, `PendingShareLedgerTests`
+  Hermes takes the message carrying it, or when the person deletes it in ☰ › Shared with bighelp (or Settings' first
+  screen, in every mode), which lists every waiting share; never by itself. `PendingShareInboxTests`, `PendingShareLedgerTests`
   and `PendingShareWaitTests` run under any Swift (no UIKit); `PendingShareComposerTests` drive the chat.
 - **Plugin routes:**
   - Each route is a `WorkspaceOperation` case plus a `Route(path:feature:isMutation:maximumResponseBytes:)` in
@@ -437,7 +456,7 @@ change in both repos.
     (`hermes dashboard` or `hermes serve`, which serves the app's connection and the plugin's routes) and the
     messaging gateway (its own copy: reply alerts, other agents' messages). "Installed and enabled" reads the
     plugin list on disk, not what runs. Every place that installs it asks to restart both
-    (`PluginRestartPrompt`), and Settings › System has Restart Hermes Dashboard beside the gateway's. Hermes
+    (`PluginRestartPrompt`), and a computer's page has Restart Hermes Dashboard beside the messaging gateway's. Hermes
     can't restart the dashboard for an app, so the plugin running in it does (`native-host-restart-v1`);
     before the dashboard has loaded the plugin, only the computer can. After an install or a restart,
     `BighelpHostRegistry.noteServicesChanged` has the runtime read the computer again (`reloadAfterHostChange`).
@@ -522,7 +541,7 @@ change in both repos.
   names, paths and which are folders; a picture comes whole from `read-data-url`, which has its own response
   limit (`DirectHermesHTTP.responseLimit`). A group chat lists the files in its messages instead
   (`ChatSessionFilesView`). Demo: `DemoHostFolders`.
-- **Phone tools** (Settings › Connections › Device access; contract in
+- **Phone tools** (Settings › Apps & skills › Device access; contract in
   [docs/IPHONE_DEVICE_TOOLS.md](docs/IPHONE_DEVICE_TOOLS.md)): an agent's `iphone_*` call reaches the phone over the
   chat's device-tool channel. `DeviceToolCatalog` lists every operation and which are journaled; each capability with
   its own iOS permission is a `DeviceCapabilityTool` that `DeviceToolRouter` checks before it runs. A new one needs a
@@ -940,7 +959,7 @@ sections can crash only on devices ("Thread stack size exceeded").
 - The car is in use from connect to disconnect: the scene holds the host connection (`holdHostConnection`) so the
   background closers leave it, and `audio` in `UIBackgroundModes` keeps voice going with the iPhone locked. A step
   that doesn't finish in 20 s ends with a message that names it (`CarPlayConnectStep`), never an endless Connecting.
-- Settings › CarPlay picks the computer and the agent (`CarPlayAgentPreference`); a pick in the car changes it too.
+- Settings › Voice › In the car (iPhone) picks the computer and the agent (`CarPlayAgentPreference`); a pick in the car changes it too.
 - Tests can't open the simulator's CarPlay window. `CarPlayVoiceUITests` drives the same session through the
   DEBUG `-test-carplay-session` screen on the demo data; `CarPlayTemplateTests` builds the car's templates.
 
@@ -1062,7 +1081,7 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   `app.loopdy.mobile.card` that only the app and that extension have (readable after first unlock, because the
   card is drawn on a locked phone). A row that doesn't open draws the plain rows. The card is at most 160 points
   tall, so the hero counts its lines (`heroCard`), fewer at larger text. Settings › Notifications › On the card
-  picks Status only, Steps, or Steps and text (`BighelpActivityDetailLevel`, in the App Group); Nerd Mode adds
+  picks Status only, Steps, or Steps and text (`BighelpActivityDetailLevel`, in the App Group); Advanced options adds
   context use and the model. The phone words steps from Hermes' tool names (`BighelpActivityStepWords`). A
   registered card is drawn only from pushes (`writesLocally`), so the app never writes detail itself.
 - Direct push (`BighelpPushRegistrar`, docs/ARCHITECTURE.md › Direct push registration): a phone that already has a

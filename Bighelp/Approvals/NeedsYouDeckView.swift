@@ -518,6 +518,7 @@ private struct NeedsYouDashboardCard: View {
 
     @BighelpThemeReader private var theme
     @State private var customAnswer = ""
+    @State private var asksToRemove = false
 
     var body: some View {
         let isResolving = model.resolvingAttentionIDs.contains(item.id)
@@ -592,8 +593,32 @@ private struct NeedsYouDashboardCard: View {
             }
 
             if isResolving { ProgressView().controlSize(.small) }
+
+            removeButton
         }
         .disabled(isResolving)
+    }
+
+    /// For an item that has nothing left to answer (its chat was deleted): out of Needs you, never out
+    /// of its chat. A button, not a swipe, so the Mac has it too.
+    private var removeButton: some View {
+        Button { asksToRemove = true } label: {
+            Text("Remove")
+                .font(.bighelp(.caption, weight: .semibold))
+                .foregroundStyle(theme.secondaryText)
+                .frame(minHeight: BighelpTokens.hitTarget)
+                .contentShape(.rect)
+        }
+        .bighelpPlainButtonStyle()
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .accessibilityIdentifier("needs-you.dashboard.remove")
+        .confirmationDialog("Remove this from Needs you?", isPresented: $asksToRemove, titleVisibility: .visible) {
+            // The deck drops the tab itself once the item leaves the Dashboard's list.
+            Button("Remove", role: .destructive) { Task { await model.dismissAttention(id: item.id) } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("It stays in its chat.")
+        }
     }
 
     private func sendCustomAnswer() {

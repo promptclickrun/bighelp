@@ -115,28 +115,21 @@ final class CompactChatMenuUITests: BighelpUITestCase {
         XCTAssertTrue(running.waitForExistence(timeout: 15), "Compact works without Nerd Mode")
     }
 
+    /// Models › Default model (`-test-models-page`): each bot's row names its model and opens its own
+    /// Default Model page, where Fast and the rest are set.
     @MainActor
-    func testDefaultFastModeShowsTheSavedValueOnTheModelsPage() {
+    func testModelsPageOpensEachBotsDefaultModel() {
         let app = makeApp()
         app.launchArguments = ["-test-models-page", "-use-demo-fixtures", "-disable-demo-delays"]
         app.launch()
-        let row = app.buttons["agent.runtime.mainChats.fast-mode"].firstMatch
-        let list = app.collectionViews.firstMatch
-        XCTAssertTrue(list.waitForExistence(timeout: 15))
-        for _ in 0..<4 where !(row.exists && row.isHittable) { list.swipeUp() }
-        XCTAssertTrue(row.waitForExistence(timeout: 10))
-        XCTAssertTrue(row.isEnabled)
+        let row = app.buttons["models.bot.travel"]
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        XCTAssertTrue(waitForElement(row, predicate: NSPredicate(format: "label CONTAINS %@", "Mina Shah, ")),
+                      "The row names the bot and its model: \(row.label)")
+        evidence("models-default-model")
         row.tap()
-        let on = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "On")).firstMatch
-        XCTAssertTrue(on.waitForExistence(timeout: 5))
-        on.tap()
-        XCTAssertTrue(waitForElement(row, predicate: NSPredicate(format: "label CONTAINS %@", "On")))
-        evidence("default-fast-mode")
-        row.tap()
-        let off = app.buttons["Off"].firstMatch
-        XCTAssertTrue(off.waitForExistence(timeout: 5))
-        off.tap()
-        XCTAssertTrue(waitForElement(row, predicate: NSPredicate(format: "label CONTAINS %@", "Off")))
+        XCTAssertTrue(app.descendants(matching: .any)["default-models"].firstMatch.waitForExistence(timeout: 10),
+                      "The bot's own Default Model page")
     }
 
     /// A row cut off at the bottom still counts as hittable, so check the menu itself: one taller than

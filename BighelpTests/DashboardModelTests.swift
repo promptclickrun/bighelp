@@ -1,7 +1,5 @@
 import Foundation
-import SwiftUI
 import Testing
-import UIKit
 @testable import Bighelp
 
 @MainActor
@@ -21,7 +19,7 @@ struct DashboardModelTests {
         await model.load()
         #expect(source.loadCount == 1)
         #expect(model.state == .loaded)
-        #expect(model.snapshot?.inbox.first?.title == "Update 1")
+        #expect(model.snapshot?.attentionItems.first?.title == "Update 1")
     }
 
     @Test func dashboardResponseFromReplacedConnectionCannotPublish() async {
@@ -39,7 +37,7 @@ struct DashboardModelTests {
         await source.waitUntilLoadStarts(count: 2)
         source.resumeLoad(at: 1, title: "Current host")
         await replacement.value
-        #expect(model.snapshot?.inbox.first?.title == "Current host")
+        #expect(model.snapshot?.attentionItems.first?.title == "Current host")
     }
 
     @Test func disappearingHomeDoesNotPublishCancellationAsDashboardFailure() async {
@@ -52,15 +50,6 @@ struct DashboardModelTests {
         await loading.value
         #expect(model.state == .idle)
         #expect(model.snapshot == nil)
-    }
-
-    @Test func inboxPrimaryActionOpensAssociatedSession() {
-        #expect(DashboardInboxInteractionPolicy.primaryAction == .openSession)
-        #expect(DashboardInboxInteractionPolicy.secondaryAction == .startChat)
-    }
-
-    @Test func tappingAnActivityUpdateDoesNotPresentAStandalonePopup() {
-        #expect(DashboardInboxInteractionPolicy.primaryAction == .openSession)
     }
 
     @Test func newerSameAccountDashboardLoadOwnsSnapshot() async {
@@ -77,7 +66,7 @@ struct DashboardModelTests {
         source.resumeLoad(at: 0, title: "Stale update")
         await olderLoad.value
 
-        #expect(model.snapshot?.inbox.map(\.title) == ["Newest update"])
+        #expect(model.snapshot?.attentionItems.map(\.title) == ["Newest update"])
     }
 
     @Test func supersededCleanupCannotRemoveAReplacementSignalFromTheNewerLoad() async {
@@ -93,14 +82,7 @@ struct DashboardModelTests {
         source.finishCleanup()
         await olderLoad.value
 
-        #expect(model.snapshot?.inbox.map(\.title) == ["Replacement update"])
-    }
-
-    @Test func homeContentGrowsWhenAChannelContainsMoreThanFiveSignals() async throws {
-        let five = try await dashboardContentHeight(signalCount: 5)
-        let six = try await dashboardContentHeight(signalCount: 6)
-
-        #expect(six > five + 80)
+        #expect(model.snapshot?.attentionItems.map(\.title) == ["Replacement update"])
     }
 
     @Test func resetInvalidatesAnInFlightRemoteLoad() async {
@@ -111,14 +93,12 @@ struct DashboardModelTests {
         await source.waitUntilLoadStarts()
         model.resetForAccountBoundary()
         source.resumeLoad(with: DashboardSnapshot(
-            inbox: [DashboardInboxItem(
+            attentionItems: [DashboardAttentionItem(
                 id: "old-account-update",
                 title: "Old account",
                 detail: "Should not be restored",
-                agentName: "Juno",
-                status: "Old"
+                urgency: .important
             )],
-            attentionItems: [],
             completedItems: [],
             agents: []
         ))
@@ -126,20 +106,18 @@ struct DashboardModelTests {
 
         #expect(model.snapshot == nil)
         #expect(model.state == .idle)
-        #expect(model.lastUpdatedLabel == "Not updated yet")
     }
 
-    @Test func refreshPreservesItemIdentityAndUpdatesFreshness() async {
+    @Test func refreshPreservesItemIdentity() async {
         let source = DashboardFixtureSource()
         let model = DashboardModel(source: source)
 
         await model.load()
-        let ids = model.snapshot!.inbox.map(\.id)
+        let ids = model.snapshot!.attentionItems.map(\.id)
 
         await model.refresh()
 
-        #expect(model.snapshot!.inbox.map(\.id) == ids)
-        #expect(model.lastUpdatedLabel == "Updated just now")
+        #expect(model.snapshot!.attentionItems.map(\.id) == ids)
     }
 
     @Test func refreshFetchesCurrentHermesDataInsteadOfOnlyChangingTheLabel() async {
@@ -150,7 +128,7 @@ struct DashboardModelTests {
         await model.refresh()
 
         #expect(source.loadCount == 2)
-        #expect(model.snapshot?.inbox.first?.title == "Update 2")
+        #expect(model.snapshot?.attentionItems.first?.title == "Update 2")
     }
 
     @Test func refreshFailureKeepsTheLastSuccessfulDashboardVisible() async {
@@ -165,21 +143,6 @@ struct DashboardModelTests {
 
         #expect(model.state == .loaded)
         #expect(model.snapshot == snapshot)
-        #expect(model.lastUpdatedLabel == "Could not refresh")
-    }
-
-    @Test func individualDismissalRemovesOnlyTheChosenRowAfterHermesAcceptsIt() async {
-        let source = ManagingDashboardSource()
-        let model = DashboardModel(source: source, now: { Date(timeIntervalSince1970: 100) })
-        await model.load()
-
-        await model.dismissUpdate(id: "update-1")
-        await model.dismissAttention(id: "attention-1")
-
-        #expect(source.dismissedIDs == ["update-1", "attention-1"])
-        #expect(model.snapshot?.inbox.map(\.id) == ["update-2"])
-        #expect(model.snapshot?.attentionItems.isEmpty == true)
-        #expect(model.mutationErrorMessage == nil)
     }
 
     @Test func approvalResponseUsesLoadedRequestWithoutReplacingValidatedSummaryScope() async {
@@ -207,147 +170,61 @@ struct DashboardModelTests {
         #expect(model.mutationErrorMessage == nil)
     }
 
-    @Test func clearAllUsesTheNewestVisibleTimestampSoNewerEventsSurvive() async {
-        let source = ManagingDashboardSource()
-        let model = DashboardModel(source: source, now: { Date(timeIntervalSince1970: 100) })
+    @Test func removingAnItemTakesItOutOfNeedsYouAndItStaysGoneAfterARefresh() async {
+        let source = RemovableDashboardSource()
+        let model = DashboardModel(source: source)
         await model.load()
+        #expect(model.snapshot?.attentionItems.map(\.id) == ["waiting-1", "waiting-2"])
 
-        await model.clearUpdates()
-        await model.clearAttention()
+        await model.dismissAttention(id: "waiting-1")
 
-        #expect(source.bulkDismissals.count == 2)
-        #expect(source.bulkDismissals[0].types == ["channel.message"])
-        #expect(source.bulkDismissals[0].createdBefore == Date(timeIntervalSince1970: 20))
-        #expect(source.bulkDismissals[1].types == ["approval.required", "attention.required"])
-        #expect(source.bulkDismissals[1].createdBefore == Date(timeIntervalSince1970: 30))
-        #expect(model.snapshot?.inbox.isEmpty == true)
-        #expect(model.snapshot?.attentionItems.isEmpty == true)
+        #expect(source.dismissedIDs == ["waiting-1"])
+        #expect(model.snapshot?.attentionItems.map(\.id) == ["waiting-2"])
+        #expect(model.mutationErrorMessage == nil)
+
+        await model.refresh()
+        #expect(model.snapshot?.attentionItems.map(\.id) == ["waiting-2"])
     }
 
-    @Test func failedDismissalKeepsTheRowAndSurfacesARetryableMessage() async {
-        let source = ManagingDashboardSource()
-        source.shouldFailMutations = true
-        let model = DashboardModel(source: source, now: { Date(timeIntervalSince1970: 100) })
+    @Test func aRefusedRemovalKeepsTheItemAndSaysWhy() async {
+        let source = RemovableDashboardSource()
+        source.refusesDismissals = true
+        let model = DashboardModel(source: source)
         await model.load()
 
-        await model.dismissUpdate(id: "update-1")
+        await model.dismissAttention(id: "waiting-1")
 
-        #expect(model.snapshot?.inbox.map(\.id) == ["update-1", "update-2"])
+        #expect(model.snapshot?.attentionItems.map(\.id) == ["waiting-1", "waiting-2"])
         #expect(model.mutationErrorMessage == "That item could not be removed. Please try again.")
     }
 
-    @Test func lostDismissalReceiptReconcilesAnItemAlreadyRemovedByHermes() async {
-        let source = ManagingDashboardSource()
-        source.shouldFailMutations = true
-        source.removeFailedDismissalFromNextLoad = true
-        let model = DashboardModel(source: source, now: { Date(timeIntervalSince1970: 100) })
+    @Test func notificationAndForegroundRefreshShareOneFetchAndRevealTheNewItem() async {
+        let source = SuspendedExternalRefreshDashboardSource()
+        let model = DashboardModel(source: source)
         await model.load()
 
-        await model.dismissUpdate(id: "update-1")
+        let notificationRefresh = Task { await model.refreshAfterExternalChange() }
+        await source.waitUntilRefreshStarts()
+        let foregroundRefresh = Task { await model.refreshAfterExternalChange() }
+        await Task.yield()
 
         #expect(source.loadCount == 2)
-        #expect(model.snapshot?.inbox.map(\.id) == ["update-2"])
-        #expect(model.mutationErrorMessage == nil)
+
+        source.finishRefresh()
+        await notificationRefresh.value
+        await foregroundRefresh.value
+
+        #expect(source.loadCount == 2)
+        #expect(model.snapshot?.attentionItems.map(\.id) == ["delivered-while-away"])
     }
 
-    @Test func completedDismissalCannotBeUndoneByAnOlderRefresh() async {
-        let source = StaleDismissalDashboardSource()
-        let model = DashboardModel(source: source, now: { Date(timeIntervalSince1970: 100) })
-        await model.load()
-
-        let refresh = Task { await model.refresh() }
-        await source.waitUntilStaleRefreshStarts()
-        await model.dismissUpdate(id: "update-1")
-
-        #expect(model.snapshot?.inbox.map(\.id) == ["update-2"])
-        source.finishStaleRefresh()
-        await refresh.value
-
-        #expect(model.snapshot?.inbox.map(\.id) == ["update-2"])
-        #expect(model.mutationErrorMessage == nil)
-    }
-
-    @Test func readAndPinMutationsPersistThenProjectPinnedRowsFirst() async {
-        let source = ManagingDashboardSource()
-        let model = DashboardModel(source: source, now: { Date(timeIntervalSince1970: 100) })
-        await model.load()
-
-        await model.setUpdateRead(id: "update-2", isRead: true)
-        await model.setUpdatePinned(id: "update-2", isPinned: true)
-
-        #expect(source.stateMutations == [
-            .init(id: "update-2", isRead: true, isPinned: false),
-            .init(id: "update-2", isRead: true, isPinned: true),
-        ])
-        #expect(model.snapshot?.inbox.map(\.id) == ["update-2", "update-1"])
-        #expect(model.snapshot?.inbox.first?.isRead == true)
-        #expect(model.snapshot?.inbox.first?.isPinned == true)
-        #expect(model.mutationErrorMessage == nil)
-    }
-
-    @Test func attentionReadAndPinMutationsUseTheOfficialEventStateOperation() async {
-        let source = ManagingDashboardSource()
-        let model = DashboardModel(source: source, now: { Date(timeIntervalSince1970: 100) })
-        await model.load()
-
-        await model.setAttentionRead(id: "attention-1", isRead: true)
-        await model.setAttentionPinned(id: "attention-1", isPinned: true)
-
-        #expect(source.stateMutations.suffix(2) == [
-            .init(id: "attention-1", isRead: true, isPinned: false),
-            .init(id: "attention-1", isRead: true, isPinned: true),
-        ])
-        #expect(model.snapshot?.attentionItems.first?.isRead == true)
-        #expect(model.snapshot?.attentionItems.first?.isPinned == true)
-        #expect(model.mutationErrorMessage == nil)
-    }
-
-    @Test func failedReadOrPinMutationKeepsTheCanonicalRowState() async {
-        let source = ManagingDashboardSource()
-        source.shouldFailMutations = true
-        let model = DashboardModel(source: source, now: { Date(timeIntervalSince1970: 100) })
-        await model.load()
-
-        await model.setUpdatePinned(id: "update-1", isPinned: true)
-
-        #expect(model.snapshot?.inbox.first(where: { $0.id == "update-1" })?.isPinned == false)
-        #expect(model.mutationErrorMessage == "That item could not be updated. Please try again.")
-    }
-
-    @Test func notificationFocusIsConsumedOnlyByTheMatchingLoadedInboxRow() async {
-        let model = DashboardModel(
-            source: ManagingDashboardSource(),
-            now: { Date(timeIntervalSince1970: 100) }
-        )
-
-        model.focusUpdate(id: "update-2")
-        #expect(model.focusedUpdateID == nil)
-
-        await model.load()
-        model.focusUpdate(id: "update-2")
-        #expect(model.focusedUpdateID == "update-2")
-
-        model.consumeFocusedUpdate(id: "update-1")
-        #expect(model.focusedUpdateID == "update-2")
-        model.consumeFocusedUpdate(id: "update-2")
-        #expect(model.focusedUpdateID == nil)
-
-        model.requestUpdateFocus(id: "attention-1")
-        #expect(model.focusedAttentionID == "attention-1")
-        model.consumeFocusedAttention(id: "update-2")
-        #expect(model.focusedAttentionID == "attention-1")
-        model.consumeFocusedAttention(id: "attention-1")
-        #expect(model.focusedAttentionID == nil)
-    }
-
-    @Test func loadAutomaticallyRemovesExpiredUpdatesAndDecisionRequests() async {
+    @Test func loadAutomaticallyRemovesExpiredDecisionRequests() async {
         let source = RetentionDashboardSource()
         let model = DashboardModel(source: source)
 
         await model.load()
 
-        #expect(source.dismissedIDs == ["expired-update", "expired-decision"])
-        #expect(model.snapshot?.inbox.map(\.id) == ["fresh-update"])
+        #expect(source.dismissedIDs == ["expired-decision"])
         #expect(model.snapshot?.attentionItems.map(\.id) == ["fresh-decision"])
     }
 
@@ -357,8 +234,7 @@ struct DashboardModelTests {
 
         await model.load()
 
-        #expect(source.dismissedIDs == ["closed-update", "closed-decision"])
-        #expect(model.snapshot?.inbox.map(\.id) == ["open-update"])
+        #expect(source.dismissedIDs == ["closed-decision"])
         #expect(model.snapshot?.attentionItems.map(\.id) == ["open-decision"])
     }
 
@@ -373,7 +249,6 @@ struct DashboardModelTests {
         )
 
         #expect(source.dismissedIDs.isEmpty)
-        #expect(model.snapshot?.inbox.map(\.id) == ["terminal-update"])
         #expect(model.snapshot?.attentionItems.map(\.id) == ["terminal-decision"])
     }
 
@@ -481,7 +356,6 @@ private final class ClarificationDashboardSource: DashboardDataSource, Dashboard
             expiresAt: expiresAt
         )
         return DashboardSnapshot(
-            inbox: [],
             attentionItems: [DashboardAttentionItem(
                 id: request.eventID,
                 title: "Hermes needs guidance",
@@ -513,83 +387,6 @@ private final class ClarificationDashboardSource: DashboardDataSource, Dashboard
 }
 
 @MainActor
-private final class ManagingDashboardSource: DashboardDataSource {
-    struct BulkDismissal: Equatable {
-        let types: [String]
-        let createdBefore: Date
-    }
-
-    struct StateMutation: Equatable {
-        let id: String
-        let isRead: Bool
-        let isPinned: Bool
-    }
-
-    var shouldFailMutations = false
-    var removeFailedDismissalFromNextLoad = false
-    private(set) var loadCount = 0
-    private(set) var dismissedIDs: [String] = []
-    private(set) var bulkDismissals: [BulkDismissal] = []
-    private(set) var stateMutations: [StateMutation] = []
-
-    func loadDashboard() async throws -> DashboardSnapshot {
-        loadCount += 1
-        return DashboardSnapshot(
-            inbox: [
-                DashboardInboxItem(
-                    id: "update-1",
-                    title: "One",
-                    detail: "One",
-                    agentName: "Juno",
-                    status: "Now",
-                    isRead: false,
-                    isPinned: false,
-                    createdAt: Date(timeIntervalSince1970: 10)
-                ),
-                DashboardInboxItem(
-                    id: "update-2",
-                    title: "Two",
-                    detail: "Two",
-                    agentName: "Juno",
-                    status: "Now",
-                    isRead: false,
-                    isPinned: false,
-                    createdAt: Date(timeIntervalSince1970: 20)
-                ),
-            ].filter {
-                !removeFailedDismissalFromNextLoad || loadCount == 1 || $0.id != "update-1"
-            },
-            attentionItems: [
-                DashboardAttentionItem(
-                    id: "attention-1",
-                    title: "Choose",
-                    detail: "Choose",
-                    urgency: .important,
-                    createdAt: Date(timeIntervalSince1970: 30)
-                )
-            ],
-            completedItems: [],
-            agents: []
-        )
-    }
-
-    func dismissDashboardEvent(id: String) async throws {
-        if shouldFailMutations { throw DashboardFixtureError.unavailable }
-        dismissedIDs.append(id)
-    }
-
-    func dismissDashboardEvents(types: [String], createdBefore: Date) async throws {
-        if shouldFailMutations { throw DashboardFixtureError.unavailable }
-        bulkDismissals.append(BulkDismissal(types: types, createdBefore: createdBefore))
-    }
-
-    func setDashboardEventState(id: String, isRead: Bool, isPinned: Bool) async throws {
-        if shouldFailMutations { throw DashboardFixtureError.unavailable }
-        stateMutations.append(.init(id: id, isRead: isRead, isPinned: isPinned))
-    }
-}
-
-@MainActor
 private final class DashboardApprovalResponseSource:
     DashboardDataSource, ApprovalRequestLoading, ApprovalClient {
     struct Submission: Equatable {
@@ -607,7 +404,6 @@ private final class DashboardApprovalResponseSource:
 
     func loadDashboard() async throws -> DashboardSnapshot {
         DashboardSnapshot(
-            inbox: [],
             attentionItems: [DashboardAttentionItem(
                 id: itemID,
                 title: "Approve session action",
@@ -648,14 +444,12 @@ private final class ChangingDashboardSource: DashboardDataSource {
     func loadDashboard() async throws -> DashboardSnapshot {
         loadCount += 1
         return DashboardSnapshot(
-            inbox: [DashboardInboxItem(
+            attentionItems: [DashboardAttentionItem(
                 id: "update",
                 title: "Update \(loadCount)",
                 detail: "Current Hermes event data",
-                agentName: "Hermes",
-                status: "Just now"
+                urgency: .important
             )],
-            attentionItems: [],
             completedItems: [],
             agents: []
         )
@@ -671,15 +465,13 @@ private final class FlakyDashboardSource: DashboardDataSource {
             throw DashboardFixtureError.unavailable
         }
         return DashboardSnapshot(
-            inbox: [DashboardInboxItem(
+            attentionItems: [DashboardAttentionItem(
                 id: "stable-update",
                 title: "Stable update",
                 detail: "Keep this visible during a transient refresh failure.",
-                agentName: "Juno",
-                status: "Just now",
+                urgency: .important,
                 createdAt: Date()
             )],
-            attentionItems: [],
             completedItems: [],
             agents: []
         )
@@ -692,24 +484,6 @@ private final class RetentionDashboardSource: DashboardDataSource {
 
     func loadDashboard() async throws -> DashboardSnapshot {
         DashboardSnapshot(
-            inbox: [
-                DashboardInboxItem(
-                    id: "expired-update",
-                    title: "Old update",
-                    detail: "No longer useful",
-                    agentName: "Hermes",
-                    status: "Old",
-                    createdAt: Date(timeIntervalSince1970: 1)
-                ),
-                DashboardInboxItem(
-                    id: "fresh-update",
-                    title: "Fresh update",
-                    detail: "Still useful",
-                    agentName: "Hermes",
-                    status: "Now",
-                    createdAt: Date()
-                ),
-            ],
             attentionItems: [
                 DashboardAttentionItem(
                     id: "expired-decision",
@@ -742,27 +516,6 @@ private final class ClosedSessionDashboardSource: DashboardDataSource {
 
     func loadDashboard() async throws -> DashboardSnapshot {
         DashboardSnapshot(
-            inbox: [
-                DashboardInboxItem(
-                    id: "closed-update",
-                    title: "Closed update",
-                    detail: "Its session has ended",
-                    agentName: "Hermes",
-                    status: "Closed",
-                    sessionID: "closed-session",
-                    isSessionClosed: true,
-                    createdAt: Date()
-                ),
-                DashboardInboxItem(
-                    id: "open-update",
-                    title: "Open update",
-                    detail: "Its session is still active",
-                    agentName: "Hermes",
-                    status: "Now",
-                    sessionID: "open-session",
-                    createdAt: Date()
-                ),
-            ],
             attentionItems: [
                 DashboardAttentionItem(
                     id: "closed-decision",
@@ -798,15 +551,6 @@ private final class TerminalSessionDashboardSource: DashboardDataSource {
 
     func loadDashboard() async throws -> DashboardSnapshot {
         DashboardSnapshot(
-            inbox: [DashboardInboxItem(
-                id: "terminal-update",
-                title: "Terminal update",
-                detail: "Its session just completed",
-                agentName: "Hermes",
-                status: "Now",
-                sessionID: "terminal-session",
-                createdAt: Date()
-            )],
             attentionItems: [DashboardAttentionItem(
                 id: "terminal-decision",
                 title: "Terminal decision",
@@ -871,65 +615,16 @@ private final class InterleavedDashboardSource: DashboardDataSource {
 
     private static func snapshot(title: String) -> DashboardSnapshot {
         DashboardSnapshot(
-            inbox: [DashboardInboxItem(
+            attentionItems: [DashboardAttentionItem(
                 id: "shared-update",
                 title: title,
                 detail: title,
-                agentName: "Hermes",
-                status: "Now"
+                urgency: .important
             )],
-            attentionItems: [],
             completedItems: [],
             agents: []
         )
     }
-}
-
-@MainActor
-private final class StaleDismissalDashboardSource: DashboardDataSource {
-    private var loadCount = 0
-    private var staleRefreshContinuation: CheckedContinuation<DashboardSnapshot, any Error>?
-
-    func loadDashboard() async throws -> DashboardSnapshot {
-        loadCount += 1
-        guard loadCount > 1 else { return Self.snapshot }
-        return try await withCheckedThrowingContinuation { continuation in
-            staleRefreshContinuation = continuation
-        }
-    }
-
-    func dismissDashboardEvent(id: String) async throws {}
-
-    func waitUntilStaleRefreshStarts() async {
-        while staleRefreshContinuation == nil { await Task.yield() }
-    }
-
-    func finishStaleRefresh() {
-        staleRefreshContinuation?.resume(returning: Self.snapshot)
-        staleRefreshContinuation = nil
-    }
-
-    private static let snapshot = DashboardSnapshot(
-        inbox: [
-            DashboardInboxItem(
-                id: "update-1",
-                title: "Delete me",
-                detail: "This row was dismissed.",
-                agentName: "Hermes",
-                status: "Now"
-            ),
-            DashboardInboxItem(
-                id: "update-2",
-                title: "Keep me",
-                detail: "This row remains.",
-                agentName: "Hermes",
-                status: "Now"
-            ),
-        ],
-        attentionItems: [],
-        completedItems: [],
-        agents: []
-    )
 }
 
 @MainActor
@@ -942,30 +637,26 @@ private final class InterleavedCleanupDashboardSource: DashboardDataSource {
         loadCount += 1
         if loadCount == 1 {
             return DashboardSnapshot(
-                inbox: [DashboardInboxItem(
+                attentionItems: [DashboardAttentionItem(
                     id: "shared-update",
                     title: "Closed update",
                     detail: "The old load will try to clean this up.",
-                    agentName: "Hermes",
-                    status: "Closed",
+                    urgency: .important,
                     isSessionClosed: true,
                     createdAt: Date()
                 )],
-                attentionItems: [],
                 completedItems: [],
                 agents: []
             )
         }
         return DashboardSnapshot(
-            inbox: [DashboardInboxItem(
+            attentionItems: [DashboardAttentionItem(
                 id: "shared-update",
                 title: "Replacement update",
                 detail: "This newer signal remains actionable.",
-                agentName: "Hermes",
-                status: "Now",
+                urgency: .important,
                 createdAt: Date()
             )],
-            attentionItems: [],
             completedItems: [],
             agents: []
         )
@@ -992,57 +683,66 @@ private final class InterleavedCleanupDashboardSource: DashboardDataSource {
     }
 }
 
+/// Like the real source: a dismissal is remembered, so later loads leave the item out.
 @MainActor
-private struct ManySignalsDashboardSource: DashboardDataSource {
-    let count: Int
+private final class RemovableDashboardSource: DashboardDataSource {
+    var refusesDismissals = false
+    private(set) var dismissedIDs: [String] = []
 
     func loadDashboard() async throws -> DashboardSnapshot {
         DashboardSnapshot(
-            inbox: (1...count).map { index in
-                DashboardInboxItem(
-                    id: "update-\(index)",
-                    title: "Update \(index)",
-                    detail: "Details for update \(index)",
-                    agentName: "Hermes",
-                    status: "Now"
-                )
-            },
-            attentionItems: (1...count).map { index in
-                DashboardAttentionItem(
-                    id: "decision-\(index)",
-                    title: "Decision \(index)",
-                    detail: "Details for decision \(index)",
-                    urgency: .important
-                )
-            },
+            attentionItems: ["waiting-1", "waiting-2"]
+                .filter { !dismissedIDs.contains($0) }
+                .map {
+                    DashboardAttentionItem(
+                        id: $0, title: "Waiting", detail: "Its chat was deleted.",
+                        urgency: .important, createdAt: Date()
+                    )
+                },
             completedItems: [],
             agents: []
         )
     }
+
+    func dismissDashboardEvent(id: String) async throws {
+        if refusesDismissals { throw DashboardFixtureError.unavailable }
+        dismissedIDs.append(id)
+    }
 }
 
 @MainActor
-private func dashboardContentHeight(signalCount: Int) async throws -> CGFloat {
-    let model = DashboardModel(source: ManySignalsDashboardSource(count: signalCount))
-    await model.load()
-    let controller = UIHostingController(rootView: DashboardView(model: model))
-    let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
-    window.rootViewController = controller
-    window.makeKeyAndVisible()
-    defer { window.isHidden = true }
+private final class SuspendedExternalRefreshDashboardSource: DashboardDataSource {
+    private(set) var loadCount = 0
+    private var refreshContinuation: CheckedContinuation<DashboardSnapshot, Never>?
 
-    controller.view.frame = window.bounds
-    controller.view.setNeedsLayout()
-    controller.view.layoutIfNeeded()
-    await Task.yield()
-    controller.view.layoutIfNeeded()
-    return try #require(controller.view.descendants(of: UIScrollView.self).first).contentSize.height
-}
+    func loadDashboard() async throws -> DashboardSnapshot {
+        loadCount += 1
+        guard loadCount > 1 else { return Self.snapshot(waiting: false) }
+        return await withCheckedContinuation { continuation in
+            refreshContinuation = continuation
+        }
+    }
 
-private extension UIView {
-    func descendants<View: UIView>(of type: View.Type) -> [View] {
-        var matches = subviews.flatMap { $0.descendants(of: type) }
-        if let match = self as? View { matches.insert(match, at: 0) }
-        return matches
+    func waitUntilRefreshStarts() async {
+        while refreshContinuation == nil { await Task.yield() }
+    }
+
+    func finishRefresh() {
+        refreshContinuation?.resume(returning: Self.snapshot(waiting: true))
+        refreshContinuation = nil
+    }
+
+    private static func snapshot(waiting: Bool) -> DashboardSnapshot {
+        DashboardSnapshot(
+            attentionItems: waiting ? [DashboardAttentionItem(
+                id: "delivered-while-away",
+                title: "Delivered while bighelp was away",
+                detail: "A question arrived in the background.",
+                urgency: .important,
+                createdAt: Date()
+            )] : [],
+            completedItems: [],
+            agents: []
+        )
     }
 }

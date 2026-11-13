@@ -159,10 +159,6 @@ final class SettingsStore {
         didSet { defaults.set(geminiLiveVoice, forKey: Keys.geminiLiveVoice) }
     }
 
-    var offlineModeEnabled: Bool {
-        didSet { defaults.set(offlineModeEnabled, forKey: Keys.offlineMode) }
-    }
-
     /// Legacy app preference retained for migration compatibility. It is not
     /// presented as, or used as, writable iOS notification authorization.
     var notificationsEnabled: Bool {
@@ -412,11 +408,6 @@ final class SettingsStore {
         didSet { defaults.set(simpleBotsGatewayFilter, forKey: Keys.simpleBotsGatewayFilter) }
     }
 
-    /// Settings › System shows every gateway (Fleet settings) to update and restart them together.
-    var systemManagesAllGateways: Bool {
-        didSet { defaults.set(systemManagesAllGateways, forKey: Keys.systemManagesAllGateways) }
-    }
-
     /// Multi-gateway's primary bot (gateway and bot, `FleetID`), kept on this device so it stays put
     /// whichever gateway is in use.
     var simpleBotsMultiPrimary: String? {
@@ -504,10 +495,6 @@ final class SettingsStore {
         let savedGeminiVoice = defaults.string(forKey: Keys.geminiLiveVoice) ?? ""
         geminiLiveVoice = LiveVoiceProvider.gemini.voices.contains(savedGeminiVoice)
             ? savedGeminiVoice : LiveVoiceProvider.gemini.defaultVoice
-        offlineModeEnabled = defaults.bool(
-            forKey: Keys.offlineMode,
-            default: false
-        )
         notificationsEnabled = defaults.bool(
             forKey: Keys.notifications,
             default: true
@@ -600,7 +587,6 @@ final class SettingsStore {
         chatSwitcherEnabled = defaults.bool(forKey: Keys.chatSwitcher, default: BighelpChatSwitcher.isOnByDefault)
         simpleBotsMultiGateway = defaults.bool(forKey: Keys.simpleBotsMultiGateway, default: false)
         simpleBotsGatewayFilter = defaults.bool(forKey: Keys.simpleBotsGatewayFilter, default: false)
-        systemManagesAllGateways = defaults.bool(forKey: Keys.systemManagesAllGateways, default: false)
         simpleBotsMultiPrimary = defaults.string(forKey: Keys.simpleBotsMultiPrimary)
         startExperience = start
         experience = codeMode ? start : .bighelp
@@ -887,7 +873,6 @@ private extension SettingsStore {
         static let codexLiveVoice = "loopdy.voice.live.codex-voice"
         static let apiLiveVoice = "loopdy.voice.live.api-voice"
         static let geminiLiveVoice = "bighelp.voice.live.gemini-voice"
-        static let offlineMode = "loopdy.demo.offlineMode"
         static let notifications = "loopdy.demo.notifications"
         static let showReasoningByDefault = "loopdy.chat.showReasoningByDefault"
         static let showToolCallsByDefault = "loopdy.chat.showToolCallsByDefault"
@@ -921,7 +906,6 @@ private extension SettingsStore {
         static let chatSwitcher = "bighelp.settings.chat-switcher"
         static let simpleBotsMultiGateway = "bighelp.simple-bots.multi-gateway"
         static let simpleBotsGatewayFilter = "bighelp.simple-bots.gateway-filter"
-        static let systemManagesAllGateways = "bighelp.settings.system.manages-all-gateways"
         static let simpleBotsMultiPrimary = "bighelp.simple-bots.multi-gateway.primary"
         static let sessionSectionPreferences = "loopdy.sessions.section-preferences.v1"
     }

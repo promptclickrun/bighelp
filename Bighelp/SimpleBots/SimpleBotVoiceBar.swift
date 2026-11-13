@@ -70,7 +70,7 @@ struct SimpleBotVoiceBar: View {
     private var statusLine: String? {
         guard let live = presentation.liveModel else {
             return presentation.conversationMode == .codexLive
-                ? String(localized: "Full Duplex couldn't start in this chat, so this is TTS voice.") : nil
+                ? String(localized: "Live couldn't start in this chat, so this chat takes turns.") : nil
         }
         if let error = live.errorMessage ?? live.cleanupMessage { return error }
         guard live.phase == .live else { return live.phase.title }

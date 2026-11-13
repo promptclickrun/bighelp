@@ -7,31 +7,24 @@ import XCTest
 /// BIGHELP_FLEET_SETTINGS_SHOTS (TEST_RUNNER_…) names a folder for screenshots;
 /// BIGHELP_FLEET_SETTINGS_APPEARANCE picks light or dark.
 final class FleetSettingsUITests: BighelpUITestCase {
-    /// Settings › System › Manage all gateways: System becomes Fleet settings for every gateway, and back.
+    /// Settings › Your computers › Update every computer: Fleet settings for every computer.
     @MainActor
-    func testManageAllGatewaysTurnsSystemIntoFleetSettings() throws {
+    func testUpdateEveryComputerOpensFleetSettings() throws {
         let app = makeApp()
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-use-multi-host-fixtures",
                                "-bighelp.hosts.all-hosts", "NO"]
         app.launch()
         openRootTab("tab.profile", in: app)
-        settingsRow("settings.menu.connectivityAndNotifications", in: app).tap()
-        let manage = app.switches["settings.system.manage-all-gateways"].firstMatch
-        XCTAssertTrue(manage.waitForExistence(timeout: 10), "System offers Manage all gateways with several gateways")
-        XCTAssertEqual(manage.value as? String, "0", "Off until the person turns it on")
-        save("system-manage-all-off", app)
+        let update = settingsRow("settings.update-every-computer", in: app)
+        XCTAssertTrue(update.exists, "Your computers offers Update every computer with several computers")
+        save("settings-update-every-computer", app)
 
-        manage.switches.firstMatch.tap()
+        update.tap()
         let homePlugin = status("fleet.settings.plugin.Home Hermes", in: app)
-        XCTAssertTrue(wait(for: homePlugin, toRead: "2.19.0 → 2.20.1"), "Every gateway shows: \(homePlugin.label)")
+        XCTAssertTrue(wait(for: homePlugin, toRead: "2.19.0 → 2.20.1"), "Every computer shows: \(homePlugin.label)")
         XCTAssertTrue(app.buttons["fleet.settings.plugin.update-all"].exists, "Update all is there")
         XCTAssertTrue(app.buttons["fleet.settings.hermes.update-all"].exists)
-        let stillThere = app.switches["settings.system.manage-all-gateways"].firstMatch
-        XCTAssertEqual(stillThere.value as? String, "1", "The switch stays on top of Fleet settings")
-        save("system-manage-all-on", app)
-
-        stillThere.switches.firstMatch.tap()
-        XCTAssertTrue(homePlugin.waitForNonExistence(timeout: 5), "Off: System shows the gateway in use again")
+        save("fleet-settings", app)
     }
 
     @MainActor
@@ -61,7 +54,7 @@ final class FleetSettingsUITests: BighelpUITestCase {
         XCTAssertTrue(app.buttons["fleet.gate.host.Home Hermes"].exists, "The hosts are still listed")
         save("settings-popup-\(appearance)", app)
         fleetSettings.tap()
-        XCTAssertTrue(app.navigationBars["Fleet settings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Update every computer"].waitForExistence(timeout: 5))
 
         let homePlugin = status("fleet.settings.plugin.Home Hermes", in: app)
         XCTAssertTrue(wait(for: homePlugin, toRead: "2.19.0 → 2.20.1"), homePlugin.label)
@@ -127,7 +120,7 @@ final class FleetSettingsUITests: BighelpUITestCase {
         let fleetSettings = app.buttons["fleet.gate.fleet-settings"]
         XCTAssertTrue(fleetSettings.waitForExistence(timeout: 5))
         fleetSettings.tap()
-        XCTAssertTrue(app.navigationBars["Fleet settings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Update every computer"].waitForExistence(timeout: 5))
 
         let homeHermes = status("fleet.settings.hermes.Home Hermes", in: app)
         XCTAssertTrue(wait(for: homeHermes, toRead: "12 commits behind"), homeHermes.label)

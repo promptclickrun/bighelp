@@ -9,8 +9,8 @@ When you add a host, bighelp tries the address first and asks only for what it
 finds: a Cloudflare Access login sends you to a **Cloudflare Access** step, and
 a proxy asking for a password sends you to a **Password needed** step. Custom
 headers, and a way to pick either step yourself, are under **More options**.
-Later, change them in **Settings › Hosts › (host) › Advanced connection details ›
-Edit access**.
+Later, change them in **Settings › Your computers › (computer) › Access ›
+Address and sign-in › Edit access**.
 
 ## How bighelp handles these values
 

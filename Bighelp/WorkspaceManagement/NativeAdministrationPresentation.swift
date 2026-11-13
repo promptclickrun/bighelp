@@ -114,9 +114,12 @@ final class NativeAdministrationPresentation: Identifiable {
     private let ownsProjectStore: Bool
     let localModels: LocalModelsStore
     let toolBackends: HostToolBackendsStore
+    /// Hermes' Kanban boards, for a computer page's Advanced · Setup › Kanban boards.
     let kanban: HermesKanbanStore
     let achievements: HermesAchievementsStore
     let voice: VoiceConfigurationStore?
+    private let rpc: any DirectHermesRPC
+    private let http: any DirectHermesAuthenticatedHTTP
     private let currentOwner: @MainActor () -> WorkspaceOwner?
     private var invalidationObserver: NativeAdministrationInvalidationObserver?
     private(set) var retired = false
@@ -142,6 +145,8 @@ final class NativeAdministrationPresentation: Identifiable {
         self.servingProfileID = servingProfileID
         self.owner = owner
         self.currentOwner = currentOwner
+        self.rpc = rpc
+        self.http = http
         stockGitCoordinator = stockGit?.coordinator
         ownsProjectStore = stockGit == nil
         let actionStatusClient = DirectHermesHostOperationsClient(rpc: rpc, http: http, owner: owner, currentOwner: currentOwner)
@@ -209,13 +214,47 @@ final class NativeAdministrationPresentation: Identifiable {
             presentationServingProfileID: servingProfileID,
             isCurrent: { currentOwner() == owner }, messaging: messaging,
             pairing: pairing, providerAccounts: providerAccounts,
-            observesProviderSetup: destination == .keys
+            observesProviderSetup: destination == .keys || destination == .models
         )
         invalidationObserver = observer
         observer.install()
     }
 
     var isCurrent: Bool { !retired && currentOwner() == owner }
+
+    /// A computer's page › Advanced · Upkeep › Logs, read over this presentation's connection.
+    func makeLogs() -> HermesLogsDestinationView {
+        HermesLogsDestinationView(
+            hostName: hostName, owner: owner, http: http,
+            workspace: DirectHermesWorkspaceClient(rpc: rpc, http: http, owner: owner,
+                                                   capabilities: .init(owner: owner), currentOwner: currentOwner),
+            currentOwner: currentOwner)
+    }
+
+    /// The computer page for the computer `hostID`, made from the registry's own connection to it
+    /// (Settings › a computer). Nil unless it's connected now.
+    static func computer(_ hostID: UUID, registry: BighelpHostRegistry) -> NativeAdministrationPresentation? {
+        guard registry.isWorkspaceReady, let host = registry.hosts.first(where: { $0.id == hostID }) else { return nil }
+        let workspace = registry.workspace(for: host)
+        let generation = registry.generation
+        guard let verified = try? workspace.verifiedConnection(for: host, generation: generation) else { return nil }
+        let direct = verified.client, owner = verified.owner
+        let connectionGeneration = owner.connectionGeneration
+        let current: @MainActor () -> WorkspaceOwner? = { [weak registry, weak workspace] in
+            guard let registry, let workspace, registry.generation == generation,
+                  workspace.connectionGeneration == connectionGeneration, workspace.isConnected else { return nil }
+            return owner
+        }
+        let profile = workspace.selectedProfile.isEmpty ? "default" : workspace.selectedProfile
+        let presentation = NativeAdministrationPresentation(
+            destination: .system, hostName: host.name, profileID: profile, servingProfileID: nil,
+            rpc: direct, http: direct, owner: owner, currentOwner: current,
+            connections: nil, invalidationSource: nil)
+        presentation.hostOperations.onServicesChanged = { [weak registry] in
+            registry?.noteServicesChanged(hostID: hostID)
+        }
+        return presentation
+    }
 
     func retire() {
         invalidationObserver?.retire()
@@ -242,12 +281,16 @@ final class NativeAdministrationPresentation: Identifiable {
 struct NativeAdministrationDestination: View {
     let presentation: NativeAdministrationPresentation
     let permissionCenter: PermissionCenter
-    /// The host's agents, for Default model's agent picker.
+    /// The computer's bots, for Models' Default model rows.
     var agents: [ModelAdministrationAgent] = []
-    /// Reads and saves each agent's reasoning default (Default model › Reasoning).
+    /// Reads and saves each bot's default model (Models › Default model).
     var reasoningDefaults: (any AgentRuntimeDefaultsClient)?
-    let onOpenProviderAccounts: () -> Void
-    let onOpenAgentDefaults: () -> Void
+    /// Demo runs: the made-up providers Models lists, in place of the stand-in computer's own (none).
+    var demoProviderAccounts: ProviderAccountsStore?
+    /// Models' Default model rows, made once the page shows and kept while it's on the stack. A
+    /// reattach hands this page a new presentation, so they're made again for its clients.
+    @State private var botDefaults: ModelsBotDefaults?
+    @State private var botDefaultsPresentation: UUID?
 
     var body: some View {
         Group {
@@ -256,25 +299,8 @@ struct NativeAdministrationDestination: View {
                 case .memory:
                     MemoryManagementView(store: presentation.memory)
                 case .system:
-                    HostOperationsView(store: presentation.hostOperations) {
-                        NavigationLink {
-                            HostToolBackendsView(store: presentation.toolBackends)
-                        } label: {
-                            Label("Tool Backends", systemImage: "wrench.and.screwdriver")
-                        }
-                        NavigationLink {
-                            HostExtensionsView(kanban: presentation.kanban, achievements: presentation.achievements)
-                        } label: {
-                            Label("Extensions", systemImage: "puzzlepiece.extension")
-                        }
-                        if let voice = presentation.voice {
-                            NavigationLink {
-                                VoiceConfigurationView(store: voice, permissionCenter: permissionCenter)
-                            } label: {
-                                Label("Host Voice", systemImage: "waveform")
-                            }
-                        }
-                    }
+                    HostOperationsView(store: presentation.hostOperations, administration: presentation,
+                                       permissionCenter: permissionCenter)
                 case .files:
                     WorkspaceFileTransferView(store: presentation.files)
                 case .projects:
@@ -290,20 +316,13 @@ struct NativeAdministrationDestination: View {
                         }
                 case .webhooks:
                     WebhookEditorView(store: presentation.webhooks)
-                case .keys:
-                    ProviderAccountsView(store: presentation.providerAccounts)
-                case .models:
-                    ModelAdministrationView(hostName: presentation.hostName, profileID: presentation.profileID,
-                        client: presentation.models, agents: agents, reasoningDefaults: reasoningDefaults,
-                        onOpenProviderAccounts: onOpenProviderAccounts,
-                        onOpenAgentDefaults: onOpenAgentDefaults)
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                NavigationLink("Local Models") {
-                                    LocalModelsView(store: presentation.localModels)
-                                }
-                            }
-                        }
+                case .keys, .models:
+                    // Default model and AI providers are one page: Models.
+                    ProviderAccountsView(store: demoProviderAccounts ?? presentation.providerAccounts, botDefaults: botDefaults,
+                                         models: presentation.models, localModels: presentation.localModels)
+                        .onAppear { makeBotDefaults() }
+                        .onChange(of: presentation.id) { _, _ in makeBotDefaults() }
+                        .onChange(of: agents) { _, agents in botDefaults?.show(agents) }
                 default:
                     unavailable
                 }
@@ -314,8 +333,33 @@ struct NativeAdministrationDestination: View {
         .id(presentation.id)
     }
 
+    private func makeBotDefaults() {
+        guard botDefaultsPresentation != presentation.id, let reasoningDefaults else { return }
+        botDefaultsPresentation = presentation.id
+        let models = presentation.models
+        botDefaults = ModelsBotDefaults(agents: agents, client: reasoningDefaults) { id in
+            AgentHelperModelsModel(agentID: id, client: models)
+        }
+    }
+
     private var unavailable: some View {
         WorkspaceUnavailableView(destination: presentation.destination, hostName: presentation.hostName,
-            reason: "Reopen this feature for the current host and profile.")
+            reason: "Open this page again for the computer in use.")
+    }
+}
+
+/// Holds a page's own administration connection and lets it go once the page leaves the stack:
+/// `.onDisappear` can't, because a page pushed over it makes it disappear too.
+@MainActor
+final class RetainedAdministration {
+    let presentation: NativeAdministrationPresentation
+
+    init(_ presentation: NativeAdministrationPresentation) {
+        self.presentation = presentation
+    }
+
+    deinit {
+        let presentation = presentation
+        Task { @MainActor in presentation.retire() }
     }
 }

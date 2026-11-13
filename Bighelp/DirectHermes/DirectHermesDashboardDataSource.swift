@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// A native approval is already owned by a verified Hermes client. The
@@ -146,8 +145,8 @@ struct DirectHermesDashboardClarification: Equatable, Sendable, Identifiable {
 /// Dashboard projection for a selected direct Hermes host.
 ///
 /// Hermes 0.21.2 does not provide the bighelp dashboard event API. This source
-/// therefore reads the already authenticated native session/profile catalogs
-/// and optional native prompt projections. It never calls Link, the notification relay, or
+/// therefore reads the already authenticated native profile catalog and the native prompt
+/// projections (what waits on the person). It never calls Link, the notification relay, or
 /// a made-up dashboard endpoint.
 @MainActor
 final class DirectHermesDashboardDataSource: DashboardDataSource,
@@ -166,9 +165,9 @@ final class DirectHermesDashboardDataSource: DashboardDataSource,
         DirectHermesDashboardClarification, DashboardClarificationResponse
     ) async throws -> Void
 
+    /// What the person removed from Needs you, kept per computer. Older saves also hold read and
+    /// pinned IDs of the Activity screen; they are ignored.
     private struct PresentationState: Codable {
-        var readIDs: Set<String> = []
-        var pinnedIDs: Set<String> = []
         var dismissedIDs: Set<String> = []
     }
 
@@ -244,30 +243,16 @@ final class DirectHermesDashboardDataSource: DashboardDataSource,
         try checkOwner()
         try Task.checkCancellation()
 
-        let currentSessions = sessions()
         let currentApprovals = uniqueApprovals(approvals())
         let currentClarifications = uniqueClarifications(clarifications())
         let attention = currentAttention(
             approvals: currentApprovals,
             clarifications: currentClarifications
         )
-        let activeIDs = Set(DashboardWorkProjection.workInFlightItems(
-            sessions: currentSessions,
-            attentionItems: attention,
-            now: now()
-        ).map(\.sessionID))
-        let inbox = currentSessions
-            .filter { !activeIDs.contains($0.id) }
-            .compactMap(sessionUpdate)
-            .filter { !presentation.dismissedIDs.contains($0.id) }
-            .map(applyPresentation(to:))
-            .sorted(by: sortInbox)
 
         return DashboardSnapshot(
-            inbox: inbox,
             attentionItems: attention
                 .filter { !presentation.dismissedIDs.contains($0.id) }
-                .map(applyPresentation(to:))
                 .sorted(by: sortAttention),
             completedItems: [],
             agents: Array(agents().prefix(8).map { agent in
@@ -282,44 +267,10 @@ final class DirectHermesDashboardDataSource: DashboardDataSource,
         )
     }
 
-    func setDashboardEventState(id: String, isRead: Bool, isPinned: Bool) async throws {
-        try checkOwner()
-        try validateID(id)
-        presentation.readIDs = isRead
-            ? presentation.readIDs.union([id])
-            : presentation.readIDs.subtracting([id])
-        presentation.pinnedIDs = isPinned
-            ? presentation.pinnedIDs.union([id])
-            : presentation.pinnedIDs.subtracting([id])
-        savePresentation()
-    }
-
     func dismissDashboardEvent(id: String) async throws {
         try checkOwner()
         try validateID(id)
         presentation.dismissedIDs.insert(id)
-        savePresentation()
-    }
-
-    func dismissDashboardEvents(types: [String], createdBefore: Date) async throws {
-        try checkOwner()
-        let normalized = Set(types)
-        let allowed = Set(["channel.message", "attention.required", "approval.required"])
-        guard !normalized.isEmpty, normalized.isSubset(of: allowed) else {
-            throw WorkspaceClientError.invalidResponse
-        }
-        let snapshot = try await loadDashboard()
-        let dismissIDs = snapshot.inbox.compactMap { item -> String? in
-            guard normalized.contains("channel.message"), item.createdAt <= createdBefore else { return nil }
-            return item.id
-        } + snapshot.attentionItems.compactMap { item -> String? in
-            guard item.createdAt <= createdBefore else { return nil }
-            let type = item.interaction.isStructuredDecision
-                ? (item.approvalID == nil ? "attention.required" : "approval.required")
-                : "attention.required"
-            return normalized.contains(type) ? item.id : nil
-        }
-        presentation.dismissedIDs.formUnion(dismissIDs)
         savePresentation()
     }
 
@@ -434,64 +385,6 @@ final class DirectHermesDashboardDataSource: DashboardDataSource,
         return approvalItems + clarificationItems
     }
 
-    private func sessionUpdate(_ session: SessionRecord) -> DashboardInboxItem? {
-        guard let item = session.items.last,
-              item.role == .assistant,
-              item.metadata.delivery != "Streaming" else { return nil }
-        let projection = projectContent(item.content)
-        guard projection.detail != nil || projection.card != nil || projection.bighelpCard != nil else {
-            return nil
-        }
-        let agent = session.agentIDs.first.flatMap { id in agents().first { $0.id == id } }
-        let timestamp = item.metadata.timestamp ?? session.updatedAt
-        return DashboardInboxItem(
-            id: Self.sessionUpdateID(sessionID: session.id, itemID: item.id),
-            title: DashboardWorkProjection.meaningfulTitle(session.title)
-                ?? (session.kind == .botMode ? "Group chat" : "Conversation"),
-            detail: projection.detail ?? "Hermes shared an update.",
-            agentName: agent?.name ?? item.sender.snapshot.name,
-            status: freshness(for: timestamp),
-            card: projection.card,
-            bighelpCard: projection.bighelpCard,
-            sessionID: session.id,
-            agentID: session.agentIDs.first,
-            isSessionClosed: false,
-            createdAt: timestamp
-        )
-    }
-
-    private func projectContent(_ content: TimelineContent) -> (
-        detail: String?, card: GenerativeUICard?, bighelpCard: BighelpCardDocument?
-    ) {
-        switch content {
-        case .message(let text):
-            let normalized = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-            return (normalized.isEmpty ? nil : String(normalized.prefix(240)), nil, nil)
-        case .generativeUI(let card):
-            return ("Hermes shared an interactive card.", card, nil)
-        case .bighelpCard(let card):
-            return ("Hermes shared a card.", nil, card)
-        case .budgetSummary, .weatherAndTasks, .approvalRequest:
-            return ("Hermes shared an update.", nil, nil)
-        case .backgroundResult(let result):
-            return (result.headline, nil, nil)
-        }
-    }
-
-    private func applyPresentation(to item: DashboardInboxItem) -> DashboardInboxItem {
-        item.withState(
-            isRead: presentation.readIDs.contains(item.id),
-            isPinned: presentation.pinnedIDs.contains(item.id)
-        )
-    }
-
-    private func applyPresentation(to item: DashboardAttentionItem) -> DashboardAttentionItem {
-        item.withState(
-            isRead: presentation.readIDs.contains(item.id),
-            isPinned: presentation.pinnedIDs.contains(item.id)
-        )
-    }
-
     private func uniqueApprovals(_ values: [DirectHermesDashboardApproval]) -> [DirectHermesDashboardApproval] {
         var seen = Set<String>()
         return values.filter {
@@ -507,22 +400,7 @@ final class DirectHermesDashboardDataSource: DashboardDataSource,
         }
     }
 
-    private func freshness(for date: Date) -> String {
-        let seconds = max(0, Int(now().timeIntervalSince(date)))
-        if seconds < 60 { return "Just now" }
-        if seconds < 3_600 { return "\(seconds / 60)m ago" }
-        if seconds < 86_400 { return "\(seconds / 3_600)h ago" }
-        return date.formatted(date: .abbreviated, time: .omitted)
-    }
-
-    private func sortInbox(_ lhs: DashboardInboxItem, _ rhs: DashboardInboxItem) -> Bool {
-        if lhs.isPinned != rhs.isPinned { return lhs.isPinned }
-        if lhs.createdAt != rhs.createdAt { return lhs.createdAt > rhs.createdAt }
-        return lhs.id < rhs.id
-    }
-
     private func sortAttention(_ lhs: DashboardAttentionItem, _ rhs: DashboardAttentionItem) -> Bool {
-        if lhs.isPinned != rhs.isPinned { return lhs.isPinned }
         if lhs.createdAt != rhs.createdAt { return lhs.createdAt > rhs.createdAt }
         return lhs.id < rhs.id
     }
@@ -531,14 +409,6 @@ final class DirectHermesDashboardDataSource: DashboardDataSource,
         guard !id.isEmpty, id.utf8.count <= 220,
               !id.contains("\0"), id == id.trimmingCharacters(in: .whitespacesAndNewlines)
         else { throw WorkspaceClientError.invalidResponse }
-    }
-
-    private static func sessionUpdateID(sessionID: String, itemID: String) -> String {
-        let prefix = "native.session."
-        let direct = prefix + sessionID + "." + itemID
-        guard direct.utf8.count > 220 else { return direct }
-        let digestInput = Data((sessionID + "\0" + itemID).utf8)
-        return prefix + BighelpLinkBase64URL.encode(Data(SHA256.hash(data: digestInput)))
     }
 
     private static func key(for authority: WorkspaceAuthority) -> String {
@@ -555,12 +425,6 @@ final class DirectHermesDashboardDataSource: DashboardDataSource,
 
     private func savePresentation() {
         let limit = 4_096
-        if presentation.readIDs.count > limit {
-            presentation.readIDs = Set(presentation.readIDs.sorted().suffix(limit))
-        }
-        if presentation.pinnedIDs.count > limit {
-            presentation.pinnedIDs = Set(presentation.pinnedIDs.sorted().suffix(limit))
-        }
         if presentation.dismissedIDs.count > limit {
             presentation.dismissedIDs = Set(presentation.dismissedIDs.sorted().suffix(limit))
         }

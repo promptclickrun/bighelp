@@ -13,7 +13,7 @@ enrollment have separate authority.
 
 ## Connect
 
-1. On first run, the Connect step opens host setup. Later, use **Settings › System › Computers › Add a computer**.
+1. On first run, the Connect step opens host setup. Later, use **Settings › Your computers › Add a computer**.
 2. Enter your host URL or IP and port.
 3. Sign in the way the host allows: a provider-issued access token, host username and password, or browser sign-in.
    Browser sign-in uses the system authentication session, an IPv4 loopback callback and PKCE. A host with no

@@ -6,11 +6,9 @@ enum DashboardFixtureError: Error {
 
 struct DashboardFixtureSource: DashboardDataSource {
     let shouldFail: Bool
-    let bighelpCards: [BighelpCardDocument]
 
-    init(shouldFail: Bool = false, bighelpCards: [BighelpCardDocument] = []) {
+    init(shouldFail: Bool = false) {
         self.shouldFail = shouldFail
-        self.bighelpCards = bighelpCards
     }
 
     func loadDashboard() async throws -> DashboardSnapshot {
@@ -19,39 +17,6 @@ struct DashboardFixtureSource: DashboardDataSource {
         }
 
         return DashboardSnapshot(
-            inbox: bighelpCards.enumerated().map { index, card in
-                DashboardInboxItem(
-                    id: "loopdy-card-gallery-\(index)",
-                    title: card.title,
-                    detail: card.spokenSummary,
-                    agentName: "Juno",
-                    status: "Demo data",
-                    bighelpCard: card,
-                    createdAt: Date(timeIntervalSince1970: 1_788_350_400 + Double(index))
-                )
-            } + [
-                DashboardInboxItem(
-                    id: "inbox-finance-payment",
-                    title: "Vendor payment is ready for review",
-                    detail: "Northstar Studio invoice is due Friday.",
-                    agentName: "Avery",
-                    status: "Ready"
-                ),
-                DashboardInboxItem(
-                    id: "inbox-travel-itinerary",
-                    title: "Your Seattle itinerary is ready",
-                    detail: "Three quiet hotel options fit the schedule.",
-                    agentName: "Mina",
-                    status: "Updated"
-                ),
-                DashboardInboxItem(
-                    id: "inbox-home-delivery",
-                    title: "Delivery window confirmed",
-                    detail: "The home team confirmed Tuesday afternoon.",
-                    agentName: "Jordan",
-                    status: "Confirmed"
-                )
-            ],
             attentionItems: ProcessInfo.processInfo.arguments.contains("-demo-needs-you")
                 ? [
                     DashboardAttentionItem(
@@ -153,6 +118,4 @@ struct DashboardFixtureSource: DashboardDataSource {
     }
 
     func dismissDashboardEvent(id: String) async throws {}
-
-    func dismissDashboardEvents(types: [String], createdBefore: Date) async throws {}
 }

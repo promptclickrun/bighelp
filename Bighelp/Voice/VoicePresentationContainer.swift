@@ -80,7 +80,7 @@ private struct LiveVoiceUnavailableView: View {
                 .padding(.horizontal, BighelpTokens.space32)
                 .accessibilityIdentifier("voice.live-unavailable.message")
             if onUseTurnBased != nil {
-                Text("TTS voice mode listens on this \(BighelpPlatform.isMac ? "Mac" : "phone") and answers in the voice set up on your computer.")
+                Text("With Take turns, this \(BighelpPlatform.isMac ? "Mac" : "phone") listens and the voice set up on your computer answers.")
                     .font(.bighelp(.footnote))
                     .foregroundStyle(theme.secondaryText)
                     .multilineTextAlignment(.center)
@@ -89,7 +89,7 @@ private struct LiveVoiceUnavailableView: View {
             Spacer()
             if let onUseTurnBased {
                 Button(action: onUseTurnBased) {
-                    Text("Use TTS voice mode")
+                    Text("Take turns instead")
                         .font(.bighelp(.headline))
                         .foregroundStyle(theme.actionForeground)
                         .frame(maxWidth: .infinity, minHeight: 52)

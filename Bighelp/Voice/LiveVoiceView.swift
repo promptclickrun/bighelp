@@ -245,7 +245,7 @@ struct LiveVoiceView: View {
                 .disabled(!model.canStart)
                 .accessibilityIdentifier("live-voice.start")
                 if model.phase == .failed, let onUseTurnBased {
-                    Button("Use TTS voice mode", action: onUseTurnBased)
+                    Button("Take turns instead", action: onUseTurnBased)
                         .bighelpFont(.body, weight: .semibold)
                         .foregroundStyle(theme.action)
                         .frame(minHeight: BighelpTokens.hitTarget)

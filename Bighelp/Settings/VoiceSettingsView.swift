@@ -27,6 +27,8 @@ enum CodexLiveVoiceSettingsPresentation {
     }
 }
 
+/// Settings › Voice in named groups: who it's for, voice chats, replies in chats, the voice itself,
+/// the car (iPhone), and Advanced in Nerd Mode.
 @MainActor
 struct VoiceSettingsView: View {
     @Bindable var settings: SettingsStore
@@ -65,17 +67,17 @@ struct VoiceSettingsView: View {
     /// The computer agents' own voice choices are kept under (`AgentVoiceChoices`).
     private var computer: String? { workspaceConnections?.owner?.cacheScopeID }
 
-    /// The agent picker's entry for the default every agent without its own choice uses. No Hermes
+    /// The For picker's entry for the default every agent without its own choice uses. No Hermes
     /// profile is named this; "" stays "no agent yet", which the first agents to load replace.
     private static let allAgents = "*"
 
     /// Everything on the page is for this agent, the same choices its Default Voice and voice bar
-    /// make in Bots mode. All agents, or no connection, edits the default for every agent.
+    /// make in Bots mode. All bots, or no connection, edits the default for every agent.
     private var editedAgentID: String? {
         computer != nil && agents.contains(where: { $0.id == agentID }) ? agentID : nil
     }
 
-    /// TTS voice and Auto TTS speak with the agent's speech provider; Full Duplex speaks for itself.
+    /// Take turns and Read replies aloud speak with the agent's speech provider; Live speaks for itself.
     private var showsSpeechProvider: Bool {
         settings.voicePreference(computer: computer, agentID: editedAgentID).mode == .turnBased
             || settings.autoSpeakRepliesEnabled
@@ -85,8 +87,8 @@ struct VoiceSettingsView: View {
         Form {
             if computer != nil, !agents.isEmpty {
                 Section {
-                    Picker("Agent", selection: $agentID) {
-                        Text("All agents").tag(Self.allAgents)
+                    Picker("For", selection: $agentID) {
+                        Text("All bots").tag(Self.allAgents)
                         ForEach(agents) { Text($0.name).tag($0.id) }
                     }
                     .accessibilityIdentifier("voice.settings.agent")
@@ -94,20 +96,12 @@ struct VoiceSettingsView: View {
             }
             VoicePreferenceSections(settings: settings, confirmAPIBilling: $confirmAPIBilling,
                                     computer: computer, agentID: editedAgentID)
-
-            if !showsSpeechProvider || agentID == Self.allAgents {
-                // Full Duplex speaks for itself, and each agent has its own speech provider.
-            } else if editedAgentID != nil {
-                if let store, store.agentID == agentID {
-                    VoiceSettingsEditor(store: store, focusedField: $focusedField, page: $page)
-                }
-            } else {
-                Section("Speech provider") {
-                    Text("Connect to your computer to choose your agents' speech provider and voice.")
-                        .foregroundStyle(theme.secondaryText)
-                }
-            }
-            if settings.nerdModeEnabled { VoiceDebugSection() }
+            speechProvider
+            #if os(iOS) && !targetEnvironment(macCatalyst)
+            // Only an iPhone connects to CarPlay, and the car is a voice chat.
+            if UIDevice.current.userInterfaceIdiom == .phone { CarPlaySettingsSection() }
+            #endif
+            if settings.nerdModeEnabled { VoiceAdvancedSection() }
         }
         .bighelpFormSurface()
         .environment(\.defaultMinListRowHeight, BighelpTokens.hitTarget)
@@ -124,7 +118,7 @@ struct VoiceSettingsView: View {
             }
             Button("Keep Codex subscription", role: .cancel) {}
         } message: {
-            Text("The host's API key may incur separate usage charges. Subscription failures never switch providers automatically.")
+            Text("Your computer's API key may incur separate usage charges. Subscription failures never switch providers automatically.")
         }
         .onChange(of: agents.map(\.id)) { _, ids in
             if agentID != Self.allAgents, !ids.contains(agentID) {
@@ -155,6 +149,23 @@ struct VoiceSettingsView: View {
         .onDisappear { if page == nil { store?.invalidate() } }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { store?.clearAPIKey() }
+        }
+    }
+
+    /// The voice: the edited bot's speech provider, voice and model.
+    @ViewBuilder
+    private var speechProvider: some View {
+        if !showsSpeechProvider || agentID == Self.allAgents {
+            // Live speaks for itself, and each agent has its own speech provider.
+        } else if editedAgentID != nil {
+            if let store, store.agentID == agentID {
+                VoiceSettingsEditor(store: store, focusedField: $focusedField, page: $page)
+            }
+        } else {
+            Section("The voice") {
+                Text("Connect to your computer to choose your bots' voice.")
+                    .foregroundStyle(theme.secondaryText)
+            }
         }
     }
 }
@@ -193,74 +204,77 @@ private struct VoicePreferenceSections: View {
 
     var body: some View {
         Section {
-            Picker("Voice mode", selection: mode) {
-                Text(VoiceConversationMode.turnBased.title).tag(VoiceConversationMode.turnBased)
+            Picker("Mode", selection: mode) {
                 Text(VoiceConversationMode.codexLive.title).tag(VoiceConversationMode.codexLive)
+                Text(VoiceConversationMode.turnBased.title).tag(VoiceConversationMode.turnBased)
             }
             .bighelpSegmentedPicker()
             .frame(minHeight: BighelpTokens.hitTarget)
             .accessibilityIdentifier("voice.settings.conversation-mode")
+            if preference.mode == .codexLive {
+                liveRows
+            } else {
+                takeTurnsRows
+            }
         } header: {
-            Text("Voice mode")
+            Text("Voice chats")
+        }
+        if preference.mode == .codexLive {
+            HostPluginFeatureSection(feature: .liveVoice)
         }
 
         Section {
-            Toggle("Use TTS on every response", isOn: $settings.autoSpeakRepliesEnabled)
+            Toggle("Read replies aloud", isOn: $settings.autoSpeakRepliesEnabled)
                 .accessibilityIdentifier("voice.settings.auto-tts")
         } header: {
             Text("In chats")
         }
+    }
 
-        if preference.mode == .codexLive {
-            Section {
-                Picker("Provider", selection: provider) {
-                    ForEach(LiveVoiceProvider.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .accessibilityIdentifier("voice.settings.live-provider")
-                Picker("Voice", selection: voice) {
-                    ForEach(preference.liveProvider.voices, id: \.self) { option in
-                        Text(option.capitalized).tag(option)
-                    }
-                }
-                .accessibilityIdentifier("voice.settings.live-voice")
-            } header: {
-                Text(VoiceConversationMode.codexLive.title)
-            }
-            HostPluginFeatureSection(feature: .liveVoice)
-        } else {
-            Section {
-                Picker("Speaking mode", selection: $settings.voiceMode) {
-                    ForEach(VoiceMode.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .accessibilityIdentifier("settings.chat.voice-mode")
-                Picker("Speech to text", selection: $settings.voiceTranscription) {
-                    ForEach(VoiceTranscriptionSource.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .accessibilityIdentifier("voice.settings.transcription")
-                Picker("Voice speed", selection: $settings.voiceSpeed) {
-                    ForEach(VoiceSpeed.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                Toggle("Hold music", isOn: $settings.voiceHoldMusicEnabled)
-                    .accessibilityIdentifier("voice.settings.hold-music")
-            } header: {
-                Text("Listening")
+    @ViewBuilder
+    private var liveRows: some View {
+        Picker("Provider", selection: provider) {
+            ForEach(LiveVoiceProvider.allCases) { option in
+                Text(option.title).tag(option)
             }
         }
+        .accessibilityIdentifier("voice.settings.live-provider")
+        Picker("Voice", selection: voice) {
+            ForEach(preference.liveProvider.voices, id: \.self) { option in
+                Text(option.capitalized).tag(option)
+            }
+        }
+        .accessibilityIdentifier("voice.settings.live-voice")
+    }
+
+    @ViewBuilder
+    private var takeTurnsRows: some View {
+        Picker("Talking", selection: $settings.voiceMode) {
+            ForEach(VoiceMode.allCases) { option in
+                Text(option.title).tag(option)
+            }
+        }
+        .accessibilityIdentifier("settings.chat.voice-mode")
+        Picker("Listens with", selection: $settings.voiceTranscription) {
+            ForEach(VoiceTranscriptionSource.allCases) { option in
+                Text(option.title).tag(option)
+            }
+        }
+        .accessibilityIdentifier("voice.settings.transcription")
+        Picker("Speed", selection: $settings.voiceSpeed) {
+            ForEach(VoiceSpeed.allCases) { option in
+                Text(option.title).tag(option)
+            }
+        }
+        Toggle("Hold music", isOn: $settings.voiceHoldMusicEnabled)
+            .accessibilityIdentifier("voice.settings.hold-music")
     }
 }
 
 /// Nerd Mode: what a Gemini Live call's screen shows of where its sound goes on this device (`LiveVoiceDebug`),
-/// and Restart sound for the call in progress.
+/// and Restart sound for the call in progress. The computer's own voice test is on the computer's page.
 @MainActor
-private struct VoiceDebugSection: View {
+private struct VoiceAdvancedSection: View {
     @AppStorage(LiveVoiceDebug.showsReportKey) private var showsReport = false
     @AppStorage(LiveVoiceDebug.showsCopyKey) private var showsCopy = false
 
@@ -268,7 +282,7 @@ private struct VoiceDebugSection: View {
 
     var body: some View {
         Section {
-            Toggle("Show call sound report", isOn: $showsReport)
+            Toggle("Call sound report", isOn: $showsReport)
                 .accessibilityIdentifier("voice.settings.debug.report")
             Toggle("Copy report button", isOn: $showsCopy)
                 .accessibilityIdentifier("voice.settings.debug.copy")
@@ -276,7 +290,7 @@ private struct VoiceDebugSection: View {
                 .disabled(!currentCall.canRestartSound)
                 .accessibilityIdentifier("voice.settings.debug.restart")
         } header: {
-            Text("Debug")
+            Text("Advanced")
         } footer: {
             if !currentCall.canRestartSound {
                 Text("Restart sound works during a Gemini Live call.")
@@ -305,9 +319,6 @@ struct VoiceSettingsEditor: View {
                     Label(confirmation, systemImage: "checkmark.circle")
                         .accessibilityIdentifier("voice.settings.confirmation")
                 }
-            }
-            if store.configuration != nil {
-                sampleSection
             }
 
             if store.isLoading {
@@ -370,8 +381,11 @@ struct VoiceSettingsEditor: View {
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("voice.settings.key-status")
             }
+            sampleRows
         } header: {
-            Text("Speech provider")
+            Text("The voice")
+        } footer: {
+            if store.hasUnsavedChanges { Text("Save to hear your changes.") }
         }
         .disabled(store.isSaving)
     }
@@ -381,28 +395,25 @@ struct VoiceSettingsEditor: View {
         page = destination
     }
 
-    private var sampleSection: some View {
-        Section {
-            Button {
-                focusedField = nil
-                Task { await store.playSample() }
-            } label: {
-                HStack {
-                    Label("Play a sample", systemImage: "play.circle")
-                    Spacer()
-                    if store.isPlayingSample { ProgressView() }
-                }
+    @ViewBuilder
+    private var sampleRows: some View {
+        Button {
+            focusedField = nil
+            Task { await store.playSample() }
+        } label: {
+            HStack {
+                Label("Play a sample", systemImage: "play.circle")
+                Spacer()
+                if store.isPlayingSample { ProgressView() }
             }
-            .disabled(!store.canPlaySample)
-            .accessibilityIdentifier("voice.settings.play-sample")
-            if let error = store.sampleError {
-                Text(error)
-                    .bighelpFont(.metadata)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("voice.settings.sample-error")
-            }
-        } footer: {
-            if store.hasUnsavedChanges { Text("Save to hear your changes.") }
+        }
+        .disabled(!store.canPlaySample)
+        .accessibilityIdentifier("voice.settings.play-sample")
+        if let error = store.sampleError {
+            Text(error)
+                .bighelpFont(.metadata)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("voice.settings.sample-error")
         }
     }
 
@@ -424,7 +435,7 @@ struct VoiceSettingsEditor: View {
         case .onThisDevice:
             "Runs on this \(OnDeviceVoiceModel.deviceName), even offline. No account or key."
         case .onYourComputer:
-            provider.hasVoice ? "Runs on your computer. Your agent's words never leave it."
+            provider.hasVoice ? "Runs on your computer. Your bot's words never leave it."
                 : "Runs on your computer. Its voice is set up there."
         case .custom:
             provider.voiceLocation == .plugin ? "A speech plugin on your computer." : "A speech command set up on your computer."
@@ -464,7 +475,7 @@ struct VoiceProviderList: View {
         .background(theme.canvas.ignoresSafeArea())
         .foregroundStyle(theme.primaryText)
         .tint(theme.action)
-        .navigationTitle("Speech provider")
+        .navigationTitle("Provider")
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -618,7 +629,7 @@ struct VoiceOptionPicker: View {
         switch store.hostCatalog {
         case .loading: String(localized: "Getting \(providerTitle) voices from your computer…")
         case .needsPluginUpdate:
-            String(localized: "Update the bighelp plugin on your computer to choose from its voices. Until then, the agent keeps the voice it has.")
+            String(localized: "Update the bighelp plugin on your computer to choose from its voices. Until then, the bot keeps the voice it has.")
         case .unavailable(let reason): reason
         case .loaded, nil: nil
         }

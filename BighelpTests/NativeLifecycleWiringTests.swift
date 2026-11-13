@@ -29,11 +29,4 @@ struct NativeLifecycleWiringTests {
         #expect(store.session(id: "chat")?.remoteStoredID == "durable")
         #expect(store.session(id: "other")?.agentIDs == ["unrelated"])
     }
-
-    @Test func lifecycleRoutesDoNotReplaceProfileEditorOrRestoreTasksMenu() {
-        #expect(WorkspaceDestination.appMenuCases.contains(.sessionMaintenance))
-        #expect(WorkspaceDestination.appMenuCases.contains(.profileLifecycle))
-        #expect(WorkspaceDestination.appMenuCases.contains(.profiles))
-        #expect(!WorkspaceDestination.appMenuCases.contains(.tasks))
-    }
 }

@@ -188,11 +188,9 @@ enum DriveCatalog {
 
     // MARK: - Settings
 
-    /// Settings opens from your circle in Bots mode and from ☰ in Chat and Code. In Bots mode the
-    /// full list is behind All Settings.
+    /// Settings opens from your circle in Bots mode and from ☰ in Chat and Code: the same pages in each.
     private static func settings(_ id: String, _ title: String, _ what: String, keywords: [String],
                                  needs: Set<DriveNeed> = [], full pages: [(String, SettingsDestination, String?)],
-                                 bots: [(String, SettingsDestination, String?)]? = nil,
                                  point: (String, String)? = nil) -> DrivePlace {
         func steps(_ trail: [(String, SettingsDestination, String?)], start: [SettingsDestination]) -> [DriveStep] {
             var path = start
@@ -204,22 +202,18 @@ enum DriveCatalog {
             if let point { built.append(.point(point.0, at: point.1)) }
             return built
         }
-        let all = (String(localized: "All Settings"), SettingsDestination.allSettings, Optional("simple-bots.settings.all"))
-        let botSteps = bots.map { steps($0, start: []) } ?? steps([all] + pages, start: [])
+        let path = steps(pages, start: [])
         return DrivePlace(id, title, what, keywords: keywords, needs: needs,
-                          playbooks: [.bots: botSteps, .chat: steps(pages, start: []), .code: steps(pages, start: [])])
+                          playbooks: [.bots: path, .chat: path, .code: path])
     }
 
     private static func section(_ section: SettingsMenuSection) -> (String, SettingsDestination, String?) {
         (section.title, .section(section), section.accessibilityIdentifier)
     }
 
-    /// Settings › Connections, and Bots mode's way to the same page.
+    /// Settings › Apps & skills.
     private static var connections: (String, SettingsDestination, String?) {
-        (String(localized: "Connections"), .apps, "settings.apps")
-    }
-    private static var botsConnections: (String, SettingsDestination, String?) {
-        (String(localized: "Connect apps"), .bots(.apps), "simple-bots.settings.apps")
+        (String(localized: "Apps & skills"), .apps, "settings.apps")
     }
     private static var deviceAccess: (String, SettingsDestination, String?) {
         (SettingsMenuSection.permissions.title, .section(.permissions), "settings.connections.device-access")
@@ -232,8 +226,7 @@ enum DriveCatalog {
             settings("settings.appearance", String(localized: "Appearance"),
                      String(localized: "Colors, light and dark mode, text size and layout."),
                      keywords: ["appearance", "theme", "color", "dark mode", "light mode", "text size", "look"],
-                     full: [section(.appearance)],
-                     bots: [(String(localized: "Appearance"), .bots(.appearance), "simple-bots.settings.appearance")]),
+                     full: [section(.appearance)]),
             settings("settings.appearance.chat-layout", String(localized: "Chat layout"),
                      String(localized: "Avatar size, names, message text size and spacing in chats."),
                      keywords: ["chat layout", "message size", "spacing", "avatar size", "font"],
@@ -249,8 +242,7 @@ enum DriveCatalog {
             settings("settings.chat", String(localized: "Chat"),
                      String(localized: "Where the app opens, how chats behave, haptics and Return."),
                      keywords: ["chat settings", "haptics", "reactions", "open on", "start screen"],
-                     full: [section(.chat)],
-                     bots: [(String(localized: "Chat"), .bots(.chat), "simple-bots.settings.chat")]),
+                     full: [section(.chat)]),
             settings("settings.chat.return-sends", String(localized: "Return sends"),
                      String(localized: "With a keyboard, Return sends the message instead of adding a line."),
                      keywords: ["return", "enter key", "keyboard", "send", "new line"],
@@ -258,50 +250,47 @@ enum DriveCatalog {
             settings("settings.voice", String(localized: "Voice"), String(localized: "How voice chats sound."),
                      keywords: ["voice", "speech", "talk", "tts", "live voice"], full: [section(.voice)]),
             settings("settings.notifications", String(localized: "Notifications"), String(localized: "Alerts from your agents."),
-                     keywords: ["notifications", "alerts", "push", "sounds", "badges"], full: [section(.notifications)],
-                     bots: [(String(localized: "Notifications"), .bots(.notifications), "simple-bots.settings.notifications")]),
+                     keywords: ["notifications", "alerts", "push", "sounds", "badges"], full: [section(.notifications)]),
             settings("settings.permissions", String(localized: "Device access"),
                      String(localized: "Which iPhone features your agents may use, like Health, Calendar and location."),
                      keywords: ["permissions", "device access", "privacy", "calendar", "location", "contacts", "photos",
                                 "health", "microphone", "camera"],
-                     full: [connections, deviceAccess], bots: [botsConnections, deviceAccess]),
+                     full: [connections, deviceAccess]),
             settings("settings.permissions.navigation", String(localized: "Show you around"),
                      String(localized: "The switch for this: agents opening pages and pointing at settings."),
                      keywords: ["show me around", "driving", "agents open pages"],
-                     full: [connections, deviceAccess], bots: [botsConnections, deviceAccess],
+                     full: [connections, deviceAccess],
                      point: (String(localized: "Show you around"), "permissions.device-tools.navigation")),
             settings("settings.permissions.appearance", String(localized: "Change how bighelp looks"),
                      String(localized: "The switch that lets agents change light or dark mode and your chat color."),
                      keywords: ["agent appearance", "agents change theme"],
-                     full: [connections, deviceAccess], bots: [botsConnections, deviceAccess],
+                     full: [connections, deviceAccess],
                      point: (String(localized: "Change how bighelp looks"), "permissions.device-tools.appearance")),
-            settings("settings.apps", String(localized: "Connections"),
-                     String(localized: "What your agents can use: this device, your other apps like email and notes, and saved logins."),
+            settings("settings.apps", String(localized: "Apps & skills"),
+                     String(localized: "What your bots can use: this device, your apps, skills, plugins and saved logins."),
                      keywords: ["apps", "connect", "connections", "connectors", "integrations", "email", "gmail", "composio"],
-                     full: [connections], bots: [botsConnections]),
-            settings("settings.marketplace", String(localized: "Marketplace"),
-                     String(localized: "Apps, skills and plugins for your agents, ways to reach them in messaging apps, and this week's featured plugin."),
+                     full: [connections]),
+            settings("settings.marketplace", String(localized: "Skills and plugins"),
+                     String(localized: "Skills and plugins for your bots, messaging apps and this week's featured plugin."),
                      keywords: ["marketplace", "plugins", "skills", "skills hub", "store", "add-ons", "extensions",
                                 "featured plugin", "telegram", "discord"],
-                     full: [(String(localized: "Marketplace"), .marketplace, "settings.marketplace")]),
-            settings("settings.vault", String(localized: "Secure credential vault"),
-                     String(localized: "Logins and cards your agents can use on websites."),
+                     full: [connections], point: (String(localized: "Featured this week"), "marketplace.featured")),
+            settings("settings.vault", String(localized: "Credential vault"),
+                     String(localized: "Logins and cards your bots can use on websites."),
                      keywords: ["vault", "passwords", "logins", "credentials", "cards", "keychain"],
                      full: [connections],
-                     point: (String(localized: "Secure credential vault"), "settings.connections.vault")),
+                     point: (String(localized: "Credential vault"), "settings.connections.vault")),
             settings("settings.you", String(localized: "You"),
                      String(localized: "Your name and photo on your messages."),
-                     keywords: ["my name", "my photo", "profile", "me"], full: [(String(localized: "You"), .you, "settings.you")],
-                     bots: [(String(localized: "You"), .bots(.you), "simple-bots.settings.you")]),
+                     keywords: ["my name", "my photo", "profile", "me"], full: [(String(localized: "You"), .you, "settings.you")]),
             settings("settings.modes", String(localized: "Modes"),
                      String(localized: "Bots mode, Code mode and the switch between them at the top of each home."),
                      keywords: ["modes", "bots mode", "code mode", "mode switch", "unified mode toggle", "experience"],
-                     full: [section(.modes)],
-                     bots: [(String(localized: "Modes"), .bots(.modes), "simple-bots.settings.modes")]),
-            settings("settings.system", String(localized: "System"),
+                     full: [section(.modes)]),
+            settings("settings.system", String(localized: "Your computers"),
                      String(localized: "Your computers, Hermes updates and restarts."),
                      keywords: ["system", "computers", "hosts", "update hermes", "plugin", "restart"],
-                     full: [section(.connectivityAndNotifications)]),
+                     full: [], point: (String(localized: "Your computers"), "settings.add-computer")),
             settings("settings.companion", String(localized: "Companion pet"),
                      String(localized: "An optional little pet that keeps you company."),
                      keywords: ["pet", "companion", "mascot"], full: [section(.appearance), section(.companion)]),
@@ -313,17 +302,13 @@ enum DriveCatalog {
     }
 
     // MARK: - Hermes (Nerd Mode)
+    // Plugins are Settings › Apps & skills (`settings.marketplace`).
 
     private static let hermesPlaces: [DrivePlace] = [
-        page("hermes.tools", String(localized: "Hermes tools"),
-             String(localized: "Your computer's Hermes tools: files, skills, memory, logs and more."),
-             keywords: ["hermes", "tools", "admin", "nerd"], needs: [.nerdMode], .workspaceHub),
         page("hermes.memory", String(localized: "Memory"), String(localized: "What your agent remembers."),
              keywords: ["memory", "remember", "forget"], .workspaceManagement(.memory)),
         page("hermes.logs", String(localized: "Logs"), String(localized: "The computer's diagnostic logs."),
              keywords: ["logs", "errors", "debug"], needs: [.nerdMode], .workspaceManagement(.logs)),
-        page("hermes.plugins", String(localized: "Plugins"), String(localized: "Add-ons installed on this computer."),
-             keywords: ["plugins", "add-ons", "extensions"], needs: [.nerdMode], .workspaceManagement(.plugins)),
         page("hermes.mcp", String(localized: "MCP Servers"), String(localized: "Tool servers connected through Hermes."),
              keywords: ["mcp", "servers", "tool servers"], needs: [.nerdMode], .workspaceManagement(.mcp)),
     ]

@@ -61,7 +61,7 @@ extension SettingsView {
                     .fixedSize(horizontal: false, vertical: true)
             }
         } footer: {
-            Text("Your name and photo show on your messages. Your agents see your name, so they know who they're talking with.")
+            Text("Your bots see your name.")
                 .bighelpFont(.metadata)
         }
         .listRowBackground(theme.surface)

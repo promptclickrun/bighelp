@@ -1,8 +1,7 @@
 import XCTest
 
-/// Settings' first screen in short groups: You as one row, your agents and what they can use
-/// (Connections, with this device's access first), the app (Modes, Appearance, ...), then System
-/// and Help. Set BIGHELP_SETTINGS_EVIDENCE (TEST_RUNNER_BIGHELP_SETTINGS_EVIDENCE) to save screenshots.
+/// Settings' first screen in short groups: you, your bots and what they can use (Apps & skills,
+/// with this device's access first), this app (Appearance, Chat, ...), your computers, then Help. Set BIGHELP_SETTINGS_EVIDENCE (TEST_RUNNER_BIGHELP_SETTINGS_EVIDENCE) to save screenshots.
 final class SettingsLayoutUITests: BighelpUITestCase {
     @MainActor
     func testConnectionsHoldDeviceAccessAndModesHoldTheModeSwitches() throws {
@@ -27,15 +26,17 @@ final class SettingsLayoutUITests: BighelpUITestCase {
             settingsRow("settings.apps", in: app).tap()
             let device = app.buttons["settings.connections.device-access"].firstMatch
             let composio = app.buttons["apps.composio"].firstMatch
-            XCTAssertTrue(device.waitForExistence(timeout: 5), "Connections starts with this device")
+            XCTAssertTrue(device.waitForExistence(timeout: 5), "Apps & skills starts with this device")
             XCTAssertTrue(composio.waitForExistence(timeout: 5))
             XCTAssertLessThan(device.frame.maxY, composio.frame.minY, "This device comes before the apps")
-            XCTAssertTrue(app.buttons["settings.connections.vault"].exists, "The vault sits with the apps")
             save("03-connections-\(appearance)", app)
+            // Logins comes after Apps, Skills and plugins and Talk anywhere: lower on the page.
+            reach(app.buttons["settings.connections.vault"].firstMatch, in: app)
+            for _ in 0..<8 where !(device.exists && device.isHittable) { app.swipeDown(velocity: .slow) }
 
             device.tap()
             XCTAssertTrue(app.switches["permissions.device-tools.calendar"].waitForExistence(timeout: 5),
-                          "Device access opens from Connections")
+                          "Device access opens from Apps & skills")
             save("04-device-access-\(appearance)", app)
             app.terminate()
         }
@@ -71,6 +72,7 @@ final class SettingsLayoutUITests: BighelpUITestCase {
             save("06-chat-advanced-\(appearance)", app)
             reach(header("Advanced · Chat list", in: app), in: app)
             reach(app.switches["settings.show-cron-sessions"].firstMatch, in: app)
+            reach(app.buttons["settings.chat.clean-up-chats"].firstMatch, in: app)
             app.navigationBars.buttons.firstMatch.tap()
 
             settingsRow("settings.menu.notifications", in: app).tap()
@@ -105,6 +107,35 @@ final class SettingsLayoutUITests: BighelpUITestCase {
             done.tap()
             reach(header("bighelp itself", in: app), in: app)
             reach(app.switches["permissions.device-tools.navigation"].firstMatch, in: app)
+            app.terminate()
+        }
+    }
+
+    /// One Settings in every mode (#976): you, Your bots, This app, Your computers, then Help & feedback
+    /// and Advanced options. Bots mode's circle opens the same page.
+    @MainActor
+    func testOneSettingsInChatAndBotsMode() throws {
+        for (mode, extra) in [("chat", [String]()), ("bots", ["-bighelp.settings.simple-bots", "YES"])] {
+            let app = makeApp()
+            app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3"] + extra
+            app.launch()
+            if mode == "bots" {
+                let circle = app.buttons["simple-bots.settings"]
+                XCTAssertTrue(circle.waitForExistence(timeout: 15))
+                circle.tap()
+            } else {
+                openSettings(in: app)
+            }
+            XCTAssertTrue(app.descendants(matching: .any)["settings.screen"].firstMatch.waitForExistence(timeout: 5),
+                          "\(mode): the one Settings")
+            XCTAssertTrue(header("Your bots", in: app).waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["settings.default-model"].exists, "Models")
+            save("11-root-\(mode)", app)
+            reach(header("This app", in: app), in: app)
+            reach(header("Your computers", in: app), in: app)
+            let advanced = reach(app.switches["settings.nerd-mode"].firstMatch, in: app)
+            XCTAssertEqual(advanced.label, "Advanced options")
+            save("12-root-end-\(mode)", app)
             app.terminate()
         }
     }

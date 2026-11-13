@@ -5,7 +5,7 @@ import XCTest
 /// bot's chat never shows ☰. Set BIGHELP_SIMPLE_BOTS_EVIDENCE (TEST_RUNNER_…) to a folder to save
 /// the screenshots.
 final class SimpleBotsAppearanceUITests: BighelpUITestCase {
-    /// Bots mode's Settings opens Settings › Chat directly, the same page All Settings has.
+    /// Bots mode's Settings is the one Settings: its Chat row opens Settings › Chat.
     @MainActor
     func testSettingsOpensChatDirectly() throws {
         let app = makeApp()
@@ -14,13 +14,13 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
         app.launch()
         XCTAssertTrue(app.buttons["simple-bots.settings"].waitForExistence(timeout: 15))
         app.buttons["simple-bots.settings"].tap()
-        let chat = app.buttons["simple-bots.settings.chat"]
+        let chat = app.buttons["settings.menu.chat"]
         for _ in 0..<4 where !(chat.exists && chat.isHittable) { app.swipeUp() }
         XCTAssertTrue(chat.isHittable, "Chat sits with Notifications and Appearance")
         chat.tap()
         XCTAssertTrue(app.navigationBars["Chat"].waitForExistence(timeout: 5), "Settings › Chat opens")
         XCTAssertTrue(app.buttons["settings.landing.screen"].firstMatch.waitForExistence(timeout: 5),
-                      "Its own rows, as in All Settings")
+                      "Its own rows")
         save("simple-bots-chat-settings", app)
     }
 
@@ -48,7 +48,7 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
 
         // Dark from Settings › Appearance: the open page changes now, not after reopening it.
         app.buttons["simple-bots.settings"].tap()
-        app.buttons["simple-bots.settings.appearance"].tap()
+        app.buttons["settings.themes"].tap()
         let dark = app.buttons["appearance.mode.dark"]
         XCTAssertTrue(dark.waitForExistence(timeout: 5))
         dark.tap()
@@ -58,7 +58,7 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
 
         // Your name: a dark box with light text, readable.
         app.navigationBars.buttons.firstMatch.tap()
-        app.buttons["simple-bots.settings.you"].tap()
+        app.buttons["settings.you"].tap()
         let name = app.textFields["profile.display-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))
         save("appearance-name-dark", app)
@@ -66,7 +66,7 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
 
         // The home behind the sheet changed too.
         app.navigationBars.buttons.firstMatch.tap()
-        app.buttons["simple-bots.settings.close"].tap()
+        app.buttons["settings.done"].tap()
         XCTAssertTrue(app.buttons["simple-bots.settings"].waitForExistence(timeout: 5))
         save("appearance-home-dark", app)
         XCTAssertLessThan(brightness(of: app.windows.firstMatch, in: app), 0.25, "The home turned dark")
@@ -114,12 +114,12 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
     @MainActor
     private func pickDarkBackground(_ choice: String, in app: XCUIApplication) {
         app.buttons["simple-bots.settings"].tap()
-        app.buttons["simple-bots.settings.appearance"].tap()
+        app.buttons["settings.themes"].tap()
         let tile = app.buttons["appearance.dark.\(choice)"]
         XCTAssertTrue(tile.waitForExistence(timeout: 5))
         tile.tap()
         app.navigationBars.buttons.firstMatch.tap()
-        app.buttons["simple-bots.settings.close"].tap()
+        app.buttons["settings.done"].tap()
         XCTAssertTrue(app.buttons["simple-bots.settings"].waitForExistence(timeout: 5))
         Thread.sleep(forTimeInterval: 0.6)
     }
@@ -129,10 +129,10 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
     private func saveScreens(_ suffix: String, _ app: XCUIApplication) {
         save("home-\(suffix)", app)
         app.buttons["simple-bots.settings"].tap()
-        XCTAssertTrue(app.buttons["simple-bots.settings.close"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["settings.done"].waitForExistence(timeout: 5))
         Thread.sleep(forTimeInterval: 0.6)
         save("settings-\(suffix)", app)
-        app.buttons["simple-bots.settings.close"].tap()
+        app.buttons["settings.done"].tap()
         XCTAssertTrue(app.buttons["simple-bots.bot.travel"].waitForExistence(timeout: 5))
         app.buttons["simple-bots.bot.travel"].tap()
         XCTAssertTrue(app.buttons["chat.back"].waitForExistence(timeout: 10))
@@ -152,7 +152,7 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
             app.launch()
             XCTAssertTrue(app.buttons["simple-bots.settings"].waitForExistence(timeout: 15))
             app.buttons["simple-bots.settings"].tap()
-            app.buttons["simple-bots.settings.you"].tap()
+            app.buttons["settings.you"].tap()
             let name = app.textFields["profile.display-name"]
             XCTAssertTrue(name.waitForExistence(timeout: 5))
             save("name-row-\(appearance)", app)
@@ -167,12 +167,12 @@ final class SimpleBotsAppearanceUITests: BighelpUITestCase {
         guard app.state == .runningForeground, app.buttons["simple-bots.settings"].waitForExistence(timeout: 3)
         else { return }
         app.buttons["simple-bots.settings"].tap()
-        app.buttons["simple-bots.settings.appearance"].tap()
+        app.buttons["settings.themes"].tap()
         let mode = app.buttons["appearance.mode.\(title.lowercased())"]
         guard mode.waitForExistence(timeout: 5) else { return }
         mode.tap()
         app.navigationBars.buttons.firstMatch.tap()
-        app.buttons["simple-bots.settings.close"].tap()
+        app.buttons["settings.done"].tap()
         _ = app.buttons["simple-bots.settings"].waitForExistence(timeout: 5)
     }
 

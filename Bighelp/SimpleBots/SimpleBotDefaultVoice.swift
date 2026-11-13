@@ -2,7 +2,7 @@ import Observation
 import SwiftUI
 
 /// What a bot's profile needs to show and edit the voice the bot speaks with: its own voice type and
-/// Full Duplex provider and voice, kept on this device, and its speech provider on its computer.
+/// Live provider and voice, kept on this device, and its speech provider on its computer.
 @MainActor
 struct SimpleBotVoiceSettings {
     let settings: SettingsStore
@@ -62,12 +62,12 @@ final class SimpleBotVoiceModel {
         settings.setVoiceConversationMode(mode, computer: voice.computer, agentID: agentID, choices: voice.choices)
     }
 
-    /// Back to the default for every agent (Settings › Voice › All agents).
+    /// Back to the default for every agent (Settings › Voice › For › All bots).
     func useDefaultMode() {
         voice.choices.setMode(nil, computer: voice.computer, agentID: agentID)
     }
 
-    /// Full Duplex provider for this bot only.
+    /// Live provider for this bot only.
     func setLiveProvider(_ provider: LiveVoiceProvider) {
         voice.choices.setLiveProvider(provider, computer: voice.computer, agentID: agentID)
     }
@@ -115,7 +115,7 @@ struct SimpleBotDefaultVoiceSheet: View {
     private var settings: SettingsStore { model.settings }
     private var preference: AgentVoicePreference { model.preference }
 
-    /// TTS speaks with the speech provider, and so does Auto TTS while the bot talks with GPT Live 1.
+    /// Take turns speaks with the speech provider, and so does Read replies aloud while the bot talks Live.
     private var showsSpeechProvider: Bool {
         preference.mode == .turnBased || settings.autoSpeakRepliesEnabled
     }
@@ -131,8 +131,8 @@ struct SimpleBotDefaultVoiceSheet: View {
                     if let store {
                         VoiceSettingsEditor(store: store, focusedField: $focusedField, page: $page)
                     } else {
-                        Section("Speech provider") {
-                            Text("Connect to your computer to choose \(botName)'s speech provider and voice.")
+                        Section("The voice") {
+                            Text("Connect to your computer to choose \(botName)'s voice.")
                                 .foregroundStyle(theme.secondaryText)
                         }
                     }
@@ -180,15 +180,15 @@ struct SimpleBotDefaultVoiceSheet: View {
 
     private var modeSection: some View {
         Section {
-            Picker(String(localized: "Voice type"), selection: mode) {
-                Text(VoiceConversationMode.turnBased.title).tag(VoiceConversationMode.turnBased)
+            Picker(String(localized: "Mode"), selection: mode) {
                 Text(VoiceConversationMode.codexLive.title).tag(VoiceConversationMode.codexLive)
+                Text(VoiceConversationMode.turnBased.title).tag(VoiceConversationMode.turnBased)
             }
             .bighelpSegmentedPicker()
             .frame(minHeight: BighelpTokens.hitTarget)
             .accessibilityIdentifier("simple-bots.default-voice.mode")
             if preference.hasOwnMode {
-                Button(String(localized: "Use the default for every agent")) { model.useDefaultMode() }
+                Button(String(localized: "Use the default for every bot")) { model.useDefaultMode() }
                     .accessibilityIdentifier("simple-bots.default-voice.use-default")
             }
         } header: {

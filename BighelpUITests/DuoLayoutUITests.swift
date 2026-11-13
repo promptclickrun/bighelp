@@ -99,6 +99,74 @@ final class DuoLayoutUITests: BighelpUITestCase {
         }
     }
 
+    // MARK: The cover screen's own affordances
+
+    @MainActor
+    func testCoverScreenOpensPhotosOverTheWholeDisplay() throws {
+        for appearance in appearances {
+            let app = makeApp()
+            app.launchArguments = demo + ["-start-chat", "-test-image-stack", "-loopdy.demo.appearance", appearance]
+            app.launch()
+            try requireCoverScreen(app)
+            let agentStack = app.descendants(matching: .any).matching(identifier: "chat.image-stack")
+                .matching(NSPredicate(format: "label == %@", "4 photos")).firstMatch
+            XCTAssertTrue(agentStack.waitForExistence(timeout: 20), "The agent's four photos show as a stack")
+            agentStack.tap()
+            let pages = element("chat.image-stack.pages", in: app)
+            XCTAssertTrue(pages.waitForExistence(timeout: 10), "The photos open")
+            let window = app.windows.firstMatch.frame
+            XCTAssertGreaterThan(pages.frame.width, window.width - 40,
+                                "The picture takes the display instead of a sheet inset for the bar")
+            XCTAssertFalse(app.navigationBars["1 of 4"].exists,
+                           "No bar stands a column up over the picture")
+            let position = element("chat.image-stack.position", in: app)
+            XCTAssertTrue(position.waitForExistence(timeout: 5), "The pictures say which is showing")
+            XCTAssertEqual(position.label, "1 of 4")
+            let close = element("chat.image-stack.close", in: app)
+            XCTAssertTrue(close.exists, "A way out, where the bar would have been")
+            XCTAssertLessThan(close.frame.midX, window.midX, "Down the leading edge, clear of the column")
+            sleep(1)
+            save("cover-photos-\(appearance)", app)
+            if appearance == "light" {
+                app.buttons["chat.image-stack.thumbnail.2"].tap()
+                XCTAssertEqual(element("chat.image-stack.position", in: app).label, "3 of 4",
+                               "The thumbnails jump to a picture")
+                app.buttons["chat.image-stack.save"].tap()
+                XCTAssertTrue(app.buttons["Save All 4 Photos"].waitForExistence(timeout: 5),
+                              "Save still offers all of them")
+                XCTAssertTrue(app.buttons["Save This Photo"].exists)
+                save("cover-photos-save-light", app)
+                pages.tap()
+                close.tap()
+                XCTAssertTrue(pages.waitForNonExistence(timeout: 5), "Close leaves the photos")
+            }
+            app.terminate()
+        }
+    }
+
+    @MainActor
+    func testCoverScreenKeepsTheAgentsFaceWhereItsMenuWas() throws {
+        let app = makeApp()
+        app.launchArguments = demo + ["-loopdy.demo.appearance", "light"]
+        app.launch()
+        try requireCoverScreen(app)
+        let feed = app.buttons["tab.feed"].firstMatch
+        XCTAssertTrue(feed.waitForExistence(timeout: 20), "The places are in the side strip")
+        feed.tap()
+        let face = app.buttons["board.more"].firstMatch
+        XCTAssertTrue(face.waitForExistence(timeout: 10), "The agent's face is where the menu was")
+        let window = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(face.frame.midX, window.midX, "It sits with the screen's other buttons")
+        XCTAssertLessThan(face.frame.maxX, window.maxX - 60,
+                          "Clear of the camera and the status, which have the column beside it")
+        sleep(1)
+        save("cover-board-face-light", app)
+        face.tap()
+        XCTAssertTrue(app.buttons["Agent profile"].waitForExistence(timeout: 5),
+                      "The face opens the same menu")
+        save("cover-board-face-menu-light", app)
+    }
+
     // MARK: Open and half-folded (an iPad simulator standing in)
 
     @MainActor

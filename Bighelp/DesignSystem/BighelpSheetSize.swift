@@ -77,6 +77,16 @@ extension View {
         #endif
     }
 
+    /// A sheet, or the whole display when `fullScreen`. The HIG allows full width where bars aren't
+    /// needed, so on a screen whose bar stands up in a side column (the Duo's cover and inner
+    /// screens) a picture opens over the display instead of inset in a sheet beside it.
+    func bighelpMediaPresentation<Item: Identifiable, Media: View>(
+        item: Binding<Item?>, fullScreen: Bool, onDismiss: (() -> Void)? = nil,
+        @ViewBuilder content: @escaping (Item) -> Media
+    ) -> some View {
+        modifier(BighelpMediaPresentation(item: item, fullScreen: fullScreen, onDismiss: onDismiss, content: content))
+    }
+
     /// Keeps UIKit in sync when a reopened Catalyst popover closes in SwiftUI.
     func bighelpPopoverDismissal(isPresented: Binding<Bool>) -> some View {
         #if targetEnvironment(macCatalyst)
@@ -199,3 +209,22 @@ private struct BighelpMacPopoverDismissal: UIViewControllerRepresentable {
     }
 }
 #endif
+
+/// A picture's presentation: a sheet, or the whole display where the screen's bar has a column of
+/// its own rather than a bar along the bottom.
+private struct BighelpMediaPresentation<Item: Identifiable, Media: View>: ViewModifier {
+    let item: Binding<Item?>
+    let fullScreen: Bool
+    let onDismiss: (() -> Void)?
+    @ViewBuilder let content: (Item) -> Media
+
+    func body(content base: Content) -> some View {
+        // One view in either container, so a screen that folds or turns mid-look keeps what it
+        // opened instead of rebuilding it.
+        if fullScreen {
+            base.bighelpFullScreenCover(item: item, onDismiss: onDismiss, content: content)
+        } else {
+            base.bighelpSheet(item: item, onDismiss: onDismiss, content: content)
+        }
+    }
+}

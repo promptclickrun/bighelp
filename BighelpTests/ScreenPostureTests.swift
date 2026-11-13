@@ -91,6 +91,17 @@ struct ScreenPostureTests {
         #expect(!AgentIslandAvailability.isShown(isPhone: false, posture: .standard))
     }
 
+    @Test func picturesTakeTheWholeDisplayOnlyWhereTheBarHasAColumn() {
+        // The cover screen and the inner one held wide stand the bar up in the trailing column, so
+        // a picture opens over the display there instead of inset in a sheet beside it.
+        #expect(ChatImageStackContent.isFullBleed(BighelpScreenGeometry(posture: .cover)))
+        #expect(ChatImageStackContent.isFullBleed(BighelpScreenGeometry(posture: .open)))
+        // Held upright (and half-folded as a laptop) the bar lies along the bottom, and the pictures
+        // keep their sheet so they stay clear of the fold.
+        #expect(!ChatImageStackContent.isFullBleed(BighelpScreenGeometry(posture: .openUpright)))
+        #expect(!ChatImageStackContent.isFullBleed(BighelpScreenGeometry(posture: .standard)))
+    }
+
     @Test func theSwitcherSettingStartsOnForPhonesAndKeepsTheChoice() {
         let name = "chat-switcher-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!

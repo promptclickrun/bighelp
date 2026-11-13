@@ -63,7 +63,7 @@ struct ChatImageStackView: View {
 
     var body: some View {
         Button {
-            viewerStart = ChatImageStackStart(index: 0)
+            viewerStart = ChatImageStackStart(index: 0, screen: screen)
         } label: {
             stack
         }
@@ -83,8 +83,8 @@ struct ChatImageStackView: View {
         }
         .task(id: images.map(\.id)) { saver.prepareShareFiles(images) }
         .onDisappear { saver.removeShareFiles() }
-        .bighelpMediaPresentation(item: $viewerStart, fullScreen: ChatImageStackContent.isFullBleed(screen)) { start in
-            ChatImageStackViewer(images: images, startIndex: start.index)
+        .bighelpMediaPresentation(item: $viewerStart) { start in
+            ChatImageStackViewer(images: images, startIndex: start.index, fullBleed: start.presentsFullScreen)
                 .bighelpSheetSize(.large)
         }
         .chatImageStackAlert(saver)
@@ -174,16 +174,30 @@ enum ChatImageThumbnail {
     }
 }
 
-struct ChatImageStackStart: Identifiable {
+struct ChatImageStackStart: Identifiable, BighelpMediaPresentationItem {
     let id = UUID()
     let index: Int
+    /// Decided when it opens: turning or folding must not swap the cover for a sheet mid-look.
+    let presentsFullScreen: Bool
+
+    init(index: Int, screen: BighelpScreenGeometry) {
+        self.index = index
+        presentsFullScreen = ChatImageStackContent.isFullBleed(screen)
+    }
 }
 
 /// A picture opened on its own over the whole display: what to show, and which of them.
-struct ChatPhotoStart: Identifiable {
+struct ChatPhotoStart: Identifiable, BighelpMediaPresentationItem {
     let id = UUID()
     let images: [ChatAttachment]
     let index: Int
+    let presentsFullScreen: Bool
+
+    init(images: [ChatAttachment], index: Int, screen: BighelpScreenGeometry) {
+        self.images = images
+        self.index = index
+        presentsFullScreen = ChatImageStackContent.isFullBleed(screen)
+    }
 }
 
 /// The stack opened: swipe through the pictures, or jump with the strip at the bottom. Save or
@@ -191,21 +205,23 @@ struct ChatPhotoStart: Identifiable {
 /// the pictures take the whole display and the controls stand down the leading edge instead.
 struct ChatImageStackViewer: View {
     let images: [ChatAttachment]
+    /// How it was opened. Fixed for the look, so a turn or a fold keeps the picture on screen.
+    let fullBleed: Bool
 
     @State private var index: Int
     @State private var saver = ChatImageStackSaver()
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.bighelpScreen) private var screen
 
-    init(images: [ChatAttachment], startIndex: Int) {
+    init(images: [ChatAttachment], startIndex: Int, fullBleed: Bool) {
         self.images = images
+        self.fullBleed = fullBleed
         _index = State(initialValue: min(max(startIndex, 0), max(images.count - 1, 0)))
     }
 
     var body: some View {
         Group {
-            if ChatImageStackContent.isFullBleed(screen) {
-                fullBleed
+            if fullBleed {
+                wholeDisplay
             } else {
                 sheet
             }
@@ -277,7 +293,7 @@ struct ChatImageStackViewer: View {
     /// The Duo's: the picture edge to edge, with no bar standing a column up over it. Close, Save
     /// and Share go down the leading edge, above the fold's side of the column, and the thumbnails
     /// stay at the bottom.
-    private var fullBleed: some View {
+    private var wholeDisplay: some View {
         ZStack(alignment: .bottom) {
             Color.black.ignoresSafeArea()
             pages

@@ -77,14 +77,18 @@ extension View {
         #endif
     }
 
-    /// A sheet, or the whole display when `fullScreen`. The HIG allows full width where bars aren't
-    /// needed, so on a screen whose bar stands up in a side column (the Duo's cover and inner
-    /// screens) a picture opens over the display instead of inset in a sheet beside it.
-    func bighelpMediaPresentation<Item: Identifiable, Media: View>(
-        item: Binding<Item?>, fullScreen: Bool, onDismiss: (() -> Void)? = nil,
+    /// A sheet, or the whole display. The HIG allows full width where bars aren't needed, so on a
+    /// screen whose bar stands up in a side column (the Duo's cover and inner screens) a picture
+    /// opens over the display instead of inset in a sheet beside it.
+    ///
+    /// The container comes from the item (`presentsFullScreen`), never from the live posture: the
+    /// two install different modifiers around the page, so a posture that changed mid-look would
+    /// dismiss the cover, present a sheet, and start the pictures over at the first one.
+    func bighelpMediaPresentation<Item: BighelpMediaPresentationItem, Media: View>(
+        item: Binding<Item?>, onDismiss: (() -> Void)? = nil,
         @ViewBuilder content: @escaping (Item) -> Media
     ) -> some View {
-        modifier(BighelpMediaPresentation(item: item, fullScreen: fullScreen, onDismiss: onDismiss, content: content))
+        modifier(BighelpMediaPresentation(item: item, onDismiss: onDismiss, content: content))
     }
 
     /// Keeps UIKit in sync when a reopened Catalyst popover closes in SwiftUI.
@@ -210,18 +214,21 @@ private struct BighelpMacPopoverDismissal: UIViewControllerRepresentable {
 }
 #endif
 
-/// A picture's presentation: a sheet, or the whole display where the screen's bar has a column of
-/// its own rather than a bar along the bottom.
-private struct BighelpMediaPresentation<Item: Identifiable, Media: View>: ViewModifier {
+/// A picture opened for the whole display, over the column the screen keeps for its bar, or in a
+/// sheet where the bar lies along the bottom. The style is decided when it opens and carried by the
+/// item, so the viewer survives a turn or a fold with the picture it was showing.
+protocol BighelpMediaPresentationItem: Identifiable {
+    var presentsFullScreen: Bool { get }
+}
+
+/// A picture's presentation: a sheet, or the whole display.
+private struct BighelpMediaPresentation<Item: BighelpMediaPresentationItem, Media: View>: ViewModifier {
     let item: Binding<Item?>
-    let fullScreen: Bool
     let onDismiss: (() -> Void)?
     @ViewBuilder let content: (Item) -> Media
 
     func body(content base: Content) -> some View {
-        // One view in either container, so a screen that folds or turns mid-look keeps what it
-        // opened instead of rebuilding it.
-        if fullScreen {
+        if item.wrappedValue?.presentsFullScreen == true {
             base.bighelpFullScreenCover(item: item, onDismiss: onDismiss, content: content)
         } else {
             base.bighelpSheet(item: item, onDismiss: onDismiss, content: content)

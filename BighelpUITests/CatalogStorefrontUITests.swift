@@ -44,7 +44,9 @@ final class CatalogStorefrontUITests: BighelpUITestCase {
             let confirm = app.buttons["Install and turn on"]
             XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Install confirms before anything changes")
             let cancel = app.buttons["Cancel"]
-            if cancel.exists { cancel.tap() } else { app.tap() }
+            // Without Cancel, a tap outside closes it: the sheet's title, not the middle, where the question is.
+            if cancel.exists { cancel.tap() } else { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap() }
+            XCTAssertTrue(confirm.waitForNonExistence(timeout: 5), "The question closes")
             goBack(in: app)
 
             // Installed plugins: the app list, a switch on each row.

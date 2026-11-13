@@ -81,6 +81,12 @@ final class SimpleBotsUITests: BighelpUITestCase {
             XCTAssertFalse(app.buttons["More"].exists)
             save("simple-menu-\(appearance)", app)
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.06)).tap()
+            // The next tap opens the chat only once the menu is gone.
+            let menuItem = app.buttons["New Chat"]
+            if !menuItem.waitForNonExistence(timeout: 3) {
+                app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.96)).tap()
+                XCTAssertTrue(menuItem.waitForNonExistence(timeout: 5), "The menu closes")
+            }
 
             // The primary bot's chat, then its profile from its name.
             primary.tap()

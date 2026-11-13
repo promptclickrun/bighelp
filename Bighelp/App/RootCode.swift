@@ -1,42 +1,16 @@
 import SwiftUI
 
-/// Code mode's sheets over its home.
+/// A project's sheets, over New chat's choices and Work filtered to the project.
 enum CodeSheet: String, Identifiable {
     case pullRequests, worktrees
     var id: String { rawValue }
 }
 
-// Code mode (Settings › Code mode): its home, sessions, changes and ☰ entries.
+// Coding sessions: the computer's Code store, a session's chat and changes, and Dev Factory.
 extension RootShellView {
     /// Code mode needs a host that starts sessions in a chosen folder: native Hermes, or the demo.
     var canUseCodeMode: Bool {
         nativeRuntime != nil || (usesWorkspaceFixtures && workspaceConnections?.isDirectSelected != true)
-    }
-
-    /// Shows the home `settings.experience` picks, and returns to it after host and account changes.
-    func applyExperience() {
-        // Bots mode's home is the Chat tab's place, whatever Code's choice.
-        let home: AppTab = settings.experience == .code && !simpleBotsOn ? .code : .sessions
-        guard appState.homeTab != home else { return }
-        appState.homeTab = home
-        appState.select(home)
-    }
-
-    @ViewBuilder
-    var codeRootTab: some View {
-        Group {
-            if let store = codeHome, store.scopeID == currentWorkspaceOwner?.cacheScopeID {
-                CodeHomeView(context: codeContext(store))
-                    .bighelpSheet(item: $codeSheet) { sheet in codeSheetView(sheet, store: store) }
-            } else if canUseCodeMode {
-                ProgressView("Loading Code")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ContentUnavailableView("Code needs your computer", systemImage: "laptopcomputer",
-                    description: Text("Connect to a computer running Hermes, then come back to Code."))
-            }
-        }
-        .task(id: currentWorkspaceOwner?.cacheScopeID) { prepareCodeHome() }
     }
 
     /// One Code home per computer, made on first use and kept through reconnects.
@@ -68,25 +42,8 @@ extension RootShellView {
                                  loadCommands: { try await features.draftSlashCommands(agentID: $0, folder: $1) })
     }
 
-    private func codeContext(_ store: CodeHomeStore) -> CodeHomeContext {
-        CodeHomeContext(
-            store: store,
-            status: CodeChatStatusReader(catalog: sessionCatalog, features: featureStore),
-            agents: agents.profiles,
-            avatarURL: { [agents] in agents.avatarURL(for: $0) },
-            sections: fleet?.sections ?? [],
-            onOpenSession: { openCodeSession($0) },
-            onOpenChanges: { appState.open(.codeChanges(sessionID: $0.id)) },
-            onOpenBatch: { appState.open(.codeBatch(id: $0.id)) },
-            onPullRequests: { codeSheet = .pullRequests },
-            onWorktrees: { codeSheet = .worktrees },
-            onRefreshActivity: { await nativeRuntime?.refreshActiveSessions() },
-            connectionKey: currentWorkspaceOwner?.connectionGeneration.uuidString
-        )
-    }
-
     @ViewBuilder
-    private func codeSheetView(_ sheet: CodeSheet, store: CodeHomeStore) -> some View {
+    func codeSheetView(_ sheet: CodeSheet, store: CodeHomeStore) -> some View {
         switch sheet {
         case .pullRequests:
             CodePullRequestsSheet(projectName: store.project?.name ?? "This project",
@@ -106,9 +63,8 @@ extension RootShellView {
         }
     }
 
-    /// Opens a Code mode session's chat over the Code home; Back returns to it.
+    /// Opens a coding session's chat over where the person is; Back returns there.
     func openCodeSession(_ session: CodeSessionRecord) {
-        appState.chatOpenedFromList = true
         guard let record = sessionCatalog.session(id: session.id) else {
             actionErrorMessage = "This session isn't on this computer anymore."
             return
@@ -160,7 +116,7 @@ extension RootShellView {
                 sendToSession: { try await starter.send($0, toSession: sessionID) }))
         } else {
             ContentUnavailableView("Changes aren't available", systemImage: "plus.forwardslash.minus",
-                description: Text("Open Code from the menu, then try again."))
+                description: Text("Open Work, then try again."))
         }
     }
 
@@ -181,13 +137,14 @@ extension RootShellView {
                 onOpenSession: { openCodeSession($0) })
         } else {
             ContentUnavailableView("This batch isn't here anymore", systemImage: "square.stack.3d.up.slash",
-                description: Text("Open Code from the menu, then try again."))
+                description: Text("Open Work, then try again."))
         }
     }
 
     // MARK: Dev Factory
 
-    /// Opens Dev Factory over the IDE home, with the computer's store made on first use.
+    /// Opens Dev Factory over where the person is (a project's Work), with the computer's store
+    /// made on first use.
     func openDevFactory() {
         guard let scope = currentWorkspaceOwner?.cacheScopeID ?? (usesWorkspaceFixtures ? "demo" : nil) else {
             actionErrorMessage = "Connect to your computer to use Dev Factory."
@@ -200,8 +157,8 @@ extension RootShellView {
             }
             devFactory = DevFactoryStore(scopeID: scope, client: client)
         }
-        appState.select(.code)
-        appState.open(.devFactory)
+        prepareCodeHome()
+        if appState.path.last != .devFactory { appState.open(.devFactory) }
     }
 
     private func devFactoryContext(_ store: DevFactoryStore) -> DevFactoryContext {
@@ -238,7 +195,7 @@ extension RootShellView {
             }
         } else {
             ContentUnavailableView("Dev Factory isn't open", systemImage: "hammer",
-                description: Text("Open it from the menu in Code."))
+                description: Text("Open it from a project in Work."))
         }
     }
 
@@ -261,40 +218,7 @@ extension RootShellView {
                 canShip: false)
         } else {
             ContentUnavailableView("Changes aren't available", systemImage: "plus.forwardslash.minus",
-                description: Text("Add this project in Code to read its changes here."))
-        }
-    }
-
-    /// ☰ in Code mode: New session, Projects, Pull requests and Worktrees, then Kanban and Settings.
-    var codeMenu: BighelpMenuDestinations.Code {
-        BighelpMenuDestinations.Code(
-            onNewSession: { afterClosingHomeSheets { appState.select(.code) } },
-            onPullRequests: codeHome?.project == nil ? nil : {
-                afterClosingHomeSheets { appState.select(.code); codeSheet = .pullRequests }
-            },
-            onWorktrees: codeHome?.project == nil ? nil : {
-                afterClosingHomeSheets { appState.select(.code); codeSheet = .worktrees }
-            },
-            onDevFactory: canOpenWorkflows ? { afterClosingHomeSheets { openDevFactory() } } : nil
-        )
-    }
-
-    /// ☰'s switch between Chat and Code, while Code mode is on in Settings. The Unified Mode
-    /// Toggle takes its place at the top of each home, so ☰ has none while that's on.
-    var experienceSwitch: BighelpMenuDestinations.ExperienceSwitch? {
-        guard settings.codeModeEnabled, !settings.unifiedModeToggleEnabled else { return nil }
-        return BighelpMenuDestinations.ExperienceSwitch(current: settings.experience) { experience in
-            afterClosingHomeSheets { settings.experience = experience }
-        }
-    }
-
-    /// Settings › Modes › Header mode switcher: Bots, Chat and Code at the top of each home
-    /// (and ⌃⌘1–⌃⌘3 on the Mac). Nil while it's off.
-    var modeSwitch: BighelpModeSwitch? {
-        guard settings.unifiedModeToggleEnabled else { return nil }
-        // At once: the pill sits in a home's header, not in a sheet that has to close first.
-        return BighelpModeSwitch(modes: settings.availableModes, current: settings.currentMode) { mode in
-            settings.switchMode(mode)
+                description: Text("Add this project in Work to read its changes here."))
         }
     }
 }

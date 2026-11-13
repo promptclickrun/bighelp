@@ -10,7 +10,7 @@ final class DeviceNavigationTool {
         case invalidArguments = "invalid_arguments"
         /// No place has that id; `places` lists them.
         case unknownPlace = "unknown_place"
-        /// The place isn't in the mode the app is in (Bots, Chat or Code).
+        /// One home: never sent any more (every place is reachable); kept for older plugins' lists.
         case notInThisMode = "not_in_this_mode"
         /// Only with Settings › Nerd Mode on. A drive never turns it on.
         case needsNerdMode = "needs_nerd_mode"
@@ -24,6 +24,8 @@ final class DeviceNavigationTool {
     }
 
     static let operations: Set<String> = ["navigation.places", "navigation.open"]
+    /// `open` still answers `mode`, which named Bots, Chat or Code. The app has one home now.
+    static let mode = "home"
     /// The plugin's bounds too.
     static let maximumQueryLength = 120
     static let maximumNoteLength = 160
@@ -31,7 +33,6 @@ final class DeviceNavigationTool {
 
     /// What the tool needs from the app.
     struct Environment {
-        var mode: @MainActor () -> BighelpMode
         var nerdMode: @MainActor () -> Bool
         /// The bot's name, when this computer has a bot with that id.
         var botName: @MainActor (String) -> String?
@@ -53,15 +54,14 @@ final class DeviceNavigationTool {
         case "navigation.places":
             let (query, limit) = try Self.placesArguments(arguments)
             try authorize()
-            let mode = environment.mode()
-            let found = DriveCatalog.search(query ?? "", mode: mode, nerdMode: environment.nerdMode(), limit: limit)
+            let found = DriveCatalog.search(query ?? "", nerdMode: environment.nerdMode(), limit: limit)
             return [
                 "places": .array(found.map { place in
                     .object([
                         "id": .string(place.id),
                         "title": .string(place.title),
                         "what": .string(place.what),
-                        "steps": .array((place.playbooks[mode] ?? []).map { .string($0.label(bot: nil)) }),
+                        "steps": .array(place.steps.map { .string($0.label(bot: nil)) }),
                         "needs": place.needs.contains(.bot) ? .string("bot") : .null,
                     ])
                 }),
@@ -70,8 +70,7 @@ final class DeviceNavigationTool {
         case "navigation.open":
             let request = try Self.openArguments(arguments)
             guard let place = DriveCatalog.place(request.place) else { throw Failure.unknownPlace }
-            let mode = environment.mode()
-            guard let steps = place.playbooks[mode] else { throw Failure.notInThisMode }
+            let steps = place.steps
             if place.needs.contains(.nerdMode), !environment.nerdMode() { throw Failure.needsNerdMode }
             var bot: (id: String, name: String)?
             if place.needs.contains(.bot) {
@@ -82,7 +81,7 @@ final class DeviceNavigationTool {
             }
             try authorize()
             guard let trail = environment.open(place, steps, bot, request.note, context) else { throw Failure.busy }
-            return ["opened": .string(place.id), "steps": .array(trail.map { .string($0) }), "mode": .string(mode.rawValue)]
+            return ["opened": .string(place.id), "steps": .array(trail.map { .string($0) }), "mode": .string(Self.mode)]
         default:
             throw Failure.unsupportedOperation
         }

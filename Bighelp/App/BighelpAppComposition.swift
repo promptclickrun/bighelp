@@ -40,21 +40,20 @@ struct BighelpAppComposition {
             || arguments.contains("-use-demo-fixtures")
         bighelpCardDataClient = BighelpCardStaticDataClient()
         let timing: DemoFixtureTiming = .immediate
-        let appState = AppState()
-        if arguments.contains("-start-inbox") {
-            appState.select(.inbox)
-        }
-        if usesFixtures, let index = arguments.firstIndex(of: "-initial-tab"),
-           arguments.indices.contains(index + 1), let tab = AppTab(rawValue: arguments[index + 1]) {
-            appState.select(tab)
-        }
+        let appState = AppState(home: .shared)
         #if DEBUG
         // A bighelp set up before the AI data agreement existed: tests forget the agreement.
         if arguments.contains("-test-forget-ai-data-agreement") { defaults.removeObject(forKey: AIDataConsent.key) }
         #endif
         let settings = SettingsStore(defaults: defaults)
-        // Built once per launch: Opens on picks one computer or all of them.
-        settings.applyLaunchLandingToAllHostsMode()
+        // Where the app opens, before anything is drawn. A link or an alert that opens the app
+        // picks its own place after this.
+        appState.home.land(on: settings.launchHomeLanding, view: settings.homeView)
+        if usesFixtures, let index = arguments.firstIndex(of: "-initial-tab"),
+           arguments.indices.contains(index + 1), let place = Self.initialPlace(arguments[index + 1]) {
+            appState.home.tab = place.tab
+            if let view = place.view { appState.home.view = view }
+        }
         let companion = CompanionStore(defaults: defaults)
         #if DEBUG
         if usesFixtures, let index = arguments.firstIndex(of: "-test-companion-adventure"),
@@ -386,7 +385,6 @@ struct BighelpAppComposition {
         DeviceAccessCardStore.shared.permissions = deviceToolPermissions
         let appearanceTool = DeviceAppearanceTool(settings: settings)
         let navigationTool = DeviceNavigationTool(.init(
-            mode: { settings.currentMode },
             nerdMode: { settings.nerdModeEnabled },
             botName: { DriveNavigator.shared.agent($0)?.name },
             open: { place, steps, bot, note, context in
@@ -791,6 +789,19 @@ struct BighelpAppComposition {
         }
         #endif
         return { SilentVoiceInputLevelSource() }
+    }
+
+    /// `-initial-tab` in demo runs: one of the three places, or a screen of the old shell by the
+    /// place that holds it now.
+    static func initialPlace(_ name: String) -> (tab: HomeTab, view: HomeConversationsView?)? {
+        if let tab = HomeTab(rawValue: name) { return (tab, nil) }
+        switch name {
+        case "bots", "agents": return (.conversations, .bots)
+        case "chats", "sessions", "sessionList": return (.conversations, .chats)
+        case "feed", "ideas", "goals": return (.today, nil)
+        case "projects", "kanban", "workflows", "scheduledTasks", "code": return (.work, nil)
+        default: return nil
+        }
     }
 
     static func initialAgentProfiles(

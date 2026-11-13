@@ -1331,7 +1331,14 @@ struct ChatView: View {
 
     @ViewBuilder
     private var editAgentItem: some View {
-        if !model.isBotMode {
+        if !model.isBotMode, homeChrome.isPushedChat {
+            // One home: the bot's page, the same one its name in the header opens.
+            Button("Bot page", systemImage: "person.crop.circle") {
+                dismissKeyboard()
+                homeChrome.onProfile(homeAgentID)
+            }
+            .accessibilityIdentifier("chat.bot-page")
+        } else if !model.isBotMode {
             Button("Edit agent", systemImage: "person.crop.circle") {
                 presentCurrentAgentEditor()
             }

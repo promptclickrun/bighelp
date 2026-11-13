@@ -22,15 +22,6 @@ struct BighelpMenuCommands: Commands {
             Button(actions?.isSidebarOpen == true ? "Hide Sidebar" : "Show Sidebar") { actions?.toggleSidebar() }
                 .keyboardShortcut("s", modifiers: [.command, .control])
                 .disabled(actions == nil)
-            // The Header mode switcher's modes. ⌘1–⌘5 are the tabs, so these add Control.
-            if let modeSwitch = actions?.modeSwitch {
-                Divider()
-                ForEach(Array(modeSwitch.modes.enumerated()), id: \.element) { index, mode in
-                    Button(mode.title) { modeSwitch.select(mode) }
-                        .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: [.command, .control])
-                        .disabled(mode == modeSwitch.current)
-                }
-            }
         }
         CommandGroup(after: .toolbar) {
             Button("Bigger Text") { BighelpInterfaceSize.shared.stepText(by: 1) }
@@ -41,10 +32,10 @@ struct BighelpMenuCommands: Commands {
                 .keyboardShortcut("0")
         }
         #if targetEnvironment(macCatalyst)
-        // The bottom bar's tabs, like a Mac app's View menu. iPad keeps its own keys.
+        // The home's three places, like a Mac app's View menu. iPad keeps its own keys.
         CommandGroup(before: .sidebar) {
-            ForEach(Array((actions?.tabs ?? AppTab.allCases).enumerated()), id: \.element) { index, tab in
-                Button(tab.commandTitle) { actions?.selectTab?(tab) }
+            ForEach(Array((actions?.tabs ?? HomeTabItem.standard(view: .chats)).enumerated()), id: \.element.id) { index, tab in
+                Button(tab.title) { actions?.selectTab?(tab.id) }
                     .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
                     .disabled(actions?.selectTab == nil)
             }
@@ -62,22 +53,13 @@ struct BighelpMenuCommands: Commands {
 struct BighelpShellActions {
     let newChat: @MainActor () -> Void
     let openSettings: @MainActor () -> Void
-    /// ☰: the Mac's sidebar.
+    /// The Mac's sidebar.
     let isSidebarOpen: Bool
     let toggleSidebar: @MainActor () -> Void
-    /// Bots, Chat and Code (⌃⌘1–⌃⌘3) while the Header mode switcher is on.
-    var modeSwitch: BighelpModeSwitch? = nil
-    /// The bottom bar's tabs (Mac ⌘1–⌘5), while the bar shows.
-    var selectTab: (@MainActor (AppTab) -> Void)? = nil
-    /// The bar's tabs in its order (Appearance › App layout).
-    var tabs: [AppTab] = AppTab.allCases
-}
-
-extension AppTab {
-    /// The bottom bar's tabs by name, for the menu bar.
-    var commandTitle: String {
-        self == .scheduledTasks ? String(localized: "Scheduled Tasks") : title
-    }
+    /// The home's three places (Mac ⌘1–⌘3). Picking one closes what is open over it.
+    var selectTab: (@MainActor (HomeTab) -> Void)? = nil
+    /// The places as the bar names them: the first follows the person's default view.
+    var tabs: [HomeTabItem] = []
 }
 
 private struct BighelpShellActionsKey: FocusedValueKey {

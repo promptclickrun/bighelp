@@ -187,7 +187,7 @@ struct NewChatCoordinatorTests {
             _ = try await start.value
             return
         }
-        state.select(.sessions)
+        state.select(.conversations)
         client.finishCreation()
 
         let outcome = try await start.value
@@ -195,6 +195,33 @@ struct NewChatCoordinatorTests {
         #expect(state.path.isEmpty)
         #expect(catalog.session(id: presentationID) == nil)
         #expect(catalog.session(id: "session-shared") != nil)
+    }
+
+    /// New chat's blank chat is on top and another bot is picked for it: the chat the computer makes
+    /// takes its place in one step. No second canvas goes between them.
+    @Test func aPickForTheBlankChatOnTopReplacesItOnce() async throws {
+        let client = DeferredNewChatSessionCatalogClient()
+        let agents = AgentDirectoryStore(
+            client: AgentDirectoryFixtureClient(profiles: [.defaultFixture]),
+            profiles: [.defaultFixture]
+        )
+        let state = AppState()
+        state.path = [.chat(conversationID: "blank")]
+        let catalog = SessionCatalogStore(client: client)
+        let coordinator = NewChatCoordinator(appState: state, agents: agents, catalog: catalog, prepare: { _ in true })
+        var presented: [String] = []
+
+        let start = Task {
+            try await coordinator.start(replacingBlankChat: true, beforePresentation: { next, _ in presented.append(next) })
+        }
+        await client.waitUntilCreateStarts()
+        #expect(state.path == [.chat(conversationID: "blank")], "The blank chat stays while the computer makes the next")
+        client.finishCreation()
+
+        let outcome = try await start.value
+        #expect(outcome == .opened(sessionID: "session-shared", agentID: "default"))
+        #expect(presented == ["session-shared"])
+        #expect(state.path == [.chat(conversationID: "session-shared")])
     }
 
     @Test func creatingAnotherLocalCanvasKeepsEarlierDraftForRecovery() {

@@ -90,8 +90,8 @@ extension EnvironmentValues {
     @Entry var homeMenuClose: (@MainActor () -> Void)?
 }
 
-/// Presents ☰ like a side menu on iPad: it slides in from the leading edge
-/// over a dimmed screen, and a tap outside closes it. iPhone keeps the sheet.
+/// Presents the sidebar on iPad: it slides in from the leading edge over a dimmed screen, and a tap
+/// outside closes it. iPhone has no sidebar: its bar holds the places.
 /// The panel is a see-through full-screen cover so it sits above the title bar.
 struct HomeMenuPresentation<Menu: View>: ViewModifier {
     @Binding var isPresented: Bool
@@ -127,7 +127,10 @@ struct HomeMenuPresentation<Menu: View>: ViewModifier {
                     presented ? open() : close()
                 }
         } else {
-            content.bighelpSheet(isPresented: $isPresented, onDismiss: onDismiss, content: menu)
+            // Compact width has no sidebar. One left open (an iPad window made narrow) closes.
+            content.onChange(of: isPresented, initial: true) { _, presented in
+                if presented { isPresented = false }
+            }
         }
     }
 

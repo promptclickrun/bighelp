@@ -27,6 +27,8 @@ struct AgentBoardContext {
     var menuHasUnread = false
     /// Opened as a quick screen (from ☰, not in the bottom bar): Back where ☰ would be.
     var onBack: (() -> Void)? = nil
+    /// False on a page that draws its own Back and options over the board (Today's See all).
+    var showsHeaderButtons = true
 }
 
 // MARK: - Shared pieces
@@ -76,7 +78,7 @@ struct BoardScroll<Content: View>: View {
             .contentMargins(.bottom, 120, for: .scrollContent)
         }
         .scrollIndicators(.hidden)
-        .overlay(alignment: .top) { AgentBoardHeaderButtons(context: context) }
+        .overlay(alignment: .top) { if context.showsHeaderButtons { AgentBoardHeaderButtons(context: context) } }
         .bighelpRefreshable { await context.store.load(agentID: context.agentID) }
         .task(id: context.agentID) {
             if context.store.agentID != context.agentID || context.store.state == .idle {
@@ -1347,7 +1349,7 @@ struct AgentAppsView<Artifacts: View>: View {
                             onAvatarTap: context.onProfile, onNameTap: context.onSwitchAgent)
                 .frame(maxWidth: .infinity)
                 .padding(.top, BighelpTokens.space8)
-                .overlay(alignment: .top) { AgentBoardHeaderButtons(context: context) }
+                .overlay(alignment: .top) { if context.showsHeaderButtons { AgentBoardHeaderButtons(context: context) } }
             Picker("Show", selection: $segment) {
                 ForEach(Segment.allCases) { Text($0.rawValue).tag($0) }
             }

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Every place an agent's drive can open, with its playbook per mode. It lists only places the
+/// Every place an agent's drive can open, with the steps that reach it. It lists only places the
 /// navigator can reach for real: a route, a tab, a bot profile tab or sheet, or a Settings page.
 /// Places that open only from a view's own state join as they get a way in (#662).
 /// `navigation.places` searches it; the plugin never holds a copy, so new places ship with the app.
@@ -8,16 +8,16 @@ enum DriveCatalog {
     static func place(_ id: String) -> DrivePlace? { byID[id] }
 
     /// The places that fit the person's words, best first. Every word must appear in the place's
-    /// title, description, keywords or trail. No words lists every place in `mode`.
-    static func search(_ query: String, mode: BighelpMode, nerdMode: Bool, limit: Int) -> [DrivePlace] {
+    /// title, description, keywords or trail. No words lists every place.
+    static func search(_ query: String, nerdMode: Bool, limit: Int) -> [DrivePlace] {
         let words = query.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init)
             .filter { !stopWords.contains($0) }
-        let reachable = places.filter { $0.playbooks[mode] != nil && (nerdMode || !$0.needs.contains(.nerdMode)) }
+        let reachable = places.filter { nerdMode || !$0.needs.contains(.nerdMode) }
         guard !words.isEmpty else { return Array(reachable.prefix(limit)) }
         let scored = reachable.compactMap { place -> (DrivePlace, Int)? in
             let title = place.title.lowercased()
             let keywords = place.keywords.joined(separator: " ").lowercased()
-            let rest = (place.what + " " + (place.playbooks[mode] ?? []).map(\.label).joined(separator: " ")).lowercased()
+            let rest = (place.what + " " + place.steps.map(\.label).joined(separator: " ")).lowercased()
             var score = 0
             for word in words {
                 let stem = word.count > 3 && word.hasSuffix("s") ? String(word.dropLast()) : word
@@ -152,20 +152,18 @@ enum DriveCatalog {
         page("boards.feed", String(localized: "Feed"), String(localized: "Posts and updates from your agent."),
              keywords: ["feed", "posts", "updates", "news"], .board(.feed)),
         page("boards.ideas", String(localized: "Ideas"), String(localized: "Things your agent offers to do for you."),
-             keywords: ["ideas", "suggestions"], .board(.ideas)),
+             keywords: ["ideas", "suggestions"], .board(.idea)),
         page("boards.goals", String(localized: "Goals"), String(localized: "Goals your agent tracks for you."),
-             keywords: ["goals", "habits", "progress"], .board(.goals)),
-        page("boards.files", String(localized: "Files"), String(localized: "Files, pages, pictures and videos your agent made."),
-             keywords: ["files", "artifacts", "media", "apps"], .board(.apps)),
+             keywords: ["goals", "habits", "progress"], .board(.goal)),
     ]
 
     private static let workPlaces: [DrivePlace] = [
         DrivePlace("agents", String(localized: "Agents"), String(localized: "Every agent and group chat on this computer."),
                    keywords: ["agents", "bots", "group chats", "team"],
-                   playbooks: [.chat: [.go(String(localized: "Agents"), .tab(.agents))]]),
+                   playbooks: [.chat: [.go(String(localized: "Bots"), .tab(.conversations, view: .bots))]]),
         DrivePlace("sessions", String(localized: "Sessions"), String(localized: "Every chat on this computer, to search and reopen."),
                    keywords: ["sessions", "chats", "history", "conversations", "old chats"],
-                   playbooks: [.chat: [.go(String(localized: "Sessions"), .tab(.sessionList))]]),
+                   playbooks: [.chat: [.go(String(localized: "Chats"), .tab(.conversations, view: .chats))]]),
         page("projects", String(localized: "Projects"), String(localized: "Related chats and folders together."),
              keywords: ["projects", "folders", "workspaces"], .projects),
         page("kanban", String(localized: "Kanban"), String(localized: "Your agents' task board, from Later to Done."),
@@ -188,7 +186,7 @@ enum DriveCatalog {
 
     // MARK: - Settings
 
-    /// Settings opens from your circle in Bots mode and from ☰ in Chat and Code: the same pages in each.
+    /// Settings opens from your circle on every root.
     private static func settings(_ id: String, _ title: String, _ what: String, keywords: [String],
                                  needs: Set<DriveNeed> = [], full pages: [(String, SettingsDestination, String?)],
                                  point: (String, String)? = nil) -> DrivePlace {
@@ -231,12 +229,6 @@ enum DriveCatalog {
                      String(localized: "Avatar size, names, message text size and spacing in chats."),
                      keywords: ["chat layout", "message size", "spacing", "avatar size", "font"],
                      full: [section(.appearance), (String(localized: "Chat layout"), .chatLayout, "settings.appearance.chat-layout")]),
-            settings("settings.appearance.app-layout", String(localized: "App layout"),
-                     String(localized: "What the bottom bar holds and the order of the menu."),
-                     keywords: ["app layout", "bottom bar", "tab bar", "tabs", "menu order", "pin"],
-                     // One home: delete with the old shell. Appearance has no App layout row any more, so
-                     // the page opens with nothing to tap.
-                     full: [section(.appearance), (String(localized: "App layout"), .appLayout, nil)]),
             settings("settings.appearance.thinking", String(localized: "Thinking"),
                      String(localized: "The look of the Thinking control that sets how hard an agent thinks."),
                      keywords: ["thinking", "reasoning", "thinking slider", "effort", "slider look"],
@@ -285,10 +277,6 @@ enum DriveCatalog {
             settings("settings.you", String(localized: "You"),
                      String(localized: "Your name and photo on your messages."),
                      keywords: ["my name", "my photo", "profile", "me"], full: [(String(localized: "You"), .you, "settings.you")]),
-            settings("settings.modes", String(localized: "Modes"),
-                     String(localized: "Bots mode, Code mode and the switch between them at the top of each home."),
-                     keywords: ["modes", "bots mode", "code mode", "mode switch", "unified mode toggle", "experience"],
-                     full: [section(.modes)]),
             settings("settings.system", String(localized: "Your computers"),
                      String(localized: "Your computers, Hermes updates and restarts."),
                      keywords: ["system", "computers", "hosts", "update hermes", "plugin", "restart"],

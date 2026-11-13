@@ -57,8 +57,6 @@ struct ChatDestinationView: View {
     let projectMove: ChatProjectMove?
     let userIdentity: UserIdentityStore
     let permissionCenter: PermissionCenter
-    /// One home: unused; it goes once the shell stops passing it.
-    let selectedTab: AppTab?
     let responseHapticsCoveredByRoot: Bool
     let appearanceAuthority: WorkspaceAuthority?
     let headerActions: ChatHeaderActions
@@ -119,7 +117,6 @@ struct ChatDestinationView: View {
         projectGitClient: any ProjectGitClient,
         userIdentity: UserIdentityStore,
         permissionCenter: PermissionCenter,
-        selectedTab: AppTab? = nil,
         responseHapticsCoveredByRoot: Bool,
         onNewChat: @escaping () -> Void,
         onOpenProviderAccounts: @escaping () -> Void,
@@ -149,7 +146,6 @@ struct ChatDestinationView: View {
         _projectChanges = State(initialValue: ProjectChangesStore(client: projectGitClient))
         self.userIdentity = userIdentity
         self.permissionCenter = permissionCenter
-        self.selectedTab = selectedTab
         self.responseHapticsCoveredByRoot = responseHapticsCoveredByRoot
         self.appearanceAuthority = appearanceAuthority
         self.hostFiles = hostFiles
@@ -886,9 +882,7 @@ struct ChatDestinationView: View {
         side: ChatEdgeSide,
         containerWidth: CGFloat
     ) -> some View {
-        let action = side == .left
-            ? settings.effectiveLeftEdgeSwipeAction
-            : settings.effectiveRightEdgeSwipeAction
+        let action = side == .left ? settings.leftEdgeSwipeAction : settings.rightEdgeSwipeAction
         Color.clear
             .frame(width: WorkspaceEdgeSwipeResolver.activationEdgeWidth)
             .contentShape(Rectangle())
@@ -908,8 +902,8 @@ struct ChatDestinationView: View {
                             ),
                             translation: value.translation,
                             containerWidth: containerWidth,
-                            leftAction: settings.effectiveLeftEdgeSwipeAction,
-                            rightAction: settings.effectiveRightEdgeSwipeAction
+                            leftAction: settings.leftEdgeSwipeAction,
+                            rightAction: settings.rightEdgeSwipeAction
                         ) else { return }
                         performChatEdgeAction(resolved)
                     }

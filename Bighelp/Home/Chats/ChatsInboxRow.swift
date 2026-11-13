@@ -87,7 +87,7 @@ extension ChatsInboxRow {
         self.init(
             id: chat.id, source: .fleetChat(chat), hostID: chat.hostID, isOnComputerInUse: false,
             title: chat.title.isEmpty ? String(localized: "New chat") : chat.title, preview: chat.preview,
-            updatedAt: chat.updatedAt, isPinned: false, isUnread: false, tracksUnread: false, hasDraft: false,
+            updatedAt: chat.updatedAt, isPinned: chat.isPinned ?? false, isUnread: false, tracksUnread: false, hasDraft: false,
             isActive: chat.isActive, isGroup: false, isCode: false, memberIDs: [chat.profileID], origin: chat.origin,
             computerTag: computerTag,
             activityKey: chat.title == "Bot Chat" ? FleetID.make(chat.hostID, chat.profileID) : nil

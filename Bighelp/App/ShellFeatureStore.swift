@@ -420,7 +420,7 @@ final class ShellFeatureStore {
             approvalModels[requestID].map(PreparedRouteModel.approval)
         case .skillsAndTools,
              .workspaceSettings, .workspaceManagement, .workspaceConnections,
-             .projects, .project, .kanban, .usage, .allHostsChats, .board,
+             .projects, .project, .kanban, .usage, .board, .work,
              .workflows, .workflow, .workflowRun, .workflowSignoff, .workflowRuns, .codeChanges, .codeBatch,
              .devFactory, .devFactoryRecipe, .devFactoryGroup, .devFactoryChanges, .simpleBotProfile, .groupSettings, .simpleBotsSection:
             nil
@@ -507,7 +507,7 @@ final class ShellFeatureStore {
             return true
         case .skillsAndTools,
              .workspaceSettings, .workspaceManagement, .workspaceConnections,
-             .projects, .project, .kanban, .usage, .allHostsChats, .board,
+             .projects, .project, .kanban, .usage, .board, .work,
              .workflows, .workflow, .workflowRun, .workflowSignoff, .workflowRuns, .codeChanges, .codeBatch,
              .devFactory, .devFactoryRecipe, .devFactoryGroup, .devFactoryChanges, .simpleBotProfile, .groupSettings, .simpleBotsSection:
             return true

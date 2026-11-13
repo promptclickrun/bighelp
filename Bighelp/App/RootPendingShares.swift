@@ -22,12 +22,11 @@ extension RootShellView {
             open: { share, destination, name in openPendingShare(share, at: destination, agentName: name) },
             openChat: { id in
                 guard let record = sessionCatalog.session(id: id) else { return }
-                appState.chatOpenedFromList = true
                 openSession(record.summary)
             })
     }
 
-    /// The same, from inside Bots mode's Settings: a chat opens once Settings has closed.
+    /// The same, from inside Settings: a chat opens once Settings has closed.
     var settingsPendingShareContext: PendingShareReviewContext {
         let context = pendingShareContext
         return PendingShareReviewContext(
@@ -36,7 +35,7 @@ extension RootShellView {
             openChat: { id in leaveSettings { context.openChat(id) } })
     }
 
-    /// ☰ › Shared with bighelp, while any share waits: every one, put off ones too.
+    /// The sidebar's Shared with bighelp, while any share waits: every one, put off ones too.
     var pendingSharesMenuRow: (count: Int, open: () -> Void)? {
         let center = PendingShareCenter.shared
         guard center.waitingCount > 0 else { return nil }
@@ -77,7 +76,6 @@ extension RootShellView {
             if let record {
                 appState.handOff(PendingShareHandoff(share: share, inbox: inbox, destination: destination,
                                                      since: .now, onDropped: { center.release($0) }))
-                appState.chatOpenedFromList = true
                 openSession(record.summary)
                 return
             }

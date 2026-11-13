@@ -17,8 +17,12 @@ extension RootShellView {
                 ProjectsHomeView(context: context)
             } else {
                 ContentUnavailableView("Projects aren't available", systemImage: "folder",
-                    description: Text("Connect to your computer, then open Projects from the menu."))
+                    description: Text("Connect to your computer, then open Projects from Work."))
             }
+        case (.sessions, let prepared):
+            sessionsDestination({ if case .sessions(let model)? = prepared { model } else { nil } }())
+        case (.work(let projectID), _):
+            workProjectPage(projectID)
         case (.kanban, _):
             kanbanDestination
         case (.workflows, _), (.workflow, _), (.workflowRun, _), (.workflowSignoff, _), (.workflowRuns, _):
@@ -38,20 +42,14 @@ extension RootShellView {
                               chat: conversationID.flatMap(featureStore.preparedChatModel(id:)))
         case (.simpleBotsSection(let id), _):
             SimpleBotsHomeView(context: simpleBotsContext, sectionID: id)
-        case (.board(let tab), _):
-            agentBoardPage(tab)
-        case (.allHostsChats, _):
-            if let fleet {
-                fleetChats(fleet)
-            } else {
-                ContentUnavailableView("All sessions", systemImage: "bubble.left.and.bubble.right")
-            }
+        case (.board(let kind, let agentID), _):
+            todayBoardPage(kind, agentID: agentID)
         case (.project(let id), _):
             if let context = projectsContext {
                 ProjectDetailView(projectID: id, context: context)
             } else {
                 ContentUnavailableView("Projects aren't available", systemImage: "folder",
-                    description: Text("Connect to your computer, then open Projects from the menu."))
+                    description: Text("Connect to your computer, then open Projects from Work."))
             }
         case (.workspaceConnections, _):
             routeWithWorkspaceMenu {
@@ -89,7 +87,7 @@ extension RootShellView {
                 } else if destination == .sessionMaintenance || destination == .profileLifecycle {
                     if let coordinator = lifecycleCoordinator,
                        isCurrentSignIn(coordinator.owner), let profileID = lifecycleProfileID,
-                       profileID == workspaceAgentID {
+                       agents.profiles.contains(where: { $0.id == profileID }) {
                         if destination == .sessionMaintenance {
                             coordinator.sessionMaintenanceView(profileID: profileID)
                         } else {
@@ -114,6 +112,7 @@ extension RootShellView {
         case (.chat(let conversationID), .chat(let model)?):
             let switcher = chatSwitcherColumn(for: conversationID,
                                               agentID: model.memberIDs.count == 1 ? model.memberIDs.first : nil)
+            let newChat = newChatSlot(forChat: conversationID, model: model)
             ChatDestinationView(
                 model: model,
                 appState: appState,
@@ -121,7 +120,8 @@ extension RootShellView {
                 featureStore: featureStore,
                 catalog: sessionCatalog,
                 agents: agents,
-                agentEditorPresentation: chatAgentEditorPresentation(for: model),
+                // One home: ⋯ › Bot page opens the bot's page; nothing presents the editor.
+                agentEditorPresentation: nil,
                 botModeRooms: botModeRooms,
                 skillsAndTools: skillsAndTools,
                 hermesWorkspaces: hermesWorkspaces,
@@ -129,17 +129,16 @@ extension RootShellView {
                 projectGitClient: projectGitClient,
                 userIdentity: userIdentity,
                 permissionCenter: permissionCenter,
-                selectedTab: appState.drawerSelectedTab,
                 responseHapticsCoveredByRoot: isHomeDrawerPresented
                     || isHostStatusPresented
                     || isHermesWorkspacePresented || actionErrorMessage != nil,
-                onNewChat: { startNewChat(explicitAgentID: nil) },
+                onNewChat: { openNewChat() },
                 onOpenProviderAccounts: { openWorkspaceDestination(.keys) },
                 onNewBotChat: botChatRestart(conversationID),
                 onContinueInBranch: { continueInBranch(from: model, $0) },
                 consumesSendOnOpen: { appState.sendsDraftOnOpen.remove($0) != nil },
                 onEdgeAction: { performWorkspaceAction($0) },
-                onOpenAgentSessions: { openAllSessions(filteredTo: $0) },
+                onOpenAgentSessions: { openSessions(filteredTo: $0) },
                 onOpenApproval: {
                     openApproval(request: $0)
                 },
@@ -148,10 +147,14 @@ extension RootShellView {
                 },
                 appearanceAuthority: currentWorkspaceOwner?.authority,
                 hostFiles: codeFileLinks(sessionID: conversationID),
-                chatFolders: { chatFolders(for: model) }
+                chatFolders: { chatFolders(for: model) },
+                newChat: newChat
             )
+            // New chat's Worktrees sheet presents from its own chat: the root is covered.
+            .modifier(CodeSheetsIfShown(isShown: newChat != nil, root: self))
             .environment(\.chatCardInteractions, cardInteractions(for: model))
-            .environment(\.agentHomeChrome, homeChrome(forChat: conversationID))
+            // Every chat is a pushed page: Back, the bot (its page) and ⋯.
+            .environment(\.agentHomeChrome, .pushedChat(onProfile: { openBotPage(fromChat: $0) }))
             .environment(\.chatDissolveTransition, chatDissolve)
             .environment(connectionKeeper)
             .bighelpSideColumn(screen, isShown: switcher != nil) { switcher }
@@ -197,4 +200,15 @@ extension RootShellView {
         }
     }
 
+}
+
+/// New chat's project sheets, only on the chat that is New chat: two chats in the stack must not
+/// both present the same sheet.
+private struct CodeSheetsIfShown: ViewModifier {
+    let isShown: Bool
+    let root: RootShellView
+
+    func body(content: Content) -> some View {
+        if isShown { root.codeSheets(content) } else { content }
+    }
 }

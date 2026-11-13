@@ -1,5 +1,7 @@
 import Foundation
 
+// One home: the old shell's tabs. Nothing selects them any more (`HomeTab` is the bar); they go with
+// `FloatingTabBar`, `BighelpAppLayout`, `BighelpMenu` and the boards' old header.
 enum AppTab: String, CaseIterable, Identifiable {
     case home, agents, sessions, inbox, profile, scheduledTasks
     case feed, ideas, goals, apps
@@ -31,6 +33,7 @@ enum AppTab: String, CaseIterable, Identifiable {
 
 enum AppRoute: Hashable {
     case chat(conversationID: String)
+    /// The computer in use's own Sessions page (projects, imports from other apps), from Chats.
     case sessions
     case scheduledTasks
     case scheduledTask(id: String, agentID: String? = nil)
@@ -53,10 +56,10 @@ enum AppRoute: Hashable {
     case workflowRuns(selected: String?)
     /// Plans, limits and what the agents used (☰ › Usage).
     case usage
-    /// The all-hosts view's chat list: every host's chats.
-    case allHostsChats
-    /// Feed, Ideas, Goals or Files as a quick screen with Back, when the bottom bar doesn't hold it.
-    case board(AppTab)
+    /// Today's See all: every bot's Feed, Ideas or Goals, or one bot's (`TodayBoardPage`).
+    case board(AgentBoardItem.Kind, agentID: String? = nil)
+    /// Work filtered to one project, with its pull requests, worktrees and Dev Factory.
+    case work(projectID: String)
     /// A Code mode session's changes, with Ship.
     case codeChanges(sessionID: String)
     /// Orchestration mode's chat for a batch sent with Send all.
@@ -74,7 +77,4 @@ enum AppRoute: Hashable {
     case groupSettings(roomID: String, conversationID: String? = nil)
     /// A section's page (Bots mode's home or the Agents screen): its bots and group chats.
     case simpleBotsSection(id: String)
-
-    /// Screens about every computer, which stay put when the working computer changes.
-    var isAllHosts: Bool { self == .allHostsChats }
 }

@@ -39,7 +39,6 @@ extension RootShellView {
         withTransaction(instant) {
             appState.path.removeLast()
             if let record = sessionCatalog.session(id: id) {
-                appState.chatOpenedFromList = true
                 openSession(record.summary)
             } else {
                 actionErrorMessage = "This chat isn't available right now. Open it again from your chats."

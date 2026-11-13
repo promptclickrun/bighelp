@@ -33,8 +33,9 @@ extension RootShellView {
         if isWorkflowsPageOpen { await workflowsStore?.load() }
     }
 
+    /// Its page is open, or Work, which lists its runs.
     private var isWorkflowsPageOpen: Bool {
-        appState.selectedTab == .workflows || appState.path.contains { route in
+        appState.selectedTab == .work || appState.path.contains { route in
             if case .workflows = route { true } else { false }
         }
     }
@@ -44,13 +45,13 @@ extension RootShellView {
     /// what to do, so a slow or failed check never hides the feature.
     var canOpenWorkflows: Bool { workflowsAvailability.host != nil || workflowsAvailability.isAvailable == true }
 
-    /// Opens ☰ › Workflows over the chat, so Back returns there.
+    /// Opens Workflows over Work, so Back returns there.
     func openWorkflows() {
         guard prepareWorkflowsStore() != nil else {
             actionErrorMessage = "Connect to your computer to use Workflows."
             return
         }
-        showOneHostPageOnSessions([.workflows])
+        showOverWork([.workflows])
     }
 
     /// Opens one workflow (a Shortcut or a link): its flow, or its Run sheet straight away.
@@ -59,13 +60,13 @@ extension RootShellView {
             actionErrorMessage = "Connect to your computer to use Workflows."
             return
         }
-        showOneHostPageOnSessions([.workflows, .workflow(id: id, startsRun: startsRun)])
+        showOverWork([.workflows, .workflow(id: id, startsRun: startsRun)])
     }
 
     /// Opens one run (a widget, a link or a notification later).
     func openWorkflows(run: String) {
         guard prepareWorkflowsStore() != nil else { return }
-        showOneHostPageOnSessions([.workflows, BighelpPlatform.isMac ? .workflowRuns(selected: run) : .workflowRun(id: run)])
+        showOverWork([.workflows, BighelpPlatform.isMac ? .workflowRuns(selected: run) : .workflowRun(id: run)])
     }
 
     /// A tapped workflow alert names its run only as a chat reference (`workflow.run.<id>`,
@@ -122,7 +123,7 @@ extension RootShellView {
                 .accessibilityIdentifier("workflows.connecting")
         } else {
             ContentUnavailableView("Workflows aren't available", systemImage: "flowchart",
-                description: Text("Connect to your computer, then open Workflows from the menu."))
+                description: Text("Connect to your computer, then open Workflows from Work."))
         }
     }
 }

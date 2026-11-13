@@ -117,11 +117,7 @@ extension SettingsView {
 
     /// Show every computer: one setting for everyone.
     private var everyComputerBinding: Binding<Bool> {
-        Binding(get: { settings.showsEveryComputer }, set: { on in
-            settings.showsEveryComputer = on
-            // One home: delete with the old shell, which redraws its all-hosts view through this.
-            if !settings.simpleBotsEnabled { onSetAllHosts?(on) }
-        })
+        Binding(get: { settings.showsEveryComputer }, set: { settings.showsEveryComputer = $0 })
     }
 
     /// Demo mode's made-up computer has no row in the registry, but its time zone still saves.

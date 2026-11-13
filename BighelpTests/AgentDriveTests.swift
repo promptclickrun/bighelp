@@ -14,30 +14,29 @@ struct AgentDriveTests {
         let ids = DriveCatalog.places.map(\.id)
         #expect(Set(ids).count == ids.count)
         for place in DriveCatalog.places {
-            #expect(!place.playbooks.isEmpty, "\(place.id) is reachable in no mode")
-            for (mode, steps) in place.playbooks {
-                #expect(steps.first?.move != nil, "\(place.id) in \(mode) starts without a move")
-                #expect(steps.dropLast().allSatisfy { !$0.points }, "\(place.id) points before its last step")
-                if steps.last?.points == true { #expect(steps.last?.target != nil) }
-            }
+            let steps = place.steps
+            #expect(steps.first?.move != nil, "\(place.id) starts without a move")
+            #expect(steps.dropLast().allSatisfy { !$0.points }, "\(place.id) points before its last step")
+            if steps.last?.points == true { #expect(steps.last?.target != nil) }
         }
     }
 
     @Test func thePersonsOwnWordsFindTheirPlace() {
-        let feed = DriveCatalog.search("How do I see what my Feed can do?", mode: .bots, nerdMode: false, limit: 3)
+        let feed = DriveCatalog.search("How do I see what my Feed can do?", nerdMode: false, limit: 3)
         #expect(feed.first?.id == "bot.dashboard.templates.feed")
-        let returnKey = DriveCatalog.search("enter key sends", mode: .chat, nerdMode: false, limit: 3)
+        let returnKey = DriveCatalog.search("enter key sends", nerdMode: false, limit: 3)
         #expect(returnKey.first?.id == "settings.chat.return-sends")
-        #expect(DriveCatalog.search("kanban", mode: .bots, nerdMode: false, limit: 5).isEmpty, "Bots mode has no Kanban")
+        #expect(DriveCatalog.search("kanban", nerdMode: false, limit: 5).first?.id == "kanban",
+                "One home: a bot's page and Work's pages are found from the same place")
     }
 
     @Test func nerdModePlacesStayHiddenUntilItIsOn() {
-        #expect(!DriveCatalog.search("logs", mode: .chat, nerdMode: false, limit: 5).contains { $0.id == "hermes.logs" })
-        #expect(DriveCatalog.search("logs", mode: .chat, nerdMode: true, limit: 5).contains { $0.id == "hermes.logs" })
+        #expect(!DriveCatalog.search("logs", nerdMode: false, limit: 5).contains { $0.id == "hermes.logs" })
+        #expect(DriveCatalog.search("logs", nerdMode: true, limit: 5).contains { $0.id == "hermes.logs" })
     }
 
     @Test func feedTemplatesWalkTheProfileThenPointAtTheDeck() throws {
-        let steps = try #require(DriveCatalog.place("bot.dashboard.templates.feed")?.playbooks[.bots])
+        let steps = try #require(DriveCatalog.place("bot.dashboard.templates.feed")).steps
         #expect(steps.map { $0.label(bot: "Nova") } == ["Nova's profile", "Dashboard", "Templates", "Feed"])
         #expect(steps[0].move == .botProfile(BotProfileOpening(tab: .dashboard)))
         #expect(steps[2].move == .botProfile(BotProfileOpening(sheet: .templates(.feed))))
@@ -60,8 +59,8 @@ struct AgentDriveTests {
         #expect(permissions.isEnabled(.appearance), "Each light tool has its own switch")
     }
 
-    @Test func placesListsMatchesForThisMode() throws {
-        let fixture = ToolFixture(mode: .bots)
+    @Test func placesListsMatches() throws {
+        let fixture = ToolFixture()
         let payload = try fixture.tool.execute(operation: "navigation.places", arguments: ["query": .string("feed templates")],
                                        context: ToolFixture.context, authorize: {})
         guard case .array(let places)? = payload["places"], case .object(let first)? = places.first else {
@@ -72,7 +71,7 @@ struct AgentDriveTests {
     }
 
     @Test func openRefusesWhatItCannotShowBeforeMovingAnything() {
-        let fixture = ToolFixture(mode: .chat)
+        let fixture = ToolFixture()
         func failure(_ arguments: [String: BighelpJSONValue]) -> String? {
             do { _ = try fixture.tool.execute(operation: "navigation.open", arguments: arguments,
                                               context: ToolFixture.context, authorize: {}); return nil }
@@ -83,18 +82,17 @@ struct AgentDriveTests {
         #expect(failure(["place": .string("kanban"), "tap": .string("x")]) == "invalid_arguments")
         #expect(failure(["place": .string("kanban"), "note": .string(String(repeating: "a", count: 161))]) == "invalid_arguments")
         #expect(failure(["place": .string("nowhere")]) == "unknown_place")
-        #expect(failure(["place": .string("bot.dashboard")]) == "not_in_this_mode")
         #expect(failure(["place": .string("hermes.logs")]) == "needs_nerd_mode")
         #expect(fixture.opened.isEmpty)
     }
 
     @Test func openStartsTheDriveForTheAgentInTheChatWhenNoBotIsNamed() throws {
-        let fixture = ToolFixture(mode: .bots)
+        let fixture = ToolFixture()
         let payload = try fixture.tool.execute(operation: "navigation.open",
                                                arguments: ["place": .string("bot.info"), "note": .string("Here it is")],
                                                context: ToolFixture.context, authorize: {})
         #expect(payload["opened"] == .string("bot.info"))
-        #expect(payload["mode"] == .string("bots"))
+        #expect(payload["mode"] == .string("home"))
         #expect(fixture.opened.map(\.bot) == ["nova"])
         #expect(fixture.opened.map(\.note) == ["Here it is"])
         #expect(throws: (any Error).self) {
@@ -105,7 +103,7 @@ struct AgentDriveTests {
     }
 
     @Test func aClosedChatStopsTheDriveBeforeItStarts() {
-        let fixture = ToolFixture(mode: .chat)
+        let fixture = ToolFixture()
         #expect(throws: (any Error).self) {
             try fixture.tool.execute(operation: "navigation.open", arguments: ["place": .string("kanban")],
                                      context: ToolFixture.context, authorize: { throw CancellationError() })
@@ -119,7 +117,7 @@ struct AgentDriveTests {
         let router = FakeRouter(path: [.chat(conversationID: "c1")])
         let navigator = DriveNavigator()
         navigator.attach(router, agent: { _ in nil }, chat: { nil })
-        let steps = try #require(DriveCatalog.place("bot.dashboard.templates.feed")?.playbooks[.bots])
+        let steps = try #require(DriveCatalog.place("bot.dashboard.templates.feed")).steps
         let trail = navigator.start(title: "Feed templates", steps: steps, bot: (id: "nova", name: "Nova"),
                                     agent: DriveAgent(id: "nova", name: "Nova", imageURL: nil), note: "Swipe right",
                                     chat: nil, reduceMotion: true)
@@ -131,7 +129,7 @@ struct AgentDriveTests {
         #expect(navigator.spotlight == "dashboard.templates.deck")
         navigator.returnToChat()
         try await waitUntil { navigator.phase == .idle }
-        #expect(router.restored == DriveSnapshot(tab: .sessions, path: [.chat(conversationID: "c1")]))
+        #expect(router.restored == DriveSnapshot(tab: .conversations, view: .chats, path: [.chat(conversationID: "c1")]))
     }
 
     @Test func aStepLightsOnlyWhenTheScreenShowsIt() async throws {
@@ -139,7 +137,7 @@ struct AgentDriveTests {
         router.shows = []
         let navigator = DriveNavigator()
         navigator.attach(router, agent: { _ in nil }, chat: { nil })
-        let steps = try #require(DriveCatalog.place("settings.chat.return-sends")?.playbooks[.chat])
+        let steps = try #require(DriveCatalog.place("settings.chat.return-sends")).steps
         navigator.start(title: "Return sends", steps: steps, bot: nil, agent: DriveAgent(id: "a", name: "A", imageURL: nil),
                         note: nil, chat: nil, reduceMotion: true)
         try await Task.sleep(for: .milliseconds(600))
@@ -156,7 +154,7 @@ struct AgentDriveTests {
         router.shows = ["settings.menu.chat"]
         let navigator = DriveNavigator()
         navigator.attach(router, agent: { _ in nil }, chat: { nil })
-        let steps = try #require(DriveCatalog.place("settings.chat.return-sends")?.playbooks[.chat])
+        let steps = try #require(DriveCatalog.place("settings.chat.return-sends")).steps
         navigator.start(title: "Return sends", steps: steps, bot: nil, agent: DriveAgent(id: "a", name: "A", imageURL: nil),
                         note: nil, chat: nil, reduceMotion: true)
         try await waitUntil { navigator.phase == .arrived }
@@ -170,7 +168,7 @@ struct AgentDriveTests {
         router.shows = ["settings.menu.chat"]
         let navigator = DriveNavigator()
         navigator.attach(router, agent: { _ in nil }, chat: { nil })
-        let steps = try #require(DriveCatalog.place("settings.chat.return-sends")?.playbooks[.chat])
+        let steps = try #require(DriveCatalog.place("settings.chat.return-sends")).steps
         navigator.start(title: "Return sends", steps: steps, bot: nil, agent: DriveAgent(id: "a", name: "A", imageURL: nil),
                         note: nil, chat: nil, reduceMotion: true)
         try await waitUntil { navigator.scrollRequest != nil }
@@ -187,7 +185,7 @@ struct AgentDriveTests {
         router.shows = []
         let navigator = DriveNavigator()
         navigator.attach(router, agent: { _ in nil }, chat: { nil })
-        let steps = try #require(DriveCatalog.place("bot.dashboard.templates.feed")?.playbooks[.bots])
+        let steps = try #require(DriveCatalog.place("bot.dashboard.templates.feed")).steps
         navigator.start(title: "Feed templates", steps: steps, bot: (id: "nova", name: "Nova"),
                         agent: DriveAgent(id: "nova", name: "Nova", imageURL: nil), note: nil, chat: nil, reduceMotion: true)
         try await waitUntil { router.moves.count == 1 }
@@ -204,7 +202,7 @@ struct AgentDriveTests {
         let first = FakeRouter(path: [.chat(conversationID: "c1")])
         let navigator = DriveNavigator()
         navigator.attach(first, agent: { _ in nil }, chat: { nil })
-        let steps = try #require(DriveCatalog.place("bot.dashboard.templates.feed")?.playbooks[.bots])
+        let steps = try #require(DriveCatalog.place("bot.dashboard.templates.feed")).steps
         navigator.start(title: "Feed templates", steps: steps, bot: (id: "nova", name: "Nova"),
                         agent: DriveAgent(id: "nova", name: "Nova", imageURL: nil), note: nil, chat: nil, reduceMotion: true)
         try await waitUntil { navigator.phase == .arrived }
@@ -229,7 +227,7 @@ struct AgentDriveTests {
         for case let file as URL in files where file.pathExtension == "swift" {
             code += (try? String(contentsOf: file, encoding: .utf8)) ?? ""
         }
-        let targets = Set(DriveCatalog.places.flatMap { $0.playbooks.values.flatMap { $0.compactMap(\.target) } })
+        let targets = Set(DriveCatalog.places.flatMap { $0.steps.compactMap(\.target) })
         let accessibility = SettingsMenuSection.allCases.map(\.accessibilityIdentifier)
         for target in targets {
             let head = target.split(separator: ".").dropLast().joined(separator: ".") + "."
@@ -267,7 +265,7 @@ struct AgentDriveTests {
         try await settle { navigator.agent("default")?.name == "Alfie" }
         #expect(navigator.agent("default")?.name == "Alfie")
         let place = try #require(DriveCatalog.place("settings.chat.return-sends"))
-        _ = navigator.open(place, steps: try #require(place.playbooks[.chat]), bot: nil, note: nil, agentID: "default")
+        _ = navigator.open(place, steps: place.steps, bot: nil, note: nil, agentID: "default")
         #expect(navigator.agent?.name == "Alfie")
         try await settle { azure.appState.isSettingsPresented }
         #expect(azure.appState.isSettingsPresented)
@@ -290,7 +288,7 @@ private final class FakeRouter: DriveRouting {
 
     init(path: [AppRoute]) { self.path = path }
 
-    func snapshot() -> DriveSnapshot { DriveSnapshot(tab: .sessions, path: path) }
+    func snapshot() -> DriveSnapshot { DriveSnapshot(tab: .conversations, view: .chats, path: path) }
     func restore(_ snapshot: DriveSnapshot) async { restored = snapshot; path = snapshot.path }
     func perform(_ move: DriveMove, bot: String?) async {
         moves.append(move)
@@ -307,9 +305,9 @@ private final class ToolFixture {
     var opened: [(place: String, bot: String?, note: String?)] = []
     private(set) var tool: DeviceNavigationTool!
 
-    init(mode: BighelpMode, nerdMode: Bool = false) {
+    init(nerdMode: Bool = false) {
         tool = DeviceNavigationTool(.init(
-            mode: { mode }, nerdMode: { nerdMode },
+            nerdMode: { nerdMode },
             botName: { $0 == "nova" ? "Nova" : nil },
             open: { [weak self] place, steps, bot, note, _ in
                 self?.opened.append((place.id, bot?.id, note))

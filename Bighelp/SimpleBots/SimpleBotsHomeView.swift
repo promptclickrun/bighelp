@@ -23,8 +23,10 @@ struct SimpleBotsContext {
     /// Which bots are working or need you, kept current while the home shows.
     var activity: BotChatActivityStore? = nil
     var activitySource: BotChatActivitySource? = nil
-    /// The Header mode switcher (Settings › Modes); nil while it's off.
-    var modeSwitch: BighelpModeSwitch? = nil
+    /// The first tab's Bots | Chats switch; nil on a page that isn't the home (a section).
+    var viewSwitch: HomeViewSwitch? = nil
+    /// Opens or closes the sidebar, where there is one (iPad at regular width, Mac, Vision Pro).
+    var onToggleSidebar: (() -> Void)? = nil
     /// The sections, and group chats' pins and hides (`FleetStore`); nil leaves sections out.
     var fleet: FleetStore? = nil
     /// New Group Chat on the gateway in use; nil when it can't make group chats.
@@ -659,27 +661,22 @@ struct SimpleBotsHomeView: View {
         .background { SimpleBotsHeaderFade() }
     }
 
-    @ViewBuilder
+    /// You, the Bots | Chats switch and New on one row; Search (and the computer filter, to its
+    /// right) on the row under it, so the switch keeps the middle to itself.
     private var homeHeader: some View {
-        if let modeSwitch = context.modeSwitch {
-            modeHeader(modeSwitch)
-        } else {
-            classicHeader
-        }
-    }
-
-    /// With the Header mode switcher: you, the mode pill and New on one row; Search (and Filter by
-    /// Gateway, to its right) on the row under it, so the pill keeps the middle to itself.
-    private func modeHeader(_ modeSwitch: BighelpModeSwitch) -> some View {
         VStack(spacing: BighelpTokens.space12) {
             ZStack {
-                HStack {
+                HStack(spacing: BighelpTokens.space8) {
+                    if let onToggleSidebar = context.onToggleSidebar {
+                        SimpleBotsCircleButton(systemImage: "sidebar.leading", label: "Sidebar",
+                                               identifier: "home.sidebar-toggle", action: onToggleSidebar)
+                    }
                     SimpleBotsPersonButton(name: context.personName, imageURL: context.personImageURL,
                                            action: context.onOpenSettings)
                     Spacer()
                     newButton
                 }
-                BighelpModePill(modeSwitch: modeSwitch)
+                if let viewSwitch = context.viewSwitch { HomeViewSwitchPill(viewSwitch: viewSwitch) }
             }
             HStack(spacing: BighelpTokens.space8) {
                 Button { sheet = .search } label: {
@@ -703,28 +700,12 @@ struct SimpleBotsHomeView: View {
                 }
             }
         }
-        .padding(.horizontal, BighelpTokens.space20)
-        .padding(.top, BighelpTokens.space4)
+        // Placed as `HomeHeaderBar` places Chats', Today's and Work's, so nothing moves when the
+        // switch or the bar changes the root.
+        .padding(HeaderButtonMetrics.slop)
+        .bighelpHeaderButtonsPlacement()
         .padding(.bottom, BighelpTokens.space8)
-        .background { SimpleBotsHeaderFade() }
-    }
-
-    private var classicHeader: some View {
-        HStack(spacing: BighelpTokens.space8) {
-            SimpleBotsPersonButton(name: context.personName, imageURL: context.personImageURL,
-                                   action: context.onOpenSettings)
-            Spacer()
-            if let gateways = context.gateways?.filter {
-                gatewayFilterButton(gateways)
-            }
-            SimpleBotsCircleButton(systemImage: "magnifyingglass", label: "Search bots",
-                                   identifier: "simple-bots.search") { sheet = .search }
-            newButton
-        }
-        .padding(.horizontal, BighelpTokens.space20)
-        .padding(.top, BighelpTokens.space4)
-        .padding(.bottom, BighelpTokens.space8)
-        .background { SimpleBotsHeaderFade() }
+        .background { HomeHeaderBackground() }
     }
 
     /// New Bot, New Group Chat and New Section; each only where it can work.

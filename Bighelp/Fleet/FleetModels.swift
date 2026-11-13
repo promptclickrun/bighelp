@@ -123,6 +123,9 @@ struct FleetChat: Codable, Equatable, Sendable, Identifiable {
     var isActive: Bool
     /// Hermes' `source` for the chat (where it started); see `SessionOrigin`.
     var origin: String? = nil
+    /// Pinned on its computer, as of the last time that computer was the one in use (only its live
+    /// record says); nil when it was never read live.
+    var isPinned: Bool? = nil
 
     var id: String { FleetID.make(hostID, storedSessionID) }
 }

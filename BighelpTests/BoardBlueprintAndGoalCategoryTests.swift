@@ -40,15 +40,13 @@ struct BoardBlueprintAndGoalCategoryTests {
     }
 
     /// The root's right-edge strip (New chat by default) sat over the trailing edge of every
-    /// board row and took right-to-left drags first. On Feed, Ideas and Goals the rows own them.
-    @Test func boardRowsOwnSwipesFromTheTrailingEdge() {
-        for tab in [AppTab.feed, .ideas, .goals] {
-            #expect(!WorkspaceEdgeSwipeResolver.trailingEdgeIsActive(tab: tab, pathIsEmpty: true), "\(tab)")
-            #expect(WorkspaceEdgeSwipeResolver.trailingEdgeIsActive(tab: tab, pathIsEmpty: false),
-                    "A chat pushed over \(tab) keeps the edge")
-        }
-        #expect(WorkspaceEdgeSwipeResolver.trailingEdgeIsActive(tab: .apps, pathIsEmpty: true))
-        #expect(WorkspaceEdgeSwipeResolver.trailingEdgeIsActive(tab: .sessions, pathIsEmpty: true))
+    /// row that swipes and took right-to-left drags first. On Today's root the rows own them.
+    @Test func todaysRowsOwnSwipesFromTheTrailingEdge() {
+        #expect(!WorkspaceEdgeSwipeResolver.trailingEdgeIsActive(tab: .today, pathIsEmpty: true))
+        #expect(WorkspaceEdgeSwipeResolver.trailingEdgeIsActive(tab: .today, pathIsEmpty: false),
+                "A chat pushed over Today keeps the edge")
+        #expect(WorkspaceEdgeSwipeResolver.trailingEdgeIsActive(tab: .conversations, pathIsEmpty: true))
+        #expect(WorkspaceEdgeSwipeResolver.trailingEdgeIsActive(tab: .work, pathIsEmpty: true))
     }
 
     // MARK: Blueprints

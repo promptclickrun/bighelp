@@ -1,7 +1,7 @@
 import Foundation
 
 /// One place in bighelp an agent can take the person to (issue #662): a page, a sheet or a control,
-/// with the steps that reach it in each mode. `DriveCatalog` lists them; `DriveNavigator` plays one.
+/// with the steps that reach it. `DriveCatalog` lists them; `DriveNavigator` plays one.
 struct DrivePlace: Identifiable, Sendable {
     let id: String
     let title: String
@@ -10,8 +10,13 @@ struct DrivePlace: Identifiable, Sendable {
     /// Words a person might use for it, beside its title and `what`.
     let keywords: [String]
     let needs: Set<DriveNeed>
-    /// The steps in each mode. A mode without steps can't reach the place.
+    // One home: the catalog still writes its steps by the mode they were made for. Pass 2 makes
+    // this one list; only `steps` is read.
     let playbooks: [BighelpMode: [DriveStep]]
+
+    /// The steps that reach it in the one home: a bot's page for a place inside a bot, else the
+    /// page's own push or its Settings pages. Every place has them.
+    var steps: [DriveStep] { playbooks[.bots] ?? playbooks[.chat] ?? playbooks[.code] ?? [] }
 
     init(_ id: String, _ title: String, _ what: String, keywords: [String] = [], needs: Set<DriveNeed> = [],
          playbooks: [BighelpMode: [DriveStep]]) {
@@ -66,8 +71,8 @@ struct DriveStep: Equatable, Sendable {
 enum DriveMove: Equatable, Sendable {
     /// Pushes a page over where the person is (the chat stays under it for Return to chat).
     case push(AppRoute)
-    /// A root place without a route (Agents, the chat list).
-    case tab(AppTab)
+    /// One of the home's three places; `view` picks Bots or Chats on the first.
+    case tab(HomeTab, view: HomeConversationsView? = nil)
     /// The bot's profile, on a tab and with a sheet. A profile already open takes the change live.
     case botProfile(BotProfileOpening)
     /// The Settings sheet, on these pages.

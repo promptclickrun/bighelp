@@ -85,7 +85,7 @@ struct HomeHeaderBar: View {
         .padding(HeaderButtonMetrics.slop)
         .bighelpHeaderButtonsPlacement()
         .padding(.bottom, BighelpTokens.space8)
-        .background { SimpleBotsHeaderFade() }
+        .background { HomeHeaderBackground() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("home.header")
     }
@@ -200,6 +200,25 @@ struct HomeHeaderBar: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Add")
         .accessibilityIdentifier("home.new")
+    }
+}
+
+/// Behind a home root's header: the page color under the whole header, so a title is never drawn
+/// over the rows scrolling by, then a short fade below it where they scroll away.
+struct HomeHeaderBackground: View {
+    @BighelpThemeReader private var theme
+
+    private static let fade: CGFloat = 16
+
+    var body: some View {
+        theme.canvas
+            .ignoresSafeArea(edges: .top)
+            .overlay(alignment: .bottom) {
+                LinearGradient(colors: [theme.canvas, theme.canvas.opacity(0)], startPoint: .top, endPoint: .bottom)
+                    .frame(height: Self.fade)
+                    .offset(y: Self.fade)
+            }
+            .allowsHitTesting(false)
     }
 }
 

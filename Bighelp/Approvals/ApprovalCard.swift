@@ -208,7 +208,7 @@ struct ApprovalCard: View {
     private func resolvedStatusText(_ decision: ApprovalDecision) -> String {
         switch decision {
         case .once: "Approved this time."
-        case .session: "Approved for this session."
+        case .session: "Approved for this chat."
         case .always: "Always approved."
         case .deny: "Denied by Hermes."
         }

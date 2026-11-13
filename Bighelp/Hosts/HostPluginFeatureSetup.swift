@@ -40,7 +40,7 @@ struct HostPluginFeatureSection: View {
     @Environment(\.bighelpHostRegistry) private var registry
     @Environment(\.scenePhase) private var scenePhase
     @State private var setup: HostNotificationSetupModel?
-    @State private var status = "Checking the selected host…"
+    @State private var status = "Checking the selected computer…"
     @State private var action: String?
     @State private var checking = false
     @State private var ready = false
@@ -166,7 +166,7 @@ struct HostPluginFeatureSection: View {
               let workspace = registry.selectedWorkspace, workspace.isConnected,
               let direct = workspace.nativeClient,
               let authority = workspace.savedConnection?.workspaceAuthority else {
-            status = "Connect to a Hermes host to check the plugin."
+            status = "Connect to a Hermes computer to check the plugin."
             return
         }
         let generation = registry.generation
@@ -226,14 +226,14 @@ struct HostPluginFeatureSection: View {
             ).filter { $0.name == "loopdy" }
             guard owns() else { return }
             if matches.isEmpty {
-                status = "The bighelp plugin is not installed on this host."
+                status = "The bighelp plugin is not installed on this computer."
                 action = "Install bighelp Plugin"
             } else if matches.count == 1, let installed = matches.first {
                 let latest = try? await GitHubPluginReleaseSource.shared.latest(refresh: false)
                 guard owns() else { return }
                 if let latest, let current = installed.version,
                    HostPluginPin.compare(current, latest.version) == .orderedAscending {
-                    status = "This host has bighelp plugin \(current). Version \(latest.version) is available."
+                    status = "This computer has bighelp plugin \(current). Version \(latest.version) is available."
                     action = "Update bighelp Plugin"
                 } else if installed.configuredEnabled {
                     status = nativeResponded
@@ -244,11 +244,11 @@ struct HostPluginFeatureSection: View {
                     action = "Enable bighelp Plugin"
                 }
             } else {
-                status = "Hermes reported more than one bighelp plugin. Review the installed plugins on your host."
+                status = "Hermes reported more than one bighelp plugin. Review the installed plugins on your computer."
             }
         } catch {
             guard owns() else { return }
-            status = "Plugin status could not be verified. Check your host connection and try again."
+            status = "Plugin status could not be verified. Check your computer connection and try again."
         }
     }
 
@@ -260,9 +260,9 @@ struct HostPluginFeatureSection: View {
         case WorkspaceClientError.unavailable(.pluginRequired)?:
             "The plugin is installed, but the Hermes dashboard on your computer hasn't loaded it yet. Restart the dashboard and the messaging gateway on your computer, then check again."
         case WorkspaceClientError.authenticationRequired?:
-            "The plugin is installed, but this host turned down bighelp's sign-in. Sign in to the host again, then check again."
+            "The plugin is installed, but this computer turned down bighelp's sign-in. Sign in to the computer again, then check again."
         default:
-            "The plugin is installed, but this host didn't answer bighelp just now. Check again in a moment."
+            "The plugin is installed, but this computer didn't answer bighelp just now. Check again in a moment."
         }
     }
 

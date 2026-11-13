@@ -540,7 +540,7 @@ struct AgentDirectoryStoreTests {
 
         #expect(store.profiles == [.defaultFixture])
         #expect(store.isLoading == false)
-        #expect(store.errorMessage == "Agents could not be loaded from Hermes. Check your Hermes connection and try again.")
+        #expect(store.errorMessage == "Bots could not be loaded from Hermes. Check your Hermes connection and try again.")
 
         try await store.load()
 
@@ -588,7 +588,7 @@ struct AgentDirectoryStoreTests {
         let remoteProfile = AgentProfile(
             id: "default",
             name: "Juno",
-            role: "Default agent",
+            role: "Default bot",
             summary: "General help",
             instructions: "Be helpful.",
             avatarFileName: nil,
@@ -622,7 +622,7 @@ struct AgentDirectoryStoreTests {
         let remoteProfile = AgentProfile(
             id: "default",
             name: "Juno",
-            role: "Default agent",
+            role: "Default bot",
             summary: "General help",
             instructions: "Be helpful.",
             avatarFileName: nil,

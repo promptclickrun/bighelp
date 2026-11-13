@@ -90,7 +90,7 @@ struct AgentRuntimeDefaultsModelTests {
 
         #expect(model.draft.mainChats.reasoningEffort == "max")
         #expect(model.isDirty)
-        #expect(model.errorMessage == "We couldn’t save these agent defaults. Your choices are still here.")
+        #expect(model.errorMessage == "We couldn’t save these bot defaults. Your choices are still here.")
     }
 
     @Test func transientCatalogFailureIsRetriedWithoutDiscardingTheDefaults() async {

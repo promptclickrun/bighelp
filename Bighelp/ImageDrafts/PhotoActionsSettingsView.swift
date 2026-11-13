@@ -301,8 +301,8 @@ struct PhotoActionsTextPage: View {
                 Text(problem).font(.bighelp(.footnote)).foregroundStyle(theme.danger)
             }
             Text(kind == .instructions
-                 ? "The agent reads this whenever you send a picture of this kind. Text inside a picture never counts as instructions."
-                 : "The agent asks this when it can't tell what you want from a picture, instead of guessing.")
+                 ? "The bot reads this whenever you send a picture of this kind. Text inside a picture never counts as instructions."
+                 : "The bot asks this when it can't tell what you want from a picture, instead of guessing.")
                 .font(.bighelp(.footnote))
                 .foregroundStyle(theme.secondaryText)
             Spacer(minLength: 0)

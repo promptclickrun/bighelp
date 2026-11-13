@@ -13,7 +13,7 @@ final class DirectHermesWorkspaceStore {
     private(set) var isConnecting = false
     private(set) var isConnected = false
     private(set) var requiresAuthentication = false
-    private(set) var status = "Connect your Hermes host."
+    private(set) var status = "Connect your Hermes computer."
     private(set) var profiles: [DirectHermesProfile] = []
     private(set) var sessions: [DirectHermesSessionSummary] = []
     private(set) var selectedChat: DirectHermesChat?
@@ -175,7 +175,7 @@ final class DirectHermesWorkspaceStore {
         let previous = retireConnection()
         let owner = generation
         isConnecting = true
-        status = "Reconnecting to your selected host…"
+        status = "Reconnecting to your selected computer…"
         let reconnectStart = ContinuousClock.now
         var reconnectOutcome = TelemetryOutcome.failed
         defer {
@@ -320,7 +320,7 @@ final class DirectHermesWorkspaceStore {
                 )
                 chat.client.suspend()
                 if selectedChat?.id == chat.id {
-                    status = "This native session could not be reattached. Its text is preserved; nothing was resent."
+                    status = "This native chat could not be reattached. Its text is preserved; nothing was resent."
                 }
             }
         }
@@ -528,7 +528,7 @@ final class DirectHermesWorkspaceStore {
             profiles = []
             sessions = []
             selectedProfile = ""
-            status = "Connection removed. Local drafts remain scoped to their original host and profile."
+            status = "Connection removed. Local drafts remain scoped to their original computer and profile."
         } catch { status = DirectHermesConversationClient.safeMessage(error) }
     }
 
@@ -554,7 +554,7 @@ final class DirectHermesWorkspaceStore {
     func newChat() async { await open(nil) }
     func openSession(_ summary: DirectHermesSessionSummary) async {
         guard summary.supportsNativeResume else {
-            status = "This history belongs to another Hermes surface. Continue it there; Direct will not take over its active gateway session."
+            status = "This history belongs to another Hermes surface. Continue it there; Direct will not take over its active gateway chat."
             return
         }
         await open(summary)

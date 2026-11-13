@@ -639,7 +639,7 @@ private final class NonRepositoryProjectGitClient: ProjectGitClient {
         throw BighelpLinkWorkspaceClientError.remote(
             status: .failed,
             code: "project_not_repository",
-            message: "This Project is not a Git repository."
+            message: "This project is not a Git repository."
         )
     }
 
@@ -661,7 +661,7 @@ private final class CountingNonRepositoryProjectGitClient: ProjectGitClient {
         throw BighelpLinkWorkspaceClientError.remote(
             status: .failed,
             code: "project_not_repository",
-            message: "This Project is not a Git repository."
+            message: "This project is not a Git repository."
         )
     }
 
@@ -682,7 +682,7 @@ private final class DeferredNonRepositoryProjectGitClient: ProjectGitClient {
             throw BighelpLinkWorkspaceClientError.remote(
                 status: .failed,
                 code: "project_not_repository",
-                message: "This Project is not a Git repository."
+                message: "This project is not a Git repository."
             )
         }
         return try await withCheckedThrowingContinuation { continuation in
@@ -698,7 +698,7 @@ private final class DeferredNonRepositoryProjectGitClient: ProjectGitClient {
         continuation?.resume(throwing: BighelpLinkWorkspaceClientError.remote(
             status: .failed,
             code: "project_not_repository",
-            message: "This Project is not a Git repository."
+            message: "This project is not a Git repository."
         ))
         continuation = nil
     }
@@ -730,7 +730,7 @@ private final class RecheckingProjectGitClient: ProjectGitClient {
             throw BighelpLinkWorkspaceClientError.remote(
                 status: .failed,
                 code: "project_not_repository",
-                message: "This Project is not a Git repository."
+                message: "This project is not a Git repository."
             )
         case .status(let status):
             pendingStatus = status

@@ -205,7 +205,7 @@ final class DirectHermesToolsetClient: ToolsetManagementClient {
             try requireOwner()
             return value
         } catch DirectHermesError.unsupportedAuthentication where route.isCapabilityProbe {
-            throw CapabilitiesManagementError.unsupportedHost("This Hermes host does not expose typed toolset management.")
+            throw CapabilitiesManagementError.unsupportedHost("This Hermes computer does not expose typed toolset management.")
         } catch DirectHermesError.unsupportedAuthentication {
             throw CapabilitiesManagementError.invalidResponse
         }

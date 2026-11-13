@@ -151,7 +151,7 @@ struct ConnectorAppsView: View {
         }
         Section {
         } footer: {
-            Text("Your agents can use the apps you connect, in any chat. Hermes keeps your sign-ins in its app service, and makes a free account there for this computer when you connect your first app.")
+            Text("Your bots can use the apps you connect, in any chat. Hermes keeps your sign-ins in its app service, and makes a free account there for this computer when you connect your first app.")
         }
     }
 
@@ -345,7 +345,7 @@ struct ConnectorAppDetailView: View {
                         Text("Accounts")
                     } footer: {
                         if app.liveAccounts.count > 1 {
-                            Text("Your agent asks which account to use, by its name.")
+                            Text("Your bot asks which account to use, by its name.")
                         }
                     }
                 }
@@ -378,7 +378,7 @@ struct ConnectorAppDetailView: View {
             Button("Cancel", role: .cancel) {}
             Button(saveTitle(request)) { save(request) }
         } message: { _ in
-            Text("Your agent uses this name to pick the account.")
+            Text("Your bot uses this name to pick the account.")
         }
         .confirmationDialog(removing.map { "Remove \($0.title)?" } ?? "",
                             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
@@ -386,7 +386,7 @@ struct ConnectorAppDetailView: View {
             Button("Remove", role: .destructive) { Task { await model.remove(account) } }
                 .accessibilityIdentifier("connector.apps.remove-confirm")
         } message: { _ in
-            Text("Your agents can't use this account after that.")
+            Text("Your bots can't use this account after that.")
         }
         .onChange(of: scenePhase) { _, phase in
             // The Mac signs in in the default browser; coming back to bighelp means done.

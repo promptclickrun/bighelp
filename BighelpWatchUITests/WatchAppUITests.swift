@@ -45,7 +45,7 @@ final class WatchAppUITests: XCTestCase {
         let session = app.buttons["watch.decide.session"]
         XCTAssertTrue(reveal("watch.decide.session", in: app))
         session.tap()
-        XCTAssertTrue(app.staticTexts["Your agent won't ask again in this chat."].waitForExistence(timeout: 5),
+        XCTAssertTrue(app.staticTexts["Your bot won't ask again in this chat."].waitForExistence(timeout: 5),
                       "Approving for the whole chat asks first")
         save("05-approval-confirm", app)
     }

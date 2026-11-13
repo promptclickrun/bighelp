@@ -27,7 +27,7 @@ enum AgentActionsPresentation {
     static func unavailableMessage(_ availability: WorkspaceAvailability) -> String? {
         switch availability {
         case .available: nil
-        case .unknown: "Checking what this host supports."
+        case .unknown: "Checking what this computer supports."
         case .unavailable(let reason): reason.message
         }
     }

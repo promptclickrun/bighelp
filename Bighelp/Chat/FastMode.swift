@@ -19,9 +19,9 @@ struct FastMode: Equatable, Sendable {
         switch value {
         case "normal": "Off"
         case "fast": "On"
-        case "auto": "Auto (set on host)"
-        case "cold": "Cold (set on host)"
-        default: "Set on host"
+        case "auto": "Auto (set on computer)"
+        case "cold": "Cold (set on computer)"
+        default: "Set on computer"
         }
     }
 

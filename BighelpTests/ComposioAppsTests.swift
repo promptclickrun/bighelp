@@ -175,7 +175,7 @@ struct ComposioAppsTests {
         #expect(try await hermes.agentHost().access() == .ready(server: "composio"))
     }
 
-    /// A refused sign-in offers "Sign in for my agent" again: Hermes' own MCP sign-in, with no
+    /// A refused sign-in offers "Sign in for my bot" again: Hermes' own MCP sign-in, with no
     /// second install, then the test again.
     @Test func aRefusedSignInSignsInAgainForTheAgent() async throws {
         let hermes = try ComposioHermes(tests: [ComposioHermes.refused, ComposioHermes.refused, ComposioHermes.reached])

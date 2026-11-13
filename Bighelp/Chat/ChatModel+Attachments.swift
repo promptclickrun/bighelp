@@ -203,7 +203,7 @@ extension ChatModel {
               pdfAttachmentTarget == target,
               orderedAttachments.compactMap(\.pdfSelection).allSatisfy({ $0.target == target }),
               orderedAttachments.compactMap(\.ordinaryAttachment) == ordinaryAttachments else {
-            failureMessage = "These PDF pages belong to an earlier Hermes session. Remove them and add the pages again; your message text is unchanged."
+            failureMessage = "These PDF pages belong to an earlier Hermes chat. Remove them and add the pages again; your message text is unchanged."
             retryRequest = nil
             return
         }
@@ -250,7 +250,7 @@ extension ChatModel {
                 removeItem(id: human.id)
                 removeProjectedMessage(id: human.id)
                 sharesReturnToBox(from: [human.id])
-                failureMessage = "The Hermes session changed before sending. Remove and re-add the PDF pages; your message text is unchanged."
+                failureMessage = "The Hermes chat changed before sending. Remove and re-add the PDF pages; your message text is unchanged."
                 return
             }
         }
@@ -280,7 +280,7 @@ extension ChatModel {
             guard nativeConversationClient === native,
                   native.currentPDFAttachmentTarget == target,
                   receipt.pdfAttachments.allSatisfy({ $0.target == target }) else {
-                failureMessage = "Hermes accepted work for the earlier session. The local PDF draft is retained and must not be sent again."
+                failureMessage = "Hermes accepted work for the earlier chat. The local PDF draft is retained and must not be sent again."
                 retryRequest = nil
                 return
             }
@@ -302,7 +302,7 @@ extension ChatModel {
             retryRequest = nil
         } catch {
             if native.currentPDFAttachmentTarget != target {
-                failureMessage = "The Hermes session changed while attaching PDF pages. Your text and selections are retained as stale and will not be retried."
+                failureMessage = "The Hermes chat changed while attaching PDF pages. Your text and selections are retained as stale and will not be retried."
             } else {
                 failureMessage = "PDF-page delivery is unconfirmed. Your exact draft is retained for review and will not be retried."
             }

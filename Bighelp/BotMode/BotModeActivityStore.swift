@@ -301,11 +301,11 @@ final class BotModeActivityStore {
     private static func sourceMessage(_ page: HermesBotModeActivityPage) -> String {
         switch page.sourceState {
         case .registeredUnobserved:
-            "The host registered tool observations; none have been received. Source loss cannot be measured."
+            "The computer registered tool observations; none have been received. Source loss cannot be measured."
         case .observed:
             "Recent live tool observations may be incomplete; source loss cannot be measured. Finished does not establish success."
         case .unsupportedPayload:
-            "Some host tool activity could not be read. Source loss cannot be measured."
+            "Some computer tool activity could not be read. Source loss cannot be measured."
         }
     }
 }

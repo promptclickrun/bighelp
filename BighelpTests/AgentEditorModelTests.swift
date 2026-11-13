@@ -162,7 +162,7 @@ struct AgentEditorModelTests {
         #expect(model.draft.instructions == "Canonical remote SOUL.")
         #expect(model.pendingAvatar != nil)
         #expect(model.hasUnsavedChanges)
-        #expect(model.saveError?.contains("agent was saved") == true)
+        #expect(model.saveError?.contains("bot was saved") == true)
         #expect(store.profiles == [committed])
 
         let saved = try await model.save()

@@ -11,9 +11,9 @@ enum BighelpLinkWorkspaceClientError: Error, Equatable, LocalizedError {
         case .invalidRequest:
             "The skill file or request is invalid."
         case .invalidResponse:
-            "Hermes returned an invalid workspace response."
+            "Hermes returned an invalid response."
         case .remote(_, _, let message):
-            message ?? "Hermes could not complete this workspace request."
+            message ?? "Hermes could not complete this request."
         }
     }
 }
@@ -95,7 +95,7 @@ enum HermesCapabilityCompatibilityError: LocalizedError {
     case updateRequired
 
     var errorDescription: String? {
-        "This host supports browsing only. Update Hermes and deploy the matching bighelp host plugin to edit, create, import, or manage capabilities."
+        "This computer supports browsing only. Update Hermes and deploy the matching bighelp plugin on the computer to edit, create, import, or manage capabilities."
     }
 }
 

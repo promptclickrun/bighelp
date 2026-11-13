@@ -26,7 +26,7 @@ struct PluginUpdateStatus: Equatable, Sendable {
             case .installedRestartRequired: "Restart required"
             case .blocked: "Update needs attention"
             case .failed: "Update failed"
-            case .timedOut: "Still waiting for the host"
+            case .timedOut: "Still waiting for the computer"
             }
         }
     }
@@ -50,8 +50,8 @@ enum PluginUpdateClientError: Error, LocalizedError {
     case unsupported, invalidResponse
     var errorDescription: String? {
         switch self {
-        case .unsupported: "This host needs the initial updater-capable bighelp plugin installed before it can update from the app."
-        case .invalidResponse: "The host has not provided matching update confirmation. No completion was recorded."
+        case .unsupported: "This computer needs the initial updater-capable bighelp plugin installed before it can update from the app."
+        case .invalidResponse: "The computer has not provided matching update confirmation. No completion was recorded."
         }
     }
 }
@@ -106,7 +106,7 @@ final class PluginUpdateStore {
     var isReconnecting: Bool { (isPending && message != nil) || status?.phase == .waitingForActivation }
     var title: String {
         if isPending, message != nil { return "Reconnecting" }
-        return status?.phase.title ?? (isWorking ? "Checking host" : "bighelp Plugin")
+        return status?.phase.title ?? (isWorking ? "Checking computer" : "bighelp Plugin")
     }
 
     func invalidate() { valid = false }
@@ -198,8 +198,8 @@ final class PluginUpdateStore {
             message = error.localizedDescription
         } else {
             message = isPending
-                ? "Waiting for the same host to reconnect and confirm this update."
-                : "The host could not be reached. Try checking its status again."
+                ? "Waiting for the same computer to reconnect and confirm this update."
+                : "The computer could not be reached. Try checking its status again."
         }
     }
 }

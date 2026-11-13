@@ -202,7 +202,7 @@ struct WorkflowLoadStateView: View {
             ContentUnavailableView {
                 Label("Update the bighelp plugin", systemImage: "puzzlepiece.extension")
             } description: {
-                Text("Update the bighelp plugin to use Workflows. Hosts › your computer › Update plugin.")
+                Text("Update the bighelp plugin to use Workflows. Your computers › your computer › Update plugin.")
             }
             .accessibilityIdentifier("workflows.update-plugin")
         case .needsHermesUpdate:

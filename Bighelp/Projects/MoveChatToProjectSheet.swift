@@ -78,7 +78,7 @@ struct MoveChatToProjectSheet: View {
                             .foregroundStyle(theme.danger)
                             .accessibilityIdentifier("chat.move-project.error")
                     } else {
-                        Text("The chat keeps its messages. The agent works in the project you pick.")
+                        Text("The chat keeps its messages. The bot works in the project you pick.")
                     }
                 }
                 .listRowBackground(theme.surface)

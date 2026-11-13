@@ -26,7 +26,7 @@ struct BighelpToolActivityCatalogTests {
             "todo_list": "Updating the to-do list…",
             "cronjob": "Scheduling a task…",
             "clarify": "Asking you a question…",
-            "delegate_task": "Asking another agent…",
+            "delegate_task": "Asking another bot…",
             "send_message": "Sending a message…",
             "text_to_speech": "Making a voice clip…",
             "bighelp_board": "Posting an update…",

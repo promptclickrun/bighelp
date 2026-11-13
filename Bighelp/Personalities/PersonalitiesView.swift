@@ -79,7 +79,7 @@ struct PersonalitiesView: View {
                 Text(
                     personality.isBuiltIn
                         ? "Your changes will be removed and Hermes’ built-in version will return."
-                        : "This removes \(personality.name) from Hermes. Existing session history is unchanged."
+                        : "This removes \(personality.name) from Hermes. Existing chat history is unchanged."
                 )
             }
         }
@@ -98,7 +98,7 @@ struct PersonalitiesView: View {
                 } label: {
                     personalityChoice(
                         title: "No overlay",
-                        detail: "Use the agent’s base behavior",
+                        detail: "Use the bot’s base behavior",
                         isSelected: store.catalog?.activeName.isEmpty == true
                     )
                 }

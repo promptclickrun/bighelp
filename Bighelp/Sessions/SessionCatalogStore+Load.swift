@@ -114,14 +114,14 @@ extension SessionCatalogStore {
             }
             if hasUsableLocalState {
                 loadErrorMessage = nil
-                refreshErrorMessage = "Sessions could not be refreshed. Try again."
+                refreshErrorMessage = "Chats could not be refreshed. Try again."
                 if !requireAuthoritativeRefresh {
                     return
                 }
                 throw error
             }
             refreshErrorMessage = nil
-            loadErrorMessage = "Sessions could not be loaded. Try again."
+            loadErrorMessage = "Chats could not be loaded. Try again."
             throw error
         }
 

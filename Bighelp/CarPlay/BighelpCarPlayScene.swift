@@ -98,7 +98,7 @@ final class CarPlayVoiceController: NSObject, CPInterfaceControllerDelegate {
             // Voice apps arrived in CarPlay with iOS 26.4.
             let info = CPInformationTemplate(
                 title: "bighelp", layout: .leading,
-                items: [CPInformationItem(title: nil, detail: "Update your iPhone to talk to your agent in CarPlay.")],
+                items: [CPInformationItem(title: nil, detail: "Update your iPhone to talk to your bot in CarPlay.")],
                 actions: [])
             interface.setRootTemplate(info, animated: false, completion: nil)
             return
@@ -159,7 +159,7 @@ final class CarPlayVoiceController: NSObject, CPInterfaceControllerDelegate {
                                            limit: min(CarPlayAgentChoice.maximumListed, Int(CPListTemplate.maximumItemCount)))
         if rows != shownAgents {
             shownAgents = rows
-            home.updateSections(rows.isEmpty ? [] : [CPListSection(items: rows.map(item(for:)), header: "Agents",
+            home.updateSections(rows.isEmpty ? [] : [CPListSection(items: rows.map(item(for:)), header: "Bots",
                                                                     sectionIndexTitle: nil)])
         }
         let phase = session.phase
@@ -423,7 +423,7 @@ enum CarPlayVoiceStates {
         end: @escaping @MainActor @Sendable () -> Void,
         agents: @escaping @MainActor @Sendable () -> Void
     ) -> [CPVoiceControlState] {
-        let who = name ?? "your agent"
+        let who = name ?? "your bot"
         func picture(_ ring: CarPlayFaces.Ring, symbol fallback: String, values: [Double]) -> UIImage {
             face.map { CarPlayFaces.voice($0, ring: ring) } ?? animated([fallback], values: values)
         }
@@ -442,7 +442,7 @@ enum CarPlayVoiceStates {
                 let stop = CPButton(image: symbol("xmark"), handler: CarPlayCallbacks.button(end))
                 stop.title = "End"
                 let list = CPButton(image: symbol("person.2"), handler: CarPlayCallbacks.button(agents))
-                list.title = "Agents"
+                list.title = "Bots"
                 state.actionButtons = [stop, list]
             }
         }

@@ -173,7 +173,7 @@ final class WorkflowRunModel {
             return false
         }
         if decision == .changes, notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            message = "Say what to change, so the agent knows what to do."
+            message = "Say what to change, so the bot knows what to do."
             return false
         }
         isWorking = true

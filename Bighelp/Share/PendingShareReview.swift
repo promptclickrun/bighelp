@@ -309,13 +309,13 @@ struct PendingShareReviewView: View {
             agentID = nil
             sessionID = nil
             pickedScope = nil
-            notice = String(localized: "You switched computers. Pick the agent again.")
+            notice = String(localized: "You switched computers. Pick the bot again.")
         }
         .accessibilityIdentifier("pending-share.review")
     }
 
     private var againTitle: String {
-        String(localized: "This may have reached \(placement?.agentName ?? String(localized: "the agent")) already. Look in that chat first.")
+        String(localized: "This may have reached \(placement?.agentName ?? String(localized: "the bot")) already. Look in that chat first.")
     }
 
     // MARK: - What it holds
@@ -385,7 +385,7 @@ struct PendingShareReviewView: View {
     private var destination: some View {
         Section {
             if agents.isEmpty {
-                Text("No agents to send it to yet.")
+                Text("No bots to send it to yet.")
                     .font(.bighelp(.body))
                     .foregroundStyle(theme.secondaryText)
                     .listRowBackground(theme.surface)
@@ -399,7 +399,7 @@ struct PendingShareReviewView: View {
                 }
             }
         } header: {
-            Text(context.computerName.map { String(localized: "Agent on \($0)") } ?? String(localized: "Agent"))
+            Text(context.computerName.map { String(localized: "Bot on \($0)") } ?? String(localized: "Bot"))
         } footer: {
             if let notice {
                 Text(notice).foregroundStyle(theme.danger)
@@ -471,11 +471,11 @@ struct PendingShareReviewView: View {
             self.agentID = nil
             sessionID = nil
             self.pickedScope = nil
-            notice = String(localized: "You switched computers. Pick the agent again.")
+            notice = String(localized: "You switched computers. Pick the bot again.")
         case .agentGone?:
             self.agentID = nil
             sessionID = nil
-            notice = String(localized: "That agent isn't on this computer anymore. Pick another.")
+            notice = String(localized: "That bot isn't on this computer anymore. Pick another.")
         case .chatGone?:
             sessionID = nil
             notice = String(localized: "That chat isn't here anymore. Pick another, or a new chat.")

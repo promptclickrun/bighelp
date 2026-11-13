@@ -261,7 +261,7 @@ final class DirectHermesAgentRuntimeDefaultsClient: AgentRuntimeDefaultsConfirmi
             "This is the global default. Hermes may apply a model-specific reasoning override."
         if hasEndpointOverride {
             support.modelUnavailableReasons[.subagents] =
-                "Hermes uses a custom endpoint for subagents. Change that override on the host before choosing a different provider here."
+                "Hermes uses a custom endpoint for subagents. Change that override on the computer before choosing a different provider here."
         }
         let defaults = AgentRuntimeDefaults(
             mainChats: AgentRuntimeSelection(providerID: provider, modelID: modelID,

@@ -18,11 +18,11 @@ enum AgentRuntimeScope: String, CaseIterable, Identifiable, Sendable {
     var detail: String {
         switch self {
         case .mainChats:
-            "Used when you start a regular chat with this agent."
+            "Used when you start a regular chat with this bot."
         case .subagents:
-            "Used when this agent delegates work to another agent."
+            "Used when this bot delegates work to a helper."
         case .scheduledTasks:
-            "Used for new scheduled tasks created for this agent."
+            "Used for new scheduled tasks created for this bot."
         }
     }
 

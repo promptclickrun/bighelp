@@ -6,8 +6,8 @@ extension RootShellView {
     @ViewBuilder
     func routeDestination(_ route: AppRoute) -> some View {
         if nativeWorkspaceStore != nil, nativeRuntime == nil {
-            ContentUnavailableView("Not available on this host", systemImage: "server.rack",
-                description: Text("This capability is not connected through the selected native host."))
+            ContentUnavailableView("Not available on this computer", systemImage: "server.rack",
+                description: Text("This capability is not connected through the selected computer."))
         } else {
         switch (route, featureStore.preparedModel(for: route)) {
         case (.workspaceSettings, _):
@@ -57,7 +57,7 @@ extension RootShellView {
                     .accessibilityIdentifier("workspace.connections")
             } else {
                 WorkspaceUnavailableView(destination: .instances, hostName: workspaceHostName,
-                                         reason: "Host selection is unavailable in this presentation.")
+                                         reason: "Computer selection is unavailable in this presentation.")
             }
         case (.workspaceManagement(let destination), _):
             if destination == .logs {
@@ -92,7 +92,7 @@ extension RootShellView {
                     }
                 } else {
                     WorkspaceUnavailableView(destination: destination, hostName: workspaceHostName,
-                        reason: "Reopen this feature for the selected host and profile.")
+                        reason: "Reopen this feature for the selected computer and profile.")
                 }
             } else if let kind = CapabilitiesManagementKind(destination: destination), opensNativeCapabilities(kind) {
                 nativeCapabilitiesDestination(kind, destination: destination)
@@ -103,7 +103,7 @@ extension RootShellView {
                                         onOpenExisting: openWorkspaceDestination)
             } else {
                 WorkspaceUnavailableView(destination: destination, hostName: workspaceHostName,
-                                         reason: "This feature requires an available native host connection.")
+                                         reason: "This feature requires an available computer connection.")
             }
         case (.chat(let conversationID), .chat(let model)?):
             let switcher = chatSwitcherColumn(for: conversationID,

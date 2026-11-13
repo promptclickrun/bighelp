@@ -241,8 +241,8 @@ extension ChatModel {
                 guard isCurrentOwner(generation) else { return }
                 if botModeRoomStore.room(id: roomID)?.memberFailures.isEmpty == false {
                     failureMessage = hasRetryableBotModeFailures
-                        ? "Some agents could not respond. Retry the failed agents."
-                        : "Some agents could not respond. You can send a new message."
+                        ? "Some bots could not respond. Retry the failed bots."
+                        : "Some bots could not respond. You can send a new message."
                     retryRequest = hasRetryableBotModeFailures ? .botModeRetry(roomID) : nil
                 }
             } catch is CancellationError {
@@ -710,8 +710,8 @@ extension ChatModel {
                 draft = ""
                 if botModeRoomStore.room(id: roomID)?.memberFailures.isEmpty == false {
                     failureMessage = hasRetryableBotModeFailures
-                        ? "Some agents could not respond. Retry the failed agents."
-                        : "Some agents could not respond. You can send a new message."
+                        ? "Some bots could not respond. Retry the failed bots."
+                        : "Some bots could not respond. You can send a new message."
                     retryRequest = hasRetryableBotModeFailures ? .botModeRetry(roomID) : nil
                 }
             case .botModeRetry(let roomID):
@@ -725,8 +725,8 @@ extension ChatModel {
                 guard isCurrentOwner(generation) else { return }
                 if botModeRoomStore.room(id: roomID)?.memberFailures.isEmpty == false {
                     failureMessage = hasRetryableBotModeFailures
-                        ? "Some agents could not respond. Retry the failed agents."
-                        : "Some agents could not respond. You can send a new message."
+                        ? "Some bots could not respond. Retry the failed bots."
+                        : "Some bots could not respond. You can send a new message."
                     retryRequest = hasRetryableBotModeFailures ? .botModeRetry(roomID) : nil
                 }
             case .send(let message, let attachments):
@@ -766,7 +766,7 @@ extension ChatModel {
                 rememberNativeBotModeSendRecovery(message: message, roomID: roomID)
             case .botModeRetry(let roomID):
                 retryRequest = .botModeRetry(roomID)
-                failureMessage = "Some agents could not respond. Retry the failed agents."
+                failureMessage = "Some bots could not respond. Retry the failed bots."
             default:
                 failureMessage = "That action is still unavailable."
             }
@@ -906,7 +906,7 @@ extension ChatModel {
         } else {
             failureMessage = refusal.code == 4090
                 ? "Hermes is at its limit of open chats. Finish a chat in another Hermes window, then send again. Your text has been kept; it was not sent again."
-                : "This session is no longer attached on Hermes. Reopen it before sending. Your text has been kept; it was not sent again."
+                : "This chat is no longer attached on Hermes. Reopen it before sending. Your text has been kept; it was not sent again."
         }
         retryRequest = nil
         persistSession()

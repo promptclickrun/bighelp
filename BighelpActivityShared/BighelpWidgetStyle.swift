@@ -271,5 +271,5 @@ extension BighelpWidgetSnapshot {
         return session.activity.flatMap(BighelpActivityPose.init(rawValue:)) ?? .thinking
     }
 
-    var agentDisplayName: String { defaultAgentName ?? "Your agent" }
+    var agentDisplayName: String { defaultAgentName ?? "Your bot" }
 }

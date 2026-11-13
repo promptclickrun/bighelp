@@ -19,7 +19,7 @@ enum ApprovalDecision: String, Codable, CaseIterable, Equatable, Sendable {
     var buttonTitle: String {
         switch self {
         case .once: "Approve this time"
-        case .session: "Approve this session"
+        case .session: "Approve this chat"
         case .always: "Always Approve"
         case .deny: "Deny"
         }
@@ -28,8 +28,8 @@ enum ApprovalDecision: String, Codable, CaseIterable, Equatable, Sendable {
     var accessibilityHint: String {
         switch self {
         case .once: "Allows only this exact Hermes request."
-        case .session: "Allows matching requests for this Hermes session."
-        case .always: "Allows matching requests in future Hermes sessions."
+        case .session: "Allows matching requests for this Hermes chat."
+        case .always: "Allows matching requests in future Hermes chats."
         case .deny: "Denies this exact Hermes request."
         }
     }

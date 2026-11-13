@@ -55,7 +55,7 @@ enum UsageExportHTML {
         body += totals(summary)
         body += when(summary, palette)
         body += breakdown("By model", summary.models, snapshot, palette, showsDetail: false)
-        body += breakdown("By agent", summary.agents, snapshot, palette, showsDetail: summary.isMultiHost)
+        body += breakdown("By bot", summary.agents, snapshot, palette, showsDetail: summary.isMultiHost)
         if summary.isMultiHost { body += breakdown("By computer", summary.hosts, snapshot, palette, showsDetail: false) }
         body += "<footer>Numbers from Hermes on each computer. Costs are Hermes' estimates. Shared from bighelp.</footer>\n"
         return """
@@ -125,7 +125,7 @@ enum UsageExportHTML {
                 if let used = computer.used[provider.id] {
                     var parts = ["\(UsageFormat.short(used.tokens)) tokens"]
                     if used.cost > 0 { parts.append(UsageFormat.money(used.cost)) }
-                    html += "<p class=\"muted small used\">Your agents: \(escape(parts.joined(separator: " · "))) in \(snapshot.range.days) days</p>\n"
+                    html += "<p class=\"muted small used\">Your bots: \(escape(parts.joined(separator: " · "))) in \(snapshot.range.days) days</p>\n"
                 }
                 html += "</div>\n"
             }
@@ -140,7 +140,7 @@ enum UsageExportHTML {
         let note: String = if metric == .tokens { "Uncached input plus output" }
             else if summary.totals.billedCost > 0 {
                 "Estimated by Hermes. Providers billed \(UsageFormat.money(summary.totals.billedCost))."
-            } else { "Estimated by Hermes from your agents' sessions" }
+            } else { "Estimated by Hermes from your bots' chats" }
         let values = summary.points.map { $0.amount.value(metric) }
         let top = values.max() ?? 0
         let width = 640.0, height = 150.0
@@ -186,13 +186,13 @@ enum UsageExportHTML {
             rows.append(("Cache hit rate", "of all input came from the cache", UsageFormat.percent(share)))
         }
         rows.append(("Input", "uncached", UsageFormat.count(totals.inputTokens)))
-        rows.append(("Output", "written by your agents", UsageFormat.count(totals.outputTokens)))
+        rows.append(("Output", "written by your bots", UsageFormat.count(totals.outputTokens)))
         rows.append(("Estimated cost", totals.billedCost > 0 ? "Providers billed \(UsageFormat.money(totals.billedCost))"
                         : "Estimated by Hermes", UsageFormat.money(totals.cost)))
         if let messages = totals.messages {
-            rows.append(("Messages", "across \(UsageFormat.count(totals.sessions)) sessions", UsageFormat.count(messages)))
+            rows.append(("Messages", "across \(UsageFormat.count(totals.sessions)) chats", UsageFormat.count(messages)))
         } else {
-            rows.append(("Sessions", "\(UsageFormat.count(totals.apiCalls)) model calls", UsageFormat.count(totals.sessions)))
+            rows.append(("Chats", "\(UsageFormat.count(totals.apiCalls)) model calls", UsageFormat.count(totals.sessions)))
         }
         var html = "<section id=\"totals\">\n<h2>Totals</h2>\n<div class=\"card list\">\n"
         for (title, detail, value) in rows {
@@ -208,13 +208,13 @@ enum UsageExportHTML {
         var html = "<section id=\"when\">\n<h2>When you use it</h2>\n<div class=\"card\">\n"
         let busiest = summary.weekdays.indices.max { summary.weekdays[$0] < summary.weekdays[$1] } ?? 0
         html += "<div class=\"row\"><strong>\(names[busiest])</strong><span class=\"badge\">Busiest</span>"
-            + "<span class=\"muted\">\(UsageFormat.count(summary.weekdays[busiest])) sessions</span></div>\n"
+            + "<span class=\"muted\">\(UsageFormat.count(summary.weekdays[busiest])) chats</span></div>\n"
         html += bars(summary.weekdays, labels: names.map { String($0.prefix(1)) }, highlight: busiest, height: 74, palette)
         if let hours = summary.hours {
             let top = hours.indices.max { hours[$0] < hours[$1] } ?? 0
             let hourName = "\(top % 12 == 0 ? 12 : top % 12) \(top < 12 ? "AM" : "PM")"
             html += "<div class=\"rule\"></div><div class=\"row\"><strong>\(hourName)</strong><span class=\"badge\">Busiest</span>"
-                + "<span class=\"muted\">\(UsageFormat.count(hours[top])) sessions</span></div>\n"
+                + "<span class=\"muted\">\(UsageFormat.count(hours[top])) chats</span></div>\n"
             html += bars(hours, labels: (0..<24).map { $0 % 6 == 0 ? "\($0 % 12 == 0 ? 12 : $0 % 12) \($0 < 12 ? "AM" : "PM")" : "" },
                          highlight: top, height: 64, palette)
         }
@@ -232,7 +232,7 @@ enum UsageExportHTML {
             svg += "<rect x=\"\(number(Double(index) * step + step * 0.09))\" y=\"\(number(height - barHeight))\" "
                 + "width=\"\(number(step * 0.82))\" height=\"\(number(barHeight))\" rx=\"3\" "
                 + "fill=\"\(count == 0 ? palette.ghost : palette.bar)\" fill-opacity=\"\(index == highlight || count == 0 ? "1" : "0.32")\">"
-                + "<title>\(UsageFormat.count(count)) sessions</title></rect>"
+                + "<title>\(UsageFormat.count(count)) chats</title></rect>"
         }
         svg += "</svg>\n<div class=\"ticks\">" + labels.map { "<span>\(escape($0))</span>" }.joined() + "</div>\n"
         return svg
@@ -256,7 +256,7 @@ enum UsageExportHTML {
                 parts.append("\(UsageFormat.percent(share)) of \(metric == .cost ? "cost" : "tokens")")
                 parts.append(metric == .cost ? "\(UsageFormat.count(row.amount.tokens)) tokens"
                              : row.amount.cost > 0 ? UsageFormat.money(row.amount.cost) : "no cost")
-                parts.append(row.sessions == 1 ? "1 session" : "\(UsageFormat.count(row.sessions)) sessions")
+                parts.append(row.sessions == 1 ? "1 chat" : "\(UsageFormat.count(row.sessions)) chats")
                 if let cache = row.cacheShare { parts.append("\(UsageFormat.percent(cache)) cached") }
                 if let failure = row.failure { parts.append(failure) }
             }

@@ -529,7 +529,7 @@ private struct GenerativeUISelectionView: View {
                 .bighelpProminentButtonStyle()
                 .tint(theme.action)
                 .disabled(selection.isEmpty || interactions?.isCurrent != true || messageID.isEmpty)
-                .accessibilityHint("Sends your choice to the agent.")
+                .accessibilityHint("Sends your choice to the bot.")
                 .accessibilityIdentifier("chat.generative-ui.selection.send")
             }
 
@@ -1113,7 +1113,7 @@ private struct GenerativeUIFormSheet: View {
                     }
                     .bighelpProminentButtonStyle()
                     .tint(theme.action)
-                    .accessibilityHint("Sends your answers to the agent.")
+                    .accessibilityHint("Sends your answers to the bot.")
                     .accessibilityIdentifier("chat.generative-ui.form.send")
                 }
             }

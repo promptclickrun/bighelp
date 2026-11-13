@@ -10,7 +10,7 @@ enum BighelpLiveActivityProjection {
         to previous: State,
         agentName: String
     ) -> State {
-        let agent = BighelpActivityText.personName(agentName) ?? "Your agent"
+        let agent = BighelpActivityText.personName(agentName) ?? "Your bot"
         let phase: State.Phase
         let action: String
         switch event.kind {
@@ -38,7 +38,7 @@ enum BighelpLiveActivityProjection {
             phase = event.lifecycle.isTerminal ? .thinking : .delegating
             action = event.lifecycle.isTerminal
                 ? BighelpActivityStatus.reviewingDelegatedWork
-                : "\(agent) is working with other agents"
+                : "\(agent) is working with other bots"
         }
         return State(
             phase: phase,

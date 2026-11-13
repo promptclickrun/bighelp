@@ -184,14 +184,14 @@ struct ConnectorInlineCard: View {
     private var intro: String {
         let names = ListFormatter.localizedString(byJoining: operation.targets.map { store.app($0.name).name })
         if operation.targets.allSatisfy({ $0.kind == .connector }) {
-            return "Your agent wants to use \(names). Sign in once, and it can use \(operation.targets.count == 1 ? "it" : "them") right away."
+            return "Your bot wants to use \(names). Sign in once, and it can use \(operation.targets.count == 1 ? "it" : "them") right away."
         }
-        return "Your agent wants to use \(names) on your computer."
+        return "Your bot wants to use \(names) on your computer."
     }
 
     private var footnote: String {
         let minutes = max(1, Int(((operation.timeout ?? 300) / 60).rounded()))
-        let wait = "Your agent waits up to \(minutes) minute\(minutes == 1 ? "" : "s"), then goes on without it."
+        let wait = "Your bot waits up to \(minutes) minute\(minutes == 1 ? "" : "s"), then goes on without it."
         guard operation.targets.contains(where: { $0.kind == .connector }) else { return wait }
         return wait + " Sign-ins are kept by the Hermes app service, not on this phone or in the chat."
     }

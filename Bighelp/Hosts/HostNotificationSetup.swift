@@ -481,9 +481,9 @@ final class HostNotificationSetupModel {
         case .managementRejected:
             String(localized: "Retry Plugin Setup")
         case .permissionDenied:
-            String(localized: "Check Host Permission Again")
+            String(localized: "Check Computer Permission Again")
         case .unsupported:
-            String(localized: "Check Host Support Again")
+            String(localized: "Check Computer Support Again")
         case .replacementRequired:
             String(localized: "Check Installed Plugin Again")
         case .releaseUnavailable:

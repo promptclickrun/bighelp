@@ -274,7 +274,7 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
                         return
                     } catch {
                         guard let registry, registry.generation == generation else { return }
-                        registry.notificationSetupError = "Chat is connected, but an existing notification observer could not prepare this session."
+                        registry.notificationSetupError = "Chat is connected, but an existing notification observer could not prepare this chat."
                     }
                 }
             }
@@ -354,7 +354,7 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
                           $0.id == current.id && $0.principalIdentity == current.principalIdentity
                               && $0.notificationBinding == current.notificationBinding
                       }) else { return }
-                registry.notificationSetupError = "Chat is connected, but notifications for this session could not be prepared. Retry notification setup in Accounts and Devices."
+                registry.notificationSetupError = "Chat is connected, but notifications for this chat could not be prepared. Retry notification setup in Accounts and Devices."
             }
         }
     }
@@ -393,7 +393,7 @@ final class BighelpManagedNotificationComposition: HostNotificationSetupServing 
             return
         } catch {
             guard isCurrent(owner) else { return }
-            registry?.notificationSetupError = "This notification's original host or event is unavailable. No other conversation was opened."
+            registry?.notificationSetupError = "This notification's original computer or event is unavailable. No other conversation was opened."
         }
     }
 

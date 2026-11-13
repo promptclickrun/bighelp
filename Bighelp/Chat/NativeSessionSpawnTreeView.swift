@@ -16,8 +16,8 @@ struct NativeSessionSpawnTreeView: View {
                     LabeledContent("Label", value: entry.label)
                         .textSelection(.enabled)
                 }
-                LabeledContent("Agent count", value: entry.count.formatted())
-                optionalValue("Session ID", entry.sessionID)
+                LabeledContent("Helpers", value: entry.count.formatted())
+                optionalValue("Chat ID", entry.sessionID)
                 optionalValue("Started", NativeSessionReadOnlyFormatting.timestamp(entry.startedAt))
                 optionalValue("Finished", NativeSessionReadOnlyFormatting.timestamp(entry.finishedAt))
             } header: {
@@ -28,7 +28,7 @@ struct NativeSessionSpawnTreeView: View {
                 if model.isBusy(.spawnTreeLoad), model.loadedSpawnTree == nil {
                     ProgressView("Loading spawn tree…")
                 } else if let snapshot = model.loadedSpawnTree {
-                    optionalValue("Session ID", snapshot.sessionID)
+                    optionalValue("Chat ID", snapshot.sessionID)
                     optionalValue("Started", NativeSessionReadOnlyFormatting.timestamp(snapshot.startedAt))
                     optionalValue("Finished", NativeSessionReadOnlyFormatting.timestamp(snapshot.finishedAt))
                     optionalValue("Label", snapshot.label)
@@ -60,7 +60,7 @@ struct NativeSessionSpawnTreeView: View {
                 if let result = model.lastSpawnTreeSave {
                     LabeledContent("Saved path", value: result.path)
                         .textSelection(.enabled)
-                    LabeledContent("Saved session", value: result.sessionID)
+                    LabeledContent("Saved chat", value: result.sessionID)
                         .textSelection(.enabled)
                 }
             } header: {

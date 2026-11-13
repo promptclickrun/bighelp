@@ -147,13 +147,13 @@ struct FirstRunPluginStep: View {
         ) {
             VStack(alignment: .leading, spacing: BighelpTokens.space12) {
                 FirstRunFeatureRow(systemImage: "bell.badge.fill", title: "Alerts",
-                                   detail: "Know when your agents reply, finish a task, or need you.", tint: .red)
+                                   detail: "Know when your bots reply, finish a task, or need you.", tint: .red)
                 FirstRunFeatureRow(systemImage: "person.2.fill", title: "Teamwork",
-                                   detail: "Your agents bring each other in to get things done.", tint: .blue)
+                                   detail: "Your bots bring each other in to get things done.", tint: .blue)
                 FirstRunFeatureRow(systemImage: "waveform", title: "Live voice",
-                                   detail: "Talk with your agents and hear them answer right away.", tint: .purple)
+                                   detail: "Talk with your bots and hear them answer right away.", tint: .purple)
                 FirstRunFeatureRow(systemImage: "rectangle.stack.fill", title: "Feed, Ideas and Goals",
-                                   detail: "Updates and plans your agents make for you.", tint: .orange)
+                                   detail: "Updates and plans your bots make for you.", tint: .orange)
                 FirstRunFeatureRow(systemImage: "photo.on.rectangle.angled", title: "Files and cards",
                                    detail: "Pictures, files and handy cards right in your chats.", tint: .teal)
                 FirstRunFeatureRow(systemImage: "lock.shield.fill", title: "Chats that stay put",
@@ -237,7 +237,7 @@ struct FirstRunNotificationsStep: View {
         FirstRunStepLayout(
             systemImage: "bell.badge.fill",
             title: "Turn on notifications?",
-            subtitle: "Get an alert when your agents reply, finish something, or have a question for you.",
+            subtitle: "Get an alert when your bots reply, finish something, or have a question for you.",
             primaryTitle: primaryTitle,
             primaryIdentifier: "onboarding.notifications.enable",
             isWorking: setup?.isWorking == true,
@@ -249,7 +249,7 @@ struct FirstRunNotificationsStep: View {
                                      time: "2m ago")
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Sample alerts from your agents")
+            .accessibilityLabel("Sample alerts from your bots")
             if let outcome {
                 Label(outcome, systemImage: "exclamationmark.circle")
                     .bighelpFont(.metadata)

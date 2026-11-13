@@ -116,7 +116,7 @@ final class AgentEditorModel: Identifiable {
             store: store,
             processor: processor,
             avatarDirectory: avatarDirectory ?? store.avatarDirectory,
-            profileCloneSupport: .unavailable("Profile cloning is available only while creating an agent."),
+            profileCloneSupport: .unavailable("Profile cloning is available only while creating a bot."),
             isCurrent: isCurrent
         )
     }
@@ -427,7 +427,7 @@ final class AgentEditorModel: Identifiable {
         guard !isSaving else { throw ValidationError.saveInProgress }
         guard !hasUnconfirmedSave else { throw WorkspaceClientError.outcomeUnknown }
         guard isCurrent() else {
-            saveError = "The host connection changed. Your edits are still here. Reopen this agent before saving."
+            saveError = "The computer connection changed. Your edits are still here. Reopen this bot before saving."
             throw CancellationError()
         }
         guard validate() else { throw ValidationError.requiredFields }
@@ -473,7 +473,7 @@ final class AgentEditorModel: Identifiable {
                 try? FileManager.default.removeItem(at: avatarDirectory.appending(path: storedFileName))
             }
             if !isCurrent() || error is CancellationError {
-                saveError = "The host connection changed. This editor cannot confirm the save."
+                saveError = "The computer connection changed. This editor cannot confirm the save."
             } else if let partial = error as? AgentDirectoryPartialMutationError {
                 editingID = partial.committedProfile.id
                 adopt(
@@ -486,15 +486,15 @@ final class AgentEditorModel: Identifiable {
                 if partial.unappliedFields.contains(.instructions) { draft.instructions = savedDraft.instructions }
                 hasUnconfirmedSave = partial.isOutcomeUncertain
                 saveError = partial.isOutcomeUncertain
-                    ? "The agent exists, but some changes could not be confirmed. Reopen it to review the current state before saving again."
-                    : "The agent was saved, but some changes were not. Your remaining edits are still here, so you can try again."
+                    ? "The bot exists, but some changes could not be confirmed. Reopen it to review the current state before saving again."
+                    : "The bot was saved, but some changes were not. Your remaining edits are still here, so you can try again."
             } else {
                 draft.avatarFileName = oldFileName
                 hasUnconfirmedSave = (error as? WorkspaceClientError) == .outcomeUnknown
                 saveError = hasUnconfirmedSave
-                    ? "Hermes may have saved this agent. Refresh Agents and review its current state before trying again."
+                    ? "Hermes may have saved this bot. Refresh Bots and review its current state before trying again."
                     : (error as? WorkspaceClientError)?.localizedDescription
-                        ?? "We couldn’t save this agent. Your changes are still here, so you can try again."
+                        ?? "We couldn’t save this bot. Your changes are still here, so you can try again."
             }
             isSaving = false
             throw error
@@ -539,7 +539,7 @@ final class AgentEditorModel: Identifiable {
             if draft.skipBundledSkills {
                 fieldErrors[.cloning] = "Cloning includes the source’s skills. Choose Start fresh to skip bundled skills."
             } else if !cloneSources.contains(where: { $0.id == source }) {
-                fieldErrors[.cloning] = "That source agent is no longer available. Refresh Agents and choose again."
+                fieldErrors[.cloning] = "That source bot is no longer available. Refresh Bots and choose again."
             }
         }
         return fieldErrors.isEmpty

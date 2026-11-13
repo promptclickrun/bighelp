@@ -103,7 +103,7 @@ final class BighelpWidgetSnapshotPublisher {
             .sorted(by: SessionCatalogReconciliation.activitySort)
             .prefix(12)
         let sessionRows = records.map { record -> BighelpWidgetSnapshot.Session in
-            let agentName = record.agentIDs.first.flatMap { names[$0] } ?? defaultAgent?.name ?? "Agent"
+            let agentName = record.agentIDs.first.flatMap { names[$0] } ?? defaultAgent?.name ?? "Bot"
             let running = record.hasActiveWork
             return .init(id: record.id, title: Self.clip(record.title, 60) ?? "Chat", agentName: agentName,
                          status: running ? Self.status(for: record) : "Replied",
@@ -117,11 +117,11 @@ final class BighelpWidgetSnapshotPublisher {
             .prefix(12)
             .map { task in
                 BighelpWidgetSnapshot.Task(id: task.id, name: Self.clip(task.name, 60) ?? "Task",
-                    agentName: names[task.agentID] ?? "Agent", schedule: Self.clip(task.scheduleDescription, 60) ?? "",
+                    agentName: names[task.agentID] ?? "Bot", schedule: Self.clip(task.scheduleDescription, 60) ?? "",
                     nextRun: task.nextRun, lastResult: Self.clip(task.lastResult, 100))
             }
         // Only agents on this computer, so another host's boards never reach the Home Screen.
-        let agentRows = profiles.prefix(50).map { BighelpWidgetSnapshot.Agent(id: $0.id, name: Self.clip($0.name, 40) ?? "Agent") }
+        let agentRows = profiles.prefix(50).map { BighelpWidgetSnapshot.Agent(id: $0.id, name: Self.clip($0.name, 40) ?? "Bot") }
         let boards = extras.agentBoards.values.filter { names[$0.agentID] != nil }.sorted { $0.agentID < $1.agentID }
         let limit = BighelpWidgetSnapshot.maximumPinnedAgents
         var snapshot = BighelpWidgetSnapshot(defaultAgentID: defaultAgent?.id, defaultAgentName: defaultAgent?.name,

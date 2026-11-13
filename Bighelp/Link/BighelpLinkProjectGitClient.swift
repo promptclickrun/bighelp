@@ -242,7 +242,7 @@ final class FixtureProjectGitClient: ProjectGitClient {
             throw BighelpLinkWorkspaceClientError.remote(
                 status: .failed,
                 code: "project_not_repository",
-                message: "This Project is not a Git repository."
+                message: "This project is not a Git repository."
             )
         }
         return ProjectGitCapabilities(

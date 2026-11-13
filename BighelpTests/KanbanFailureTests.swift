@@ -16,13 +16,13 @@ struct KanbanFailureTests {
 
     @Test func otherErrorsKeepTheirLastLine() {
         let error = #"pid 7 exited with code 1 Worker's last output: "Traceback ... PermissionError: [Errno 13] Permission denied: 'notes.txt'""#
-        #expect(KanbanFailure.explain(error) == "The agent stopped with an error: PermissionError: [Errno 13] Permission denied: 'notes.txt'")
+        #expect(KanbanFailure.explain(error) == "The bot stopped with an error: PermissionError: [Errno 13] Permission denied: 'notes.txt'")
     }
 
     @Test func timeoutsWorkspacesAndBareExits() {
         #expect(KanbanFailure.explain("run exceeded max runtime (1800s)") == "It ran longer than it's allowed to and was stopped.")
-        #expect(KanbanFailure.explain("workspace: task has no workspace_path").hasPrefix("Its workspace isn't set up:"))
-        #expect(KanbanFailure.explain("pid 9 exited with code 137") == "The agent stopped unexpectedly (exit code 137).")
+        #expect(KanbanFailure.explain("workspace: task has no workspace_path").hasPrefix("Its folder isn't set up:"))
+        #expect(KanbanFailure.explain("pid 9 exited with code 137") == "The bot stopped unexpectedly (exit code 137).")
         #expect(KanbanFailure.explain(String(repeating: "x", count: 500)).count <= 220)
     }
 

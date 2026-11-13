@@ -416,7 +416,7 @@ final class LiveVoiceModel {
             phase = .ended
             cleanupMessage = provider == .gemini
                 ? geminiClose?.message ?? "Gemini ended the call. Work you started keeps going."
-                : "The host closed live voice. Accepted tasks were not cancelled."
+                : "The computer closed live voice. Accepted tasks were not cancelled."
         default: break // Unknown events cannot execute/control tasks.
         }
     }
@@ -562,7 +562,7 @@ final class LiveVoiceModel {
 
     private func requestClose(_ id: String) {
         guard client.hasCurrentOwner else { return }
-        cleanupMessage = "Audio stopped on this device. Confirming host cleanup…"
+        cleanupMessage = "Audio stopped on this device. Confirming computer cleanup…"
         isClosing = true
         closingTask = Task { @MainActor [weak self, client] in
             defer {
@@ -572,10 +572,10 @@ final class LiveVoiceModel {
             do {
                 try await client.close(voiceID: id)
                 guard let self, self.voiceID == id, client.hasCurrentOwner else { return }
-                self.cleanupMessage = "Host acknowledged closing voice. Accepted tasks continue independently."
+                self.cleanupMessage = "Computer acknowledged closing voice. Accepted tasks continue independently."
             } catch {
                 guard let self, self.voiceID == id, client.hasCurrentOwner else { return }
-                self.cleanupMessage = "Audio stopped on this device. Host cleanup is unconfirmed; tasks were not cancelled."
+                self.cleanupMessage = "Audio stopped on this device. Computer cleanup is unconfirmed; tasks were not cancelled."
             }
         }
     }

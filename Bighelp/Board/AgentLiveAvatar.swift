@@ -231,11 +231,11 @@ struct AgentHeroHeader: View {
             .contextMenu {
                 if !showsName {
                     Button("Open profile", systemImage: "person.crop.circle", action: onAvatarTap)
-                    Button("Switch agent", systemImage: "arrow.left.arrow.right", action: onNameTap)
+                    Button("Switch bot", systemImage: "arrow.left.arrow.right", action: onNameTap)
                 }
             }
             .accessibilityActions {
-                if !showsName { Button("Switch agent", action: onNameTap) }
+                if !showsName { Button("Switch bot", action: onNameTap) }
             }
             if showsName || statusLine != nil || sessionTitle != nil {
             ZStack(alignment: .top) {
@@ -253,7 +253,7 @@ struct AgentHeroHeader: View {
             .buttonStyle(.plain)
             .accessibilityLabel(displayName)
             .accessibilityValue(statusLine ?? sessionTitle ?? "")
-            .accessibilityHint("Switch agents or open a group chat.")
+            .accessibilityHint("Switch bots or open a group chat.")
             .accessibilityIdentifier("agent.hero.name")
             }
             .transition(.opacity)

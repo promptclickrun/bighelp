@@ -18,7 +18,7 @@ struct DirectHermesChatView: View {
     var body: some View {
         VStack(spacing: 0) {
             if !chat.client.connected {
-                Button("Reconnect to this host", systemImage: "arrow.clockwise") {
+                Button("Reconnect to this computer", systemImage: "arrow.clockwise") {
                     Task { await store.suspend(); await store.reconnect() }
                 }
                 .accessibilityIdentifier("direct-hermes.reconnect")
@@ -74,7 +74,7 @@ private struct DirectHermesControlsView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .accessibilityIdentifier("direct-hermes.model")
-                    Button("Use for this session") {
+                    Button("Use for this chat") {
                         isApplying = true
                         Task {
                             defer { isApplying = false }
@@ -85,7 +85,7 @@ private struct DirectHermesControlsView: View {
                     .disabled(isApplying || chat.model.isSending || modelIdentifier.isEmpty || !chat.client.connected)
                     .accessibilityIdentifier("direct-hermes.model-apply")
                 } header: { Text("Model") } footer: {
-                    Text("This changes only the native session, not profile defaults. Models stay fixed while a turn is running.")
+                    Text("This changes only the native chat, not profile defaults. Models stay fixed while a turn is running.")
                 }
                 if let error { Section { Text(error).foregroundStyle(.secondary) } }
                 Section {
@@ -101,12 +101,12 @@ private struct DirectHermesControlsView: View {
                             }
                         }
                     }
-                } header: { Text("Advanced · Host commands") } footer: {
-                    Text("A command is inserted into your draft, never sent automatically. Review its arguments; some commands change host configuration.")
+                } header: { Text("Advanced · Computer commands") } footer: {
+                    Text("A command is inserted into your draft, never sent automatically. Review its arguments; some commands change computer configuration.")
                 }
             }
             .bighelpFormSurface()
-            .navigationTitle("Session settings")
+            .navigationTitle("Chat settings")
             // "Later", not "Done": the card's own Done is what answers.
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Later") { dismiss() }.keyboardShortcut(.cancelAction).bighelpToolbarText() } }
             .task {
@@ -547,19 +547,19 @@ struct DirectHermesSupportView: View {
         NavigationStack {
             List {
                 Section("Native Hermes") {
-                    Text("Messages, reasoning, tools, subagents, profiles, and saved sessions come directly from Hermes.")
+                    Text("Messages, reasoning, tools, subagents, profiles, and saved chats come directly from Hermes.")
                     Text("Stop, steer, queued prompts, approvals, clarification, and commands use native requests. Acceptance does not prove a queued prompt or steer was consumed; review retained submissions after an interrupted connection.")
                 }
                 Section("Separate integrations") {
                     Text("Wiki, Cards and forms, phone tools, voice, project changes, and notifications need their own supported integrations. They are never silently forwarded through Link.")
-                    Text("Standalone hosts do not yet expose attachments, full provider picking, multi-question clarification, or subagent control windows in bighelp. Hermes may support more than this client shows.")
+                    Text("Standalone computers do not yet expose attachments, full provider picking, multi-question clarification, or subagent control windows in bighelp. Hermes may support more than this client shows.")
                 }
                 Section("History & recovery") {
-                    Text("Saved history can have tool summaries without live IDs or results and may be less detailed than the live stream. Local text and uncertain submissions stay bound to the exact account, host, and profile.")
-                    Text("Reopening reattaches without resending prompts. If the runtime is gone, choose a saved session. \(BighelpPlatform.isMac ? "macOS" : "iOS") can suspend sockets; notifications require separate verified enrollment.")
+                    Text("Saved history can have tool summaries without live IDs or results and may be less detailed than the live stream. Local text and uncertain submissions stay bound to the exact account, computer, and profile.")
+                    Text("Reopening reattaches without resending prompts. If the runtime is gone, choose a saved chat. \(BighelpPlatform.isMac ? "macOS" : "iOS") can suspend sockets; notifications require separate verified enrollment.")
                 }
             }
-            .navigationTitle("Host support")
+            .navigationTitle("Computer support")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
     }

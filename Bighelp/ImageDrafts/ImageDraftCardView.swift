@@ -175,7 +175,7 @@ struct ImageDraftCardView: View {
         case .replaced:
             line(String(localized: "Replaced by a newer draft."), systemImage: nil, color: theme.secondaryText)
         case .mismatched:
-            line(String(localized: "This card doesn't match the draft the agent made. Ask for it again."),
+            line(String(localized: "This card doesn't match the draft the bot made. Ask for it again."),
                  systemImage: "exclamationmark.triangle.fill", color: theme.warning)
         }
     }

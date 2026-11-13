@@ -395,7 +395,7 @@ struct ChatView: View {
         ) { dialog in
             switch dialog {
             case .rename:
-                TextField("Session name", text: $sessionTitleDraft)
+                TextField("Chat name", text: $sessionTitleDraft)
                     .accessibilityIdentifier("chat.session-title.rename-field")
                 Button("Cancel", role: .cancel) {}
                 Button("Save") { renameCurrentSession() }
@@ -408,7 +408,7 @@ struct ChatView: View {
             case .rename:
                 Text(onNewBotChat == nil
                      ? "Enter a name up to \(SessionTitleRules.maximumLength) characters."
-                     : "Renamed, this becomes a regular chat, and tapping the agent starts a new Bot Chat.")
+                     : "Renamed, this becomes a regular chat, and tapping the bot starts a new Bot Chat.")
             case .error:
                 Text(sessionTitleErrorMessage)
             }
@@ -708,10 +708,10 @@ struct ChatView: View {
             } catch is CancellationError {
                 return
             } catch SessionCatalogError.invalidTitle {
-                sessionTitleErrorMessage = "Enter a session name between 1 and \(SessionTitleRules.maximumLength) characters."
+                sessionTitleErrorMessage = "Enter a chat name between 1 and \(SessionTitleRules.maximumLength) characters."
                 sessionTitleDialog = .error
             } catch {
-                sessionTitleErrorMessage = "bighelp could not rename this session. Try again."
+                sessionTitleErrorMessage = "bighelp could not rename this chat. Try again."
                 sessionTitleDialog = .error
             }
         }
@@ -950,7 +950,7 @@ struct ChatView: View {
                         newChatItems
                         botPageItem
                     } label: {
-                        Label("Agent", systemImage: "person.crop.circle")
+                        Label("Bot", systemImage: "person.crop.circle")
                     }
                     .accessibilityIdentifier("chat.options.agent")
                 }
@@ -1134,7 +1134,7 @@ struct ChatView: View {
                 try await client.compact(conversationID: model.conversationID)
             } catch is CancellationError {
             } catch {
-                compactError = "Hermes couldn't compact this chat. Try again when the agent isn't replying."
+                compactError = "Hermes couldn't compact this chat. Try again when the bot isn't replying."
             }
         }
     }
@@ -1299,7 +1299,7 @@ struct ChatView: View {
         } else {
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                 Text("Context window").bighelpFont(.label, weight: .semibold)
-                Text("Hermes reports this chat's context size after the agent's next reply.")
+                Text("Hermes reports this chat's context size after the bot's next reply.")
                     .bighelpFont(.metadata)
                     .foregroundStyle(theme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)

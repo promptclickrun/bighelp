@@ -20,7 +20,7 @@ struct SessionRuntimeControlSupport: Equatable, Sendable {
 
     static let available = SessionRuntimeControlSupport()
     static let nativeReasoningReadOnly =
-        "This Hermes host does not expose a safe current-chat reasoning change or reset. The current value is read-only."
+        "This Hermes computer does not expose a safe current-chat reasoning change or reset. The current value is read-only."
 }
 
 struct SessionRuntimeModelConfirmation: Identifiable, Equatable, Sendable {

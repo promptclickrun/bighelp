@@ -20,7 +20,7 @@ final class ChatAttachmentMenuUITests: BighelpUITestCase {
             XCTAssertFalse(rows[0].isEnabled, "No camera in the simulator")
             // New chat isn't checked by name: the bar's own New chat button is on screen.
             for gone in ["Voice mode", "Change model", "Choose agent", "PDF as pages", "Auto TTS",
-                         "Session controls"] {
+                         "Chat controls"] {
                 XCTAssertFalse(app.buttons[gone].exists, "\(gone) left the plus menu")
             }
             evidence("menu-\(appearance)", app)

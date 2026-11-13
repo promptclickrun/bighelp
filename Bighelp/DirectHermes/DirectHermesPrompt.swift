@@ -919,7 +919,7 @@ enum DirectHermesWorkspaceError: Error, LocalizedError {
     case attachmentsUnavailable, reviewRequired, interruptAndSendUnavailable, expiredPrompt, modelConfirmationRequired, liveReplayUnavailable, nativeTurnActive, midSessionRejected
     var errorDescription: String? {
         switch self {
-        case .nativeTurnActive: "The native session is already working. Reopen it to recover its live controls, or wait for it to finish."
+        case .nativeTurnActive: "The native chat is already working. Reopen it to recover its live controls, or wait for it to finish."
         case .liveReplayUnavailable: "Live event replay is no longer available. Keep the retained content and reopen saved history after Hermes becomes idle; nothing was resent."
         case .attachmentsUnavailable: "Direct attachments are not enabled yet. Your text and attachments have not been sent."
         case .reviewRequired: "Reopen this chat to reconnect before sending. Your previous text is saved locally and will not be resent automatically."

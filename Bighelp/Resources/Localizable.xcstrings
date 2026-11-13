@@ -1804,6 +1804,23 @@
         }
       }
     },
+    "Address of your computer": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Address of your computer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "电脑的网址或 IP 地址"
+          }
+        }
+      }
+    },
     "Advanced": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -2008,23 +2025,6 @@
         }
       }
     },
-    "Agent templates": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Agent templates"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "智能体模板"
-          }
-        }
-      }
-    },
     "Agents": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -2195,40 +2195,6 @@
         }
       }
     },
-    "All Gateways": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "All Gateways"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "所有网关"
-          }
-        }
-      }
-    },
-    "All agents": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "All agents"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "所有智能体"
-          }
-        }
-      }
-    },
     "All bots": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -2276,6 +2242,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "所有渠道"
+          }
+        }
+      }
+    },
+    "All computers": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All computers"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "所有电脑"
           }
         }
       }
@@ -2892,36 +2875,36 @@
         }
       }
     },
-    "Auto keeps the large avatar on the biggest iPhones and uses Medium on the rest. With the name hidden, tap the avatar for the agent's profile, or touch and hold it to switch agents.": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+    "Auto keeps the large avatar on the biggest iPhones and uses Medium on the rest. With the name hidden, tap the avatar for the bot's profile, or touch and hold it to switch bots.": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Auto keeps the large avatar on the biggest iPhones and uses Medium on the rest. With the name hidden, tap the avatar for the agent's profile, or touch and hold it to switch agents."
+            "value": "Auto keeps the large avatar on the biggest iPhones and uses Medium on the rest. With the name hidden, tap the avatar for the bot's profile, or touch and hold it to switch bots."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "选择“自动”时，最大尺寸的 iPhone 使用大头像，其他机型使用中等头像。隐藏名字时，轻点头像可查看智能体资料，按住头像可切换智能体。"
+            "value": "选择“自动”时，最大尺寸的 iPhone 使用大头像，其他机型使用中等头像。隐藏名字时，轻点头像可查看机器人资料，按住头像可切换机器人。"
           }
         }
       }
     },
-    "Auto uses the large avatar in tall windows and Medium in shorter ones. With the name hidden, click the avatar for the agent's profile, or click and hold it to switch agents.": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+    "Auto uses the large avatar in tall windows and Medium in shorter ones. With the name hidden, click the avatar for the bot's profile, or click and hold it to switch bots.": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Auto uses the large avatar in tall windows and Medium in shorter ones. With the name hidden, click the avatar for the agent's profile, or click and hold it to switch agents."
+            "value": "Auto uses the large avatar in tall windows and Medium in shorter ones. With the name hidden, click the avatar for the bot's profile, or click and hold it to switch bots."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "选择“自动”时，较高的窗口使用大头像，较矮的窗口使用中等头像。隐藏名字时，点按头像可查看智能体资料，按住头像可切换智能体。"
+            "value": "选择“自动”时，较高的窗口使用大头像，较矮的窗口使用中等头像。隐藏名字时，点按头像可查看机器人资料，按住头像可切换机器人。"
           }
         }
       }
@@ -3245,6 +3228,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "机器人页面或设置"
+          }
+        }
+      }
+    },
+    "Bot templates": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bot templates"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "机器人模板"
           }
         }
       }
@@ -3929,6 +3929,23 @@
         }
       }
     },
+    "Chat actions": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat actions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "聊天操作"
+          }
+        }
+      }
+    },
     "Chat appearance": {
       "localizations": {
         "en": {
@@ -4095,19 +4112,19 @@
         }
       }
     },
-    "Chat with the Hermes agents running on your computer. No separate bighelp account required.": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "Chat with the Hermes bots running on your computer. No separate bighelp account required.": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Chat with the Hermes agents running on your computer. No separate bighelp account required."
+            "value": "Chat with the Hermes bots running on your computer. No separate bighelp account required."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "与电脑上运行的 Hermes 智能体聊天，无需另建 bighelp 账户。"
+            "value": "与电脑上运行的 Hermes 机器人聊天，无需另建 bighelp 账户。"
           }
         }
       }
@@ -4214,13 +4231,13 @@
         }
       }
     },
-    "Check Host Permission Again": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+    "Check Computer Permission Again": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Check Host Permission Again"
+            "value": "Check Computer Permission Again"
           }
         },
         "zh-Hans": {
@@ -4231,13 +4248,13 @@
         }
       }
     },
-    "Check Host Support Again": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+    "Check Computer Support Again": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Check Host Support Again"
+            "value": "Check Computer Support Again"
           }
         },
         "zh-Hans": {
@@ -7284,19 +7301,19 @@
         }
       }
     },
-    "Filter by gateway": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+    "Filter by computer": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Filter by gateway"
+            "value": "Filter by computer"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "按网关筛选"
+            "value": "按电脑筛选"
           }
         }
       }
@@ -7335,19 +7352,19 @@
         }
       }
     },
-    "Finding your agents…": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "Finding your bots…": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Finding your agents…"
+            "value": "Finding your bots…"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "正在查找智能体…"
+            "value": "正在查找机器人…"
           }
         }
       }
@@ -7607,19 +7624,19 @@
         }
       }
     },
-    "Get an alert when your agents reply, finish something, or have a question for you.": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "Get an alert when your bots reply, finish something, or have a question for you.": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Get an alert when your agents reply, finish something, or have a question for you."
+            "value": "Get an alert when your bots reply, finish something, or have a question for you."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "智能体回复、完成工作或有问题要问你时，收到提醒。"
+            "value": "机器人回复、完成工作或有问题要问你时，收到提醒。"
           }
         }
       }
@@ -8317,23 +8334,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "主页"
-          }
-        }
-      }
-    },
-    "Host URL or IP address": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Host URL or IP address"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "电脑的网址或 IP 地址"
           }
         }
       }
@@ -9069,19 +9069,19 @@
         }
       }
     },
-    "Know when your agents reply, finish a task, or need you.": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "Know when your bots reply, finish a task, or need you.": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Know when your agents reply, finish a task, or need you."
+            "value": "Know when your bots reply, finish a task, or need you."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "智能体回复、完成任务或需要你时，及时收到提醒。"
+            "value": "机器人回复、完成任务或需要你时，及时收到提醒。"
           }
         }
       }
@@ -9490,23 +9490,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "正在载入通知类别…"
-          }
-        }
-      }
-    },
-    "Loading sessions": {
-      "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Loading sessions"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "正在载入会话"
           }
         }
       }
@@ -15607,19 +15590,19 @@
         }
       }
     },
-    "Sample alerts from your agents": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "Sample alerts from your bots": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sample alerts from your agents"
+            "value": "Sample alerts from your bots"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "智能体通知示例"
+            "value": "机器人通知示例"
           }
         }
       }
@@ -16388,19 +16371,19 @@
         }
       }
     },
-    "Send context into the live turn so the agent can adjust its response.": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "Send context into the live turn so the bot can adjust its response.": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Send context into the live turn so the agent can adjust its response."
+            "value": "Send context into the live turn so the bot can adjust its response."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "在本轮回复中补充信息，让智能体调整回答。"
+            "value": "在本轮回复中补充信息，让机器人调整回答。"
           }
         }
       }
@@ -16605,23 +16588,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "本次会话"
-          }
-        }
-      }
-    },
-    "Session actions": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Session actions"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "会话操作"
           }
         }
       }
@@ -16881,23 +16847,6 @@
         }
       }
     },
-    "Show agent name": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Show agent name"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "显示智能体名字"
-          }
-        }
-      }
-    },
     "Show all": {
       "comment": "Simplified Chinese draft for Needs you, blueprints in the message box and Settings › Modes; fluent-speaker review pending.",
       "localizations": {
@@ -16911,6 +16860,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "显示全部"
+          }
+        }
+      }
+    },
+    "Show bot name": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show bot name"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "显示机器人名字"
           }
         }
       }
@@ -17119,19 +17085,19 @@
         }
       }
     },
-    "Shows what the agents said to each other.": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
+    "Shows what the bots said to each other.": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Shows what the agents said to each other."
+            "value": "Shows what the bots said to each other."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "显示智能体之间说了什么。"
+            "value": "显示机器人之间说了什么。"
           }
         }
       }
@@ -18513,19 +18479,19 @@
         }
       }
     },
-    "Talk with your agents and hear them answer right away.": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "Talk with your bots and hear them answer right away.": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Talk with your agents and hear them answer right away."
+            "value": "Talk with your bots and hear them answer right away."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "与智能体说话，即时听到回答。"
+            "value": "与机器人说话，即时听到回答。"
           }
         }
       }
@@ -20517,19 +20483,19 @@
         }
       }
     },
-    "Updates and plans your agents make for you.": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "Updates and plans your bots make for you.": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Updates and plans your agents make for you."
+            "value": "Updates and plans your bots make for you."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "智能体为你准备的进展和计划。"
+            "value": "机器人为你准备的进展和计划。"
           }
         }
       }
@@ -21861,23 +21827,6 @@
         }
       }
     },
-    "Your agent": {
-      "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Your agent"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "你的智能体"
-          }
-        }
-      }
-    },
     "Your agent is still working. Press 1–%lld, or Return to %@.": {
       "localizations": {
         "en": {
@@ -21890,57 +21839,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "智能体仍在工作。按 1–%lld 选择，或按回车键执行“%@”。"
-          }
-        }
-      }
-    },
-    "Your agents are ready to chat.": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Your agents are ready to chat."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "智能体已准备好，可以开始聊天。"
-          }
-        }
-      }
-    },
-    "Your agents bring each other in to get things done.": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Your agents bring each other in to get things done."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "智能体会邀请彼此协作，一起完成任务。"
-          }
-        }
-      }
-    },
-    "Your agents, right at home.": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Your agents, right at home."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "你的智能体，随时在身边。"
           }
         }
       }
@@ -21958,6 +21856,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "用几处点缀呈现模糊的周围环境。仅在开启时使用相机。"
+          }
+        }
+      }
+    },
+    "Your bot": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your bot"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的机器人"
           }
         }
       }
@@ -21996,6 +21911,23 @@
         }
       }
     },
+    "Your bots are ready to chat.": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your bots are ready to chat."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "机器人已准备好，可以开始聊天。"
+          }
+        }
+      }
+    },
     "Your bots beside each chat": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -22009,6 +21941,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "在每个聊天旁显示你的机器人"
+          }
+        }
+      }
+    },
+    "Your bots bring each other in to get things done.": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your bots bring each other in to get things done."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "机器人会邀请彼此协作，一起完成任务。"
           }
         }
       }
@@ -22060,6 +22009,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "电脑连上后，你的机器人会显示在这里。"
+          }
+        }
+      }
+    },
+    "Your bots, right at home.": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your bots, right at home."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的机器人，随时在身边。"
           }
         }
       }
@@ -22353,19 +22319,19 @@
         }
       }
     },
-    "bighelp and its colorful agent companions": {
-      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+    "bighelp and its colorful bot companions": {
+      "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "bighelp and its colorful agent companions"
+            "value": "bighelp and its colorful bot companions"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "bighelp 和多彩的智能体伙伴"
+            "value": "bighelp 和多彩的机器人伙伴"
           }
         }
       }

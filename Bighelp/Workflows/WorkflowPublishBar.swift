@@ -58,7 +58,7 @@ struct WorkflowPublishBar: View {
     /// What publishing does here, or what stands in its way.
     private var detail: String {
         switch (isNew, model.canRun) {
-        case (true, true): "Not live yet. Publish it so schedules and your agents can run it."
+        case (true, true): "Not live yet. Publish it so schedules and your bots can run it."
         case (true, false): "Not live yet. Fix what's marked in the flow, then publish."
         case (false, true): "Runs use the last published version until you publish."
         case (false, false): "Runs use the last published version. Fix what's marked in the flow, then publish."

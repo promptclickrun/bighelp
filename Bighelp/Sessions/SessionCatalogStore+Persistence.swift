@@ -147,7 +147,7 @@ extension SessionCatalogStore {
 
     func persistenceDidFail() {
         cancelPersistenceCheckpoint()
-        persistenceErrorMessage = "Session changes could not be saved. Try again."
+        persistenceErrorMessage = "Chat changes could not be saved. Try again."
         hasUnsavedChanges = true
     }
 }

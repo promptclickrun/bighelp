@@ -193,7 +193,7 @@ final class DirectHermesPluginLifecycleClient: PluginLifecycleManagementClient {
             try requireOwner()
             return try CapabilitiesPayload.object(value)
         } catch DirectHermesError.unsupportedAuthentication where route.isCapabilityProbe {
-            throw CapabilitiesManagementError.unsupportedHost("This Hermes host does not expose plugin lifecycle management.")
+            throw CapabilitiesManagementError.unsupportedHost("This Hermes computer does not expose plugin lifecycle management.")
         } catch DirectHermesError.unsupportedAuthentication {
             throw CapabilitiesManagementError.invalidResponse
         } catch DirectHermesError.rpcRejected(_, let message) {

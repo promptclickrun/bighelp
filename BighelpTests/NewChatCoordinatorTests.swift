@@ -473,7 +473,7 @@ struct NewChatCoordinatorTests {
         let remoteDefault = AgentProfile(
             id: "juno",
             name: "Juno",
-            role: "Default agent",
+            role: "Default bot",
             summary: "The live Hermes default agent.",
             instructions: "Help with everyday work.",
             avatarFileName: nil,

@@ -128,7 +128,7 @@ struct BighelpShortcutGatewayTests {
 
     @Test func statusOfAnotherGatewayNeverSwitchesToIt() async throws {
         let (harness, gateways, _) = try await harness()
-        #expect(await harness.service.hostStatus(gatewayID: Self.studio) == "Connected to Studio.\n1 agent.")
+        #expect(await harness.service.hostStatus(gatewayID: Self.studio) == "Connected to Studio.\n1 bot.")
         gateways.reachable = false
         #expect(await harness.service.hostStatus(gatewayID: Self.studio) == "bighelp can't reach Studio right now.")
         #expect(gateways.selected.isEmpty)

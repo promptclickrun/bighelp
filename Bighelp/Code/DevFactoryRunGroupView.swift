@@ -127,7 +127,7 @@ struct DevFactoryRunGroupView: View {
         .onDisappear { model.disappear() }
         .alert("What should change?", isPresented: Binding(get: { askingChanges != nil },
                                                            set: { if !$0 { askingChanges = nil } })) {
-            TextField("Notes for the agent", text: $notes)
+            TextField("Notes for the bot", text: $notes)
             Button("Send back") {
                 if let run = askingChanges {
                     Task { await model.signoff(run, .changes, notes: notes) }

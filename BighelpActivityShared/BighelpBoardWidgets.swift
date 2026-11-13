@@ -9,7 +9,7 @@ import WidgetKit
 
 struct BoardWidgetAgent: AppEntity {
     static let autoID = "auto"
-    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Agent")
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Bot")
     static let defaultQuery = BoardWidgetAgentQuery()
     static let auto = BoardWidgetAgent(id: autoID, name: "Auto")
 
@@ -18,7 +18,7 @@ struct BoardWidgetAgent: AppEntity {
 
     var displayRepresentation: DisplayRepresentation {
         id == Self.autoID
-            ? DisplayRepresentation(title: "Auto", subtitle: "The agent you're using in bighelp")
+            ? DisplayRepresentation(title: "Auto", subtitle: "The bot you're using in bighelp")
             : DisplayRepresentation(title: "\(name)")
     }
 }
@@ -42,13 +42,13 @@ struct BoardWidgetAgentQuery: EntityQuery {
 }
 
 struct BoardWidgetIntent: WidgetConfigurationIntent {
-    static let title: LocalizedStringResource = "Agent"
-    static let description = IntentDescription("Choose whose board to show, or Auto for the agent you're using.")
+    static let title: LocalizedStringResource = "Bot"
+    static let description = IntentDescription("Choose whose board to show, or Auto for the bot you're using.")
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpWidgetGateway?
 
-    @Parameter(title: "Agent")
+    @Parameter(title: "Bot")
     var agent: BoardWidgetAgent?
 }
 
@@ -227,7 +227,7 @@ struct BighelpBoardWidgetView: View {
                     Text(section.title).foregroundStyle(colors.primary)
                 }
                 .font(.caption.weight(.bold))
-                Text(board?.agentName ?? "Pick an agent")
+                Text(board?.agentName ?? "Pick a bot")
                     .font(.caption2)
                     .foregroundStyle(colors.secondary)
             }
@@ -245,7 +245,7 @@ struct BighelpBoardWidgetView: View {
             text = board.isLoaded ? section.emptyText(name: board.agentName)
                 : "Open bighelp to load \(board.agentName)'s \(section.title)."
         } else {
-            text = "This agent isn't on your computer anymore. Edit the widget to pick another."
+            text = "This bot isn't on your computer anymore. Edit the widget to pick another."
         }
         return Text(text)
             .font(.caption)
@@ -335,18 +335,18 @@ private struct BoardWidgetConfiguration {
 
 struct BighelpFeedWidget: Widget {
     var body: some WidgetConfiguration {
-        BoardWidgetConfiguration.make(.feed, description: "Your agent's latest Feed posts. Pick an agent, or Auto.")
+        BoardWidgetConfiguration.make(.feed, description: "Your bot's latest Feed posts. Pick a bot, or Auto.")
     }
 }
 
 struct BighelpIdeasWidget: Widget {
     var body: some WidgetConfiguration {
-        BoardWidgetConfiguration.make(.ideas, description: "Things your agent offers to do for you. Pick an agent, or Auto.")
+        BoardWidgetConfiguration.make(.ideas, description: "Things your bot offers to do for you. Pick a bot, or Auto.")
     }
 }
 
 struct BighelpGoalsWidget: Widget {
     var body: some WidgetConfiguration {
-        BoardWidgetConfiguration.make(.goals, description: "The goals your agent is tracking. Pick an agent, or Auto.")
+        BoardWidgetConfiguration.make(.goals, description: "The goals your bot is tracking. Pick a bot, or Auto.")
     }
 }

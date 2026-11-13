@@ -13,8 +13,8 @@ struct BighelpAgentWidget: Widget {
                 BighelpAgentWidgetView(snapshot: entry.snapshot)
             }
         }
-        .configurationDisplayName("Your Agent")
-        .description("See what your agent is up to, its latest posts and goals, and start a chat.")
+        .configurationDisplayName("Your Bot")
+        .description("See what your bot is up to, its latest posts and goals, and start a chat.")
         .supportedFamilies(Self.families)
         .bighelpWidgetPlacement()
     }

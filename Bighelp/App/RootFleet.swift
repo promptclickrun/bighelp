@@ -19,7 +19,7 @@ extension RootShellView {
             // No agent named: the home agent. One that's gone is never swapped for another.
             let agent = agentID.map { id in agents.profiles.first { $0.id == id } } ?? homeAgent
             guard let agent else {
-                actionErrorMessage = "That agent isn't on \(place) anymore."
+                actionErrorMessage = "That bot isn't on \(place) anymore."
                 return
             }
             guard startsVoice else {
@@ -79,7 +79,7 @@ extension RootShellView {
         }
         guard fleet.canOpen(hostID) else {
             _ = home.takeNewChatHandoff(after: .refused)
-            actionErrorMessage = "\(fleet.hostName(hostID)) is a sample host in this demo."
+            actionErrorMessage = "\(fleet.hostName(hostID)) is a sample computer in this demo."
             return
         }
         recordLiveFleet()

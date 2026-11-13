@@ -206,7 +206,7 @@ struct SessionStatusRailView: View {
         case .background:
             return background.detail
         case .tasks:
-            return tasks.map { "\($0.completedCount)/\($0.totalCount)" } ?? "Session"
+            return tasks.map { "\($0.completedCount)/\($0.totalCount)" } ?? "Chat"
         }
     }
 

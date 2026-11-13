@@ -109,7 +109,7 @@ struct ScheduledTaskBlueprintsView: View {
                     store.blueprints.isEmpty ? "No ideas yet" : "No matching ideas",
                     systemImage: store.blueprints.isEmpty ? "square.grid.2x2" : "magnifyingglass",
                     description: Text(store.blueprints.isEmpty
-                        ? "This Hermes host did not return any task ideas."
+                        ? "This Hermes computer did not return any task ideas."
                         : "Try another title, category, summary, or schedule."))
             }
         }
@@ -170,9 +170,9 @@ private struct ScheduledTaskBlueprintPreviewView: View {
                 Text("Overview")
             }
 
-            Section("Which agent?") {
+            Section("Which bot?") {
                 if agents.profiles.isEmpty {
-                    Text("No available agents")
+                    Text("No available bots")
                         .foregroundStyle(theme.danger)
                 } else {
                     Picker("Owner", selection: $selectedAgentID) {
@@ -354,7 +354,7 @@ private struct ScheduledTaskBlueprintPreviewView: View {
     }
 
     private var reviewSummary: String {
-        let agent = agents.profiles.first(where: { $0.id == selectedAgentID })?.name ?? "the selected agent"
+        let agent = agents.profiles.first(where: { $0.id == selectedAgentID })?.name ?? "the selected bot"
         return "\(agent) will own \(blueprint.title.lowercased()), scheduled \(blueprint.scheduleDescription)."
     }
 

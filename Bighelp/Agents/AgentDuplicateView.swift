@@ -37,7 +37,7 @@ struct AgentDuplicateView: View {
                     }
                     Section {
                         Button { Task { await model.confirm() } } label: {
-                            Text("Duplicate agent")
+                            Text("Duplicate bot")
                                 .fontWeight(.semibold)
                                 .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget)
                         }
@@ -76,7 +76,7 @@ struct AgentDuplicateView: View {
                     .listRowBackground(theme.surface)
                 }
                 if model.isPreparing || model.isSubmitting {
-                    ProgressView(model.isSubmitting ? "Duplicating agent" : "Preparing review")
+                    ProgressView(model.isSubmitting ? "Duplicating bot" : "Preparing review")
                 }
                 if let error = model.errorMessage {
                     Text(error).foregroundStyle(theme.danger)
@@ -87,7 +87,7 @@ struct AgentDuplicateView: View {
             .disabled(model.isSubmitting)
             .scrollContentBackground(.hidden)
             .background(theme.canvas.ignoresSafeArea())
-            .navigationTitle("Duplicate agent")
+            .navigationTitle("Duplicate bot")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -115,16 +115,16 @@ struct AgentDuplicateView: View {
         Section {
             switch result {
             case .committed:
-                Label("Agent duplicated", systemImage: "checkmark.circle")
-                Text("Hermes confirmed the new profile. Return to Agents to view it.")
+                Label("Bot duplicated", systemImage: "checkmark.circle")
+                Text("Hermes confirmed the new profile. Return to Bots to view it.")
                     .foregroundStyle(theme.secondaryText)
             case .partial:
-                Label("Agent created with incomplete settings", systemImage: "exclamationmark.triangle")
-                Text("Some requested settings were not copied. Review the new agent before using it. Do not submit another duplicate to finish these changes.")
+                Label("Bot created with incomplete settings", systemImage: "exclamationmark.triangle")
+                Text("Some requested settings were not copied. Review the new bot before using it. Do not submit another duplicate to finish these changes.")
                     .foregroundStyle(theme.secondaryText)
             case .unconfirmed:
                 Label("Duplication not confirmed", systemImage: "questionmark.circle")
-                Text("Hermes may have created the new profile. Return to Agents and refresh before trying again; another submission could create unwanted work.")
+                Text("Hermes may have created the new profile. Return to Bots and refresh before trying again; another submission could create unwanted work.")
                     .foregroundStyle(theme.secondaryText)
             }
         }

@@ -28,8 +28,8 @@ struct AppearanceStudioView<Extras: View>: View {
                 section(String(localized: "Themes"), caption: String(localized: "Light and dark, picked separately")) {
                     AppearanceThemeGrid(settings: settings) { preset, dark in previewTheme(preset, dark: dark) }
                 }
-                section(String(localized: "Agent messages"), caption: nil) {
-                    Picker("Agent messages", selection: $agentStyle) {
+                section(String(localized: "Bot messages"), caption: nil) {
+                    Picker("Bot messages", selection: $agentStyle) {
                         ForEach(ChatAgentMessageStyle.allCases) { Text($0.title).tag($0) }
                     }
                     .bighelpSegmentedPicker()

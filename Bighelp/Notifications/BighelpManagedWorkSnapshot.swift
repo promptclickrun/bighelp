@@ -17,12 +17,12 @@ struct BighelpManagedWorkSnapshot: Decodable, Equatable, Sendable {
         var contentState: LoopdySessionActivityAttributes.ContentState {
             let action: String
             switch phase {
-            case .thinking, .usingTool: action = "Your agent is working"
-            case .waiting: action = "Your agent needs attention"
-            case .delegating: action = "Agents are working"
-            case .responding: action = "Your agent is responding"
-            case .completed: action = outcome == .cancelled ? "Stopped" : "Your agent finished"
-            case .failed: action = "Your agent could not finish"
+            case .thinking, .usingTool: action = "Your bot is working"
+            case .waiting: action = "Your bot needs attention"
+            case .delegating: action = "Bots are working"
+            case .responding: action = "Your bot is responding"
+            case .completed: action = outcome == .cancelled ? "Stopped" : "Your bot finished"
+            case .failed: action = "Your bot could not finish"
             }
             return .init(phase: phase, currentAction: action, progress: terminal ? 100 : 0,
                 completedSteps: 0, activeSubagentCount: activeSubagentCount, latestTool: nil, timestamp: observedAt)

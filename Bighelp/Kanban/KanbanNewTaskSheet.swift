@@ -28,7 +28,7 @@ struct KanbanNewTaskSheet: View {
                             .lineLimit(1...4)
                             .focused($titleFocused)
                             .accessibilityIdentifier("kanban.new.title")
-                        TextField("Add details for the agent (optional)", text: $details, axis: .vertical)
+                        TextField("Add details for the bot (optional)", text: $details, axis: .vertical)
                             .font(.bighelp(.body))
                             .foregroundStyle(theme.secondaryText)
                             .lineLimit(1...8)
@@ -46,7 +46,7 @@ struct KanbanNewTaskSheet: View {
                         .pickerStyle(.segmented)
                         .accessibilityIdentifier("kanban.new.when")
                         Text(lane == .ready
-                             ? "Goes to Ready. An agent picks it up next and works on it with AI."
+                             ? "Goes to Ready. A bot picks it up next and works on it with AI."
                              : model.autoPlan == true
                                 ? "Goes to Later. Auto plan is on, so Hermes may split it into smaller tasks."
                                 : "Goes to Later. Nothing runs until you move it to Ready.")

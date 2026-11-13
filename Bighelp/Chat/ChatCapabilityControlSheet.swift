@@ -28,11 +28,11 @@ struct CapabilityControlSheet: View {
                     Text(selection.itemID).font(.bighelp(.body, design: .monospaced)).textSelection(.enabled)
                     Text("Hermes profile: \(selection.agentID)").bighelpFont(.metadata)
                     if store.isLoadingControl {
-                        ProgressView("Reading host settings…").tint(theme.action)
+                        ProgressView("Reading computer settings…").tint(theme.action)
                     } else if let control = store.capabilityControl,
                               control.agentID == selection.agentID,
                               control.kind == selection.kind, control.itemID == selection.itemID {
-                        LabeledContent("Host-reported state", value: control.isEnabled ? "Enabled" : "Disabled")
+                        LabeledContent("Computer-reported state", value: control.isEnabled ? "Enabled" : "Disabled")
                         Text(control.scope).bighelpFont(.body)
                         Text(control.activation).bighelpFont(.metadata).foregroundStyle(theme.secondaryText)
                         if control.canToggle {
@@ -74,10 +74,10 @@ struct CapabilityControlSheet: View {
                         .bighelpActionStyle()
                         .tint(theme.action)
                     } else {
-                        Text("Only the supported host settings above are editable here. Credentials, server commands, and executable tool code stay on the host.")
+                        Text("Only the supported computer settings above are editable here. Credentials, server commands, and executable tool code stay on the computer.")
                             .bighelpFont(.metadata).foregroundStyle(theme.secondaryText)
                     }
-                    Button("Refresh host state", systemImage: "arrow.clockwise") {
+                    Button("Refresh computer state", systemImage: "arrow.clockwise") {
                         Task { await reload() }
                     }
                     .bighelpActionStyle().tint(theme.action)

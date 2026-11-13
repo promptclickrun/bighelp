@@ -55,7 +55,7 @@ struct ScheduledTasksView: View {
             .bighelpSheet(isPresented: $isAgentPickerPresented) {
                 NavigationStack {
                     AgentSelectionView(
-                        title: "Choose an agent",
+                        title: "Choose a bot",
                         detail: "Who should take care of this task?",
                         agents: agents.profiles,
                         avatarURL: agents.avatarURL(for:)
@@ -259,7 +259,7 @@ struct ScheduledTasksView: View {
                     Text("Nothing scheduled yet")
                         .bighelpFont(.sectionTitle)
                         .foregroundStyle(theme.primaryText)
-                    Text("Ask an agent to check in, summarize, or remind you on a schedule that suits you.")
+                    Text("Ask a bot to check in, summarize, or remind you on a schedule that suits you.")
                         .bighelpFont(.body)
                         .foregroundStyle(theme.secondaryText)
                         .multilineTextAlignment(.center)
@@ -297,7 +297,7 @@ struct ScheduledTasksView: View {
                 systemImage: "magnifyingglass",
                 description: Text(searchQuery.isEmpty
                     ? "No tasks match these filters."
-                    : "Try another task, instruction, schedule, or agent name.")
+                    : "Try another task, instruction, schedule, or bot name.")
             )
             .listRowBackground(theme.canvas)
             .listRowSeparator(.hidden)
@@ -356,8 +356,8 @@ struct ScheduledTasksView: View {
             .bighelpSegmentedPicker()
             .accessibilityIdentifier("scheduled-tasks.filter.status")
             Menu {
-                Picker("Agent", selection: Bindable(store).agentFilterID) {
-                    Text("All agents").tag(String?.none)
+                Picker("Bot", selection: Bindable(store).agentFilterID) {
+                    Text("All bots").tag(String?.none)
                     ForEach(agents.profiles) { agent in
                         Text(agent.name).tag(String?.some(agent.id))
                     }
@@ -374,7 +374,7 @@ struct ScheduledTasksView: View {
                     .contentShape(.capsule)
             }
             .fixedSize()
-            .accessibilityLabel("Agent filter")
+            .accessibilityLabel("Bot filter")
             .accessibilityValue(agentFilterTitle(store.agentFilterID))
             .accessibilityIdentifier("scheduled-tasks.filter.agent")
         }
@@ -440,8 +440,8 @@ struct ScheduledTasksView: View {
     }
 
     private func agentFilterTitle(_ id: String?) -> String {
-        guard let id else { return "All agents" }
-        return agent(id: id)?.name ?? "Unavailable agent"
+        guard let id else { return "All bots" }
+        return agent(id: id)?.name ?? "Unavailable bot"
     }
 
     @BighelpThemeReader private var theme

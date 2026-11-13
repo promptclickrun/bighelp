@@ -53,9 +53,9 @@ struct BotModeObservedToolView: View {
 
     private func omissionMessage(_ state: HermesBotModeActivityDetail.State) -> String {
         switch state {
-        case .available, .unavailable: "Not provided by the host."
-        case .omittedSize: "Omitted by the host because of its size."
-        case .omittedSensitive: "Omitted by the host's sensitive-content check."
+        case .available, .unavailable: "Not provided by the computer."
+        case .omittedSize: "Omitted by the computer because of its size."
+        case .omittedSensitive: "Omitted by the computer's sensitive-content check."
         }
     }
 }

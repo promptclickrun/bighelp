@@ -30,7 +30,7 @@ final class VoiceStepLineUITests: BighelpUITestCase {
         let step = app.descendants(matching: .any)["voice.step"]
         XCTAssertTrue(waitFor(step, label: "Checking your calendars…"), "The first step shows: \(step.label)")
         save("voice-2-step-calendar", app)
-        XCTAssertTrue(waitFor(step, label: "Asking another agent…"), step.label)
+        XCTAssertTrue(waitFor(step, label: "Asking another bot…"), step.label)
         // The helper reads a file of its own meanwhile; that stays in its folder.
         let deadline = Date().addingTimeInterval(2)
         while Date() < deadline {

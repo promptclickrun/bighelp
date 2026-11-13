@@ -9,8 +9,8 @@ import UniformTypeIdentifiers
 /// whichever one bighelp is using.
 struct BighelpShortcutGatewayEntity: AppEntity {
     static let typeDisplayRepresentation = TypeDisplayRepresentation(
-        name: "Gateway",
-        numericFormat: "\(placeholder: .int) gateways"
+        name: "Computer",
+        numericFormat: "\(placeholder: .int) computers"
     )
     static let defaultQuery = BighelpShortcutGatewayQuery()
 
@@ -42,7 +42,7 @@ struct BighelpShortcutGatewayQuery: EntityQuery {
         // A gateway taken out of bighelp keeps its place, so running the Shortcut can say so.
         return identifiers.map { id in
             gateways.first { $0.id.uuidString == id }.map(BighelpShortcutGatewayEntity.init)
-                ?? BighelpShortcutGatewayEntity(id: id, name: "Removed gateway")
+                ?? BighelpShortcutGatewayEntity(id: id, name: "Removed computer")
         }
     }
 
@@ -58,8 +58,8 @@ struct BighelpShortcutGatewayQuery: EntityQuery {
 
 struct LoopdyShortcutAgentEntity: AppEntity {
     static let typeDisplayRepresentation = TypeDisplayRepresentation(
-        name: "bighelp agent",
-        numericFormat: "\(placeholder: .int) bighelp agents"
+        name: "bighelp bot",
+        numericFormat: "\(placeholder: .int) bighelp bots"
     )
     static let defaultQuery = BighelpShortcutAgentQuery()
 
@@ -90,7 +90,7 @@ struct LoopdyShortcutAgentEntity: AppEntity {
     }
 
     var displayRepresentation: DisplayRepresentation {
-        let details = [isDefault ? "Default agent" : nil, role.isEmpty ? nil : role, hostName.map { "on \($0)" }]
+        let details = [isDefault ? "Default bot" : nil, role.isEmpty ? nil : role, hostName.map { "on \($0)" }]
             .compactMap { $0 }
         return DisplayRepresentation(
             title: "\(name)",
@@ -201,7 +201,7 @@ enum LoopdyShortcutReasoning: String, AppEnum {
 
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Reasoning level")
     static let caseDisplayRepresentations: [Self: DisplayRepresentation] = [
-        .automatic: .init(title: "Automatic", subtitle: "Use the agent default"),
+        .automatic: .init(title: "Automatic", subtitle: "Use the bot default"),
         .none: .init(title: "Off", subtitle: "No explicit reasoning budget"),
         .minimal: .init(title: "Minimal", subtitle: "Smallest available budget"),
         .low: .init(title: "Low", subtitle: "Faster, lighter reasoning"),
@@ -242,9 +242,9 @@ enum BighelpShortcutAttachmentBuilder {
 }
 
 struct SendLoopdyChatIntent: AppIntent {
-    static let title: LocalizedStringResource = "Ask an agent"
+    static let title: LocalizedStringResource = "Ask a bot"
     static let description = IntentDescription(
-        "Starts a new chat with your agent on the gateway you choose, with any pictures or files you add. Wait for response returns the answer to Shortcuts without opening bighelp. Turn it off to send and continue right away.",
+        "Starts a new chat with your bot on the computer you choose, with any pictures or files you add. Wait for response returns the answer to Shortcuts without opening bighelp. Turn it off to send and continue right away.",
         categoryName: "Chat"
     )
     static let openAppWhenRun = false
@@ -254,14 +254,14 @@ struct SendLoopdyChatIntent: AppIntent {
 
     @Parameter(
         title: "Message",
-        requestValueDialog: "What would you like to ask your agent?"
+        requestValueDialog: "What would you like to ask your bot?"
     )
     var message: String
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpShortcutGatewayEntity?
 
-    @Parameter(title: "Agent")
+    @Parameter(title: "Bot")
     var agent: LoopdyShortcutAgentEntity?
 
     @Parameter(title: "Model")
@@ -308,7 +308,7 @@ struct SendLoopdyChatIntent: AppIntent {
         let output: String
         switch result.delivery {
         case .queued:
-            output = "Sent to \(result.agentName). bighelp will notify you as the session progresses."
+            output = "Sent to \(result.agentName). bighelp will notify you as the chat progresses."
         case .completed(let response):
             output = response
         }
@@ -319,7 +319,7 @@ struct SendLoopdyChatIntent: AppIntent {
 struct StartLoopdyVoiceChatIntent: AppIntent {
     static let title: LocalizedStringResource = "Start voice chat"
     static let description = IntentDescription(
-        "Opens your agent's Bot Chat on the gateway you choose and starts talking right away.",
+        "Opens your bot's Bot Chat on the computer you choose and starts talking right away.",
         categoryName: "Chat"
     )
     static let openAppWhenRun = true
@@ -328,10 +328,10 @@ struct StartLoopdyVoiceChatIntent: AppIntent {
     @available(iOS 26.0, *)
     static var supportedModes: IntentModes { .foreground(.immediate) }
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpShortcutGatewayEntity?
 
-    @Parameter(title: "Agent")
+    @Parameter(title: "Bot")
     var agent: LoopdyShortcutAgentEntity?
 
     static var parameterSummary: some ParameterSummary {
@@ -361,7 +361,7 @@ struct BighelpAppShortcuts: AppShortcutsProvider {
                 "Ask an agent with \(.applicationName)",
                 "Ask \(\.$agent) in \(.applicationName)",
             ],
-            shortTitle: "Ask an agent",
+            shortTitle: "Ask a bot",
             systemImageName: "message.badge.waveform"
         )
         AppShortcut(
@@ -446,7 +446,7 @@ struct BighelpAppShortcuts: AppShortcutsProvider {
                 "Switch agents in \(.applicationName)",
                 "Switch to \(\.$agent) in \(.applicationName)",
             ],
-            shortTitle: "Switch agent",
+            shortTitle: "Switch bot",
             systemImageName: "arrow.left.arrow.right.circle"
         )
     }

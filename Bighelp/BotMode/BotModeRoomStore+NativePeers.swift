@@ -32,7 +32,7 @@ extension BotModeRoomStore {
         }
         guard let peerHosts, let home = nativeClient as? any HermesBotModePeerRegistering,
               let state = room.nativeState, let homeInstallID = nativeCapabilities?.authorityGatewayID else {
-            nativePeerLinkProblems[roomID] = "Agents on other computers join once this computer is connected."
+            nativePeerLinkProblems[roomID] = "Bots on other computers join once this computer is connected."
             return
         }
         let boundary = nativeBoundaryGeneration

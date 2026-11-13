@@ -74,7 +74,7 @@ final class DeviceAccessCardUITests: BighelpUITestCase {
         toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
         let note = element("device-access.health-sharing", in: app)
         XCTAssertTrue(note.waitForExistence(timeout: 5), "The sharing note comes first")
-        XCTAssertTrue(app.staticTexts["Share Health data with your agent?"].exists)
+        XCTAssertTrue(app.staticTexts["Share Health data with your bot?"].exists)
         capture("device-access-health-sharing-\(appearance)", in: app)
         app.buttons["device-access.health-sharing.continue"].firstMatch.tap()
         expectation(for: NSPredicate(format: "value == '1'"), evaluatedWith: toggle)

@@ -57,7 +57,7 @@ struct ShareView: View {
                 if model.noteIsTooLong {
                     Text("Your note is too long.").foregroundStyle(.red)
                 } else {
-                    Text("Nothing is sent yet. In bighelp you choose the agent and chat, look it over, and send it yourself.")
+                    Text("Nothing is sent yet. In bighelp you choose the bot and chat, look it over, and send it yourself.")
                 }
             }
         }
@@ -71,7 +71,7 @@ struct ShareView: View {
                 .accessibilityHidden(true)
             Text("Saved for bighelp")
                 .font(.headline)
-            Text("Open bighelp to choose the agent and chat, then send it. It stays on this device until you send it or delete it.")
+            Text("Open bighelp to choose the bot and chat, then send it. It stays on this device until you send it or delete it.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

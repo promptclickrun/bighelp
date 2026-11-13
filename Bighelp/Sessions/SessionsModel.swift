@@ -158,9 +158,9 @@ struct SessionDaySection: Identifiable, Equatable {
 
         var title: String {
             switch self {
-            case .active: "Active Sessions"
+            case .active: "Active Chats"
             case .pinned: "Pinned"
-            case .sessions: "Sessions"
+            case .sessions: "Chats"
             case .today: "Today"
             case .yesterday: "Yesterday"
             case .earlier: "Earlier"
@@ -383,7 +383,7 @@ final class SessionsModel {
                 generation == accountGeneration,
                 loadGeneration == latestLoadGeneration
             else { return }
-            loadState = .failed("We couldn’t load your sessions. Try again.")
+            loadState = .failed("We couldn’t load your chats. Try again.")
         }
     }
 

@@ -44,7 +44,7 @@ final class AgentDirectoryStore {
     private(set) var errorMessage: String?
     private(set) var errorCode: String?
 
-    static let hermesCompatibilityRecovery = "This Hermes gateway cannot load agents. Update Hermes on the host, restart the gateway, then reconnect bighelp and try again."
+    static let hermesCompatibilityRecovery = "This Hermes gateway cannot load bots. Update Hermes on the computer, restart the gateway, then reconnect bighelp and try again."
 
     static func isHermesCapabilityMissing(_ error: any Error) -> Bool {
         if case BighelpLinkWorkspaceClientError.remote(_, let code, _) = error {
@@ -129,7 +129,7 @@ final class AgentDirectoryStore {
             if Self.isHermesCapabilityMissing(error) { errorCode = "hermes_capability_missing" }
             errorMessage = errorCode == "hermes_capability_missing"
                 ? Self.hermesCompatibilityRecovery
-                : "Agents could not be loaded from Hermes. Check your Hermes connection and try again."
+                : "Bots could not be loaded from Hermes. Check your Hermes connection and try again."
             throw error
         }
     }

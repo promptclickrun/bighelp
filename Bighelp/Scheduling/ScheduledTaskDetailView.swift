@@ -55,8 +55,8 @@ struct ScheduledTaskDetailView: View {
                 .bighelpSheet(isPresented: $isDuplicatePickerPresented) {
                     NavigationStack {
                         AgentSelectionView(
-                            title: "Duplicate for another agent",
-                            detail: "Choose the agent that should own the new task.",
+                            title: "Duplicate for another bot",
+                            detail: "Choose the bot that should own the new task.",
                             agents: agents.profiles,
                             avatarURL: agents.avatarURL(for:)
                         ) { destination in
@@ -106,7 +106,7 @@ struct ScheduledTaskDetailView: View {
             VStack(spacing: BighelpTokens.space12) {
                 AvatarView(
                     stableID: profile?.id ?? "unavailable-\(task.agentID)",
-                    displayName: profile?.name ?? "Unavailable agent",
+                    displayName: profile?.name ?? "Unavailable bot",
                     imageURL: profile.flatMap(agents.avatarURL(for:)),
                     size: 80,
                     state: state
@@ -118,7 +118,7 @@ struct ScheduledTaskDetailView: View {
                         .foregroundStyle(theme.primaryText)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text(profile?.name ?? "Agent unavailable")
+                    Text(profile?.name ?? "Bot unavailable")
                         .bighelpFont(.label)
                         .foregroundStyle(theme.secondaryText)
                     Text(ScheduledTaskCopy.friendlySchedule(task))
@@ -224,7 +224,7 @@ struct ScheduledTaskDetailView: View {
                 }
                 if agent(for: task) == nil {
                     Label(
-                        "Agent unavailable. You can keep this history, delete it, or duplicate it for an available agent.",
+                        "Bot unavailable. You can keep this history, delete it, or duplicate it for an available bot.",
                         systemImage: "exclamationmark.triangle.fill"
                     )
                     .foregroundStyle(theme.warning)
@@ -326,7 +326,7 @@ struct ScheduledTaskDetailView: View {
                             detailLine("Skills", execution.skills.joined(separator: ", "), systemImage: "books.vertical")
                         }
                         if execution.runsWithoutAgent {
-                            detailLine("Agent", "Not used: sends what the script prints", systemImage: "person.crop.circle.badge.xmark")
+                            detailLine("Bot", "Not used: sends what the script prints", systemImage: "person.crop.circle.badge.xmark")
                         }
                     }
                     duplicateButton(task)
@@ -350,7 +350,7 @@ struct ScheduledTaskDetailView: View {
     private func duplicateButton(_ task: ScheduledTask) -> some View {
         let duplicate = presentation(for: task).action(.duplicate)
         let isEnabled = duplicate.isEnabled && !agents.profiles.isEmpty && !store.isPending("create")
-        Button("Duplicate for another agent", systemImage: "doc.on.doc") {
+        Button("Duplicate for another bot", systemImage: "doc.on.doc") {
             isDuplicatePickerPresented = true
         }
         .frame(minHeight: BighelpTokens.hitTarget)
@@ -406,7 +406,7 @@ struct ScheduledTaskDetailView: View {
         if task.status == .completed || task.status == .failed {
             return presentation(for: task).nextRunCopy
         }
-        let date = task.nextRun?.formatted(date: .complete, time: .shortened) ?? "Will be confirmed by the agent"
+        let date = task.nextRun?.formatted(date: .complete, time: .shortened) ?? "Will be confirmed by the bot"
         return task.isPaused ? "Paused · \(date)" : date
     }
 

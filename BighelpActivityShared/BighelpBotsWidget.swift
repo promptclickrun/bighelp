@@ -110,9 +110,9 @@ struct BotsWidgetBotQuery: EntityQuery {
 
 struct BotsWidgetIntent: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "Bots"
-    static let description = IntentDescription("Choose a gateway and the bots to show. Tap a bot to open its chat.")
+    static let description = IntentDescription("Choose a computer and the bots to show. Tap a bot to open its chat.")
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpWidgetGateway?
 
     @Parameter(title: "Bots", size: [.systemSmall: 1, .systemMedium: 2, .systemLarge: 4])

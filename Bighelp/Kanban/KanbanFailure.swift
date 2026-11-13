@@ -10,16 +10,16 @@ enum KanbanFailure {
             return "It ran longer than it's allowed to and was stopped."
         }
         if lower.hasPrefix("workspace:") {
-            return "Its workspace isn't set up: " + clipped(String(text.dropFirst("workspace:".count)))
+            return "Its folder isn't set up: " + clipped(String(text.dropFirst("workspace:".count)))
         }
         if let problem = lastError(in: text) {
             if let module = missingModule(in: problem) {
-                return "The agent couldn't start on your computer: Python can't find \"\(module)\". Hermes may need to be reinstalled or updated there."
+                return "The bot couldn't start on your computer: Python can't find \"\(module)\". Hermes may need to be reinstalled or updated there."
             }
-            return "The agent stopped with an error: " + clipped(problem)
+            return "The bot stopped with an error: " + clipped(problem)
         }
         if let code = exitCode(in: text) {
-            return "The agent stopped unexpectedly (exit code \(code))."
+            return "The bot stopped unexpectedly (exit code \(code))."
         }
         return clipped(text)
     }

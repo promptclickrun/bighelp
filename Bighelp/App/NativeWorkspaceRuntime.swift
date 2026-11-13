@@ -837,7 +837,7 @@ final class NativeWorkspaceRuntime {
                 pluginStates.record(.running, owner: owner)
             } catch {
                 try require(owner, request: request)
-                optionalFeatureMessage = "Optional host integrations are unavailable. Core workspace access does not require them."
+                optionalFeatureMessage = "Optional computer integrations are unavailable. Core access does not require them."
                 let state = await Self.pluginState(after: error, store: directStore)
                 try require(owner, request: request)
                 pluginStates.record(state, owner: owner)
@@ -916,7 +916,7 @@ final class NativeWorkspaceRuntime {
                     supported.formUnion([.projectsEdit, .sessionWorkspaceEdit])
                 } catch {
                     try require(owner, request: request)
-                    optionalFeatureMessage = "Project actions could not be verified. Refresh this host before changing projects."
+                    optionalFeatureMessage = "Project actions could not be verified. Refresh this computer before changing projects."
                 }
             }
             await roomCatalog
@@ -930,7 +930,7 @@ final class NativeWorkspaceRuntime {
         } catch {
             guard !retired, refreshID == request else { return }
             errorMessage = error is WorkspaceClientError
-                ? error.localizedDescription : "The native workspace could not be loaded. No other host or transport was used."
+                ? error.localizedDescription : "bighelp could not load this computer's data. No other computer or transport was used."
         }
     }
 

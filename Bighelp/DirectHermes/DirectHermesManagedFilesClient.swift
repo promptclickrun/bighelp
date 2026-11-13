@@ -160,19 +160,19 @@ enum DirectHermesManagedFilesError: Error, Equatable, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidPath:
-            "Choose a file or folder inside this host’s configured workspace."
+            "Choose a file or folder inside this computer’s configured folder."
         case .invalidName:
             "Use a single file or folder name without slashes or control characters."
         case .invalidResponse:
             "Hermes returned an invalid managed-file response. Refresh before trying again."
         case .scopeUnavailable:
-            "This computer didn't confirm which folder your agent works in, so bighelp opened no files."
+            "This computer didn't confirm which folder your bot works in, so bighelp opened no files."
         case .scopeChanged:
-            "Hermes’ managed-files policy changed after this workspace was opened. Reopen Files to establish the current boundary."
+            "Hermes’ managed-files policy changed after this folder was opened. Reopen Files to establish the current boundary."
         case .fileTooLarge(let limit):
             "This file exceeds bighelp’s bounded native transfer limit of \(ByteCountFormatter.string(fromByteCount: Int64(limit), countStyle: .file))."
         case .ownerChanged:
-            "The selected host or account changed. Reopen Files from the current workspace."
+            "The selected computer or account changed. Reopen Files."
         case .transferTransportRequired:
             "This transfer needs authenticated binary, HEAD, Range, or multipart HTTP support that the current Direct transport does not yet expose."
         case .mediaStreamingOnly:

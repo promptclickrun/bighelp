@@ -155,7 +155,7 @@ struct ChatToolPhraseTests {
         let helper = ChatActivityEvent(eventID: "h", sessionID: "s", turnID: "t", kind: .subagent,
                                        lifecycle: .running, title: "Research ryokans", summary: nil, detail: nil,
                                        occurredAt: 1, subagentID: "sub-1")
-        #expect(helper.toolPhrase.live == "Asking another agent…")
+        #expect(helper.toolPhrase.live == "Asking another bot…")
         // The step line names the program that does the work, not the `cd` before it.
         let tests = ChatActivityEvent(eventID: "n", sessionID: "s", turnID: "t", kind: .tool, lifecycle: .succeeded,
                                       title: "Tool", summary: nil, detail: nil, occurredAt: 1, toolCallID: "n",
@@ -164,6 +164,6 @@ struct ChatToolPhraseTests {
         #expect(ChatActivityPresentation.step(for: tests).detail == "npm")
         #expect(ChatToolSummary.summary(of: [helper, helper.updating(lifecycle: .succeeded, summary: nil,
                                                                       detail: nil, occurredAt: 2)])
-                == "Asked 2 other agents")
+                == "Asked 2 other bots")
     }
 }

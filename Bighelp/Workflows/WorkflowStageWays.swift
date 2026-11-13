@@ -73,12 +73,12 @@ struct WorkflowDeliverySection: View {
         } footer: {
             Text(isTypingOther
                  ? "A platform, then a colon and the channel: discord:#news, telegram:-1001234567890 or slack:C0123ABCD."
-                 : "The computer sends it with Hermes, like a scheduled task's results. No agent runs.")
+                 : "The computer sends it with Hermes, like a scheduled task's results. No bot runs.")
                 .font(.bighelp(.footnote))
         }
         Section {
             if choices.isEmpty {
-                Text("Add an agent stage before this one: a delivery sends what earlier stages made.")
+                Text("Add a bot stage before this one: a delivery sends what earlier stages made.")
                     .foregroundStyle(theme.secondaryText)
             }
             ForEach(choices) { choice in

@@ -99,7 +99,7 @@ extension ChatModel {
 
     var botModeMemberCountLabel: String {
         let count = botModeRoom?.members.count ?? memberIDs.count
-        return "\(count) \(count == 1 ? "agent" : "agents")"
+        return "\(count) \(count == 1 ? "bot" : "bots")"
     }
 
     var memberProfiles: [AgentProfile] {
@@ -156,13 +156,13 @@ extension ChatModel {
         }
         guard botModeExecutionEnabled else {
             guard let capabilities = botModeRoomStore?.nativeCapabilities else {
-                return "Connect to the selected Hermes host to run this room."
+                return "Connect to the selected Hermes computer to run this room."
             }
             if capabilities.protocolVersion != 2 {
-                return "This host's room protocol is not supported."
+                return "This computer's room protocol is not supported."
             }
             if !capabilities.driver {
-                return "The Hermes room driver is not running on this host."
+                return "The Hermes room driver is not running on this computer."
             }
             return "This room's capabilities, authority or member routing are unavailable on this connection."
         }
@@ -201,7 +201,7 @@ extension ChatModel {
         if !botModeExecutionEnabled { return "this room can't run on this connection" }
         if botModeRoom?.nativeRetryJournal != nil { return "a retry is still being confirmed" }
         if acceptsBotModeFollowUp || !orderedDraftAttachments.isEmpty { return nil }
-        if botModeRoom?.isRunning == true { return "the agents are still replying" }
+        if botModeRoom?.isRunning == true { return "the bots are still replying" }
         if botModeRoom?.nativePendingEventID != nil { return "a message is still being sent" }
         if hasNativeBotModeRetryActions { return "interrupted work is waiting for your decision" }
         return nil
@@ -557,7 +557,7 @@ extension ChatModel {
                     }
                     snapshot = .init(
                         name: profile?.name ?? peerAgent?.name ?? nativeMember?.displayName ?? nativeMember?.handle
-                            ?? "Unavailable agent",
+                            ?? "Unavailable bot",
                         avatarFileName: profile?.avatarFileName,
                         imageURL: peerAgent?.imageURL
                     )
@@ -625,7 +625,7 @@ extension ChatModel {
             replaceMention(token, with: "@\(room.member(id: agentID)?.handle ?? AgentHandle.normalized(agent.name))")
             flushPersistence()
         } catch {
-            failureMessage = "Agent could not be added. Try again."
+            failureMessage = "Bot could not be added. Try again."
             throw error
         }
     }
@@ -705,9 +705,9 @@ extension ChatModel {
     func mentionErrorMessage(_ error: MentionError) -> String {
         switch error {
         case .unknown(let handle):
-            "No agent named @\(displayHandle(handle)) in this chat. Edit the mention and try again."
+            "No bot named @\(displayHandle(handle)) in this chat. Edit the mention and try again."
         case .ambiguous(let handle):
-            "More than one agent is named @\(displayHandle(handle)) in this chat. Edit the mention and try again."
+            "More than one bot is named @\(displayHandle(handle)) in this chat. Edit the mention and try again."
         }
     }
 

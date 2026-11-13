@@ -17,19 +17,19 @@ enum NativeWorkspaceLifecycleError: Error, Equatable, LocalizedError, Sendable {
         case .ownerChanged:
             "The selected Hermes connection changed. Reopen this lifecycle screen."
         case .invalidConstruction:
-            "Profile and session lifecycle controls require the retained native Hermes owner."
+            "Profile and chat lifecycle controls require the retained native Hermes owner."
         case .durableSessionUnavailable:
-            "Hermes confirmed this stored session, but the current profile catalog could not resolve its exact durable identity. Refresh Sessions before trying again."
+            "Hermes confirmed this stored chat, but the current profile catalog could not resolve its exact durable identity. Refresh Chats before trying again."
         case .profileStateCouldNotBeVerified:
             "bighelp could not verify every saved draft for this profile, so the profile change was not sent."
         case .protectedProfileState(_, let sessionIDs):
-            "Resolve or save the pending work in \(sessionIDs.count) profile session(s) before renaming or deleting this profile. No profile change was sent."
+            "Resolve or save the pending work in \(sessionIDs.count) profile chat(s) before renaming or deleting this profile. No profile change was sent."
         case .profileBusy:
-            "This agent is still replying and didn't stop. Wait for it to finish, then delete it. Nothing was deleted."
+            "This bot is still replying and didn't stop. Wait for it to finish, then delete it. Nothing was deleted."
         case .profileInGroups(_, let titles):
             titles.count == 1
-                ? "This agent is in the group chat “\(titles[0])”. Delete that group first, then delete the agent. Nothing was deleted."
-                : "This agent is in \(titles.count) group chats. Delete those groups first, then delete the agent. Nothing was deleted."
+                ? "This bot is in the group chat “\(titles[0])”. Delete that group first, then delete the bot. Nothing was deleted."
+                : "This bot is in \(titles.count) group chats. Delete those groups first, then delete the bot. Nothing was deleted."
         case .sharedStateMismatch:
             "Hermes confirmed the profile change, but the shared bighelp stores did not reconcile to the exact readback. Reopen Profiles; do not repeat the server operation."
         }

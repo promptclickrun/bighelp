@@ -324,15 +324,15 @@ enum HostOperationsError: Error, Equatable, LocalizedError, Sendable {
 
     var errorDescription: String? {
         switch self {
-        case .unavailable(let feature): "This Hermes host does not expose \(feature). No private substitute was used."
-        case .ownerChanged: "The selected host or connection changed. Reopen Host Operations before continuing."
-        case .invalidRequest: "This host operation is invalid."
-        case .invalidResponse: "Hermes returned an unsupported Host Operations response."
+        case .unavailable(let feature): "This Hermes computer does not expose \(feature). No private substitute was used."
+        case .ownerChanged: "The selected computer or connection changed. Reopen the computer's page before you continue."
+        case .invalidRequest: "This computer operation is invalid."
+        case .invalidResponse: "Hermes returned an answer that bighelp does not know."
         case .outcomeUnknown: "Hermes did not confirm the operation. Refresh its status before trying again."
         case .unsupportedAction: "Hermes returned an action that this client cannot safely poll."
         case .downloadUnavailable: "This connection cannot download backup archives through the authenticated native transport."
         case .downloadTooLarge: "This backup exceeds the native client’s bounded download limit."
-        case .reviewChanged: "Authoritative host state changed after review. Refresh and review it again before continuing."
+        case .reviewChanged: "Authoritative computer state changed after review. Refresh and review it again before continuing."
         case .shareFailed: "Hermes could not create a redacted diagnostics share. No upload receipt was returned."
         case .importUploadUnavailable: "This connection does not expose the fixed authenticated backup-import upload transport."
         case .importTooLarge: "This backup exceeds bighelp’s bounded private import limit."

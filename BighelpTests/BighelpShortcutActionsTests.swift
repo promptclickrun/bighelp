@@ -359,7 +359,7 @@ struct BighelpShortcutActionsTests {
                           hasAcceptedMessage: true),
         ]
         let status = await harness.service.hostStatus()
-        #expect(status == "Connected to Studio Mac.\n2 agents.\n1 chat working right now.\nHermes 0.21.4.")
+        #expect(status == "Connected to Studio Mac.\n2 bots.\n1 chat working right now.\nHermes 0.21.4.")
     }
 
     @Test func hostStatusLeavesOutAnythingThatIsNotAVersion() async throws {
@@ -367,7 +367,7 @@ struct BighelpShortcutActionsTests {
         harness.service.hostServices.hostName = { "Studio Mac" }
         harness.service.hostServices.hermesVersion = { "/Users/someone/.hermes token=abc" }
         let status = await harness.service.hostStatus()
-        #expect(status == "Connected to Studio Mac.\n2 agents.\nNothing is working right now.")
+        #expect(status == "Connected to Studio Mac.\n2 bots.\nNothing is working right now.")
     }
 
     @Test func hostStatusWithoutAComputerOrConnectionSaysSo() async throws {

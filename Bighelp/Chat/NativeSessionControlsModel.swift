@@ -146,7 +146,7 @@ final class NativeSessionControlsModel {
         guard ObjectIdentifier(client) == owner.clientID,
               ObjectIdentifier(client) == originalClient.map({ ObjectIdentifier($0) }) else {
             ownsOriginalClient = false
-            errorMessage = "This session changed while its controls were open. Close the controls and reopen them from the current chat."
+            errorMessage = "This chat changed while its controls were open. Close the controls and reopen them from the current chat."
             invalidateRequests()
             return false
         }
@@ -161,7 +161,7 @@ final class NativeSessionControlsModel {
             connectionGeneration: connectionGeneration
         )
         actions = client.sessionActions
-        noticeMessage = "Connection refreshed. Session actions now use the current connection."
+        noticeMessage = "Connection refreshed. Chat actions now use the current connection."
         return true
     }
 
@@ -199,7 +199,7 @@ final class NativeSessionControlsModel {
             finish(request)
         } catch {
             fail(request, error: error,
-                 fallback: "Hermes could not load the current session status, usage, and context.")
+                 fallback: "Hermes could not load the current chat status, usage, and context.")
         }
     }
 
@@ -236,7 +236,7 @@ final class NativeSessionControlsModel {
         } catch {
             if accepts(request) { toolsetLoadState = .failed }
             fail(request, error: error,
-                 fallback: "Hermes could not read the current live-session tool configuration.")
+                 fallback: "Hermes could not read the current live-chat tool configuration.")
         }
     }
 
@@ -258,21 +258,21 @@ final class NativeSessionControlsModel {
                 toolsetLoadState = .loaded
                 if readback.toolsets.first(where: { $0.name == name })?.enabled == enabled {
                     toolsetReadbackRequired = false
-                    noticeMessage = "\(name) is \(enabled ? "enabled" : "disabled"). Hermes rebuilt the idle live session and the current tool state was read back."
+                    noticeMessage = "\(name) is \(enabled ? "enabled" : "disabled"). Hermes rebuilt the idle live chat and the current tool state was read back."
                 } else {
                     toolsetReadbackRequired = true
-                    errorMessage = "Hermes rebuilt the live session, but authoritative readback did not confirm \(name) as \(enabled ? "enabled" : "disabled"). Refresh before another change."
+                    errorMessage = "Hermes rebuilt the live chat, but authoritative readback did not confirm \(name) as \(enabled ? "enabled" : "disabled"). Refresh before another change."
                 }
             } else {
                 toolsetLoadState = .failed
                 toolsetReadbackRequired = true
-                noticeMessage = "Hermes accepted the \(name) change, but live-session readback failed. Refresh tool configuration before another change."
+                noticeMessage = "Hermes accepted the \(name) change, but live-chat readback failed. Refresh tool configuration before another change."
             }
             finish(request)
         } catch {
             if accepts(request) { toolsetLoadState = .failed }
             fail(request, error: error,
-                 fallback: "Hermes could not confirm the live-session tool change. Refresh before trying again.")
+                 fallback: "Hermes could not confirm the live-chat tool change. Refresh before trying again.")
         }
     }
 
@@ -320,7 +320,7 @@ final class NativeSessionControlsModel {
             if isOutcomeUnknown(error) {
                 await reconcileUnknown(kind: kind, error: error)
             } else {
-                publish(error, fallback: "Hermes could not compress this session.")
+                publish(error, fallback: "Hermes could not compress this chat.")
             }
         }
     }
@@ -339,7 +339,7 @@ final class NativeSessionControlsModel {
             if isOutcomeUnknown(error) {
                 await reconcileUnknown(kind: kind, error: error)
             } else {
-                publish(error, fallback: "Hermes could not undo the latest session message.")
+                publish(error, fallback: "Hermes could not undo the latest chat message.")
             }
         }
     }
@@ -350,11 +350,11 @@ final class NativeSessionControlsModel {
             let result = try await request.actions.save()
             guard accepts(request) else { return }
             lastSave = result
-            noticeMessage = result.file.map { "Session saved to \($0)." } ?? "Session save acknowledged."
+            noticeMessage = result.file.map { "Chat saved to \($0)." } ?? "Chat save acknowledged."
             finish(request)
         } catch {
             fail(request, error: error,
-                 fallback: "Hermes could not confirm the session save. Check before saving again.")
+                 fallback: "Hermes could not confirm the chat save. Check before saving again.")
         }
     }
 
@@ -382,7 +382,7 @@ final class NativeSessionControlsModel {
             control = snapshot
             finish(request)
         } catch {
-            fail(request, error: error, fallback: "Hermes could not load session control state.")
+            fail(request, error: error, fallback: "Hermes could not load chat control state.")
         }
     }
 
@@ -393,12 +393,12 @@ final class NativeSessionControlsModel {
             guard accepts(request) else { return false }
             control = result.control
             lastControlDispatch = result.dispatch
-            noticeMessage = controlDispatchMessage(result.dispatch) ?? "Session control updated."
+            noticeMessage = controlDispatchMessage(result.dispatch) ?? "Chat control updated."
             finish(request)
             return true
         } catch {
             fail(request, error: error,
-                 fallback: "Hermes could not confirm the session-control change. Refresh its current state before trying again.")
+                 fallback: "Hermes could not confirm the chat-control change. Refresh its current state before trying again.")
             return false
         }
     }

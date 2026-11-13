@@ -78,7 +78,7 @@ struct NativeMessageReactionBar: View {
     private func accessibilityLabel(for reaction: NativeMessageReaction) -> String {
         switch reaction.author {
         case .user: "Your reaction, \(reaction.emoji)"
-        case .agent: "Agent reaction, \(reaction.emoji)"
+        case .agent: "Bot reaction, \(reaction.emoji)"
         }
     }
 

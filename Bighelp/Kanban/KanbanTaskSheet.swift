@@ -134,15 +134,15 @@ struct KanbanTaskSheet: View {
             .contentShape(.rect)
         }
         .kanbanMacMenu(.asDrawn)
-        .accessibilityLabel("Agent: \(model.agent(task.assignee)?.name ?? "anyone")")
-        .accessibilityHint("Give this card to another agent.")
+        .accessibilityLabel("Bot: \(model.agent(task.assignee)?.name ?? "anyone")")
+        .accessibilityHint("Give this card to another bot.")
         .accessibilityIdentifier("kanban.task.agent")
     }
 
     @ViewBuilder private func details(_ task: HermesKanbanTask) -> some View {
         if isEditing {
             section("Details") {
-                TextField("Add details for the agent", text: $draftDetails, axis: .vertical)
+                TextField("Add details for the bot", text: $draftDetails, axis: .vertical)
                     .lineLimit(3...12)
                     .accessibilityIdentifier("kanban.task.details-field")
             }
@@ -188,8 +188,8 @@ struct KanbanTaskSheet: View {
     private func composer(_ task: HermesKanbanTask) -> some View {
         let name = model.agent(task.assignee)?.name.split(separator: " ").first.map(String.init)
         let prompt = task.status == .review ? "What should change?"
-            : task.status == .blocked && task.blockKind == "needs_input" ? "Answer \(name ?? "the agent")…"
-            : "Tell \(name ?? "the agent") something…"
+            : task.status == .blocked && task.blockKind == "needs_input" ? "Answer \(name ?? "the bot")…"
+            : "Tell \(name ?? "the bot") something…"
         return HStack(alignment: .bottom, spacing: BighelpTokens.space8) {
             TextField(prompt, text: $message, axis: .vertical)
                 .lineLimit(1...5)
@@ -302,7 +302,7 @@ struct KanbanNeedsYouCard: View {
     let answer: () -> Void
 
     var body: some View {
-        let name = model.agent(task.assignee)?.name.split(separator: " ").first.map(String.init) ?? "Your agent"
+        let name = model.agent(task.assignee)?.name.split(separator: " ").first.map(String.init) ?? "Your bot"
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
             Label(title(name), systemImage: symbol)
                 .font(.bighelp(.headline))
@@ -365,7 +365,7 @@ struct KanbanNeedsYouCard: View {
                     Button(agent.name) { Task { await model.assign(task, to: agent.id) } }
                 }
             } label: {
-                Label("Give it to another agent", systemImage: "arrow.turn.up.right")
+                Label("Give it to another bot", systemImage: "arrow.turn.up.right")
                     .font(.bighelp(.subheadline).weight(.medium))
             }
             .kanbanMacMenu(.bordered)
@@ -497,7 +497,7 @@ struct KanbanThread: View {
     }
 
     private func runRow(_ run: HermesKanbanRun) -> some View {
-        let name = model.agent(run.profile)?.name ?? "An agent"
+        let name = model.agent(run.profile)?.name ?? "A bot"
         return HStack(alignment: .top, spacing: BighelpTokens.space8) {
             Image(systemName: run.isActive ? "bolt.circle.fill" : run.error == nil ? "checkmark.circle" : "exclamationmark.circle")
                 .foregroundStyle(run.isActive ? KanbanLane.working.tint : run.error == nil ? theme.secondaryText : KanbanLane.needsYou.tint)
@@ -581,7 +581,7 @@ struct KanbanNerdDetails: View {
             if let pid = task.workerPID { row("Worker PID", "\(pid)") }
             if let model = task.modelOverride { row("Model", model + (task.providerOverride.map { " · \($0)" } ?? "")) }
             if let effort = task.reasoningEffort { row("Reasoning", effort) }
-            row("Workspace", task.workspacePath ?? task.workspaceKind)
+            row("Folder", task.workspacePath ?? task.workspaceKind)
             if task.consecutiveFailures > 0 { row("Failures", "\(task.consecutiveFailures)") }
             if let detail {
                 ForEach(detail.runs) { run in

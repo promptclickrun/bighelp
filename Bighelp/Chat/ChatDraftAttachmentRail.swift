@@ -332,7 +332,7 @@ struct DraftAttachmentsSheet: View {
                             .foregroundStyle(theme.primaryText)
                             .lineLimit(1)
                             .truncationMode(.middle)
-                        Text(stale(attachment) ? "Earlier session · remove and re-add these pages"
+                        Text(stale(attachment) ? "Earlier chat · remove and re-add these pages"
                              : attachment.isPhoto ? attachment.sizeOrPages
                              : [attachment.isPDF ? "PDF" : "File", attachment.sizeOrPages].joined(separator: " · "))
                             .font(.bighelp(.footnote))

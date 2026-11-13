@@ -62,7 +62,7 @@ struct NativeSessionRollbackReviewView: View {
                         }
                     }
                     if let rendered = diff.rendered, !rendered.isEmpty, rendered != diff.diff {
-                        DisclosureGroup("Host-rendered review") {
+                        DisclosureGroup("Computer-rendered review") {
                             Text(rendered)
                                 .font(.bighelp(.body).monospaced())
                                 .textSelection(.enabled)

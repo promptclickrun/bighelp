@@ -50,7 +50,7 @@ struct VoiceLaunchCover: View {
         let persona = AgentPersona(stableID: agent?.id ?? "voice")
         VStack(spacing: BighelpTokens.space24) {
             Spacer()
-            AgentLiveAvatar(agentID: agent?.id ?? "voice", displayName: agent?.name ?? "Agent",
+            AgentLiveAvatar(agentID: agent?.id ?? "voice", displayName: agent?.name ?? "Bot",
                             imageURL: agent?.imageURL, activity: .thinking, size: 200, showsBadge: false)
             Text(agent.map { "Starting voice with \($0.name)…" } ?? "Starting voice…")
                 .font(.bighelp(.title3).weight(.semibold))

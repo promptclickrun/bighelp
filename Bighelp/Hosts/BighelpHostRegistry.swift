@@ -257,7 +257,7 @@ final class BighelpHostRegistry {
             try finishPendingCleanup()
         } catch {
             storageIsReadable = false
-            errorMessage = "Temporary host setup data could not be removed. Unlock this device and retry before connecting another host."
+            errorMessage = "Temporary computer setup data could not be removed. Unlock this device and retry before connecting another computer."
             return
         }
         guard let scope else { return }
@@ -283,7 +283,7 @@ final class BighelpHostRegistry {
         } catch {
             // Corrupt/newer metadata is not an empty valid registry; don't overwrite it.
             storageIsReadable = false
-            errorMessage = "Saved hosts could not be read. Their data has not been replaced."
+            errorMessage = "Saved computers could not be read. Their data has not been replaced."
         }
     }
 
@@ -319,7 +319,7 @@ final class BighelpHostRegistry {
         guard pendingIDs.remove(id) != nil else { return }
         workspaces[id]?.suspendForPresentationExit()
         do { try vaults[id]?.delete() }
-        catch { errorMessage = "Temporary host credentials could not be removed. Unlock this device and retry account cleanup." }
+        catch { errorMessage = "Temporary computer credentials could not be removed. Unlock this device and retry account cleanup." }
         vaults[id]?.invalidate(); draftStores[id]?.invalidate()
         workspaces[id] = nil; vaults[id] = nil; draftStores[id] = nil
     }
@@ -379,7 +379,7 @@ final class BighelpHostRegistry {
             selectedHostID = id
             selectedWorkspace = selectedHost.map { workspace(for: $0) }
             errorMessage = nil
-        } catch { errorMessage = "The host selection could not be saved on this device." }
+        } catch { errorMessage = "The computer selection could not be saved on this device." }
     }
 
     /// The name people see for a computer. Its address, sign-in and chats don't change.
@@ -505,7 +505,7 @@ final class BighelpHostRegistry {
         store.prepareChat = { [weak self] chat in
             guard let self, let host = self.hosts.first(where: { $0.id == id }) else { return }
             do { try await self.prepareChat?(host, chat) }
-            catch { self.notificationSetupError = "Chat is connected, but notifications for this session could not be prepared. Retry notification setup in Accounts and Devices." }
+            catch { self.notificationSetupError = "Chat is connected, but notifications for this chat could not be prepared. Retry notification setup in Accounts and Devices." }
         }
         store.onNativeEvent = { [weak self] event in
             guard let self, let host = self.hosts.first(where: { $0.id == id }) else { return }
@@ -575,5 +575,5 @@ extension EnvironmentValues {
 
 enum HostSetupError: Error, LocalizedError {
     case alreadyConfigured
-    var errorDescription: String? { "This host account is already configured. Select it in Accounts and Devices." }
+    var errorDescription: String? { "This computer account is already configured. Select it in Accounts and Devices." }
 }

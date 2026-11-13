@@ -138,7 +138,7 @@ extension ChatModel {
             return .superseded
         }
         guard !orderedDraftAttachments.contains(where: { $0.pdfSelection != nil }) else {
-            failureMessage = "PDF pages and session references must be sent in separate messages. Your draft is unchanged."
+            failureMessage = "PDF pages and chat references must be sent in separate messages. Your draft is unchanged."
             return .unavailable
         }
         // BotModeRoomStore's current public send API parses its sole text and

@@ -57,7 +57,7 @@ struct DevFactoryHomeView: View {
                     } header: {
                         Text("Start from a template")
                     } footer: {
-                        Text("Or ask an agent to write one: it can make and run recipes too.")
+                        Text("Or ask a bot to write one: it can make and run recipes too.")
                     }
                     .listRowBackground(theme.surface)
                 }
@@ -368,7 +368,7 @@ struct DevFactoryNewRecipeSheet: View {
                         .autocorrectionDisabled()
                 }
                 .listRowBackground(theme.surface)
-                Section("Agent") {
+                Section("Bot") {
                     Picker("Codes with", selection: Binding(get: { setup.agentID ?? "" },
                                                             set: { setup.agentID = $0.isEmpty ? nil : $0 })) {
                         ForEach(context.agents) { agent in Text(agent.name).tag(agent.id) }
@@ -550,7 +550,7 @@ struct DevFactoryRecipeView: View {
 
     private func stepKind(_ stage: WorkflowStage) -> String {
         switch stage.kind {
-        case .agent: "Agent task · each project"
+        case .agent: "Bot task · each project"
         case .command: "Check · each project"
         case .signoff: stage.signsChanges ? "Your sign-off on the changes" : "Your sign-off"
         case .pullRequest: "Pull request · each project"

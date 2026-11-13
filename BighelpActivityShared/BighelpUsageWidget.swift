@@ -301,9 +301,9 @@ struct UsageWidgetPlanQuery: EntityQuery {
 struct UsageWidgetIntent: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "Usage"
     static let description = IntentDescription(
-        "Choose a gateway, a style, and the plans to show.")
+        "Choose a computer, a style, and the plans to show.")
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpWidgetGateway?
 
     @Parameter(title: "Style", default: .automatic)
@@ -526,7 +526,7 @@ struct BighelpUsageWidget: Widget {
             }
         }
         .configurationDisplayName("Usage")
-        .description("How much of each plan's limits you've used, and when they reset. Pick a gateway and a style.")
+        .description("How much of each plan's limits you've used, and when they reset. Pick a computer and a style.")
         .supportedFamilies(Self.families)
         .bighelpWidgetPlacement()
     }

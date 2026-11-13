@@ -794,7 +794,7 @@ struct ChatModelTests {
         let rows = SessionContextPresentation.tokenRows(for: snapshot)
         #expect(rows.first(where: { $0.id == "latest-cached" })?.value == "0")
         #expect(rows.contains(where: { $0.id == "session-cached" }) == false)
-        #expect(rows.first(where: { $0.id == "session-total" })?.title == "Session total")
+        #expect(rows.first(where: { $0.id == "session-total" })?.title == "Chat total")
         #expect(rows.first(where: { $0.id == "session-total" })?.value
             == SessionContextPresentation.exactCount(155_664))
     }
@@ -829,7 +829,7 @@ struct ChatModelTests {
         ])
         #expect(rows.first(where: { $0.id == "latest-input" })?.title == "Latest input")
         #expect(rows.first(where: { $0.id == "latest-cached" })?.title == "Latest cached")
-        #expect(rows.first(where: { $0.id == "session-total" })?.title == "Session total (incl. subagents)")
+        #expect(rows.first(where: { $0.id == "session-total" })?.title == "Chat total (incl. subagents)")
         #expect(
             rows.first(where: { $0.id == "latest-input" })?.value
                 == SessionContextPresentation.exactCount(120_400)
@@ -1439,7 +1439,7 @@ struct ChatModelTests {
         )
         #expect(
             ChatRuntimeSelectionLockout.accessibilityHint(isTurnActive: false)
-                == "Opens settings for this session."
+                == "Opens settings for this chat."
         )
     }
 
@@ -2181,8 +2181,8 @@ struct ChatModelTests {
     @Test func pendingPresentationNeverUsesTheBighelpBrandAsAnAgentName() {
         let presentation = PendingMessagePresentation(agentName: "bighelp")
 
-        #expect(presentation.visibleText == "Your agent is working…")
-        #expect(presentation.accessibilityLabel == "Sending. Your agent is working.")
+        #expect(presentation.visibleText == "Your bot is working…")
+        #expect(presentation.accessibilityLabel == "Sending. Your bot is working.")
     }
 
     @Test func workingAgentNamePrefersTheLiveHermesDraftIdentity() async {
@@ -2483,7 +2483,7 @@ struct ChatModelTests {
             AgentProfile(
                 id: "default",
                 name: "Juno",
-                role: "Default agent",
+                role: "Default bot",
                 summary: "The default Hermes agent.",
                 instructions: "Be helpful.",
                 avatarFileName: nil,
@@ -2673,7 +2673,7 @@ struct ChatModelTests {
             id: "active-history-page",
             kind: .direct,
             agentIDs: ["default"],
-            title: "Active session",
+            title: "Active chat",
             isActive: true,
             hasAcceptedMessage: true
         )

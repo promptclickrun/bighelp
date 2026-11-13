@@ -34,10 +34,10 @@ struct VoiceStepLineTests {
         model.acceptActivity(ChatActivityEvent(eventID: "helper", sessionID: "voice-steps", turnID: "turn",
             kind: .subagent, lifecycle: .running, title: "Compare routes", summary: nil, detail: nil,
             occurredAt: 1, subagentID: "helper-1"))
-        #expect(model.liveStepPhrase == "Asking another agent…")
+        #expect(model.liveStepPhrase == "Asking another bot…")
         model.acceptActivity(tool("helper-read", name: "read_file", arguments: #"{"path":"routes.md"}"#,
                                   subagentID: "helper-1"))
-        #expect(model.liveStepPhrase == "Asking another agent…", "The helper's file read isn't the agent's step")
+        #expect(model.liveStepPhrase == "Asking another bot…", "The helper's file read isn't the agent's step")
     }
 
     @Test func eachStepStaysLongEnoughToReadAndGapsDontBlink() {

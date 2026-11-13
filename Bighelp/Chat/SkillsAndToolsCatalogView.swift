@@ -107,7 +107,7 @@ struct SkillsAndToolsCatalogView: View {
         )) {
             Button("OK") { store.clearError() }
         } message: {
-            Text(store.errorMessage ?? "The host could not complete this action.")
+            Text(store.errorMessage ?? "The computer could not complete this action.")
         }
         .accessibilityIdentifier("skills-tools.screen")
     }

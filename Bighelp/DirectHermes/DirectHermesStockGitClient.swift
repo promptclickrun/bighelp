@@ -263,7 +263,7 @@ final class DirectHermesStockGitClient: StockGitManaging, ProjectGitClient {
             throw BighelpLinkWorkspaceClientError.remote(
                 status: .failed,
                 code: "project_not_repository",
-                message: "This Project is not a Git repository."
+                message: "This project is not a Git repository."
             )
         }
         let status = try decodeStatus(statusValue)

@@ -55,13 +55,13 @@ struct NativeSessionControlsView: View {
                 controlsForm
             } else {
                 ContentUnavailableView(
-                    "Session changed",
+                    "Chat changed",
                     systemImage: "arrow.triangle.2.circlepath",
                     description: Text("Close these controls and reopen them from the current chat.")
                 )
             }
         }
-        .navigationTitle("Session controls")
+        .navigationTitle("Chat controls")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
@@ -105,7 +105,7 @@ struct NativeSessionControlsView: View {
             .presentationDragIndicator(.visible)
         }
         .confirmationDialog(
-            destructiveAction?.title ?? "Review session change",
+            destructiveAction?.title ?? "Review chat change",
             isPresented: $showsDestructiveReview,
             presenting: destructiveAction
         ) { action in
@@ -220,7 +220,7 @@ struct NativeSessionControlsView: View {
                 Button("Try again") { Task { await model.refreshToolsets() } }
             case .loaded:
                 if enabledToolsets.isEmpty {
-                    Text("No enabled configurable toolsets were reported by this live session.")
+                    Text("No enabled configurable toolsets were reported by this live chat.")
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(enabledToolsets) { toolset in
@@ -246,7 +246,7 @@ struct NativeSessionControlsView: View {
             } header: {
                 Text("Last installed-skill reload")
             } footer: {
-                Text("Installed skills are not a per-session enabled list.")
+                Text("Installed skills are not a per-chat enabled list.")
             }
         }
     }
@@ -254,7 +254,7 @@ struct NativeSessionControlsView: View {
     private var overviewSection: some View {
         Section {
             if model.isBusy(.overview), model.status == nil {
-                ProgressView("Loading session details…")
+                ProgressView("Loading chat details…")
             }
             if let status = model.status {
                 VStack(alignment: .leading, spacing: BighelpTokens.space4) {
@@ -291,7 +291,7 @@ struct NativeSessionControlsView: View {
                 .buttonStyle(.plain)
                 .accessibilityHint("Shows the exact context category breakdown.")
             }
-            Button("Refresh session details", systemImage: "arrow.clockwise") {
+            Button("Refresh chat details", systemImage: "arrow.clockwise") {
                 Task { await model.refreshOverview() }
             }
             .disabled(model.isBusy(.overview))
@@ -344,13 +344,13 @@ struct NativeSessionControlsView: View {
                     .foregroundStyle(.secondary)
                     .padding(.top, BighelpTokens.space4)
             } label: {
-                Label("Advanced session tools", systemImage: "slider.horizontal.3")
+                Label("Advanced chat tools", systemImage: "slider.horizontal.3")
             }
             .accessibilityIdentifier("chat.native-session-controls.advanced")
         } header: {
             Text("Advanced")
         } footer: {
-            Text("Host-level controls and inspection tools for this session.")
+            Text("Computer-level controls and inspection tools for this chat.")
         }
     }
 
@@ -381,17 +381,17 @@ struct NativeSessionControlsView: View {
         } header: {
             Text("Skills")
         } footer: {
-            Text("Reloads installed skills and refreshes this chat’s command list without resetting the session.")
+            Text("Reloads installed skills and refreshes this chat’s command list without resetting the chat.")
         }
     }
 
     private var toolsSection: some View {
         Section {
             if model.isBusy(.toolsetsRead), model.toolsets.isEmpty {
-                ProgressView("Reading live-session tools…")
+                ProgressView("Reading live-chat tools…")
             }
             if model.toolsets.isEmpty, !model.isBusy(.toolsetsRead) {
-                Text("No configurable toolsets were reported by this Hermes session.")
+                Text("No configurable toolsets were reported by this Hermes chat.")
                     .foregroundStyle(.secondary)
             }
             ForEach(model.toolsets) { toolset in
@@ -434,8 +434,8 @@ struct NativeSessionControlsView: View {
             Text("Tools")
         } footer: {
             Text(isSessionRunning
-                 ? "Tool changes require an idle session."
-                 : "A change rebuilds the live agent and clears its process-local visible history. bighelp preserves the canonical transcript and confirms the new tool state before another change.")
+                 ? "Tool changes require an idle chat."
+                 : "A change rebuilds the live bot and clears its process-local visible history. bighelp preserves the canonical transcript and confirms the new tool state before another change.")
         }
     }
 
@@ -443,7 +443,7 @@ struct NativeSessionControlsView: View {
         Section {
             TextField("Optional compression focus", text: $compressionFocus, axis: .vertical)
                 .lineLimit(1...4)
-            Button("Compress session", systemImage: "arrow.down.right.and.arrow.up.left") {
+            Button("Compress chat", systemImage: "arrow.down.right.and.arrow.up.left") {
                 review(.compression)
             }
             .disabled(idleHistoryActionDisabled || model.isBusy(.compression))
@@ -453,7 +453,7 @@ struct NativeSessionControlsView: View {
             }
             .disabled(idleHistoryActionDisabled || model.isBusy(.undo))
 
-            Button("Save session", systemImage: "square.and.arrow.down") {
+            Button("Save chat", systemImage: "square.and.arrow.down") {
                 Task { await model.save() }
             }
             .disabled(idleActionDisabled || model.isBusy(.save))
@@ -491,7 +491,7 @@ struct NativeSessionControlsView: View {
             Text("Maintenance")
         } footer: {
             Text(isSessionRunning
-                 ? "Compression, undo, save, working-directory changes, and rollback restore require an idle session."
+                 ? "Compression, undo, save, working-directory changes, and rollback restore require an idle chat."
                  : "History-changing actions require an explicit review and a successful canonical chat refresh before another history change.")
         }
     }
@@ -621,7 +621,7 @@ struct NativeSessionControlsView: View {
                     ContentUnavailableView(
                         "Rollback unavailable",
                         systemImage: "arrow.uturn.backward.circle",
-                        description: Text("This Hermes session reports rollback as disabled.")
+                        description: Text("This Hermes chat reports rollback as disabled.")
                     )
                 } else if list.checkpoints.isEmpty {
                     Text("No rollback checkpoints.")
@@ -659,7 +659,7 @@ struct NativeSessionControlsView: View {
             }
             if let status = model.delegationStatus {
                 LabeledContent("New delegation", value: status.paused ? "Paused" : "Allowed")
-                LabeledContent("Active agents", value: status.active.count.formatted())
+                LabeledContent("Active helpers", value: status.active.count.formatted())
                 LabeledContent("Maximum depth", value: status.maxSpawnDepth.formatted())
                 LabeledContent("Maximum concurrent children", value: status.maxConcurrentChildren.formatted())
 
@@ -684,7 +684,7 @@ struct NativeSessionControlsView: View {
 
     private var spawnTreesSection: some View {
         Section {
-            Toggle("Include other sessions", isOn: $crossSessionSpawnTrees)
+            Toggle("Include other chats", isOn: $crossSessionSpawnTrees)
             Stepper("Maximum results: \(spawnTreeLimit)", value: $spawnTreeLimit, in: 1...500, step: 10)
             Button("Load spawn trees", systemImage: "arrow.clockwise") {
                 Task {
@@ -722,7 +722,7 @@ struct NativeSessionControlsView: View {
                 ContentUnavailableView(
                     "Verification status unavailable",
                     systemImage: "checkmark.seal",
-                    description: Text("This Hermes host does not support the typed verification-status method.")
+                    description: Text("This Hermes computer does not support the typed verification-status method.")
                 )
             } else {
                 TextField("Optional working directory", text: $verificationDirectory)
@@ -743,7 +743,7 @@ struct NativeSessionControlsView: View {
         } header: {
             Text("Verification")
         } footer: {
-            Text("Read-only host evidence. Commands shown here cannot run from this screen.")
+            Text("Read-only computer evidence. Commands shown here cannot run from this screen.")
         }
     }
 
@@ -865,7 +865,7 @@ private enum NativeSessionDestructiveAction {
 
     var title: String {
         switch self {
-        case .compression: "Review session compression"
+        case .compression: "Review chat compression"
         case .undo: "Review undo"
         case .goalClear: "Clear the current goal?"
         case .loopStop: "Stop the current loop?"
@@ -879,7 +879,7 @@ private enum NativeSessionDestructiveAction {
 
     var confirmationLabel: String {
         switch self {
-        case .compression: "Compress session"
+        case .compression: "Compress chat"
         case .undo: "Undo latest message"
         case .goalClear: "Clear goal"
         case .loopStop: "Stop loop"
@@ -893,11 +893,11 @@ private enum NativeSessionDestructiveAction {
     var explanation: String {
         switch self {
         case .compression:
-            "Hermes may replace older session history with a compressed summary. bighelp will refresh canonical chat history after Hermes acknowledges the change."
+            "Hermes may replace older chat history with a compressed summary. bighelp will refresh canonical chat history after Hermes acknowledges the change."
         case .undo:
-            "Hermes will remove the latest session message. bighelp will refresh canonical chat history after Hermes acknowledges the change."
+            "Hermes will remove the latest chat message. bighelp will refresh canonical chat history after Hermes acknowledges the change."
         case .goalClear:
-            "Hermes Clear removes the current standing goal. Hermes has no separate goal-delete action, and this does not delete chat messages or session history."
+            "Hermes Clear removes the current standing goal. Hermes has no separate goal-delete action, and this does not delete chat messages or chat history."
         case .loopStop:
             "This stops the current managed loop."
         case .heartbeatClear:
@@ -907,7 +907,7 @@ private enum NativeSessionDestructiveAction {
         case .subgoalClear:
             "This removes every current subgoal."
         case .toolset(let name, let enabled):
-            "Hermes will \(enabled ? "enable" : "disable") \(name), persist the CLI tool configuration, and rebuild this idle live session. Stock Hermes clears process-local visible history, attachments, edit snapshots, and session-scoped model, reasoning, and service-tier overrides before re-deriving them from config, then emits fresh session info. bighelp preserves the canonical transcript and requires live tool-state readback before another change."
+            "Hermes will \(enabled ? "enable" : "disable") \(name), persist the CLI tool configuration, and rebuild this idle live chat. Stock Hermes clears process-local visible history, attachments, edit snapshots, and chat-scoped model, reasoning, and service-tier overrides before re-deriving them from config, then emits fresh chat info. bighelp preserves the canonical transcript and requires live tool-state readback before another change."
         }
     }
 }

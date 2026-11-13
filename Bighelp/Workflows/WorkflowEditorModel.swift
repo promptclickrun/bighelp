@@ -124,7 +124,7 @@ final class WorkflowEditorModel {
         var taken = definition.allStages
         taken.append(contentsOf: block.branches.filter { branch in !taken.contains { $0.key == branch.key } })
         var branch = WorkflowStage(new: .agent, existing: taken)
-        branch.title = "Agent \(block.branches.count + 1)"
+        branch.title = "Bot \(block.branches.count + 1)"
         let earlier = earlierStages(than: definition.parent(of: block.key)?.key ?? block.key, in: definition)
             .filter { $0.key != block.key }
         WorkflowStageDefaults.fill(&branch, earlier: earlier, definition: &definition)
@@ -247,7 +247,7 @@ final class WorkflowEditorModel {
             !WorkflowFlowGraph.graphCodes.contains($0.code) && !Self.roleCodes.contains($0.code)
         }
         let roles = unboundRoles.map {
-            WorkflowValidation.Issue(stageKey: nil, code: Self.roleUnbound, message: "Choose an agent for \($0.label).",
+            WorkflowValidation.Issue(stageKey: nil, code: Self.roleUnbound, message: "Choose a bot for \($0.label).",
                                      isError: true)
         }
         return local + roles + host
@@ -324,7 +324,7 @@ final class WorkflowEditorModel {
             message = nil
             if let validation = try? await client.validate(workflowID: workflowID) { self.validation = validation }
         } catch WorkspaceClientError.rejected(let code, _) where code == "profile_not_found" {
-            message = "That agent isn't on this computer any more."
+            message = "That bot isn't on this computer any more."
         } catch {
             message = WorkflowsStore.reason(error)
         }
@@ -352,8 +352,9 @@ final class WorkflowEditorModel {
     func addRole(named name: String) -> String? {
         let label = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))
         guard definition != nil else { return nil }
-        let shown = label.isEmpty ? "Agent" : label
-        let key = WorkflowInputKey.make(from: shown, existing: definition?.roles.map(\.key) ?? [])
+        let shown = label.isEmpty ? "Bot" : label
+        // A role with no name keeps the key it always had; only what a person reads changed.
+        let key = WorkflowInputKey.make(from: label.isEmpty ? "Agent" : label, existing: definition?.roles.map(\.key) ?? [])
         definition?.roles.append(.init(key: key, label: shown))
         return key
     }
@@ -504,7 +505,7 @@ enum WorkflowStageDefaults {
         switch stage.kind {
         case .agent:
             if definition.roles.isEmpty {
-                definition.roles.append(.init(key: "agent", label: "Agent"))
+                definition.roles.append(.init(key: "agent", label: "Bot"))
             }
             stage.role = definition.roles.first?.key
         case .check:

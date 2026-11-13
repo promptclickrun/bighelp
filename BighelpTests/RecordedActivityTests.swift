@@ -25,7 +25,7 @@ struct RecordedActivityTests {
         #expect(!ChatActivityPresentation.step(for: event).isRunning)
         let record = SessionRecord(id: "recorded-session", kind: .direct, agentIDs: ["default"],
                                    title: "Saved", activityEvents: [event])
-        #expect(SessionSubagentDetailPresentation.statusTitle(for: record) == "Saved child session; outcome unavailable")
+        #expect(SessionSubagentDetailPresentation.statusTitle(for: record) == "Saved child chat; outcome unavailable")
     }
 
     @Test func recordedHistoryCannotStartOrCompleteLiveActivityWork() {

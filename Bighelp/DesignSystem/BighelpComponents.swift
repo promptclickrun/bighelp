@@ -771,7 +771,7 @@ struct SessionContextTokenPopover: View {
                         }
                         .bighelpPlainButtonStyle(.circle)
                         .bighelpIconLabel("Usage")
-                        .accessibilityHint("Shows your plans and limits and what your agents used.")
+                        .accessibilityHint("Shows your plans and limits and what your bots used.")
                         .accessibilityIdentifier("chat.session-context.provider-usage")
                     }
                 }

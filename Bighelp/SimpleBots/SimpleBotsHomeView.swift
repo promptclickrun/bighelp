@@ -750,7 +750,7 @@ struct SimpleBotsHomeView: View {
             Button {
                 shownGateway = ""
             } label: {
-                if shown == nil { Label("All Gateways", systemImage: "checkmark") } else { Text("All Gateways") }
+                if shown == nil { Label("All computers", systemImage: "checkmark") } else { Text("All computers") }
             }
             Divider()
             ForEach(gateways) { gateway in
@@ -770,9 +770,9 @@ struct SimpleBotsHomeView: View {
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
-        .accessibilityLabel("Filter by gateway")
+        .accessibilityLabel("Filter by computer")
         .accessibilityValue(shown.flatMap { id in gateways.first { $0.id == id }?.name }
-                            ?? String(localized: "All Gateways"))
+                            ?? String(localized: "All computers"))
         .accessibilityIdentifier("simple-bots.gateway-filter")
     }
 

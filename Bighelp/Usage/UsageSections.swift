@@ -101,7 +101,7 @@ struct UsageHeroCard: View {
         if summary.totals.billedCost > 0 {
             return "Estimated by Hermes. Providers billed \(UsageFormat.money(summary.totals.billedCost))."
         }
-        return "Estimated by Hermes from your agents' sessions"
+        return "Estimated by Hermes from your bots' chats"
     }
 
     // MARK: Focus
@@ -280,13 +280,13 @@ struct UsageTotalsSection: View {
                 divider
                 row("Input", "uncached", UsageFormat.count(totals.inputTokens), id: "input")
                 divider
-                row("Output", "written by your agents", UsageFormat.count(totals.outputTokens), id: "output")
+                row("Output", "written by your bots", UsageFormat.count(totals.outputTokens), id: "output")
                 divider
                 if let messages = totals.messages {
-                    row("Messages", "across \(UsageFormat.count(totals.sessions)) sessions",
+                    row("Messages", "across \(UsageFormat.count(totals.sessions)) chats",
                         UsageFormat.count(messages), id: "messages")
                 } else {
-                    row("Sessions", "\(UsageFormat.count(totals.apiCalls)) model calls",
+                    row("Chats", "\(UsageFormat.count(totals.apiCalls)) model calls",
                         UsageFormat.count(totals.sessions), id: "sessions")
                 }
             }
@@ -379,7 +379,7 @@ struct UsageWhenSection: View {
         }
     }
 
-    private func sessions(_ count: Int) -> String { count == 1 ? "1 session" : "\(UsageFormat.count(count)) sessions" }
+    private func sessions(_ count: Int) -> String { count == 1 ? "1 chat" : "\(UsageFormat.count(count)) chats" }
 
     private func header(_ title: String, busiest: Bool, value: String) -> some View {
         HStack(spacing: BighelpTokens.space8) {
@@ -401,7 +401,7 @@ struct UsageWhenSection: View {
             header(Self.weekdays[selected], busiest: selected == busiest, value: sessions(counts[selected]))
             Chart {
                 ForEach(counts.indices, id: \.self) { index in
-                    BarMark(x: .value("Day", Self.weekdays[index]), y: .value("Sessions", counts[index]), width: .ratio(0.82))
+                    BarMark(x: .value("Day", Self.weekdays[index]), y: .value("Chats", counts[index]), width: .ratio(0.82))
                         .foregroundStyle(palette.bar)
                         .opacity(index == selected ? 1 : 0.32)
                         .cornerRadius(6)
@@ -451,7 +451,7 @@ struct UsageWhenSection: View {
             Chart {
                 ForEach(counts.indices, id: \.self) { index in
                     // An empty hour keeps a sliver in the track color so the day reads as 24 hours.
-                    BarMark(x: .value("Hour", String(index)), y: .value("Sessions", max(Double(counts[index]), Double(top) * 0.04)),
+                    BarMark(x: .value("Hour", String(index)), y: .value("Chats", max(Double(counts[index]), Double(top) * 0.04)),
                             width: .ratio(0.86))
                         .foregroundStyle(counts[index] == 0 ? palette.ghost : palette.bar)
                         .opacity(index == selected || counts[index] == 0 ? 1 : 0.32)
@@ -561,7 +561,7 @@ struct UsageBreakdownSection: View {
         parts.append("\(UsageFormat.percent(share)) of \(metric == .cost ? "cost" : "tokens")")
         parts.append(metric == .cost ? "\(UsageFormat.count(row.amount.tokens)) tokens"
                      : row.amount.cost > 0 ? UsageFormat.money(row.amount.cost) : "no cost")
-        parts.append(row.sessions == 1 ? "1 session" : "\(UsageFormat.count(row.sessions)) sessions")
+        parts.append(row.sessions == 1 ? "1 chat" : "\(UsageFormat.count(row.sessions)) chats")
         if let cache = row.cacheShare { parts.append("\(UsageFormat.percent(cache)) cached") }
         if let failure = row.failure { parts.append(failure) }
         return parts.joined(separator: " · ")

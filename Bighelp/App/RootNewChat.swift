@@ -135,7 +135,7 @@ extension RootShellView {
             openHostedGroup(group.summary?.hostedRoomID ?? group.roomID, owner: owner, settings: false,
                             opened: { if let id = $0 { dropNewChatBlank(under: id) } })
         } else if group.summary != nil {
-            actionErrorMessage = "This group is no longer available on the selected host."
+            actionErrorMessage = "This group is no longer available on the selected computer."
         }
     }
 

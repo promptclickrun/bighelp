@@ -77,7 +77,7 @@ enum SpatialAvatarPinchAction: String, CaseIterable, Identifiable, Sendable {
 
     var detail: String {
         switch self {
-        case .talk: "Your agent starts listening, in the voice mode you picked in Voice."
+        case .talk: "Your bot starts listening, in the voice mode you picked in Voice."
         case .type: "A message box opens with the keyboard, so you can type and send."
         }
     }
@@ -232,7 +232,7 @@ enum MidSessionChatBehavior: String, CaseIterable, Identifiable, Sendable {
     var detail: String {
         switch self {
         case .steer:
-            String(localized: "Send context into the live turn so the agent can adjust its response.")
+            String(localized: "Send context into the live turn so the bot can adjust its response.")
         case .queued:
             String(localized: "Wait for the live turn to finish, then send this as the next message.")
         case .interruptAndSend:

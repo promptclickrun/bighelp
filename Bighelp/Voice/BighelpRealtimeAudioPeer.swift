@@ -79,7 +79,7 @@ final class BighelpRealtimeAudioPeer: NSObject {
             case .audioUnavailable: "Audio is unavailable. Check your audio route and try again."
             case .negotiation: "The native audio connection could not be negotiated."
             case .timeout: "The native audio connection timed out."
-            case .invalidSDP: "The host returned an invalid audio connection."
+            case .invalidSDP: "The computer returned an invalid audio connection."
             }
         }
     }

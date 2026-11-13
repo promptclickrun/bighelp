@@ -202,7 +202,7 @@ private struct AgentCollaborationCard: View {
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Agent collaboration from \(from.name) to \(to.name). \(statusLabel).")
+            .accessibilityLabel("Bot collaboration from \(from.name) to \(to.name). \(statusLabel).")
             .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
             .accessibilityHint(isExpanded ? "Collapses the collaboration transcript." : "Expands the collaboration transcript.")
             .accessibilityIdentifier("chat.collaboration.\(event.eventID)")

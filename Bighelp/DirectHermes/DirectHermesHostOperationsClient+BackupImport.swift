@@ -128,7 +128,7 @@ extension DirectHermesHostOperationsClient {
                     body: ["archive": .string(checked), "force": .boolean(true)]
                 ),
                 expectedAction: .importArchive,
-                feature: "host backup import"
+                feature: "computer backup import"
             )
         case .uploadedFile(let name, let byteCount):
             guard let bytes = review.uploadedBytes, bytes.count == byteCount,

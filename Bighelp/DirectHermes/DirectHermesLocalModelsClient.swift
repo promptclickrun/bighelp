@@ -167,17 +167,17 @@ enum HermesLocalModelsError: Error, Equatable, LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .unavailable:
-            "This Hermes host does not expose managed local models. No \(BighelpPlatform.isMac ? "Mac" : "iPhone")-local substitute was used."
+            "This Hermes computer does not expose managed local models. No \(BighelpPlatform.isMac ? "Mac" : "iPhone")-local substitute was used."
         case .ownerChanged:
-            "The selected host or connection changed. Reopen Local Models before continuing."
+            "The selected computer or connection changed. Reopen Local Models before continuing."
         case .invalidRequest:
-            "Check the selected model or host-local path and try again."
+            "Check the selected model or computer-local path and try again."
         case .invalidResponse:
             "Hermes returned an unsupported Local Models response. No change was confirmed."
         case .responseTooLarge:
             "The Local Models response exceeded this screen’s safe display limit."
         case .reviewChanged:
-            "Host model state changed after review. Review the current download, model, or server state before continuing."
+            "Computer model state changed after review. Review the current download, model, or server state before continuing."
         case .outcomeUnknown:
             "Hermes did not confirm the operation. Refresh jobs and model status before trying again."
         case .readbackFailed:

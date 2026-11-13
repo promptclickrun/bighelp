@@ -59,7 +59,7 @@ struct SkillsAndToolsCatalogContent: View {
                 ContentUnavailableView(
                     "Capabilities unavailable",
                     systemImage: "shippingbox",
-                    description: Text(store.errorMessage ?? "Connect to the selected Hermes host and try again.")
+                    description: Text(store.errorMessage ?? "Connect to the selected Hermes computer and try again.")
                 )
             }
 
@@ -213,7 +213,7 @@ struct SkillsAndToolsCatalogContent: View {
         VStack(alignment: .leading, spacing: BighelpTokens.space20) {
             capabilitySection(
                 title: "Skills",
-                emptyMessage: "No skills are enabled for this agent.",
+                emptyMessage: "No skills are enabled for this bot.",
                 rows: catalog.skills.map { skill in
                     CapabilityRow(
                         id: skill.id,

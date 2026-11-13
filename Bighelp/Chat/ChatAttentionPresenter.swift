@@ -85,7 +85,7 @@ struct ChatAttentionBar: View {
 
     private var title: String {
         let name = agentName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let who = name.isEmpty ? "Your agent" : name
+        let who = name.isEmpty ? "Your bot" : name
         let approvals = prompts.filter { $0.kind == .approval }.count
         let questions = prompts.count - approvals
         switch (approvals, questions) {

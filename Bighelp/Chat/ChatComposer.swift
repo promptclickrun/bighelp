@@ -357,7 +357,7 @@ struct ChatComposer: View, Equatable {
                         .accessibilityIdentifier("chat.composer.menu.provider-usage")
                 }
             } label: {
-                Label("Session actions", systemImage: "ellipsis")
+                Label("Chat actions", systemImage: "ellipsis")
                     .labelStyle(.iconOnly)
                     .font(.system(size: 18, weight: .medium))
                     .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)

@@ -66,7 +66,7 @@ final class SessionRuntimeControlModel {
 
     var modelDisplayName: String {
         guard let currentModel else {
-            return allowsAgentDefaults ? "Agent default" : "Session model"
+            return allowsAgentDefaults ? "Bot default" : "Chat model"
         }
         return ModelNameCatalogStore.shared.displayName(for: currentModel)
     }
@@ -597,7 +597,7 @@ final class SessionRuntimeControlModel {
     /// replacing any existing session selection. The picker clears this
     /// recoverable message when the user asks it to load again.
     func markAgentDefaultsLoadFailed() {
-        errorMessage = "Couldn’t load agent defaults. Check your Hermes connection and try again."
+        errorMessage = "Couldn’t load bot defaults. Check your Hermes connection and try again."
     }
 
     private func apply(
@@ -669,7 +669,7 @@ final class SessionRuntimeControlModel {
             }
             pendingModelConfirmation = required.confirmation
             confirmationCompletion = onCompleted
-            statusMessage = "Review the host's confirmation before applying this model."
+            statusMessage = "Review the computer's confirmation before applying this model."
             invalidateNativeModelPicker()
         } catch let deferred as SessionRuntimeModelDeferred {
             guard generation == selectionGeneration else { return }
@@ -683,7 +683,7 @@ final class SessionRuntimeControlModel {
         } catch {
             guard generation == selectionGeneration else { return }
             errorMessage = (error as? WorkspaceClientError)?.localizedDescription
-                ?? "The session setting could not be updated. Try again."
+                ?? "The chat setting could not be updated. Try again."
         }
     }
 
@@ -787,7 +787,7 @@ final class SessionRuntimeControlModel {
 
     private static func reasoningDetail(for value: String) -> String {
         switch value {
-        case "reset": "Uses the agent’s configured default"
+        case "reset": "Uses the bot’s configured default"
         case "none": "Fastest responses without extended reasoning"
         case "minimal": "A quick check before answering"
         case "low": "Faster responses with light reasoning"

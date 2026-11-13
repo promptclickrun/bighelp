@@ -285,7 +285,7 @@ struct HostSetupView: View {
         case .protection(.cloudflareAccess): String(localized: "This address is protected by Cloudflare Access. Enter its service token.")
         case .protection(.password): String(localized: "This address asks for a username and password before Hermes.")
         case .signIn(let discovery): signInDetail(discovery)
-        case .connected: String(localized: "Your agents are ready to chat.")
+        case .connected: String(localized: "Your bots are ready to chat.")
         }
     }
 
@@ -354,7 +354,7 @@ struct HostSetupView: View {
                 .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                 .submitLabel(.continue)
                 .onSubmit { if !isWorking { discover() } }
-                .accessibilityLabel("Host URL or IP address")
+                .accessibilityLabel("Address of your computer")
                 .accessibilityIdentifier("host-setup.address")
                 .focused($isAddressFocused)
                 .disabled(hostToAuthenticate != nil)
@@ -469,7 +469,7 @@ struct HostSetupView: View {
 
     private var connectionAction: some View {
         primaryAction(
-            isWorking ? (discovery == nil ? String(localized: "Finding your agents…") : String(localized: "Connecting…"))
+            isWorking ? (discovery == nil ? String(localized: "Finding your bots…") : String(localized: "Connecting…"))
                       : (discovery == nil ? String(localized: "Continue") : String(localized: "Connect")),
             identifier: "host-setup.connect-host",
             disabled: isWorking || !stepIsFilledIn

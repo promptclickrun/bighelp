@@ -321,7 +321,7 @@ enum WatchRelayError: Error, Equatable {
         case .noHost: "Set up bighelp on your iPhone first."
         case .unreachable: "Your computer isn't answering. Check that it's on and online."
         case .chatGone: "That chat isn't on your computer anymore."
-        case .agentGone: "That agent isn't available anymore."
+        case .agentGone: "That bot isn't available anymore."
         case .needGone: "This was already answered or expired."
         case .notSent: "Your message didn't go through. Try again."
         case .notConfirmed: "Your answer wasn't confirmed. Check bighelp on your iPhone."

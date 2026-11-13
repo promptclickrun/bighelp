@@ -14,7 +14,7 @@ struct ScheduledTaskRow: View {
         HStack(alignment: dynamicTypeSize.isAccessibilitySize ? .top : .center, spacing: BighelpTokens.space12) {
             AvatarView(
                 stableID: agent?.id ?? "unavailable-\(task.agentID)",
-                displayName: agent?.name ?? "Unavailable agent",
+                displayName: agent?.name ?? "Unavailable bot",
                 imageURL: avatarURL,
                 size: 44,
                 state: liveState
@@ -100,7 +100,7 @@ enum ScheduledTaskCopy {
         case .paused: return "Paused"
         case .active: break
         }
-        guard let nextRun else { return "Next run confirmed by your agent" }
+        guard let nextRun else { return "Next run confirmed by your bot" }
         return "Next: \(shortDate(nextRun, now: now))"
     }
 

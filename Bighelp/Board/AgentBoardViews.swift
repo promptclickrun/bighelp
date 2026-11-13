@@ -439,7 +439,7 @@ struct BoardStateBanner: View {
                 .font(.bighelp(.subheadline))
                 .foregroundStyle(theme.secondaryText)
         case .unavailable where context.store.isDisconnected:
-            Label("Connect to your Hermes host to see this.", systemImage: "bolt.horizontal.circle")
+            Label("Connect to your Hermes computer to see this.", systemImage: "bolt.horizontal.circle")
                 .font(.bighelp(.subheadline))
                 .foregroundStyle(theme.secondaryText)
         case .unavailable:
@@ -452,7 +452,7 @@ struct BoardStateBanner: View {
     /// The host (a Mac, a server or a cloud sandbox) runs an older plugin.
     private var pluginUpdate: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-            Label("Your Hermes host is running an older bighelp plugin", systemImage: "puzzlepiece.extension")
+            Label("Your Hermes computer is running an older bighelp plugin", systemImage: "puzzlepiece.extension")
                 .font(.bighelp(.headline))
                 .foregroundStyle(theme.primaryText)
             Text("Update it in Settings, under this computer's Plugin version, or ask \(context.agentName) to do it. "

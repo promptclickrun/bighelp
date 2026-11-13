@@ -17,8 +17,8 @@ struct AgentShortcutsView: View {
                             symbol: "plus.app"
                         )
                         instruction(
-                            "Choose this agent",
-                            detail: "Set Agent to \(agent.name). The selected host must be connected when it runs.",
+                            "Choose this bot",
+                            detail: "Set Bot to \(agent.name). The selected computer must be connected when it runs.",
                             symbol: "person.crop.circle"
                         )
                         instruction(

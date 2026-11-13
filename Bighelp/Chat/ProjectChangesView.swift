@@ -150,7 +150,7 @@ struct ProjectChangesView: View {
                     ContentUnavailableView(
                         "Project changes unavailable",
                         systemImage: "arrow.triangle.branch",
-                        description: Text("This Project is not a Git repository.")
+                        description: Text("This project is not a Git repository.")
                     )
                 } else {
                     VStack(spacing: BighelpTokens.space16) {

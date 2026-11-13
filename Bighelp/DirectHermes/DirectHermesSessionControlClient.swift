@@ -84,7 +84,7 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
     func selectionSupport(sessionID: String, agentID: String) -> SessionRuntimeControlSupport {
         let modelReason: String?
         if currentOwner() != owner || workspace.owner != owner {
-            modelReason = "The host connection changed. Reopen this chat's controls."
+            modelReason = "The computer connection changed. Reopen this chat's controls."
         } else if (try? DirectHermesSessionIdentity.decode(sessionID, owner: owner))
                     .map({ DirectHermesSessionValidation.same($0.profileID, agentID) }) == true {
             // This agent's chat, live or not yet (still starting, or reattaching): its lists
@@ -93,7 +93,7 @@ final class DirectHermesSessionControlClient: SessionRuntimeControlConfirming, S
                 workspace.capabilities.availability(for: .sessionModelEdit, owner: owner, profileID: agentID)
             )
         } else {
-            modelReason = "This chat is not attached to a current live Hermes session."
+            modelReason = "This chat is not attached to a current live Hermes chat."
         }
         return SessionRuntimeControlSupport(
             modelUnavailableReason: modelReason,

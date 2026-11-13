@@ -33,7 +33,7 @@ struct ApprovalModelTests {
 
     @Test func approvalActionsUseTheExactHermesScopeLabels() {
         #expect(ApprovalDecision.once.buttonTitle == "Approve this time")
-        #expect(ApprovalDecision.session.buttonTitle == "Approve this session")
+        #expect(ApprovalDecision.session.buttonTitle == "Approve this chat")
         #expect(ApprovalDecision.always.buttonTitle == "Always Approve")
         #expect(ApprovalDecision.deny.buttonTitle == "Deny")
     }

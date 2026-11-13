@@ -522,7 +522,7 @@ struct ScheduledTaskPresentation: Sendable {
         self.agentName = agentName
     }
 
-    var resolvedAgentName: String { agentName ?? "Unavailable agent" }
+    var resolvedAgentName: String { agentName ?? "Unavailable bot" }
 
     var lastResultCopy: String {
         if let result = task.lastResult { return "Last result: \(result)" }
@@ -559,7 +559,7 @@ struct ScheduledTaskPresentation: Sendable {
             return ScheduledTaskActionAvailability(
                 isVisible: true,
                 isEnabled: agentName != nil,
-                reason: agentName == nil ? "Agent unavailable" : nil
+                reason: agentName == nil ? "Bot unavailable" : nil
             )
         case .duplicate, .delete:
             return ScheduledTaskActionAvailability(isVisible: true, isEnabled: true, reason: nil)
@@ -569,7 +569,7 @@ struct ScheduledTaskPresentation: Sendable {
     var nextRunCopy: String {
         if task.status == .completed { return "Completed; no future run is scheduled" }
         if task.status == .failed { return "Scheduling failed; review this task on Hermes" }
-        guard let nextRun = task.nextRun else { return "Next run will be confirmed by the agent" }
+        guard let nextRun = task.nextRun else { return "Next run will be confirmed by the bot" }
         let date = nextRun.formatted(date: .abbreviated, time: .shortened)
         return task.isPaused ? "Paused; next run \(date)" : "Next run \(date)"
     }
@@ -591,7 +591,7 @@ enum ScheduledTasksError: Error, Equatable, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .agentRequired: "Choose an agent before creating this task."
+        case .agentRequired: "Choose a bot before creating this task."
         case .taskNotFound: "This task is no longer available."
         case .ambiguousTask: "More than one profile has this task ID. Open the task from its owning profile."
         case .invalidCatalog: "Hermes returned duplicate tasks for the same profile. Refresh before changing them."

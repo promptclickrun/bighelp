@@ -86,7 +86,7 @@ enum UsageWidgetPublisher {
             read = true
         } else {
             complete = false
-            let why = host.failure ?? (host.unreadAgents.isEmpty ? nil : "Couldn't read every agent's usage.")
+            let why = host.failure ?? (host.unreadAgents.isEmpty ? nil : "Couldn't read every bot's usage.")
             if snapshot.totals == nil, let why { snapshot.note = why }
         }
         switch host.limits {

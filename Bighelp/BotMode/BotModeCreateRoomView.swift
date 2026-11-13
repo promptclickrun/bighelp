@@ -98,7 +98,7 @@ struct BotModeCreateRoomView: View {
             } header: {
                 Text("Participants")
             } footer: {
-                Text("Choose two to six agents on this host. Hermes fixes the participants when the room is created.")
+                Text("Choose two to six bots on this computer. Hermes fixes the participants when the room is created.")
             }
             if let sectionChoice {
                 Section { sectionPicker(sectionChoice) }
@@ -113,7 +113,7 @@ struct BotModeCreateRoomView: View {
                         .accessibilityIdentifier("bot-mode.create.error")
                 }
                 if ownerChanged {
-                    Section { Text("The selected host changed. Close this form and reopen it for the current host.") }
+                    Section { Text("The selected computer changed. Close this form and reopen it for the current computer.") }
                 }
             }
             Section {
@@ -155,7 +155,7 @@ struct BotModeCreateRoomView: View {
                             .foregroundStyle(theme.secondaryText)
                     }
                     if pickableProfiles.isEmpty {
-                        Text("No agents on this host yet.")
+                        Text("No bots on this computer yet.")
                             .bighelpFont(.body)
                             .foregroundStyle(theme.secondaryText)
                     } else {
@@ -168,7 +168,7 @@ struct BotModeCreateRoomView: View {
                             }
                         }
                     }
-                    Text("Pick 2 to \(BotModeRoom.maximumMembers) agents. Members are fixed once the group is created.")
+                    Text("Pick 2 to \(BotModeRoom.maximumMembers) bots. Members are fixed once the group is created.")
                         .bighelpFont(.metadata)
                         .foregroundStyle(theme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -187,7 +187,7 @@ struct BotModeCreateRoomView: View {
                 }
 
                 if !rooms.canCreateNativeRoom {
-                    Label("This host isn’t ready for group chats yet.", systemImage: "info.circle")
+                    Label("This computer isn’t ready for group chats yet.", systemImage: "info.circle")
                         .bighelpFont(.label)
                         .foregroundStyle(theme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -202,7 +202,7 @@ struct BotModeCreateRoomView: View {
                 }
                 if ownerChanged {
                     Label(
-                        "The selected host changed. Close this form and reopen it for the current host.",
+                        "The selected computer changed. Close this form and reopen it for the current computer.",
                         systemImage: "arrow.triangle.2.circlepath"
                     )
                     .bighelpFont(.label)
@@ -378,7 +378,7 @@ struct BotModeCreateRoomView: View {
         DisclosureGroup(isExpanded: $isAdvancedExpanded) {
             VStack(alignment: .leading, spacing: BighelpTokens.space12) {
                 if selectedHandles.isEmpty {
-                    Text("Pick agents to see how you’ll mention them.")
+                    Text("Pick bots to see how you’ll mention them.")
                         .bighelpFont(.label)
                         .foregroundStyle(theme.secondaryText)
                 } else {
@@ -396,7 +396,7 @@ struct BotModeCreateRoomView: View {
                     }
                 }
                 Label {
-                    Text("Hermes hosts this group on the selected host. Mention @handle for one agent or @all for everyone. Earlier direct chats stay private.")
+                    Text("Hermes hosts this group on the selected computer. Mention @handle for one bot or @all for everyone. Earlier direct chats stay private.")
                 } icon: {
                     Image(systemName: "lock.shield")
                 }
@@ -497,7 +497,7 @@ struct BotModeCreateRoomView: View {
         .accessibilityLabel(profile.role.isEmpty ? profile.name : "\(profile.name), \(profile.role)")
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityHint("Double-tap to select or deselect this agent.")
+        .accessibilityHint("Double-tap to select or deselect this bot.")
         .accessibilityIdentifier("bot-mode.create.participant.\(profile.id)")
     }
 
@@ -521,8 +521,8 @@ struct BotModeCreateRoomView: View {
             .map(\.name)
         guard !names.isEmpty else { return nil }
         return names.count == 1
-            ? "\(names[0]) can’t join group chats on this host."
-            : "\(ListFormatter.localizedString(byJoining: names)) can’t join group chats on this host."
+            ? "\(names[0]) can’t join group chats on this computer."
+            : "\(ListFormatter.localizedString(byJoining: names)) can’t join group chats on this computer."
     }
 
     /// A group named after its agents: "Juno & Alfie", "Juno, Alfie & Nova". New chat names the group
@@ -546,7 +546,7 @@ struct BotModeCreateRoomView: View {
     private func create() async {
         guard !isSubmitting else { return }
         guard !ownerChanged else {
-            errorMessage = "The selected host changed. Reopen this form before creating a room."
+            errorMessage = "The selected computer changed. Reopen this form before creating a room."
             return
         }
         isSubmitting = true
@@ -568,7 +568,7 @@ struct BotModeCreateRoomView: View {
         } catch {
             errorMessage = hasPendingCreation
                 ? "The room could not be confirmed. Check this same room before creating another."
-                : "The room could not be created. Check the host and participants, then try again."
+                : "The room could not be created. Check the computer and participants, then try again."
         }
     }
 }

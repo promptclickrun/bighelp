@@ -68,7 +68,7 @@ final class ChatTurnFailureUITests: BighelpUITestCase {
         let card = app.descendants(matching: .any)["chat.turn-failure"].firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 15))
         XCTAssertEqual(app.staticTexts["chat.turn-failure.sentence"].label,
-                       "Hermes couldn't start the agent. Check that an AI provider is set up.")
+                       "Hermes couldn't start the bot. Check that an AI provider is set up.")
         XCTAssertTrue(app.buttons["chat.turn-failure.fix.providers"].exists)
         capture(app, "light-5-could-not-start")
 

@@ -161,7 +161,7 @@ extension BotModeRoomStore {
                let taskID = event.taskID,
                expectedTaskIDs.map({ $0.contains(taskID) }) ?? true {
                 let message = event.kind == "turn.deferred"
-                    ? "Hermes deferred this member's turn. Retry only when the host offers that action."
+                    ? "Hermes deferred this member's turn. Retry only when the computer offers that action."
                     : "The Hermes member turn did not complete."
                 let failure = BotModeMemberFailure(
                     memberID: memberID,

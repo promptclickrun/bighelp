@@ -80,8 +80,8 @@ extension AgentProfile {
     static let bighelpLinkDefault = AgentProfile(
         id: "default",
         name: "bighelp",
-        role: "Default agent",
-        summary: "Your default Hermes agent.",
+        role: "Default bot",
+        summary: "Your default Hermes bot.",
         instructions: "",
         avatarFileName: nil,
         isDefault: true

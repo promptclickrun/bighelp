@@ -303,7 +303,7 @@ extension BotModeRoomStore {
             guard catalogRefreshID == refreshID else { return }
             nativeCapabilities = capabilities
             guard capabilities.protocolVersion == 2, capabilities.supports("groups.list") else {
-                catalogState = .unavailable("This Hermes host does not support the required room catalog.")
+                catalogState = .unavailable("This Hermes computer does not support the required room catalog.")
                 return
             }
             var rooms: [HermesBotModeRoomState] = []

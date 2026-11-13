@@ -275,7 +275,7 @@ enum DirectHermesVoiceConfigurationError: Error, LocalizedError, Equatable, Send
         case .inlineTranscriptionLimit(let bytes):
             "This recording is larger than the current authenticated inline limit of \(bytes) bytes. The full 25 MiB relay needs the fixed voice-media transport extension."
         case .streamingTransportUnavailable:
-            "Streaming playback needs a fresh authenticated audio WebSocket. Buffered host playback is still available."
+            "Streaming playback needs a fresh authenticated audio WebSocket. Buffered computer playback is still available."
         case .invalidProviderResponse:
             "The configured voice provider returned an unsupported response."
         }

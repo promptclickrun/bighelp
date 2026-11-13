@@ -22,8 +22,8 @@ struct ScheduledTaskPresentationTests {
 
         let presentation = ScheduledTaskPresentation(task: task, agentName: nil)
 
-        #expect(presentation.deleteConfirmationTitle == "Delete Morning brief for Unavailable agent?")
-        #expect(presentation.deleteConfirmationMessage.contains("Unavailable agent"))
+        #expect(presentation.deleteConfirmationTitle == "Delete Morning brief for Unavailable bot?")
+        #expect(presentation.deleteConfirmationMessage.contains("Unavailable bot"))
     }
 
     @Test func unavailableAgentKeepsMutatingActionsVisibleButDisabled() {
@@ -33,7 +33,7 @@ struct ScheduledTaskPresentationTests {
 
         #expect(presentation.action(.edit).isVisible)
         #expect(!presentation.action(.edit).isEnabled)
-        #expect(presentation.action(.edit).reason == "Agent unavailable")
+        #expect(presentation.action(.edit).reason == "Bot unavailable")
         #expect(presentation.action(.pauseOrResume).isVisible)
         #expect(!presentation.action(.runNow).isEnabled)
         #expect(presentation.action(.delete).isEnabled)

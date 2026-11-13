@@ -4,7 +4,7 @@ import SwiftUI
 /// Sort (For you, Newest, Most used; bighelp only when there are community ones). Picking one fills
 /// in the editor like the Templates rail.
 struct AgentTemplateBrowser: View {
-    var title = String(localized: "Agent templates")
+    var title = String(localized: "Bot templates")
     var myTemplates: MyTemplatesStore = .shared
     let onPick: (AgentSoulTemplate) -> Void
     @Environment(\.dismiss) private var dismiss

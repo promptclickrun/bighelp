@@ -182,7 +182,7 @@ struct BighelpWidgetSnapshot: Codable, Equatable, Sendable {
             case .ideas: ideas
             case .goals: goals
             }
-            return ResolvedBoard(agentID: defaultAgentID, agentName: defaultAgentName ?? "Your agent",
+            return ResolvedBoard(agentID: defaultAgentID, agentName: defaultAgentName ?? "Your bot",
                                  items: items ?? [], isLoaded: true)
         }
         guard let agentID, let agent = agents?.first(where: { $0.id == agentID }) else { return nil }

@@ -160,7 +160,7 @@ enum ChatCardInteractionError: Error, LocalizedError {
         switch self {
         case .unavailable: "This action is unavailable on the current connection."
         case .notReady: "This chat can't send right now. Try again in a moment."
-        case .ownerChanged: "This card belongs to a different host, profile, or conversation."
+        case .ownerChanged: "This card belongs to a different computer, profile, or conversation."
         case .snapshotChanged: "This task changed after the card was created. Refresh before changing it."
         case .taskMissing: "This task is no longer available."
         case .invalidResult: "Hermes did not confirm the requested task state."

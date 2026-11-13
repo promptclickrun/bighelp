@@ -88,21 +88,21 @@ enum BighelpShortcutServiceError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .connectionUnavailable:
-            "bighelp couldn't reach your host. Check that it's online and connected, then try again."
+            "bighelp couldn't reach your computer. Check that it's online and connected, then try again."
         case .agentUnavailable:
-            "That agent is not available in Hermes."
+            "That bot is not available in Hermes."
         case .sessionUnavailable:
-            "bighelp could not create the chat session."
+            "bighelp could not create the chat."
         case .modelUnavailable:
-            "That model is not available for this session."
+            "That model is not available for this chat."
         case .reasoningUnavailable:
-            "That reasoning level is not available for this session."
+            "That reasoning level is not available for this chat."
         case .deliveryFailed:
             "Hermes could not complete the message. Open bighelp and try again."
         case .responseUnavailable:
             "No final text response was received. Open the chat in bighelp to check its progress."
         case .emptyMessage:
-            "Enter a message for your agent."
+            "Enter a message for your bot."
         case .scheduledTaskUnavailable:
             "That scheduled task isn't on your computer anymore."
         case .scheduledTaskFailed:
@@ -124,11 +124,11 @@ enum BighelpShortcutServiceError: LocalizedError, Equatable {
         case .workflowUnavailable:
             "That workflow isn't on your computer anymore."
         case .gatewayUnavailable:
-            "That gateway isn't in bighelp anymore. Pick another one in the Shortcut."
+            "That computer isn't in bighelp anymore. Pick another one in the Shortcut."
         case .gatewayUnreachable:
-            "bighelp couldn't reach that gateway. Check that it's online, then try again."
+            "bighelp couldn't reach that computer. Check that it's online, then try again."
         case .agentNotOnGateway:
-            "That agent isn't on the gateway this Shortcut uses. Pick the agent again."
+            "That bot isn't on the computer this Shortcut uses. Pick the bot again."
         case .aiDataNotAgreed:
             "Open bighelp and agree to share data with your Hermes computer and its AI providers first."
         }

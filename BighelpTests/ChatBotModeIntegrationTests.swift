@@ -75,7 +75,7 @@ struct ChatBotModeIntegrationTests {
         #expect(model.botModeExecutionEnabled == false)
         #expect(model.canInteractWithBotMode == false)
         #expect(model.canSend == false)
-        #expect(model.botModeStatus == "Connect to the selected Hermes host to run this room.")
+        #expect(model.botModeStatus == "Connect to the selected Hermes computer to run this room.")
         #expect(model.timelineEvents == visibleBefore)
 
         #expect(throws: BotModeRoomError.executionUnavailable) {
@@ -351,7 +351,7 @@ struct ChatBotModeIntegrationTests {
 
         #expect(model.memberIDs == ["finance"])
         #expect(!model.isBotMode)
-        #expect(model.botModeMemberCountLabel == "1 agent")
+        #expect(model.botModeMemberCountLabel == "1 bot")
         #expect(model.draft.isEmpty)
         #expect(!model.timelineEvents.contains(where: { $0.kind == .botModeStarted }))
         #expect(model.botModeRoomStore?.room(id: "bot-fixture") == nil)
@@ -1355,7 +1355,7 @@ struct ChatBotModeIntegrationTests {
 
         #expect(model.draft == "@finley same message")
         #expect(model.canRetry == false)
-        #expect(model.failureMessage == "No agent named @finley in this chat. Edit the mention and try again.")
+        #expect(model.failureMessage == "No bot named @finley in this chat. Edit the mention and try again.")
         #expect(model.botModeRoom?.visibleEvents.filter { $0.kind == .human }.count == 0)
     }
 

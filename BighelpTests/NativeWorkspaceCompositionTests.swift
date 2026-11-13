@@ -98,7 +98,7 @@ struct NativeWorkspaceCompositionTests {
         }
         let controls = try #require(model.runtimeControls)
         controls.seedAgentDefaults(.init(providerID: "profile-provider", modelID: "profile-model", reasoningEffort: "high"))
-        #expect(controls.modelDisplayName == "Session model")
+        #expect(controls.modelDisplayName == "Chat model")
         #expect(controls.currentModel == nil)
     }
 

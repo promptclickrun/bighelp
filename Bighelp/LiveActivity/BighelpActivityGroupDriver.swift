@@ -78,7 +78,7 @@ final class BighelpActivityGroupDriver: BighelpLiveActivityDriving {
             rows[row.id] = row
             virtualIDs[row.id] = virtualIDs[row.id] ?? saved[row.id]?.virtualID ?? "\(snapshot.nativeActivityID)|row|\(row.id)"
             attributes[row.id] = saved[row.id]?.attributes ?? .make(sessionID: row.id, sessionTitle: "Chat",
-                agentID: "agent", agentName: "Your agent")
+                agentID: "agent", agentName: "Your bot")
             if var info = saved[row.id] { info.state = row.state; saved[row.id] = info }
         }
         for id in rows.keys where !displayedIDs.contains(id) && !hiddenActiveKeys.contains(BighelpActivitySession.membershipKey(id)) {

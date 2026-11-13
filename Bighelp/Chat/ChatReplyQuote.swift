@@ -134,7 +134,7 @@ struct ChatReplyQuote: Equatable, Sendable {
         switch author {
         case .agent:
             let name = agentName.trimmingCharacters(in: .whitespacesAndNewlines)
-            return name.isEmpty ? "Replying to your agent" : "Replying to \(name)"
+            return name.isEmpty ? "Replying to your bot" : "Replying to \(name)"
         case .me: return "Replying to yourself"
         case .named(let name): return "Replying to \(name)"
         case .unnamed: return "Replying to a message"

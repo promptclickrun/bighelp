@@ -23,8 +23,8 @@ enum KanbanLane: String, CaseIterable, Identifiable, Hashable, Codable, Sendable
     var subtitle: String {
         switch self {
         case .later: "Planned, not started"
-        case .ready: "An agent picks these up next"
-        case .working: "Agents on it now"
+        case .ready: "A bot picks these up next"
+        case .working: "Bots on it now"
         case .needsYou: "Waiting on your answer or review"
         case .done: "Finished"
         }
@@ -147,7 +147,7 @@ struct KanbanWidgetBoardQuery: EntityQuery {
 }
 
 struct KanbanWidgetAgent: AppEntity {
-    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Agent")
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Bot")
     static let defaultQuery = KanbanWidgetAgentQuery()
     let id: String
     let name: String
@@ -198,13 +198,13 @@ enum KanbanWidgetGrouping: String, AppEnum {
 
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Group by")
     static let caseDisplayRepresentations: [KanbanWidgetGrouping: DisplayRepresentation] = [
-        .status: "Status", .agent: "Agent", .board: "Board",
+        .status: "Status", .agent: "Bot", .board: "Board",
     ]
 }
 
 struct KanbanWidgetIntent: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "Kanban"
-    static let description = IntentDescription("Your agents' tasks, filtered the way you like.")
+    static let description = IntentDescription("Your bots' tasks, filtered the way you like.")
 
     @Parameter(title: "Board", description: "Leave empty for every board.")
     var board: KanbanWidgetBoard?
@@ -212,7 +212,7 @@ struct KanbanWidgetIntent: WidgetConfigurationIntent {
     @Parameter(title: "Status", default: .open)
     var status: KanbanWidgetStatus
 
-    @Parameter(title: "Agent", description: "Leave empty for every agent.")
+    @Parameter(title: "Bot", description: "Leave empty for every bot.")
     var agent: KanbanWidgetAgent?
 
     @Parameter(title: "Group by", default: .status)
@@ -456,7 +456,7 @@ struct BighelpKanbanWidget: Widget {
             }
         }
         .configurationDisplayName("Kanban")
-        .description("Tasks from your boards. Pick a board, a status and an agent.")
+        .description("Tasks from your boards. Pick a board, a status and a bot.")
         .supportedFamilies(Self.families)
         .bighelpWidgetPlacement()
     }

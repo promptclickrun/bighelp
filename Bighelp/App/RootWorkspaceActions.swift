@@ -26,7 +26,7 @@ extension RootShellView {
                                       hasFailed: connectionKeeper.state == .disconnected)
         case .unavailable:
             WorkspaceUnavailableView(destination: destination, hostName: workspaceHostName,
-                reason: "Open this feature again after connecting to the selected host and profile.")
+                reason: "Open this feature again after connecting to the selected computer and profile.")
         }
     }
 
@@ -49,7 +49,7 @@ extension RootShellView {
                                       hasFailed: connectionKeeper.state == .disconnected)
         case .unavailable:
             WorkspaceUnavailableView(destination: destination, hostName: workspaceHostName,
-                reason: "Reopen this feature after connecting to the selected host and profile.")
+                reason: "Reopen this feature after connecting to the selected computer and profile.")
         }
     }
 
@@ -136,7 +136,7 @@ extension RootShellView {
                       invalidationSource.servingProfileID.map({ Data($0.utf8) })
                         == servingProfileID.map({ Data($0.utf8) }) else {
                     if !reattaching {
-                        actionErrorMessage = "Management updates could not be connected. Reopen this feature after refreshing the selected host."
+                        actionErrorMessage = "Management updates could not be connected. Reopen this feature after refreshing the selected computer."
                     }
                     return false
                 }
@@ -145,7 +145,7 @@ extension RootShellView {
                     do { stockGit = try runtime.stockGitPresentation(profileID: profileID) }
                     catch {
                         if !reattaching {
-                            actionErrorMessage = "Project changes could not be connected. Reopen Projects after refreshing this host."
+                            actionErrorMessage = "Project changes could not be connected. Reopen Projects after refreshing this computer."
                         }
                         return false
                     }
@@ -401,7 +401,7 @@ extension RootShellView {
             guard let coordinator = try makeLifecycleCoordinator(isShown: { lifecyclePresentationID == presentationID })
             else {
                 if !reattaching {
-                    actionErrorMessage = "Connect to a native Hermes host before managing sessions or profiles."
+                    actionErrorMessage = "Connect to a native Hermes computer before managing chats or profiles."
                 }
                 return false
             }
@@ -412,7 +412,7 @@ extension RootShellView {
             return true
         } catch {
             if !reattaching {
-                actionErrorMessage = "The session and profile controls could not connect to this host."
+                actionErrorMessage = "The chat and profile controls could not connect to this computer."
             }
             return false
         }
@@ -483,7 +483,7 @@ extension RootShellView {
                     try await botModeRooms.renameNativeRoom(roomID: id, name: name)
                 } catch {
                     guard currentWorkspaceOwner == request.owner else { return }
-                    actionErrorMessage = "The group could not be renamed. Check the host and try again."
+                    actionErrorMessage = "The group could not be renamed. Check the computer and try again."
                 }
             }
         case .deleteGroup(let id):
@@ -549,7 +549,7 @@ extension RootShellView {
                 opened?(nil)
                 guard currentWorkspaceOwner == owner else { return }
                 actionErrorMessage = "Hermes could not open this group. "
-                    + (HermesRefusalMessage.sentence(in: error) ?? "Check the host and try again.")
+                    + (HermesRefusalMessage.sentence(in: error) ?? "Check the computer and try again.")
             }
         }
     }

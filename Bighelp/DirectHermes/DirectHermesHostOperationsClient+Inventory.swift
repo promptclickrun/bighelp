@@ -8,7 +8,7 @@ extension DirectHermesHostOperationsClient {
         } ?? []
         return try DirectHermesHostPayload.overview(try await json(
             .init(path: "/api/status", method: .get, query: query, maximumResponseBytes: 256 * 1_024),
-            feature: "host status"
+            feature: "computer status"
         ))
     }
 
@@ -148,7 +148,7 @@ extension DirectHermesHostOperationsClient {
         try await launch(
             .init(path: "/api/ops/backup", method: .post, body: ["output": .null]),
             expectedAction: .backup,
-            feature: "host backups"
+            feature: "computer backups"
         )
     }
 

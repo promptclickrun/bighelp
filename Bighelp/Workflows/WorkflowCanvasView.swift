@@ -217,9 +217,9 @@ struct WorkflowCanvasView: View {
         switch inspectorTab {
         case .setup:
             if stage.kind == .agent {
-                inspectorLabel("Agent")
+                inspectorLabel("Bot")
                 VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                    Text(context.agentName(model.agentID(for: stage.role)) ?? "No agent yet")
+                    Text(context.agentName(model.agentID(for: stage.role)) ?? "No bot yet")
                         .font(.bighelp(.body).weight(.semibold))
                     if !stage.tools.isEmpty { WorkflowChips(items: stage.tools) }
                     if stage.hasBroadTools {
@@ -260,7 +260,7 @@ struct WorkflowCanvasView: View {
                 inspectorLabel("Sends")
                 WorkflowChips(items: stage.deliver, monospaced: true)
             } else {
-                Text("The run waits for you here, with no agent running.")
+                Text("The run waits for you here, with no bot running.")
                     .font(.bighelp(.body))
             }
         case .output:

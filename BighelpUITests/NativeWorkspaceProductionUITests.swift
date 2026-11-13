@@ -1355,7 +1355,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             let controls = app.buttons["chat.session-info.controls"]
             XCTAssertTrue(controls.waitForExistence(timeout: 5))
             controls.tap()
-            XCTAssertTrue(app.navigationBars["Session controls"].waitForExistence(timeout: 5),
+            XCTAssertTrue(app.navigationBars["Chat controls"].waitForExistence(timeout: 5),
                           "Session controls must open from Chat info.")
             XCTAssertTrue(app.staticTexts["Status"].waitForExistence(timeout: 20),
                           "The real stock session status must decode and render.")
@@ -1371,7 +1371,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             returnToHome(in: app)
             XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 10))
             openHostPage("sessionMaintenance", in: app)
-            XCTAssertTrue(app.navigationBars["Session Maintenance"].waitForExistence(timeout: 15))
+            XCTAssertTrue(app.navigationBars["Clean up chats"].waitForExistence(timeout: 15))
             let mostRecent = app.buttons["session-maintenance.most-recent"]
             for _ in 0..<6 where !mostRecent.isHittable { app.swipeUp() }
             mostRecent.tap()

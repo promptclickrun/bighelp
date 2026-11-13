@@ -263,6 +263,8 @@ extension RootShellView {
                                onSend: { askSimpleBot(id, $0, fillsBlanks: false, sendsAtOnce: true) },
                                onBlueprint: { askSimpleBot(id, $0, fillsBlanks: true) })
                        },
+                       shellBoardKey: { agentBoardClientKey },
+                       configureShellBoard: { await configureAgentBoard($0) },
                        onBack: { [appState] in
                            if case .board? = appState.path.last { appState.path.removeLast() }
                        })

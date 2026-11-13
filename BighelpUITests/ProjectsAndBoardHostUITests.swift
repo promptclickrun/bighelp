@@ -17,11 +17,7 @@ final class ProjectsAndBoardHostUITests: BighelpUITestCase {
         try onboardOpenHost(app, address: try XCTUnwrap(probe["address"]))
         XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 30), "The home opens")
 
-        // The seeded posts are new: the Today tab says so before it's opened.
-        let todayTab = app.buttons["home.tab.today"].firstMatch
-        XCTAssertTrue(todayTab.waitForExistence(timeout: 10))
-        let newOnTab = expectation(for: NSPredicate(format: "value == %@", "New"), evaluatedWith: todayTab)
-        wait(for: [newOnTab], timeout: 20)
+        // Today's dot on the bar is for Needs you only, so new posts don't mark the tab.
         openBoard("feed", in: app)
         let stockTips = app.descendants(matching: .any)["board.feed.post.probe-stock-tips"]
         XCTAssertTrue(stockTips.waitForExistence(timeout: 20), "The host's Feed shows")

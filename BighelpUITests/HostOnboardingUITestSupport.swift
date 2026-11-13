@@ -6,7 +6,11 @@ extension BighelpUITestCase {
     /// The very first setup asks once to share data with AI providers; agrees when it does.
     @MainActor func agreeToAIDataIfAsked(_ app: XCUIApplication) {
         let agree = app.buttons["onboarding.ai-consent.agree"]
-        if agree.waitForExistence(timeout: 3) { agree.tap() }
+        guard agree.waitForExistence(timeout: 3) else { return }
+        agree.tap()
+        // The sheet closes with an animation. A tap on a field under it before it's gone gives no
+        // keyboard focus, and the typing that follows fails.
+        _ = agree.waitForNonExistence(timeout: 5)
     }
 
     @MainActor func onboardOpenHost(_ app: XCUIApplication, address: String) throws {
@@ -19,6 +23,9 @@ extension BighelpUITestCase {
             agreeToAIDataIfAsked(app)
         }
         XCTAssertTrue(field.waitForExistence(timeout: 10))
+        // A run that opens on the address step (the welcome was done in an earlier run) can still be
+        // asked to agree, over the step: the field takes no typing until that sheet is answered.
+        agreeToAIDataIfAsked(app)
         field.tap()
         field.typeText(address)
         // During onboarding the button reports the screen's identifier.

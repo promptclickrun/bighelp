@@ -87,13 +87,14 @@ final class BotDashboardUITests: BighelpUITestCase {
         app.buttons["dashboard.undo"].tap()
         XCTAssertTrue(top.waitForExistence(timeout: 5), "Undo brings it back")
 
-        // Right: the bot's own chat (history and all) with the post in its message box, not sent.
+        // Right: the bot's own chat (history and all) with the post as a card in its message box, not sent.
         top.swipeRight(velocity: .fast)
         let composer = app.textViews["chat.composer.text"]
         XCTAssertTrue(composer.waitForExistence(timeout: 10), "The bot's chat opens")
-        let draft = NSPredicate(format: "value BEGINSWITH %@", "About “Lisbon fares dropped 18% for October”")
-        expectation(for: draft, evaluatedWith: composer)
-        waitForExpectations(timeout: 5)
+        let card = app.descendants(matching: .any)["chat.board-card-draft"].firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 5), "The post waits in the message box as a card")
+        let title = app.descendants(matching: .any)["chat.board-card-draft.title"].firstMatch
+        XCTAssertTrue(title.label.contains("Lisbon fares dropped 18% for October"), "It is the post that was swiped")
     }
 
     /// Screenshots for design review, only when `BIGHELP_DASHBOARD_SHOTS` names a folder: the

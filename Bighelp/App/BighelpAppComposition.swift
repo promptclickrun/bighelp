@@ -306,10 +306,6 @@ struct BighelpAppComposition {
         // from the start.
         if usesFixtures, botModeRooms.usesNativeRooms { Task { await botModeRooms.refreshNativeRoomCatalog() } }
         #endif
-        // The same for its chats. The store starts from the copy an earlier run saved, and the one
-        // home's lists only draw what it holds (the old Chat home's first chat used to load it), so a
-        // demo reads its chat list now. Without this, a demo showed last run's chats until a refresh.
-        if usesFixtures { Task { try? await sessionCatalog.load() } }
         do {
             try BotModeRoomLoadingPolicy.load(botModeRooms, for: .startup)
         } catch {
@@ -698,6 +694,12 @@ struct BighelpAppComposition {
             if featureStore.prepare(route) {
                 appState.activateConversation(id: conversationID, source: .newChat)
             }
+        } else if usesFixtures, subagentStreamAcceptanceFixture == nil {
+            // A real host's runtime reads the chat list at connect. A demo's store starts from the copy
+            // an earlier run saved, and the one home's lists only draw what it holds, so a demo that
+            // opens on the home reads its chat list now. A chat opened at launch (above) reads it
+            // itself as it loads; a read before that would leave that chat on the saved copy.
+            Task { try? await sessionCatalog.load() }
         }
 
         self.appState = appState

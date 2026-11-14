@@ -570,7 +570,9 @@ struct ChatDestinationView: View {
             isPresented: $isPhotoPickerPresented,
             selection: $photoSelections,
             maxSelectionCount: max(0, 10 - model.draftAttachments.count),
-            matching: .images
+            matching: .any(of: [.images, .videos]),
+            // As Photos keeps it: the default converts a video first, which takes longer than sending it.
+            preferredItemEncoding: .current
         )
         .fileImporter(
             isPresented: $isFilePickerPresented,

@@ -222,6 +222,9 @@ change in both repos.
   - Content appears only after the user asks their agent for it.
 - **The plus button only adds to a message.** Its menu (`ChatAttachmentMenu`, `ChatActionMenuAction`) is Camera,
   Scan Document, Photo Library, Files and Drawing (Apple's canvas, `ChatDrawingSheet`; Add attaches a picture).
+  Photo Library takes photos and videos. A video comes as Photos keeps it (`preferredItemEncoding: .current`;
+  the default converts it first, which takes longer than sending it) and goes as a file does: over 8 MB, in
+  pieces (`ChatPickedVideo`).
   Never put a setting or a way to another screen there: the model chip, the voice button, New chat and Settings
   hold those.
 - **Protect the chat.** The accepted chat behavior is a contract: [docs/CHAT_INTERACTION_CONTRACT.md](docs/CHAT_INTERACTION_CONTRACT.md).

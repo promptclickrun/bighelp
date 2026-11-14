@@ -127,26 +127,31 @@ extension ChatDestinationView {
         }
     }
 
-    /// Photos come in one at a time; the tag above the message box shows "Adding 2 of 4…"
-    /// and keeps any that didn't attach, with Try again.
+    /// Photos and videos come in one at a time; the tag above the message box shows
+    /// "Adding 2 of 4…" and keeps any that didn't attach, with Try again.
     func importPhotos(_ selections: [PhotosPickerItem]) async {
         defer { photoSelections = [] }
         guard !selections.isEmpty else { return }
         attachmentFlow.completeSuccessfulImport()
-        await model.importDraftAttachments(.photos, selections.map { selection in
-            DraftAttachmentLoader(name: nil) {
+        let videos = selections.filter(\.isVideo).count
+        let kind: DraftAttachmentImportKind = videos == 0 ? .photos : videos == selections.count ? .videos : .attachments
+        await model.importDraftAttachments(kind, selections.map { selection in
+            DraftAttachmentLoader(draftNamed: nil, load: { [model] in
+                if selection.isVideo {
+                    return try await ChatPickedVideo.draftAttachment(from: selection, id: Self.attachmentID(), into: model)
+                }
                 guard let data = try await selection.loadTransferable(type: Data.self) else {
                     throw ChatAttachmentError.invalidSize
                 }
                 let type = selection.supportedContentTypes.first ?? .jpeg
                 let extensionValue = type.preferredFilenameExtension ?? "jpg"
-                return try ChatAttachmentPreparer().prepare(
+                return .attachment(try ChatAttachmentPreparer().prepare(
                     id: Self.attachmentID(),
                     fileName: "image-\(UUID().uuidString.lowercased()).\(extensionValue)",
                     mimeType: type.preferredMIMEType ?? "image/jpeg",
                     data: data
-                )
-            }
+                ))
+            })
         })
     }
 

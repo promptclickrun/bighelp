@@ -133,11 +133,9 @@ struct BighelpConnectionIndicator: View {
         ZStack {
             switch phase {
             case .connecting:
-                // The kit's launch: a dot pops in and unspools into the b.
-                BighelpNoodleView(motion: .launch, size: side, playback: .loop(pause: 0.6), tint: color)
+                BighelpLifterView(motion: .idle, size: side, tint: color)
             case .reconnecting:
-                // The kit's spring: bouncing back.
-                BighelpNoodleView(motion: .spring, size: side, playback: .loop(pause: 0.3), tint: color)
+                BighelpLifterView(motion: .idle, size: side, tint: color)
             case .connected:
                 Circle().fill(color)
                     .frame(width: 8 * unit, height: 8 * unit)

@@ -3,6 +3,16 @@
     {
       "filename" : "BighelpMarkColor.svg",
       "idiom" : "universal"
+    },
+    {
+      "appearances" : [
+        {
+          "appearance" : "luminosity",
+          "value" : "dark"
+        }
+      ],
+      "filename" : "BighelpMarkColorDark.svg",
+      "idiom" : "universal"
     }
   ],
   "info" : {

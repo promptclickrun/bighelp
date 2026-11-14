@@ -97,7 +97,7 @@ struct ChatReasoningMessageView: View {
             HStack(spacing: BighelpTokens.space8) {
                 Group {
                     if playsLoader {
-                        BighelpNoodleView(motion: .thinking, size: glyphSide)
+                        BighelpLifterView(motion: .thinking, size: glyphSide)
                     } else {
                         BighelpActivityGlyphView(glyph: BighelpActivitySummary.glyph(for: message.phase), side: glyphSide)
                             .foregroundStyle(message.phase == .failed ? theme.danger : theme.tertiaryText)

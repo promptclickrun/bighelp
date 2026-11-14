@@ -1281,7 +1281,7 @@ struct IdeaDetailSheet: View {
         } label: {
             Group {
                 if isAccepting {
-                    BighelpNoodleView(motion: .loader, size: 20, tint: theme.actionForeground)
+                    BighelpLifterView(motion: .idle, size: 20, tint: theme.actionForeground)
                 } else {
                     Text(acceptFailed ? "Try again" : "Let's do it")
                 }

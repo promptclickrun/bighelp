@@ -3,7 +3,7 @@ import SwiftUI
 // The Bots view of the first tab, the bot page, and the loader that covers a chat while it opens.
 extension RootShellView {
     /// Every computer shown: a bot on another gateway opens once that gateway is connected and its chats
-    /// are loaded, often a few seconds. The Noodle loader covers the whole wait, from the tap to
+    /// are loaded, often a few seconds. The lifter loader covers the whole wait, from the tap to
     /// the chat, so the screen never looks stuck; Cancel goes back to where the tap came from.
     @ViewBuilder var simpleBotsOpeningLoader: some View {
         #if DEBUG

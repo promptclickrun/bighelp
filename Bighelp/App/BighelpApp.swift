@@ -748,7 +748,7 @@ struct BighelpApp: App {
             .environment(\.bighelpUIV2Enabled, settings.uiV2Enabled)
             .environment(\.bighelpUIV3Enabled, settings.interfaceVersion == .v3)
             .environment(\.nerdModeEnabled, settings.nerdModeEnabled)
-            .progressViewStyle(BighelpNoodleProgressStyle())
+            .progressViewStyle(BighelpLifterProgressStyle())
             .modifier(BighelpTextSizing())
             #if os(visionOS)
             .modifier(SpatialAvatarMainWindowHooks(model: spatialAvatar))

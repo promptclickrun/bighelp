@@ -193,7 +193,7 @@ struct ChatLiveWorkView: View {
     private func glyph(_ phase: BighelpActivityPhase) -> some View {
         Group {
             if phase.isLive, playsLoader {
-                BighelpNoodleView(motion: phase == .thinking ? .thinking : .loader, size: glyphSide)
+                BighelpLifterView(motion: phase == .thinking ? .thinking : .searching, size: glyphSide)
             } else {
                 BighelpActivityGlyphView(glyph: BighelpActivitySummary.glyph(for: phase), side: glyphSide)
                     .foregroundStyle(waiting != nil ? theme.warning : phase.isLive ? theme.tertiaryText : theme.success)

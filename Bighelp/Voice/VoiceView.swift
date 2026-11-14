@@ -443,9 +443,9 @@ struct VoiceView: View {
     }
 
     private var authoritativeStatus: some View {
-        let noodle = VoiceNoodle.motion(turnBased: model.status, live: liveState)
+        let lifter = VoiceLifter.motion(turnBased: model.status, live: liveState)
         return HStack(spacing: BighelpTokens.space8) {
-            BighelpNoodleView(motion: noodle, size: 22, playback: VoiceNoodle.playback(noodle))
+            BighelpLifterView(motion: lifter, size: 22)
             Text("\(model.agentName) · \(statusText)")
                 .bighelpFont(.label, weight: .semibold)
                 .lineLimit(1)
@@ -679,7 +679,7 @@ struct VoiceView: View {
             HStack(spacing: BighelpTokens.space8) {
                 if model.isEndPending {
                     // The b reels itself in: the call is ending.
-                    BighelpNoodleView(motion: .exit, size: 20, tint: .white)
+                    BighelpLifterView(motion: .sleeping, size: 20, tint: .white)
                 } else {
                     Image(systemName: "phone.down.fill")
                         .font(.system(size: 17, weight: .semibold))

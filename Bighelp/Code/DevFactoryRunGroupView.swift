@@ -153,7 +153,7 @@ struct DevFactoryRunGroupView: View {
                 Spacer(minLength: 0)
                 CodePill(text: DevFactoryWords.state(run), tint: DevFactoryWords.tint(run, theme))
                     // A run that finishes while you watch gets the kit's done.
-                    .bighelpNoodleMoment(.done, when: run.state == .succeeded, size: 28)
+                    .bighelpLifterMoment(.success, when: run.state == .succeeded, size: 28)
             }
             if let stages = detail?.stages, !stages.isEmpty {
                 HStack(spacing: 4) {

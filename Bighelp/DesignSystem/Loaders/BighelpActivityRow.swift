@@ -224,8 +224,8 @@ struct BighelpActivityRow: View {
     var accessibilityIdentifier: String?
     /// Names the row for a screen's `BighelpActivityLoaderFocus`.
     var loaderID: String?
-    /// The Noodle to play while live; nil plays thinking or the loader by the phase.
-    var loaderMotion: BighelpNoodleMotion?
+    /// The lifter state to play while live; nil plays thinking or searching by the phase.
+    var loaderMotion: BighelpLifterMotion?
 
     private let expansion: Binding<Bool>?
     @State private var localExpanded: Bool
@@ -234,7 +234,7 @@ struct BighelpActivityRow: View {
          stepCount: Int? = nil, note: String? = nil, receipt: String? = nil, detailsBelow: Bool = false,
          isExpanded: Binding<Bool>,
          onDisclosureChange: @escaping () -> Void = {}, accessibilityIdentifier: String? = nil,
-         loaderID: String? = nil, loaderMotion: BighelpNoodleMotion? = nil) {
+         loaderID: String? = nil, loaderMotion: BighelpLifterMotion? = nil) {
         self.phase = phase
         self.title = title
         self.steps = steps
@@ -394,7 +394,7 @@ struct BighelpActivityRow: View {
         }
         return Group {
             if playsLoader {
-                BighelpNoodleView(motion: loaderMotion ?? (phase == .thinking ? .thinking : .loader), size: glyphSide)
+                BighelpLifterView(motion: loaderMotion ?? (phase == .thinking ? .thinking : .searching), size: glyphSide)
             } else {
                 BighelpActivityGlyphView(glyph: BighelpActivitySummary.glyph(for: phase), side: glyphSide)
                     .foregroundStyle(color)
@@ -510,7 +510,7 @@ struct BighelpActivityStepRow: View {
     }
 }
 
-/// Draws an activity glyph at a size, still. Thinking is the Noodle at rest.
+/// Draws an activity glyph at a size, still. Thinking is the lifter at rest.
 struct BighelpActivityGlyphView: View {
     let glyph: BighelpActivityGlyph
     let side: CGFloat
@@ -523,10 +523,8 @@ struct BighelpActivityGlyphView: View {
             case .symbol(let name):
                 BighelpSymbolImage(systemName: name)
             case .thinking:
-                // The Noodle at rest, in the row's color; the loader plays in its place while live.
-                BighelpNoodleShape()
-                    .stroke(style: StrokeStyle(lineWidth: side * 0.13, lineCap: .round, lineJoin: .round))
-                    .padding(side * 0.14)
+                // The lifter at rest; the loader stands in its place while live.
+                BighelpLifterMark(size: side)
             case .done:
                 Image(systemName: "checkmark").resizable().scaledToFit()
                     .fontWeight(.bold).scaleEffect(0.72)

@@ -44,42 +44,34 @@ enum VoiceOrbPresentation {
     }
 }
 
-/// The Noodle in the voice pill acts out the call: it listens, thinks and talks along,
-/// rests while paused or muted, and asks when something went wrong.
-enum VoiceNoodle {
-    static func motion(_ state: AgentLiveState) -> BighelpNoodleMotion {
+/// The lifter in the voice pill acts out the call: he waits while it listens, thinks and
+/// announces along, naps while paused, muted or ended, and sweats when something went wrong.
+enum VoiceLifter {
+    static func motion(_ state: AgentLiveState) -> BighelpLifterMotion {
         switch state {
-        case .listening: .listening
+        case .listening, .nudge: .idle
         case .thinking: .thinking
-        case .speaking: .talking
-        case .idle: .resting
-        case .happy: .done
-        case .nudge: .hello
+        case .speaking: .replying
+        case .idle: .sleeping
+        case .happy: .success
         }
     }
 
-    static func motion(turnBased status: VoiceStatus, live: AgentLiveState) -> BighelpNoodleMotion {
+    static func motion(turnBased status: VoiceStatus, live: AgentLiveState) -> BighelpLifterMotion {
         switch status {
         case .listening, .working, .speaking: motion(live)
-        case .paused: .resting
-        case .unavailable: .question
+        case .paused: .sleeping
+        case .unavailable: .error
         }
     }
 
-    static func motion(livePhase phase: LiveVoiceModel.Phase, live: AgentLiveState) -> BighelpNoodleMotion {
+    static func motion(livePhase phase: LiveVoiceModel.Phase, live: AgentLiveState) -> BighelpLifterMotion {
         switch phase {
         case .live: motion(live)
-        case .preparing, .connecting: .launch
-        case .interrupted: .resting
-        case .idle: .idle
-        case .ended: .exit
-        case .failed: .question
+        case .preparing, .connecting, .idle: .idle
+        case .interrupted, .ended: .sleeping
+        case .failed: .error
         }
-    }
-
-    /// Connecting repeats its launch with a rest; the rest play as the kit made them.
-    static func playback(_ motion: BighelpNoodleMotion) -> BighelpNoodlePlayback {
-        motion == .launch ? .loop(pause: 0.6) : .automatic
     }
 }
 

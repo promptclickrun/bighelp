@@ -249,7 +249,7 @@ struct BoardActionPillLabel: View {
     var body: some View {
         Group {
             if isBusy {
-                BighelpNoodleView(motion: .loader, size: 20, tint: theme.actionForeground)
+                BighelpLifterView(motion: .idle, size: 20, tint: theme.actionForeground)
             } else if let systemImage {
                 Label(title, systemImage: systemImage)
             } else {

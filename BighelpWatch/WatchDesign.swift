@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// bighelp's dark palette on the Watch: warm surfaces, cream text, lavender
-/// for actions and your own messages, Ember coral only in the brand mark.
+/// for actions and your own messages, coral only in the brand mark.
 enum WatchDesign {
     static let minimumControlHeight: CGFloat = 44
 
@@ -13,7 +13,7 @@ enum WatchDesign {
         static let secondaryText = text.opacity(0.66)
         static let accent = SwiftUI.Color(red: 0xC9 / 255, green: 0xB6 / 255, blue: 0xFF / 255)
         static let outgoing = SwiftUI.Color(red: 0x7B / 255, green: 0x52 / 255, blue: 0xE0 / 255)
-        static let ember = SwiftUI.Color(red: 0xFF / 255, green: 0x8A / 255, blue: 0x7A / 255)
+        static let coral = SwiftUI.Color(red: 0xFF / 255, green: 0x5A / 255, blue: 0x36 / 255)
         static let needs = SwiftUI.Color(red: 0xE5 / 255, green: 0x62 / 255, blue: 0x4F / 255)
         static let done = SwiftUI.Color(red: 0x2F / 255, green: 0xA5 / 255, blue: 0x8B / 255)
     }
@@ -43,7 +43,7 @@ struct WatchAgentOrb: View {
     }
 }
 
-/// The Noodle, bighelp's mark.
+/// The lifter, Bighelp's mark.
 struct WatchBrandMark: View {
     var size: CGFloat = 22
 

@@ -54,9 +54,7 @@ PANELS = [
     # Goals have no progress number on the host, so the copy promises none.
     ("08-goals", "04-goals", "Goals", ("Your goals,", "in one place."),
      ("Tell your bot what you're working toward.", "It checks in and keeps notes.")),
-    ("09-code", "12-code", "Work", ("Code anywhere.", "Just describe it."),
-     ("Each message starts its own coding session.", "Check the changes when it's done.")),
-    ("10-plan", "02-packing", "Chat", ("A clear plan.", "Less juggling."),
+    ("09-plan", "02-packing", "Chat", ("A clear plan.", "Less juggling."),
      ("Checklists, budgets and next steps.", "More than a wall of text.")),
 ]
 
@@ -79,7 +77,7 @@ class Display:
 DISPLAYS = {
     "APP_IPHONE_67": Display((1320, 2868), "iphone", 11.4, 3.45, 2.5, 8.4, 70, 1.45, 10.4),
     "APP_IPHONE_65": Display((1284, 2778), "iphone", 11.4, 3.45, 2.5, 8.4, 70, 1.45, 10.4),
-    "APP_IPAD_PRO_3GEN_129": Display((2064, 2752), "ipad", 8.4, 2.8, 2.0, 6.0, 57, 1.1, 2.8),
+    "APP_IPAD_PRO_3GEN_129": Display((2064, 2752), "ipad", 8.4, 2.8, 2.0, 6.0, 61, 1.1, 2.8),
     # The cover screen is short and wide, so the device is narrower and the words smaller.
     "APP_IPHONE_DUO": Display((1398, 2034), "duo", 9.2, 3.0, 2.2, 7.0, 60, 1.3, 6.0),
 }
@@ -156,10 +154,13 @@ def render(document: str, size: tuple[int, int], output: Path) -> None:
     with tempfile.TemporaryDirectory() as folder:
         source = Path(folder) / "poster.html"
         source.write_text(document)
-        subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-                        f"--user-data-dir={folder}/profile", "--force-device-scale-factor=1",
-                        f"--window-size={size[0]},{size[1]}", "--virtual-time-budget=2000",
-                        f"--screenshot={output}", source.as_uri()], check=True, capture_output=True, timeout=120)
+        command = [CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
+                   f"--user-data-dir={folder}/profile", "--force-device-scale-factor=1",
+                   f"--window-size={size[0]},{size[1]}", "--virtual-time-budget=2000",
+                   f"--screenshot={output}", source.as_uri()]
+        # Chrome now and then exits before it draws, on a busy Mac: one more try.
+        if subprocess.run(command, capture_output=True, timeout=120).returncode != 0:
+            subprocess.run(command, check=True, capture_output=True, timeout=120)
     with Image.open(output) as image:
         if image.size != size:
             raise SystemExit(f"{output} came out {image.size}, not {size}")

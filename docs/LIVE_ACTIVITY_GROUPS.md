@@ -32,6 +32,8 @@ Text-only turns did not emit a reasoning/tool activity, so they never reached th
 
 Confirmed live turn starts now reach the notification bridge without adding a transcript row. The bridge starts locally before the snapshot request, and binding an already-running, connected chat admits that live state too. Failed starts retain a pending event for a later live opportunity. An authenticated snapshot can promote the exact captured row to canonical host ownership. Canonical status then comes from that host, not local message-segment endings.
 
+A card gets updates with bighelp away, and its detail, only after the phone gives it to the computer's turn. The phone asks the computer which work a turn is (`POST …/work`) the moment the turn starts. Hermes sends that start before it prepares the turn, and the plugin learns of the turn at the turn's first model request, so the first answer can name no work or only the chat's last, finished turn. The phone asked once: such a card stayed its own for the whole turn, moved only while bighelp was open, and showed no detail. Now the phone asks again after 1, 2, 4, 8, 15, 30 and 60 seconds (`BighelpManagedActivityBridge.snapshotRetryWaits`) while that turn runs and nothing has taken its card, each ask in the stream's order. A plugin with the wait (`WORK_WAIT_SECONDS`) also holds its answer up to 8 seconds for running work to show, which helps app builds that ask once.
+
 ActivityKit still controls whether a request may start. This change does not introduce remote push-to-start or promise that work first discovered while the app is suspended will create a card. A denied request is logged and remains retryable; stale content is shown honestly.
 
 ## Ownership and updates

@@ -575,6 +575,47 @@ import UserNotifications
         await runtime.resetForAccountBoundary()
     }
 
+    /// The phone asks which work a turn is the moment the turn starts. The computer learns of the turn a
+    /// little later, at its first model request, so that first answer can name no work. Asked only once,
+    /// the card then stayed this phone's for the whole turn: no update with bighelp away, and no detail.
+    @Test(arguments: [1, Int.max])
+    func aTurnTheComputerHadNotSeenYetIsAskedAboutAgain(knownAfterReads: Int) async throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanup() }
+        _ = try await fixture.service.enroll(host: fixture.host, connection: fixture.connection, isCurrent: { true })
+        let runtime = BighelpManagedNativeActivityRuntime(service: fixture.service, driver: NativeActivityDriver(),
+            environment: .sandbox, topic: "app.loopdy.mobile", now: { Date(timeIntervalSince1970: 1_800_000_100) })
+        fixture.service.activityRuntime = runtime
+        let client = try DirectHermesConversationClient(rpc: UnenrolledChatRPC(), hostIdentity: fixture.host.principalIdentity,
+            profile: "default", runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch",
+            drafts: .init(root: fixture.root.appending(path: "drafts")))
+        defer { client.suspend() }
+        let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [])
+        client.model = model
+        fixture.hostAPI.runningWorkAfterReads = knownAfterReads
+        client.receive(.init(type: "message.start", sessionID: "runtime", payload: [:], sequence: 1))
+        let waits: [Duration] = [.milliseconds(5), .milliseconds(5), .milliseconds(5)]
+        BighelpManagedActivityBridge.bind(service: fixture.service, host: fixture.host,
+            chat: DirectHermesChat(id: "saved", client: client, model: model), snapshotRetryWaits: waits)
+        let known = knownAfterReads < Int.max
+        func settled() -> Bool {
+            known ? fixture.ledger.activities.contains { $0.canonicalTurnID == "canonical-turn" && !$0.retired }
+                : fixture.hostAPI.workReads > waits.count
+        }
+        for _ in 0..<400 where !settled() { try await Task.sleep(for: .milliseconds(5)) }
+        try await Task.sleep(for: .milliseconds(40))
+        if known {
+            #expect(fixture.ledger.activities.contains { $0.canonicalTurnID == "canonical-turn" && !$0.retired },
+                    "The card goes to the computer's turn once the computer knows it")
+            #expect(fixture.hostAPI.workReads == 2, "It stops asking once the turn is known")
+        } else {
+            #expect(fixture.hostAPI.workReads == 1 + waits.count, "It asks a few more times, then stops")
+            #expect(!fixture.ledger.activities.contains { $0.canonicalTurnID != nil })
+        }
+        client.suspend()
+        await runtime.resetForAccountBoundary()
+    }
+
     /// iOS starts a Live Activity only for an app in front, and a turn with a file starts once the file
     /// is up, often after the person left: that turn got no card. Armed at Send (T3 Code's playbook), the
     /// card exists, and the turn's row takes the armed row's place as an update.
@@ -1620,6 +1661,9 @@ import UserNotifications
         var offline = false
         var holdWorkSnapshot = false
         var workContinuation: CheckedContinuation<Void, Never>?
+        /// How many times the phone asked about a chat's work, and after how many the computer knows the turn.
+        var workReads = 0
+        var runningWorkAfterReads: Int?
         var enrollRejection: DirectHostNotificationError?
         var removedGrants: [String] = []
         /// The agent each client was made for (`?profile=`), in order.
@@ -1631,7 +1675,16 @@ import UserNotifications
             guard isCurrent() else { throw DirectHermesError.secureStorageChanged }
             if offline { throw DirectHermesError.notConnected }
             if suffix.hasSuffix("/work"), method == "POST" {
+                workReads += 1
                 if holdWorkSnapshot { await withCheckedContinuation { workContinuation = $0 } }
+                // Like the plugin: it knows a turn from the turn's first model request on, not before.
+                if let after = runningWorkAfterReads, workReads > after,
+                   let profile = body?["profile"]?.string, let session = body?["sessionId"]?.string {
+                    return .object(["version": .integer(1), "grantId": .string(account.template.grantId), "work": .object([
+                        "profile": .string(profile), "sessionId": .string(session), "turnId": .string("canonical-turn"),
+                        "phase": .string("thinking"), "activeSubagentCount": .integer(0), "terminal": .boolean(false),
+                        "outcome": .null, "observedAt": .integer(Int(Date().timeIntervalSince1970))])])
+                }
                 return .object(["version": .integer(1), "grantId": .string(account.template.grantId), "work": .null])
             }
             if method == "DELETE", suffix.hasPrefix("/enrollments/"), !suffix.dropFirst(13).contains("/") {

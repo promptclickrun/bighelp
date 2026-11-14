@@ -222,13 +222,109 @@ enum BighelpManagedActivityBridge {
             return nil
         }
     }
-    private final class Binding {
+    @MainActor private final class Binding {
         var previous: Task<Void, Never>?
         var ticket = UUID()
         var selections: [SelectionKey: Selection] = [:]
+        /// Turns still asking the computer which work they are (`snapshotRetryWaits`).
+        var retries: [SelectionKey: Task<Void, Never>] = [:]
+
+        /// Runs `work` after everything queued before it, so the admitted stream keeps its order.
+        @discardableResult
+        func enqueue(_ work: @escaping @MainActor () async -> Void) -> Task<Void, Never> {
+            let before = previous
+            let ticket = UUID(); self.ticket = ticket
+            let task = Task { @MainActor in
+                await before?.value
+                await work()
+                if self.ticket == ticket { self.previous = nil }
+            }
+            previous = task
+            return task
+        }
+    }
+    /// The chat, connection and registry a queued step was made for. Every step checks it after each wait.
+    private struct Scope {
+        let host: BighelpConfiguredHost
+        let chatID: String
+        let profile: String
+        let session: String
+        let epoch: String
+        let generation: UUID
+
+        @MainActor func isCurrent(_ service: BighelpManagedNotificationService, _ client: DirectHermesConversationClient) -> Bool {
+            !Task.isCancelled && client.connected && client.profile == profile && client.storedID == session
+                && client.projection.epoch == epoch && service.registry.generation == generation
+                && service.ownsChat(host: host, client: client)
+        }
+        func key(_ localTurn: String) -> SelectionKey {
+            .init(profile: profile, session: session, epoch: epoch, localTurn: localTurn)
+        }
     }
 
-    static func bind(service: BighelpManagedNotificationService, host: BighelpConfiguredHost, chat: DirectHermesChat) {
+    /// How long to wait before each further ask about a turn the computer didn't know at its start.
+    /// The phone asks the moment a turn starts; the computer learns of the turn at its first model
+    /// request, once its memory and context are ready. That is usually a second or two later, and
+    /// longer for a chat that was idle. Most asks come early, while bighelp is likely still open.
+    static let snapshotRetryWaits: [Duration] = [.seconds(1), .seconds(2), .seconds(4), .seconds(8),
+                                                 .seconds(15), .seconds(30), .seconds(60)]
+
+    /// Asks the computer which work this turn is and gives the card to it. False while the computer
+    /// names no running work (it hasn't seen the turn yet) or the read fails.
+    private static func select(_ scope: Scope, _ binding: Binding, service: BighelpManagedNotificationService,
+                               chat: DirectHermesChat, event: ChatActivityEvent) async -> Bool {
+        let client = chat.client
+        let isCurrent: @MainActor () -> Bool = { [weak service, weak client] in
+            guard let service, let client else { return false }
+            return scope.isCurrent(service, client)
+        }
+        guard let snapshot = try? await service.workSnapshot(host: scope.host, profile: scope.profile,
+                  storedSessionID: scope.session, isCurrent: isCurrent),
+              isCurrent(), snapshot.work?.terminal == false, client.projection.turnID == event.turnID else { return false }
+        do {
+            if try await service.activityRuntime?.promote(host: scope.host, chat: chat,
+                localTurn: event.turnID, snapshot: snapshot) != true {
+                try await service.activityRuntime?.receive(host: scope.host, chat: chat, event: event,
+                    canonicalHostTurnID: snapshot.work?.turnId, workSnapshot: snapshot)
+            }
+            guard isCurrent() else { return false }
+            binding.selections[scope.key(event.turnID)] = .observed(snapshot)
+            return true
+        } catch {
+            // Keep the admitted local row; a later ask must not guess a new host turn.
+            return false
+        }
+    }
+
+    /// The computer learns of a turn at its first model request, which comes after the phone's first
+    /// ask. Asked only once, the card stayed this phone's for the whole turn: it got no update with
+    /// bighelp away, and no detail. So the phone asks a few more times, each in the stream's order,
+    /// while that turn still runs and nothing has taken its card. It holds neither the chat nor its model.
+    private static func askAgain(_ scope: Scope, _ binding: Binding, service: BighelpManagedNotificationService,
+                                 chat: DirectHermesChat, event: ChatActivityEvent, waits: [Duration]) {
+        let key = scope.key(event.turnID)
+        binding.retries[key]?.cancel()
+        binding.retries[key] = Task { @MainActor [weak service, weak client = chat.client, weak model = chat.model] in
+            for wait in waits {
+                try? await Task.sleep(for: wait)
+                guard !Task.isCancelled else { return }
+                await binding.enqueue { [weak service, weak client, weak model] in
+                    guard let service, let client, let model, scope.isCurrent(service, client),
+                          case .local = binding.selections[key],
+                          client.projection.running, client.projection.turnID == event.turnID else { return }
+                    _ = await select(scope, binding, service: service,
+                                     chat: DirectHermesChat(id: scope.chatID, client: client, model: model), event: event)
+                }.value
+                // Done once the card went to the computer's turn, the turn is over, or the chat moved on.
+                guard case .local = binding.selections[key], let service, let client, scope.isCurrent(service, client),
+                      client.projection.running, client.projection.turnID == event.turnID else { break }
+            }
+            if !Task.isCancelled { binding.retries[key] = nil }
+        }
+    }
+
+    static func bind(service: BighelpManagedNotificationService, host: BighelpConfiguredHost, chat: DirectHermesChat,
+                     snapshotRetryWaits: [Duration] = BighelpManagedActivityBridge.snapshotRetryWaits) {
         // Serial task ownership preserves the admitted stream's callback order.
         // The callback owns neither its client nor its model; queued work checks
         // the exact captured session/epoch/registry generation after every await.
@@ -241,24 +337,14 @@ enum BighelpManagedActivityBridge {
         chat.client.onAdmittedActivity = { [weak service, weak client = chat.client, weak model = chat.model] change, turn, failed in
             guard let service, let client, model != nil,
                   !change.activities.isEmpty || change.terminal else { return }
-            let profile = client.profile; let session = client.storedID
-            let epoch = client.projection.epoch; let generation = service.registry.generation
-            let before = binding.previous
-            let ticket = UUID(); binding.ticket = ticket
-            binding.previous = Task { @MainActor [weak service, weak client, weak model] in
-                await before?.value
-                defer { if binding.ticket == ticket { binding.previous = nil } }
-                guard let service, let client, let model else { return }
-                @MainActor func isCurrent() -> Bool {
-                    !Task.isCancelled && client.connected && client.profile == profile && client.storedID == session
-                        && client.projection.epoch == epoch && service.registry.generation == generation
-                        && service.ownsChat(host: host, client: client)
-                }
-                guard isCurrent() else { return }
+            let scope = Scope(host: host, chatID: chatID, profile: client.profile, session: client.storedID,
+                              epoch: client.projection.epoch, generation: service.registry.generation)
+            binding.enqueue { [weak service, weak client, weak model] in
+                guard let service, let client, let model, scope.isCurrent(service, client) else { return }
                 let currentChat = DirectHermesChat(id: chatID, client: client, model: model)
                 for event in change.activities {
-                    guard isCurrent() else { return }
-                    let key = SelectionKey(profile: profile, session: session, epoch: epoch, localTurn: event.turnID)
+                    guard scope.isCurrent(service, client) else { return }
+                    let key = scope.key(event.turnID)
                     if binding.selections[key] == nil, !event.lifecycle.isTerminal {
                         // A null/failed read is a LOCAL fallback for this segment,
                         // not permission to guess a turn or query again per token.
@@ -268,36 +354,27 @@ enum BighelpManagedActivityBridge {
                         // Token registration can wait for its exact host snapshot.
                         try? await service.activityRuntime?.receive(host: host, chat: currentChat, event: event,
                             canonicalHostTurnID: nil)
-                        guard isCurrent() else { return }
-                        if let snapshot = try? await service.workSnapshot(host: host, profile: profile,
-                            storedSessionID: session, isCurrent: isCurrent) {
-                            guard isCurrent() else { return }
-                            if snapshot.work?.terminal == false, client.projection.turnID == event.turnID {
-                                do {
-                                    if try await service.activityRuntime?.promote(host: host, chat: currentChat,
-                                        localTurn: event.turnID, snapshot: snapshot) != true {
-                                        try await service.activityRuntime?.receive(host: host, chat: currentChat, event: event,
-                                            canonicalHostTurnID: snapshot.work?.turnId, workSnapshot: snapshot)
-                                    }
-                                    guard isCurrent() else { return }
-                                    binding.selections[key] = .observed(snapshot)
-                                } catch {
-                                    // Keep the admitted local row; retrying must not guess a new host turn.
-                                }
-                            }
+                        guard scope.isCurrent(service, client) else { return }
+                        if await !select(scope, binding, service: service, chat: currentChat, event: event),
+                           scope.isCurrent(service, client), !snapshotRetryWaits.isEmpty {
+                            askAgain(scope, binding, service: service, chat: currentChat, event: event, waits: snapshotRetryWaits)
                         }
                     }
-                    guard isCurrent(), let selection = binding.selections[key] else { continue }
+                    guard scope.isCurrent(service, client), let selection = binding.selections[key] else { continue }
                     let snapshot = selection.snapshot
                     // Track the authoritative CURRENT work explicitly; no claim
                     // that its ID equals the projection segment's synthetic ID.
                     try? await service.activityRuntime?.receive(host: host, chat: currentChat, event: event,
                         canonicalHostTurnID: snapshot?.work?.turnId, workSnapshot: snapshot)
                 }
-                guard isCurrent() else { return }
+                guard scope.isCurrent(service, client) else { return }
                 if change.terminal {
-                    try? await service.activityRuntime?.finish(host: host, profile: profile,
-                        storedSessionID: session, originalLocalTurnID: turn,
+                    // The turn ended: nothing is left to ask the computer about.
+                    for key in binding.retries.keys where key.localTurn == turn {
+                        binding.retries.removeValue(forKey: key)?.cancel()
+                    }
+                    try? await service.activityRuntime?.finish(host: host, profile: scope.profile,
+                        storedSessionID: scope.session, originalLocalTurnID: turn,
                         outcome: failed ? .failed : .succeeded)
                 }
             }

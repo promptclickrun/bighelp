@@ -1180,6 +1180,10 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   "Sending your message" row under the chat's own opaque ID): iOS starts a Live Activity only for an app in front,
   and a turn with a file starts once the file is up, often after the person left, so it got no card. A turn that
   starts later joins the card as an update and takes that row's place; a row no turn takes goes after two minutes.
+- A card is the computer's to update (pushes, sealed detail) only once the phone has matched it to the computer's
+  turn (`BighelpManagedActivityBridge`, the plugin's `work` route). The phone asks as the turn starts, which is
+  before the plugin has seen the turn, so it asks again a few times (`snapshotRetryWaits`) while the turn runs.
+  Asked once, a card whose first answer named no work moved only while bighelp was open and never got detail.
 - The Live Activity uses the app's palette and real host phases, never a guessed percentage. Titles stay in the
   phone's App Group; only opaque row IDs and bounded status reach the push service. Stale rows say Paused.
 - The card's first chat shows its work (#960, `BighelpActivityHeroView`): the step in progress, the last steps, a

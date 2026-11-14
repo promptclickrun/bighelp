@@ -149,23 +149,29 @@ final class DuoLayoutUITests: BighelpUITestCase {
             let window = app.windows.firstMatch.frame
             XCTAssertGreaterThan(field.frame.minY, window.midY, "The message box sits under the fold")
             XCTAssertLessThan(field.frame.minY, window.midY + 120, "Just under it")
-            // The half under the fold is a desk: the agent's state and the two usual moves, under the
-            // message box, instead of an empty slab.
-            XCTAssertTrue(element("chat.laptop.deck", in: app).waitForExistence(timeout: 5),
+            // The half under the fold is a desk: the bot and what it's doing, then New chat and Bot
+            // page, under the message box.
+            XCTAssertTrue(element("chat.laptop.desk", in: app).waitForExistence(timeout: 5),
                           "The half under the fold carries the desk")
-            let newChat = element("chat.laptop.new-chat", in: app)
-            XCTAssertTrue(newChat.waitForExistence(timeout: 5), "New chat is in reach under the fold")
-            XCTAssertGreaterThan(newChat.frame.minY, field.frame.maxY, "The desk sits under the message box")
-            XCTAssertLessThan(newChat.frame.maxY, window.maxY, "and on screen")
+            XCTAssertTrue(element("chat.laptop.status", in: app).exists, "It says what the bot is doing")
+            for id in ["chat.laptop.new-chat", "chat.laptop.bot-page"] {
+                let button = app.buttons[id]
+                XCTAssertTrue(button.waitForExistence(timeout: 5), "\(id) is in reach under the fold")
+                XCTAssertGreaterThan(button.frame.minY, field.frame.maxY, "\(id) sits under the message box")
+                XCTAssertLessThan(button.frame.maxY, window.maxY, "\(id) is on screen")
+            }
             sleep(1)
             save("laptop-chat-\(appearance)", app)
             if appearance == "light" {
                 field.tap()
                 XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
                 XCTAssertGreaterThan(field.frame.minY, window.midY, "Typing, it rests on the keyboard, still under the fold")
-                XCTAssertFalse(element("chat.laptop.new-chat", in: app).exists,
-                               "Typing, the desk gets out of the way")
+                XCTAssertFalse(element("chat.laptop.desk", in: app).exists, "Typing, the desk gets out of the way")
                 save("laptop-typing-light", app)
+            } else {
+                app.buttons["chat.laptop.bot-page"].tap()
+                XCTAssertTrue(app.buttons["simple-bots.profile.more"].waitForExistence(timeout: 10),
+                              "Bot page opens the bot's page")
             }
             app.terminate()
         }

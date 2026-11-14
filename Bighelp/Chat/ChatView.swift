@@ -547,9 +547,8 @@ struct ChatView: View {
                     Spacer(minLength: headerHeight).layoutPriority(laptopDeckHeight > 0 ? 1 : 0)
                     VStack(spacing: 0) {
                         // Half-folded like a laptop, the half under the fold is the desk: the message box
-                        // sits just under the fold, by the hinge and above the keyboard, and the tray
-                        // under it says what the agent is doing and keeps the usual next moves in reach,
-                        // so that half of the screen works instead of standing empty.
+                        // sits just under the fold, and the bot with what it's doing fills the rest
+                        // (`ChatLaptopDesk`). Typing, the box rests on the keyboard instead.
                         if laptopDeckHeight > 0, isDraftFocused { Spacer(minLength: 0) }
                         composer
                             .fixedSize(horizontal: false, vertical: !(referenceHub ?? fallbackReferenceHub).isPresented)
@@ -557,8 +556,15 @@ struct ChatView: View {
                             .popover(isPresented: sessionControlsPresented(from: .composer)) { macSessionControls }
                             #endif
                         if laptopDeckHeight > 0, !isDraftFocused {
-                            laptopDeckTray
-                                .frame(maxHeight: .infinity, alignment: .top)
+                            if showsLaptopDesk {
+                                ChatLaptopDesk(model: model, agentID: homeAgentID, name: agentName,
+                                               imageURL: resolvedIdentityParticipants.first?.imageURL,
+                                               onNewChat: onNewChatTap,
+                                               onBotPage: { homeChrome.onProfile(homeAgentID) })
+                                    .frame(maxHeight: .infinity, alignment: .top)
+                            } else {
+                                Spacer(minLength: 0)
+                            }
                         }
                         newChatChoices
                     }
@@ -596,6 +602,12 @@ struct ChatView: View {
     private var laptopDeckHeight: CGFloat {
         guard screen.isLaptop, let fold = screen.fold else { return 0 }
         return max(0, safeBottomInWindow - fold.maxY)
+    }
+
+    /// The desk shows for a chat with one bot that the shell pushed. A blank New chat keeps its To
+    /// row, people list and choices, and a group chat has no one bot to show.
+    private var showsLaptopDesk: Bool {
+        homeChrome.isPushedChat && !model.isBotMode && newChat == nil
     }
 
     /// One home: the bots to pick from, over a new chat's empty messages until something is sent.
@@ -668,81 +680,6 @@ struct ChatView: View {
                              dismissKeyboard()
                              dismiss()
                          })
-    }
-
-    /// The desk under the fold on the iPhone Duo: who is working and on what, then the two moves a
-    /// person makes between turns. It fills the half of the screen the message box leaves, so the
-    /// laptop pose reads on top and acts on the bottom instead of leaving a slab of nothing.
-    @ViewBuilder
-    private var laptopDeckTray: some View {
-        VStack(spacing: BighelpTokens.space12) {
-            Spacer(minLength: 0)
-            if model.liveActivityKind != .idle {
-                HStack(spacing: BighelpTokens.space12) {
-                    AgentLiveAvatar(agentID: homeAgentID, displayName: agentName,
-                                    imageURL: resolvedIdentityParticipants.first?.imageURL,
-                                    activity: model.liveActivityKind, size: 44)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(agentName)
-                            .bighelpFont(.label, weight: .semibold)
-                            .foregroundStyle(theme.primaryText)
-                        Text(model.liveActivityKind.label)
-                            .bighelpFont(.metadata)
-                            .foregroundStyle(theme.secondaryText)
-                    }
-                    .accessibilityElement(children: .combine)
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, BighelpTokens.space16)
-                .padding(.vertical, BighelpTokens.space12)
-                .background(theme.surface,
-                            in: RoundedRectangle(cornerRadius: BighelpTokens.radius16, style: .continuous))
-                .accessibilityElement(children: .contain)
-                .accessibilityIdentifier("chat.laptop.activity")
-            } else {
-                // Nothing to report, so the desk is the agent itself: the same face the home carries,
-                // standing where the empty half of the screen would be.
-                VStack(spacing: BighelpTokens.space8) {
-                    AgentLiveAvatar(agentID: homeAgentID, displayName: agentName,
-                                    imageURL: resolvedIdentityParticipants.first?.imageURL,
-                                    activity: .idle, size: 132)
-                    Text(AgentActivityKind.idle.label)
-                        .bighelpFont(.metadata)
-                        .foregroundStyle(theme.secondaryText)
-                }
-                .accessibilityElement(children: .contain)
-                .accessibilityIdentifier("chat.laptop.agent")
-            }
-            HStack(spacing: BighelpTokens.space8) {
-                laptopDeckAction(String(localized: "New chat"), systemImage: "square.and.pencil",
-                                 identifier: "chat.laptop.new-chat", action: startNewChatFromBar)
-                laptopDeckAction(String(localized: "Switch agent"), systemImage: "arrow.left.arrow.right",
-                                 identifier: "chat.laptop.switch-agent", action: pickAgentsFromBar)
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, BighelpTokens.space16)
-        .padding(.top, BighelpTokens.space12)
-        // A container element, so the tray's own id doesn't land on its buttons: an accessibility
-        // modifier on a plain container is applied to every child, and would replace theirs.
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("chat.laptop.deck")
-    }
-
-    private func laptopDeckAction(_ title: String, systemImage: String, identifier: String,
-                                  action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .labelStyle(.titleAndIcon)
-                .bighelpFont(.label, weight: .semibold)
-                .foregroundStyle(theme.primaryText)
-                .padding(.horizontal, BighelpTokens.space12)
-                .padding(.vertical, 10)
-                .bighelpNavigationGlass(in: Capsule(), isInteractive: true)
-        }
-        .buttonStyle(.bighelpTilePress)
-        .accessibilityIdentifier(identifier)
     }
 
     private var composer: some View {

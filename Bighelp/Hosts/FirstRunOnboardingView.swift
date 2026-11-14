@@ -225,7 +225,7 @@ struct FirstRunOnboardingView: View {
         ScrollView {
             VStack(spacing: BighelpTokens.space32) {
                 Spacer(minLength: BighelpTokens.space16)
-                FirstRunCompanionConstellation()
+                FirstRunLifterHero()
                     .frame(maxWidth: 520)
 
                 VStack(spacing: BighelpTokens.space16) {
@@ -444,74 +444,42 @@ struct FirstRunOnboardingView: View {
     @BighelpThemeReader private var theme
 }
 
-private struct FirstRunCompanionConstellation: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// The b writes itself in, waves hello, then rests.
-    @State private var logoMotion: BighelpLifterMotion? = .success
+/// The welcome's hero: the lifter acts out what agents do, one state after another. Each
+/// state plays whole and ends on the idle pose, so the next one starts where it stopped.
+/// With Reduce Motion he holds the still mark.
+private struct FirstRunLifterHero: View {
+    static let states: [BighelpLifterMotion] = [.thinking, .searching, .coding, .replying, .success]
+    @State private var index = 0
 
     var body: some View {
-        GeometryReader { proxy in
-            let avatarSize = min(106, max(74, proxy.size.width * 0.28))
-            let horizontalOffset = min(132, max(88, proxy.size.width * 0.34))
-
-            ZStack {
-                RoundedRectangle(cornerRadius: BighelpTokens.radius28, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: gradientColors,
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: BighelpTokens.radius28, style: .continuous)
-                            .stroke(theme.border, lineWidth: BighelpTokens.hairline)
-                    }
-
-                BighelpLogo(height: 72, motion: logoMotion) {
-                    logoMotion = nil
+        ZStack {
+            RoundedRectangle(cornerRadius: BighelpTokens.radius28, style: .continuous)
+                .fill(LinearGradient(colors: gradientColors, startPoint: .topLeading, endPoint: .bottomTrailing))
+                .overlay {
+                    RoundedRectangle(cornerRadius: BighelpTokens.radius28, style: .continuous)
+                        .stroke(theme.border, lineWidth: BighelpTokens.hairline)
                 }
-                    .padding(.horizontal, BighelpTokens.space32)
-                    .padding(.vertical, BighelpTokens.space20)
-                    .background(.thinMaterial, in: .capsule)
-                    .overlay { Capsule().stroke(theme.border, lineWidth: BighelpTokens.hairline) }
-
-                companion(.lobster, motion: .bounce)
-                    .frame(width: avatarSize, height: avatarSize)
-                    .offset(x: -horizontalOffset, y: -69)
-                    .rotationEffect(.degrees(-7))
-                companion(.messenger, motion: .dance)
-                    .frame(width: avatarSize * 0.96, height: avatarSize * 0.96)
-                    .offset(x: horizontalOffset, y: -66)
-                    .rotationEffect(.degrees(6))
-                companion(.robot, motion: .bounce)
-                    .frame(width: avatarSize * 0.9, height: avatarSize * 0.9)
-                    .offset(x: horizontalOffset * 0.72, y: 83)
-                companion(.dragon, motion: .none)
-                    .frame(width: avatarSize * 0.77, height: avatarSize * 0.77)
-                    .offset(x: -horizontalOffset * 0.88, y: 86)
+            VStack(spacing: BighelpTokens.space12) {
+                BighelpLifterView(motion: Self.states[index], size: 150, playback: .once) {
+                    index = (index + 1) % Self.states.count
+                }
+                Image("BighelpWordmark")
+                    .resizable()
+                    .renderingMode(.template)
+                    .scaledToFit()
+                    .foregroundStyle(theme.isDarkPalette ? BighelpBrand.cream : BighelpBrand.ink)
+                    .frame(height: 44)
             }
         }
         .frame(height: 286)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Bighelp and its colorful bot companions")
+        .accessibilityLabel(BighelpBrand.appName)
+        .accessibilityIdentifier("loopdy.brand-logo")
     }
 
     private var gradientColors: [Color] {
         let accents = theme.backgroundAccents.map { $0.opacity(0.22) }
         return accents.isEmpty ? [theme.action.opacity(0.16), theme.canvas] : accents
-    }
-
-    private func companion(
-        _ character: CompanionCharacter,
-        motion: CompanionAmbientMotion
-    ) -> some View {
-        CompanionAvatar(
-            appearance: CompanionAppearance(character: character, usesCharacterColors: true),
-            reaction: .idle,
-            isAnimating: !reduceMotion,
-            ambientMotion: motion
-        )
     }
 
     @BighelpThemeReader private var theme

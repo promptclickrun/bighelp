@@ -320,11 +320,11 @@ final class BighelpLinkApplicationDelegate: NSObject, UIApplicationDelegate,
         return true
     }
 
-    /// The pieces of a big file finished while bighelp was suspended (`BighelpBackgroundUploads`).
+    /// The pieces of a big file finished while bighelp was suspended (`BigFilePieceSession.background`).
     func application(_ application: UIApplication, handleEventsForBackgroundURLSession identifier: String,
                      completionHandler: @escaping @Sendable () -> Void) {
-        guard identifier == BighelpBackgroundUploads.identifier else { return completionHandler() }
-        BighelpBackgroundUploads.shared.handleEvents(completion: completionHandler)
+        guard identifier == BigFilePieceSession.backgroundIdentifier else { return completionHandler() }
+        BigFilePieceSession.background.handleEvents(completion: completionHandler)
     }
 
     // UIKit wants both answers below on the main thread. The async forms of

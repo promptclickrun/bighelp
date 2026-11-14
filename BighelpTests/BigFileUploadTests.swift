@@ -141,20 +141,20 @@ struct BigFileUploadTests {
         let url = URL(string: "https://hermes.example.invalid" + DirectHermesBigFileChunk.route)!
         let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
         let body = Data(#"{"uploadId":"x"}"#.utf8)
-        let finished = try BighelpBackgroundUploads.outcome(failure: nil, captured: nil, taskResponse: response,
+        let finished = try BigFilePieceSession.outcome(failure: nil, captured: nil, taskResponse: response,
                                                             requested: url, body: body).get()
         #expect(finished.1.statusCode == 200 && finished.0 == body)
         #expect(throws: (any Error).self) {
-            try BighelpBackgroundUploads.outcome(failure: nil, captured: nil, taskResponse: nil, requested: url, body: body).get()
+            try BigFilePieceSession.outcome(failure: nil, captured: nil, taskResponse: nil, requested: url, body: body).get()
         }
         let elsewhere = HTTPURLResponse(url: URL(string: "https://other.example.invalid/")!, statusCode: 200,
                                         httpVersion: nil, headerFields: nil)!
         #expect(throws: DirectHermesError.redirectRefused) {
-            try BighelpBackgroundUploads.outcome(failure: nil, captured: nil, taskResponse: elsewhere, requested: url,
+            try BigFilePieceSession.outcome(failure: nil, captured: nil, taskResponse: elsewhere, requested: url,
                                                  body: body).get()
         }
         #expect(throws: CancellationError.self) {
-            try BighelpBackgroundUploads.outcome(failure: URLError(.cancelled), captured: nil, taskResponse: response,
+            try BigFilePieceSession.outcome(failure: URLError(.cancelled), captured: nil, taskResponse: response,
                                                  requested: url, body: body).get()
         }
     }
@@ -282,6 +282,69 @@ struct BigFileUploadTests {
         #expect(waits.value == 2)
     }
 
+    @Test func aFileThatArrivedIsNotSentAgainWhenItsMessageIsTriedAgain() async throws {
+        let file = try await Self.file(bytes: 9 * 1_024 * 1_024)
+        defer { BigFileStore.remove(file) }
+        let host = FakeUploadHost()
+        let first = try await BigFileUploader(host: host, sender: host).upload(file, agentID: "default")
+        let sentOnce = host.pieceOffsets.count
+        // The chat's connection changed before Hermes took the file: Try again uploads it anew,
+        // on a link that drops the first call.
+        host.dropsNextCall = true
+        var progress: [Int] = []
+        let again = try await BigFileUploader(host: host, sender: host, retryDelays: [.zero], sleep: { _ in })
+            .upload(file, agentID: "default") { progress.append($0.sentBytes) }
+        #expect(again == first)
+        #expect(host.pieceOffsets.count == sentOnce, "The host has the whole file: no piece goes twice")
+        #expect(progress == [file.byteCount], "Its tile shows the file as up")
+
+        // Once Hermes has it and the staged copy is gone, the same file is a new upload.
+        await BigFileUploader(host: host, sender: host).discard(first.uploadID)
+        let later = try await BigFileUploader(host: host, sender: host).upload(file, agentID: "default")
+        #expect(later.uploadID != first.uploadID)
+        #expect(host.pieceOffsets.count == sentOnce * 2)
+    }
+
+    /// The first pieces of a file start at the same moment. Each once made a session of its own,
+    /// their tasks shared numbers, and all but one waited for an answer that went to another.
+    @Test func piecesThatStartTogetherEachGetAnAnswer() async throws {
+        let piece = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString + ".part")
+        try Data(count: 64).write(to: piece)
+        defer { try? FileManager.default.removeItem(at: piece) }
+        // Nothing listens here, so every piece ends at once, with an error.
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:9/piece")!)
+        request.httpMethod = "POST"
+        let sent = request
+        let sends = (0..<3).map { _ in
+            Task.detached {
+                (try? await BigFilePieceSession.inFront.send(sent, fromFile: piece, onSent: { _ in })) == nil
+            }
+        }
+        var ended = 0
+        for send in sends {
+            if await send.value { ended += 1 }
+        }
+        #expect(ended == 3)
+    }
+
+    @Test func piecesGoStraightToTheHostInFrontAndThroughIOSWhenBighelpIsAway() async throws {
+        let piece = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString + ".part")
+        try Data([1, 2, 3]).write(to: piece)
+        defer { try? FileManager.default.removeItem(at: piece) }
+        let inFront = CountingSender(), away = CountingSender()
+        let place = AppPlace()
+        let sender = BigFilePieceSender(inFront: inFront, away: away, isAway: { place.isAway })
+        let request = URLRequest(url: URL(string: "https://hermes.example.invalid/piece")!)
+        _ = try await sender.send(request, fromFile: piece, onSent: { _ in })
+        #expect((inFront.count, away.count) == (1, 0))
+        place.isAway = true
+        _ = try await sender.send(request, fromFile: piece, onSent: { _ in })
+        #expect((inFront.count, away.count) == (1, 1))
+        place.isAway = false
+        _ = try await sender.send(request, fromFile: piece, onSent: { _ in })
+        #expect((inFront.count, away.count) == (2, 1))
+    }
+
     @Test func preparingCopiesAndChecksumsWithoutLoadingTheWholeFile() async throws {
         let file = try await Self.file(bytes: 3_000_000)
         defer { BigFileStore.remove(file) }
@@ -305,6 +368,29 @@ struct BigFileUploadTests {
         try data.write(to: source)
         defer { try? FileManager.default.removeItem(at: source) }
         return try await BigFileStore.prepare(copying: source, fileName: "Clip.mov", mimeType: "application/octet-stream")
+    }
+}
+
+/// Whether Bighelp is in the background, as a test says.
+private final class AppPlace: @unchecked Sendable {
+    private let lock = NSLock()
+    private var away = false
+    var isAway: Bool {
+        get { lock.withLock { away } }
+        set { lock.withLock { away = newValue } }
+    }
+}
+
+/// A piece session that only counts what it was given.
+private final class CountingSender: BigFileChunkSending, @unchecked Sendable {
+    private let lock = NSLock()
+    private var sent = 0
+    var count: Int { lock.withLock { sent } }
+
+    func send(_ request: URLRequest, fromFile file: URL,
+              onSent: @escaping @Sendable (Int64) -> Void) async throws -> (Data, HTTPURLResponse) {
+        lock.withLock { sent += 1 }
+        return (Data(), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
     }
 }
 
@@ -338,12 +424,14 @@ private final class FakeUploadHost: BigFileUploadHost, BigFileChunkSending, @unc
     var staleOnce = false
     var unreadableOnce = false
     var offline = false
+    var dropsNextCall = false
     var startRefusal: String?
     var contextReloads = 0
     private var uploadID = String(repeating: "9", count: 32)
     private var byteCount = 0
     private var sha = ""
     private var received: Set<Int> = []
+    private var finishedUploads: Set<String> = []
     private var bytes = Data()
     var stored: Data { bytes }
 
@@ -355,6 +443,10 @@ private final class FakeUploadHost: BigFileUploadHost, BigFileChunkSending, @unc
                  payload: [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue] {
         operations.append(operation)
         if offline { throw WorkspaceClientError.transportUnavailable }
+        if dropsNextCall {
+            dropsNextCall = false
+            throw WorkspaceClientError.transportUnavailable
+        }
         switch operation {
         case .uploadsStart:
             if let startRefusal { throw WorkspaceClientError.rejected(code: startRefusal) }
@@ -366,6 +458,12 @@ private final class FakeUploadHost: BigFileUploadHost, BigFileChunkSending, @unc
                 // Another piece size is another upload.
                 chunkBytes = requested
                 uploadID = String(repeating: "8", count: 32)
+                received = []
+                bytes = Data()
+            }
+            if finishedUploads.contains(uploadID) {
+                // The plugin's `start` never gives a finished upload back: the file begins again.
+                uploadID = String(repeating: "7", count: 32)
                 received = []
                 bytes = Data()
             }
@@ -382,6 +480,12 @@ private final class FakeUploadHost: BigFileUploadHost, BigFileChunkSending, @unc
             return answer()
         case .uploadsStatus: return answer()
         case .uploadsFinish:
+            let finishedPath = BighelpJSONValue.string("/srv/agent/uploads/2026-10-31/Clip.mov")
+            if let asked = payload["uploadId"]?.string, finishedUploads.contains(asked) {
+                // Asked again, a finished upload answers with the same file.
+                return answer().merging(["uploadId": .string(asked), "finished": .boolean(true),
+                                         "inWorkspace": .boolean(true), "path": finishedPath]) { $1 }
+            }
             guard received.count == (byteCount + chunkBytes - 1) / chunkBytes else {
                 throw WorkspaceClientError.rejected(code: "upload_incomplete")
             }
@@ -389,10 +493,19 @@ private final class FakeUploadHost: BigFileUploadHost, BigFileChunkSending, @unc
                 received = []
                 throw WorkspaceClientError.rejected(code: "upload_corrupt")
             }
+            finishedUploads.insert(uploadID)
             return answer().merging(["finished": .boolean(true), "inWorkspace": .boolean(true),
-                                     "path": .string("/srv/agent/uploads/2026-10-31/Clip.mov")]) { $1 }
+                                     "path": finishedPath]) { $1 }
         case .uploadsDiscard:
-            discardedUploads.append(payload["uploadId"]?.string ?? "")
+            let discarded = payload["uploadId"]?.string ?? ""
+            finishedUploads.remove(discarded)
+            if discarded == uploadID {
+                // The upload is gone from the host: the same file is a new upload.
+                uploadID = String(repeating: "6", count: 32)
+                received = []
+                bytes = Data()
+            }
+            discardedUploads.append(discarded)
             return ["discarded": .boolean(true)]
         default: throw WorkspaceClientError.unavailable(.unsupportedOperation)
         }

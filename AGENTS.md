@@ -596,12 +596,18 @@ change in both repos.
   `AgentFileLoad.stallAfter` anyway. The `ChatFiles` log has each try's reason.
 - **Big files people send** (over `ChatAttachment.maximumBytes`, 8 MiB, up to 256 MiB; plugin `native-uploads-v1`,
   bighelp-plugin's docs/BIG_FILES.md): Hermes' `file.attach` takes a file in one socket frame, so bigger files go
-  to the plugin's `uploads/*` routes in 4 MiB pieces instead (`BigFileUploader`), in any order, from a background
-  `URLSession` (`BighelpBackgroundUploads`) that iOS keeps sending while the app is away. The host records a piece
-  only once all of it arrived; after a drop the app asks `status` and sends only the rest, and starting the same
-  file again gets the same upload back. A proxy in front of Hermes that refuses a piece (`413`; aiohttp and nginx
-  take 1 MB a request by default) gets the file again at once in 512 KiB pieces (`chunkBytes`, plugin
-  `native-uploads-small-pieces-v1`), never a quiet retry; an older plugin says to update it. The app keeps its own
+  to the plugin's `uploads/*` routes in 4 MiB pieces instead (`BigFileUploader`), in any order. While Bighelp is
+  in front a piece goes over an ordinary `URLSession`, at the link's speed; in the background it goes through
+  the background session, which iOS keeps sending while the app is away, at a pace iOS sets
+  (`BigFilePieceSender`, `BigFilePieceSession`). Keep the background session for the background: its tasks
+  run outside the app, and iOS decides when. The host records a piece only once all of it arrived; after a
+  drop the app asks `status` and sends only the rest, and starting the same file again gets the same upload
+  back, until it is finished: the plugin's `start` begins a finished file from nothing, so the app keeps what
+  `finish` answered until Hermes takes the file (`BigFileUploader.arrived`) and Try again sends no piece
+  twice. The `ChatFiles` log has how long the copy, the upload and `file.attach` took. A proxy in front of
+  Hermes that refuses a piece (`413`; aiohttp and nginx take 1 MB a request by default) gets the file again at
+  once in 512 KiB pieces (`chunkBytes`, plugin `native-uploads-small-pieces-v1`), never a quiet retry; an
+  older plugin says to update it. The app keeps its own
   copy on disk (`ChatBigFile`, `BigFileStore`, a `.bigFile` draft) and never holds the whole file in memory.
   `finish` checks the SHA-256 and moves the file into the agent's working folder (`uploads/<date>/<name>`, what
   its Files tab shows); stock `file.attach` then takes it by `path` and tells the agent its type, size and place

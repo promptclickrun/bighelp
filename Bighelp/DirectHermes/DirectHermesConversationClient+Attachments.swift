@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 /// Whole-batch attachment validation, serial staging and retained upload intent.
 extension DirectHermesConversationClient {
@@ -190,9 +191,12 @@ extension DirectHermesConversationClient {
         let staged = try await uploader.upload(file, agentID: profile) { onProgress(file.id, $0) }
         try Task.checkCancellation()
         guard connected, owner == generation else { throw DirectHermesError.notConnected }
+        let began = ContinuousClock.now
         let response = try await rpc.request("file.attach", params: [
             "session_id": .string(runtimeID), "path": .string(staged.path), "name": .string(file.fileName),
         ])
+        let seconds = (ContinuousClock.now - began) / .seconds(1)
+        AgentFileLoad.log.notice("big file attached: \(seconds, format: .fixed(precision: 1), privacy: .public) s")
         guard connected, owner == generation else { throw DirectHermesError.disconnected(outcomeUnknown: true) }
         let reference = try DirectHermesFileAttachments.reference(response, allowsInPlace: true)
         await uploader.discard(staged.uploadID)

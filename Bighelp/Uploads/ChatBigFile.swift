@@ -1,6 +1,7 @@
 import AVFoundation
 import CryptoKit
 import Foundation
+import OSLog
 import UniformTypeIdentifiers
 
 /// A file over 8 MB picked for a message. It stays on disk the whole way: the
@@ -137,7 +138,12 @@ enum BigFileStore {
                           into model: ChatModel?) async throws -> ChatBigFile {
         guard byteCount <= BigFileUploads.maximumBytes else { throw BigFileUploadError(failure: .tooLarge) }
         if let model, !(await model.supportsBigFiles()) { throw BigFileUploadError(failure: .pluginRequired) }
-        return try await prepare(copying: source, fileName: fileName, mimeType: mimeType)
+        let began = ContinuousClock.now
+        let file = try await prepare(copying: source, fileName: fileName, mimeType: mimeType)
+        let seconds = (ContinuousClock.now - began) / .seconds(1)
+        AgentFileLoad.log.notice(
+            "big file copied: \(file.byteCount, privacy: .public) bytes, \(seconds, format: .fixed(precision: 1), privacy: .public) s")
+        return file
     }
 
     /// Piece `index` of the file, written to its own file for an upload task, with its checksum.

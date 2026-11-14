@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 /// The host side a big file goes to: the plugin's JSON routes, and a signed-in
 /// request for each piece.
@@ -45,7 +46,7 @@ final class BigFileUploader {
     private let retryDelays: [Duration]
     private let sleep: @Sendable (Duration) async throws -> Void
 
-    init(host: any BigFileUploadHost, sender: any BigFileChunkSending = BighelpBackgroundUploads.shared,
+    init(host: any BigFileUploadHost, sender: any BigFileChunkSending = BigFilePieceSender.shared,
          parallelPieces: Int = 3,
          retryDelays: [Duration] = [.seconds(1), .seconds(3), .seconds(10), .seconds(30), .seconds(60)],
          sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
@@ -63,6 +64,12 @@ final class BigFileUploader {
             throw BigFileUploadError(failure: .other)
         }
         var waits = retryDelays[...]
+        if let staged = try await arrivedBefore(file, waits: &waits) {
+            onProgress(.init(sentBytes: file.byteCount, byteCount: file.byteCount))
+            return staged
+        }
+        waits = retryDelays[...]
+        let began = ContinuousClock.now
         var restartedDamaged = false
         // The host's piece size until a proxy refuses it; then `BigFileUploads.smallChunkBytes`.
         var pieceBytes: Int?
@@ -77,8 +84,14 @@ final class BigFileUploader {
                     let value = try await host.perform(.uploadsFinish, payload: ["uploadId": .string(receipt.uploadID)])
                     let finished = try BigFileUploadReceipt.finishedFile(value, uploadID: receipt.uploadID)
                     BigFileStore.remove(pieceFolderOf: file)
-                    return BigFileStagedUpload(uploadID: receipt.uploadID, path: finished.path,
-                                               inWorkspace: finished.inWorkspace)
+                    let staged = BigFileStagedUpload(uploadID: receipt.uploadID, path: finished.path,
+                                                     inWorkspace: finished.inWorkspace)
+                    Self.arrived[file.id] = staged
+                    let seconds = (ContinuousClock.now - began) / .seconds(1)
+                    // How long each file took, to tell a slow link from a slow app on a real phone.
+                    AgentFileLoad.log.notice(
+                        "big file up: \(file.byteCount, privacy: .public) bytes, \(seconds, format: .fixed(precision: 1), privacy: .public) s, pieces of \(receipt.plan.chunkBytes, privacy: .public)")
+                    return staged
                 } catch let error where Self.code(of: error) == "upload_corrupt" && !restartedDamaged {
                     // The host forgot its pieces; send them all once more.
                     restartedDamaged = true
@@ -133,8 +146,39 @@ final class BigFileUploader {
 
     /// Removes the host's staged copy once Hermes has its own (or the message is dropped).
     func discard(_ uploadID: String) async {
+        Self.arrived = Self.arrived.filter { $0.value.uploadID != uploadID }
         _ = try? await host.perform(.uploadsDiscard, payload: ["uploadId": .string(uploadID)])
     }
+
+    /// Files the host holds whole that Hermes hasn't taken yet, by `ChatBigFile.id`. A message can
+    /// stop between the two (the chat's connection changed while its file went up), and the
+    /// plugin's `start` begins a finished file again from nothing: Try again sent all of it twice.
+    private static var arrived: [String: BigFileStagedUpload] = [:]
+
+    /// The file as the host already holds it, asked again through `finish`, which answers a
+    /// finished upload with the same path. Nil once the host let go of it: then it goes again.
+    private func arrivedBefore(_ file: ChatBigFile,
+                               waits: inout ArraySlice<Duration>) async throws -> BigFileStagedUpload? {
+        guard let staged = Self.arrived[file.id] else { return nil }
+        do {
+            // The chat's connection just changed, so this call gets the same quiet tries as the others.
+            let value = try await retrying(&waits) {
+                do {
+                    return try await self.host.perform(.uploadsFinish, payload: ["uploadId": .string(staged.uploadID)])
+                } catch WorkspaceClientError.rejected {
+                    throw LetGo()
+                }
+            }
+            let finished = try BigFileUploadReceipt.finishedFile(value, uploadID: staged.uploadID)
+            return BigFileStagedUpload(uploadID: staged.uploadID, path: finished.path, inWorkspace: finished.inWorkspace)
+        } catch is LetGo {
+            Self.arrived[file.id] = nil
+            return nil
+        }
+    }
+
+    /// The host no longer holds a file it finished.
+    private struct LetGo: Error {}
 
     // Steps
 
@@ -276,7 +320,7 @@ final class BigFileUploader {
     }
 
     private static func error(_ error: any Error) -> any Error {
-        if error is CancellationError || error is BigFileUploadError { return error }
+        if error is CancellationError || error is BigFileUploadError || error is LetGo { return error }
         return BigFileUploadError(failure: BigFileUploadFailure(error))
     }
 }

@@ -2,11 +2,12 @@ import Foundation
 
 /// What's being added to the draft, for the tag's "Adding 2 of 4… photos".
 enum DraftAttachmentImportKind: Equatable, Sendable {
-    case photos, files, attachments
+    case photos, videos, files, attachments
 
     var noun: String {
         switch self {
         case .photos: "photos"
+        case .videos: "videos"
         case .files: "files"
         case .attachments: "attachments"
         }
@@ -15,6 +16,7 @@ enum DraftAttachmentImportKind: Equatable, Sendable {
     fileprivate var singular: String {
         switch self {
         case .photos: "A photo"
+        case .videos: "A video"
         case .files: "A file"
         case .attachments: "An attachment"
         }

@@ -1,14 +1,17 @@
 import Foundation
 
-/// A background `URLSession` for the pieces of big files. iOS sends its tasks
-/// itself, so a video keeps going while bighelp is in the background or
-/// suspended. Pieces that finish then are recorded on the host; when bighelp
-/// comes back, `uploads/status` says which arrived, and only the rest go again.
-/// Like the app's own sessions, it keeps no cookies or credentials, refuses
-/// redirects and answers no sign-in challenge by itself.
-final class BighelpBackgroundUploads: NSObject, BigFileChunkSending, URLSessionDataDelegate, @unchecked Sendable {
-    static let identifier = "app.loopdy.mobile.big-file-uploads"
-    static let shared = BighelpBackgroundUploads()
+/// A `URLSession` for the pieces of big files. There are two, and `BigFilePieceSender` picks:
+/// - `inFront` is an ordinary session, as fast as the link. Its tasks stop when iOS suspends Bighelp.
+/// - `background` hands each piece to iOS, which sends it outside the app at a pace iOS sets (far
+///   under the link's), so a piece on its way keeps going while Bighelp is in the background or
+///   suspended. Pieces that finish then are recorded on the host; when Bighelp comes back,
+///   `uploads/status` says which arrived, and only the rest go again.
+/// Like the app's own sessions, both keep no cookies or credentials, refuse redirects and answer no
+/// sign-in challenge by themselves.
+final class BigFilePieceSession: NSObject, BigFileChunkSending, URLSessionDataDelegate, @unchecked Sendable {
+    static let backgroundIdentifier = "app.loopdy.mobile.big-file-uploads"
+    static let background = BigFilePieceSession(runsInBackground: true)
+    static let inFront = BigFilePieceSession(runsInBackground: false)
     /// The host's answer to a piece is a few hundred bytes of JSON.
     static let maximumResponseBytes = 65_536
 
@@ -23,26 +26,38 @@ final class BighelpBackgroundUploads: NSObject, BigFileChunkSending, URLSessionD
     private let lock = NSLock()
     private var pending: [Int: Pending] = [:]
     private var finishEvents: (@Sendable () -> Void)?
-    private lazy var session: URLSession = {
-        let configuration = URLSessionConfiguration.background(withIdentifier: Self.identifier)
-        configuration.isDiscretionary = false
-        configuration.sessionSendsLaunchEvents = true
+    /// Made once, with the object. Three pieces start at the same moment: made on first use, each of
+    /// them made a session of its own, their tasks shared numbers, and two of three answers were lost.
+    private var session: URLSession!
+
+    private init(runsInBackground: Bool) {
+        super.init()
+        let configuration: URLSessionConfiguration
+        if runsInBackground {
+            configuration = .background(withIdentifier: Self.backgroundIdentifier)
+            configuration.isDiscretionary = false
+            configuration.sessionSendsLaunchEvents = true
+            // A piece waits for the network while the phone is offline, up to a day.
+            configuration.timeoutIntervalForResource = 24 * 60 * 60
+        } else {
+            configuration = .ephemeral
+            configuration.waitsForConnectivity = false
+            // One piece, on the slowest link worth waiting for. A drop costs only this piece.
+            configuration.timeoutIntervalForResource = 10 * 60
+        }
         configuration.httpCookieStorage = nil
         configuration.httpShouldSetCookies = false
         configuration.urlCredentialStorage = nil
         configuration.urlCache = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.timeoutIntervalForRequest = 60
-        // A piece waits for the network while the phone is offline, up to a day.
-        configuration.timeoutIntervalForResource = 24 * 60 * 60
         configuration.httpMaximumConnectionsPerHost = 3
-        return URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
-    }()
+        session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+    }
 
-    /// iOS woke bighelp because this session's tasks finished while it was away.
+    /// iOS woke Bighelp because the background session's tasks finished while it was away.
     func handleEvents(completion: @escaping @Sendable () -> Void) {
         lock.withLock { finishEvents = completion }
-        _ = session
     }
 
     func send(_ request: URLRequest, fromFile file: URL,
@@ -52,11 +67,12 @@ final class BighelpBackgroundUploads: NSObject, BigFileChunkSending, URLSessionD
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 lock.withLock { pending[task.taskIdentifier] = Pending(continuation: continuation, onSent: onSent) }
-                if Task.isCancelled {
-                    task.cancel()
-                } else {
-                    task.resume()
-                }
+                guard Task.isCancelled else { return task.resume() }
+                // Cancelled before it started: its end may have come before it was listed above,
+                // and then nothing else would end this wait.
+                task.cancel()
+                lock.withLock { pending.removeValue(forKey: task.taskIdentifier) }?
+                    .continuation.resume(throwing: CancellationError())
             }
         } onCancel: {
             task.cancel()
@@ -124,8 +140,8 @@ final class BighelpBackgroundUploads: NSObject, BigFileChunkSending, URLSessionD
                                                      body: value.received))
     }
 
-    /// How a finished piece ends. A background session never asks about the response before the body
-    /// (`didReceive response` is for foreground sessions), so the task's own response stands in for it:
+    /// How a finished piece ends. The background session never asks about the response before the body
+    /// (`didReceive response` is for ordinary sessions), so the task's own response stands in for it:
     /// without it every piece that reached the host came back as a refusal.
     static func outcome(failure: (any Error)?, captured: HTTPURLResponse?, taskResponse: URLResponse?,
                         requested: URL?, body: Data) -> Result<(Data, HTTPURLResponse), any Error> {

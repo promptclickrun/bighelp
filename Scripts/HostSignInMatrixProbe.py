@@ -977,6 +977,13 @@ def run_mode(mode: str, args, repo: Path) -> int:
         if mode == "sso":
             idp = MockIdentityProvider(client_id="bighelp-signin-test")
             env.update(HERMES_DASHBOARD_OIDC_ISSUER=idp.issuer, HERMES_DASHBOARD_OIDC_CLIENT_ID=idp.client_id)
+        # Hermes 0.23 serves no chats from a home whose session store nobody made yet (503 "Session store
+        # is not initialized"), and `hermes serve` without a gateway doesn't make it.
+        subprocess.run([str(Path(args.hermes).parent / "python"), "-c",
+                        "import sys; from pathlib import Path; from hermes_state import SessionDB; "
+                        "SessionDB(db_path=Path(sys.argv[1]) / 'state.db')", str(home)],
+                       cwd=project, env=env, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                       timeout=120)
         log = (args.results / f"hermes-{mode}.log").open("w")
         process = subprocess.Popen([args.hermes, "serve", "--host", "127.0.0.1", "--port", str(port), "--isolated",
                                     "--skip-build"], cwd=project, env=env, stdout=log, stderr=subprocess.STDOUT)

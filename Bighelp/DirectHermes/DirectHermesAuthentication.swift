@@ -1166,7 +1166,7 @@ final class DirectHermesAuthenticator {
         )
     }
 
-    /// A big file's piece, signed in now, for a session that sends it later (`BighelpBackgroundUploads`).
+    /// A big file's piece, signed in now, for a session that sends it later (`BigFilePieceSession`).
     func authenticatedBigFileChunkRequest(_ chunk: DirectHermesBigFileChunk,
                                           nativeGuard: DirectHermesNativeRequestGuard) async throws -> URLRequest {
         let tokens = try await authenticatedTokens()

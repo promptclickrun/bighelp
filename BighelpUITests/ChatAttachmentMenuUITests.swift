@@ -63,6 +63,36 @@ final class ChatAttachmentMenuUITests: BighelpUITestCase {
         XCTAssertTrue(app.staticTexts["1 photo"].firstMatch.waitForExistence(timeout: 5), "Still one picture")
     }
 
+    /// Photo Library takes videos too. The simulator's library has none, so the run adds one first
+    /// (`xcrun simctl addmedia <simulator> <a short video>`) and sets BIGHELP_LIBRARY_HAS_VIDEO
+    /// (TEST_RUNNER_BIGHELP_LIBRARY_HAS_VIDEO); skipped without it.
+    @MainActor
+    func testAVideoFromThePhotoLibraryIsAddedToTheMessage() throws {
+        guard ProcessInfo.processInfo.environment["BIGHELP_LIBRARY_HAS_VIDEO"] != nil else {
+            throw XCTSkip("Add a video to the simulator's photo library first")
+        }
+        let app = launch(appearance: "light")
+        app.buttons["chat.attachment"].firstMatch.tap()
+        let library = app.buttons["Photo Library"].firstMatch
+        XCTAssertTrue(library.waitForExistence(timeout: 5))
+        library.tap()
+
+        // Photos names a video "Video, six seconds, …".
+        let video = app.images.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Video")).firstMatch
+        XCTAssertTrue(video.waitForExistence(timeout: 15), "The picker lists videos, not only photos")
+        evidence("library-with-video", app)
+        video.tap()
+        let add = app.buttons["Add"].firstMatch
+        if add.waitForExistence(timeout: 3) { add.tap() }
+
+        let attached = app.descendants(matching: .any)["chat.draft-attachments"].firstMatch
+        XCTAssertTrue(attached.waitForExistence(timeout: 20), "The video is on the message")
+        let name = app.staticTexts.matching(NSPredicate(format: "label ENDSWITH[c] %@", ".mov")).firstMatch
+        XCTAssertTrue(name.waitForExistence(timeout: 5), "As a file, under the name Photos gave it")
+        XCTAssertTrue(app.buttons["chat.send"].firstMatch.isEnabled, "And it can be sent")
+        evidence("video-attached", app)
+    }
+
     /// The page is white paper in dark mode too, so its buttons and its ink must stay dark.
     @MainActor
     func testTheDrawingPageReadsInDarkMode() throws {

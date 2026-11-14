@@ -65,7 +65,12 @@ struct BighelpActivitySessionInfo: Codable, Sendable {
         guard let data = defaults?.data(forKey: key), data.count < 262_144 else { return [:] }
         return (try? JSONDecoder().decode([String: Self].self, from: data)) ?? [:]
     }
+    /// What is saved for a row: what the card shows, never the secret that opens it.
+    var withoutCardKey: Self {
+        .init(attributes: attributes.withoutCardKey, title: title, virtualID: virtualID, state: state, dismissed: dismissed)
+    }
     static func save(_ infos: [String: Self]) {
+        let infos = infos.mapValues(\.withoutCardKey)
         guard infos.count <= 128, let data = try? JSONEncoder().encode(infos), data.count < 262_144 else { return }
         defaults?.set(data, forKey: key)
     }

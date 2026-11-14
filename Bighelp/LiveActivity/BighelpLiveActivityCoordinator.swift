@@ -761,6 +761,10 @@ final class BighelpActivityKitDriver: BighelpLiveActivityDriving {
             BighelpLiveActivityLog.note(.cardRequestDisabled)
             throw ActivityError.disabled
         }
+        // The shared card opens its rows' sealed detail with this phone's secret. The card is drawn
+        // where the keychain can't be reached, so the card carries the secret itself.
+        var attributes = attributes
+        if state.sessions != nil { attributes.cardKey = BighelpActivityCardKey.attributeKey() }
         let activity: Activity<LoopdySessionActivityAttributes>
         do {
             activity = try Activity.request(
@@ -871,7 +875,7 @@ final class BighelpActivityKitDriver: BighelpLiveActivityDriving {
                   !activity.content.state.phase.isTerminal else { return nil }
             return BighelpLiveActivitySnapshot(
                 nativeActivityID: activity.id,
-                attributes: activity.attributes,
+                attributes: activity.attributes.withoutCardKey,
                 state: activity.content.state,
                 pushToken: tokens[activity.id]
             )

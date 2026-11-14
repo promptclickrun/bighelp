@@ -14,10 +14,17 @@ command that waits, the reply's first lines, helper goals, context use and the m
 sealed-card-v1 (`BighelpActivityDetail`; the plugin's `card_detail.py`; `BighelpTests/Fixtures/sealed-card-v1-vector.json`
 is shared by both).
 
-The app makes one random secret in a keychain group that only it and the Live Activity extension have, derives a
-key for each chat row from it, and sends that row key to the computer after the card's registration is confirmed
-(`PUT …/live-activities/<activity>/card-key`, over the app's own connection to the computer). The extension
-derives the same key from the row's ID when it draws. The service fits sealed detail to the rows in the order
+The app makes one random secret in the keychain, derives a key for each chat row from it, and sends that row key
+to the computer after the card's registration is confirmed (`PUT …/live-activities/<activity>/card-key`, over the
+app's own connection to the computer). The extension derives the same key from the row's ID when it draws.
+
+The card carries its own copy of the secret, in its attributes (`LoopdySessionActivityAttributes.cardKey`, set in
+`BighelpActivityKitDriver.start`). It has to: iOS draws a Live Activity in a second copy of the widget extension
+whose sandbox (`sessions-extension`) may not talk to the keychain. On an iPhone the keychain read fails there
+(`Sandbox: BighelpLiveActivity deny mach-lookup com.apple.securityd` in the system log) and every card drew its
+plain rows, though the widgets' copy of the same extension and the simulator both read the keychain. Attributes
+stay with iOS on the person's own devices and no push carries them. The app never saves the copy anywhere else
+(`withoutCardKey`). A card started by a build before this one carries none and draws its plain rows. The service fits sealed detail to the rows in the order
 the card shows them and leaves it off rows that would pass Apple's 4 KB; the phone does the same when it rewrites
 the card. A row without detail, with detail that doesn't open, or with Settings › Notifications › On the card set
 to Status only, draws the rows described above. The timer counts on the phone from the turn's start time.

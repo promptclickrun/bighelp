@@ -143,6 +143,19 @@ enum BighelpActivityCardKey {
                                info: Data(rowID.utf8), outputByteCount: 32)
     }
 
+    /// The secret as a card's attributes carry it (`LoopdySessionActivityAttributes.cardKey`), made on
+    /// first use. Only the app calls this, as it starts a card.
+    static func attributeKey() -> String? {
+        master(create: true).map { BighelpActivityDetail.encode($0.withUnsafeBytes { Data($0) }) }
+    }
+
+    /// The secret a card's attributes carry, or nil when they carry none that is one.
+    static func master(attributeKey: String?) -> SymmetricKey? {
+        guard let attributeKey, attributeKey.utf8.count == 43, let data = BighelpActivityDetail.decode(attributeKey),
+              data.count == 32 else { return nil }
+        return SymmetricKey(data: data)
+    }
+
     /// The row key as the computer takes it, or nil when this device keeps no card key.
     static func wireKey(rowID: String) -> String? {
         master(create: true).map { master in
@@ -180,9 +193,12 @@ enum BighelpActivityDetailLevel: String, CaseIterable, Sendable {
 }
 
 extension BighelpActivitySession {
-    /// This row's detail, when it carries one that opens with this phone's key.
-    func openDetail() -> BighelpActivityDetail? {
-        guard let sealed, let master = BighelpActivityCardKey.master() else { return nil }
+    /// This row's detail, when it carries one that opens with this phone's key. `cardKey` is the card's
+    /// own copy of the secret (its attributes'): the card is drawn where the keychain can't be reached, so
+    /// the keychain is only asked for a card started before cards carried one.
+    func openDetail(cardKey: String? = nil) -> BighelpActivityDetail? {
+        guard let sealed, let master = BighelpActivityCardKey.master(attributeKey: cardKey) ?? BighelpActivityCardKey.master()
+        else { return nil }
         return BighelpActivityDetail.open(sealed, timestamp: timestamp, key: BighelpActivityCardKey.rowKey(id, master: master))
     }
 }

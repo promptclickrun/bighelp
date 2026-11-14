@@ -1231,9 +1231,12 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   `sealed` field (`BighelpActivityDetail`, plugin `card_detail.py`, sealed-card-v1): AES-256-GCM under a key for
   that chat row, which the app gives the computer over its own connection (`BighelpActivityCardKey`, the
   registrar's `card-key` PUT). The notification service and Apple carry bytes they can't read; never put new card
-  text in a plain field. The Live Activity extension opens it as it draws, with a secret in the keychain group
-  `app.loopdy.mobile.card` that only the app and that extension have (readable after first unlock, because the
-  card is drawn on a locked phone). A row that doesn't open draws the plain rows. The card is at most 160 points
+  text in a plain field. The card opens it as it draws, with a secret the app keeps in the keychain group
+  `app.loopdy.mobile.card` and copies into each card's attributes as the card starts
+  (`LoopdySessionActivityAttributes.cardKey`). The copy is needed: an iPhone draws a Live Activity in a second copy
+  of the widget extension whose sandbox can't reach the keychain, so a card that asked the keychain drew only plain
+  rows, on devices and never in the simulator. Never save that copy anywhere (`withoutCardKey`), and never read
+  the keychain to draw a Live Activity. A row that doesn't open draws the plain rows. The card is at most 160 points
   tall, so the hero counts its lines (`heroCard`), fewer at larger text. Settings › Notifications › On the card
   picks Status only, Steps, or Steps and text (`BighelpActivityDetailLevel`, in the App Group); Advanced options adds
   context use and the model. The phone words steps from Hermes' tool names (`BighelpActivityStepWords`). A

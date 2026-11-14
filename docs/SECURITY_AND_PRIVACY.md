@@ -534,10 +534,14 @@ and complete model output.
 What the card shows beyond that (the step in progress and what it works on, the
 last steps, a question or command that waits, the first lines of the reply) comes
 as detail the Hermes host encrypts for one chat row's key: AES-256-GCM, bound to
-the update's time. The app derives that key from a secret in a keychain group
-shared only with its Live Activity extension and gives it to the host over its
-own connection, so the notification service and Apple forward bytes they cannot
-read. They still read each row's phase, time and helper count. Nothing signs the
+the update's time. The app derives that key from a secret it keeps in the
+Keychain and gives it to the host over its own connection, so the notification
+service and Apple forward bytes they cannot read. iOS draws a Live Activity in a
+sandbox that cannot reach the Keychain, so each card also carries a copy of the
+secret in its ActivityKit attributes, which the app sets when it starts the card.
+Attributes stay with iOS on the person's own devices: no push carries them, the
+notification service and the host never get them, and bighelp writes the secret
+to no file or setting. They still read each row's phase, time and helper count. Nothing signs the
 detail beyond the shared key: the notification service can delay or drop it, and
 cannot forge or read it. Settings › Notifications › On the card chooses how much
 of the detail is drawn; Status only draws none.

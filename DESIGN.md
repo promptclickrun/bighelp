@@ -2,7 +2,7 @@
 
 ## Authority and scope
 
-The current authority is the **Noodle brand kit** (`BighelpBrand`, the Ember palette) and its blended direction:
+The current authority is the **lifter brand kit** (`BighelpBrand`: Coral, Cream, Ink and Night) and its blended direction:
 1a "Messages, evolved" structure, in the **Ink** look the Bots view started (#622): white by day, black at night, ink
 controls in the person's own color. Cream ("Center stage") and Graphite ("After dark") stay as page choices.
 The app is a simple messaging experience for personal assistant agents. Earlier bighelp/iOS 27 Builder references
@@ -11,7 +11,7 @@ are historical (`docs/ui-v3-design.md`).
 In anything a person reads (the name under the icon, copy, alerts, widgets, permission prompts, the plugin's
 messages), the app's name is **Bighelp**, with a capital B (`BighelpBrand.appName`). Values that are stored or sent
 stay lowercase: the session source `bighelp`, settings keys, IDs, the `window.bighelp` bridge, URLs and domains
-(bighelp.app). The Noodle's lowercase b is the logo, not the name.
+(bighelp.app).
 
 ## Simplicity means hierarchy, not concealment
 
@@ -28,10 +28,11 @@ stay lowercase: the session source `bighelp`, settings keys, IDs, the `window.bi
 
 ## Visual language
 
-- **The Noodle** (`BighelpNoodleMark`, `BighelpWordmark`) is one continuous Ember (#FF8A7A) stroke that writes a
-  lowercase b and kicks out at the bottom left as a chat-bubble tail. It appears in chrome (root nav bars, icon,
-  setup) and as the app's loaders, never as a chat participant and never in an agent color. In the wordmark the mark
-  stands in for the b, then "ighelp" in the kit's outlined Nunito: ink by day, cream after dark. See **Noodle** below.
+- **The lifter** (`BighelpLifterMark`, `BighelpWordmark`) is a coral (#FF5A36) helper holding a box overhead: the
+  box is ink (#1A1420) by day and cream (#FFF6EC) after dark, and it turns into what he's doing. He appears in
+  chrome (icon, setup, the sidebar's empty page) and as the app's loaders, never as a chat participant and never in
+  an agent color. The wordmark is the kit's horizontal lockup: the lifter, then "Bighelp" in the kit's outlined
+  Bricolage Grotesque, ink by day and cream after dark. See **Lifter** below.
 - **Ink** is the default look, the one the Bots view always had: Classic's Paper page (#FFFFFF) by day and Black at night,
   black bubbles by day (dark gray #3A3A3F after dark), and buttons and tinted text in the page's ink. Its switches
   are green, since an ink switch would be white on white after dark. Every control that acts (New chat, the
@@ -257,7 +258,7 @@ The app icon badge means "something arrived while you were away": pushes set it,
 (`BighelpAppBadge`). The app never sets a count of its own, so it can't get stuck on items the user can't see.
 
 **Apple Watch** is a remote for bighelp on the iPhone, in the same dark palette (lavender actions and your own
-messages, the Noodle mark). Home puts **Talk to** your agent first (dictate or type; replies are read aloud unless the
+messages, the lifter mark). Home puts **Talk to** your agent first (dictate or type; replies are read aloud unless the
 speaker button is off), then **Needs you** (approvals showing exactly what they're for, wider approvals asking
 again; questions with their choices or a spoken answer), recent **Chats**, and the agent's **Feed, Ideas and Goals**
 with each item's full text. Change agent sits at the bottom. **Open on iPhone** goes straight there when bighelp is
@@ -413,7 +414,7 @@ chats (source `workflow`) stay out of Sessions, recents and widgets.
 **Show every computer** (Settings › Your computers, on until turned off) puts every computer's bots and chats in the
 Bots view, the Chats view and New chat's list of bots, like Messages with several accounts: each chat says which
 computer it is on, and the Chats view's chips filter by computer. A tap on another computer's bot or chat makes that
-computer the one in use first, while the list stays up (the Bots view shows the Noodle loader, with Cancel, until the
+computer the one in use first, while the list stays up (the Bots view shows the lifter, with Cancel, until the
 bot opens). Today and Work show the computer in use, and their header's computer menu switches it. Usage instead adds
 up every host, with a row for each. Settings' Your computers group also has **Update every computer** (with two or
 more), one page for every host: Update Hermes (each host's commits behind), Update bighelp Plugin (each host's
@@ -623,7 +624,7 @@ page's ink (white after dark). The text is SF Pro, as everywhere.
   a line takes the place of its latest message ("Browsing the web…", "Working…"). A face that can't act it out
   (a photo, or any face with Reduce Motion or Low Power Mode) gets a still badge for the kind of work instead
   (a globe while it browses, in the page's ink). One waiting on you (an approval, a question) gets a raised hand
-  in ember and "Needs you", which wins over working. A bot with no turn running but work in the background
+  in coral and "Needs you", which wins over working. A bot with no turn running but work in the background
   (subagents, background commands, a scheduled task, from any Hermes process) keeps a calm face with a still stack
   badge, and its row says "In the background: Preview server" in plain ink; a turn wins over it. It's only what
   the computer says (`BotChatActivityStore`): unknown or out of date shows nothing, and it clears when the work ends.
@@ -782,30 +783,26 @@ iPhone, iPad and Vision Pro stay exactly as they are.
   and the page to make it narrower or wider (the page keeps at least 380 points); the width is remembered, and a
   double-click on the line goes back to the usual width.
 
-## Noodle
+## Lifter
 
-The kit's 19 motions ship as its Lottie files (`Resources/Noodle`) and are drawn natively (`BighelpNoodleView`,
-no Lottie library): at most 30 frames a second, only on screen, and the still mark with Reduce Motion, in Low Power
-Mode and in the background. The loader gallery (`-bighelp-loader-gallery`, Noodle) shows each one. Where they play:
+The kit's eight states ship as its Lottie files, one for light pages and one for dark (`Resources/Lifter`), and are
+drawn natively (`BighelpLifterView`, no Lottie library): at most 30 frames a second, only on screen, and the still mark
+with Reduce Motion, in Low Power Mode and in the background. A state plays its intro once (the box turns into its
+prop), then its loop for as long as it shows; a one-shot (`.once`) plays the whole file and ends on the idle pose.
+**Below 28 points it's always the still mark** (`BighelpLifterView.smallestMotion`): the figure doesn't read smaller,
+so the chat's 20-point rows and the small spinners stay still. The loader gallery (`-bighelp-loader-gallery`, Lifter)
+shows each one. Where they play:
 
-| Motion | Where |
+| State | Where |
 |---|---|
-| loader | Anything loading: every indeterminate `ProgressView` (`BighelpNoodleProgressStyle`, set at the app's root), `BighelpSpinner`, the chat's active tool folder |
-| thinking | Reasoning: the chat's active thinking row, a folder between calls, voice while the agent works |
-| listening, talking, resting | The voice pill: the microphone is open, the agent speaks, the call is paused or muted |
-| launch | Connecting (host setup, live voice), restoring a session |
-| spring | Reconnecting (Your computers, a plugin update waiting for Hermes) |
-| lasso | Searching (models, skills, chats) |
-| infinity | Helper agents running in the chat's active folder |
-| squiggle | Sending from the message box |
-| question | A page that can't open, voice that isn't available |
-| exit | Ending a voice call |
-| reveal, then hello | The first run's welcome |
-| idle | Empty places (no agents yet) |
-| done | An IDE session or a Dev Factory run that finishes while you watch (`bighelpNoodleMoment`) |
-| heart | Pinning a favorite model |
-| bunny | Three taps on the wordmark under Settings › Help & feedback |
-| pull | Pull to refresh (`bighelpRefreshable`): its frames follow the pull, then the loader plays |
+| idle | Anything loading: every indeterminate `ProgressView` (`BighelpLifterProgressStyle`, set at the app's root), `BighelpSpinner`; connecting and reconnecting; voice listening; empty places; pull to refresh (`bighelpRefreshable`: his press follows the pull) |
+| thinking | Reasoning: the chat's active thinking row, voice while the agent works |
+| searching | The chat's active tool folder; searching (models, skills, chats) |
+| coding | Helper agents running in the chat's active folder |
+| replying | Voice while the agent speaks; sending from the message box |
+| success | The first run's welcome; a Dev Factory run that finishes while you watch (`bighelpLifterMoment`); three taps on the wordmark under Settings › Help & feedback |
+| error | A page that can't open, voice that isn't available |
+| sleeping | Voice paused, muted or ended |
 
 **The chat plays one loader at a time**: on its newest live tool folder, thinking row or running turn's block
 (`ChatCanvasTranscriptProjection.activeLoaderID`, `BighelpActivityLoaderFocus`). Every other row, and each tool step

@@ -12,7 +12,7 @@ struct WorkspaceUnavailableView: View {
                 Text(destination.title)
             } icon: {
                 // The kit's question: didn't catch that.
-                BighelpNoodleView(motion: .question, size: 48)
+                BighelpLifterView(motion: .error, size: 48)
             }
         } description: {
             Text("\(reason)\n\nSelected host: \(hostName)")

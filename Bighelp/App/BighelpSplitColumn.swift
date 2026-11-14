@@ -77,7 +77,7 @@ struct BighelpSplitPlaceholder: View {
 
     var body: some View {
         VStack(spacing: BighelpTokens.space16) {
-            BighelpNoodleMark(size: 44)
+            BighelpLifterMark(size: 44)
             Text(message)
                 .bighelpFont(.body)
                 .foregroundStyle(theme.secondaryText)

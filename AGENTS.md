@@ -201,7 +201,7 @@ change in both repos.
     `FleetID`). It is the one switch behind the old all-hosts view and Multi-gateway (the saved key is the old
     all-hosts one). Pins live on each bot's own computer; the primary bot is kept on the device
     (`simpleBotsMultiPrimary`). Acting on another computer's bot goes through `openFleet`; the Bots view stays
-    under the Noodle loader (`SimpleBotsOpeningOverlay`, with Cancel) until the bot opens. A computer that
+    under the lifter loader (`SimpleBotsOpeningOverlay`, with Cancel) until the bot opens. A computer that
     doesn't answer gives the selection back to the one the tap came from (`FleetSwitchFallback`), so neither the
     app nor its next launch is left on it. While it's on, the other computers stay connected
     (`keepsFleetHostsConnected`), through the background grace too, so opening on one is instant.
@@ -263,7 +263,7 @@ change in both repos.
 | `Bighelp/Spatial/` | Vision Pro: the agent in the room (`SpatialAvatarModel`, its volume and voice panel, its Settings section) |
 | `BighelpWatch/`, `BighelpWatchShared/`, `Bighelp/Watch/` | The Watch app, the Watch–iPhone wire (`WatchWire`), and the iPhone's `WatchRelay` that answers it |
 | `Bighelp/CarPlay/` | CarPlay's hands-free voice chat (`CarPlayVoiceSession`) and its scene |
-| `Bighelp/DesignSystem/` | `BighelpTheme`, `BighelpTokens`, glass surfaces, fonts, provider logos, `BighelpDeferredSection`, the Noodle brand and its motions (`Noodle/`), the Thinking control and its looks (`ThinkingSlider/`) |
+| `Bighelp/DesignSystem/` | `BighelpTheme`, `BighelpTokens`, glass surfaces, fonts, provider logos, `BighelpDeferredSection`, the lifter brand and its motions (`Lifter/`), the Thinking control and its looks (`ThinkingSlider/`) |
 | `Bighelp/Hosts/`, `Bighelp/LiveActivity/`, `Bighelp/Notifications/`, `Bighelp/Shortcuts/` | Host setup, Live Activities, notifications, App Intents |
 | `Bighelp/Telemetry/` | Usage and crash numbers (Settings › Help & feedback › Share usage and diagnostics): the client, MetricKit, the switch that also tells hosts |
 | `BighelpTests/` (Swift Testing), `BighelpUITests/` (XCUITest) | Tests. The UI test base class `BighelpUITestCase` is in `ReferenceHubUITests.swift` |
@@ -1267,9 +1267,11 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
 
 ### Avatars and art
 
-- The brand is the Noodle (DESIGN.md › Noodle). Its motions are the brand kit's Lottie files in
-  `Bighelp/Resources/Noodle`, drawn natively by `BighelpNoodleView`, which reads only what the kit's generator
-  writes. Replace them with the kit's own output, never hand-edited, and check them in the loader gallery.
+- The brand is the lifter (DESIGN.md › Lifter). His motions are the brand kit's Lottie files in
+  `Bighelp/Resources/Lifter`, one for light pages and one for dark, drawn natively by `BighelpLifterView`, which
+  reads only what the kit writes (shape layers, rectangles, ellipses, paths, fills, strokes, transforms and the
+  intro, loop and outro markers). Replace them with the kit's own output, never hand-edited, and check them in the
+  loader gallery. Below 28 points he's the still mark.
 - The chat plays one loader at a time, on its newest live folder (`BighelpActivityLoaderFocus`). A new live
   indicator in the chat goes through that focus, not its own animation.
 - The avatar kit's source is `Design/AvatarKit`. `tools/export_native.py` writes `Bighelp/Resources/AvatarKit.json`,

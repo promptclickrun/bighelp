@@ -335,7 +335,7 @@ struct SimpleBotActivityBadge: View {
             .font(.system(size: size * 0.5, weight: .bold))
             .foregroundStyle(activity == .waiting ? Color.white : theme.actionForeground)
             .frame(width: size, height: size)
-            .background(Circle().fill(activity == .waiting ? BighelpBrand.ember : theme.action))
+            .background(Circle().fill(activity == .waiting ? BighelpBrand.coral : theme.action))
             .overlay(Circle().stroke(theme.canvas, lineWidth: max(2, size * 0.12)))
             .accessibilityHidden(true)
     }

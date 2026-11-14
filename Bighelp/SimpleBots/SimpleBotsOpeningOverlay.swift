@@ -13,7 +13,7 @@ struct SimpleBotsOpeningOverlay: View {
             Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
             theme.canvas.opacity(0.35).ignoresSafeArea()
             VStack(spacing: BighelpTokens.space16) {
-                BighelpNoodleView(motion: .loader, size: 72)
+                BighelpLifterView(motion: .idle, size: 72)
                     .accessibilityHidden(true)
                 VStack(spacing: BighelpTokens.space4) {
                     Text(botName.map { String(localized: "Opening \($0)…") } ?? String(localized: "Opening…"))

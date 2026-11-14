@@ -48,7 +48,7 @@ struct ChatWorkTrailCard: View {
                 accessibilityIdentifier: "chat.work-trail.\(turn.id)",
                 loaderID: ChatLoaderID.workTrail(turn),
                 // Helper agents keep going on their own: the kit's infinity.
-                loaderMotion: turn.events.last { $0.lifecycle == .running }?.kind == .subagent ? .infinity : nil
+                loaderMotion: turn.events.last { $0.lifecycle == .running }?.kind == .subagent ? .coding : nil
             )
             if isExpanded, rendersExpandedEvents {
                 ForEach(turn.events) { event in

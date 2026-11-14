@@ -1219,7 +1219,7 @@ struct SimpleBotsRowLabel: View {
     /// Needing you in ember, a turn in the action color, work in the background in plain ink.
     private func lineColor(_ activity: BotChatActivity) -> Color {
         switch activity {
-        case .waiting: BighelpBrand.ember
+        case .waiting: BighelpBrand.coral
         case .background: theme.primaryText
         case .idle, .working: theme.action
         }

@@ -55,7 +55,7 @@ struct WatchBoardRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
                     if item.isUnread {
-                        Circle().fill(WatchDesign.Color.ember).frame(width: 6, height: 6)
+                        Circle().fill(WatchDesign.Color.coral).frame(width: 6, height: 6)
                             .accessibilityLabel("New")
                     }
                     Text(item.title).font(.body.weight(.semibold)).lineLimit(2)

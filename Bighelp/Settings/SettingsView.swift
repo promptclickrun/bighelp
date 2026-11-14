@@ -520,14 +520,14 @@ struct ClearCacheConfirmation: ViewModifier {
     }
 }
 
-/// The wordmark under Help & feedback. Tap it three times and the b does a shadow-puppet
-/// bunny (the kit's easter egg).
+/// The wordmark under Help & feedback. Tap it three times and the lifter's box turns into a
+/// check badge and he jumps (the kit's easter egg).
 private struct BighelpBunnySignature: View {
     @State private var taps = 0
-    @State private var motion: BighelpNoodleMotion?
+    @State private var motion: BighelpLifterMotion?
 
     var body: some View {
-        BighelpWordmark(height: 24, motion: motion) { motion = nil }
+        BighelpWordmark(height: 36, motion: motion) { motion = nil }
             .frame(maxWidth: .infinity)
             .padding(.top, BighelpTokens.space24)
             .contentShape(.rect)
@@ -535,7 +535,7 @@ private struct BighelpBunnySignature: View {
                 taps += 1
                 guard taps >= 3 else { return }
                 taps = 0
-                motion = .bunny
+                motion = .success
             }
             .accessibilityIdentifier("settings.signature")
     }

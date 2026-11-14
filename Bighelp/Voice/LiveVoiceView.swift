@@ -131,11 +131,11 @@ struct LiveVoiceView: View {
         .accessibilityIdentifier("live-voice.screen")
     }
 
-    /// The Noodle acting out the call, then "Agent · state": the same pill as turn-based voice.
+    /// The lifter acting out the call, then "Agent · state": the same pill as turn-based voice.
     private var statusPill: some View {
-        let noodle = VoiceNoodle.motion(livePhase: model.phase, live: liveState)
+        let lifter = VoiceLifter.motion(livePhase: model.phase, live: liveState)
         return HStack(spacing: BighelpTokens.space8) {
-            BighelpNoodleView(motion: noodle, size: 22, playback: VoiceNoodle.playback(noodle))
+            BighelpLifterView(motion: lifter, size: 22)
             Text("\(model.agentName) · \(statusText)")
                 .bighelpFont(.label, weight: .semibold)
                 .lineLimit(1)

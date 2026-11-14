@@ -2,9 +2,9 @@ import SwiftUI
 import UIKit
 
 extension View {
-    /// `.refreshable` with the Noodle: the system still runs the pull and holds the list
-    /// open while `action` runs, but the kit's pull follows your finger (its frames track
-    /// the pull distance), then its loader plays until the refresh ends. Where the pull
+    /// `.refreshable` with the lifter: the system still runs the pull and holds the list
+    /// open while `action` runs, but the lifter's press follows your finger (his idle frames
+    /// track the pull distance), then he keeps pressing until the refresh ends. Where the pull
     /// can't be read (before iOS 18, and on the Mac), it's the system spinner.
     func bighelpRefreshable(_ action: @escaping @MainActor @Sendable () async -> Void) -> some View {
         modifier(BighelpPullToRefresh(action: action))
@@ -12,12 +12,12 @@ extension View {
 }
 
 enum BighelpPullToRefreshMetrics {
-    /// The pull distance that finishes the kit's pull (and about where the system lets go).
+    /// The pull distance that finishes the lifter's press (and about where the system lets go).
     static let fullPull: CGFloat = 90
     static let markSize: CGFloat = 30
 
-    /// The system spinner is hidden only where the Noodle can stand in for it.
-    static var drawsNoodle: Bool {
+    /// The system spinner is hidden only where the lifter can stand in for it.
+    static var drawsLifter: Bool {
         guard !BighelpPlatform.isMac else { return false }
         if #available(iOS 18.0, visionOS 2.0, *) { return true }
         return false
@@ -25,11 +25,11 @@ enum BighelpPullToRefreshMetrics {
 
     /// Called once at launch, before any list makes its refresh control.
     @MainActor static func hideSystemSpinner() {
-        guard drawsNoodle else { return }
+        guard drawsLifter else { return }
         UIRefreshControl.appearance().tintColor = .clear
     }
 
-    /// How far into the kit's pull (0...1) a pull of `distance` points is.
+    /// How far into the lifter's press (0...1) a pull of `distance` points is.
     static func progress(_ distance: CGFloat) -> Double {
         Double(min(max(distance / fullPull, 0), 1))
     }
@@ -60,7 +60,7 @@ private struct BighelpPullToRefresh: ViewModifier {
     func body(content: Content) -> some View {
         let state = state
         let refreshing = content.refreshable { [state, action] in await state.run(action) }
-        if BighelpPullToRefreshMetrics.drawsNoodle, #available(iOS 18.0, visionOS 2.0, *) {
+        if BighelpPullToRefreshMetrics.drawsLifter, #available(iOS 18.0, visionOS 2.0, *) {
             refreshing
                 .onScrollGeometryChange(for: [CGFloat].self) { geometry in
                     [-(geometry.contentOffset.y + geometry.contentInsets.top), geometry.contentInsets.top]
@@ -80,7 +80,7 @@ private struct BighelpPullToRefresh: ViewModifier {
         let size = BighelpPullToRefreshMetrics.markSize
         let gap = max(topInset - restingInset, 0) + pull
         if pull > 4 || state.isRefreshing {
-            BighelpNoodleView(motion: state.isRefreshing ? .loader : .pull, size: size,
+            BighelpLifterView(motion: .idle, size: size,
                               playback: state.isRefreshing ? .automatic : .progress(BighelpPullToRefreshMetrics.progress(pull)),
                               accessibilityLabel: state.isRefreshing ? "Refreshing" : nil)
                 // Centered in the gap the pull opens above the content. The insets are measured

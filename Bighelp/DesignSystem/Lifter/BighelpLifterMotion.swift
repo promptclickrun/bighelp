@@ -1,57 +1,55 @@
 import Foundation
 import SwiftUI
 
-/// The brand kit's motion set: one Lottie file each in `Resources/Noodle`, drawn natively
-/// by `BighelpNoodleView`. Each case says when the app plays it (DESIGN.md › Noodle).
-enum BighelpNoodleMotion: String, CaseIterable, Sendable {
-    /// Draws itself, then flicks its tail. Splash and onboarding.
-    case reveal
-    /// The pen writes the b and erases it. Anything loading.
-    case loader
-    /// Still, with a tail flick every four seconds. Empty places.
+/// The brand kit's lifter: eight states, each a Lottie file for light pages and one for dark
+/// ones in `Resources/Lifter`, drawn natively by `BighelpLifterView`. DESIGN.md › Lifter says
+/// where each one plays.
+enum BighelpLifterMotion: String, CaseIterable, Sendable {
+    /// He presses the box overhead. Waiting, loading, connecting, empty places.
     case idle
-    /// A dot pops in and unspools into the b. App launch, connecting to a computer.
-    case launch
-    /// The b reels into its tail and pops. Ending, signing out.
-    case exit
-    /// Driven by how far you pull, then the loader. Pull to refresh.
-    case pull
-    case thinking, listening, talking, resting
-    /// Becomes a check and sparkles. Finished work.
-    case done
-    /// Waves its stem. First run, a new agent.
-    case hello
-    case heart = "trick-heart"
-    case question = "trick-question"
-    case infinity = "trick-infinity"
-    case lasso = "trick-lasso"
-    case spring = "trick-spring"
-    case bunny = "trick-bunny"
-    case squiggle = "trick-squiggle"
+    /// The box becomes a brain and he juggles it. Reasoning.
+    case thinking
+    /// The box becomes a computer and he types. Helper agents and coding sessions at work.
+    case coding
+    /// He announces into a ring announcer's mic. Speaking, sending.
+    case replying
+    /// The box becomes a magnifying glass and he scans. Searching, reading, tool use.
+    case searching
+    /// The box becomes a check badge, he jumps, confetti. Finished work, the welcome.
+    case success
+    /// The box becomes a warning sign and he sweats. Something failed.
+    case error
+    /// The box becomes a moon balloon and he naps. Paused, muted, ended.
+    case sleeping
 
-    var resourceName: String { "bighelp-\(rawValue)" }
+    func resourceName(dark: Bool) -> String { "bighelp-lifter-\(rawValue)-\(dark ? "dark" : "light")" }
 }
 
-/// One kit animation, read once from its file. Only what the kit's generator writes is
-/// understood: shape layers of groups with paths (still or morphing), ellipses, strokes,
-/// fills, trims and transforms, on eased or held keyframes. Anything else is skipped.
-struct BighelpNoodleAnimation: Sendable {
+/// One kit animation, read once from its file. Only what the kit writes is understood:
+/// shape layers of groups with paths (still or morphing), rectangles, ellipses, strokes,
+/// fills and transforms, on eased or held keyframes, and the intro, loop and outro markers.
+/// Anything else is skipped.
+struct BighelpLifterAnimation: Sendable {
     let frameRate: Double
     let inPoint: Double
     let outPoint: Double
-    let loops: Bool
+    /// Turns the box into this state's prop, once. Nil when the state is only a loop (idle).
+    let intro: Range<Double>?
+    /// Repeats for as long as the state lasts; starts and ends on the same pose.
+    let loop: Range<Double>
     /// Bottom layer first.
     let layers: [Layer]
 
     var frameCount: Double { outPoint - inPoint }
     var duration: TimeInterval { frameCount / frameRate }
 
-    /// The kit's 512-point composition. The mark sits in the middle, its 100-unit artboard
-    /// scaled 2.8 times with (43, 53) at the center.
-    static let compositionSide: CGFloat = 512
-    /// The square of the composition the view's frame shows: the mark fills it, and extras
-    /// (sparkles, z's, sound arcs) draw past it.
-    static let markBox: CGFloat = 290
+    /// The kit draws the lifter on a 400-point square at 1.5625 times the still mark's
+    /// 200-unit artboard, the mark's center at (200, 197.5). `markBox` is the part of the
+    /// square the mark fills, so a motion and the still mark line up at any size; props,
+    /// jumps and confetti draw past it.
+    static let compositionSide: CGFloat = 400
+    static let markBox: CGFloat = 312.5
+    static let markCenter = CGPoint(x: 200, y: 197.5)
 
     struct Layer: Sendable {
         let inPoint: Double
@@ -67,11 +65,11 @@ struct BighelpNoodleAnimation: Sendable {
 
     enum Item: Sendable {
         case path(Animated<Bezier>)
+        case rectangle(center: Animated<[Double]>, size: Animated<[Double]>, radius: Animated<Double>)
         case ellipse(center: Animated<[Double]>, size: Animated<[Double]>)
         case stroke(color: Animated<[Double]>, opacity: Animated<Double>, width: Animated<Double>,
                     cap: CGLineCap, join: CGLineJoin)
         case fill(color: Animated<[Double]>, opacity: Animated<Double>)
-        case trim(start: Animated<Double>, end: Animated<Double>, offset: Animated<Double>)
         case group(Group)
     }
 
@@ -114,7 +112,7 @@ struct BighelpNoodleAnimation: Sendable {
     }
 
     /// A property's value: still, or keyframes eased between with the kit's cubic curves.
-    enum Animated<Value: BighelpNoodleInterpolating>: Sendable {
+    enum Animated<Value: BighelpLifterInterpolating>: Sendable {
         case still(Value)
         case keyframes([Keyframe<Value>])
 
@@ -129,7 +127,7 @@ struct BighelpNoodleAnimation: Sendable {
                     guard frame < next.time else { continue }
                     if key.holds || next.time <= key.time { return key.value }
                     let linear = (frame - key.time) / (next.time - key.time)
-                    let eased = key.curve.map { BighelpNoodleCurve.solve($0, at: linear) } ?? linear
+                    let eased = key.curve.map { BighelpLifterCurve.solve($0, at: linear) } ?? linear
                     return Value.interpolate(key.value, next.value, eased)
                 }
                 return keys[keys.count - 1].value
@@ -147,21 +145,21 @@ struct BighelpNoodleAnimation: Sendable {
 }
 
 /// Values the kit animates, blended between two keyframes.
-protocol BighelpNoodleInterpolating: Sendable {
+protocol BighelpLifterInterpolating: Sendable {
     static func interpolate(_ a: Self, _ b: Self, _ t: Double) -> Self
 }
 
-extension Double: BighelpNoodleInterpolating {
+extension Double: BighelpLifterInterpolating {
     static func interpolate(_ a: Double, _ b: Double, _ t: Double) -> Double { a + (b - a) * t }
 }
 
-extension Array: BighelpNoodleInterpolating where Element == Double {
+extension Array: BighelpLifterInterpolating where Element == Double {
     static func interpolate(_ a: [Double], _ b: [Double], _ t: Double) -> [Double] {
         zip(a, b).map { $0 + ($1 - $0) * t }
     }
 }
 
-extension BighelpNoodleAnimation.Bezier: BighelpNoodleInterpolating {
+extension BighelpLifterAnimation.Bezier: BighelpLifterInterpolating {
     /// The kit morphs between paths with the same number of points; any other pair holds.
     static func interpolate(_ a: Self, _ b: Self, _ t: Double) -> Self {
         guard a.vertices.count == b.vertices.count else { return t < 1 ? a : b }
@@ -174,7 +172,7 @@ extension BighelpNoodleAnimation.Bezier: BighelpNoodleInterpolating {
 }
 
 /// The kit's eases: CSS cubic-bezier curves solved for x.
-enum BighelpNoodleCurve {
+enum BighelpLifterCurve {
     static func solve(_ curve: (Double, Double, Double, Double), at x: Double) -> Double {
         guard x > 0 else { return 0 }
         guard x < 1 else { return 1 }
@@ -194,13 +192,12 @@ enum BighelpNoodleCurve {
 
 // MARK: Drawing
 
-extension BighelpNoodleAnimation {
-    /// Draws one frame into `context`, the composition scaled so the mark box fills `side`
-    /// points around the context's center. A tint repaints every stroke and fill, keeping
-    /// their own opacity (the loader's faint ghost stays faint).
+extension BighelpLifterAnimation {
+    /// Draws one frame into `context`, scaled so the mark box fills `side` points around
+    /// the context's center. A tint repaints every stroke and fill, keeping their own opacity.
     func draw(frame: Double, in context: GraphicsContext, center: CGPoint, side: CGFloat, tint: Color?) {
         let scale = side / Self.markBox
-        let view = CGAffineTransform(translationX: -Self.compositionSide / 2, y: -Self.compositionSide / 2)
+        let view = CGAffineTransform(translationX: -Self.markCenter.x, y: -Self.markCenter.y)
             .concatenating(CGAffineTransform(scaleX: scale, y: scale))
             .concatenating(CGAffineTransform(translationX: center.x, y: center.y))
         for layer in layers where frame >= layer.inPoint && frame < layer.outPoint {
@@ -213,42 +210,31 @@ extension BighelpNoodleAnimation {
         }
     }
 
-    /// The plain mark, as every motion rests: for Reduce Motion and paused loaders.
-    static func drawMark(in context: GraphicsContext, center: CGPoint, side: CGFloat, color: Color) {
-        let unit = side / markBox * 2.8
-        let matrix = CGAffineTransform(translationX: -43, y: -53)
-            .concatenating(CGAffineTransform(scaleX: unit, y: unit))
-            .concatenating(CGAffineTransform(translationX: center.x, y: center.y))
-        let mark = BighelpNoodleShape.artboardPath.applying(matrix)
-        context.stroke(mark, with: .color(color),
-                       style: StrokeStyle(lineWidth: 16 * unit, lineCap: .round, lineJoin: .round))
-    }
-
     private func draw(_ group: Group, frame: Double, matrix parent: CGAffineTransform, opacity parentOpacity: Double,
                       in context: GraphicsContext, tint: Color?) {
         let opacity = parentOpacity * group.transform.opacity.value(at: frame) / 100
         guard opacity > 0 else { return }
         let matrix = group.transform.matrix(at: frame).concatenating(parent)
-        var paths: [Path] = []
-        var trims: [(Double, Double, Double)] = []
+        var shape = Path()
         for item in group.items {
             switch item {
-            case .path(let bezier): paths.append(bezier.value(at: frame).path)
+            case .path(let bezier): shape.addPath(bezier.value(at: frame).path)
+            case .rectangle(let center, let size, let radius):
+                let c = center.value(at: frame), s = size.value(at: frame)
+                let rect = CGRect(x: c[safe: 0] - s[safe: 0] / 2, y: c[safe: 1] - s[safe: 1] / 2,
+                                  width: s[safe: 0], height: s[safe: 1])
+                let corner = min(radius.value(at: frame), rect.width / 2, rect.height / 2)
+                shape.addPath(Path(roundedRect: rect, cornerRadius: max(0, corner), style: .circular))
             case .ellipse(let center, let size):
                 let c = center.value(at: frame), s = size.value(at: frame)
-                paths.append(Path(ellipseIn: CGRect(x: c[safe: 0] - s[safe: 0] / 2, y: c[safe: 1] - s[safe: 1] / 2,
-                                                    width: s[safe: 0], height: s[safe: 1])))
-            case .trim(let start, let end, let offset):
-                trims.append((start.value(at: frame), end.value(at: frame), offset.value(at: frame)))
+                shape.addPath(Path(ellipseIn: CGRect(x: c[safe: 0] - s[safe: 0] / 2, y: c[safe: 1] - s[safe: 1] / 2,
+                                                     width: s[safe: 0], height: s[safe: 1])))
             case .group(let child):
                 draw(child, frame: frame, matrix: matrix, opacity: opacity, in: context, tint: tint)
             case .stroke, .fill: break
             }
         }
-        let shown = paths.map { path in trims.reduce(path) { Self.trim($0, $1) } }.filter { !$0.isEmpty }
-        guard !shown.isEmpty else { return }
-        var shape = Path()
-        for path in shown { shape.addPath(path) }
+        guard !shape.isEmpty else { return }
         // Line widths scale with the transform, so stroke in the group's own space.
         var local = context
         local.concatenate(matrix)
@@ -271,53 +257,55 @@ extension BighelpNoodleAnimation {
         if let tint { return tint.opacity(alpha * own) }
         return Color(.sRGB, red: rgba[safe: 0], green: rgba[safe: 1], blue: rgba[safe: 2], opacity: alpha * own)
     }
-
-    /// A trim in percent of the path's length, turned by its offset in degrees.
-    static func trim(_ path: Path, _ trim: (start: Double, end: Double, offset: Double)) -> Path {
-        var from = min(trim.start, trim.end) / 100, to = max(trim.start, trim.end) / 100
-        let length = min(to - from, 1)
-        guard length > 0.0001 else { return Path() }
-        guard length < 0.9999 else { return path }
-        from += trim.offset / 360
-        from -= from.rounded(.down)
-        to = from + length
-        if to <= 1 { return path.trimmedPath(from: from, to: to) }
-        var wrapped = path.trimmedPath(from: from, to: 1)
-        wrapped.addPath(path.trimmedPath(from: 0, to: to - 1))
-        return wrapped
-    }
 }
 
 // MARK: Reading the kit's files
 
-extension BighelpNoodleAnimation {
-    /// Every motion, read on first use and kept.
-    @MainActor static func named(_ motion: BighelpNoodleMotion) -> BighelpNoodleAnimation? {
-        if let cached = cache[motion] { return cached }
-        guard let url = Bundle.main.url(forResource: motion.resourceName, withExtension: "json"),
+extension BighelpLifterAnimation {
+    /// Every motion, in each palette, read on first use and kept.
+    @MainActor static func named(_ motion: BighelpLifterMotion, dark: Bool) -> BighelpLifterAnimation? {
+        let key = motion.resourceName(dark: dark)
+        if let cached = cache[key] { return cached }
+        guard let url = Bundle.main.url(forResource: key, withExtension: "json"),
               let data = try? Data(contentsOf: url),
-              let animation = BighelpNoodleAnimation(data: data) else { return nil }
-        cache[motion] = animation
+              let animation = BighelpLifterAnimation(data: data) else { return nil }
+        cache[key] = animation
         return animation
     }
 
-    @MainActor private static var cache: [BighelpNoodleMotion: BighelpNoodleAnimation] = [:]
+    @MainActor private static var cache: [String: BighelpLifterAnimation] = [:]
 
     init?(data: Data) {
         guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               let frameRate = Self.number(root["fr"]), frameRate > 0,
               let outPoint = Self.number(root["op"]),
               let layerList = root["layers"] as? [[String: Any]] else { return nil }
+        let inPoint = Self.number(root["ip"]) ?? 0
+        guard outPoint > inPoint else { return nil }
         self.frameRate = frameRate
-        inPoint = Self.number(root["ip"]) ?? 0
+        self.inPoint = inPoint
         self.outPoint = outPoint
-        loops = ((root["meta"] as? [String: Any])?["loop"] as? Bool) ?? false
+        let markers = Self.markers(root["markers"], within: inPoint..<outPoint)
+        intro = markers["intro"]
+        loop = markers["loop"] ?? inPoint..<outPoint
         layers = layerList.reversed().compactMap { layer in
             guard Self.number(layer["ty"]) == 4, let shapes = layer["shapes"] as? [[String: Any]] else { return nil }
-            return Layer(inPoint: Self.number(layer["ip"]) ?? 0, outPoint: Self.number(layer["op"]) ?? outPoint,
+            return Layer(inPoint: Self.number(layer["ip"]) ?? inPoint, outPoint: Self.number(layer["op"]) ?? outPoint,
                          transform: Self.transform(layer["ks"] as? [String: Any]),
                          groups: shapes.compactMap(Self.group))
         }
+    }
+
+    /// `[{"cm": "loop", "tm": 30, "dr": 60}]`, kept only when it lies inside the file.
+    private static func markers(_ json: Any?, within file: Range<Double>) -> [String: Range<Double>] {
+        var ranges: [String: Range<Double>] = [:]
+        for marker in json as? [[String: Any]] ?? [] {
+            guard let name = marker["cm"] as? String, let start = number(marker["tm"]),
+                  let length = number(marker["dr"]), length > 0,
+                  start >= file.lowerBound, start + length <= file.upperBound else { continue }
+            ranges[name] = start..<(start + length)
+        }
+        return ranges
     }
 
     private static func group(_ json: [String: Any]) -> Group? {
@@ -330,6 +318,9 @@ extension BighelpNoodleAnimation {
         switch json["ty"] as? String {
         case "gr": return group(json).map(Item.group)
         case "sh": return animated(json["ks"], bezier).map(Item.path)
+        case "rc":
+            guard let center = animated(json["p"], vector), let size = animated(json["s"], vector) else { return nil }
+            return .rectangle(center: center, size: size, radius: animated(json["r"], scalar) ?? .still(0))
         case "el":
             guard let center = animated(json["p"], vector), let size = animated(json["s"], vector) else { return nil }
             return .ellipse(center: center, size: size)
@@ -342,9 +333,6 @@ extension BighelpNoodleAnimation {
         case "fl":
             guard let color = animated(json["c"], vector) else { return nil }
             return .fill(color: color, opacity: animated(json["o"], scalar) ?? .still(100))
-        case "tm":
-            return .trim(start: animated(json["s"], scalar) ?? .still(0), end: animated(json["e"], scalar) ?? .still(100),
-                         offset: animated(json["o"], scalar) ?? .still(0))
         default: return nil
         }
     }

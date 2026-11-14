@@ -75,9 +75,8 @@ struct BighelpThinkingOrbPresentation: Sendable {
     let size: BighelpThinkingOrbSize
     let displaySize: Double?
     let visibleLabel: String?
-    /// The brand kit's motion for the scenario, and how it plays.
-    let motion: BighelpNoodleMotion
-    let playback: BighelpNoodlePlayback
+    /// The lifter's state for the scenario.
+    let motion: BighelpLifterMotion
 
     var hidesOrbFromAccessibility: Bool {
         visibleLabel != nil
@@ -88,30 +87,24 @@ struct BighelpThinkingOrbPresentation: Sendable {
         scale: BighelpThinkingOrbScale,
         visibleLabel: String? = nil
     ) -> Self {
-        let noodle = noodle(for: scenario)
         return Self(
             state: state(for: scenario),
             size: size(for: scale),
             displaySize: nil,
             visibleLabel: visibleLabel,
-            motion: noodle.motion,
-            playback: noodle.playback
+            motion: motion(for: scenario)
         )
     }
 
-    /// Plain loading writes the b; the rest use the kit's motion for what's going on.
-    /// Tricks loop with a short rest so each pass reads as one gesture.
-    private static func noodle(for scenario: BighelpThinkingOrbScenario)
-        -> (motion: BighelpNoodleMotion, playback: BighelpNoodlePlayback) {
+    /// The lifter's state for what's going on (DESIGN.md › Lifter).
+    private static func motion(for scenario: BighelpThinkingOrbScenario) -> BighelpLifterMotion {
         switch scenario {
-        case .working: (.loader, .automatic)
-        case .searching: (.lasso, .loop(pause: 0.4))
-        case .reasoning: (.thinking, .automatic)
-        case .listening: (.listening, .automatic)
-        case .connecting, .shaping: (.launch, .loop(pause: 0.6))
-        case .coordinating: (.infinity, .loop())
-        case .composing: (.squiggle, .loop(pause: 0.3))
-        case .waiting: (.resting, .automatic)
+        case .working, .listening, .connecting, .shaping: .idle
+        case .searching: .searching
+        case .reasoning: .thinking
+        case .coordinating: .coding
+        case .composing: .replying
+        case .waiting: .sleeping
         }
     }
 
@@ -155,7 +148,7 @@ struct BighelpThinkingOrbPresentation: Sendable {
     }
 }
 
-/// bighelp's loader: the brand kit's Noodle, acting out the scenario (DESIGN.md › Noodle).
+/// Bighelp's loader: the lifter, acting out the scenario (DESIGN.md › Lifter).
 struct BighelpThinkingOrb: View {
     let scenario: BighelpThinkingOrbScenario
     let scale: BighelpThinkingOrbScale
@@ -205,18 +198,17 @@ struct BighelpThinkingOrb: View {
     }
 
     private func orb(for presentation: BighelpThinkingOrbPresentation) -> some View {
-        BighelpNoodleView(
+        BighelpLifterView(
             motion: presentation.motion,
             size: CGFloat(displaySize ?? presentation.displaySize ?? Double(presentation.size.rawValue)),
-            playback: presentation.playback,
-            tint: noodleTint,
+            tint: lifterTint,
             isPaused: BighelpThinkingOrbPresentation.shouldPause(explicitly: isPaused, scenePhase: scenePhase),
             accessibilityLabel: presentation.hidesOrbFromAccessibility ? nil : presentation.state.label
         )
     }
 
-    /// The kit's Ember by default; black or white when it sits on a filled button.
-    private var noodleTint: Color? {
+    /// The kit's own colors by default; black or white when it sits on a filled button.
+    private var lifterTint: Color? {
         if let tint { return tint }
         switch surface {
         case .automatic: return nil

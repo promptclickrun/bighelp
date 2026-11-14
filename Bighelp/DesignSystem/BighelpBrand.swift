@@ -1,25 +1,29 @@
 import SwiftUI
 import UIKit
 
-/// The bighelp identity, the Noodle: one continuous stroke writes a lowercase b and kicks
-/// out at the bottom left as a chat-bubble tail. It lives in chrome and loaders, never as
-/// a chat participant. The kit's motions are `BighelpNoodleMotion`.
+/// The Bighelp identity, the lifter: a coral helper holding a box overhead. The box turns
+/// into what he's doing (a brain, a magnifying glass, a check). He lives in chrome and
+/// loaders, never as a chat participant. His motions are `BighelpLifterMotion`.
 enum BighelpBrand {
     static let appName = "Bighelp"
 
-    static let ember = Color(hex: "FF8A7A")
-    static let ink = Color(hex: "1C1A19")
-    static let cream = Color(hex: "F5F2EF")
-    static let night = Color(hex: "121110")
+    /// The lifter, the app icon's background, accents.
+    static let coral = Color(hex: "FF5A36")
+    /// The box and text on dark pages.
+    static let cream = Color(hex: "FFF6EC")
+    /// The box on light pages, the lifter's eyes.
+    static let ink = Color(hex: "1A1420")
+    /// Dark surfaces.
+    static let night = Color(hex: "0E0E10")
 }
 
 extension Color {
     /// Ink for text on a filled accent: white on the deep violet used by day,
-    /// Ember ink on the pale lavender used after dark. Every accent that passes
+    /// the brand's ink on the pale lavender used after dark. Every accent that passes
     /// the theme's canvas-contrast contract reads correctly with this rule.
     static let bighelpActionInk = Color(uiColor: UIColor { traits in
         traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0x1C / 255, green: 0x1A / 255, blue: 0x19 / 255, alpha: 1)
+            ? UIColor(red: 0x1A / 255, green: 0x14 / 255, blue: 0x20 / 255, alpha: 1)
             : .white
     })
 }
@@ -32,53 +36,55 @@ extension View {
     }
 }
 
-/// The wordmark: the mark stands in for the b, then "ighelp" in the kit's outlined
-/// Nunito, ink by day and cream after dark. `height` is the kit's full wordmark box.
-/// Pass a motion to play it in the b's place (the onboarding writes itself in).
+/// The wordmark, as the kit's horizontal lockup: the lifter, then "Bighelp" in the kit's
+/// outlined Bricolage Grotesque, ink by day and cream after dark. `height` is the lockup's
+/// full height, the lifter's included. Pass a motion to play it once in the lifter's place
+/// (the welcome, Settings' easter egg); without one the lifter is still.
 struct BighelpWordmark: View {
-    var height: CGFloat = 26
-    var motion: BighelpNoodleMotion?
-    var playback: BighelpNoodlePlayback = .automatic
+    var height: CGFloat = 36
+    var motion: BighelpLifterMotion?
+    var playback: BighelpLifterPlayback = .once
     var onFinish: (() -> Void)?
 
     @BighelpThemeReader private var theme
 
-    /// The kit's wordmark geometry, in its own units: the box is 915 tall, the mark's cell
-    /// 726.9 wide (the stroke plus the gap to the i), the letters 2870 wide. The mark's
-    /// center sits at (345, 411.1) in its cell and its stroke is 786.2 tall.
+    /// The kit's lockup in its own units: 608.7 by 192. The lifter's 200-unit artboard starts
+    /// at (-16, -8) and the letters, 444.7 by 148.8, at (156, 30).
     private enum Kit {
-        static let height: CGFloat = 915
-        static let markCell: CGFloat = 726.9
-        static let letters: CGFloat = 2870
-        static let markCenter = CGPoint(x: 345, y: 411.1)
-        static let markHeight: CGFloat = 786.2
+        static let size = CGSize(width: 608.7, height: 192)
+        static let mark = CGPoint(x: -16, y: -8)
+        static let markSide: CGFloat = 200
+        static let letters = CGRect(x: 156, y: 30, width: 444.7, height: 148.8)
     }
 
     var body: some View {
-        let unit = height / Kit.height
-        HStack(spacing: 0) {
-            BighelpNoodleView(motion: motion ?? .idle,
-                              size: Kit.markHeight * unit * BighelpNoodleAnimation.markBox / 274.4,
-                              playback: playback, isPaused: motion == nil, onFinish: onFinish)
-                .position(x: Kit.markCenter.x * unit, y: Kit.markCenter.y * unit)
-                .frame(width: Kit.markCell * unit, height: height)
-            Image("BighelpWordmarkLetters")
-                .resizable()
-                .renderingMode(.template)
-                .foregroundStyle(theme.isDarkPalette ? BighelpBrand.cream : BighelpBrand.ink)
-                .frame(width: Kit.letters * unit, height: height)
-        }
-        .fixedSize()
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(BighelpBrand.appName)
+        let unit = height / Kit.size.height
+        Color.clear
+            .frame(width: Kit.size.width * unit, height: height)
+            .overlay(alignment: .topLeading) {
+                BighelpLifterView(motion: motion ?? .idle, size: Kit.markSide * unit, playback: playback,
+                                  isPaused: motion == nil, onFinish: onFinish)
+                    .offset(x: Kit.mark.x * unit, y: Kit.mark.y * unit)
+            }
+            .overlay(alignment: .topLeading) {
+                Image("BighelpWordmark")
+                    .resizable()
+                    .renderingMode(.template)
+                    .foregroundStyle(theme.isDarkPalette ? BighelpBrand.cream : BighelpBrand.ink)
+                    .frame(width: Kit.letters.width * unit, height: Kit.letters.height * unit)
+                    .offset(x: Kit.letters.minX * unit, y: Kit.letters.minY * unit)
+            }
+            .fixedSize()
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(BighelpBrand.appName)
     }
 }
 
-#Preview("Noodle") {
+#Preview("Lifter") {
     VStack(spacing: 24) {
-        BighelpWordmark(height: 40)
-        BighelpWordmark(height: 52, motion: .reveal)
-        BighelpNoodleMark(size: 96)
+        BighelpWordmark(height: 48)
+        BighelpWordmark(height: 72, motion: .success)
+        BighelpLifterMark(size: 96)
     }
     .padding()
     .background(BighelpBrand.cream)

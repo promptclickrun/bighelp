@@ -239,8 +239,7 @@ struct CodeWhereLine: View {
     @BighelpThemeReader private var theme
 }
 
-/// A session's status as a still dot: working, waiting on you, ready. When a session
-/// finishes while you watch, the kit's done plays once in its place.
+/// A session's status as a still dot: working, waiting on you, ready.
 struct CodeStatusDot: View {
     let status: CodeSessionStatus
 
@@ -250,14 +249,8 @@ struct CodeStatusDot: View {
             .frame(width: 10, height: 10)
             .background(Circle().fill(color.opacity(0.22)).frame(width: 18, height: 18))
             .frame(width: 18, height: 18)
-            .bighelpNoodleMoment(.done, when: isReady, size: 22)
             .padding(.top, 2)
             .accessibilityHidden(true)
-    }
-
-    private var isReady: Bool {
-        if case .ready = status { return true }
-        return false
     }
 
     private var color: Color {

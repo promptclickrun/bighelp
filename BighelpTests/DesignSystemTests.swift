@@ -633,14 +633,14 @@ struct DesignSystemTests {
         }
     }
 
-    /// The Noodle mark (cards may use it as an icon) and the wordmark's letters, drawn in
+    /// The lifter mark (cards may use it as an icon) and the wordmark's letters, drawn in
     /// the theme's ink, ship as vectors.
     @Test func compiledBrandAssetsArePresent() throws {
         let mark = try #require(UIImage(named: "BighelpMarkColor"))
-        let letters = try #require(UIImage(named: "BighelpWordmarkLetters"))
+        let letters = try #require(UIImage(named: "BighelpWordmark"))
 
-        #expect(abs(mark.size.width / mark.size.height - 86.0 / 98.0) < 0.01)
-        #expect(abs(letters.size.width / letters.size.height - 2870.0 / 915.0) < 0.01)
+        #expect(abs(mark.size.width / mark.size.height - 1) < 0.01)
+        #expect(abs(letters.size.width / letters.size.height - 444.7 / 148.8) < 0.01)
         #expect(letters.renderingMode == .alwaysTemplate)
     }
 

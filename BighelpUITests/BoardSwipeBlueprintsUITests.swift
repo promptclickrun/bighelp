@@ -130,7 +130,10 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
                 XCTAssertTrue(blueprint.waitForExistence(timeout: 5))
                 blueprint.tap()
                 XCTAssertTrue(sheet.waitForNonExistence(timeout: 5), "A pick closes the sheet")
-                let sent = app.descendants(matching: .any)["chat.message.inline-selection"].firstMatch
+                // The bot's chat has earlier messages, so look for this one by its words.
+                let messages = app.descendants(matching: .any).matching(identifier: "chat.message.inline-selection")
+                let sent = messages.matching(NSPredicate(format: "value CONTAINS %@", "post what Acme shipped")).firstMatch
+                let unsent = messages.matching(NSPredicate(format: "value CONTAINS %@", "look at our recent chats")).firstMatch
                 let tray = app.descendants(matching: .any)["chat.blueprint.tray"].firstMatch
                 if pick == "feed-marketing-1" {
                     XCTAssertTrue(tray.waitForExistence(timeout: 10), "Its blank is a chip to fill in")
@@ -144,10 +147,7 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
                     XCTAssertTrue(send.isEnabled)
                     XCTAssertFalse(sent.exists, "Nothing is sent until the person taps Send")
                     send.tap()
-                    XCTAssertTrue(sent.waitForExistence(timeout: 20))
-                    let shown = NSPredicate(format: "value CONTAINS %@", "post what Acme shipped")
-                    XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: shown, object: sent)],
-                                                  timeout: 8), .completed, "The blank is filled in what was sent")
+                    XCTAssertTrue(sent.waitForExistence(timeout: 20), "The blank is filled in what was sent")
                     XCTAssertTrue(tray.waitForNonExistence(timeout: 5), "The chips go with the message")
                 } else {
                     let editor = app.textViews["chat.composer.text"]
@@ -156,7 +156,7 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
                     XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: placed, object: editor)],
                                                   timeout: 8), .completed, "…with the prompt ready to edit")
                     XCTAssertFalse(tray.exists, "No blanks, no chips")
-                    XCTAssertFalse(sent.exists, "Nothing is sent until the person taps Send")
+                    XCTAssertFalse(unsent.exists, "Nothing is sent until the person taps Send")
                 }
             }
             app.terminate()
@@ -192,7 +192,7 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
     }
 
     /// Let's do it records the idea by its ID (the demo board stands in for the host) and opens
-    /// a chat with only the readable text: the ID never reaches the message box.
+    /// the bot's chat to send the idea as a card: the ID never reaches the message box.
     @MainActor
     func testLetsDoItOpensAChatWithTheIdeaTitleOnly() throws {
         for appearance in ["light", "dark"] {
@@ -205,12 +205,10 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
             XCTAssertTrue(accept.waitForExistence(timeout: 5))
             save("board-idea-sheet-\(appearance)", app)
             accept.tap()
+            // Let's do it sends the idea as a card to the bot's chat, so the box stays empty.
+            XCTAssertTrue(app.buttons["chat.back"].waitForExistence(timeout: 10), "The bot's chat opens")
             let editor = app.textViews["chat.composer.text"]
             XCTAssertTrue(editor.waitForExistence(timeout: 10))
-            let placed = NSPredicate(format: "value == %@",
-                                     "Yes, go ahead with this idea: “I can plan Sam's birthday dinner end to end”.")
-            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: placed, object: editor)],
-                                          timeout: 8), .completed, "The readable text is ready to send")
             XCTAssertFalse((editor.value as? String ?? "").contains("idea-1"), "The idea's ID stays out of the chat")
             XCTAssertFalse(app.descendants(matching: .any)["board.idea.accept.failed"].exists)
             save("board-idea-lets-do-it-\(appearance)", app)

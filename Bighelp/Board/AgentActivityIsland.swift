@@ -29,8 +29,8 @@ enum AgentIslandAvailability {
     /// The Duo's cameras and status sit in a column on its trailing edge, so the top of the
     /// screen has no island to cover. Drawing one there also reserved space at the top, which
     /// moved every screen and — because the app reads its posture from the measured size — came
-    /// back round as a posture change: the stage shook the whole UI open. `BighelpStripTabs`
-    /// carries the agent on those screens instead.
+    /// back round as a posture change: the stage shook the whole UI open. A bot's face shows its own
+    /// activity badge on those screens instead, as on a phone without an island.
     static func isShown(isPhone: Bool, posture: BighelpScreenPosture) -> Bool {
         isPhone && posture == .standard
     }
@@ -46,7 +46,7 @@ enum DynamicIslandGeometry {
         // trailing edge, so there is nothing across the top to cover. Reserving top space there
         // moved every screen — and because the posture this app lays itself out by comes from
         // the measured size, the reservation fed back into the posture: the whole UI shook while
-        // the stage was open. The strip carries the agent instead (see `BighelpStripTabs`).
+        // the stage was open. A bot's face shows its own activity badge there instead.
         // A window that hasn't settled reports neither size class: wait for it rather than guess.
         guard let horizontal = Self.sizeClass(window.traitCollection.horizontalSizeClass),
               let vertical = Self.sizeClass(window.traitCollection.verticalSizeClass) else { return nil }

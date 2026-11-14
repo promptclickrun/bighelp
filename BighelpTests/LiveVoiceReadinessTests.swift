@@ -26,7 +26,7 @@ struct LiveVoiceReadinessTests {
         model.receive(["voiceId": .string(voiceID), "event": .object(["kind": .string("started")])], owner: owner)
         #expect(model.phase == .connecting)
         peer.running = true
-        for _ in 0..<200 where model.phase != .live { try await Task.sleep(for: .milliseconds(10)) }
+        for _ in 0..<50 where model.phase != .live { try await Task.sleep(for: .milliseconds(10)) }
         #expect(model.phase == .live)
         model.setSpeakerMuted(true)
         #expect(model.isSpeakerMuted)

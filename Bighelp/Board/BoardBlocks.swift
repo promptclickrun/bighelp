@@ -134,12 +134,14 @@ extension BighelpBlockColor {
 
 // MARK: - Tiles
 
-/// Tiles two to a List row, the same height side by side. At accessibility text sizes they
-/// stack one to a row, and then each row also swipes (a row with two tiles can't say which).
+/// Tiles two to a List row, the same height side by side. One to a row (Feed, and every board at
+/// accessibility text sizes), each row also swipes: a row with two tiles can't say which.
 struct BoardTileRows<Tile: View>: View {
     let items: [AgentBoardItem]
     let columns: Int
     let store: AgentBoardStore
+    /// Swipe right on a tile that has a row of its own (Feed's Do it).
+    var onDoIt: ((AgentBoardItem) -> Void)? = nil
     @ViewBuilder let tile: (AgentBoardItem) -> Tile
 
     private struct Row: Identifiable {
@@ -156,7 +158,7 @@ struct BoardTileRows<Tile: View>: View {
             if size == 1, let item = row.items.first {
                 tile(item)
                     .boardRow(top: BoardBlockMetrics.tileSpacing / 2, bottom: BoardBlockMetrics.tileSpacing / 2)
-                    .boardItemSwipe(item, store: store)
+                    .boardItemSwipe(item, store: store, onDoIt: onDoIt.map { act in { act(item) } })
             } else {
                 HStack(alignment: .top, spacing: BoardBlockMetrics.tileSpacing) {
                     ForEach(row.items) { item in

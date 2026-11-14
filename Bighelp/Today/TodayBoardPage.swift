@@ -47,6 +47,7 @@ struct TodayBoardPage: View {
                 TodayBoardAllBots(context: context, kind: kind)
             }
         }
+        .modifier(TodayBoardsMirror(board: store, today: context.store))
         .safeAreaInset(edge: .top, spacing: 0) { header }
         .background(theme.canvas.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)

@@ -23,6 +23,23 @@ struct TodayBoardsContext {
     func bot(_ agentID: String) -> SimpleBotsBot? { localBots.first { $0.profileID == agentID } }
 }
 
+/// Hands Today what a bot's own board shows, while that board is on screen: its Feed, Ideas or
+/// Goals page from See all, or its Dashboard. A clear, a thumbs down or a yes made there shows on
+/// Today's panels and in All bots at once (`TodayBoardsStore.take`).
+struct TodayBoardsMirror: ViewModifier {
+    let board: AgentBoardStore
+    let today: TodayBoardsStore?
+
+    func body(content: Content) -> some View {
+        content.onChange(of: board.items) { _, items in
+            // Only a board that has loaded: one that is changing bots is empty for a moment.
+            guard let today, board.state == .loaded, let agentID = board.agentID,
+                  let scope = board.followableConnection?.scope else { return }
+            today.take(items, agentID: agentID, scope: scope)
+        }
+    }
+}
+
 extension AgentBoardItem.Kind {
     /// The panel's and See all's name for it.
     var todayTitle: String {

@@ -172,7 +172,10 @@ change in both repos.
     menu. A refusal (Update now too soon, a delete the computer refused) shows as one quiet line under the header
     (`TodayNotice`). A read where no bot answered is not a read: the boards keep loading rather than say "Nothing
     yet". One `TodayBoardsStore` and one `TodayPanelLayoutStore` live in `HomeSelection`, above the per-computer
-    `AppState`. `TodayBoardPage` is a pushed page, so it brings the shell's board to the connection of the moment
+    `AppState`. A bot's own board (its page from See all, its Dashboard) hands `TodayBoardsStore` what it shows
+    each time it changes (`TodayBoardsMirror`, `take`). Today reads its copy at most once a minute, so a post
+    cleared on the bot's own page stayed on Today and in All bots until a pull down. `TodayBoardPage` is a
+    pushed page, so it brings the shell's board to the connection of the moment
     itself (`configureShellBoard`, as a bot's Dashboard does): the shell's root task waits under a pushed page, and
     after a return to the app the page then showed its copy while the computer refused every thumbs down and Clear.
   - Work (`Bighelp/Work/`) is one list of what the bots are doing, each row read from the store that holds it
@@ -1385,8 +1388,8 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
   Python 3.14 and its `messaging` extra (the API server serves RoomLink).
 - `Scripts/AppStoreScreenshots.sh` takes the App Store screenshots from the real app on an isolated host whose
   agents really run their tools on made-up files. No demo chats in store screenshots.
-  `Scripts/AppStorePosters.py` frames them as posters in bighelp.app's style with the app's Ink look (Paper and
-  Black, Inter 800 headlines, the Ember Noodle).
+  `Scripts/AppStorePosters.py` frames them as posters in the lifter brand (Cream and Night pages, Bricolage
+  Grotesque 800 headlines, Coral, the lifter lockup).
 - **Never start Hermes with a fresh `HERMES_HOME` against a shared Hermes checkout.** Hermes treats it as an
   unfinished update, rebuilds the checkout and rewrites its launchers to point at your throwaway environment. Instead:
   - Use a separate clone of Hermes.

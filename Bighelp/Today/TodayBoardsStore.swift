@@ -32,6 +32,8 @@ final class TodayBoardsStore {
     @ObservationIgnored private var byScope: [String: [String: [AgentBoardItem]]] = [:]
     @ObservationIgnored private var readAt: [String: Date] = [:]
     @ObservationIgnored private var generation = 0
+    /// What bots' own pages showed while a read ran (`take`), by bot: newer than any answer in the read.
+    @ObservationIgnored private var takenDuringRead: [String: [AgentBoardItem]] = [:]
     @ObservationIgnored private let now: () -> Date
 
     init(now: @escaping () -> Date = Date.init) {
@@ -64,6 +66,7 @@ final class TodayBoardsStore {
         let generation = generation
         isReading = true
         tracksUnread = client.supportsFeedback
+        takenDuringRead = [:]
         let wanted = Self.readOrder(botIDs: botIDs, hiddenIDs: hiddenIDs)
         let previous = byScope[scope] ?? [:]
         var next: [String: [AgentBoardItem]] = [:]
@@ -78,6 +81,9 @@ final class TodayBoardsStore {
                 if let kept = previous[id] { next[id] = kept }
             }
             guard generation == self.generation else { return }
+            // What a bot's own page showed while this read ran wins over every answer in it, the
+            // ones that came before the page changed and the ones that failed.
+            for (taken, items) in takenDuringRead where wanted.contains(taken) { next[taken] = items }
             // Each bot shows as it arrives; bots not read yet keep what they had.
             var shown = previous.filter { wanted.contains($0.key) }
             shown.merge(next) { _, new in new }
@@ -94,6 +100,15 @@ final class TodayBoardsStore {
         isReading = false
         // Only a read where every bot answered counts, so a dropping connection doesn't hold off the next.
         if allWorked { readAt[scope] = now() }
+    }
+
+    /// One bot's board as its own page shows it now (`TodayBoardsMirror`). A post cleared there, or
+    /// an idea answered, is then gone from Today and from All bots at once. Without this they kept
+    /// their copy until the next read, a minute later or on a pull down.
+    func take(_ items: [AgentBoardItem], agentID: String, scope: String) {
+        if isReading, scope == self.scope { takenDuringRead[agentID] = items }
+        byScope[scope, default: [:]][agentID] = items
+        if scope == self.scope, boards[agentID] != items { boards[agentID] = items }
     }
 
     /// The newest items of `kind` across bots, as each bot's own board lists them.

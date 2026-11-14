@@ -24,6 +24,15 @@ struct AgentBoardContext {
     var onBack: (() -> Void)? = nil
 }
 
+extension AgentBoardContext {
+    /// Do it on a Feed post: the bot's chat opens and gets "Let's do it!" with the post as a card.
+    /// The post stays in Feed, read.
+    func doIt(_ post: AgentBoardItem) {
+        onSend(post.letsDoItMessage)
+        Task { await store.setRead(post, true) }
+    }
+}
+
 extension View {
     /// Back and New chat over a board that was opened in a sheet.
     func boardSheetButtons(_ context: AgentBoardContext) -> some View {
@@ -186,6 +195,9 @@ enum BoardItemMenu {
         let store = context.store
         switch item.kind {
         case .feed:
+            // The same as swiping the post right.
+            Button(DashboardCardAction.doIt.title(botName: context.agentName),
+                   systemImage: DashboardCardAction.doIt.systemImage) { context.doIt(item) }
             Button(item.rating == .up ? "Remove thumbs up" : "Thumbs up",
                    systemImage: item.rating == .up ? "hand.thumbsup.fill" : "hand.thumbsup") {
                 Task { await store.rate(item, item.rating == .up ? .none : .up) }
@@ -252,21 +264,34 @@ struct LessLikeThis: ViewModifier {
 }
 
 /// Swipe left on a board item to clear it (Feed), say not now (Ideas) or remove it (Goals),
-/// with Undo. Swipe actions belong to a List row, so this goes on the row's outermost view.
+/// with Undo. A Feed post also swipes right for Do it (`onDoIt`). Swipe actions belong to a List
+/// row, so this goes on the row's outermost view.
 private struct BoardItemSwipe: ViewModifier {
     let item: AgentBoardItem
     let store: AgentBoardStore
+    /// Swipe right, for the items that have it.
+    var onDoIt: (() -> Void)? = nil
 
     func body(content: Content) -> some View {
         let dismiss = BoardDismissAction(kind: item.kind)
-        content.swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: dismiss.isDestructive ? .destructive : nil) {
-                Task { await store.dismiss(item) }
-            } label: {
-                Label(dismiss.title, systemImage: dismiss.systemImage)
+        content
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button(role: dismiss.isDestructive ? .destructive : nil) {
+                    Task { await store.dismiss(item) }
+                } label: {
+                    Label(dismiss.title, systemImage: dismiss.systemImage)
+                }
+                .tint(dismiss.isDestructive ? theme.danger : (item.kind == .idea ? theme.warning : .gray))
             }
-            .tint(dismiss.isDestructive ? theme.danger : (item.kind == .idea ? theme.warning : .gray))
-        }
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                if let onDoIt {
+                    Button(action: onDoIt) {
+                        Label(DashboardCardAction.doIt.title(botName: ""),
+                              systemImage: DashboardCardAction.doIt.systemImage)
+                    }
+                    .tint(theme.success)
+                }
+            }
     }
 
     @BighelpThemeReader private var theme
@@ -277,8 +302,8 @@ extension View {
         modifier(BoardItemActions(item: item, context: context))
     }
 
-    func boardItemSwipe(_ item: AgentBoardItem, store: AgentBoardStore) -> some View {
-        modifier(BoardItemSwipe(item: item, store: store))
+    func boardItemSwipe(_ item: AgentBoardItem, store: AgentBoardStore, onDoIt: (() -> Void)? = nil) -> some View {
+        modifier(BoardItemSwipe(item: item, store: store, onDoIt: onDoIt))
     }
 }
 
@@ -510,8 +535,9 @@ enum BoardTimeBucket {
 
 // MARK: - Feed
 
-/// Feed: what's new today in a green block, the newest posts as tiles two to a row, then the
-/// rest as rows in a card. Every post opens in full (`FeedPostDetailSheet`).
+/// Feed: what's new today in a green block, the newest posts as tiles, then the rest as rows in a
+/// card. Every post has a List row of its own, so each one swipes: right for Do it, left for Clear.
+/// A tap opens the post in full (`FeedPostDetailSheet`).
 struct AgentFeedView: View {
     let context: AgentBoardContext
     @State private var showsBlueprints = false
@@ -519,7 +545,6 @@ struct AgentFeedView: View {
     /// Posts that were new while the page was open. They count as read a moment after they
     /// show (`BoardScroll`), so this keeps the page from rearranging under the person.
     @State private var newIDs: Set<String> = []
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// At most this many tiles; older posts are rows.
     private static let maximumTiles = 6
@@ -529,8 +554,8 @@ struct AgentFeedView: View {
         let posts = store.feed.sorted { $0.createdAt > $1.createdAt }
         let isEmpty = posts.isEmpty && store.state == .loaded
         let fresh = posts.filter { newIDs.contains($0.id) }
-        // The new posts, rounded up to fill the last row, and at least the newest two.
-        let tileCount = min(posts.count, Self.maximumTiles, max(2, fresh.count + fresh.count % 2))
+        // The new posts, and at least the newest two.
+        let tileCount = min(posts.count, Self.maximumTiles, max(2, fresh.count))
         let tiles = Array(posts.prefix(tileCount))
         let rows = Array(posts.dropFirst(tileCount))
         BoardScroll(context: context, title: "Feed",
@@ -554,7 +579,8 @@ struct AgentFeedView: View {
                 FeedTodayBlock(posts: fresh, context: context)
                     .boardRow()
             }
-            BoardTileRows(items: tiles, columns: dynamicTypeSize.isAccessibilitySize ? 1 : 2, store: store) { item in
+            // One tile to a row: a row with two tiles can't say which one a swipe is for.
+            BoardTileRows(items: tiles, columns: 1, store: store, onDoIt: { context.doIt($0) }) { item in
                 FeedPostTile(item: item, context: context) { openedPost = .init(id: item.id) }
             }
             if !rows.isEmpty {
@@ -563,7 +589,7 @@ struct AgentFeedView: View {
                 ForEach(rows) { item in
                     FeedPostRow(item: item, context: context) { openedPost = .init(id: item.id) }
                         .boardCardSegment(isFirst: item.id == rows.first?.id, isLast: item.id == rows.last?.id)
-                        .boardItemSwipe(item, store: store)
+                        .boardItemSwipe(item, store: store, onDoIt: { context.doIt(item) })
                 }
             }
         }
@@ -615,8 +641,8 @@ private struct FeedTodayBlock: View {
     }
 }
 
-/// A new post as a pastel tile. It shares a List row with its neighbor, so its long-press menu
-/// is its own `Menu` (a tap opens the post) and it has no swipe.
+/// A new post as a pastel tile, in a List row of its own. Its long-press menu is its own `Menu`
+/// (a tap opens the post); the row swipes.
 private struct FeedPostTile: View {
     let item: AgentBoardItem
     let context: AgentBoardContext

@@ -80,6 +80,8 @@ struct BotProfilePinning {
 struct SimpleBotDashboardHooks {
     /// The shell's board store; the Dashboard's own store follows its connection.
     let shellBoard: AgentBoardStore
+    /// Today's copy of every bot's board, which takes what this bot's Dashboard changes.
+    var todayBoards: TodayBoardsStore? = nil
     /// The connection the shell's board should be on now, and setting it up for that one.
     let shellBoardKey: @MainActor () -> RootShellView.AgentBoardClientKey
     let configureShellBoard: @MainActor (RootShellView.AgentBoardClientKey) async -> Void
@@ -1257,6 +1259,7 @@ struct SimpleBotProfileView: View {
             BoardDashboardView(model: dashboard, context: boardContext(profile, hooks: hooks, store: dashboard.store),
                                shellBoard: hooks.shellBoard, shellBoardKey: hooks.shellBoardKey,
                                configureShellBoard: hooks.configureShellBoard)
+                .modifier(TodayBoardsMirror(board: dashboard.store, today: hooks.todayBoards))
         }
     }
 

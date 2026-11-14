@@ -349,4 +349,106 @@ struct SessionContentRepositoryTests {
         #expect(try reopened.loadSession(id: first.id) == first)
         #expect(try reopened.loadSession(id: second.id) == second)
     }
+
+    /// More chats stay loaded than the restored-transcript cache holds (the open chat, the warm
+    /// ones, every agent's Bot Chat). A save rewrote each one past the cache's six, every time.
+    @Test func updatingOneOfManyLoadedConversationsRewritesOnlyThatOne() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = SessionContentRepository(directory: directory, name: "sessions", scopeID: { "host-fixture" })
+        var records = (0..<12).map {
+            SessionRecord(id: "chat-\($0)", kind: .direct, agentIDs: ["default"], title: "Chat \($0)", draft: "draft \($0)")
+        }
+        try repository.save(records)
+        #expect(repository.contentWriteCount == 12)
+        try repository.save(records)
+        #expect(repository.contentWriteCount == 12, "A save with nothing changed writes no content.")
+        records[9].draft = "updated"
+        try repository.save(records)
+        #expect(repository.contentWriteCount == 13)
+        let reopened = SessionContentRepository(directory: directory, name: "sessions", scopeID: { "host-fixture" })
+        for record in records { #expect(try reopened.loadSession(id: record.id) == record) }
+    }
+
+    /// The host's list is mostly chats this device never opened. They have no content to keep,
+    /// so they share one content file instead of one each.
+    @Test func chatsWithNothingInThemShareOneContentFile() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let scoped = directory.appending(path: "hermes-hosts/host-fixture")
+        func contentFiles() throws -> [String] {
+            try FileManager.default.contentsOfDirectory(atPath: scoped.path(percentEncoded: false))
+                .filter { $0.hasPrefix("sessions-content-") }
+        }
+        let repository = SessionContentRepository(directory: directory, name: "sessions", scopeID: { "host-fixture" })
+        var records = (0..<50).map {
+            SessionRecord(id: "chat-\($0)", kind: .direct, agentIDs: ["default"], title: "Chat \($0)")
+        }
+        try repository.save(records)
+        #expect(repository.contentWriteCount == 1)
+        #expect(try contentFiles().count == 1)
+        records[3].title = "Renamed"
+        try repository.save(records)
+        #expect(repository.contentWriteCount == 1)
+
+        // A chat that gains content gets a file of its own, and gives it up when it is empty again.
+        records[4].draft = "Something to keep"
+        try repository.save(records)
+        #expect(repository.contentWriteCount == 2)
+        #expect(try contentFiles().count == 2)
+        var reopened = SessionContentRepository(directory: directory, name: "sessions", scopeID: { "host-fixture" })
+        for record in records { #expect(try reopened.loadSession(id: record.id) == record) }
+        records[4].draft = ""
+        try repository.save(records)
+        #expect(repository.contentWriteCount == 2)
+        #expect(try contentFiles().count == 1)
+
+        // The shared file goes with the last chat that used it, and comes back with the next.
+        for index in records.indices { records[index].draft = "draft \(index)" }
+        try repository.save(records)
+        #expect(try contentFiles().count == 50)
+        records[0].draft = ""
+        try repository.save(records)
+        #expect(try contentFiles().count == 50)
+        reopened = SessionContentRepository(directory: directory, name: "sessions", scopeID: { "host-fixture" })
+        for record in records { #expect(try reopened.loadSession(id: record.id) == record) }
+        // A cold catalog's rows restore without the bounded cache ever holding the shared content.
+        let listed = try reopened.load()
+        #expect(try reopened.restoreContent(in: #require(listed.first { $0.id == "chat-0" })) == records[0])
+    }
+
+    /// A save that iOS ends part-way leaves the content files it wrote before the manifest.
+    @Test(.timeLimit(.minutes(1)))
+    func contentFilesNoRowPointsToAreRemoved() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let scoped = directory.appending(path: "hermes-hosts/host-fixture")
+        let repository = SessionContentRepository(directory: directory, name: "sessions", scopeID: { "host-fixture" })
+        let records = (0..<3).map {
+            SessionRecord(id: "chat-\($0)", kind: .direct, agentIDs: ["default"], title: "Chat \($0)", draft: "draft \($0)")
+        } + [SessionRecord(id: "empty", kind: .direct, agentIDs: ["default"], title: "Empty")]
+        try repository.save(records)
+        func age(_ file: URL, by seconds: TimeInterval) throws {
+            try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-seconds)],
+                                                  ofItemAtPath: file.path(percentEncoded: false))
+        }
+        for file in try FileManager.default.contentsOfDirectory(at: scoped, includingPropertiesForKeys: nil) {
+            try age(file, by: 3_600)
+        }
+        func leftover(agedBy seconds: TimeInterval) throws -> URL {
+            let file = scoped.appending(path: "sessions-content-\(UUID().uuidString.lowercased())-v1.json")
+            try Data("{}".utf8).write(to: file)
+            try age(file, by: seconds)
+            return file
+        }
+        let old = try leftover(agedBy: 3_600)
+        let justWritten = try leftover(agedBy: 0)
+
+        #expect(await repository.removeUnreferencedContent() == 1)
+        #expect(!FileManager.default.fileExists(atPath: old.path(percentEncoded: false)))
+        #expect(FileManager.default.fileExists(atPath: justWritten.path(percentEncoded: false)),
+                "A file from the last minute may belong to a save in progress.")
+        let reopened = SessionContentRepository(directory: directory, name: "sessions", scopeID: { "host-fixture" })
+        for record in records { #expect(try reopened.loadSession(id: record.id) == record) }
+    }
 }

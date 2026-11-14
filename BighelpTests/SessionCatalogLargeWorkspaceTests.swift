@@ -10,6 +10,8 @@ import Testing
 @Suite(.serialized)
 struct SessionCatalogLargeWorkspaceTests {
     private static let scheduledChatCount = 4_350
+    /// What a computer with months of scheduled runs lists.
+    private static let installedChatCount = 7_000
     private static let openChatID = "open-chat"
 
     @Test func aListRefreshWithNothingNewStaysCheapAndWritesNothing() async throws {
@@ -80,6 +82,87 @@ struct SessionCatalogLargeWorkspaceTests {
             .loadSession(id: Self.openChatID)?.draft == typed)
     }
 
+    /// The first run after an install has no saved copy, so every chat comes from the host's
+    /// list with its content loaded and empty. Each save then wrote one file per chat, on the
+    /// main thread: 7,000 chats held it for seconds, and going to the background ended in the
+    /// watchdog.
+    @Test(.timeLimit(.minutes(2)))
+    func theFirstRunAfterAnInstallSavesEveryListedChatWithoutAFileEach() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = SessionContentRepository(directory: directory, name: "native-sessions-v2", currentSchemaVersion: 2)
+        let catalog = SessionCatalogStore(
+            client: DemoSessionCatalogClient(records: Self.scheduledChats(preview: true, count: Self.installedChatCount)),
+            repository: repository, defaults: isolatedDefaults())
+        try await catalog.load()
+        #expect(catalog.records.count == Self.installedChatCount)
+
+        let clock = ContinuousClock()
+        let first = clock.measure { catalog.flushPersistence() }
+        let firstWrites = repository.contentWriteCount
+        // One row changes, and the app goes to the background.
+        catalog.showRead(id: "session-7")
+        let second = clock.measure { catalog.flushPersistence() }
+        let secondWrites = repository.contentWriteCount - firstWrites
+        let files = try FileManager.default.contentsOfDirectory(atPath: directory.path(percentEncoded: false))
+        print("LARGE_WORKSPACE_INSTALL chats=\(catalog.records.count) first=\(first) firstWrites=\(firstWrites)"
+            + " second=\(second) secondWrites=\(secondWrites) files=\(files.count)")
+        #expect(!catalog.hasUnsavedChanges)
+        #expect(firstWrites <= 1, "Chats with nothing in them share one content file.")
+        #expect(secondWrites == 0, "A change to one row rewrites no chat's content.")
+        #expect(files.count <= 3)
+        #expect(second < .milliseconds(250), "Leaving the app must not hold the main thread.")
+        let reopened = SessionContentRepository(directory: directory, name: "native-sessions-v2", currentSchemaVersion: 2)
+        #expect(try reopened.load().count == Self.installedChatCount)
+        #expect(try reopened.loadSession(id: "session-7")?.isUnread == false)
+        #expect(try reopened.loadSession(id: "session-8")?.items.isEmpty == true)
+    }
+
+    /// The same first run with a chat open: checkpoints while typing must leave the main actor free.
+    @Test(.timeLimit(.minutes(2)))
+    func typingOnTheFirstRunAfterAnInstallLeavesTheMainActorResponsive() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = SessionContentRepository(directory: directory, name: "native-sessions-v2", currentSchemaVersion: 2)
+        var open = Self.openChat
+        open.items = Array(Self.openChatItems.prefix(200))
+        let catalog = SessionCatalogStore(
+            client: DemoSessionCatalogClient(records: Self.scheduledChats(preview: true, count: Self.installedChatCount) + [open]),
+            repository: repository, defaults: isolatedDefaults(), persistenceCheckpointDelay: .milliseconds(500))
+        try await catalog.load()
+        catalog.flushPersistence()
+        let savesBefore = catalog.repositorySaveCount
+        let contentWritesBefore = repository.contentWriteCount
+
+        var maximumGap: Duration = .zero
+        let probe = Task { @MainActor in
+            var previous = ContinuousClock.now
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .milliseconds(5)) } catch { return }
+                let now = ContinuousClock.now
+                maximumGap = max(maximumGap, now - previous)
+                previous = now
+            }
+        }
+        let typed = "Please summarize what the last scheduled run found"
+        for length in 1...typed.count {
+            catalog.updateChatSnapshot(draft: String(typed.prefix(length)), items: open.items,
+                activityEvents: [], activityVisibility: nil, for: Self.openChatID)
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        // Automatic saves of a list this size are paced (`checkpointDelay`).
+        for _ in 0..<800 where catalog.hasUnsavedChanges { try await Task.sleep(for: .milliseconds(50)) }
+        probe.cancel()
+        await probe.value
+        let saves = catalog.repositorySaveCount - savesBefore
+        let contentWrites = repository.contentWriteCount - contentWritesBefore
+        print("LARGE_WORKSPACE_INSTALL_TYPING maximumMainActorGap=\(maximumGap) saves=\(saves) contentWrites=\(contentWrites)")
+        #expect(saves >= 1 && saves <= 4)
+        #expect(contentWrites == saves, "Only the chat being typed in is rewritten.")
+        #expect(!catalog.hasUnsavedChanges)
+        #expect(maximumGap < .milliseconds(100), "A checkpoint must leave typing responsive.")
+    }
+
     @Test func aLargeAutomaticCheckpointLeavesTheMainActorResponsive() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -132,8 +215,8 @@ struct SessionCatalogLargeWorkspaceTests {
     }
 
     /// The host's list rows carry the last line as `catalogPreview` and no items.
-    private static func scheduledChats(preview: Bool) -> [SessionRecord] {
-        (0..<scheduledChatCount).map { index in
+    private static func scheduledChats(preview: Bool, count: Int = scheduledChatCount) -> [SessionRecord] {
+        (0..<count).map { index in
             let at = Date(timeIntervalSince1970: 1_700_000_000 + TimeInterval(index) * 900)
             var record = SessionRecord(id: "session-\(index)", kind: .direct, agentIDs: ["default"],
                 title: "Scheduled run \(index)", remoteStoredID: "stored-\(index)",

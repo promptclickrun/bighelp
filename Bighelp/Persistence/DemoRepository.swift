@@ -111,6 +111,16 @@ final class DemoRepository<Value: Codable> {
 
     private var checkpointEpoch = UUID()
     private var preparedCheckpoint: PreparedCheckpoint?
+    /// The file as this repository last wrote it, or last read it without changing it. While
+    /// that same file is on disk its schema version is known, so a save need not read the
+    /// whole file back to check it: a catalog of thousands of chats is megabytes.
+    private var knownFile: DemoRepositoryFileWitness?
+
+    /// Whether the file on disk is still the one this repository last wrote or read.
+    var holdsKnownFile: Bool {
+        guard let identity = knownFile?.identity, let url = try? resolvedFileURL() else { return false }
+        return (try? DemoRepositoryFileIdentity.read(url)) == identity
+    }
     private struct Envelope<Payload: Codable>: Codable {
         let schemaVersion: Int
         let value: Payload
@@ -128,6 +138,11 @@ final class DemoRepository<Value: Codable> {
             path: "unavailable-\(name)-avatars",
             directoryHint: .isDirectory
         )
+    }
+
+    /// The folder this repository's file is in, for an owner that keeps sibling files there.
+    func scopedDirectory() throws -> URL {
+        try resolvedDirectory()
     }
 
     func scopedAvatarsDirectory() throws -> URL {
@@ -207,11 +222,15 @@ final class DemoRepository<Value: Codable> {
         try requireBighelpProtectedData(protectedDataAvailability)
         let fileURL = try resolvedFileURL()
         guard fileManager.fileExists(atPath: fileURL.bighelpFileSystemPath) else { return nil }
+        let identity = try? DemoRepositoryFileIdentity.read(fileURL)
         let data = try Data(contentsOf: fileURL)
         let version = try JSONDecoder().decode(EnvelopeVersion.self, from: data).schemaVersion
         guard version >= 0 else { throw DemoRepositoryError.invalidSchemaVersion(version) }
         guard version <= currentSchemaVersion else {
             throw DemoRepositoryError.unsupportedSchemaVersion(found: version, current: currentSchemaVersion)
+        }
+        if let identity, (try? DemoRepositoryFileIdentity.read(fileURL)) == identity {
+            knownFile = DemoRepositoryFileWitness(identity: identity, schemaVersion: version)
         }
         let decoded = version < currentSchemaVersion
             ? try migratedData(data, fromVersion: version) : data
@@ -360,7 +379,12 @@ final class DemoRepository<Value: Codable> {
 
     func savePreparedEncoding(_ encoding: DemoRepositoryPreparedEncoding) throws {
         try requireBighelpProtectedData(protectedDataAvailability)
-        let previous = try DemoRepositoryFileWitness.read(resolvedFileURL())
+        let previous: DemoRepositoryFileWitness
+        if holdsKnownFile, let knownFile {
+            previous = knownFile
+        } else {
+            previous = try DemoRepositoryFileWitness.read(resolvedFileURL())
+        }
         try persistPrepared(encoding, previous: previous)
     }
 
@@ -408,6 +432,8 @@ final class DemoRepository<Value: Codable> {
             try? fileManager.removeItem(at: temporaryURL)
             throw error
         }
+        knownFile = DemoRepositoryFileWitness(identity: try? DemoRepositoryFileIdentity.read(fileURL),
+                                              schemaVersion: encoding.schemaVersion)
     }
 
     /// Retries a protected write after iOS reports that protected data is

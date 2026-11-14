@@ -5,6 +5,8 @@ import Foundation
 @MainActor
 protocol SessionCatalogRepository: AnyObject {
     var supportsContentCompaction: Bool { get }
+    /// How many bytes the last save wrote, for pacing automatic saves. Zero when unknown.
+    var lastSaveByteCount: Int { get }
     func load() throws -> [SessionRecord]
     func loadSession(id: String) throws -> SessionRecord?
     func restoreContent(in record: SessionRecord) throws -> SessionRecord
@@ -17,6 +19,7 @@ protocol SessionCatalogRepository: AnyObject {
 
 extension SessionCatalogRepository {
     var supportsContentCompaction: Bool { false }
+    var lastSaveByteCount: Int { 0 }
     func loadSession(id: String) throws -> SessionRecord? {
         try load().first { $0.id == id }
     }
@@ -50,6 +53,9 @@ enum SessionContentRepositoryError: Error, Equatable {
 /// A protected metadata manifest points to immutable, session-specific revisions.
 /// Content is written first; atomic manifest replacement is the only commit.
 /// Failed adoption leaves the old manifest and every referenced revision intact.
+/// A chat with nothing in it has no revision of its own: all of them point to
+/// `emptyContentRevision`. A host's list is mostly chats this device never opened, and
+/// a file for each made every save write thousands of files on the main thread.
 /// All files remain beneath DemoRepository's existing host directory, which the
 /// account data eraser already removes. Legacy snapshots are never deleted here.
 @MainActor
@@ -81,6 +87,13 @@ final class SessionContentRepository: SessionCatalogRepository {
             activityEvents = record.activityEvents
         }
 
+        static let empty = Content(SessionRecord(id: "", kind: .direct, agentIDs: [], title: ""))
+
+        var isEmpty: Bool {
+            draft.isEmpty && referenceState == nil && items.isEmpty
+                && botModePrivateHistory.isEmpty && activityEvents.isEmpty
+        }
+
         func restoring(_ metadata: SessionRecord) -> SessionRecord {
             var record = metadata
             record.draft = draft
@@ -104,6 +117,8 @@ final class SessionContentRepository: SessionCatalogRepository {
         let baseRevision: UUID?
         let manifest: Manifest
         let content: [UUID: Content]
+        /// Each chat that was saved with its content loaded, and the revision that holds it.
+        let loaded: [String: SavedContent]
 
         func encoded() throws -> PreparedSave {
             let writes = try content.map { revision, value in
@@ -148,6 +163,11 @@ final class SessionContentRepository: SessionCatalogRepository {
         let bytes: Int
     }
 
+    private struct SavedContent: Sendable {
+        let revision: UUID
+        let value: Content
+    }
+
     private struct PreparedCheckpoint {
         let id: UUID
         let plan: Plan
@@ -155,6 +175,7 @@ final class SessionContentRepository: SessionCatalogRepository {
     }
 
     private let legacy: DemoRepository<[SessionRecord]>
+    private let protectedDataAvailability: any BighelpProtectedDataAvailabilityProviding
     private let manifestRepository: DemoRepository<Manifest>
     private let manifestRevisionRepository: DemoRepository<ManifestRevision>
     private let name: String
@@ -168,10 +189,21 @@ final class SessionContentRepository: SessionCatalogRepository {
     private let maximumResidentContentEntries: Int
     private let maximumResidentContentBytes: Int
     private var residentContentBytes = 0
+    /// What the last save wrote for each chat whose content the catalog holds. The catalog
+    /// owns those transcripts already, so keeping them costs nothing, and a save can tell an
+    /// unchanged chat from a changed one however many are loaded. The cache above holds six.
+    private var savedContent: [String: SavedContent] = [:]
+    /// The scopes whose unreferenced content files this process has already removed.
+    private var cleanedScopes: Set<String> = []
     private var preparedCheckpoint: PreparedCheckpoint?
     private(set) var contentWriteCount = 0
+    private(set) var lastSaveByteCount = 0
     private(set) var contentLoadCount = 0
     var residentContentCount: Int { contentCache.count }
+
+    /// The revision of every chat with no draft, messages or activity. Its file is written
+    /// with the first chat that points to it and removed with the last, like any revision.
+    nonisolated static let emptyContentRevision = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
     var residentContentByteCount: Int { residentContentBytes }
 
     init(
@@ -195,6 +227,7 @@ final class SessionContentRepository: SessionCatalogRepository {
             migrations: migrations, scopeID: scopeID, currentSchemaVersion: currentSchemaVersion
         )
         self.legacy = legacy
+        self.protectedDataAvailability = protectedDataAvailability
         self.name = name
         self.seed = seed
         manifestRepository = legacy.child(name: "\(name)-catalog", seed: Manifest())
@@ -207,21 +240,52 @@ final class SessionContentRepository: SessionCatalogRepository {
         scope = nil
         epoch = UUID()
         manifest = nil
-        contentCache.removeAll()
-        contentCacheOrder.removeAll()
-        residentContentBytes = 0
+        forgetLoadedContent()
         preparedCheckpoint = nil
     }
 
     func load() throws -> [SessionRecord] {
         try selectScope()
-        // Read the manifest even if cached: another repository instance or the
-        // account eraser may have changed durable state since our last load.
-        manifest = nil
+        // Another repository instance or the account eraser may have changed durable state
+        // since our last load, so the cached manifest stands only while its file is the same.
+        if !manifestRepository.holdsKnownFile { manifest = nil }
         try ensureManifest()
         let retained = Set((manifest?.records ?? []).compactMap(\.localContentRevision))
         retainResidentContent(revisions: retained)
+        if let scope, cleanedScopes.insert(scope).inserted {
+            Task { await removeUnreferencedContent() }
+        }
         return manifest?.records ?? []
+    }
+
+    /// Removes content files no row points to. A save ended part-way (the watchdog, a crash,
+    /// a full disk) leaves the files it wrote before the manifest, and a save only removes the
+    /// revisions it retires itself. Files from the last minute stay: whatever this process
+    /// writes from now on is newer than that, and the shared empty revision is never touched,
+    /// because a later save may write that same file again.
+    @discardableResult
+    func removeUnreferencedContent() async -> Int {
+        guard let manifest, let directory = try? legacy.scopedDirectory(),
+              protectedDataAvailability.isProtectedDataAvailable else { return 0 }
+        let referenced = Set(manifest.records.compactMap(\.localContentRevision))
+        let prefix = "\(name)-content-", suffix = "-v1.json"
+        let cutoff = Date.now.addingTimeInterval(-60)
+        return await Task.detached(priority: .utility) {
+            let files = (try? FileManager.default.contentsOfDirectory(
+                at: directory, includingPropertiesForKeys: [.contentModificationDateKey]
+            )) ?? []
+            var removed = 0
+            for file in files {
+                let fileName = file.lastPathComponent
+                guard fileName.hasPrefix(prefix), fileName.hasSuffix(suffix),
+                      let revision = UUID(uuidString: String(fileName.dropFirst(prefix.count).dropLast(suffix.count))),
+                      revision != Self.emptyContentRevision, !referenced.contains(revision),
+                      let modified = try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+                      modified < cutoff else { continue }
+                if (try? FileManager.default.removeItem(at: file)) != nil { removed += 1 }
+            }
+            return removed
+        }.value
     }
 
     func loadSession(id: String) throws -> SessionRecord? {
@@ -238,7 +302,9 @@ final class SessionContentRepository: SessionCatalogRepository {
             throw SessionContentRepositoryError.staleCheckpoint
         }
         let content: Content
-        if let cached = residentContent(revision) {
+        if revision == Self.emptyContentRevision {
+            content = .empty
+        } else if let cached = residentContent(revision) {
             content = cached
         } else {
             let child = contentRepository(revision)
@@ -266,6 +332,7 @@ final class SessionContentRepository: SessionCatalogRepository {
               ) else {
             throw SessionContentRepositoryError.staleCheckpoint
         }
+        savedContent[record.id] = nil
         return metadata
     }
 
@@ -315,7 +382,14 @@ final class SessionContentRepository: SessionCatalogRepository {
         guard prepared.scope == scope, prepared.epoch == epoch else {
             throw SessionContentRepositoryError.staleCheckpoint
         }
-        let currentRevision = try manifestRevisionRepository.loadExistingPreservingSource()?.revision
+        // The file this repository last read or wrote holds the manifest it has in memory.
+        // Reading megabytes of rows back from disk to learn one revision held the main thread.
+        let currentRevision: UUID?
+        if let manifest, manifestRepository.holdsKnownFile {
+            currentRevision = manifest.revision
+        } else {
+            currentRevision = try manifestRevisionRepository.loadExistingPreservingSource()?.revision
+        }
         guard currentRevision == prepared.baseRevision else {
             throw SessionContentRepositoryError.staleCheckpoint
         }
@@ -343,10 +417,12 @@ final class SessionContentRepository: SessionCatalogRepository {
         // not poison change detection or a retry's original revision guard.
         manifest = candidate
         preparedCheckpoint = nil
+        savedContent = plan.loaded
+        lastSaveByteCount = prepared.writes.reduce(prepared.manifest.byteCount) { $0 + $1.data.byteCount }
         let encodedByteCounts = Dictionary(uniqueKeysWithValues: prepared.writes.map {
             ($0.revision, $0.data.byteCount)
         })
-        for (revision, value) in plan.content {
+        for (revision, value) in plan.content where revision != Self.emptyContentRevision {
             rememberResidentContent(
                 value,
                 revision: revision,
@@ -387,16 +463,19 @@ final class SessionContentRepository: SessionCatalogRepository {
             try save(records)
             // Migration is the sole whole-history read; do not keep that
             // temporary decoded corpus alive behind a metadata-only catalog.
-            contentCache.removeAll()
-            contentCacheOrder.removeAll()
-            residentContentBytes = 0
+            forgetLoadedContent()
         } catch {
             manifest = nil
-            contentCache.removeAll()
-            contentCacheOrder.removeAll()
-            residentContentBytes = 0
+            forgetLoadedContent()
             throw error
         }
+    }
+
+    private func forgetLoadedContent() {
+        contentCache.removeAll()
+        contentCacheOrder.removeAll()
+        residentContentBytes = 0
+        savedContent.removeAll()
     }
 
     private func prepare(_ records: [SessionRecord]) throws -> Plan {
@@ -408,6 +487,7 @@ final class SessionContentRepository: SessionCatalogRepository {
         let existing = Dictionary(uniqueKeysWithValues: manifest.records.map { ($0.id, $0) })
         let knownRevisions = Set(manifest.records.compactMap(\.localContentRevision))
         var content: [UUID: Content] = [:]
+        var loaded: [String: SavedContent] = [:]
         let metadata = try records.map { record -> SessionRecord in
             if let revision = record.localContentRevision {
                 // Metadata-only edits reuse the exact existing content pointer.
@@ -423,12 +503,18 @@ final class SessionContentRepository: SessionCatalogRepository {
             }
             let payload = Content(record)
             let revision: UUID
-            if let old = existing[record.id]?.localContentRevision,
-               let cached = residentContent(old), cached == payload {
-                revision = old
+            if payload.isEmpty {
+                revision = Self.emptyContentRevision
+                if !knownRevisions.contains(revision) { content[revision] = payload }
             } else {
-                revision = UUID()
-                content[revision] = payload
+                if let old = existing[record.id]?.localContentRevision, old != Self.emptyContentRevision,
+                   holds(payload, for: record.id, at: old) {
+                    revision = old
+                } else {
+                    revision = UUID()
+                    content[revision] = payload
+                }
+                loaded[record.id] = SavedContent(revision: revision, value: payload)
             }
             var row = record
             row.localContentRevision = revision
@@ -436,7 +522,7 @@ final class SessionContentRepository: SessionCatalogRepository {
             row.catalogPreview = String(record.summary.preview.prefix(512))
             row.catalogHasDraft = SessionRecord.holdsDraft(record.draft)
             row.hasDeferredReferenceState = record.referenceState != nil
-                || ReferenceCodec.decode(record.draft).hasValidAppendix
+                || (!record.draft.isEmpty && ReferenceCodec.decode(record.draft).hasValidAppendix)
             row.draft = ""
             row.referenceState = nil
             row.items = []
@@ -445,7 +531,13 @@ final class SessionContentRepository: SessionCatalogRepository {
             return row
         }
         return Plan(schemaVersion: legacy.currentSchemaVersion, scope: scope, epoch: epoch, baseRevision: manifest.revision,
-                    manifest: Manifest(revision: UUID(), records: metadata), content: content)
+                    manifest: Manifest(revision: UUID(), records: metadata), content: content, loaded: loaded)
+    }
+
+    /// Whether `revision` already holds exactly this content for the chat.
+    private func holds(_ payload: Content, for id: String, at revision: UUID) -> Bool {
+        if let saved = savedContent[id], saved.revision == revision { return saved.value == payload }
+        return residentContent(revision) == payload
     }
 
     private func validate(_ manifest: Manifest) throws {

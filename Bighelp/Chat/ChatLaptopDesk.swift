@@ -52,6 +52,8 @@ struct ChatLaptopDesk: View {
     private func face(_ activity: AgentActivityKind, size: CGFloat) -> some View {
         SimpleBotFace(agentID: agentID, name: name, imageURL: imageURL, size: size,
                       activity: activity == .idle ? nil : .working(tool: nil))
+            // Its name is in the lines beside it: VoiceOver would say it twice.
+            .accessibilityHidden(true)
     }
 
     private func lines(_ activity: AgentActivityKind, alignment: HorizontalAlignment) -> some View {

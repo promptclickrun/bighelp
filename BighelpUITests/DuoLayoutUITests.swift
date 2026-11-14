@@ -153,7 +153,8 @@ final class DuoLayoutUITests: BighelpUITestCase {
             // page, under the message box.
             XCTAssertTrue(element("chat.laptop.desk", in: app).waitForExistence(timeout: 5),
                           "The half under the fold carries the desk")
-            XCTAssertTrue(element("chat.laptop.status", in: app).exists, "It says what the bot is doing")
+            XCTAssertEqual(element("chat.laptop.status", in: app).label, "Avery Park, Here for you",
+                           "It says who the bot is and what it's doing, once")
             for id in ["chat.laptop.new-chat", "chat.laptop.bot-page"] {
                 let button = app.buttons[id]
                 XCTAssertTrue(button.waitForExistence(timeout: 5), "\(id) is in reach under the fold")

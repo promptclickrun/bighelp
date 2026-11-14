@@ -30,6 +30,7 @@ final class SessionCatalogStore {
     /// Goes up whenever `presentedRecords` may have changed, so a screen that lists chats can
     /// keep what it worked out from them until then.
     @ObservationIgnored private(set) var presentedRevision = 0
+    @ObservationIgnored private var recentSummariesCache: [Bool: (revision: Int, summaries: [SessionSummary])] = [:]
 
     /// UI reads a stable snapshot during historical delivery. Routing, merge,
     /// authorization and persistence always use the current canonical records.
@@ -688,13 +689,23 @@ final class SessionCatalogStore {
         recentSummaries(includeCronSessions: false)
     }
 
+    /// The newest chats, kept until the records change. Many screens read this as they draw (the
+    /// Bots view, the Chats view, the island, the sidebar), and each read walked and sorted every
+    /// chat: with thousands of chats that was most of the main thread's work after a list refresh.
     func recentSummaries(includeCronSessions: Bool) -> [SessionSummary] {
-        presentedRecords
+        // Reading the records is what tells Observation a screen depends on them.
+        let records = presentedRecords
+        if let kept = recentSummariesCache[includeCronSessions], kept.revision == presentedRevision {
+            return kept.summaries
+        }
+        let summaries = records
             .filter { !$0.isSubagentSession && !$0.isWorkflowSession && ($0.hasAcceptedMessage || $0.hasActiveWork) }
             .filter { includeCronSessions || !$0.isCronSession }
             .sorted(by: SessionCatalogReconciliation.activitySort)
             .prefix(Self.summaryRetentionLimit)
             .map(\.summary)
+        recentSummariesCache[includeCronSessions] = (presentedRevision, summaries)
+        return summaries
     }
 
     /// Synchronous durable checkpoint for the canonical send boundary. Unlike

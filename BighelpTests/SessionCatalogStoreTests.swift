@@ -26,6 +26,23 @@ struct SessionCatalogStoreTests {
         }
     }
 
+    /// The recent chats are kept between changes; a kept list must never outlive one.
+    @Test func recentChatsFollowEveryChangeToTheRecords() {
+        let chat = SessionRecord(id: "chat", kind: .direct, agentIDs: ["finance"], title: "Budget",
+            createdAt: Date(timeIntervalSince1970: 1), updatedAt: Date(timeIntervalSince1970: 1), hasAcceptedMessage: true)
+        let catalog = SessionCatalogStore(client: DemoSessionCatalogClient(), records: [chat], defaults: isolatedDefaults())
+        #expect(catalog.recentSummaries.map(\.title) == ["Budget"])
+        catalog.reconcileLiveSessionTitle(id: chat.id, title: "Budget for May", persist: false)
+        #expect(catalog.recentSummaries.map(\.title) == ["Budget for May"])
+
+        // While history is delivered the screens keep the list they had, then take the new one.
+        catalog.setPresentationDeferred(true)
+        catalog.reconcileLiveSessionTitle(id: chat.id, title: "Budget for June", persist: false)
+        #expect(catalog.recentSummaries.map(\.title) == ["Budget for May"])
+        catalog.setPresentationDeferred(false)
+        #expect(catalog.recentSummaries.map(\.title) == ["Budget for June"])
+    }
+
     @Test func canonicalEventRefinementDoesNotCreateASecondWorkTrailIdentity() throws {
         let original = ChatActivityEvent(eventID: "stored-result-row", sessionID: "chat", turnID: "stored-turn",
             kind: .tool, lifecycle: .recorded, title: "Read", summary: nil, detail: nil, occurredAt: 1,

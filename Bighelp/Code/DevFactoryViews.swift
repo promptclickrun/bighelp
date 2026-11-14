@@ -471,14 +471,7 @@ struct DevFactoryRecipeView: View {
         .navigationTitle(detail?.name ?? "Recipe")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("Edit steps", systemImage: "pencil") { context.onEditRecipe(recipeID) }
-                } label: {
-                    Image(systemName: "ellipsis").bighelpToolbarIcon()
-                }
-                .accessibilityIdentifier("devfactory.recipe.more")
-            }
+            recipeOptions
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Button {
@@ -514,6 +507,26 @@ struct DevFactoryRecipeView: View {
             errorMessage = nil
         } catch {
             errorMessage = WorkflowsStore.reason(error)
+        }
+    }
+
+    /// The recipe's own action, in the system's overflow menu from iOS 27: the Duo's column keeps
+    /// one "⋯", the system's, rather than an app menu stacked above it.
+    @ToolbarContentBuilder
+    private var recipeOptions: some ToolbarContent {
+        if #available(iOS 27.0, macCatalyst 27.0, visionOS 27.0, *) {
+            ToolbarOverflowMenu {
+                Button("Edit steps", systemImage: "pencil") { context.onEditRecipe(recipeID) }
+            }
+        } else {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button("Edit steps", systemImage: "pencil") { context.onEditRecipe(recipeID) }
+                } label: {
+                    Image(systemName: "ellipsis").bighelpToolbarIcon()
+                }
+                .accessibilityIdentifier("devfactory.recipe.more")
+            }
         }
     }
 

@@ -161,6 +161,32 @@ final class DuoLayoutUITests: BighelpUITestCase {
         }
     }
 
+    // MARK: Every screen
+
+    /// From iOS 27 a project's actions sit in the system's overflow menu, so its bar has one "⋯" and
+    /// the Duo's column doesn't stack ours above the system's. Runs on any simulator.
+    @MainActor
+    func testAProjectsActionsSitInTheSystemsOverflowMenu() throws {
+        guard #available(iOS 27.0, *) else { throw XCTSkip("The system's overflow menu came with iOS 27") }
+        let app = makeApp()
+        app.launchArguments = demo + ["-loopdy.demo.appearance", "light"]
+        app.launch()
+        openRootTab("tab.projects", in: app)
+        let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "projects.card.")).firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 20), "The demo has a project")
+        card.tap()
+        XCTAssertTrue(element("project.screen", in: app).waitForExistence(timeout: 10), "The project opens")
+        XCTAssertFalse(app.buttons["project.options"].exists, "No menu of our own beside the system's")
+        sleep(1)
+        save("project-bar-light", app)
+        let overflow = app.buttons.matching(
+            NSPredicate(format: "label == %@ OR identifier CONTAINS[c] %@", "More", "overflow")).firstMatch
+        XCTAssertTrue(overflow.waitForExistence(timeout: 5), "The system's overflow is on the screen:\n\(app.debugDescription)")
+        overflow.tap()
+        XCTAssertTrue(app.buttons["Archive project"].waitForExistence(timeout: 5), "It holds the project's actions")
+        save("project-overflow-light", app)
+    }
+
     // MARK: Helpers
 
     @MainActor

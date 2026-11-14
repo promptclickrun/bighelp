@@ -79,6 +79,18 @@ struct ScreenPostureTests {
         }
     }
 
+    @Test func theAppNeverDrawsItsOwnIslandOnTheDuo() {
+        // Folded, open wide and half-folded: the camera and the status sit in a side column, so
+        // there is no top-edge island to cover. Reserving space at the top also moved every
+        // screen and fed back into the posture, so the stage shook the whole UI open.
+        for posture in [BighelpScreenPosture.cover, .open, .openUpright] {
+            #expect(!AgentIslandAvailability.isShown(isPhone: true, posture: posture))
+        }
+        #expect(AgentIslandAvailability.isShown(isPhone: true, posture: .standard))
+        // iPad, the Mac and Vision Pro have no island to cover.
+        #expect(!AgentIslandAvailability.isShown(isPhone: false, posture: .standard))
+    }
+
     @Test func theSwitcherSettingStartsOnForPhonesAndKeepsTheChoice() {
         let name = "chat-switcher-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!

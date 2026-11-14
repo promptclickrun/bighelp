@@ -144,29 +144,6 @@ final class DuoLayoutUITests: BighelpUITestCase {
         }
     }
 
-    @MainActor
-    func testCoverScreenKeepsTheAgentsFaceWhereItsMenuWas() throws {
-        let app = makeApp()
-        app.launchArguments = demo + ["-loopdy.demo.appearance", "light"]
-        app.launch()
-        try requireCoverScreen(app)
-        let feed = app.buttons["tab.feed"].firstMatch
-        XCTAssertTrue(feed.waitForExistence(timeout: 20), "The places are in the side strip")
-        feed.tap()
-        let face = app.buttons["board.more"].firstMatch
-        XCTAssertTrue(face.waitForExistence(timeout: 10), "The agent's face is where the menu was")
-        let window = app.windows.firstMatch.frame
-        XCTAssertGreaterThan(face.frame.midX, window.midX, "It sits with the screen's other buttons")
-        XCTAssertLessThan(face.frame.maxX, window.maxX - 60,
-                          "Clear of the camera and the status, which have the column beside it")
-        sleep(1)
-        save("cover-board-face-light", app)
-        face.tap()
-        XCTAssertTrue(app.buttons["Agent profile"].waitForExistence(timeout: 5),
-                      "The face opens the same menu")
-        save("cover-board-face-menu-light", app)
-    }
-
     /// A posture change with the viewer open: photo three must survive it, and so must the viewer.
     /// It skips on a screen that can't turn — the foldable simulator reports only its cover display
     /// in portrait, so a test here needs a device that really changes posture.

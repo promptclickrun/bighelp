@@ -285,7 +285,7 @@ final class NativeWorkspaceInvalidationCoordinator {
     /// this many times as long as the last read took before the next one, up to
     /// `longestSessionsRefreshGap`. A short list reads in well under a second and keeps the 5 s.
     static let sessionsRefreshRestFactor = 5
-    static let longestSessionsRefreshGap: Duration = .seconds(60)
+    static let longestSessionsRefreshGap: Duration = .seconds(30)
 
     private var sessionsRefreshGap: Duration {
         max(minimumSessionsRefreshGap,

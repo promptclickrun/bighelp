@@ -451,4 +451,27 @@ struct SessionContentRepositoryTests {
         let reopened = SessionContentRepository(directory: directory, name: "sessions", scopeID: { "host-fixture" })
         for record in records { #expect(try reopened.loadSession(id: record.id) == record) }
     }
+
+    /// The cleanup is asked for when one computer's chats load. If another computer is in use by
+    /// the time it runs, it must leave that computer's files alone.
+    @Test(.timeLimit(.minutes(1)))
+    func cleanupNeverTouchesAnotherComputersFiles() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var host = "host-a"
+        let repository = SessionContentRepository(directory: directory, name: "sessions", scopeID: { host })
+        try repository.save([SessionRecord(id: "a", kind: .direct, agentIDs: ["default"], title: "A", draft: "on a")])
+        let other = SessionRecord(id: "b", kind: .direct, agentIDs: ["default"], title: "B", draft: "on b")
+        try SessionContentRepository(directory: directory, name: "sessions", scopeID: { "host-b" }).save([other])
+        let folder = directory.appending(path: "hermes-hosts/host-b")
+        for file in try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) {
+            try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-3_600)],
+                                                  ofItemAtPath: file.path(percentEncoded: false))
+        }
+        // The repository still holds host-a's rows; host-b is now the computer in use.
+        host = "host-b"
+        #expect(await repository.removeUnreferencedContent() == 0)
+        let reopened = SessionContentRepository(directory: directory, name: "sessions", scopeID: { "host-b" })
+        #expect(try reopened.loadSession(id: other.id) == other)
+    }
 }

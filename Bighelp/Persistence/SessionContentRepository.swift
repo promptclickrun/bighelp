@@ -252,25 +252,35 @@ final class SessionContentRepository: SessionCatalogRepository {
         try ensureManifest()
         let retained = Set((manifest?.records ?? []).compactMap(\.localContentRevision))
         retainResidentContent(revisions: retained)
-        if let scope, cleanedScopes.insert(scope).inserted {
-            Task { await removeUnreferencedContent() }
+        if let scope, !cleanedScopes.contains(scope), let sweep = unreferencedContentSweep() {
+            cleanedScopes.insert(scope)
+            Task.detached(priority: .utility) { _ = sweep() }
         }
         return manifest?.records ?? []
     }
 
     /// Removes content files no row points to. A save ended part-way (the watchdog, a crash,
     /// a full disk) leaves the files it wrote before the manifest, and a save only removes the
-    /// revisions it retires itself. Files from the last minute stay: whatever this process
-    /// writes from now on is newer than that, and the shared empty revision is never touched,
-    /// because a later save may write that same file again.
+    /// revisions it retires itself.
     @discardableResult
     func removeUnreferencedContent() async -> Int {
-        guard let manifest, let directory = try? legacy.scopedDirectory(),
-              protectedDataAvailability.isProtectedDataAvailable else { return 0 }
+        guard let sweep = unreferencedContentSweep() else { return 0 }
+        return await Task.detached(priority: .utility, operation: sweep).value
+    }
+
+    /// The removal, with the folder and the rows read in this one step: a switch to another
+    /// computer before it runs must not point one computer's rows at another's folder.
+    /// Files from the last minute stay, since whatever this process writes from now on is newer
+    /// than that. The shared empty revision is never touched, because a later save may write
+    /// that same file again.
+    private func unreferencedContentSweep() -> (@Sendable () -> Int)? {
+        guard let scope, let manifest, (try? legacy.storageScopeIdentifier()) == scope,
+              let directory = try? legacy.scopedDirectory(),
+              protectedDataAvailability.isProtectedDataAvailable else { return nil }
         let referenced = Set(manifest.records.compactMap(\.localContentRevision))
         let prefix = "\(name)-content-", suffix = "-v1.json"
         let cutoff = Date.now.addingTimeInterval(-60)
-        return await Task.detached(priority: .utility) {
+        return {
             let files = (try? FileManager.default.contentsOfDirectory(
                 at: directory, includingPropertiesForKeys: [.contentModificationDateKey]
             )) ?? []
@@ -285,7 +295,7 @@ final class SessionContentRepository: SessionCatalogRepository {
                 if (try? FileManager.default.removeItem(at: file)) != nil { removed += 1 }
             }
             return removed
-        }.value
+        }
     }
 
     func loadSession(id: String) throws -> SessionRecord? {

@@ -501,7 +501,8 @@ final class LiveVoiceModel {
         monitorTask = Task { @MainActor [weak self] in
             var disconnectedSince: ContinuousClock.Instant? = .now
             while !Task.isCancelled {
-                do { try await Task.sleep(for: .seconds(1)) } catch { return }
+                let cadence: Duration = self?.phase == .connecting ? .milliseconds(100) : .seconds(1)
+                do { try await Task.sleep(for: cadence) } catch { return }
                 guard let self, self.generation == token, self.isCallOpen else { return }
                 guard self.client.hasCurrentOwner else { self.invalidateOwner(); return }
                 if self.phase == .live || self.phase == .interrupted {

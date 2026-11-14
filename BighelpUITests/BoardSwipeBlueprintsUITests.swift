@@ -34,6 +34,78 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
         }
     }
 
+    /// A post cleared on one bot's Feed is gone from All bots and from Today's Feed panel at once.
+    /// They kept their own copy of the bot's board until the next read, so the post stayed there
+    /// until a pull down.
+    @MainActor
+    func testAPostClearedOnABotsFeedIsGoneFromAllBotsAndToday() throws {
+        let app = launch(appearance: "light")
+        openTodayBoard("feed", in: app)
+        let inAllBots = app.descendants(matching: .any)["today.boards.item.finance/feed-3"].firstMatch
+        XCTAssertTrue(inAllBots.waitForExistence(timeout: 10), "All bots lists the post before it's cleared")
+        app.buttons["today.board-page.chip.finance"].firstMatch.tap()
+        let row = app.descendants(matching: .any)["board.feed.post.feed-3"]
+        _ = app.buttons["board.blueprints"].waitForExistence(timeout: 10)
+        scroll(app, until: row)
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        swipeLeft(on: row, in: app, fromEdge: false)
+        let clear = app.buttons["Clear"].firstMatch
+        XCTAssertTrue(clear.waitForExistence(timeout: 5))
+        clear.tap()
+        XCTAssertTrue(row.waitForNonExistence(timeout: 5), "Clear hides the post on the bot's Feed")
+
+        app.buttons["today.board-page.chip.all"].firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["today.board-page.all"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["today.boards.item.finance/feed-1"].firstMatch
+            .waitForExistence(timeout: 5), "All bots still lists the bot's other posts")
+        XCTAssertFalse(inAllBots.exists, "The cleared post is gone from All bots without a pull down")
+        save("board-cleared-all-bots", app)
+
+        app.buttons["today.board-page.back"].firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["today.boards"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.descendants(matching: .any)["today.boards.item.finance/feed-3"].firstMatch.exists,
+                       "…and from Today's Feed panel")
+        save("board-cleared-today", app)
+    }
+
+    /// Every post on a bot's Feed has a row of its own, so each one swipes both ways: right for Do
+    /// it, which opens the bot's chat to send "Let's do it!" with the post, and left for Clear.
+    @MainActor
+    func testEveryFeedPostSwipesRightForDoItAndLeftForClear() throws {
+        for appearance in ["light", "dark"] {
+            let app = launch(appearance: appearance)
+            openBoard("tab.feed", in: app)
+            _ = app.buttons["board.blueprints"].waitForExistence(timeout: 10)
+            save("board-feed-rows-\(appearance)", app)
+            for id in ["feed-1", "feed-2", "feed-3"] {
+                let row = app.descendants(matching: .any)["board.feed.post.\(id)"]
+                scroll(app, until: row)
+                XCTAssertTrue(row.waitForExistence(timeout: 10), "\(id) is on the Feed")
+                swipeLeft(on: row, in: app, fromEdge: false)
+                XCTAssertTrue(app.buttons["Clear"].firstMatch.waitForExistence(timeout: 5), "\(id) swipes left for Clear")
+                if id == "feed-1" { save("board-feed-swipe-clear-\(appearance)", app) }
+                // Put the row back: a tap beside the action closes it.
+                swipeRight(on: row, in: app, by: 60)
+                swipeRight(on: row, in: app, by: 110)
+                XCTAssertTrue(app.buttons["Do it"].firstMatch.waitForExistence(timeout: 5), "\(id) swipes right for Do it")
+                if id == "feed-1" { save("board-feed-swipe-do-it-\(appearance)", app) }
+                swipeLeft(on: row, in: app, fromEdge: false)
+            }
+            guard appearance == "light" else { app.terminate(); continue }
+            let row = app.descendants(matching: .any)["board.feed.post.feed-1"]
+            scroll(app, until: row)
+            swipeRight(on: row, in: app, by: 110)
+            let doIt = app.buttons["Do it"].firstMatch
+            XCTAssertTrue(doIt.waitForExistence(timeout: 5))
+            doIt.tap()
+            // The demo's chat doesn't take a message sent from outside it, so this checks the way
+            // there; the message itself is checked on a real computer.
+            XCTAssertTrue(app.buttons["chat.back"].waitForExistence(timeout: 10), "Do it opens the bot's chat")
+            save("board-feed-do-it-chat", app)
+            app.terminate()
+        }
+    }
+
     /// A blueprint goes to a new chat's message box, nothing sent: one with a blank shows it as a
     /// chip that Send waits for, and one with none is plain text ready to edit.
     @MainActor
@@ -163,6 +235,15 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
         let origin = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
         let start = origin.withOffset(CGVector(dx: startX, dy: y))
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -110, dy: 0)),
+                    withVelocity: .slow, thenHoldForDuration: 0.1)
+    }
+
+    @MainActor private func swipeRight(on row: XCUIElement, in app: XCUIApplication, by distance: CGFloat) {
+        let y = row.frame.minY + min(row.frame.height / 2, 30)
+        let origin = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
+        // From the middle of the row: a drag from the screen's left edge is the system's Back.
+        let start = origin.withOffset(CGVector(dx: row.frame.midX - row.frame.width / 4, dy: y))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: distance, dy: 0)),
                     withVelocity: .slow, thenHoldForDuration: 0.1)
     }
 

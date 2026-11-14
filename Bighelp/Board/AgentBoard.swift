@@ -495,7 +495,8 @@ struct AgentIdentityDocuments: Equatable, Sendable {
 
 extension AgentBoardItem {
     /// What Let's do it sends: "Let's do it!" with the idea attached as a card. The host learns
-    /// which idea from `AgentBoardStore.accept`, so its ID never shows in the chat.
+    /// which idea from `AgentBoardStore.accept`, so its ID never shows in the chat. Do it on a Feed
+    /// post sends the same words with the post as the card (`AgentBoardContext.doIt`).
     var letsDoItMessage: String { chatCard.prefixing("Let's do it!") }
 }
 

@@ -11,6 +11,8 @@ struct TodayBoardsStoreTests {
         var boards: [String: [AgentBoardItem]]
         var failing: Set<String> = []
         private(set) var reads: [String] = []
+        /// Runs while a bot's read is on its way back, for what happens in the meantime.
+        var duringRead: ((String) -> Void)?
         let supportsFeedback = true
 
         init(_ boards: [String: [AgentBoardItem]] = [:]) { self.boards = boards }
@@ -18,7 +20,9 @@ struct TodayBoardsStoreTests {
         func items(agentID: String) async throws -> [AgentBoardItem] {
             reads.append(agentID)
             if failing.contains(agentID) { throw WorkspaceClientError.invalidRequest }
-            return boards[agentID] ?? []
+            let answer = boards[agentID] ?? []
+            duringRead?(agentID)
+            return answer
         }
 
         func update(agentID: String, itemID: String, change: AgentBoardChange) async throws -> AgentBoardItem {
@@ -139,6 +143,51 @@ struct TodayBoardsStoreTests {
         await store.refresh(client: client, scope: "computer-1", botIDs: ["mina", "avery"], force: true)
         #expect(store.hasRead)
         #expect(store.entries(.feed).map(\.id) == ["mina/m1"])
+    }
+
+    @Test func aPostClearedOnTheBotsOwnPageIsGoneFromTodayWithoutARead() async {
+        let clock = Clock()
+        let store = TodayBoardsStore(now: { clock.now })
+        let first = post("m1", minutesAgo: 30, clock: clock), second = post("m2", minutesAgo: 5, clock: clock)
+        let client = Client(["mina": [first, second]])
+        await store.refresh(client: client, scope: "mac", botIDs: ["mina"])
+        #expect(store.entries(.feed).map(\.item.id) == ["m2", "m1"])
+
+        // The bot's own Feed page cleared the post and hands over what it shows now.
+        var cleared = first
+        cleared.dismissed = true
+        store.take([cleared, second], agentID: "mina", scope: "mac")
+        #expect(store.entries(.feed).map(\.item.id) == ["m2"], "Gone at once")
+        #expect(client.reads == ["mina"], "No read was needed")
+
+        // Coming back to Today within the minute reads nothing and keeps it gone.
+        await store.refresh(client: client, scope: "mac", botIDs: ["mina"])
+        #expect(store.entries(.feed).map(\.item.id) == ["m2"])
+        #expect(client.reads == ["mina"])
+    }
+
+    @Test func aReadOnItsWayBackKeepsWhatTheBotsOwnPageChanged() async {
+        let clock = Clock()
+        let store = TodayBoardsStore(now: { clock.now })
+        let first = post("m1", minutesAgo: 30, clock: clock), second = post("m2", minutesAgo: 5, clock: clock)
+        let client = Client(["mina": [first, second], "avery": [post("a1", minutesAgo: 1, clock: clock)]])
+        var cleared = first
+        cleared.dismissed = true
+        // The answer for mina left the computer before the clear; the page hands its copy over first.
+        client.duringRead = { id in
+            if id == "mina" { store.take([cleared, second], agentID: "mina", scope: "mac") }
+        }
+        await store.refresh(client: client, scope: "mac", botIDs: ["mina", "avery"])
+        #expect(store.entries(.feed).map(\.item.id) == ["a1", "m2"], "The older answer doesn't bring the post back")
+    }
+
+    @Test func anotherComputersBoardIsTakenWithoutShowingHere() async {
+        let clock = Clock()
+        let store = TodayBoardsStore(now: { clock.now })
+        let client = Client(["mina": [post("m1", minutesAgo: 30, clock: clock)]])
+        await store.refresh(client: client, scope: "mac", botIDs: ["mina"])
+        store.take([post("other", minutesAgo: 1, clock: clock)], agentID: "mina", scope: "studio")
+        #expect(store.entries(.feed).map(\.item.id) == ["m1"])
     }
 
     @Test func answeredAndDismissedItemsStayOffToday() {

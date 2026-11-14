@@ -312,14 +312,15 @@ it: thumbs up/down on Feed (a thumbs down may ask "Less like this?" with quick r
 into a goal" and "Start a chat" on Ideas, done/active on Goals, and read/unread, Copy and Share everywhere. It ends
 with the item's dismiss: **Clear** a Feed post, **Not now** for an idea (the plugin remembers it), **Remove** a goal.
 Each hides with Undo (`BoardDismissAction`). An item with a List row of its own also dismisses with a swipe left
-(Feed's Earlier rows, goals, and tiles at accessibility text sizes); tiles two to a row share one, so theirs is in
-the menu only. The root's right-edge New chat strip steps aside on the boards. New items carry a dot, and a dot on
+(every Feed post, goals, and tiles at accessibility text sizes); tiles two to a row share one, so theirs is in
+the menu only. A Feed post also swipes right for **Do it**, which sends "Let's do it!" with the post as a card to
+the bot's chat; the same is in its menu. The root's right-edge New chat strip steps aside on the boards. New items carry a dot, and a dot on
 the Feed, Ideas or Goals tab says something there is unseen. The agent reads the ratings and reasons before it
 posts (plugin 2.19.0).
 The boards are **color blocks** (`BoardBlocks.swift`): the agent's face and name on the page with no backing, then
 items as rounded tiles in a pastel (`BighelpBlockColor`, the same color for the same item or category every time)
 with dark ink on them. **Feed** leads with what's new in a deep green block (only while something is new), the
-newest posts as tiles two to a row, then Earlier as rows in a card. **Ideas** has chips by the agent's sections
+newest posts as tiles one to a row, then Earlier as rows in a card, so every post swipes both ways. **Ideas** has chips by the agent's sections
 over a tall newest idea with **Let's do it** beside two short ones, then the rest as tiles. A tile opens the item
 on a tap and its menu on a long press (`Menu(primaryAction:)`; a ⋯ on the Mac). Buttons and chips on the blocks
 take the person's color (`theme.action`).

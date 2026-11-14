@@ -106,6 +106,18 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
         app.launchArguments.removeLast(2)
         app.launch()
 
+        // The home's other places: Today with every bot's boards, Work's one list, and Chats.
+        openHomeTab("today", in: app)
+        _ = app.descendants(matching: .any)["today.boards"].firstMatch.waitForExistence(timeout: 30)
+        sleep(3)
+        save("13-today", app)
+        openHomeTab("work", in: app)
+        sleep(3)
+        save("14-work", app)
+        showChats(in: app)
+        sleep(3)
+        save("15-chats", app)
+
         // Work › Tasks (Kanban) and Work › Schedules.
         openWorkDoor("tasks", in: app)
         sleep(3)

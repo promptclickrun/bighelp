@@ -83,7 +83,8 @@ struct WorkList: View {
                 }
             }
             .padding(.horizontal, BighelpTokens.space16)
-            .padding(.top, BighelpTokens.space4)
+            // Under the home header the chips clear its fade; a pushed page has a navigation bar.
+            .padding(.top, context.header == nil ? BighelpTokens.space4 : HomeHeaderBackground.fade)
             .padding(.bottom, BighelpTokens.space32)
             .frame(maxWidth: 720)
             .frame(maxWidth: .infinity)

@@ -56,7 +56,7 @@ struct ChatsInboxView: View {
             BighelpSearchField(text: $search, prompt: String(localized: "Search chats"),
                                accessibilityLabel: String(localized: "Search chats"),
                                accessibilityIdentifier: "chats.search")
-                .bighelpListSearchRow()
+                .bighelpListSearchRow(top: HomeHeaderBackground.fade)
             ChatsInboxChips(computers: list.chipComputers, statuses: context.fleet?.statuses ?? [:],
                             selection: $filter)
                 .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: BighelpTokens.space4, trailing: 0))

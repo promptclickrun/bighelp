@@ -602,6 +602,51 @@ struct DirectHermesSessionCatalogClientTests {
         #expect(workspace.calls.filter { $0.operation == .sessionsList }.count == 2)
     }
 
+    /// A computer that lists more chats than the app holds showed none of them: the list read ended
+    /// in an error (#1001). It now keeps the newest and says nothing is wrong.
+    @Test(.timeLimit(.minutes(2)))
+    func aComputerWithMoreChatsThanTheAppHoldsListsItsNewest() async throws {
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, payload in
+            if operation == .profilesList { return Self.profiles() }
+            let offset = try #require(payload["offset"]?.integer)
+            return ["sessions": .array((offset..<(offset + 100)).map { Self.session(id: "s-\($0)") }),
+                    "total": .integer(13_500), "offset": .integer(offset), "limit": .integer(100)]
+        }
+        let records = try await Self.client(workspace).list()
+        #expect(records.count == DirectHermesSessionCatalogClient.listCapacity)
+        #expect(records.first?.remoteStoredID == "s-0", "Hermes lists the newest first.")
+        let pages = workspace.calls.filter { $0.operation == .sessionsList }.compactMap { $0.payload["offset"]?.integer }
+        #expect(pages.allSatisfy { $0 < DirectHermesSessionCatalogClient.listCapacity }, "No page past the last one kept is read.")
+    }
+
+    @Test func profilesShareTheListWhenTheirChatsDoNotAllFit() {
+        typealias Client = DirectHermesSessionCatalogClient
+        #expect(Client.listQuotas(totals: [300, 40, 6_000], capacity: 9_000) == [300, 40, 6_000], "Everything fits.")
+        #expect(Client.listQuotas(totals: [100, 20_000, 30_000], capacity: 9_000) == [100, 4_450, 4_450])
+        #expect(Client.listQuotas(totals: [nil, 100], capacity: 9_000) == [8_900, 100], "No count: what is left.")
+        #expect(Client.listQuotas(totals: [], capacity: 9_000).isEmpty)
+    }
+
+    /// A scheduled task makes a chat for each run. The list leaves them out, as Hermes Desktop's
+    /// recent chats do, until the person turns on Show Scheduled Runs.
+    @Test(arguments: [false, true])
+    func scheduledRunsStayOutOfTheListUntilAskedFor(asked: Bool) async throws {
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, _ in
+            if operation == .profilesList { return Self.profiles() }
+            return ["sessions": .array([Self.session(id: "s-0")]), "total": .integer(1), "offset": .integer(0),
+                    "limit": .integer(100)]
+        }
+        let client = DirectHermesSessionCatalogClient(workspace: workspace, owner: workspace.owner!,
+                                                      currentOwner: { workspace.owner }, listsScheduledRuns: { asked })
+        #expect(try await client.list().count == 1)
+        let excluded = workspace.calls.first { $0.operation == .sessionsList }?.payload["exclude_sources"]
+        #expect(excluded == .string(asked ? "tool,kanban,bot_room" : "tool,kanban,bot_room,cron"))
+        #expect(workspace.calls.contains { $0.operation == .nativeSessionActiveList },
+                "The app's own list still finds the sessions that are working now.")
+    }
+
     /// Hermes 0.21.x `/api/sessions` (#215): no `has_more`, and pinned sessions back-filled onto
     /// every page past the limit, so a pinned row repeats. More than 100 sessions must still list.
     @Test func pinnedRowsRepeatOnEveryStockHermesPage() async throws {

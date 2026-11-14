@@ -73,6 +73,8 @@ final class NativeWorkspaceSessionBridge: SessionCatalogClient {
     var streamVerificationSequence: UInt64 = 0
     var retired = false
     private let unavailable = NativeWorkspaceUnavailableClient()
+    /// Sessions › Show Scheduled Runs: whether the list of chats takes each scheduled run's chat too.
+    private let listsScheduledRuns: @MainActor () -> Bool
     lazy var box = WorkspaceOwnedClientBox<DirectHermesSessionCatalogClient>(
         connections: connections, authority: authority
     ) { [weak self] workspace, owner, currentOwner in
@@ -95,7 +97,8 @@ final class NativeWorkspaceSessionBridge: SessionCatalogClient {
                 guard states.count <= 128 else { throw WorkspaceClientError.capacityExceeded }
                 try self.creationRepository.save(states)
                 self.creationStates = states
-            }
+            },
+            listsScheduledRuns: self.listsScheduledRuns
         )
         let saved = self.creationStates
         let usable = Self.restorableCreationStates(saved, scopeID: self.authority.cacheScopeID, owner: owner)
@@ -109,7 +112,9 @@ final class NativeWorkspaceSessionBridge: SessionCatalogClient {
     private weak var lastCatalogClient: DirectHermesSessionCatalogClient?
 
     init(connections: WorkspaceConnectionStore, authority: WorkspaceAuthority, directory: URL,
-         protectedData: any BighelpProtectedDataAvailabilityProviding = BighelpSystemProtectedDataAvailability()) throws {
+         protectedData: any BighelpProtectedDataAvailabilityProviding = BighelpSystemProtectedDataAvailability(),
+         listsScheduledRuns: @escaping @MainActor () -> Bool = { false }) throws {
+        self.listsScheduledRuns = listsScheduledRuns
         self.connections = connections
         self.authority = authority
         drafts = DirectHermesDraftStore(root: directory.appending(path: "submission-journals", directoryHint: .isDirectory))

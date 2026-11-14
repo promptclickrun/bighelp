@@ -3,6 +3,12 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.88
+
+### Fixed
+
+- **Chats and Work:** the search field on the Chats view and the status chips on Work show in full. Before, the header covered their top edge.
+
 ## 2.6.87
 
 ### New

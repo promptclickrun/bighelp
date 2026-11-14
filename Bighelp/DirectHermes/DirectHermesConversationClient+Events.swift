@@ -310,7 +310,7 @@ extension DirectHermesConversationClient {
         resetPromptContract()
         model?.suspendNativeTurn(from: self)
         model?.reconcileNativeReactionConnectionState(from: self)
-        status = "Session reclaimed by Hermes · reopen before sending"
+        status = "Chat reclaimed by Hermes · reopen before sending"
         finish(throwing: DirectHermesError.disconnected(outcomeUnknown: pendingID != nil))
     }
 

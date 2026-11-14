@@ -645,14 +645,14 @@ final class ChatModel {
         guard !canSend else { return nil }
         if lacksConnection, connectionIsOverdue { return "not connected to your computer" }
         if !isBotMode, let native = nativeConversationClient {
-            if !native.connected { return "not connected to host" }
+            if !native.connected { return "not connected to your computer" }
             if native.isHydratingForReason { return "loading chat history" }
             if native.needsRecoveryForReason { return "recovering the last message" }
-            if native.requiresDurableReattachmentForReason { return "reattaching to the host session" }
+            if native.requiresDurableReattachmentForReason { return "reattaching to the chat" }
             if native.preparingAttachmentID != nil { return "preparing an attachment" }
             if native.hasPendingSubmissionForReason { return "a message is still being sent" }
         }
-        if isAwaitingAuthoritativeSessionAllocation { return "starting the chat on the host" }
+        if isAwaitingAuthoritativeSessionAllocation { return "starting the chat on your computer" }
         if let blueprintDraft, !blueprintDraft.isComplete { return "fill in the blueprint blanks" }
         if richDraftRecovery.hasUnexportedChanges { return "saving the draft" }
         if referenceSubmission != nil || referenceSendInFlight { return "a message is still being sent" }
@@ -662,7 +662,7 @@ final class ChatModel {
             return nil
         }
         if isBotMode, let reason = botModeSendUnavailableReason { return reason }
-        if isSending { return "the agent is still replying" }
+        if isSending { return "the bot is still replying" }
         return "this attachment can't be sent here"
     }
 

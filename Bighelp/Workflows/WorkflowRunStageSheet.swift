@@ -156,7 +156,7 @@ struct WorkflowRunStagePage: View {
                             WorkflowStageIcon(kind: .agent, size: 32)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(agent.title).font(.bighelp(.body))
-                                Text(context.agentName(agent.agentID) ?? "An agent")
+                                Text(context.agentName(agent.agentID) ?? "A bot")
                                     .font(.bighelp(.caption))
                                     .foregroundStyle(theme.secondaryText)
                             }
@@ -170,7 +170,7 @@ struct WorkflowRunStagePage: View {
                     .accessibilityIdentifier("workflows.run.stage.agent.\(agent.key)")
                 }
             } header: {
-                Text("Agents at the same time")
+                Text("Bots at the same time")
             } footer: {
                 Text("The workflow goes on when every one is done.")
                     .font(.bighelp(.footnote))
@@ -192,7 +192,7 @@ struct WorkflowRunStagePage: View {
         default:
             if let attempt = stage.attempts.last, attempt.state != .planned {
                 Section("Result") {
-                    row("Done by", context.agentName(attempt.agentID ?? stage.agentID) ?? "An agent")
+                    row("Done by", context.agentName(attempt.agentID ?? stage.agentID) ?? "A bot")
                     row("Status", stage.state.title)
                     if stage.attempts.count > 1 { row("Tries", "\(stage.attempts.count)") }
                 }

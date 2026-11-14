@@ -34,15 +34,15 @@ final class WorkspaceSessionControlProxy: SessionRuntimeControlConfirming, Sessi
     func selectionSupport(sessionID: String, agentID: String) -> SessionRuntimeControlSupport {
         guard box.hasCurrentCapabilities else {
             return SessionRuntimeControlSupport(
-                modelUnavailableReason: "Checking what this host supports.",
-                reasoningUnavailableReason: "Checking what this host supports."
+                modelUnavailableReason: "Checking what this computer supports.",
+                reasoningUnavailableReason: "Checking what this computer supports."
             )
         }
         do { return try box.value().selectionSupport(sessionID: sessionID, agentID: agentID) }
         catch {
             return SessionRuntimeControlSupport(
-                modelUnavailableReason: "Connect to this host before changing this session's model.",
-                reasoningUnavailableReason: "Reconnect to this host before changing this session's reasoning level."
+                modelUnavailableReason: "Connect to this computer before changing this chat's model.",
+                reasoningUnavailableReason: "Reconnect to this computer before changing this chat's reasoning level."
             )
         }
     }

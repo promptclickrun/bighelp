@@ -70,7 +70,7 @@ final class BighelpPromptAlerts {
         let eventType = arrival.isApproval ? "approval.required" : "clarification.required"
         if await Self.pluginAlerted(eventType: eventType) { return }
         let content = UNMutableNotificationContent()
-        let name = arrival.agentName ?? "Your agent"
+        let name = arrival.agentName ?? "Your bot"
         content.title = arrival.isApproval ? "\(name) needs your OK" : "\(name) has a question"
         content.body = String(arrival.detail.prefix(400))
         content.sound = .default

@@ -42,7 +42,7 @@ extension BighelpUITestCase {
     /// button reads Continue in first setup, like Connect's, so the step's own line tells them apart.
     @MainActor @discardableResult
     func continueAfterConnecting(_ app: XCUIApplication, timeout: TimeInterval = 45) -> Bool {
-        guard app.staticTexts["Your agents are ready to chat."].waitForExistence(timeout: timeout) else { return false }
+        guard app.staticTexts["Your bots are ready to chat."].waitForExistence(timeout: timeout) else { return false }
         let next = app.buttons.matching(NSPredicate(
             format: "identifier IN %@ AND (label IN %@ OR label BEGINSWITH %@)",
             ["host-setup.continue", "host-setup.screen"], ["Start chatting", "Continue"], "Let")).firstMatch

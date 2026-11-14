@@ -104,7 +104,7 @@ final class BighelpPinnedAgentsWidgetFeed {
         func candidate(hostID: UUID?, agentID: String, name: String, picture: URL?) -> Candidate {
             Candidate(
                 fleetID: hostID.map { FleetID.make($0, agentID) } ?? agentID,
-                agent: .init(agentID: agentID, name: clip(name) ?? "Agent", hostID: hostID?.uuidString,
+                agent: .init(agentID: agentID, name: clip(name) ?? "Bot", hostID: hostID?.uuidString,
                              hostName: hostID.flatMap { id in hosts.firstIndex { $0.id == id } }
                                 .map { widgetHostName(hosts[$0].name, number: $0 + 1) },
                              avatarKey: picture.map { _ in BighelpPinnedAvatarWriter.key(hostID: hostID, agentID: agentID) }),

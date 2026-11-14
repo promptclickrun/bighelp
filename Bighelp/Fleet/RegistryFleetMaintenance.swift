@@ -15,18 +15,18 @@ final class RegistryFleetMaintenance: FleetMaintenanceConnecting {
 
     func connect(_ hostID: UUID) async -> FleetMaintenanceReach {
         guard registry.isWorkspaceReady, let host = registry.hosts.first(where: { $0.id == hostID }) else {
-            return .offline("Couldn't reach this host.")
+            return .offline("Couldn't reach this computer.")
         }
         let workspace = registry.workspace(for: host)
         guard workspace.hasSavedConnection else { return .signedOut }
         // Another caller is already connecting it (the all-hosts view, or a switch).
         for _ in 0..<100 where workspace.isConnecting {
-            do { try await Task.sleep(for: .milliseconds(200)) } catch { return .offline("Couldn't reach this host.") }
+            do { try await Task.sleep(for: .milliseconds(200)) } catch { return .offline("Couldn't reach this computer.") }
         }
         if !workspace.isConnected { await workspace.reconnect() }
         let generation = registry.generation
         guard let verified = try? workspace.verifiedConnection(for: host, generation: generation) else {
-            return workspace.hasSavedConnection ? .offline("Offline. Couldn't reach this host.") : .signedOut
+            return workspace.hasSavedConnection ? .offline("Offline. Couldn't reach this computer.") : .signedOut
         }
         let direct = verified.client, owner = verified.owner
         let connectionGeneration = owner.connectionGeneration

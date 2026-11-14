@@ -13,17 +13,17 @@ import Foundation
 struct BighelpFocusFilter: SetFocusFilterIntent {
     static let title: LocalizedStringResource = "bighelp"
     static let description = IntentDescription(
-        "Tell your agents about this Focus, and keep their alerts quiet while it is on.",
+        "Tell your bots about this Focus, and keep their alerts quiet while it is on.",
         categoryName: "Focus"
     )
 
-    @Parameter(title: "Name", description: "What this Focus is, like Work or Sleep. Your agents can read it.")
+    @Parameter(title: "Name", description: "What this Focus is, like Work or Sleep. Your bots can read it.")
     var name: String?
 
-    @Parameter(title: "Note for agents", description: "Anything your agents should know while this Focus is on.")
+    @Parameter(title: "Note for bots", description: "Anything your bots should know while this Focus is on.")
     var note: String?
 
-    @Parameter(title: "Quiet agent alerts", default: false)
+    @Parameter(title: "Quiet bot alerts", default: false)
     var quietAlerts: Bool
 
     var displayRepresentation: DisplayRepresentation {

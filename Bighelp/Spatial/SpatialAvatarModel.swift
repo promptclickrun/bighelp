@@ -121,7 +121,7 @@ final class SpatialAvatarModel {
             let workspace = try await connect()
             self.workspace = workspace
             refreshAgent(in: workspace)
-            connection = agent == nil ? .unavailable("No agent yet") : .ready
+            connection = agent == nil ? .unavailable("No bot yet") : .ready
         } catch is CancellationError {
         } catch {
             connection = .unavailable(Self.message(for: error))

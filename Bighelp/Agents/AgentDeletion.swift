@@ -85,17 +85,17 @@ enum AgentDeletionPresentation {
     static func errorMessage(_ error: any Error) -> String {
         switch error {
         case HermesProfileLifecycleError.currentProfileProtected:
-            "Hermes is running as this agent on this connection, so it can't be deleted from here."
+            "Hermes is running as this bot on this connection, so it can't be deleted from here."
         case HermesProfileLifecycleError.activeDefaultProtected:
-            "This agent is your computer's default. Make another bot the default first, in its Advanced Options › Manage bots."
+            "This bot is your computer's default. Make another bot the default first, in its Advanced Options › Manage bots."
         case HermesProfileLifecycleError.reviewChanged:
-            "This agent changed while it was being deleted. Try again."
+            "This bot changed while it was being deleted. Try again."
         case HermesProfileLifecycleError.outcomeUnknown:
             BighelpPlatform.isMac
                 ? "Hermes didn't confirm the deletion. Refresh the list before trying again."
                 : "Hermes didn't confirm the deletion. Pull down to refresh the list before trying again."
         default:
-            (error as? LocalizedError)?.errorDescription ?? "The agent couldn't be deleted. Try again."
+            (error as? LocalizedError)?.errorDescription ?? "The bot couldn't be deleted. Try again."
         }
     }
 }

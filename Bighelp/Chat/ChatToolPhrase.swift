@@ -80,7 +80,7 @@ struct ChatToolPhrase: Equatable, Sendable {
         "Made a voice clip": "Made %d voice clips",
         "Read a skill": "Read %d skills",
         "Asked you a question": "Asked you %d questions",
-        "Asked another agent": "Asked %d other agents",
+        "Asked another bot": "Asked %d other bots",
         "Sent a message": "Sent %d messages",
         "Made a card": "Made %d cards",
         "Posted an update": "Posted %d updates",

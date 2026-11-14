@@ -294,7 +294,7 @@ final class TeamCallModel: Identifiable {
         let text = event.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !ChatSilentReply.isMarker(text), text != "(pass)" else { return }
         let member = member(memberID)
-        lines.append(Line(id: event.id, memberID: memberID, speaker: member?.name ?? "Agent", text: text))
+        lines.append(Line(id: event.id, memberID: memberID, speaker: member?.name ?? "Bot", text: text))
         trimLines()
         let minimum = member.map { settings.firstSentenceMinimum(for: $0.voiceKey) }
             ?? TeamCallVoiceSettings.defaultFirstSentenceMinimum

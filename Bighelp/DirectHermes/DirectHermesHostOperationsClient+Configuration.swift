@@ -58,7 +58,7 @@ extension DirectHermesHostOperationsClient {
             DirectHermesHostPayload.isConfigPath(configPath, insideProfileHome: $0.path)
         }
         guard matches.count == 1, let resolved = matches.first else {
-            throw HostOperationsError.unavailable("a uniquely verified serving profile for unscoped host operations")
+            throw HostOperationsError.unavailable("a uniquely verified serving profile for unscoped computer operations")
         }
         if let supplied,
            !Data(supplied.utf8).elementsEqual(Data(resolved.name.utf8)) {

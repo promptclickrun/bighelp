@@ -139,7 +139,7 @@ struct ChatSessionSettingsView: View {
                     }
                     if nerdModeEnabled, nativeSessionControls != nil {
                         Button { isSessionShown = true } label: {
-                            quickActionLabel("Session", systemImage: "slider.horizontal.3")
+                            quickActionLabel("Chat", systemImage: "slider.horizontal.3")
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("chat.session-info.controls")
@@ -189,7 +189,7 @@ struct ChatSessionSettingsView: View {
             // Host details (project folder, connection, profile) are for Nerd Mode.
             if nerdModeEnabled {
                 if let workspace = model.sessionWorkspaceName, !workspace.isEmpty {
-                    LabeledContent("Workspace", value: workspace)
+                    LabeledContent("Project", value: workspace)
                 }
                 if let native = model.nativeConversationClient {
                     LabeledContent("Connection", value: native.isReadyForSubmission ? "Ready" : "Recovering")
@@ -263,7 +263,7 @@ struct ChatSessionSettingsView: View {
     private var privacySection: some View {
         if model.isBotMode {
             Section {
-                Label("Earlier direct chats stay private to their original agent", systemImage: "lock.shield")
+                Label("Earlier direct chats stay private to their original bot", systemImage: "lock.shield")
             } header: {
                 Text("Privacy")
             }
@@ -338,7 +338,7 @@ struct ChatSessionSettingsView: View {
     private var participantSummary: String {
         let count = participants.count
         if count == 0 { return "No participant details available" }
-        return "\(count) \(count == 1 ? "agent" : "agents")"
+        return "\(count) \(count == 1 ? "bot" : "bots")"
     }
 
     private var participants: [ChatSessionDetailsParticipant] {

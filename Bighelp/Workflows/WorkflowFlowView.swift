@@ -653,7 +653,7 @@ struct WorkflowMoreMenu: View {
                 Button("Inputs", systemImage: "arrow.right.to.line") { editInputs() }
             }
             if let editRoles {
-                Button("Agent roles", systemImage: "person.2") { editRoles() }
+                Button("Bot roles", systemImage: "person.2") { editRoles() }
                     .accessibilityIdentifier("workflows.more.roles")
             }
             if let editTrigger, model.trigger != nil {
@@ -704,11 +704,11 @@ struct WorkflowRolePicker: View {
                     Button(agent.name) { Task { await model.bind(role: role.key, agentID: agent.id) } }
                 }
                 if model.agentID(for: role.key) != nil {
-                    Button("No agent", role: .destructive) { Task { await model.bind(role: role.key, agentID: nil) } }
+                    Button("No bot", role: .destructive) { Task { await model.bind(role: role.key, agentID: nil) } }
                 }
             } label: {
                 HStack(spacing: BighelpTokens.space4) {
-                    Text(context.agentName(model.agentID(for: role.key)) ?? "Choose an agent")
+                    Text(context.agentName(model.agentID(for: role.key)) ?? "Choose a bot")
                     Image(systemName: "chevron.up.chevron.down").font(.bighelp(.caption2))
                 }
                 .font(.bighelp(.body).weight(.semibold))
@@ -755,13 +755,13 @@ struct WorkflowRolesEditor: View {
                     .frame(minHeight: BighelpTokens.hitTarget)
                     .accessibilityIdentifier("workflows.roles.add")
                 } footer: {
-                    Text("A role is a job in this workflow, like Writer. Picking an agent on a stage sets its role too.")
+                    Text("A role is a job in this workflow, like Writer. Picking a bot on a stage sets its role too.")
                         .font(.bighelp(.footnote))
                 }
             }
             .scrollContentBackground(.hidden)
             .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
-            .navigationTitle("Agent roles")
+            .navigationTitle("Bot roles")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

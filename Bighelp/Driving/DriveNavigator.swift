@@ -126,7 +126,7 @@ final class DriveNavigator {
     func open(_ place: DrivePlace, steps: [DriveStep], bot: (id: String, name: String)?, note: String?,
               agentID: String) -> [String]? {
         guard canDrive else { return nil }
-        let agent = agent(agentID) ?? DriveAgent(id: agentID, name: String(localized: "Your agent"), imageURL: nil)
+        let agent = agent(agentID) ?? DriveAgent(id: agentID, name: String(localized: "Your bot"), imageURL: nil)
         return start(title: place.title, steps: steps, bot: bot, agent: agent, note: note, chat: chatOnScreen?(),
                      reduceMotion: UIAccessibility.isReduceMotionEnabled)
     }

@@ -436,13 +436,13 @@ extension BighelpShortcutService {
     /// switched to: checking on it must not move bighelp there.
     func hostStatus(gatewayID: UUID?) async -> String {
         let gateway: BighelpShortcutGateway?
-        do { gateway = try self.gateway(gatewayID) } catch { return "That gateway isn't in bighelp anymore." }
+        do { gateway = try self.gateway(gatewayID) } catch { return "That computer isn't in bighelp anymore." }
         guard let gateway, !gateway.isInUse else { return await hostStatus() }
         let name = String(gateway.name.prefix(80))
         guard let agents = try? await gatewayDirectory.agents(on: gateway.id, reachOnly: true) else {
             return "bighelp can't reach \(name) right now."
         }
-        return ["Connected to \(name).", agents.count == 1 ? "1 agent." : "\(agents.count) agents."]
+        return ["Connected to \(name).", agents.count == 1 ? "1 bot." : "\(agents.count) bots."]
             .joined(separator: "\n")
     }
 
@@ -467,7 +467,7 @@ extension BighelpShortcutService {
         case 1: "1 chat working right now."
         default: "\(working) chats working right now."
         }
-        var lines = ["Connected to \(name).", agents == 1 ? "1 agent." : "\(agents) agents.", workingLine]
+        var lines = ["Connected to \(name).", agents == 1 ? "1 bot." : "\(agents) bots.", workingLine]
         if let version = Self.plainVersion(await hostServices.hermesVersion()) { lines.append("Hermes \(version).") }
         return lines.joined(separator: "\n")
     }

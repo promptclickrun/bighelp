@@ -139,7 +139,7 @@ struct SessionRow: View {
     }
 
     private var agentNames: [String] {
-        session.agentIDs.map { profilesByID[$0]?.name ?? "Unavailable agent" }
+        session.agentIDs.map { profilesByID[$0]?.name ?? "Unavailable bot" }
     }
 
     private var accessibilityLabel: String {
@@ -266,7 +266,7 @@ struct SessionIdentityView: View {
     private var identities: [Identity] {
         let mapped = session.agentIDs.prefix(4).map { agentID -> Identity in
             guard let profile = agents.profiles.first(where: { $0.id == agentID }) else {
-                return Identity(id: "unavailable-\(agentID)", name: "Unavailable agent", imageURL: nil)
+                return Identity(id: "unavailable-\(agentID)", name: "Unavailable bot", imageURL: nil)
             }
             return Identity(id: profile.id, name: profile.name, imageURL: agents.avatarURL(for: profile))
         }
@@ -324,7 +324,7 @@ struct SessionsGettingStartedView: View {
     let onStart: (() -> Void)?
 
     private let steps: [(title: String, detail: String)] = [
-        ("Pick an agent", "Each agent keeps its own skills and memory."),
+        ("Pick a bot", "Each bot keeps its own skills and memory."),
         ("Say what you need", "Type, talk, or attach a photo or file."),
         ("Get notified when it's done", "Work keeps going while you're away."),
     ]
@@ -335,7 +335,7 @@ struct SessionsGettingStartedView: View {
                 Text("Your first chat")
                     .font(.bighelp(.footnote).weight(.semibold))
                     .foregroundStyle(theme.action)
-                Text("Ask for anything.\nYour agent takes it from there.")
+                Text("Ask for anything.\nYour bot takes it from there.")
                     .font(.bighelp(.title2).bold())
                     .foregroundStyle(theme.primaryText)
                     .fixedSize(horizontal: false, vertical: true)

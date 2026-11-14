@@ -58,7 +58,7 @@ final class AgentTemplateLibrary {
     }
 
     private func uniqueTitle(_ name: String) -> String {
-        let base = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Agent" : name
+        let base = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Bot" : name
         let taken = Set(templates.map(\.title))
         guard taken.contains(base) else { return base }
         var number = 2

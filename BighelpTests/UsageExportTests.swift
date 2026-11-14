@@ -174,7 +174,7 @@ struct UsageExportTests {
             #expect(!html.contains(external), "Nothing loaded from anywhere: \(external)")
         }
         for section in ["id=\"limits\"", "id=\"trend\"", "id=\"totals\"", "id=\"when\"", "id=\"by-model\"",
-                        "id=\"by-agent\"", "id=\"by-computer\"", "<svg"] {
+                        "id=\"by-bot\"", "id=\"by-computer\"", "<svg"] {
             #expect(html.contains(section), "Has \(section)")
         }
         // Each computer's plans under its own name.

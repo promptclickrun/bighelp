@@ -64,7 +64,7 @@ struct ChatDestinationAgentResolverTests {
 
         #expect(identity == ChatDestinationAgentIdentity(
             name: "Juno",
-            role: "Hermes agent"
+            role: "Hermes bot"
         ))
     }
 
@@ -106,7 +106,7 @@ struct ChatDestinationAgentResolverTests {
 
         #expect(resolver.resolve(sessionID: "session-delayed-agent-directory") == ChatDestinationAgentIdentity(
             name: "Juno",
-            role: "Hermes agent"
+            role: "Hermes bot"
         ))
 
         client.resumeList()

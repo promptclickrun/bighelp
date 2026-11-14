@@ -272,7 +272,7 @@ struct NativeSessionDelegationRow: View {
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                 value("Subagent ID", delegation.id)
                 optionalValue("Parent ID", delegation.parentID)
-                optionalValue("Child session ID", delegation.childSessionID)
+                optionalValue("Child chat ID", delegation.childSessionID)
                 optionalValue("Delegation ID", delegation.delegationID)
                 optionalValue("Depth", delegation.depth?.formatted())
                 optionalValue("Goal", delegation.goal)
@@ -304,7 +304,7 @@ struct NativeSessionSpawnTreeRow: View {
             VStack(alignment: .leading, spacing: BighelpTokens.space4) {
                 Text(entry.label.isEmpty ? "Spawn tree" : entry.label)
                     .foregroundStyle(.primary)
-                Text("\(entry.count.formatted()) agents")
+                Text("\(entry.count.formatted()) helpers")
                     .font(.bighelp(.caption))
                     .foregroundStyle(.secondary)
                 Text(entry.path)
@@ -330,7 +330,7 @@ struct NativeSessionVerificationStatusView: View {
         VStack(alignment: .leading, spacing: BighelpTokens.space8) {
             LabeledContent("Status", value: status.status)
             optionalValue("Root", status.root)
-            optionalValue("Session ID", status.sessionID)
+            optionalValue("Chat ID", status.sessionID)
             if let paths = status.changedPaths {
                 DisclosureGroup("Changed paths (\(paths.count))") {
                     VStack(alignment: .leading, spacing: BighelpTokens.space4) {
@@ -348,7 +348,7 @@ struct NativeSessionVerificationStatusView: View {
                     VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                         optionalValue("ID", evidence.id?.formatted())
                         optionalValue("Created", evidence.createdAt)
-                        optionalValue("Session ID", evidence.sessionID)
+                        optionalValue("Chat ID", evidence.sessionID)
                         optionalValue("Working directory", evidence.workingDirectory)
                         optionalValue("Root", evidence.root)
                         optionalValue("Command", evidence.command)

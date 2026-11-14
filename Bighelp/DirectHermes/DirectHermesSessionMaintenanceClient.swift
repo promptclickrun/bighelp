@@ -243,15 +243,15 @@ enum HermesSessionMaintenanceError: Error, Equatable, LocalizedError, Sendable {
 
     var errorDescription: String? {
         switch self {
-        case .ownerChanged: "The selected Hermes host changed. Reopen Session Maintenance."
-        case .invalidRequest: "This session maintenance request is invalid."
-        case .invalidResponse: "Hermes returned an unsupported session maintenance response."
-        case .reviewChanged: "The reviewed sessions changed. Refresh the review before continuing."
+        case .ownerChanged: "The selected Hermes computer changed. Reopen Clean up chats."
+        case .invalidRequest: "This chat maintenance request is invalid."
+        case .invalidResponse: "Hermes returned an unsupported chat maintenance response."
+        case .reviewChanged: "The reviewed chats changed. Refresh the review before continuing."
         case .outcomeUnknown: "Hermes did not confirm the operation. Refresh before trying it again."
         case .nativeReadbackRequired: "This destructive action requires the Direct connection’s exact HTTP readback support."
-        case .transferTooLarge: "This session package exceeds the current authenticated native transport limit."
+        case .transferTooLarge: "This chat package exceeds the current authenticated native transport limit."
         case .confirmedCloseNeedsReconciliation:
-            "Hermes closed the live runtime and preserved its stored history, but bighelp could not retire the old native binding. Refresh Sessions; do not repeat the close operation."
+            "Hermes closed the live runtime and preserved its stored history, but bighelp could not retire the old native binding. Refresh Chats; do not repeat the close operation."
         }
     }
 }
@@ -1141,7 +1141,7 @@ final class DirectHermesSessionMaintenanceClient: HermesSessionMaintenanceManagi
            !exact(responseProfile, profileID) {
             throw HermesSessionMaintenanceError.invalidResponse
         }
-        let title = try optionalText(row["title"], maximum: 4_096) ?? "Untitled session"
+        let title = try optionalText(row["title"], maximum: 4_096) ?? "Untitled chat"
         let source = try optionalText(row["source"], maximum: 128) ?? "unknown"
         let endedAt = date(row["ended_at"])
         return .init(

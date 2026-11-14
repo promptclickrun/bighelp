@@ -46,17 +46,17 @@ enum WorkspaceUnavailableReason: String, Equatable, Sendable {
 
     var message: String {
         switch self {
-        case .notConnected: "Connect to this host before continuing."
-        case .authenticationRequired: "Sign in to this Hermes host again."
-        case .unsupportedHost: "This host does not support this feature."
-        case .unsupportedOperation: "This operation is unavailable on this host."
-        case .pluginRequired: "This feature requires a compatible bighelp plugin on the host."
-        case .driverUnavailable: "The host's room driver is not running."
+        case .notConnected: "Connect to this computer before continuing."
+        case .authenticationRequired: "Sign in to this Hermes computer again."
+        case .unsupportedHost: "This computer does not support this feature."
+        case .unsupportedOperation: "This operation is unavailable on this computer."
+        case .pluginRequired: "This feature requires a compatible bighelp plugin on the computer."
+        case .driverUnavailable: "The computer's room driver is not running."
         case .permissionRequired: "This feature requires an explicit permission grant."
-        case .policyRestricted: "The host's policy does not permit this operation."
-        case .hostRestartRequired: "The host must activate its updated configuration before continuing."
-        case .identityContextUnavailable: "This host cannot verify the identity context required for this action."
-        case .conversationDeletionUnsupported: "Hermes can remove individual session records, but cannot confirm erasing every related conversation record."
+        case .policyRestricted: "The computer's policy does not permit this operation."
+        case .hostRestartRequired: "The computer must activate its updated configuration before continuing."
+        case .identityContextUnavailable: "This computer cannot verify the identity context required for this action."
+        case .conversationDeletionUnsupported: "Hermes can remove individual chat records, but cannot confirm erasing every related conversation record."
         }
     }
 }

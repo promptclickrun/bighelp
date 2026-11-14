@@ -371,18 +371,18 @@ enum DirectHermesError: Error, LocalizedError, Sendable, Equatable {
     }
     var errorDescription: String? {
         switch self {
-        case .invalidEndpoint: "Enter a valid HTTPS host address, optionally with a port and deployment path."
+        case .invalidEndpoint: "Enter a valid HTTPS computer address, optionally with a port and deployment path."
         case .plaintextNotAllowed: "Plain http:// only works on a private network, like home Wi-Fi, a VPN or Tailscale. Use https:// for this address."
-        case .invalidCredentials: "The host rejected these credentials. Use a provider-issued access token or check your username and password."
-        case .authenticationRequired: "Your host session has expired. Sign in again."
-        case .unsupportedAuthentication: "This host does not support the selected sign-in method."
+        case .invalidCredentials: "The computer rejected these credentials. Use a provider-issued access token or check your username and password."
+        case .authenticationRequired: "Your computer session has expired. Sign in again."
+        case .unsupportedAuthentication: "This computer does not support the selected sign-in method."
         case .ambiguousPasswordProvider: "Choose a password provider, use browser sign-in, or connect with a provider-issued access token."
-        case .authModeChanged: "The host authentication mode changed. Sign in again; credentials were not sent using another mode."
-        case .identityChanged: "The authenticated host account changed. Sign in again to keep chats separate."
-        case .savedConnectionInvalid: "The saved host connection is invalid. Remove it and sign in again."
+        case .authModeChanged: "The computer authentication mode changed. Sign in again; credentials were not sent using another mode."
+        case .identityChanged: "The authenticated computer account changed. Sign in again to keep chats separate."
+        case .savedConnectionInvalid: "The saved computer connection is invalid. Remove it and sign in again."
         case .secureStorageUnavailable: "The device could not access secure connection storage. Unlock the device and try again."
-        case .secureStorageChanged: "The saved host connection changed. Reopen the current connection before continuing."
-        case .redirectRefused: "The host redirected the connection. Enter its final HTTPS address instead."
+        case .secureStorageChanged: "The saved computer connection changed. Reopen the current connection before continuing."
+        case .redirectRefused: "The computer redirected the connection. Enter its final HTTPS address instead."
         case .invalidAccessCredentials: "Enter the Cloudflare Access client ID and client secret from your service token."
         case .cloudflareAccessDenied: "Cloudflare Access didn't let bighelp through. Check the service token's client ID and secret, and that your Access policy allows it (Service Auth)."
         case .hostNameRefused:
@@ -391,20 +391,20 @@ enum DirectHermesError: Error, LocalizedError, Sendable, Equatable {
             throughCloudflare
                 ? "Cloudflare answered with a web page instead of Hermes. Check that your Access policy allows the service token (Service Auth) and that the tunnel sends this address to Hermes."
                 : "This address answered with a web page instead of Hermes. Check the address and port."
-        case .invalidResponse: "The host returned an unsupported or invalid response."
-        case .messageTooLarge: "The host message exceeds this client's safe size limit."
-        case .tooManyRequests: "Too many host requests are pending. Wait before trying again."
-        case .notConnected: "The host is not connected. Reconnect before continuing."
-        case .connectionFailed: "Could not connect to the host. Check its address, your VPN or Tailscale, and that Hermes is running."
+        case .invalidResponse: "The computer returned an unsupported or invalid response."
+        case .messageTooLarge: "The computer message exceeds this client's safe size limit."
+        case .tooManyRequests: "Too many computer requests are pending. Wait before trying again."
+        case .notConnected: "The computer is not connected. Reconnect before continuing."
+        case .connectionFailed: "Could not connect to the computer. Check its address, your VPN or Tailscale, and that Hermes is running."
         case .tlsRequired: "The secure connection could not be verified. Check the computer's HTTPS certificate."
-        case .rateLimited: "The host is limiting sign-in attempts. Wait before trying again."
-        case .serverUnavailable: "The host authentication service is unavailable. Try again later."
+        case .rateLimited: "The computer is limiting sign-in attempts. Wait before trying again."
+        case .serverUnavailable: "The computer authentication service is unavailable. Try again later."
         case .browserAuthenticationUnavailable: "Browser sign-in could not start on this device. Keep bighelp in the foreground, or use a password or provider-issued access token."
-        case .nativeTokenExchangeUncertain: "The host sign-in could not be confirmed. Start a new sign-in; the one-time code will not be reused."
+        case .nativeTokenExchangeUncertain: "The computer sign-in could not be confirmed. Start a new sign-in; the one-time code will not be reused."
         case .disconnected(let unknown), .timedOut(let unknown), .cancelled(let unknown):
-            unknown ? "The connection ended before the host confirmed the action. It may have been accepted. Check the conversation before sending again." : "The host request did not complete. Reconnect or try again."
+            unknown ? "The connection ended before the computer confirmed the action. It may have been accepted. Check the conversation before sending again." : "The computer request did not complete. Reconnect or try again."
         case .rpcRejected(let code, let message):
-            message.sentence.map { "\($0) (code \(code))" } ?? "The host rejected this operation (code \(code))."
+            message.sentence.map { "\($0) (code \(code))" } ?? "The computer rejected this operation (code \(code))."
         case .activeSessionLimit:
             "Hermes is at its limit of open chats. Finish a chat in another Hermes window, then try again."
         }

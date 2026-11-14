@@ -34,7 +34,7 @@ struct DirectHermesHistoryProjectionTests {
         #expect(!ChatActivityPresentation.step(for: recordedEvent).isRunning)
         let record = SessionRecord(id: "recorded-session", kind: .direct, agentIDs: ["default"],
                                    title: "Saved", activityEvents: [recordedEvent])
-        #expect(SessionSubagentDetailPresentation.statusTitle(for: record) == "Saved child session; outcome unavailable")
+        #expect(SessionSubagentDetailPresentation.statusTitle(for: record) == "Saved child chat; outcome unavailable")
     }
 
     @Test func recordedStateRoundTripsOnlyInLocalTypedStorageAndLegacyWireRejectsIt() throws {

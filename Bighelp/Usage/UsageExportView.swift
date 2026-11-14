@@ -51,7 +51,7 @@ struct UsageExportBlocks {
             }
         }
         rows("By model", summary.models, showsDetail: false)
-        rows("By agent", summary.agents, showsDetail: summary.isMultiHost)
+        rows("By bot", summary.agents, showsDetail: summary.isMultiHost)
         if summary.isMultiHost { rows("By computer", summary.hosts, showsDetail: false) }
         return blocks
     }
@@ -221,7 +221,7 @@ private struct UsageExportHero: View {
         if summary.totals.billedCost > 0 {
             return "Estimated by Hermes. Providers billed \(UsageFormat.money(summary.totals.billedCost))."
         }
-        return "Estimated by Hermes from your agents' sessions"
+        return "Estimated by Hermes from your bots' chats"
     }
 
     private var axis: [String] {
@@ -303,7 +303,7 @@ private struct UsageExportRows: View {
         parts.append("\(UsageFormat.percent(share)) of \(metric == .cost ? "cost" : "tokens")")
         parts.append(metric == .cost ? "\(UsageFormat.count(row.amount.tokens)) tokens"
                      : row.amount.cost > 0 ? UsageFormat.money(row.amount.cost) : "no cost")
-        parts.append(row.sessions == 1 ? "1 session" : "\(UsageFormat.count(row.sessions)) sessions")
+        parts.append(row.sessions == 1 ? "1 chat" : "\(UsageFormat.count(row.sessions)) chats")
         if let cache = row.cacheShare { parts.append("\(UsageFormat.percent(cache)) cached") }
         if let failure = row.failure { parts.append(failure) }
         return parts.joined(separator: " · ")

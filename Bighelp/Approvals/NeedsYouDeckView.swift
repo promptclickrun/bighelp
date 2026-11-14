@@ -838,7 +838,7 @@ struct NeedsYouDecisionButtons: View {
     private func title(_ decision: ApprovalDecision) -> String {
         switch decision {
         case .once: String(localized: "Approve once")
-        case .session: String(localized: "Session")
+        case .session: String(localized: "This chat")
         case .always: String(localized: "Always")
         case .deny: String(localized: "Decline")
         }

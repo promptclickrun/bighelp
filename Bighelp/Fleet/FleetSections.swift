@@ -413,8 +413,8 @@ extension FleetStore {
 
     static func placementMessage(_ error: any Error, hostName: String) -> String {
         switch error as? WorkspaceClientError {
-        case .unavailable?: "Update Hermes on \(hostName) to keep sections and hidden agents there."
-        case .conflict?: "This agent changed on another device. Try again."
+        case .unavailable?: "Update Hermes on \(hostName) to keep sections and hidden bots there."
+        case .conflict?: "This bot changed on another device. Try again."
         default: "\(hostName) couldn't save this just now. Try again."
         }
     }

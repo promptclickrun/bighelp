@@ -519,8 +519,8 @@ struct ChatAgentTalkRail: View {
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel(label)
-        .accessibilityHint(opensInPlace ? (isExpanded ? "Hides the agent's work." : "Shows the agent's work.")
-                           : "Shows what the agents said to each other.")
+        .accessibilityHint(opensInPlace ? (isExpanded ? "Hides the bot's work." : "Shows the bot's work.")
+                           : "Shows what the bots said to each other.")
         .accessibilityValue(opensInPlace ? (isExpanded ? "Open" : "Closed") : "")
         .accessibilityIdentifier("chat.agent-talk.\(talk.id)")
         .accessibilityAction { open(inPlace: opensInPlace) }

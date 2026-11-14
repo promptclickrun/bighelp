@@ -253,7 +253,7 @@ final class DirectHermesSkillsHubClient: SkillsHubManagementClient {
             try requireOwner()
             return value
         } catch DirectHermesError.unsupportedAuthentication where route.isCapabilityProbe {
-            throw CapabilitiesManagementError.unsupportedHost("This Hermes host does not expose the Skills Hub management routes.")
+            throw CapabilitiesManagementError.unsupportedHost("This Hermes computer does not expose the Skills Hub management routes.")
         } catch DirectHermesError.unsupportedAuthentication {
             throw CapabilitiesManagementError.invalidResponse
         }

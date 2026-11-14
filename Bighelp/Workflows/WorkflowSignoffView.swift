@@ -313,7 +313,7 @@ struct WorkflowSignoffView: View {
                         HStack(spacing: BighelpTokens.space8) { buttons(signoff) }
                     }
                 }
-                Text("No agent is running while this waits. Approving hands the file to you; it does not publish anything.")
+                Text("No bot is running while this waits. Approving hands the file to you; it does not publish anything.")
                     .font(.bighelp(.caption))
                     .foregroundStyle(theme.tertiaryText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -330,7 +330,7 @@ struct WorkflowSignoffView: View {
     private func notesField(_ signoff: WorkflowSignoff) -> some View {
         // The agent that wrote the file gets the notes.
         let writer = model.detail?.outputs.first { $0.sha256 == signoff.artifactSHA256 }?.stageKey
-        let name = context.agentName(model.detail?.stages.first { $0.key == writer }?.agentID) ?? "the agent"
+        let name = context.agentName(model.detail?.stages.first { $0.key == writer }?.agentID) ?? "the bot"
         return TextField("Notes", text: $notes,
                          prompt: Text("Notes for \(name) (needed to ask for changes)").bighelpFieldHint(theme),
                          axis: .vertical)

@@ -383,7 +383,7 @@ struct BighelpModelPickerSheet: View {
         onConfirmModel: ((SessionRuntimeModelConfirmation) -> Void)? = nil,
         onCancelModelConfirmation: ((SessionRuntimeModelConfirmation) -> Void)? = nil,
         applyTitle: String = "Apply to current chat",
-        defaultModelTitle: String = "Host default",
+        defaultModelTitle: String = "Computer default",
         isEmbedded: Bool = false,
         onClose: (() -> Void)? = nil,
         onApply: ((SessionRuntimeSelectionDraft) -> Void)? = nil

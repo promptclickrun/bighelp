@@ -125,7 +125,7 @@ final class HostPluginUpdateModel {
         guard state == .updateAvailable, let pin = release?.pin, let registry,
               let connection = currentConnection() else { return false }
         guard let lock = registry.beginPluginManagement(hostID: hostID) else {
-            message = "Another plugin change is running on this host. Try again in a moment."
+            message = "Another plugin change is running on this computer. Try again in a moment."
             return false
         }
         defer { registry.endPluginManagement(hostID: hostID, owner: lock) }
@@ -136,14 +136,14 @@ final class HostPluginUpdateModel {
         // Trust what the host now reports, not the install call's outcome.
         guard let installed = try? await installedPlugin(connection.workspace), installed.found else {
             fail(updateFailed
-                 ? "The update didn't finish. Check your host connection and try again."
+                 ? "The update didn't finish. Check your computer connection and try again."
                  : "bighelp couldn't confirm the update. Check again in a moment.")
             return false
         }
         installedVersion = installed.version
         guard installed.pinnedSHA == pin.revision
                 || Self.state(installed: installed.version, running: nil, latest: latestVersion) != .updateAvailable else {
-            fail("The host still has version \(installed.version ?? "unknown"). Try the update again.")
+            fail("The computer still has version \(installed.version ?? "unknown"). Try the update again.")
             return false
         }
         state = .restartNeeded

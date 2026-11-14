@@ -95,7 +95,7 @@ struct FleetSettingsView: View {
         } header: {
             Text("bighelp plugin")
         } footer: {
-            Text("Each host keeps running the old plugin until it restarts.")
+            Text("Each computer keeps running the old plugin until it restarts.")
         }
     }
 
@@ -103,7 +103,7 @@ struct FleetSettingsView: View {
         Section {
             let count = store.gatewayCandidates.count
             BighelpActionRow(title: "Restart Hermes Gateway",
-                             detail: count == 0 ? "No host to restart" : "On \(hosts(count))",
+                             detail: count == 0 ? "No computer to restart" : "On \(hosts(count))",
                              systemImage: "arrow.clockwise",
                              isWorking: store.hosts.contains { $0.gateway.kind == .working }) {
                 confirmation = .restartGateways(count: count)
@@ -118,7 +118,7 @@ struct FleetSettingsView: View {
         } header: {
             Text("Messaging gateway")
         } footer: {
-            Text("Hosts that are offline or signed out are skipped.")
+            Text("Computers that are offline or signed out are skipped.")
         }
     }
 
@@ -126,12 +126,12 @@ struct FleetSettingsView: View {
         store.hosts.contains { $0[keyPath: job].kind == .checking }
     }
 
-    private func hosts(_ count: Int) -> String { count == 1 ? "1 host" : "\(count) hosts" }
+    private func hosts(_ count: Int) -> String { count == 1 ? "1 computer" : "\(count) computers" }
 
     private func summary(_ count: Int, _ job: KeyPath<FleetMaintenanceHost, FleetHostJob>) -> String {
         if count > 0 { return "\(hosts(count)) can update" }
         if store.hosts.contains(where: { $0[keyPath: job].kind == .working }) { return "Updating…" }
-        return isChecking(job) ? "Checking hosts…" : "Nothing to update"
+        return isChecking(job) ? "Checking computers…" : "Nothing to update"
     }
 
     // MARK: Confirmations
@@ -166,13 +166,13 @@ struct FleetSettingsView: View {
     private func confirmMessage(_ confirmation: Confirmation) -> String {
         switch confirmation {
         case .updateHermes:
-            "Each host installs the update and may restart, so bighelp can disconnect for a moment."
+            "Each computer installs the update and may restart, so bighelp can disconnect for a moment."
         case .updateHermesOn:
             "It installs the update and may restart, so bighelp can disconnect for a moment."
         case .restartGatewayOn:
-            "Messaging pauses for a moment on that host. Replies in progress may stop."
+            "Messaging pauses for a moment on that computer. Replies in progress may stop."
         case .restartGateways:
-            "Messaging pauses for a moment on each host. Replies in progress may stop."
+            "Messaging pauses for a moment on each computer. Replies in progress may stop."
         case .finishHermes:
             "The messaging gateway restarts on the updated Hermes. Messaging pauses for a moment."
         case .restartPlugin(let host):

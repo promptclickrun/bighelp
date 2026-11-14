@@ -192,7 +192,7 @@ extension BotModeRoomStore {
                 return
             } catch BotModeRoomError.executionUnavailable {
                 guard boundary == nativeBoundaryGeneration else { return }
-                nativeRoomSyncErrors[roomID] = "This host cannot currently synchronize native rooms."
+                nativeRoomSyncErrors[roomID] = "This computer cannot currently synchronize native rooms."
                 return
             } catch {
                 guard boundary == nativeBoundaryGeneration else { return }
@@ -206,7 +206,7 @@ extension BotModeRoomStore {
                     || error as? WorkspaceClientError == .transportUnavailable
                     || error as? WorkspaceClientError == .outcomeUnknown
                 if error is WorkspaceClientError, !knownTransport {
-                    nativeRoomSyncErrors[roomID] = "The room connection is no longer usable. Reopen it to refresh the host state."
+                    nativeRoomSyncErrors[roomID] = "The room connection is no longer usable. Reopen it to refresh the computer state."
                     return
                 }
                 if !knownTransport { unknownFailures += 1 }

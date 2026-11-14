@@ -61,8 +61,8 @@ struct WatchNeedView: View {
             }
         } message: {
             Text(confirming == .always
-                 ? "Your agent won't ask again for this kind of action."
-                 : "Your agent won't ask again in this chat.")
+                 ? "Your bot won't ask again for this kind of action."
+                 : "Your bot won't ask again in this chat.")
         }
         .userActivity(WatchPhoneLink.handoffActivityType, element: need?.link) { link, activity in
             activity.title = link.title

@@ -25,7 +25,7 @@ struct SessionSubagentRosterSheet: View {
                               systemImage: "square.stack.3d.up")
                             .font(.bighelp(.headline))
                             .foregroundStyle(theme.primaryText)
-                        Text(totalSubagents > 0 ? "Tap a subagent to watch it work." : "Work the agent left running in this chat.")
+                        Text(totalSubagents > 0 ? "Tap a subagent to watch it work." : "Work the bot left running in this chat.")
                             .font(.bighelp(.subheadline))
                             .foregroundStyle(theme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
@@ -274,7 +274,7 @@ private struct SessionSubagentDetailView: View {
                                 .foregroundStyle(theme.primaryText)
                                 .fixedSize(horizontal: false, vertical: true)
                             Text(record.map(SessionSubagentDetailPresentation.statusTitle)
-                                ?? "Waiting for child session")
+                                ?? "Waiting for child chat")
                                 .font(.bighelp(.subheadline))
                                 .foregroundStyle(theme.secondaryText)
                         }
@@ -313,7 +313,7 @@ private struct SessionSubagentDetailView: View {
                     HStack(spacing: BighelpTokens.space8) {
                         BighelpThinkingOrb(scenario: .working, scale: .inline)
                             .accessibilityHidden(true)
-                        Text(availabilityMessage ?? "Loading the persisted child session from Hermes…")
+                        Text(availabilityMessage ?? "Loading the persisted child chat from Hermes…")
                             .bighelpFont(.metadata)
                             .foregroundStyle(theme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
@@ -330,7 +330,7 @@ private struct SessionSubagentDetailView: View {
         }
         .background(BighelpThemeCanvas(theme: theme).ignoresSafeArea())
         .accessibilityIdentifier("subagent.detail.\(subagent.sessionID)")
-        .navigationTitle("Subagent session")
+        .navigationTitle("Subagent chat")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             subagentStreamAcceptanceFixture?.observeDetail(
@@ -455,7 +455,7 @@ private struct SessionSubagentDetailView: View {
 
     private func refreshPersistedSession() async {
         guard let sessionCatalog else {
-            availabilityMessage = "This child session is not available in this preview."
+            availabilityMessage = "This child chat is not available in this preview."
             return
         }
 
@@ -469,8 +469,8 @@ private struct SessionSubagentDetailView: View {
             return
         } catch {
             availabilityMessage = record == nil
-                ? "Waiting for Hermes to persist this child session…"
-                : "The latest child-session update is not available yet."
+                ? "Waiting for Hermes to persist this child chat…"
+                : "The latest child-chat update is not available yet."
         }
     }
 

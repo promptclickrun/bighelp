@@ -35,7 +35,7 @@ struct LoopdySessionActivityAttributes: Codable, Hashable, Sendable {
         var activeRows: [String]? = nil
 
         static func initial(agentName: String, timestamp: Int) -> ContentState {
-            let name = BighelpActivityText.personName(agentName) ?? "Your agent"
+            let name = BighelpActivityText.personName(agentName) ?? "Your bot"
             return ContentState(
                 phase: .thinking,
                 currentAction: "\(name) is getting started",
@@ -69,7 +69,7 @@ struct LoopdySessionActivityAttributes: Codable, Hashable, Sendable {
             let agentName = BighelpActivityText.personName(agentName)
         else { return nil }
         // Retain the required v1 key without copying private chat titles.
-        let title = "Active session"
+        let title = "Active chat"
         return LoopdySessionActivityAttributes(
             sessionID: sessionID,
             sessionTitle: title,
@@ -112,7 +112,7 @@ enum BighelpActivityText {
 enum BighelpActivityStatus {
     static let responseReady = "Response ready"
     static let reviewingDelegatedWork = "Reviewing delegated work"
-    static let agentsWorking = "Agents are still working"
+    static let agentsWorking = "Bots are still working"
     static let finished = "Finished"
     static let couldNotFinish = "Could not finish"
     static let stopped = "Stopped"
@@ -127,7 +127,7 @@ struct BighelpActivityPresentation: Equatable {
     let pose: BighelpActivityPose
 
     init(attributes: LoopdySessionActivityAttributes, state: LoopdySessionActivityAttributes.ContentState, isStale: Bool) {
-        agentName = BighelpActivityText.personName(attributes.agentName) ?? "Your agent"
+        agentName = BighelpActivityText.personName(attributes.agentName) ?? "Your bot"
         pose = isStale && !state.phase.isTerminal ? .idle : BighelpActivityPose(phase: state.phase, tool: state.latestTool)
         if isStale && !state.phase.isTerminal {
             status = "Updates paused"
@@ -149,7 +149,7 @@ struct BighelpActivityPresentation: Equatable {
             symbolName = pose.symbolName
         case .delegating:
             status = state.currentAction == BighelpActivityStatus.responseReady
-                ? BighelpActivityStatus.responseReady : "Working with other agents"
+                ? BighelpActivityStatus.responseReady : "Working with other bots"
             symbolName = "person.2"
         case .responding:
             status = "Writing the response"
@@ -163,7 +163,7 @@ struct BighelpActivityPresentation: Equatable {
             symbolName = "exclamationmark.circle"
         }
         if children > 0 {
-            detail = children == 1 ? "1 agent still working" : "\(children) agents still working"
+            detail = children == 1 ? "1 bot still working" : "\(children) bots still working"
         } else if state.phase == .waiting {
             detail = "Open bighelp to continue"
         } else {

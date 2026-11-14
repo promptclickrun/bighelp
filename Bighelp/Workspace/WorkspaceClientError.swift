@@ -15,15 +15,15 @@ enum WorkspaceClientError: Error, Equatable, LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .unavailable(let reason): reason.message
-        case .ownerChanged: "The selected host or connection changed. Reopen this screen before continuing."
-        case .authenticationRequired: "Sign in to this Hermes host again."
-        case .invalidRequest: "This host request is invalid."
+        case .ownerChanged: "The selected computer or connection changed. Reopen this screen before continuing."
+        case .authenticationRequired: "Sign in to this Hermes computer again."
+        case .invalidRequest: "This computer request is invalid."
         case .invalidResponse: "Hermes returned an unsupported or invalid response."
-        case .transportUnavailable: "The host is unavailable. Check its connection and try again."
+        case .transportUnavailable: "The computer is unavailable. Check its connection and try again."
         case .rejected(let code, let message):
             Self.workspaceFilesMessage(code) ?? message.sentence ?? "Hermes rejected this operation."
-        case .conflict: "The host state changed. Reload it before applying your changes."
-        case .outcomeUnknown: "The host did not confirm this action. Check its current state before trying again."
+        case .conflict: "The computer state changed. Reload it before applying your changes."
+        case .outcomeUnknown: "The computer did not confirm this action. Check its current state before trying again."
         case .capacityExceeded: "This operation exceeds the supported size or capacity."
         }
     }
@@ -37,30 +37,30 @@ enum WorkspaceClientError: Error, Equatable, LocalizedError, Sendable {
     static func workspaceFilesMessage(_ code: String?) -> String? {
         switch code {
         case workspacePluginOutdated:
-            "bighelp needs the newest bighelp plugin on this computer to find this agent's folder. Update it in "
+            "bighelp needs the newest bighelp plugin on this computer to find this bot's folder. Update it in "
                 + "Settings, under this computer's Plugin version. If it's already up to date, restart Hermes to "
                 + "finish the update, then try again."
         case "workspace_not_configured":
-            "This agent's chats start in a folder that isn't its own, like Hermes's program folder or the "
-                + "computer's top folder, so bighelp won't show it. Make a folder named “workspace” in the agent's "
-                + "Hermes folder, or choose a working folder for the agent in Hermes, then try again."
+            "This bot's chats start in a folder that isn't its own, like Hermes's program folder or the "
+                + "computer's top folder, so bighelp won't show it. Make a folder named “workspace” in the bot's "
+                + "Hermes folder, or choose a working folder for the bot in Hermes, then try again."
         case "workspace_in_container":
-            "This agent works inside a container, so its files aren't on the computer bighelp can read."
+            "This bot works inside a container, so its files aren't on the computer bighelp can read."
         case "workspace_on_remote":
-            "This agent works on another computer over SSH, so its files aren't on the computer bighelp can read."
+            "This bot works on another computer over SSH, so its files aren't on the computer bighelp can read."
         case "workspace_windows_unsupported":
-            "bighelp can't show an agent's files from a Windows computer yet."
+            "bighelp can't show a bot's files from a Windows computer yet."
         case "workspace_hermes_folder":
-            "This agent works in Hermes's own folder, which holds its settings and keys, so bighelp won't show it. "
-                + "Make a folder named “workspace” in it for the agent's files, then try again."
+            "This bot works in Hermes's own folder, which holds its settings and keys, so bighelp won't show it. "
+                + "Make a folder named “workspace” in it for the bot's files, then try again."
         case "workspace_unavailable":
-            "This agent's working folder is missing on its computer, or Hermes can't open it."
+            "This bot's working folder is missing on its computer, or Hermes can't open it."
         case "workspace_config_invalid":
-            "Hermes can't read this agent's settings (config.yaml) on its computer. Fix them there, then try again."
+            "Hermes can't read this bot's settings (config.yaml) on its computer. Fix them there, then try again."
         case "workspace_identity_changed", "workspace_changed":
-            "This agent's working folder just changed. Try again."
+            "This bot's working folder just changed. Try again."
         case "workspace_identity_unavailable", "workspace_files_unavailable":
-            "This computer's Hermes can't share an agent's files yet. Update Hermes and the bighelp plugin."
+            "This computer's Hermes can't share a bot's files yet. Update Hermes and the bighelp plugin."
         default:
             nil
         }

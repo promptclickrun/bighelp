@@ -125,7 +125,7 @@ struct WorkflowStageEditor: View {
     private var agentPicker: some View {
         let agentID = model.agentID(for: stage.role)
         return HStack {
-            Text("Agent")
+            Text("Bot")
                 .font(.bighelp(.body))
             Spacer()
             if isAssigning { ProgressView() }
@@ -135,7 +135,7 @@ struct WorkflowStageEditor: View {
                 }
             } label: {
                 HStack(spacing: BighelpTokens.space4) {
-                    Text(context.agentName(agentID) ?? "Choose an agent")
+                    Text(context.agentName(agentID) ?? "Choose a bot")
                     Image(systemName: "chevron.up.chevron.down").font(.bighelp(.caption2))
                 }
                 .font(.bighelp(.body).weight(.semibold))
@@ -214,8 +214,8 @@ struct WorkflowStageEditor: View {
                 Text("Checks")
             } footer: {
                 Text(checkableOutputs.isEmpty
-                     ? "Add an agent stage before this one: a check looks at what an earlier stage made."
-                     : "The computer checks these itself. No agent runs.")
+                     ? "Add a bot stage before this one: a check looks at what an earlier stage made."
+                     : "The computer checks these itself. No bot runs.")
                     .font(.bighelp(.footnote))
             }
         case .decision where stage.onMany.count > 1:
@@ -233,7 +233,7 @@ struct WorkflowStageEditor: View {
             } header: {
                 Text("Reads \(stage.onMany.count) verdicts")
             } footer: {
-                Text("Each agent says pass or changes, with notes.")
+                Text("Each bot says pass or changes, with notes.")
                     .font(.bighelp(.footnote))
             }
             ways
@@ -267,7 +267,7 @@ struct WorkflowStageEditor: View {
                             Text($0).tag($0)
                         }
                     }
-                    Text("The run waits for you here, with no agent running. Approving never publishes anything.")
+                    Text("The run waits for you here, with no bot running. Approving never publishes anything.")
                         .font(.bighelp(.footnote))
                         .foregroundStyle(theme.secondaryText)
                 }
@@ -300,7 +300,7 @@ struct WorkflowStageEditor: View {
                                 Text(branch.title)
                                     .font(.bighelp(.body))
                                     .foregroundStyle(theme.primaryText)
-                                Text(context.agentName(model.agentID(for: branch.role)) ?? "Choose an agent")
+                                Text(context.agentName(model.agentID(for: branch.role)) ?? "Choose a bot")
                                     .font(.bighelp(.caption))
                                     .foregroundStyle(model.agentID(for: branch.role) == nil ? theme.action
                                                      : theme.secondaryText)
@@ -320,14 +320,14 @@ struct WorkflowStageEditor: View {
                     guard stage.branches.count - offsets.count >= 2 else { return }
                     stage.branches.remove(atOffsets: offsets)
                 }
-                Button("Add an agent", systemImage: "plus") { addBranch() }
+                Button("Add a bot", systemImage: "plus") { addBranch() }
                     .disabled(stage.branches.count >= 5)
                     .frame(minHeight: BighelpTokens.hitTarget)
                     .accessibilityIdentifier("workflows.stage.add-branch")
             } header: {
-                Text("Agents at the same time")
+                Text("Bots at the same time")
             } footer: {
-                Text("All of them start at once, and the workflow goes on when every one is done. They can't read each other's work; the next stage can read all of it. 2 to 5 agents.")
+                Text("All of them start at once, and the workflow goes on when every one is done. They can't read each other's work; the next stage can read all of it. 2 to 5 bots.")
                     .font(.bighelp(.footnote))
             }
         case .unknown:
@@ -373,13 +373,13 @@ struct WorkflowStageEditor: View {
                 .font(.bighelp(.footnote))
         }
         Section {
-            Toggle("If it fails, an agent fixes it", isOn: Binding(get: { stage.fix != nil }, set: { on in
+            Toggle("If it fails, a bot fixes it", isOn: Binding(get: { stage.fix != nil }, set: { on in
                 stage.fix = on ? .init(role: model.definition?.roles.first?.key ?? "coder",
                                        instructions: "The command failed. Fix the code so it passes.") : nil
             }))
             .accessibilityIdentifier("workflows.stage.fix")
             if let fix = stage.fix {
-                Picker("Agent", selection: Binding(get: { fix.role }, set: { stage.fix?.role = $0 })) {
+                Picker("Bot", selection: Binding(get: { fix.role }, set: { stage.fix?.role = $0 })) {
                     ForEach(model.definition?.roles ?? [], id: \.key) { role in
                         Text(context.agentName(model.agentID(for: role.key)) ?? role.label).tag(role.key)
                     }

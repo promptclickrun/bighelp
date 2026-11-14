@@ -125,7 +125,7 @@ final class SessionCatalogStore {
                 hasLoadedCatalogState = true
             } catch {
                 repositoryAllowsWrites = false
-                loadErrorMessage = "Sessions could not be loaded. Try again."
+                loadErrorMessage = "Chats could not be loaded. Try again."
             }
         }
         rebuildSubagentParentIndex()
@@ -185,7 +185,7 @@ final class SessionCatalogStore {
             records.removeAll()
             repositoryAllowsWrites = false
             hasLoadedCatalogState = false
-            loadErrorMessage = "Sessions could not be loaded. Try again."
+            loadErrorMessage = "Chats could not be loaded. Try again."
         }
     }
 

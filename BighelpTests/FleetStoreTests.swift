@@ -171,7 +171,7 @@ struct FleetStoreTests {
         let rio = try #require(fleet.agent(hostID: studio, profileID: "rio"))
         await #expect(throws: WorkspaceClientError.self) { try await fleet.setHidden(rio, true) }
         #expect(fleet.agent(hostID: studio, profileID: "rio")?.isHidden == false)
-        #expect(fleet.placementError == "Update Hermes on Studio to keep sections and hidden agents there.")
+        #expect(fleet.placementError == "Update Hermes on Studio to keep sections and hidden bots there.")
     }
 
     /// Agents on both hosts file into one section; the selected host saves
@@ -405,13 +405,13 @@ struct FleetStoreTests {
         await first.waitForReads()
         await first.waitForSaves()
 
-        reader.failures[office] = "Couldn't reach this host."
+        reader.failures[office] = "Couldn't reach this computer."
         let relaunched = FleetStore(reader: reader, directory: folder, saveDelay: .zero)
         #expect(relaunched.agents(on: office).map(\.name) == ["Kit"], "Shown at once from this device")
         relaunched.refresh(force: true)
         await relaunched.waitForReads()
 
-        #expect(relaunched.statuses[office] == .unreachable("Couldn't reach this host."))
+        #expect(relaunched.statuses[office] == .unreachable("Couldn't reach this computer."))
         #expect(relaunched.agents(on: office).map(\.name) == ["Kit"])
     }
 

@@ -523,7 +523,7 @@ final class DirectHermesConversationClient: StreamingConversationClient, Stoppab
             journal = next
         } catch {
             needsRecovery = true
-            status = "Hermes rotated the stored session. The original draft remains retained; its new local scope could not be saved."
+            status = "Hermes rotated the stored chat. The original draft remains retained; its new local scope could not be saved."
         }
     }
 

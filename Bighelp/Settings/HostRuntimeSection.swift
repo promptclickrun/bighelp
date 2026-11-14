@@ -19,7 +19,7 @@ struct HostRuntimeSection: View {
                 Text(detail).bighelpFont(.body)
                     .foregroundStyle(theme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
-                if currentStore?.isChecking == true { ProgressView("Checking host") }
+                if currentStore?.isChecking == true { ProgressView("Checking computer") }
             }
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("settings.host-runtime-status")
@@ -54,15 +54,15 @@ struct HostRuntimeSection: View {
                     await requestedStore.refresh()
                 }
             } label: {
-                Label("Check Host Status", systemImage: "arrow.clockwise")
+                Label("Check Computer Status", systemImage: "arrow.clockwise")
                     .frame(minHeight: BighelpTokens.hitTarget)
             }
             .disabled(currentStore == nil || currentStore?.isChecking == true || agents?.isLoading == true)
             .accessibilityIdentifier("settings.check-host-runtime")
         } header: {
-            Text("Host")
+            Text("Computer")
         } footer: {
-            Text("A connected Link does not prove every feature works. Checking never updates or restarts the host; plugin updates do not update Hermes.")
+            Text("A connected Link does not prove every feature works. Checking never updates or restarts the computer; plugin updates do not update Hermes.")
         }
         .foregroundStyle(theme.primaryText)
         .tint(theme.action)
@@ -71,47 +71,47 @@ struct HostRuntimeSection: View {
 
     private var title: String {
         if needsHermesRecovery { return "Hermes compatibility needs attention" }
-        if status?.plugin.restartState == .required || status?.hermes.restartState == .required { return "Host restart required" }
-        if agents?.errorMessage != nil { return "Agent discovery unavailable" }
+        if status?.plugin.restartState == .required || status?.hermes.restartState == .required { return "Computer restart required" }
+        if agents?.errorMessage != nil { return "Bot discovery unavailable" }
         if status?.hermes.updateState == .available { return "Hermes update available" }
         switch currentStore?.availability {
         case .supported:
             if status?.compatibility.state == .compatible,
-               status?.compatibility.checkedOperations.contains("agents.list") == true { return "Agent discovery available" }
-            return "Host compatibility unknown"
-        case .unsupported: return "Host diagnostics not supported"
-        case .unavailable: return "Host status unavailable"
-        case .unknown, nil: return "Host status unknown"
+               status?.compatibility.checkedOperations.contains("agents.list") == true { return "Bot discovery available" }
+            return "Computer compatibility unknown"
+        case .unsupported: return "Computer diagnostics not supported"
+        case .unavailable: return "Computer status unavailable"
+        case .unknown, nil: return "Computer status unknown"
         }
     }
 
     private var detail: String {
         if needsHermesRecovery { return AgentDirectoryStore.hermesCompatibilityRecovery }
         if status?.hermes.restartState == .required {
-            return "Restart the Hermes gateway on the host when active work can be interrupted, then reconnect and check again."
+            return "Restart the Hermes gateway on the computer when active work can be interrupted, then reconnect and check again."
         }
         if status?.plugin.restartState == .required {
-            return "The installed bighelp plugin differs from the active plugin. Restart the gateway on the host when active work can be interrupted, then reconnect and check again. For plugin updates, use Settings → Connectivity → Updates."
+            return "The installed bighelp plugin differs from the active plugin. Restart the gateway on the computer when active work can be interrupted, then reconnect and check again. For plugin updates, use Settings → Connectivity → Updates."
         }
         if agents?.errorMessage != nil {
-            return "Agents could not be loaded. Check again or inspect the gateway. Existing chats and cached agents remain available; this does not prove Hermes is outdated."
+            return "Bots could not be loaded. Check again or inspect the gateway. Existing chats and cached bots remain available; this does not prove Hermes is outdated."
         }
         if status?.hermes.updateState == .available {
-            return "Update Hermes on the host, then restart when active work can be interrupted. Reconnect and check again. Updating the bighelp plugin does not update Hermes."
+            return "Update Hermes on the computer, then restart when active work can be interrupted. Reconnect and check again. Updating the bighelp plugin does not update Hermes."
         }
         switch currentStore?.availability {
         case .supported:
             if status?.compatibility.state == .compatible,
                status?.compatibility.checkedOperations.contains("agents.list") == true {
-                return "The host listed agents. This does not check every feature or prove Hermes is current."
+                return "The computer listed bots. This does not check every feature or prove Hermes is current."
             }
-            return "Agent compatibility is not established. Unknown version or update details do not prove the host is outdated."
+            return "Bot compatibility is not established. Unknown version or update details do not prove the computer is outdated."
         case .unsupported:
-            return "This host does not advertise diagnostics. That does not establish whether Hermes is current. Check the gateway on the host; bighelp plugin updates are separate in Settings → Connectivity → Updates."
+            return "This computer does not advertise diagnostics. That does not establish whether Hermes is current. Check the gateway on the computer; bighelp plugin updates are separate in Settings → Connectivity → Updates."
         case .unavailable:
-            return "The host did not provide a verified status. Check the connection and try again. No update or restart was requested."
+            return "The computer did not provide a verified status. Check the connection and try again. No update or restart was requested."
         case .unknown, nil:
-            return "Host diagnostics have not been verified. Connect to the paired host and check again. Missing diagnostics do not mean Hermes is outdated."
+            return "Computer diagnostics have not been verified. Connect to the paired computer and check again. Missing diagnostics do not mean Hermes is outdated."
         }
     }
 }

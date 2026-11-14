@@ -88,7 +88,7 @@ enum BighelpToolActivityCatalog {
         "cronjob_manage": scheduling,
         // People and other agents
         "clarify": make(.glyph(.question), "Asking you a question…", "Asked you a question"),
-        "delegate_task": make(.glyph(.agents), "Asking another agent…", "Asked another agent"),
+        "delegate_task": make(.glyph(.agents), "Asking another bot…", "Asked another bot"),
         "mixture_of_agents": make(.glyph(.group), "Asking several models…", "Asked several models"),
         "send_message": make(.glyph(.plane), "Sending a message…", "Sent a message"),
         "react_to_message": reacting,

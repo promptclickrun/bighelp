@@ -339,9 +339,9 @@ struct RootShellView: View {
         Group {
             if let registry = hostRegistry, registry.isWorkspaceReady, !registry.storageIsReadable {
                 ContentUnavailableView {
-                    Label("Saved hosts unavailable", systemImage: "externaldrive.badge.exclamationmark")
+                    Label("Saved computers unavailable", systemImage: "externaldrive.badge.exclamationmark")
                 } description: {
-                    Text(registry.errorMessage ?? "Saved hosts could not be loaded.")
+                    Text(registry.errorMessage ?? "Saved computers could not be loaded.")
                 } actions: {
                     Button("Try Again") { registry.retryLoading() }
                 }
@@ -443,7 +443,7 @@ struct RootShellView: View {
         NativeWorkspaceStatusView(
             status: nativeWorkspaceStatus,
             message: nativeWorkspaceError ?? nativeRuntime?.errorMessage
-                ?? nativeWorkspaceStore?.status ?? "Connecting to this host.",
+                ?? nativeWorkspaceStore?.status ?? "Connecting to this computer.",
             registry: hostRegistry,
             reconnect: {
                 Task {
@@ -517,7 +517,7 @@ struct RootShellView: View {
             BighelpCard {
                 VStack(spacing: BighelpTokens.space12) {
                     BighelpThinkingOrb(scenario: .shaping)
-                    Text("Restoring session")
+                    Text("Restoring chat")
                         .bighelpFont(.sectionTitle)
                         .foregroundStyle(theme.primaryText)
                     Text("Loading the transcript and rebuilding saved interface cards…")
@@ -533,7 +533,7 @@ struct RootShellView: View {
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isModal)
-        .accessibilityLabel("Restoring session")
+        .accessibilityLabel("Restoring chat")
         .accessibilityIdentifier("session.restore.loading")
     }
 
@@ -1094,7 +1094,7 @@ struct RootShellView: View {
                     }
                 }
                 if actionErrorShowsHostStatus {
-                    Button("View Host Status") {
+                    Button("View Computer Status") {
                         actionErrorMessage = nil
                         actionErrorShowsHostStatus = false
                         actionErrorRetry = nil
@@ -1116,7 +1116,7 @@ struct RootShellView: View {
                     }
                     .scrollContentBackground(.hidden)
                     .background(theme.canvas.ignoresSafeArea())
-                    .navigationTitle("Host Status")
+                    .navigationTitle("Computer Status")
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Done") { isHostStatusPresented = false }
@@ -1188,7 +1188,7 @@ struct RootShellView: View {
             openApproval(requestID: id)
         case .group(let roomID):
             guard let owner = currentWorkspaceOwner else {
-                actionErrorMessage = "This group is no longer available on the selected host."
+                actionErrorMessage = "This group is no longer available on the selected computer."
                 return
             }
             openHostedGroup(roomID, owner: owner, settings: false)
@@ -1220,7 +1220,7 @@ struct RootShellView: View {
         }
         guard !host.isSelected else { return false }
         guard fleet.canOpen(hostID) else {
-            actionErrorMessage = "\(host.name) is a sample host in this demo."
+            actionErrorMessage = "\(host.name) is a sample computer in this demo."
             return true
         }
         recordLiveFleet()
@@ -1244,7 +1244,7 @@ struct RootShellView: View {
             return
         }
         guard nativeWorkspaceStore == nil else {
-            actionErrorMessage = "This legacy chat link cannot be opened. The native host was not changed."
+            actionErrorMessage = "This legacy chat link cannot be opened. No computer was changed."
             return
         }
         sessionRestoreTask?.cancel()
@@ -1279,7 +1279,7 @@ struct RootShellView: View {
                 )
                 let route = AppRoute.chat(conversationID: sessionID)
                 guard try featureStore.prepareForUserNavigation(route) else {
-                    actionErrorMessage = "This session could not be prepared. Try again."
+                    actionErrorMessage = "This chat could not be prepared. Try again."
                     return
                 }
                 appState.activateConversation(id: sessionID, source: .quickSwitch)
@@ -1287,7 +1287,7 @@ struct RootShellView: View {
                 return
             } catch {
                 guard sessionRestoreRequest == restoreRequest else { return }
-                actionErrorMessage = "This session could not be loaded from Hermes. Try again."
+                actionErrorMessage = "This chat could not be loaded from Hermes. Try again."
             }
         }
     }
@@ -1562,7 +1562,7 @@ struct RootShellView: View {
             // While the host is reconnecting, open the saved conversation; it
             // catches up once the connection returns instead of showing an error.
             if openCachedChatWhileReconnecting(route) { return }
-            actionErrorMessage = "This session could not be prepared. Try again."
+            actionErrorMessage = "This chat could not be prepared. Try again."
         }
     }
 
@@ -1582,7 +1582,7 @@ struct RootShellView: View {
             openSession(session)
         case .hostedRoom(let roomID):
             guard let owner = currentWorkspaceOwner else {
-                actionErrorMessage = "This group is no longer available on the selected host."
+                actionErrorMessage = "This group is no longer available on the selected computer."
                 return
             }
             openHostedGroup(roomID, owner: owner, settings: false)
@@ -1609,7 +1609,7 @@ struct RootShellView: View {
                 model.resolveBranchContinuation(continuation)
                 let route = AppRoute.chat(conversationID: branch.id)
                 guard try featureStore.prepareForUserNavigation(route) else {
-                    actionErrorMessage = "This chat went on in a new chat with the same history. Find it in Sessions."
+                    actionErrorMessage = "This chat went on in a new chat with the same history. Find it in Chats."
                     return
                 }
                 appState.activateConversation(id: branch.id, source: .fork)
@@ -1629,12 +1629,12 @@ struct RootShellView: View {
                 )
                 let route = AppRoute.chat(conversationID: fork.id)
                 guard try featureStore.prepareForUserNavigation(route) else {
-                    actionErrorMessage = "The fork was created, but could not be opened. Find it in Sessions."
+                    actionErrorMessage = "The fork was created, but could not be opened. Find it in Chats."
                     return
                 }
                 appState.activateConversation(id: fork.id, source: .fork)
             } catch {
-                actionErrorMessage = "This checkpoint could not be forked. Refresh the session and try again."
+                actionErrorMessage = "This checkpoint could not be forked. Refresh the chat and try again."
             }
         }
     }
@@ -1645,7 +1645,7 @@ struct RootShellView: View {
             appState.open(route)
         } catch {
             if openCachedChatWhileReconnecting(route) { return }
-            actionErrorMessage = "This session could not be prepared. Try again."
+            actionErrorMessage = "This chat could not be prepared. Try again."
         }
     }
 
@@ -1744,7 +1744,7 @@ private struct NativeWorkspaceStatusView: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label("Hermes workspace", systemImage: "network")
+            Label("Your computer", systemImage: "network")
         } description: {
             Text(message)
         } actions: {

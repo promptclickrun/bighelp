@@ -464,7 +464,7 @@ struct BighelpLinkWorkspaceClientsTests {
 
         #expect(!selected)
         #expect(store.workspaceID(forSessionID: "session_workspace_unconfirmed_0001") == nil)
-        #expect(store.errorMessage == "That Workspace could not be selected.")
+        #expect(store.errorMessage == "That project could not be selected.")
     }
 
     @Test func authoritativeSessionWorkspaceClearRemovesTheLocalSelectionAndLabel() async {

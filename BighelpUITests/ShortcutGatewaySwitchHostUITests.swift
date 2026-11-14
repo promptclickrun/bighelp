@@ -37,7 +37,7 @@ final class ShortcutGatewaySwitchHostUITests: BighelpUITestCase {
         let other = try XCTUnwrap(probe["address_a"]).components(separatedBy: ":")[0]
         app.launchArguments = ["-bighelp.hosts.all-hosts", "NO", "-test-shortcut-ask", other]
         app.launch()
-        let answer = app.alerts["Ask an agent"]
+        let answer = app.alerts["Ask a bot"]
         XCTAssertTrue(answer.waitForExistence(timeout: 90), "Ask an agent finishes")
         save("2-answer", app)
         let text = answer.staticTexts.allElementsBoundByIndex.map(\.label).joined(separator: " ")

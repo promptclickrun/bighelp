@@ -16,7 +16,7 @@ struct BighelpActivityHeroView: View {
     var colors: BighelpActivityColors
     @Environment(\.isLuminanceReduced) private var luminanceReduced
 
-    private var agentName: String { BighelpActivityText.personName(attributes.agentName) ?? "Your agent" }
+    private var agentName: String { BighelpActivityText.personName(attributes.agentName) ?? "Your bot" }
     private var showsText: Bool { level == .stepsAndText }
     private var tint: Color { luminanceReduced ? colors.secondary : colors.stateColor(row.phase, isStale: isStale) }
     private var helpers: Int { min(max(row.activeSubagentCount, 0), 99) }

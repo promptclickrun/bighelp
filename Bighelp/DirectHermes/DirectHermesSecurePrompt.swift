@@ -88,9 +88,9 @@ struct DirectHermesSecurePrompt: Identifiable {
             if let prompt, !prompt.isEmpty { return "\(place) for a one-time code. \(prompt)" }
             return "\(place) for a one-time code. Enter the code it sent to your phone, email or app."
         case .vaultSaveLogin:
-            return "Your agent is on the sign-in page of \(site ?? "a site") and needs a login to continue."
+            return "Your bot is on the sign-in page of \(site ?? "a site") and needs a login to continue."
         case .vaultUnlock:
-            return "Your agent wants to use logins saved in \(server ?? "your password manager")."
+            return "Your bot wants to use logins saved in \(server ?? "your password manager")."
         }
     }
 }
@@ -641,7 +641,7 @@ final class DirectHermesSecurePromptStore {
     ) async {
         var detail: String?
         do { try await reload(entry.prompt.runtimeSessionID) }
-        catch { detail = "Hermes confirmed the setup change. The server will be available in a new session if live reload did not finish." }
+        catch { detail = "Hermes confirmed the setup change. The server will be available in a new chat if live reload did not finish." }
         guard current(entry.prompt)?.prompt.key == entry.prompt.key else { return }
         let value = Self.mcpOutcome(
             status: status,
@@ -1076,7 +1076,7 @@ private struct DirectHermesSecurePromptView: View {
                         LabeledContent("Site", value: site)
                             .accessibilityIdentifier("direct-hermes.vault-site")
                     }
-                    LabeledContent(prompt.isAgentRequest || isVault ? "Agent" : "Profile", value: prompt.profile)
+                    LabeledContent(prompt.isAgentRequest || isVault ? "Bot" : "Profile", value: prompt.profile)
                     if let server = prompt.server {
                         LabeledContent("Server", value: server)
                     }
@@ -1162,7 +1162,7 @@ private struct DirectHermesSecurePromptView: View {
             if let footer {
                 Text(footer)
             } else if prompt.isAgentRequest, let name = prompt.envVar {
-                Text("Saved privately on your computer as \(name). Your agent can use it in commands but never sees what you type, and bighelp doesn't keep it or add it to chat.")
+                Text("Saved privately on your computer as \(name). Your bot can use it in commands but never sees what you type, and bighelp doesn't keep it or add it to chat.")
             } else {
                 Text("This value is sent only to the waiting request. bighelp does not save it, add it to chat, or copy it to the clipboard.")
             }
@@ -1187,7 +1187,7 @@ private struct DirectHermesSecurePromptView: View {
         } header: {
             Text("One-time code")
         } footer: {
-            Text("Hermes types the code into the waiting page on your computer. Your agent never sees it, and bighelp doesn't keep it or add it to chat.")
+            Text("Hermes types the code into the waiting page on your computer. Your bot never sees it, and bighelp doesn't keep it or add it to chat.")
         }
     }
 
@@ -1213,7 +1213,7 @@ private struct DirectHermesSecurePromptView: View {
         } header: {
             Text("Login")
         } footer: {
-            Text("Saved in Hermes' vault on your computer for this site only, then filled into the page. Your agent never sees the password, and bighelp doesn't keep it or add it to chat.")
+            Text("Saved in Hermes' vault on your computer for this site only, then filled into the page. Your bot never sees the password, and bighelp doesn't keep it or add it to chat.")
         }
     }
 

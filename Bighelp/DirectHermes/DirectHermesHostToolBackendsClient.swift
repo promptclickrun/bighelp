@@ -94,23 +94,23 @@ enum HermesHostToolBackendsError: Error, Equatable, LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .unavailable:
-            "This Hermes host does not expose typed host tool backend controls."
+            "This Hermes computer does not expose typed computer tool backend controls."
         case .ownerChanged:
-            "The selected host or connection changed. Reopen Tool Backends before continuing."
+            "The selected computer or connection changed. Reopen Tool Backends before continuing."
         case .invalidRequest:
-            "The selected host tool backend change is invalid."
+            "The selected computer tool backend change is invalid."
         case .invalidResponse:
             "Hermes returned an unsupported Tool Backends response. No change was confirmed."
         case .responseTooLarge:
             "The Tool Backends response exceeded this screen’s safe display limit."
         case .reviewChanged:
-            "Host backend status changed after review. Review the current state before continuing."
+            "Computer backend status changed after review. Review the current state before continuing."
         case .outcomeUnknown:
-            "Hermes did not confirm the operation. Refresh host status before trying again."
+            "Hermes did not confirm the operation. Refresh computer status before trying again."
         case .readbackFailed:
             "Hermes accepted the request, but the requested backend state was not confirmed by readback."
         case .hostInteractionRequired:
-            "Continue on the host Mac. macOS permission dialogs cannot be approved from \(BighelpPlatform.isMac ? "bighelp" : "this iPhone or iPad")."
+            "Continue on the Mac that runs Hermes. macOS permission dialogs cannot be approved from \(BighelpPlatform.isMac ? "bighelp" : "this iPhone or iPad")."
         }
     }
 }

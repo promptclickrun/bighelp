@@ -44,9 +44,9 @@ struct BighelpWidgetGatewayList: Codable, Equatable, Sendable {
 /// A widget's gateway: one computer, or the one in use.
 struct BighelpWidgetGateway: AppEntity {
     static let inUseID = "in-use"
-    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Gateway")
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Computer")
     static let defaultQuery = BighelpWidgetGatewayQuery()
-    static let inUse = BighelpWidgetGateway(id: inUseID, name: "Gateway in use")
+    static let inUse = BighelpWidgetGateway(id: inUseID, name: "Computer in use")
 
     let id: String
     let name: String
@@ -56,7 +56,7 @@ struct BighelpWidgetGateway: AppEntity {
 
     var displayRepresentation: DisplayRepresentation {
         id == Self.inUseID
-            ? DisplayRepresentation(title: "Gateway in use", subtitle: "The one you're using in bighelp")
+            ? DisplayRepresentation(title: "Computer in use", subtitle: "The one you're using in bighelp")
             : DisplayRepresentation(title: "\(name)")
     }
 }
@@ -65,7 +65,7 @@ struct BighelpWidgetGatewayQuery: EntityQuery {
     func entities(for identifiers: [String]) async throws -> [BighelpWidgetGateway] {
         let known = try await suggestedEntities()
         // A gateway removed from bighelp keeps its place; its widget shows nothing.
-        return identifiers.map { id in known.first { $0.id == id } ?? BighelpWidgetGateway(id: id, name: "Removed gateway") }
+        return identifiers.map { id in known.first { $0.id == id } ?? BighelpWidgetGateway(id: id, name: "Removed computer") }
     }
 
     func suggestedEntities() async throws -> [BighelpWidgetGateway] {
@@ -77,10 +77,10 @@ struct BighelpWidgetGatewayQuery: EntityQuery {
 
 /// The Gateway choice of widgets that have only that one.
 struct GatewayWidgetIntent: WidgetConfigurationIntent {
-    static let title: LocalizedStringResource = "Gateway"
-    static let description = IntentDescription("Show one gateway, or the one you're using in bighelp.")
+    static let title: LocalizedStringResource = "Computer"
+    static let description = IntentDescription("Show one computer, or the one you're using in bighelp.")
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpWidgetGateway?
 }
 
@@ -114,12 +114,12 @@ struct GatewayWidgetProvider: AppIntentTimelineProvider {
 /// New Chat: a gateway, and an agent on it (Auto is that gateway's default agent).
 struct NewChatWidgetIntent: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "New chat"
-    static let description = IntentDescription("Choose the gateway and the agent a new chat starts with.")
+    static let description = IntentDescription("Choose the computer and the bot a new chat starts with.")
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpWidgetGateway?
 
-    @Parameter(title: "Agent")
+    @Parameter(title: "Bot")
     var agent: BoardWidgetAgent?
 }
 

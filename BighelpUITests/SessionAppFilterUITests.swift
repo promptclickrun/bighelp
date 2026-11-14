@@ -39,9 +39,9 @@ final class SessionAppFilterUITests: BighelpUITestCase {
         // The filter menu asks one labeled question at a time.
         let filters = app.descendants(matching: .any).matching(identifier: "sessions.filters").firstMatch
         filters.tap()
-        let agent = choice("Agent", in: app)
-        XCTAssertTrue(agent.waitForExistence(timeout: 5), "Agent is its own choice")
-        XCTAssertTrue(agent.label.contains("All agents"), "It says what it's set to: \(agent.label)")
+        let agent = choice("Bot", in: app)
+        XCTAssertTrue(agent.waitForExistence(timeout: 5), "Bot is its own choice")
+        XCTAssertTrue(agent.label.contains("All bots"), "It says what it's set to: \(agent.label)")
         XCTAssertTrue(choice("Type", in: app).exists)
         XCTAssertTrue(choice("Project", in: app).exists)
         save("sessions-filter-menu", app)

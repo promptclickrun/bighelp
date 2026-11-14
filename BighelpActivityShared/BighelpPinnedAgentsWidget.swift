@@ -53,25 +53,25 @@ extension EnvironmentValues {
 enum PinnedAgentsWidgetScope: String, AppEnum {
     case current, multi, one
 
-    static var typeDisplayRepresentation: TypeDisplayRepresentation { TypeDisplayRepresentation(name: "Agents") }
+    static var typeDisplayRepresentation: TypeDisplayRepresentation { TypeDisplayRepresentation(name: "Bots") }
 
     static var caseDisplayRepresentations: [Self: DisplayRepresentation] {
         [
-            .current: DisplayRepresentation(title: "Current Gateway", subtitle: "Pinned agents on the computer you're using"),
-            .multi: DisplayRepresentation(title: "Multi Gateway", subtitle: "Pinned agents on all your computers"),
-            .one: DisplayRepresentation(title: "One Gateway", subtitle: "Pinned agents on the gateway you choose"),
+            .current: DisplayRepresentation(title: "Computer in use", subtitle: "Pinned bots on the computer you're using"),
+            .multi: DisplayRepresentation(title: "All computers", subtitle: "Pinned bots on all your computers"),
+            .one: DisplayRepresentation(title: "One computer", subtitle: "Pinned bots on the computer you choose"),
         ]
     }
 }
 
 struct PinnedAgentsWidgetIntent: WidgetConfigurationIntent {
-    static let title: LocalizedStringResource = "Pinned agents"
-    static let description = IntentDescription("Show the pinned agents of the computer you're using, or of all your computers.")
+    static let title: LocalizedStringResource = "Pinned bots"
+    static let description = IntentDescription("Show the pinned bots of the computer you're using, or of all your computers.")
 
     @Parameter(title: "Show", default: .current)
     var scope: PinnedAgentsWidgetScope
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpWidgetGateway?
 
     static var parameterSummary: some ParameterSummary {
@@ -116,8 +116,8 @@ extension BighelpWidgetSnapshot {
 
     /// One Gateway's large title names the gateway.
     var pinnedTitle: String {
-        guard let name = pinnedAgents?.first?.hostName else { return "Pinned agents" }
-        return "Pinned agents · \(name)"
+        guard let name = pinnedAgents?.first?.hostName else { return "Pinned bots" }
+        return "Pinned bots · \(name)"
     }
 
     static var previewPinned: BighelpWidgetSnapshot {
@@ -223,8 +223,8 @@ struct BighelpPinnedAgentsWidgetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if family == .systemLarge {
-                BighelpWidgetSectionTitle(title: scope == .multi ? "Pinned agents · All computers"
-                                          : scope == .one ? snapshot.pinnedTitle : "Pinned agents",
+                BighelpWidgetSectionTitle(title: scope == .multi ? "Pinned bots · All computers"
+                                          : scope == .one ? snapshot.pinnedTitle : "Pinned bots",
                                           symbol: "pin.fill")
             }
             if agents.isEmpty {
@@ -290,7 +290,7 @@ struct BighelpPinnedAgentsWidgetView: View {
                 .font(.title3)
                 .foregroundStyle(colors.accent.opacity(0.75))
                 .widgetAccentable()
-            Text("No pinned agents yet. Pin agents in bighelp to see them here.")
+            Text("No pinned bots yet. Pin bots in bighelp to see them here.")
                 .font(.caption)
                 .foregroundStyle(colors.secondary)
                 .multilineTextAlignment(.center)
@@ -310,8 +310,8 @@ struct BighelpPinnedAgentsWidget: Widget {
                 BighelpPinnedAgentsWidgetView(snapshot: entry.snapshot, scope: entry.scope)
             }
         }
-        .configurationDisplayName("Pinned Agents")
-        .description("Your pinned agents. Tap one to chat.")
+        .configurationDisplayName("Pinned Bots")
+        .description("Your pinned bots. Tap one to chat.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
         .bighelpWidgetPlacement()
     }

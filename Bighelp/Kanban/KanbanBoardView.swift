@@ -44,7 +44,7 @@ struct KanbanScreen: View {
                     .disabled(boardName.trimmingCharacters(in: .whitespaces).isEmpty)
                 Button("Cancel", role: .cancel) { boardName = "" }
             } message: {
-                Text("Boards keep separate projects apart. Your agents see every board.")
+                Text("Boards keep separate projects apart. Your bots see every board.")
             }
             .alert("Turn on Auto plan?", isPresented: $confirmsAutoPlan) {
                 Button("Turn On") {
@@ -125,7 +125,7 @@ struct KanbanScreen: View {
         ContentUnavailableView {
             Label("No boards yet", systemImage: "rectangle.split.3x1")
         } description: {
-            Text("A board holds your agents' tasks in lanes: Later, Ready, Working, Needs you and Done.")
+            Text("A board holds your bots' tasks in lanes: Later, Ready, Working, Needs you and Done.")
         } actions: {
             Button("New Board") { isNamingBoard = true }.buttonStyle(.borderedProminent)
         }
@@ -728,8 +728,8 @@ struct KanbanEmptyLane: View {
     private var text: String {
         switch lane {
         case .later: "Nothing planned. Add a card for later."
-        case .ready: "Drop a card here and an agent picks it up."
-        case .working: "No agent is working on anything."
+        case .ready: "Drop a card here and a bot picks it up."
+        case .working: "No bot is working on anything."
         case .needsYou: "Nothing needs you."
         case .done: "Finished cards land here."
         }

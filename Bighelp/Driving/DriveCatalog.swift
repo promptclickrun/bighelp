@@ -21,15 +21,25 @@ enum DriveCatalog {
             var score = 0
             for word in words {
                 let stem = word.count > 3 && word.hasSuffix("s") ? String(word.dropLast()) : word
-                if title.contains(stem) { score += 4 }
-                else if keywords.contains(stem) { score += 3 }
-                else if rest.contains(stem) { score += 1 }
+                let forms = [stem] + (sameThing[stem] ?? [])
+                if forms.contains(where: title.contains) { score += 4 }
+                else if forms.contains(where: keywords.contains) { score += 3 }
+                else if forms.contains(where: rest.contains) { score += 1 }
                 else { return nil }
             }
             return (place, score)
         }
         return scored.sorted { $0.1 > $1.1 }.prefix(limit).map(\.0)
     }
+
+    /// Hermes and its models say agent, host and session; the app says bot, computer and chat. The
+    /// model asks with either word, so a place is found by both.
+    private static let sameThing: [String: [String]] = [
+        "agent": ["bot"], "bot": ["agent"],
+        "host": ["computer"], "gateway": ["computer"], "computer": ["host", "gateway"],
+        "session": ["chat"], "chat": ["session"],
+        "workspace": ["project"], "project": ["workspace"],
+    ]
 
     /// Words that say nothing about a place ("how do I see what my Feed can do").
     private static let stopWords: Set<String> = [
@@ -144,32 +154,32 @@ enum DriveCatalog {
     }
 
     private static let boardPlaces: [DrivePlace] = [
-        page("boards.feed", String(localized: "Feed"), String(localized: "Posts and updates from your agent."),
+        page("boards.feed", String(localized: "Feed"), String(localized: "Posts and updates from your bot."),
              keywords: ["feed", "posts", "updates", "news"], .board(.feed)),
-        page("boards.ideas", String(localized: "Ideas"), String(localized: "Things your agent offers to do for you."),
+        page("boards.ideas", String(localized: "Ideas"), String(localized: "Things your bot offers to do for you."),
              keywords: ["ideas", "suggestions"], .board(.idea)),
-        page("boards.goals", String(localized: "Goals"), String(localized: "Goals your agent tracks for you."),
+        page("boards.goals", String(localized: "Goals"), String(localized: "Goals your bot tracks for you."),
              keywords: ["goals", "habits", "progress"], .board(.goal)),
     ]
 
     private static let workPlaces: [DrivePlace] = [
-        DrivePlace("agents", String(localized: "Agents"), String(localized: "Every agent and group chat on this computer."),
+        DrivePlace("agents", String(localized: "Bots"), String(localized: "Every bot and group chat on this computer."),
                    keywords: ["agents", "bots", "group chats", "team"],
                    steps: [.go(String(localized: "Bots"), .tab(.conversations, view: .bots))]),
-        DrivePlace("sessions", String(localized: "Sessions"), String(localized: "Every chat on this computer, to search and reopen."),
+        DrivePlace("sessions", String(localized: "Chats"), String(localized: "Every chat on this computer, to search and reopen."),
                    keywords: ["sessions", "chats", "history", "conversations", "old chats"],
                    steps: [.go(String(localized: "Chats"), .tab(.conversations, view: .chats))]),
         page("projects", String(localized: "Projects"), String(localized: "Related chats and folders together."),
              keywords: ["projects", "folders", "workspaces"], .projects),
-        page("kanban", String(localized: "Kanban"), String(localized: "Your agents' task board, from Later to Done."),
+        page("kanban", String(localized: "Kanban"), String(localized: "Your bots' task board, from Later to Done."),
              keywords: ["kanban", "board", "tasks", "cards", "todo"], .kanban),
-        page("workflows", String(localized: "Workflows"), String(localized: "Multi-step jobs agents run, with your sign-off."),
+        page("workflows", String(localized: "Workflows"), String(localized: "Multi-step jobs bots run, with your sign-off."),
              keywords: ["workflows", "automation", "pipelines", "runs"], .workflows),
-        page("scheduled-tasks", String(localized: "Scheduled tasks"), String(localized: "Work your agents do on a schedule."),
+        page("scheduled-tasks", String(localized: "Scheduled tasks"), String(localized: "Work your bots do on a schedule."),
              keywords: ["scheduled", "tasks", "routines", "cron", "every day", "reminders"], .scheduledTasks),
-        page("usage", String(localized: "Usage"), String(localized: "Your plans, limits, and how much each agent used."),
+        page("usage", String(localized: "Usage"), String(localized: "Your plans, limits, and how much each bot used."),
              keywords: ["usage", "limits", "plan", "cost", "tokens", "quota"], .usage),
-        page("skills", String(localized: "Skills & tools"), String(localized: "The skills and tools your agent can use."),
+        page("skills", String(localized: "Skills & tools"), String(localized: "The skills and tools your bot can use."),
              keywords: ["skills", "tools", "abilities", "plugins"], .skillsAndTools),
         page("models", String(localized: "Default model"), String(localized: "The AI model new chats start with."),
              keywords: ["model", "default model", "ai model", "llm"], .workspaceManagement(.models)),
@@ -223,7 +233,7 @@ enum DriveCatalog {
                      keywords: ["chat layout", "message size", "spacing", "avatar size", "font"],
                      full: [section(.appearance), (String(localized: "Chat layout"), .chatLayout, "settings.appearance.chat-layout")]),
             settings("settings.appearance.thinking", String(localized: "Thinking"),
-                     String(localized: "The look of the Thinking control that sets how hard an agent thinks."),
+                     String(localized: "The look of the Thinking control that sets how hard a bot thinks."),
                      keywords: ["thinking", "reasoning", "thinking slider", "effort", "slider look"],
                      full: [section(.appearance), (String(localized: "Thinking"), .thinking, "settings.appearance.thinking")]),
             settings("settings.chat", String(localized: "Chat"),
@@ -236,21 +246,21 @@ enum DriveCatalog {
                      full: [section(.chat)], point: (String(localized: "Return sends"), "settings.chat.return-sends")),
             settings("settings.voice", String(localized: "Voice"), String(localized: "How voice chats sound."),
                      keywords: ["voice", "speech", "talk", "tts", "live voice"], full: [section(.voice)]),
-            settings("settings.notifications", String(localized: "Notifications"), String(localized: "Alerts from your agents."),
+            settings("settings.notifications", String(localized: "Notifications"), String(localized: "Alerts from your bots."),
                      keywords: ["notifications", "alerts", "push", "sounds", "badges"], full: [section(.notifications)]),
             settings("settings.permissions", String(localized: "Device access"),
-                     String(localized: "Which iPhone features your agents may use, like Health, Calendar and location."),
+                     String(localized: "Which iPhone features your bots may use, like Health, Calendar and location."),
                      keywords: ["permissions", "device access", "privacy", "calendar", "location", "contacts", "photos",
                                 "health", "microphone", "camera"],
                      full: [connections, deviceAccess]),
             settings("settings.permissions.navigation", String(localized: "Show you around"),
-                     String(localized: "The switch for this: agents opening pages and pointing at settings."),
-                     keywords: ["show me around", "driving", "agents open pages"],
+                     String(localized: "The switch for this: bots opening pages and pointing at settings."),
+                     keywords: ["show me around", "driving", "agents open pages", "bots open pages"],
                      full: [connections, deviceAccess],
                      point: (String(localized: "Show you around"), "permissions.device-tools.navigation")),
             settings("settings.permissions.appearance", String(localized: "Change how bighelp looks"),
-                     String(localized: "The switch that lets agents change light or dark mode and your chat color."),
-                     keywords: ["agent appearance", "agents change theme"],
+                     String(localized: "The switch that lets bots change light or dark mode and your chat color."),
+                     keywords: ["agent appearance", "agents change theme", "bot appearance", "bots change theme"],
                      full: [connections, deviceAccess],
                      point: (String(localized: "Change how bighelp looks"), "permissions.device-tools.appearance")),
             settings("settings.apps", String(localized: "Apps & skills"),
@@ -288,7 +298,7 @@ enum DriveCatalog {
     // Plugins are Settings › Apps & skills (`settings.marketplace`).
 
     private static let hermesPlaces: [DrivePlace] = [
-        page("hermes.memory", String(localized: "Memory"), String(localized: "What your agent remembers."),
+        page("hermes.memory", String(localized: "Memory"), String(localized: "What your bot remembers."),
              keywords: ["memory", "remember", "forget"], .workspaceManagement(.memory)),
         page("hermes.logs", String(localized: "Logs"), String(localized: "The computer's diagnostic logs."),
              keywords: ["logs", "errors", "debug"], needs: [.nerdMode], .workspaceManagement(.logs)),

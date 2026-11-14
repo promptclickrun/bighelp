@@ -35,7 +35,7 @@ struct BighelpLiveActivityPresentationTests {
         )
 
         #expect(descriptor.sessionID == "session_live_activity_0001")
-        #expect(descriptor.sessionTitle == "Active session")
+        #expect(descriptor.sessionTitle == "Active chat")
         #expect(descriptor.agentID == "juno")
         #expect(descriptor.agentName == "Juno")
         #expect(descriptor.deepLink.absoluteString == "loopdy://chat/session_live_activity_0001")
@@ -101,7 +101,7 @@ struct BighelpLiveActivityPresentationTests {
             agentName: "Juno"
         )
         #expect(delegation.phase == .delegating)
-        #expect(delegation.currentAction == "Juno is working with other agents")
+        #expect(delegation.currentAction == "Juno is working with other bots")
         #expect(delegation.activeSubagentCount == 0)
 
         let finished = BighelpLiveActivityProjection.final(

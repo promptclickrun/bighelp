@@ -1067,17 +1067,17 @@ struct BighelpPluginCapabilitiesSection: View {
         if host.isAvailable {
             if permissionCenter.deviceTools.scope == nil {
                 status = "Available · iPhone not bound"
-                detail = "The host reports phone tools, but this iPhone has no current host-scoped device grant."
+                detail = "The computer reports phone tools, but this iPhone has no current computer-scoped device grant."
             } else if permissionCenter.deviceTools.isEnabled(deviceCapability) {
                 status = "Enabled on this iPhone"
                 detail = deviceAccessDetail(deviceCapability)
             } else {
                 status = "Available · Off"
-                detail = "The host reports phone tools. Access remains off for this iPhone and selected host."
+                detail = "The computer reports phone tools. Access remains off for this iPhone and selected computer."
             }
         } else {
             status = "\(host.status) · \(iosAccessStatus(deviceCapability))"
-            detail = "\(host.detail) \(iosAccessDetail(deviceCapability)) Install or activate the host feature first, then grant this protected iOS access separately. Notification opt-in never requests it."
+            detail = "\(host.detail) \(iosAccessDetail(deviceCapability)) Install or activate the computer feature first, then grant this protected iOS access separately. Notification opt-in never requests it."
         }
         return capabilityRow(title: title, systemImage: systemImage, status: status, detail: detail)
     }
@@ -1091,16 +1091,16 @@ struct BighelpPluginCapabilitiesSection: View {
             detail = "\(host.detail) Watch pairing and app installation are separate iPhone states; notification opt-in does not change either one."
         } else if !WCSession.isSupported() {
             status = "Unavailable on this iPhone"
-            detail = "The host reports Watch support, but Watch connectivity is unavailable on this device."
+            detail = "The computer reports Watch support, but Watch connectivity is unavailable on this device."
         } else if !WCSession.default.isPaired {
             status = "Available · No paired Watch"
-            detail = "The host reports Watch support. No Apple Watch is paired with this iPhone."
+            detail = "The computer reports Watch support. No Apple Watch is paired with this iPhone."
         } else if !WCSession.default.isWatchAppInstalled {
             status = "Available · App not installed"
             detail = "An Apple Watch is paired, but the bighelp Watch app is not installed."
         } else {
             status = WCSession.default.isReachable ? "Installed · Reachable" : "Installed · Not currently reachable"
-            detail = "The host reports Watch support and the bighelp Watch app is installed. Reachability can change when the app is not active."
+            detail = "The computer reports Watch support and the bighelp Watch app is installed. Reachability can change when the app is not active."
         }
         return capabilityRow(title: "Apple Watch", systemImage: "applewatch", status: status, detail: detail)
     }
@@ -1109,7 +1109,7 @@ struct BighelpPluginCapabilitiesSection: View {
         guard let connections, let owner = connections.owner else {
             return CapabilityPresentation(
                 status: "Not connected",
-                detail: "Connect the selected Hermes host to read this capability.",
+                detail: "Connect the selected Hermes computer to read this capability.",
                 isAvailable: false
             )
         }
@@ -1117,13 +1117,13 @@ struct BighelpPluginCapabilitiesSection: View {
         case .unknown:
             return CapabilityPresentation(
                 status: "Not verified",
-                detail: "The selected host has not reported this capability.",
+                detail: "The selected computer has not reported this capability.",
                 isAvailable: false
             )
         case .available:
             return CapabilityPresentation(
                 status: "Available",
-                detail: "The selected host reports this capability as available.",
+                detail: "The selected computer reports this capability as available.",
                 isAvailable: true
             )
         case .unavailable(let reason):
@@ -1138,13 +1138,13 @@ struct BighelpPluginCapabilitiesSection: View {
     private func deviceAccessDetail(_ capability: DeviceToolCapability) -> String {
         switch permissionCenter.deviceTools.status(for: capability) {
         case .notRequested:
-            "bighelp’s host grant is on; iOS access has not been requested in this session."
+            "bighelp’s computer grant is on; iOS access has not been requested in this session."
         case .available:
-            "The host grant and iOS access are available on this iPhone."
+            "The computer grant and iOS access are available on this iPhone."
         case .denied:
-            "The host grant is on, but iOS access is denied."
+            "The computer grant is on, but iOS access is denied."
         case .unavailable:
-            "The host grant is on, but this device reports the system capability as unavailable."
+            "The computer grant is on, but this device reports the system capability as unavailable."
         }
     }
 

@@ -333,7 +333,7 @@ final class KanbanBoardModel {
         do {
             apply(try await service.startReadyWork(board: slug))
             await refreshWorkers(force: true)
-            notice = Notice(text: "Asked your agents to start.", isError: false)
+            notice = Notice(text: "Asked your bots to start.", isError: false)
         } catch {
             notice = Notice(text: "Hermes couldn't start the work. Check that Hermes is running on your computer.")
         }

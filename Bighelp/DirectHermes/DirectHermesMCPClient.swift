@@ -193,7 +193,7 @@ final class DirectHermesMCPClient: MCPManagementClient, MCPRuntimeManagementClie
         else { resourceCount = 0 }
         return MCPProbeResult(
             succeeded: succeeded,
-            error: succeeded ? nil : "Connection test failed. Review the server’s authentication and host configuration.",
+            error: succeeded ? nil : "Connection test failed. Review the server’s authentication and computer configuration.",
             tools: tools,
             toolCount: toolCount,
             promptCount: promptCount,
@@ -376,7 +376,7 @@ final class DirectHermesMCPClient: MCPManagementClient, MCPRuntimeManagementClie
             try requireOwner()
             return try CapabilitiesPayload.object(value)
         } catch DirectHermesError.unsupportedAuthentication where route.isCapabilityProbe {
-            throw CapabilitiesManagementError.unsupportedHost("This Hermes host does not expose MCP management routes.")
+            throw CapabilitiesManagementError.unsupportedHost("This Hermes computer does not expose MCP management routes.")
         } catch DirectHermesError.unsupportedAuthentication {
             throw CapabilitiesManagementError.invalidResponse
         }
@@ -397,7 +397,7 @@ final class DirectHermesMCPClient: MCPManagementClient, MCPRuntimeManagementClie
             try requireOwner()
             if case .rpcRejected(let code, _) = error {
                 if code == -32601 {
-                    throw CapabilitiesManagementError.unsupportedHost("This Hermes host does not expose typed MCP RPC management.")
+                    throw CapabilitiesManagementError.unsupportedHost("This Hermes computer does not expose typed MCP RPC management.")
                 }
                 throw CapabilitiesManagementError.rejected("Hermes rejected the MCP operation.")
             }

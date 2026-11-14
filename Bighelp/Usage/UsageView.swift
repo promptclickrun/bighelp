@@ -185,7 +185,7 @@ struct UsageView: View {
                                       identifier: "usage.models", showsDetail: false)
             }
             BighelpDeferredSection {
-                UsageBreakdownSection(title: "By agent", rows: summary.agents, summary: summary, store: store,
+                UsageBreakdownSection(title: "By bot", rows: summary.agents, summary: summary, store: store,
                                       identifier: "usage.agents", showsDetail: summary.isMultiHost)
             }
             if summary.isMultiHost {

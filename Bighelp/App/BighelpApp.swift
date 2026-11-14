@@ -366,7 +366,7 @@ struct BighelpApp: App {
         let demo: @MainActor () -> Bool = { usesDemo && !connections.isDirectSelected }
         let demoBoards = DemoAgentBoardClient()
         return BighelpShortcutHostServices(
-            hostName: { demo() ? "Demo host" : connections.selectedDirectHost?.name },
+            hostName: { demo() ? "Demo computer" : connections.selectedDirectHost?.name },
             hermesVersion: {
                 if demo() { return "0.21.4" }
                 guard let owner = connections.owner, let workspace = connections.workspace,

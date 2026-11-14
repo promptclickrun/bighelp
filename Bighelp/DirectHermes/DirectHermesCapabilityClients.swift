@@ -30,7 +30,7 @@ enum HermesSkillUploadError: LocalizedError, Equatable {
         case .invalidName(let name):
             "Hermes can't use the name \"\(name)\". Use lowercase letters, digits, dots, dashes or underscores, up to 64."
         case .alreadyExists(let name):
-            "This agent already has a skill named \(name). To change it, open it and edit it."
+            "This bot already has a skill named \(name). To change it, open it and edit it."
         case .tooLong:
             "This SKILL.md is too long for Hermes. A SKILL.md can have up to 100,000 characters."
         case .unreadable:
@@ -100,7 +100,7 @@ final class DirectHermesSkillsAndToolsClient: HermesSkillsAndToolsCatalogClient 
             management: HermesCapabilityManagement(
                 canRead: true, canCreate: editAvailable, canUpdate: editAvailable, canImport: editAvailable
             ),
-            toolsNotice: editAvailable ? "" : "Skill uploads and edits are unavailable on this host."
+            toolsNotice: editAvailable ? "" : "Skill uploads and edits are unavailable on this computer."
         )
     }
 

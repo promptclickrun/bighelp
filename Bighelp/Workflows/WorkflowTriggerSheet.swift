@@ -50,7 +50,7 @@ struct WorkflowTriggerSheet: View {
                 } footer: {
                     Text(isScheduled
                          ? "\(context.hostName) starts a run on this schedule, even when the app is closed. Each run spends what a run spends."
-                         : "A run starts only when you tap Run, or when you ask an agent to start one.")
+                         : "A run starts only when you tap Run, or when you ask a bot to start one.")
                         .font(.bighelp(.footnote))
                 }
                 if isScheduled {

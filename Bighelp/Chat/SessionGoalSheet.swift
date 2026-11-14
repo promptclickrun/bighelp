@@ -35,7 +35,7 @@ struct SessionGoalSheet: View {
                 Button("Clear goal", role: .destructive) { perform("clear") }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Hermes uses Clear to remove the standing goal. This does not delete chat messages or session history; Hermes has no separate goal-delete action.")
+                Text("Hermes uses Clear to remove the standing goal. This does not delete chat messages or chat history; Hermes has no separate goal-delete action.")
             }
         }
     }
@@ -49,7 +49,7 @@ struct SessionGoalSheet: View {
                 )
                 .font(.bighelp(.headline))
                 .foregroundStyle(state.lifecycle == .paused ? theme.warning : theme.success)
-                Text("Keep this session focused. Updates and completion apply to this goal only.")
+                Text("Keep this chat focused. Updates and completion apply to this goal only.")
                     .font(.bighelp(.subheadline))
                     .foregroundStyle(theme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)

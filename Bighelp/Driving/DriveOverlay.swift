@@ -292,7 +292,7 @@ private struct DriveIslandBar: View {
     private var arrived: Bool { navigator.phase == .arrived }
 
     private var title: some View {
-        let name = navigator.agent?.name ?? String(localized: "Your agent")
+        let name = navigator.agent?.name ?? String(localized: "Your bot")
         return Text(arrived ? String(localized: "\(name) brought you here") : String(localized: "\(name) is driving"))
             .font(.bighelp(.subheadline, weight: .semibold))
             .foregroundStyle(.white)

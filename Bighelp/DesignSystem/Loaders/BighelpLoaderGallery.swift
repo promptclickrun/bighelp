@@ -40,7 +40,7 @@ private enum GallerySection: String, CaseIterable, Identifiable {
         case .noodle: "Noodle"
         case .images: "Images"
         case .cards: "Cards"
-        case .hosts: "Hosts"
+        case .hosts: "Computers"
         case .activity: "Activity"
         case .buttons: "Buttons"
         case .scroll: "Scroll"
@@ -169,7 +169,7 @@ private struct GalleryNoodle: View {
     private static let uses: [(BighelpNoodleMotion, String)] = [
         (.loader, "Loading"), (.thinking, "Thinking"), (.listening, "Voice: listening"),
         (.talking, "Voice: talking"), (.resting, "Voice: paused"), (.launch, "Connecting"),
-        (.spring, "Reconnecting"), (.lasso, "Searching"), (.infinity, "Helper agents"),
+        (.spring, "Reconnecting"), (.lasso, "Searching"), (.infinity, "Helper bots"),
         (.squiggle, "Sending"), (.question, "Can't open a page"), (.exit, "Ending a call"),
         (.reveal, "First run"), (.hello, "After the reveal"), (.idle, "Empty places"),
         (.done, "Work finished"), (.heart, "Favorite model"), (.bunny, "Settings, three taps"),
@@ -276,7 +276,7 @@ private struct GalleryImages: View {
                 BighelpImageGeneratingView(caption: progress < 0.6 ? "Sketching the layout" : "Adding the details",
                                            variant: .develop, aspectRatio: 16 / 10,
                                            progress: showsProgress ? progress : nil)
-                Toggle("Real progress from the host", isOn: $showsProgress)
+                Toggle("Real progress from the computer", isOn: $showsProgress)
                     .font(.bighelp(.subheadline))
                     .accessibilityIdentifier("loader-gallery.progress-toggle")
                 if showsProgress {
@@ -670,7 +670,7 @@ private struct GalleryButtons: View {
             : theme.actionForeground
         return Button(action: action) {
             BighelpButtonLoadingLabel(state: state, ink: ink) {
-                Label("New agent", systemImage: "person.badge.plus")
+                Label("New bot", systemImage: "person.badge.plus")
                     .frame(minWidth: 132)
             }
             .font(.bighelp(.body, weight: .semibold))

@@ -83,11 +83,11 @@ extension RootShellView {
     var workspaceHostName: String {
         if let host = workspaceConnections?.selectedDirectHost { return host.name }
         if let id = demoHosts.selectedHostID, let host = demoHosts.host(id: id) { return host.name }
-        return usesWorkspaceFixtures ? "Demo host" : "Select a host"
+        return usesWorkspaceFixtures ? "Demo computer" : "Select a computer"
     }
 
     var workspaceProfileName: String {
-        agents.resolvedAgent(explicitID: nil)?.name ?? "Select an agent"
+        agents.resolvedAgent(explicitID: nil)?.name ?? "Select a bot"
     }
 
     var sessionOrganizationAccountID: String? {
@@ -198,7 +198,7 @@ extension RootShellView {
             if let served = session?.servingAgentID {
                 let name = agents.resolvedAgent(explicitID: served)?.name ?? ""
                 permissionCenter.nativeDeviceToolStatus = DeviceToolChannelNote.otherAgent(
-                    enabled: enabled, servingAgentName: name.isEmpty ? "your default agent" : name)
+                    enabled: enabled, servingAgentName: name.isEmpty ? "your default bot" : name)
                 return
             }
             if NativeDeviceToolSession.isChatHeld(error) {

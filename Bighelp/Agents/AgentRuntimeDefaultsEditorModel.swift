@@ -60,7 +60,7 @@ final class AgentRuntimeDefaultsEditorModel {
             } catch {
                 guard generation == loadGeneration else { return }
                 guard attempt < retryDelays.count else {
-                    errorMessage = "We couldn’t load this agent’s model defaults. Try again."
+                    errorMessage = "We couldn’t load this bot’s model defaults. Try again."
                     return
                 }
                 do {
@@ -78,7 +78,7 @@ final class AgentRuntimeDefaultsEditorModel {
             errorMessage = nil
         } catch is CancellationError {
         } catch {
-            errorMessage = "We couldn’t refresh this agent’s models. Try again."
+            errorMessage = "We couldn’t refresh this bot’s models. Try again."
         }
     }
 
@@ -205,7 +205,7 @@ final class AgentRuntimeDefaultsEditorModel {
             throw partial
         } catch {
             errorMessage = (error as? WorkspaceClientError)?.localizedDescription
-                ?? "We couldn’t save these agent defaults. Your choices are still here."
+                ?? "We couldn’t save these bot defaults. Your choices are still here."
             throw error
         }
     }

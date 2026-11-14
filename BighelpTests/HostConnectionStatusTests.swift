@@ -63,9 +63,9 @@ struct HostConnectionStatusTests {
         #expect(shown(HostConnectionStatus(fleet: .loading, hostName: "Studio Mac"))!
                 == (.connecting, "Loading Studio Mac…"))
         #expect(shown(HostConnectionStatus(fleet: .ready, hostName: "Studio Mac"))! == (.connected, "Studio Mac"))
-        let away = HostConnectionStatus(fleet: .unreachable("Couldn't reach this host."), hostName: "Office Linux")
+        let away = HostConnectionStatus(fleet: .unreachable("Couldn't reach this computer."), hostName: "Office Linux")
         #expect(shown(away)! == (.disconnected, "Office Linux"))
-        #expect(away?.detailText == "Couldn't reach this host.", "The host's own reason stays visible")
+        #expect(away?.detailText == "Couldn't reach this computer.", "The host's own reason stays visible")
 
         let opening = HostConnectionStatus(fleetSwitchTo: "Studio Mac", isConnecting: true, hasTried: true)
         #expect(shown(opening)! == (.connecting, "Connecting to Studio Mac…"))
@@ -77,7 +77,7 @@ struct HostConnectionStatusTests {
 
     @Test func otherSurfacesMapEveryState() {
         #expect(HostConnectionStatus(spatial: .connecting)?.phase == .connecting)
-        #expect(HostConnectionStatus(spatial: .unavailable("No agent yet"))?.phase == .disconnected)
+        #expect(HostConnectionStatus(spatial: .unavailable("No bot yet"))?.phase == .disconnected)
         #expect(HostConnectionStatus(spatial: .ready) == nil)
 
         #expect(shown(HostConnectionStatus(dashboardIsConnected: true))! == (.connected, "Connected"))

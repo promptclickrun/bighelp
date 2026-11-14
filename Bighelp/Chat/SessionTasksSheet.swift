@@ -22,7 +22,7 @@ struct SessionTasksSheet: View {
         VStack(alignment: .leading, spacing: BighelpTokens.space20) {
             VStack(alignment: .leading, spacing: BighelpTokens.space12) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("Session progress")
+                    Text("Chat progress")
                         .font(.bighelp(.headline))
                         .foregroundStyle(theme.primaryText)
                         .accessibilityAddTraits(.isHeader)
@@ -37,7 +37,7 @@ struct SessionTasksSheet: View {
                     total: Double(max(1, state.totalCount))
                 )
                 .tint(theme.action)
-                .accessibilityLabel("Session task progress")
+                .accessibilityLabel("Chat task progress")
                 .accessibilityValue("\(state.completedCount) of \(state.totalCount) completed")
             }
             .padding(BighelpTokens.space16)

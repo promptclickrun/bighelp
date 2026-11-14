@@ -161,7 +161,7 @@ struct SpatialAvatarVolume: View {
             .onChanged { turn(by: $0.translation.width) }
             .onEnded { _ in spinAtDragStart = spin })
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(model.agent?.name ?? "Your agent")
+        .accessibilityLabel(model.agent?.name ?? "Your bot")
         .accessibilityValue(model.activity.label)
         .accessibilityHint(settings.spatialAvatarPinchAction == .talk ? "Starts talking" : "Opens a message box")
         .accessibilityAddTraits(.isButton)
@@ -290,7 +290,7 @@ struct SpatialAvatarVolume: View {
 
     private var promptBar: some View {
         HStack(alignment: .bottom, spacing: BighelpTokens.space12) {
-            TextField("Message \(model.agent?.name ?? "your agent")", text: $model.draft, axis: .vertical)
+            TextField("Message \(model.agent?.name ?? "your bot")", text: $model.draft, axis: .vertical)
                 .lineLimit(1...4)
                 .focused($isPromptFocused)
                 .onSubmit(send)

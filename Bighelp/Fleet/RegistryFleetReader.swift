@@ -121,7 +121,7 @@ final class RegistryFleetReader: FleetHostReading {
         guard registry.selectedHostID != hostID else { throw CancellationError() }
         guard let verified = try? store.verifiedConnection(for: host, generation: registry.generation) else {
             throw FleetReadError(message: store.hasSavedConnection
-                ? "Couldn't reach this host." : "Sign in to this host again in Settings.")
+                ? "Couldn't reach this computer." : "Sign in to this computer again in Settings.")
         }
 
         let client = verified.client, owner = verified.owner

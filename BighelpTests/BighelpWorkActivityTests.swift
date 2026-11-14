@@ -67,7 +67,7 @@ struct BighelpWorkActivityTests {
             progress: 85, completedSteps: 9, activeSubagentCount: 2, latestTool: "PRIVATE COMMAND", timestamp: 100)
         let normal = BighelpActivityPresentation(attributes: attrs, state: state, isStale: false)
         #expect(normal.status == "Working")
-        #expect(normal.detail == "2 agents still working")
+        #expect(normal.detail == "2 bots still working")
         #expect(!normal.accessibilityLabel.contains("PRIVATE"))
         let stale = BighelpActivityPresentation(attributes: attrs, state: state, isStale: true)
         #expect(stale.status == "Updates paused")

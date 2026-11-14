@@ -22,7 +22,7 @@ extension BighelpShortcutDestination: AppEnum {
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Place in bighelp")
     static let caseDisplayRepresentations: [Self: DisplayRepresentation] = [
         .chats: .init(title: "Chats", image: .init(systemName: "bubble.left.and.bubble.right")),
-        .agents: .init(title: "Agents", subtitle: "Your agents and group chats", image: .init(systemName: "person.2")),
+        .agents: .init(title: "Bots", subtitle: "Your bots and group chats", image: .init(systemName: "person.2")),
         .feed: .init(title: "Feed", image: .init(systemName: "newspaper")),
         .ideas: .init(title: "Ideas", image: .init(systemName: "lightbulb")),
         .goals: .init(title: "Goals", image: .init(systemName: "target")),
@@ -211,7 +211,7 @@ struct BighelpOpenWorkflowIntent: AppIntent {
 struct BighelpNewChatIntent: AppIntent {
     static let title: LocalizedStringResource = "New chat"
     static let description = IntentDescription(
-        "Opens bighelp on a new chat with the agent you choose, on the gateway you choose.",
+        "Opens bighelp on a new chat with the bot you choose, on the computer you choose.",
         categoryName: "Chat"
     )
     static let openAppWhenRun = true
@@ -220,10 +220,10 @@ struct BighelpNewChatIntent: AppIntent {
     @available(iOS 26.0, *)
     static var supportedModes: IntentModes { .foreground(.immediate) }
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpShortcutGatewayEntity?
 
-    @Parameter(title: "Agent")
+    @Parameter(title: "Bot")
     var agent: LoopdyShortcutAgentEntity?
 
     static var parameterSummary: some ParameterSummary {
@@ -242,7 +242,7 @@ struct BighelpNewChatIntent: AppIntent {
 struct BighelpContinueChatIntent: AppIntent {
     static let title: LocalizedStringResource = "Continue last chat"
     static let description = IntentDescription(
-        "Opens your most recent chat with the agent, or a new one if you haven't chatted yet.",
+        "Opens your most recent chat with the bot, or a new one if you haven't chatted yet.",
         categoryName: "Chat"
     )
     static let openAppWhenRun = true
@@ -251,10 +251,10 @@ struct BighelpContinueChatIntent: AppIntent {
     @available(iOS 26.0, *)
     static var supportedModes: IntentModes { .foreground(.immediate) }
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpShortcutGatewayEntity?
 
-    @Parameter(title: "Agent")
+    @Parameter(title: "Bot")
     var agent: LoopdyShortcutAgentEntity?
 
     static var parameterSummary: some ParameterSummary {
@@ -282,7 +282,7 @@ struct BighelpOpenGroupChatIntent: AppIntent {
     @available(iOS 26.0, *)
     static var supportedModes: IntentModes { .foreground(.immediate) }
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpShortcutGatewayEntity?
 
     @Parameter(title: "Group chat")
@@ -314,7 +314,7 @@ struct BighelpRunScheduledTaskIntent: AppIntent {
     @available(iOS 26.0, *)
     static var supportedModes: IntentModes { [.background] }
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpShortcutGatewayEntity?
 
     @Parameter(title: "Scheduled task")
@@ -350,10 +350,10 @@ struct BighelpAddKanbanTaskIntent: AppIntent {
     @Parameter(title: "Notes", inputOptions: .init(multiline: true))
     var notes: String?
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpShortcutGatewayEntity?
 
-    @Parameter(title: "Agent")
+    @Parameter(title: "Bot")
     var agent: LoopdyShortcutAgentEntity?
 
     static var parameterSummary: some ParameterSummary {
@@ -376,7 +376,7 @@ struct BighelpAddKanbanTaskIntent: AppIntent {
 struct BighelpHostStatusIntent: AppIntent {
     static let title: LocalizedStringResource = "Get computer status"
     static let description = IntentDescription(
-        "Says whether bighelp can reach your gateway, how many agents it has and how many chats are working. Checking a gateway doesn't switch bighelp to it.",
+        "Says whether bighelp can reach your computer, how many bots it has and how many chats are working. Checking a computer doesn't switch bighelp to it.",
         categoryName: "Automation"
     )
     static let openAppWhenRun = false
@@ -384,7 +384,7 @@ struct BighelpHostStatusIntent: AppIntent {
     @available(iOS 26.0, *)
     static var supportedModes: IntentModes { [.background] }
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpShortcutGatewayEntity?
 
     static var parameterSummary: some ParameterSummary {
@@ -402,7 +402,7 @@ struct BighelpHostStatusIntent: AppIntent {
 struct BighelpBoardItemsIntent: AppIntent {
     static let title: LocalizedStringResource = "Get Feed, Ideas or Goals"
     static let description = IntentDescription(
-        "Returns up to 10 items from an agent's Feed, Ideas or Goals as text, one per line.",
+        "Returns up to 10 items from a bot's Feed, Ideas or Goals as text, one per line.",
         categoryName: "Automation"
     )
     static let openAppWhenRun = false
@@ -413,10 +413,10 @@ struct BighelpBoardItemsIntent: AppIntent {
     @Parameter(title: "Section", default: .feed)
     var section: BighelpShortcutBoardSection
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpShortcutGatewayEntity?
 
-    @Parameter(title: "Agent")
+    @Parameter(title: "Bot")
     var agent: LoopdyShortcutAgentEntity?
 
     static var parameterSummary: some ParameterSummary {
@@ -437,7 +437,7 @@ struct BighelpBoardItemsIntent: AppIntent {
 struct BighelpOpenSectionIntent: AppIntent {
     static let title: LocalizedStringResource = "Open in bighelp"
     static let description = IntentDescription(
-        "Opens bighelp on Chats, Agents, Feed, Ideas, Goals, Projects, Kanban, Workflows, Scheduled tasks or Settings.",
+        "Opens bighelp on Chats, Bots, Feed, Ideas, Goals, Projects, Kanban, Workflows, Scheduled tasks or Settings.",
         categoryName: "Navigation"
     )
     static let openAppWhenRun = true
@@ -449,7 +449,7 @@ struct BighelpOpenSectionIntent: AppIntent {
     @Parameter(title: "Place", default: .chats)
     var section: BighelpShortcutDestination
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpShortcutGatewayEntity?
 
     static var parameterSummary: some ParameterSummary {
@@ -467,20 +467,20 @@ struct BighelpOpenSectionIntent: AppIntent {
 // MARK: - Agents
 
 struct BighelpSwitchAgentIntent: AppIntent {
-    static let title: LocalizedStringResource = "Switch agent"
+    static let title: LocalizedStringResource = "Switch bot"
     static let description = IntentDescription(
-        "Makes the agent the one bighelp opens on, the same as picking it in the app.",
-        categoryName: "Agents"
+        "Makes the bot the one bighelp opens on, the same as picking it in the app.",
+        categoryName: "Bots"
     )
     static let openAppWhenRun = false
 
     @available(iOS 26.0, *)
     static var supportedModes: IntentModes { [.background] }
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpShortcutGatewayEntity?
 
-    @Parameter(title: "Agent")
+    @Parameter(title: "Bot")
     var agent: LoopdyShortcutAgentEntity
 
     static var parameterSummary: some ParameterSummary {
@@ -497,10 +497,10 @@ struct BighelpSwitchAgentIntent: AppIntent {
 }
 
 struct BighelpOpenAgentIntent: AppIntent {
-    static let title: LocalizedStringResource = "Open agent"
+    static let title: LocalizedStringResource = "Open bot"
     static let description = IntentDescription(
-        "Opens the agent's home in bighelp: its latest chat, with Feed, Ideas and Goals a tap away.",
-        categoryName: "Agents"
+        "Opens the bot's home in bighelp: its latest chat, with Feed, Ideas and Goals a tap away.",
+        categoryName: "Bots"
     )
     static let openAppWhenRun = true
 
@@ -508,10 +508,10 @@ struct BighelpOpenAgentIntent: AppIntent {
     @available(iOS 26.0, *)
     static var supportedModes: IntentModes { .foreground(.immediate) }
 
-    @Parameter(title: "Gateway")
+    @Parameter(title: "Computer")
     var gateway: BighelpShortcutGatewayEntity?
 
-    @Parameter(title: "Agent")
+    @Parameter(title: "Bot")
     var agent: LoopdyShortcutAgentEntity
 
     static var parameterSummary: some ParameterSummary {

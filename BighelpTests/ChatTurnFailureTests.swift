@@ -153,7 +153,7 @@ struct ChatTurnFailureTests {
         ("auth_permanent", "auth", "Sign-in to Demo Cloud stopped working.", [.fixSignIn]),
         ("model_not_found", "provider", "This model isn't available.", [.pickAnotherModel]),
         ("context_overflow", "provider", "This chat is too long for the model.", [.startNewChat]),
-        ("agent_init_failed", "runtime", "Hermes couldn't start the agent. Check that an AI provider is set up.",
+        ("agent_init_failed", "runtime", "Hermes couldn't start the bot. Check that an AI provider is set up.",
          [.tryAgain, .checkProviders]),
     ])
     func eachKindHasItsSentenceAndFix(code: String, layer: String, sentence: String, fixes: [ChatTurnFailureFix]) throws {

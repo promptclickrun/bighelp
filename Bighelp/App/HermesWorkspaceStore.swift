@@ -95,7 +95,7 @@ final class HermesWorkspaceStore {
             errorMessage = nil
         } catch {
             guard generation == loadGeneration else { return }
-            errorMessage = "Workspaces could not be loaded from Hermes."
+            errorMessage = "Projects could not be loaded from Hermes."
         }
     }
 
@@ -157,7 +157,7 @@ final class HermesWorkspaceStore {
         } catch {
             guard generation == loadGeneration else { return false }
             errorMessage = (error as? WorkspaceClientError)?.errorDescription
-                ?? "That Workspace could not be selected."
+                ?? "That project could not be selected."
             return false
         }
     }
@@ -197,7 +197,7 @@ final class HermesWorkspaceStore {
             return true
         } catch {
             guard generation == loadGeneration else { return false }
-            errorMessage = "That Workspace could not be created. Check the remote folder path."
+            errorMessage = "That project could not be created. Check the remote folder path."
             return false
         }
     }
@@ -223,7 +223,7 @@ final class HermesWorkspaceStore {
             return true
         } catch {
             guard generation == loadGeneration else { return false }
-            errorMessage = "That Workspace registration could not be archived."
+            errorMessage = "That project could not be archived."
             return false
         }
     }

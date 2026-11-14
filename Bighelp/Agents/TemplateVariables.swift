@@ -102,11 +102,11 @@ enum TemplateVariables {
         for text in texts {
             for key in keys(in: text) where !used.contains(key) { used.append(key) }
         }
-        var fields = [TemplateVariable(key: agentName, label: "Name", kind: .text, example: "Give your agent a name",
+        var fields = [TemplateVariable(key: agentName, label: "Name", kind: .text, example: "Give your bot a name",
                                        maxLength: nameLength)]
         if asksForUserName, used.contains(userName) {
             fields.append(TemplateVariable(key: userName, label: "Your name", kind: .text, example: "Your first name",
-                                           help: "So your agent knows what to call you.", maxLength: nameLength))
+                                           help: "So your bot knows what to call you.", maxLength: nameLength))
         }
         var taken = reserved
         for variable in declared where used.contains(variable.key) && taken.insert(variable.key).inserted {

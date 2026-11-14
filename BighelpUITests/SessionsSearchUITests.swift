@@ -11,7 +11,7 @@ final class SessionsSearchUITests: BighelpUITestCase {
         app.launch()
         openThisComputerSessions(in: app)
 
-        let search = app.searchFields["Search sessions"].firstMatch
+        let search = app.searchFields["Search chats"].firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 5), "Sessions has a search field without a pull")
         XCTAssertLessThan(search.frame.minY, app.windows.firstMatch.frame.height * 0.35, "It sits at the top")
         shot("one-computer-list", app)

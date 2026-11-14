@@ -343,7 +343,7 @@ enum BighelpNotificationErrorCode: String, CaseIterable, Codable, Sendable {
         case .enrollmentInactive: "This computer doesn't have this device's notification permission anymore. \(Self.setUpAgain)"
         case .enrollmentChanged: "This computer's copy of this device's notification permission changed. \(Self.setUpAgain)"
         case .recipientKeyRefused: "This computer didn't accept this device's alert key. \(Self.updateApp) \(Self.sendUs)"
-        case .chatScopeRefused: "This computer refused alerts for the open chat's agent. \(Self.setUpAgain)"
+        case .chatScopeRefused: "This computer refused alerts for the open chat's bot. \(Self.setUpAgain)"
         case .chatAlertsRefused: "This computer couldn't turn on alerts for the open chat. Try again."
         case .claimMismatch: "This computer confirmed a different notification permission. \(Self.setUpAgain)"
         case .enrollmentChangedDuringCheck: "This computer's notification setup changed while bighelp checked it. Try again."

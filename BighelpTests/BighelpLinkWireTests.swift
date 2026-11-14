@@ -1562,7 +1562,7 @@ struct BighelpLinkWireTests {
                 "profiles": [{
                   "id": "juno",
                   "name": "Juno",
-                  "role": "Default agent",
+                  "role": "Default bot",
                   "summary": "General help",
                   "instructions": "Be helpful.",
                   "isDefault": true

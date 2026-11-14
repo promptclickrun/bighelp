@@ -33,7 +33,7 @@ struct WatchBoardView: View {
     }
 
     private var emptyText: String {
-        let name = store.agent?.firstName ?? "Your agent"
+        let name = store.agent?.firstName ?? "Your bot"
         return switch kind {
         case .feed: "Nothing in the Feed yet. Ask \(name) for updates on your iPhone."
         case .ideas: "No ideas yet. Ask \(name) for some."

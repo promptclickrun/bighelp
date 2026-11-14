@@ -153,7 +153,7 @@ struct UsageSummary: Equatable, Sendable {
             if host.failure == nil, !host.unreadAgents.isEmpty {
                 hostRow.failure = host.unreadAgents.count == 1
                     ? "\(host.unreadAgents[0])'s usage couldn't be read."
-                    : "\(host.unreadAgents.count) agents' usage couldn't be read."
+                    : "\(host.unreadAgents.count) bots' usage couldn't be read."
             }
             for agent in host.agents {
                 let report = agent.report

@@ -20,7 +20,7 @@ struct BotModeDiscardCard: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Text(isConfirming
                      ? "\(agentName) may have done part of it already. Discarding doesn’t undo that."
-                     : "The host stopped while \(agentName) was answering. Discard that answer so the group can go on.")
+                     : "The computer stopped while \(agentName) was answering. Discard that answer so the group can go on.")
                     .font(.bighelp(.subheadline))
                     .foregroundStyle(theme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)

@@ -125,7 +125,7 @@ enum HermesProfileLifecycleError: Error, Equatable, LocalizedError, Sendable {
 
     var errorDescription: String? {
         switch self {
-        case .ownerChanged: "The selected Hermes host changed. Reopen Profile Lifecycle."
+        case .ownerChanged: "The selected Hermes computer changed. Reopen Profile Lifecycle."
         case .invalidRequest: "This profile lifecycle request is invalid."
         case .invalidResponse: "Hermes returned an unsupported profile lifecycle response."
         case .currentProfileProtected: "The profile serving this connection cannot be renamed or deleted here. Switch to another serving profile first."

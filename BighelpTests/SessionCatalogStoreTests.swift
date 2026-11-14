@@ -822,7 +822,7 @@ struct SessionCatalogStoreTests {
         #expect(client.listCallCount == 1)
         #expect(catalog.session(id: cached.id)?.draft == "Keep me visible")
         #expect(catalog.loadErrorMessage == nil)
-        #expect(catalog.refreshErrorMessage == "Sessions could not be refreshed. Try again.")
+        #expect(catalog.refreshErrorMessage == "Chats could not be refreshed. Try again.")
     }
 
     @Test func draftHistoryAndActivityPersistenceDoNotPromoteSessionRecency() {
@@ -1018,7 +1018,7 @@ struct SessionCatalogStoreTests {
         #expect(client.listCallCount == 1)
         #expect(catalog.records.isEmpty)
         #expect(catalog.loadErrorMessage == nil)
-        #expect(catalog.refreshErrorMessage == "Sessions could not be refreshed. Try again.")
+        #expect(catalog.refreshErrorMessage == "Chats could not be refreshed. Try again.")
     }
 
     @Test func failedRemoteLoadWithoutUsableLocalStateStillThrows() async {
@@ -1031,7 +1031,7 @@ struct SessionCatalogStoreTests {
 
         #expect(client.listCallCount == 1)
         #expect(catalog.records.isEmpty)
-        #expect(catalog.loadErrorMessage == "Sessions could not be loaded. Try again.")
+        #expect(catalog.loadErrorMessage == "Chats could not be loaded. Try again.")
         #expect(catalog.refreshErrorMessage == nil)
     }
 
@@ -1684,7 +1684,7 @@ struct SessionCatalogStoreTests {
 
         #expect(catalog.session(id: record.id)?.draft == "This remains in memory")
         #expect(catalog.loadErrorMessage == nil)
-        #expect(catalog.persistenceErrorMessage == "Session changes could not be saved. Try again.")
+        #expect(catalog.persistenceErrorMessage == "Chat changes could not be saved. Try again.")
         #expect(catalog.hasUnsavedChanges)
     }
 

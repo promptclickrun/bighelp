@@ -589,11 +589,11 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
 
         var title: String {
             switch self {
-            case .agent: "Agent stage"
+            case .agent: "Bot stage"
             case .check: "Check"
             case .decision: "Decision"
             case .signoff: "Sign-off"
-            case .parallel: "Parallel agents"
+            case .parallel: "Parallel bots"
             case .delivery: "Delivery"
             case .command: "Check"
             case .pullRequest: "Pull request"
@@ -883,7 +883,7 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
         case .check: title = "Check"
         case .decision: title = "Decision"
         case .signoff: title = "Your sign-off"
-        case .parallel: title = "Parallel agents"
+        case .parallel: title = "Parallel bots"
         case .delivery: title = "Send it"
         case .command: title = "Run the tests"
         case .pullRequest: title = "Open a pull request"
@@ -903,7 +903,7 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             var taken = existing + [self]
             for letter in ["A", "B", "C"] {
                 var branch = WorkflowStage(new: .agent, existing: taken)
-                branch.title = "Agent \(letter)"
+                branch.title = "Bot \(letter)"
                 taken.append(branch)
                 branches.append(branch)
             }
@@ -1004,7 +1004,7 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
     func subtitle(agentName: (String?) -> String?) -> String {
         switch kind {
         case .agent:
-            let agent = agentName(role) ?? "no agent yet"
+            let agent = agentName(role) ?? "no bot yet"
             return [role, agent].compactMap { $0 }.joined(separator: " → ")
         case .check: return rules.map(\.summary).joined(separator: " · ")
         case .decision:
@@ -1023,7 +1023,7 @@ struct WorkflowStage: Equatable, Sendable, Identifiable {
             let place = to.map { WorkflowDeliveryPlace.title($0) } ?? "nowhere yet"
             return deliver.count == 1 ? "1 output → \(place)" : "\(deliver.count) outputs → \(place)"
         case .parallel:
-            let names = branches.map { agentName($0.role) ?? "no agent yet" }
+            let names = branches.map { agentName($0.role) ?? "no bot yet" }
             return "\(branches.count) at once · " + names.joined(separator: ", ")
         case .unknown: return ""
         }

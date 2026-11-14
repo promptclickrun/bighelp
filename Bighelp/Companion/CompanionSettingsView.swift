@@ -10,10 +10,10 @@ struct CompanionSettingsView: View {
             Section {
                 Toggle("Show pet companion", isOn: $store.isEnabled)
                     .tint(theme.action)
-                    .accessibilityHint("Shows each agent's avatar as a pet in its chats.")
+                    .accessibilityHint("Shows each bot's avatar as a pet in its chats.")
                     .accessibilityIdentifier("companion.enabled")
             } footer: {
-                Text("Each agent's pet is its own avatar. Pets never send messages or do anything.")
+                Text("Each bot's pet is its own avatar. Pets never send messages or do anything.")
             }
 
             Section {

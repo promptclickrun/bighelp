@@ -795,8 +795,8 @@ struct DirectHermesProjection {
             running = false
             change.reclaim = value
             change.activities = [publishActivity(key: "reclaimed:\(eventKey)", kind: .tool,
-                title: "Session reclaimed", detail: value.reason,
-                payload: ["summary": .string("Hermes retired this live session. Reopen it before sending.")],
+                title: "Chat reclaimed", detail: value.reason,
+                payload: ["summary": .string("Hermes retired this live chat. Reopen it before sending.")],
                 terminal: true, lifecycleOverride: .cancelled)]
         case "todo.updated":
             acceptCanonicalTodoSnapshot(

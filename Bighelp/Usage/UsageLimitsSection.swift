@@ -453,11 +453,11 @@ struct UsageLimitCard: View {
         }
     }
 
-    /// "Your agents: 2.5M tokens · $126.09 in 30 days".
+    /// "Your bots: 2.5M tokens · $126.09 in 30 days".
     private func usedText(_ used: UsageAmount) -> String {
         var parts = ["\(UsageFormat.short(used.tokens)) tokens"]
         if used.cost > 0 { parts.append(UsageFormat.money(used.cost)) }
-        return "Your agents: " + parts.joined(separator: " · ") + " in \(range.days) days"
+        return "Your bots: " + parts.joined(separator: " · ") + " in \(range.days) days"
     }
 }
 

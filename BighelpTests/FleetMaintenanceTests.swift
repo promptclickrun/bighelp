@@ -31,7 +31,7 @@ struct FleetMaintenanceTests {
         let (store, _) = store([
             ready(homeID, "Home", home, Plugin(installed: "2.19.0", latest: "2.20.1")),
             ready(studioID, "Studio", studio),
-            .init(id: officeID, name: "Office", reach: .offline("Offline. Couldn't reach this host.")),
+            .init(id: officeID, name: "Office", reach: .offline("Offline. Couldn't reach this computer.")),
             .init(id: atticID, name: "Attic", reach: .signedOut),
         ])
         await store.refresh()

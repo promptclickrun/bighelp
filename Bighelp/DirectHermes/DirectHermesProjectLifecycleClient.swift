@@ -419,13 +419,13 @@ final class DirectHermesProjectLifecycleClient: HermesProjectLifecycleManaging {
     private func summary(_ action: HermesProjectLifecycleAction, overview: HermesProjectOverview) -> String {
         func project(_ id: String) -> String { overview.registeredProjects.first(where: { $0.id == id })?.name ?? "this project" }
         switch action {
-        case .create(let name, let root): return "Register \(name) with the discovered host folder \(root). No repository files will be copied or changed."
+        case .create(let name, let root): return "Register \(name) with the discovered computer folder \(root). No repository files will be copied or changed."
         case .addFolder(let id, let root, _, let primary): return "Add \(root) to \(project(id))\(primary ? " and make it the primary folder" : "")."
         case .removeFolder(let id, let path):
             let primary = overview.registeredProjects.first(where: { $0.id == id })?.folders.first(where: { $0.path == path })?.isPrimary == true
-            return "Remove \(path) from \(project(id)). The folder and its files remain on the host.\(primary ? " Hermes will select another registered folder as primary." : "")"
+            return "Remove \(path) from \(project(id)). The folder and its files remain on the computer.\(primary ? " Hermes will select another registered folder as primary." : "")"
         case .setPrimary(let id, let path): return "Use \(path) as the primary folder for \(project(id))."
-        case .delete(let id): return "Permanently delete the \(project(id)) registration and its folder associations. Files on the host are not deleted."
+        case .delete(let id): return "Permanently delete the \(project(id)) registration and its folder associations. Files on the computer are not deleted."
         }
     }
 
@@ -526,7 +526,7 @@ final class DirectHermesProjectLifecycleClient: HermesProjectLifecycleManaging {
         return .init(
             id: try text(row["id"], maximum: 512),
             profileID: try optionalText(row["profile"], maximum: 128) ?? "",
-            title: try optionalText(row["title"], maximum: 2_000) ?? "Untitled session",
+            title: try optionalText(row["title"], maximum: 2_000) ?? "Untitled chat",
             preview: try optionalText(row["preview"], maximum: 16_384) ?? "",
             cwd: try optionalHostPath(row["cwd"]),
             branch: try optionalText(row["git_branch"], maximum: 300),

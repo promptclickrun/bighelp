@@ -419,7 +419,7 @@ struct BotStudioView: View {
                 change { $0.move = BotLook.Move(rawValue: raw) ?? .calm }
                 trying = nil
             }
-            Text("Try how it looks while your agent works")
+            Text("Try how it looks while your bot works")
                 .bighelpFont(.metadata)
                 .foregroundStyle(theme.secondaryText)
                 .padding(.horizontal, BighelpTokens.space20)

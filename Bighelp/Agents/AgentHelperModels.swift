@@ -137,7 +137,7 @@ extension DirectHermesAuxiliaryModelAssignment {
         "voice_chat": String(localized: "Voice chats"),
         "triage_specifier": String(localized: "Sorting new tasks"),
         "kanban_decomposer": String(localized: "Splitting Kanban cards"),
-        "profile_describer": String(localized: "Describing agents"),
+        "profile_describer": String(localized: "Describing bots"),
         "curator": String(localized: "Tidying memory"),
         "memory_query_rewrite": String(localized: "Searching memory"),
         "goal_judge": String(localized: "Checking goals"),

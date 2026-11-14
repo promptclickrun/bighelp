@@ -85,8 +85,8 @@ struct MentionSuggestionsView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(!suggestion.isEnabled)
-                    .accessibilityLabel(suggestion.isEnabled ? suggestion.displayLabel : "\(suggestion.displayLabel). This chat can include up to 6 agents")
-                    .accessibilityHint(suggestion.isEnabled ? "Inserts this mention." : "This chat can include up to 6 agents")
+                    .accessibilityLabel(suggestion.isEnabled ? suggestion.displayLabel : "\(suggestion.displayLabel). This chat can include up to 6 bots")
+                    .accessibilityHint(suggestion.isEnabled ? "Inserts this mention." : "This chat can include up to 6 bots")
                     .accessibilityIdentifier("chat.mention.\(suggestion.agentID ?? suggestion.handle)")
                 }
             }

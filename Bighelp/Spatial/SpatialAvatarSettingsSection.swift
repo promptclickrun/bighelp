@@ -13,7 +13,7 @@ struct SpatialAvatarSettingsSection: View {
 
     var body: some View {
         Section {
-            Toggle("Show your agent in the room", isOn: Binding(
+            Toggle("Show your bot in the room", isOn: Binding(
                 get: { avatar?.isVolumeOpen ?? false },
                 set: { show in
                     if show { openWindow(id: SpatialAvatarSceneID.avatar) }
@@ -40,7 +40,7 @@ struct SpatialAvatarSettingsSection: View {
         } header: {
             Text("In your space")
         } footer: {
-            Text("\(settings.spatialAvatarPinchAction.detail) Simple mode closes bighelp's window and leaves just your agent; Open bighelp under it brings the window back. To move your agent, pinch and hold the bar under it and drag. Let go near a table and it stays anchored there.")
+            Text("\(settings.spatialAvatarPinchAction.detail) Simple mode closes bighelp's window and leaves just your bot; Open bighelp under it brings the window back. To move your bot, pinch and hold the bar under it and drag. Let go near a table and it stays anchored there.")
                 .bighelpFont(.metadata)
         }
         .listRowBackground(theme.surface)

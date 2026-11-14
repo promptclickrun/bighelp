@@ -153,7 +153,7 @@ struct ChatLayoutSettingsView: View {
                 .bighelpSegmentedPicker()
                 .frame(minHeight: BighelpTokens.hitTarget)
                 .accessibilityIdentifier("chat-layout.avatar-size")
-                Toggle("Show agent name", isOn: $showsAgentName)
+                Toggle("Show bot name", isOn: $showsAgentName)
                     .accessibilityIdentifier("chat-layout.shows-name")
             } header: {
                 Text("Chat header")
@@ -218,12 +218,12 @@ struct ChatLayoutSettingsView: View {
         #if targetEnvironment(macCatalyst)
         String(localized: """
             Auto uses the large avatar in tall windows and Medium in shorter ones. With the name hidden, click the \
-            avatar for the agent's profile, or click and hold it to switch agents.
+            avatar for the bot's profile, or click and hold it to switch bots.
             """)
         #else
         String(localized: """
             Auto keeps the large avatar on the biggest iPhones and uses Medium on the rest. With the name hidden, \
-            tap the avatar for the agent's profile, or touch and hold it to switch agents.
+            tap the avatar for the bot's profile, or touch and hold it to switch bots.
             """)
         #endif
     }
@@ -266,7 +266,7 @@ private struct ChatLayoutPreview: View {
                     .fill(theme.action)
                     .frame(width: avatarSize, height: avatarSize)
                 if showsAgentName {
-                    Text("Your agent")
+                    Text("Your bot")
                         .font(.bighelp(.subheadline).weight(.semibold))
                         .padding(.horizontal, BighelpTokens.space16)
                         .padding(.vertical, 6)

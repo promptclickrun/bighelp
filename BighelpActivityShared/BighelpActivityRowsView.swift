@@ -48,7 +48,7 @@ struct BighelpActivityRowsView: View {
             Link(destination: BighelpWidgetSnapshot.chatURL(row.id)) {
                 BighelpActivityHeroView(
                     row: row, title: info?.title ?? "Chat",
-                    attributes: info?.attributes ?? LoopdySessionActivityAttributes(sessionID: row.id, sessionTitle: "Chat", agentID: "agent", agentName: "Your agent"),
+                    attributes: info?.attributes ?? LoopdySessionActivityAttributes(sessionID: row.id, sessionTitle: "Chat", agentID: "agent", agentName: "Your bot"),
                     detail: detail, level: level, showsNerdLine: showsNerdLine, isStale: stale(row),
                     lines: max(0, room - others.count - (more > 0 ? 1 : 0)),
                     colors: BighelpActivityColors(snapshot: snapshot, scheme: scheme))
@@ -99,7 +99,7 @@ struct BighelpActivityRowsView: View {
     @ViewBuilder
     private func rowContent(_ row: BighelpActivitySession) -> some View {
         let info = infos[row.id]
-        let attributes = info?.attributes ?? LoopdySessionActivityAttributes(sessionID: row.id, sessionTitle: "Chat", agentID: "agent", agentName: "Your agent")
+        let attributes = info?.attributes ?? LoopdySessionActivityAttributes(sessionID: row.id, sessionTitle: "Chat", agentID: "agent", agentName: "Your bot")
         let rowIsStale = stale(row)
         let presentation = BighelpActivityPresentation(attributes: attributes, state: row.state, isStale: rowIsStale)
         let tint = BighelpActivityColors(snapshot: snapshot, scheme: scheme).stateColor(row.phase, isStale: rowIsStale)

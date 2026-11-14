@@ -33,7 +33,7 @@ enum BighelpShortcutAskProbe {
     }
 
     @MainActor private static func show(_ answer: String) {
-        let alert = UIAlertController(title: "Ask an agent", message: answer, preferredStyle: .alert)
+        let alert = UIAlertController(title: "Ask a bot", message: answer, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         var top = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first?
             .rootViewController

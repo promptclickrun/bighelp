@@ -67,7 +67,7 @@ private struct LiveVoiceUnavailableView: View {
     var body: some View {
         VStack(spacing: BighelpTokens.space16) {
             Spacer()
-            AvatarView(stableID: agentID ?? "agent", displayName: "Agent",
+            AvatarView(stableID: agentID ?? "agent", displayName: "Bot",
                        imageURL: agentImageURL, size: 140, state: .idle)
                 .accessibilityHidden(true)
             Text(reason.title)

@@ -65,7 +65,7 @@ struct PeopleAndChatView: View {
                 }
             } header: {
                 HStack {
-                    Text("Agents in this chat")
+                    Text("Bots in this chat")
                     Spacer()
                     Text(memberCountTitle)
                 }
@@ -110,9 +110,9 @@ struct PeopleAndChatView: View {
                         .accessibilityIdentifier("chat.people.add.\(profile.id)")
                     }
                 } header: {
-                    Text("Add an agent")
+                    Text("Add a bot")
                 } footer: {
-                    Text("This chat can include up to \(BotModeRoom.maximumMembers) agents.")
+                    Text("This chat can include up to \(BotModeRoom.maximumMembers) bots.")
                 }
             }
 
@@ -140,7 +140,7 @@ struct PeopleAndChatView: View {
                     .listRowBackground(theme.raisedSurface)
             }
 
-            Section("Agents in this chat") {
+            Section("Bots in this chat") {
                 ForEach(model.memberProfiles) { profile in
                     memberRow(profile)
                 }
@@ -159,9 +159,9 @@ struct PeopleAndChatView: View {
                         .accessibilityIdentifier("chat.people.add.\(profile.id)")
                     }
                 } header: {
-                    Text("Add an agent")
+                    Text("Add a bot")
                 } footer: {
-                    Text("This chat can include up to 6 agents")
+                    Text("This chat can include up to 6 bots")
                 }
             }
 
@@ -216,7 +216,7 @@ struct PeopleAndChatView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Remove \(profile.name)")
             .disabled(model.memberIDs.count <= 1)
-            .accessibilityHint(model.memberIDs.count <= 1 ? "A chat must keep one agent." : "Removes this agent from the chat.")
+            .accessibilityHint(model.memberIDs.count <= 1 ? "A chat must keep one bot." : "Removes this bot from the chat.")
             .accessibilityIdentifier("chat.people.remove.\(profile.id)")
         } else {
             Button {
@@ -229,7 +229,7 @@ struct PeopleAndChatView: View {
             .buttonStyle(.plain)
             .disabled(model.memberIDs.count <= 1)
             .accessibilityLabel("Remove \(profile.name)")
-            .accessibilityHint(model.memberIDs.count <= 1 ? "A chat must keep one agent." : "Removes this agent from the chat.")
+            .accessibilityHint(model.memberIDs.count <= 1 ? "A chat must keep one bot." : "Removes this bot from the chat.")
             .accessibilityIdentifier("chat.people.remove.\(profile.id)")
         }
     }
@@ -239,7 +239,7 @@ struct PeopleAndChatView: View {
             try model.addMember(agentID: profile.id)
             errorMessage = nil
         } catch {
-            errorMessage = "Agent could not be added. Try again."
+            errorMessage = "Bot could not be added. Try again."
         }
     }
 
@@ -254,12 +254,12 @@ struct PeopleAndChatView: View {
 
     private var membershipExplanation: String {
         if !model.botModeExecutionEnabled {
-            return model.botModeStatus ?? "Connect to a compatible Hermes host to start a group chat. Existing shared history stays available."
+            return model.botModeStatus ?? "Connect to a compatible Hermes computer to start a group chat. Existing shared history stays available."
         }
         if model.botModeRoom?.hasNativeRoom == true {
-            return "Hermes runs this shared room. Members are fixed after its first message. Earlier direct history stays private to the original agent."
+            return "Hermes runs this shared room. Members are fixed after its first message. Earlier direct history stays private to the original bot."
         }
-        return "Members can see new shared turns. Earlier direct history stays private to the original agent."
+        return "Members can see new shared turns. Earlier direct history stays private to the original bot."
     }
 
     private var availableProfiles: [AgentProfile] {
@@ -269,7 +269,7 @@ struct PeopleAndChatView: View {
     }
 
     private var memberCountTitle: String {
-        "\(model.memberIDs.count) of \(BotModeRoom.maximumMembers) agents"
+        "\(model.memberIDs.count) of \(BotModeRoom.maximumMembers) bots"
     }
 
     @BighelpThemeReader private var theme
@@ -279,8 +279,8 @@ struct PeopleAndChatView: View {
 enum BotModeMemberRemovalPresentation {
     static func errorMessage(for error: any Error) -> String {
         if error as? BotModeRoomError == .sharedHistoryRequiresBotMode {
-            return "Group chats with shared messages must keep at least two agents."
+            return "Group chats with shared messages must keep at least two bots."
         }
-        return "Agent could not be removed. Keep at least one agent in this chat."
+        return "Bot could not be removed. Keep at least one bot in this chat."
     }
 }

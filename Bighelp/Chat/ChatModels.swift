@@ -43,7 +43,7 @@ enum NativeMessageReactionAvailability: Equatable, Sendable {
         case .reconnectRequired:
             "Reconnect to Hermes to change reactions"
         case .unsupportedHost:
-            "This Hermes host does not support message reactions"
+            "This Hermes computer does not support message reactions"
         }
     }
 }

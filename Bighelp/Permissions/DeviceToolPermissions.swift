@@ -147,17 +147,17 @@ enum DeviceToolCapability: String, CaseIterable, Codable, Identifiable, Sendable
     /// The connect card's one line about what the agent gets once the switch is on.
     var cardLine: String {
         switch self {
-        case .health: String(localized: "Your agent can read your Health data, like sleep, steps, and heart rate. It never changes it.")
-        case .calendar: String(localized: "Your agent can see, add, change, and delete events in your calendars.")
-        case .reminders: String(localized: "Your agent can see, add, change, and delete your reminders.")
-        case .contacts: String(localized: "Your agent can look up, add, change, and delete people in your contacts.")
-        case .photos: String(localized: "Your agent can find and look at your photos, and save pictures it makes.")
-        case .location: String(localized: "Your agent can see where you are when it asks, while bighelp is open.")
-        case .geofences: String(localized: "Your agent hears from bighelp when you arrive at or leave places you name.")
-        case .alarms: String(localized: "Your agent can set, change, and turn off alarms and timers.")
-        case .music: String(localized: "Your agent can see what's playing, play and pause music, and make playlists.")
-        case .focus: String(localized: "Your agent can see when a Focus is on, with the note you set for it.")
-        case .shortcuts: String(localized: "Your agent can run the shortcut you name here and get what it returns.")
+        case .health: String(localized: "Your bot can read your Health data, like sleep, steps, and heart rate. It never changes it.")
+        case .calendar: String(localized: "Your bot can see, add, change, and delete events in your calendars.")
+        case .reminders: String(localized: "Your bot can see, add, change, and delete your reminders.")
+        case .contacts: String(localized: "Your bot can look up, add, change, and delete people in your contacts.")
+        case .photos: String(localized: "Your bot can find and look at your photos, and save pictures it makes.")
+        case .location: String(localized: "Your bot can see where you are when it asks, while bighelp is open.")
+        case .geofences: String(localized: "Your bot hears from bighelp when you arrive at or leave places you name.")
+        case .alarms: String(localized: "Your bot can set, change, and turn off alarms and timers.")
+        case .music: String(localized: "Your bot can see what's playing, play and pause music, and make playlists.")
+        case .focus: String(localized: "Your bot can see when a Focus is on, with the note you set for it.")
+        case .shortcuts: String(localized: "Your bot can run the shortcut you name here and get what it returns.")
         case .appearance, .navigation: detail
         }
     }

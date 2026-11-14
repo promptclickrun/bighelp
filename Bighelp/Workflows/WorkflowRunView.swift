@@ -166,7 +166,7 @@ struct WorkflowRunContent: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Waiting for your sign-off")
                         .font(.bighelp(.headline))
-                    Text("No agent is running while it waits.")
+                    Text("No bot is running while it waits.")
                         .font(.bighelp(.footnote))
                         .foregroundStyle(theme.secondaryText)
                 }

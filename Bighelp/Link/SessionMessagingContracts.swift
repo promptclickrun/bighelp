@@ -23,9 +23,9 @@ enum BighelpLinkLiveSocketError: Error, Equatable, LocalizedError {
         case .pickerOpenFailed(let message): return message
         case .requestFailed(_, let message): return message
         case .hostUpdateRequired:
-            return "Update the bighelp plugin on this Hermes host to use this feature, then reconnect."
+            return "Update the bighelp plugin on this Hermes computer to use this feature, then reconnect."
         case .directHostSetupRequired:
-            return "Direct connection is unavailable on this host. Check Direct settings and connection status in the host’s bighelp plugin, then reconnect."
+            return "Direct connection is unavailable on this computer. Check Direct settings and connection status in the computer’s bighelp plugin, then reconnect."
         default: return nil
         }
     }

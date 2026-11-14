@@ -27,7 +27,7 @@ final class SkillsAndToolsStore {
             return HermesCapabilityCompatibilityError.updateRequired.localizedDescription
         }
         if !management.canRead || !management.canCreate || !management.canUpdate || !management.canImport {
-            return catalog.toolsNotice.isEmpty ? "Some capability actions are unavailable on this host." : catalog.toolsNotice
+            return catalog.toolsNotice.isEmpty ? "Some capability actions are unavailable on this computer." : catalog.toolsNotice
         }
         return nil
     }

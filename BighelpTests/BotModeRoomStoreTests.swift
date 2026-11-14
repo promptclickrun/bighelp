@@ -139,7 +139,7 @@ struct BotModeRoomStoreTests {
 
         await model.send()
 
-        #expect(model.failureMessage == "No agent named @claude in this chat. Edit the mention and try again.")
+        #expect(model.failureMessage == "No bot named @claude in this chat. Edit the mention and try again.")
         #expect(model.draft == "Ask @claude for help")
         #expect(model.canRetry == false)
         #expect(store.room(id: room.id)?.visibleEvents == room.visibleEvents)

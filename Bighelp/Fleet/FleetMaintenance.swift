@@ -132,7 +132,7 @@ final class FleetMaintenanceHost: Identifiable {
         if hermesJob.receipt != nil {
             switch phase(hermesJob) {
             case .running, nil:
-                return FleetHostJob(.working, reach == .ready ? "Updating…" : "Updating… waiting for the host")
+                return FleetHostJob(.working, reach == .ready ? "Updating…" : "Updating… waiting for the computer")
             case .failed:
                 return FleetHostJob(.failed, "Update failed")
             case .outcomeUnknown:

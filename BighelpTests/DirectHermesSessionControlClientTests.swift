@@ -770,7 +770,7 @@ struct DirectHermesSessionControlClientTests {
         let controls = SessionRuntimeControlModel(sessionID: fixture.appID, agentID: "studio", messaging: fixture.client())
         await controls.loadFastModeIfNeeded()
         #expect(controls.fastMode?.mode == FastMode("future-mode"))
-        #expect(controls.fastMode?.title == "Set on host")
+        #expect(controls.fastMode?.title == "Set on computer")
         await controls.selectFastMode(.on)
         controls.reconcileFastMode(.off, observedAt: .distantPast)
         #expect(controls.fastMode?.mode == .on)

@@ -110,7 +110,7 @@ enum ChatRuntimeSelectionLockout {
     static func accessibilityHint(isTurnActive: Bool) -> String {
         isLocked(isTurnActive: isTurnActive)
             ? accessibilityHint
-            : "Opens settings for this session."
+            : "Opens settings for this chat."
     }
 }
 
@@ -322,19 +322,19 @@ enum SessionContextPresentation {
         ))
         if let sessionInputTokens = snapshot.sessionInputTokens {
             rows.append(SessionContextTokenRow(
-                id: "session-input", title: "Session input",
+                id: "session-input", title: "Chat input",
                 value: exactCount(sessionInputTokens)
             ))
         }
         if let sessionOutputTokens = snapshot.sessionOutputTokens {
             rows.append(SessionContextTokenRow(
-                id: "session-output", title: "Session output",
+                id: "session-output", title: "Chat output",
                 value: exactCount(sessionOutputTokens)
             ))
         }
         if let sessionCachedTokens = snapshot.sessionCachedTokens {
             rows.append(SessionContextTokenRow(
-                id: "session-cached", title: "Session cached",
+                id: "session-cached", title: "Chat cached",
                 value: exactCount(sessionCachedTokens)
             ))
         }
@@ -342,8 +342,8 @@ enum SessionContextPresentation {
             rows.append(SessionContextTokenRow(
                 id: "session-total",
                 title: snapshot.sessionIncludesSubagents == true
-                    ? "Session total (incl. subagents)"
-                    : "Session total",
+                    ? "Chat total (incl. subagents)"
+                    : "Chat total",
                 value: exactCount(sessionTotalTokens)
             ))
         }

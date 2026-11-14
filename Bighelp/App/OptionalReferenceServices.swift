@@ -42,7 +42,7 @@ final class OptionalReferenceServices {
         }
         wikiClient = client
         do { try drafts.setContext(owner: owner) }
-        catch { lifecycleFailure = "A Wiki draft could not be saved on this device. Return to its original account and host to recover it before closing the app." }
+        catch { lifecycleFailure = "A Wiki draft could not be saved on this device. Return to its original account and computer to recover it before closing the app." }
         wiki.setContext(owner: owner, client: client)
     }
 

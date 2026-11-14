@@ -64,13 +64,13 @@ struct SessionMaintenanceView: View {
                 .bighelpRefreshable { await store.refresh() }
             } else {
                 ContentUnavailableView(
-                    "Session maintenance unavailable",
+                    "Clean up chats unavailable",
                     systemImage: "rectangle.stack.badge.exclamationmark",
-                    description: Text("The selected host changed. Reopen Session Maintenance from the current workspace.")
+                    description: Text("The selected computer changed. Reopen Clean up chats.")
                 )
             }
         }
-        .navigationTitle("Session Maintenance")
+        .navigationTitle("Clean up chats")
         .navigationBarTitleDisplayMode(.inline)
         .task { if store.statistics == nil { await store.load() } }
         .onDisappear { if !store.ownsScope { store.retire() } }
@@ -98,7 +98,7 @@ struct SessionMaintenanceView: View {
             do {
                 let urls = try result.get()
                 guard urls.count == 1, let url = urls.first else {
-                    callbackError = "Choose one session package."
+                    callbackError = "Choose one chat package."
                     return
                 }
                 let accessed = url.startAccessingSecurityScopedResource()
@@ -106,7 +106,7 @@ struct SessionMaintenanceView: View {
                 let info = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
                 guard info.isRegularFile == true, info.isSymbolicLink != true,
                       let size = info.fileSize, size <= DirectHermesHTTP.maximumSessionTransferBytes else {
-                    callbackError = "Choose a session package no larger than 25 MiB."
+                    callbackError = "Choose a chat package no larger than 25 MiB."
                     return
                 }
                 store.prepareImport(data: try Data(contentsOf: url, options: .mappedIfSafe))
@@ -120,7 +120,7 @@ struct SessionMaintenanceView: View {
         ) { result in
             exportDocument = nil
             store.clearExport()
-            if case .failure = result { callbackError = "The session package was prepared, but \(BighelpPlatform.isMac ? "macOS" : "iOS") did not save it." }
+            if case .failure = result { callbackError = "The chat package was prepared, but \(BighelpPlatform.isMac ? "macOS" : "iOS") did not save it." }
         }
         .confirmationDialog(
             "Close live runtime?",
@@ -136,9 +136,9 @@ struct SessionMaintenanceView: View {
             }
             Button("Cancel", role: .cancel) { closeCandidate = nil }
         } message: { session in
-            Text("Close only the live runtime for “\(session.title)”. Stored history stays available to resume; this does not delete or archive the session.")
+            Text("Close only the live runtime for “\(session.title)”. Stored history stays available to resume; this does not delete or archive the chat.")
         }
-        .alert("Session maintenance", isPresented: Binding(
+        .alert("Clean up chats", isPresented: Binding(
             get: { callbackError != nil }, set: { if !$0 { callbackError = nil } }
         )) {
             Button("OK", role: .cancel) { callbackError = nil }
@@ -148,17 +148,17 @@ struct SessionMaintenanceView: View {
 
     private var scopeSection: some View {
         Section {
-            LabeledContent("Host", value: store.hostName)
+            LabeledContent("Computer", value: store.hostName)
             LabeledContent("Profile", value: store.profileID)
-        } header: { Text("Workspace") } footer: {
-            Text("Every operation is scoped to this exact profile. Session chat and history remain in the existing conversation experience.")
+        } header: { Text("Computer") } footer: {
+            Text("Every operation is scoped to this exact profile. Chat and history remain in the existing conversation experience.")
         }
     }
 
     @ViewBuilder
     private var statusSections: some View {
         if store.isLoading || store.operationTitle != nil {
-            Section { ProgressView(store.operationTitle ?? "Loading sessions") }
+            Section { ProgressView(store.operationTitle ?? "Loading chats") }
         }
         if let message = store.errorMessage {
             Section {
@@ -181,7 +181,7 @@ struct SessionMaintenanceView: View {
     private var statisticsSection: some View {
         if let stats = store.statistics {
             Section("Overview") {
-                LabeledContent("Sessions", value: stats.total.formatted())
+                LabeledContent("Chats", value: stats.total.formatted())
                 LabeledContent("Active store", value: stats.activeStore.formatted())
                 LabeledContent("Archived", value: stats.archived.formatted())
                 LabeledContent("Messages", value: stats.messages.formatted())
@@ -199,7 +199,7 @@ struct SessionMaintenanceView: View {
 
     private var lifecycleSection: some View {
         Section {
-            Button("Find Most Recent Session", systemImage: "clock.arrow.circlepath") {
+            Button("Find Most Recent Chat", systemImage: "clock.arrow.circlepath") {
                 Task { await store.findMostRecent() }
             }
             .disabled(store.isBusy)
@@ -215,7 +215,7 @@ struct SessionMaintenanceView: View {
                             .textSelection(.enabled)
                         Text(recent.source).font(.bighelp(.caption)).foregroundStyle(.secondary)
                     }
-                    Button("Open Most Recent in Sessions", systemImage: "arrow.up.forward.app") {
+                    Button("Open Most Recent in Chats", systemImage: "arrow.up.forward.app") {
                         adoptable = .init(
                             profileID: lookup.profileID,
                             storedSessionID: recent.storedSessionID,
@@ -224,22 +224,22 @@ struct SessionMaintenanceView: View {
                     }
                 } else {
                     ContentUnavailableView(
-                        "No recent session",
+                        "No recent chat",
                         systemImage: "clock.badge.questionmark",
-                        description: Text("Hermes returned no stored session ID. This stock method also folds host lookup failures into a null result, so refresh before treating the profile as empty.")
+                        description: Text("Hermes returned no stored chat ID. This stock method also folds computer lookup failures into a null result, so refresh before treating the profile as empty.")
                     )
                 }
             }
         } header: {
-            Text("Open a session")
+            Text("Open a chat")
         } footer: {
-            Text("Most Recent uses Hermes’s stored session ID exactly. Closing a live runtime is available from each active session’s Actions menu and never deletes history.")
+            Text("Most Recent uses Hermes’s stored chat ID exactly. Closing a live runtime is available from each active chat’s Actions menu and never deletes history.")
         }
     }
 
     private var ownerBackfillSection: some View {
         Section {
-            Button("Review Legacy Session Ownership", systemImage: "person.crop.circle.badge.checkmark") {
+            Button("Review Legacy Chat Ownership", systemImage: "person.crop.circle.badge.checkmark") {
                 Task { await store.prepareOwnerBackfill() }
             }
             .disabled(store.isBusy || store.statistics == nil)
@@ -253,7 +253,7 @@ struct SessionMaintenanceView: View {
 
     private var cleanupSection: some View {
         Section {
-            Button("Review Empty Sessions", systemImage: "rectangle.stack.badge.minus") {
+            Button("Review Empty Chats", systemImage: "rectangle.stack.badge.minus") {
                 Task { await store.prepareEmptyDelete() }
             }
             .disabled(store.isBusy || (store.statistics?.emptyEndedCount ?? 0) == 0)
@@ -265,7 +265,7 @@ struct SessionMaintenanceView: View {
                     set: { store.pruneFilter.olderThanDays = Double($0) }
                 ), in: 1...3_650
             )
-            Toggle("Include archived sessions", isOn: $store.pruneFilter.includeArchived)
+            Toggle("Include archived chats", isOn: $store.pruneFilter.includeArchived)
             Button("Preview Prune", systemImage: "clock.badge.questionmark") {
                 Task { await store.preparePrune() }
             }
@@ -280,9 +280,9 @@ struct SessionMaintenanceView: View {
     private var selectedSessionsSection: some View {
         Section {
             if store.sessions.isEmpty {
-                ContentUnavailableView("No sessions", systemImage: "rectangle.stack")
+                ContentUnavailableView("No chats", systemImage: "rectangle.stack")
             } else {
-                DisclosureGroup("Choose sessions (\(store.selectedSessionIDs.count))") {
+                DisclosureGroup("Choose chats (\(store.selectedSessionIDs.count))") {
                     ForEach(store.sessions) { session in
                         HStack(alignment: .top, spacing: BighelpTokens.space8) {
                             Button {
@@ -336,13 +336,13 @@ struct SessionMaintenanceView: View {
                 }
                 .disabled(store.selectedSessionIDs.isEmpty || store.isBusy)
             }
-        } header: { Text("Sessions and deletion") }
+        } header: { Text("Chats and deletion") }
           footer: { Text("Actions keeps hidden state separate from archive state. Archived rows must be restored before hiding so they remain discoverable. Selection is only for the separately reviewed delete operation.") }
     }
 
     private var portabilitySection: some View {
         Section {
-            Menu("Export Session", systemImage: "square.and.arrow.up") {
+            Menu("Export Chat", systemImage: "square.and.arrow.up") {
                 ForEach(store.sessions) { session in
                     Button(session.title) {
                         Task {
@@ -357,12 +357,12 @@ struct SessionMaintenanceView: View {
             }
             .disabled(store.sessions.isEmpty || store.isBusy)
 
-            Button("Import Session JSON", systemImage: "square.and.arrow.down") {
+            Button("Import Chat JSON", systemImage: "square.and.arrow.down") {
                 showsImporter = true
             }
             .disabled(store.isBusy)
         } header: { Text("Advanced · Import & export") }
-          footer: { Text("Packages contain session rows and messages only. Import restores history, not ownership of a live process or messaging channel.") }
+          footer: { Text("Packages contain chat rows and messages only. Import restores history, not ownership of a live process or messaging channel.") }
     }
 
     @ViewBuilder
@@ -376,7 +376,7 @@ struct SessionMaintenanceView: View {
                 Text("Claude Code").tag("claude")
                 Text("Codex CLI").tag("codex")
             }
-            Button("Find Foreign Sessions", systemImage: "externaldrive.badge.magnifyingglass") {
+            Button("Find Foreign Chats", systemImage: "externaldrive.badge.magnifyingglass") {
                 Task { await store.loadForeign() }
             }
             .disabled(store.isBusy)
@@ -406,13 +406,13 @@ struct SessionMaintenanceView: View {
             }
         } header: { Text("Advanced · Foreign history") }
           footer: {
-              Text("Hermes scans only its supported tool folders and returns opaque handles. bighelp never sends a host path or imports before you review the bounded preview.")
+              Text("Hermes scans only its supported tool folders and returns opaque handles. bighelp never sends a computer path or imports before you review the bounded preview.")
           }
     }
 
     private var lineageSection: some View {
         Section {
-            TextField("Stored session ID", text: $lineageInput)
+            TextField("Stored chat ID", text: $lineageInput)
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
             Button("Find Latest Descendant", systemImage: "point.bottomleft.forward.to.point.topright.scurvepath") {
                 Task { await store.resolveLineage(sessionID: lineageInput) }
@@ -427,7 +427,7 @@ struct SessionMaintenanceView: View {
                         }
                     }
                 }
-                Button("Open Latest in Sessions") {
+                Button("Open Latest in Chats") {
                     adoptable = .init(
                         profileID: lineage.profileID, storedSessionID: lineage.latestSessionID,
                         reason: .lineageContinuation
@@ -435,7 +435,7 @@ struct SessionMaintenanceView: View {
                 }
             }
         } header: { Text("Advanced · Lineage") }
-          footer: { Text("This resolves compression descendants only. The existing session bridge owns resume and chat adoption.") }
+          footer: { Text("This resolves compression descendants only. The existing chat bridge owns resume and chat adoption.") }
     }
 
     @ViewBuilder
@@ -443,14 +443,14 @@ struct SessionMaintenanceView: View {
         if let request = adoptable {
             Section("Ready to open") {
                 Text(request.storedSessionID).font(.bighelp(.caption).monospaced()).textSelection(.enabled)
-                Button("Adopt in Sessions", systemImage: "arrow.up.forward.app") {
+                Button("Adopt in Chats", systemImage: "arrow.up.forward.app") {
                     Task {
                         do {
                             try await onAdoptSession(request)
                             adoptable = nil
                         } catch {
                             callbackError = (error as? LocalizedError)?.errorDescription
-                                ?? "Sessions could not adopt this stored session."
+                                ?? "Chats could not adopt this stored chat."
                         }
                     }
                 }
@@ -498,7 +498,7 @@ struct SessionMaintenanceView: View {
                     ForEach(review.sessions) { session in sessionLabel(session) }
                 }
                 Section {
-                    Button("Delete These Sessions", role: .destructive) {
+                    Button("Delete These Chats", role: .destructive) {
                         Task { await store.deleteReviewedBulk() }
                     }
                     .disabled(store.isBusy)
@@ -506,7 +506,7 @@ struct SessionMaintenanceView: View {
                     Text("bighelp re-reads every target and requires its exact reviewed snapshot before sending one bulk-delete request. Every ID must then read back as absent.")
                 }
             }
-            .navigationTitle("Review Selected Sessions")
+            .navigationTitle("Review Selected Chats")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { store.clearBulkReview() }.keyboardShortcut(.cancelAction).bighelpToolbarText() } }
         }
     }
@@ -516,20 +516,20 @@ struct SessionMaintenanceView: View {
             List {
                 Section {
                     LabeledContent("Profile", value: review.profileID)
-                    LabeledContent("Empty ended sessions", value: review.count.formatted())
-                    LabeledContent("All sessions", value: review.stats.total.formatted())
+                    LabeledContent("Empty ended chats", value: review.count.formatted())
+                    LabeledContent("All chats", value: review.stats.total.formatted())
                     LabeledContent("Archived protected", value: review.stats.archived.formatted())
                 }
                 Section {
-                    Button("Delete \(review.count) Empty Sessions", role: .destructive) {
+                    Button("Delete \(review.count) Empty Chats", role: .destructive) {
                         Task { await store.deleteReviewedEmpty() }
                     }
                     .disabled(review.count == 0 || store.isBusy)
                 } footer: {
-                    Text("Hermes defines this target set as ended, non-archived sessions with no message rows. bighelp requires the count to remain exact before deletion and zero afterward.")
+                    Text("Hermes defines this target set as ended, non-archived chats with no message rows. bighelp requires the count to remain exact before deletion and zero afterward.")
                 }
             }
-            .navigationTitle("Review Empty Sessions")
+            .navigationTitle("Review Empty Chats")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { store.clearEmptyReview() }.keyboardShortcut(.cancelAction).bighelpToolbarText() } }
         }
     }
@@ -539,8 +539,8 @@ struct SessionMaintenanceView: View {
             List {
                 Section {
                     LabeledContent("Profile", value: review.profileID)
-                    LabeledContent("Matched ended sessions", value: review.sessions.count.formatted())
-                    LabeledContent("Open sessions skipped", value: review.skippedOpen.formatted())
+                    LabeledContent("Matched ended chats", value: review.sessions.count.formatted())
+                    LabeledContent("Open chats skipped", value: review.skippedOpen.formatted())
                     LabeledContent("Archived included", value: review.filter.includeArchived ? "Yes" : "No")
                 }
                 Section("Exact dry-run targets") {
@@ -552,12 +552,12 @@ struct SessionMaintenanceView: View {
                 }
                 if !review.sessions.isEmpty {
                     Section {
-                        Button("Prune These Sessions", role: .destructive) {
+                        Button("Prune These Chats", role: .destructive) {
                             Task { await store.pruneReviewedSessions() }
                         }
                         .disabled(store.isBusy)
                     } footer: {
-                        Text("The complete stock dry-run response must be unchanged immediately before deletion. Every reviewed session must then read back as absent.")
+                        Text("The complete stock dry-run response must be unchanged immediately before deletion. Every reviewed chat must then read back as absent.")
                     }
                 }
             }
@@ -571,10 +571,10 @@ struct SessionMaintenanceView: View {
             List {
                 Section {
                     LabeledContent("Profile", value: review.profileID)
-                    LabeledContent("Sessions", value: review.sessionIDs.count.formatted())
+                    LabeledContent("Chats", value: review.sessionIDs.count.formatted())
                     LabeledContent("Package", value: ByteCountFormatter.string(fromByteCount: Int64(review.byteCount), countStyle: .file))
                 }
-                Section("Session IDs") {
+                Section("Chat IDs") {
                     ForEach(review.sessionIDs, id: \.self) { id in
                         Text(id).font(.bighelp(.caption).monospaced()).textSelection(.enabled)
                     }
@@ -623,7 +623,7 @@ struct SessionMaintenanceView: View {
                 }
                 Section {
                     if let existing = preview.alreadyImportedSessionID {
-                        Button("Open Imported Session") {
+                        Button("Open Imported Chat") {
                             adoptable = .init(
                                 profileID: preview.profileID, storedSessionID: existing,
                                 reason: .foreignHistoryImport

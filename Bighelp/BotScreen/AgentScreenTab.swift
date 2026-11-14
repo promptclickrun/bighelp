@@ -304,7 +304,7 @@ struct AgentScreenTab: View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
             if let blocker = status.blocker {
                 sentence(status.isInSandbox
-                         ? "The agent's sandbox needs a desktop image before its screen can start."
+                         ? "The bot's sandbox needs a desktop image before its screen can start."
                          : "Your computer is low on memory, so the screen can't start right now.",
                          symbol: "exclamationmark.triangle")
                     .accessibilityIdentifier("agent.screen.blocked")
@@ -333,7 +333,7 @@ struct AgentScreenTab: View {
     private func notInstalled(_ status: BotScreenStatus) -> some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
             sentence(status.isInSandbox
-                     ? "The agent's sandbox needs a desktop image before it can have a screen."
+                     ? "The bot's sandbox needs a desktop image before it can have a screen."
                      : "Your computer needs the screen apps installed first. Whoever runs it can do that once.",
                      symbol: "shippingbox")
                 .accessibilityIdentifier("agent.screen.not-installed")

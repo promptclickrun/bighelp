@@ -43,7 +43,7 @@ struct TimelineSenderResolver {
 
     func display(forAgentID id: String) -> TimelineSenderDisplay {
         let fallback = id == "default"
-            ? "Agent"
+            ? "Bot"
             : id.replacingOccurrences(of: "_", with: " ").capitalized
         return display(for: .agent(id: id, snapshot: .init(name: fallback)))
     }
@@ -450,13 +450,13 @@ struct PendingMessagePresentation: Equatable {
             .split(whereSeparator: \Character.isWhitespace)
             .joined(separator: " ")
         if isGroup {
-            visibleText = "Your agents are working…"
-            accessibilityLabel = "Sending. Your agents are working."
+            visibleText = "Your bots are working…"
+            accessibilityLabel = "Sending. Your bots are working."
         } else {
             // The default agent's name: "bighelp", or "Loopdy" on hosts set up before the rename.
             let isDefaultName = ["bighelp", "Loopdy"].contains { normalizedName.caseInsensitiveCompare($0) == .orderedSame }
             let name = normalizedName.isEmpty || isDefaultName
-                ? "Your agent"
+                ? "Your bot"
                 : normalizedName
             visibleText = "\(name) is working…"
             accessibilityLabel = "Sending. \(name) is working."

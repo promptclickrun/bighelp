@@ -52,9 +52,9 @@ struct AgentSelectionView: View {
             }
             if agents.isEmpty {
                 ContentUnavailableView(
-                    "No agents yet",
+                    "No bots yet",
                     systemImage: "person.crop.circle.badge.questionmark",
-                    description: Text("Add an agent first, then give it a task.")
+                    description: Text("Add a bot first, then give it a task.")
                 )
                 .listRowBackground(Color.clear)
             }

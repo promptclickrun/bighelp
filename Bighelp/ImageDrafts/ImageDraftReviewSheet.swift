@@ -81,7 +81,7 @@ struct ImageDraftReviewSheet: View {
             Button("Discard", role: .destructive) { Task { await discard() } }
                 .accessibilityIdentifier("image-draft.review.discard.confirm")
         } message: {
-            Text("Nothing is saved, and the agent hears that you discarded it.")
+            Text("Nothing is saved, and the bot hears that you discarded it.")
         }
         .bighelpFullScreenCover(isPresented: $showsPhoto) {
             if let photo = store.photo(key) { ImageDraftPhotoViewer(image: photo) }
@@ -180,7 +180,7 @@ struct ImageDraftReviewSheet: View {
             banner(String(localized: "A newer draft replaced this one. Review that one instead."), systemImage: nil,
                    color: theme.secondaryText)
         case .mismatched:
-            banner(String(localized: "This card doesn't match the draft the agent made, so it can't be saved. Ask for it again."),
+            banner(String(localized: "This card doesn't match the draft the bot made, so it can't be saved. Ask for it again."),
                    systemImage: "exclamationmark.triangle.fill", color: theme.warning)
         case .unknown, .awaitingReview:
             EmptyView()

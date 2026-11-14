@@ -33,7 +33,7 @@ struct HermesWebhookDraft: Equatable, Sendable {
         var id: Self { self }
         var title: String {
             switch self {
-            case .log: "Host log"
+            case .log: "Computer log"
             case .origin: "Origin conversation"
             case .telegram: "Telegram"
             case .discord: "Discord"

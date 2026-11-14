@@ -19,15 +19,15 @@ extension DirectHermesSessionError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .creationUnconfirmed:
-            "This agent's last new chat didn't finish setting up on your computer. Try again in a moment."
+            "This bot's last new chat didn't finish setting up on your computer. Try again in a moment."
         case .creationInProgress:
-            "A new chat with this agent is already starting."
+            "A new chat with this bot is already starting."
         case .workspaceNotConfirmed:
-            "Your computer didn't start the chat in this agent's project folder. Check the project in Projects, then try again."
+            "Your computer didn't start the chat in this bot's project folder. Check the project in Projects, then try again."
         case .projectFolderUnusable:
-            "bighelp can't use this agent's project folder. Check the project in Projects, then try again."
+            "bighelp can't use this bot's project folder. Check the project in Projects, then try again."
         case .canonicalMissing:
-            "This agent's own chat couldn't be found on your computer."
+            "This bot's own chat couldn't be found on your computer."
         case .creationPersistenceRequired, .sessionNotPersisted:
             "bighelp couldn't keep track of the new chat. Try again."
         case .invalidResponse, .historyChanged:
@@ -35,7 +35,7 @@ extension DirectHermesSessionError: LocalizedError {
         case .nativeRowDeletionOnly:
             "This chat can only be deleted here, not changed."
         case .modelNotConfirmed(let model):
-            "Your computer didn't start the session on \(model). Check this agent's models, then try again."
+            "Your computer didn't start the chat on \(model). Check this bot's models, then try again."
         }
     }
 }

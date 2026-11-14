@@ -329,7 +329,7 @@ struct WorkflowCanvasBoard: View {
 
     private func detail(_ stage: WorkflowStage) -> String {
         switch stage.kind {
-        case .agent: context.agentName(model.agentID(for: stage.role)) ?? definition?.role(stage.role)?.label ?? "No agent yet"
+        case .agent: context.agentName(model.agentID(for: stage.role)) ?? definition?.role(stage.role)?.label ?? "No bot yet"
         case .check: stage.rules.count == 1 ? "1 rule" : "\(stage.rules.count) rules"
         case .decision: stage.sources.count > 1 ? "\(stage.sources.count) verdicts" : stage.on ?? ""
         case .signoff: stage.signsChanges ? "You approve the changes" : "You approve the file"

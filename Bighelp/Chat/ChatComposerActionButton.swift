@@ -391,7 +391,7 @@ private struct MidSessionSendOptionsSheet: View {
                     .bighelpFont(.sectionTitle, weight: .semibold)
                     .foregroundStyle(theme.primaryText)
                 Text(fromKeyboard
-                     ? String(localized: "Your agent is still working. Press 1–\(choices.count), or Return to \(defaultBehavior.title.lowercased()).")
+                     ? String(localized: "Your bot is still working. Press 1–\(choices.count), or Return to \(defaultBehavior.title.lowercased()).")
                      : (BighelpPlatform.isMac
                         ? String(localized: "Click sends with \(defaultBehavior.title). Choose a one-time alternative below.")
                         : String(localized: "Tap sends with \(defaultBehavior.title). Choose a one-time alternative below.")))

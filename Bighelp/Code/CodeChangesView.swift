@@ -411,7 +411,7 @@ struct CodeShipSheet: View {
                     Button {
                         Task { if await model.askAgentToShip() { dismiss() } }
                     } label: {
-                        HStack { Spacer(); Text("Ask the agent to open it"); Spacer() }
+                        HStack { Spacer(); Text("Ask the bot to open it"); Spacer() }
                     }
                     .disabled(model.isShipping)
                     .accessibilityIdentifier("code.ship.ask-agent")

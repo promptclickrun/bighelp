@@ -99,10 +99,10 @@ final class HomeShellUITests: BighelpUITestCase {
             }
             XCTAssertTrue(thisComputer.exists && thisComputer.isHittable, "This computer is at the end of Chats")
             thisComputer.tap()
-            XCTAssertTrue(app.navigationBars["Sessions"].waitForExistence(timeout: 10), "It is a pushed page")
+            XCTAssertTrue(app.navigationBars["Chats"].waitForExistence(timeout: 10), "It is a pushed page")
             XCTAssertFalse(app.buttons["home.new-chat"].exists)
             shot("chats-this-computer", appearance, app)
-            app.navigationBars["Sessions"].buttons.firstMatch.tap()
+            app.navigationBars["Chats"].buttons.firstMatch.tap()
             XCTAssertTrue(element("chats.inbox", in: app).waitForExistence(timeout: 10))
             app.terminate()
         }

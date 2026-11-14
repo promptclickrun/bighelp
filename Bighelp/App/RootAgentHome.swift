@@ -237,7 +237,7 @@ extension RootShellView {
     func createGroupChat(with profileIDs: [String], peers: [HermesBotModePeerCandidate] = [],
                          firstMessage: String? = nil, ended: (@MainActor (String?) -> Void)? = nil) {
         guard let owner = groupCreationReadyOwner else {
-            actionErrorMessage = "Group chats need a connected Hermes host."
+            actionErrorMessage = "Group chats need a connected Hermes computer."
             ended?(nil)
             return
         }
@@ -272,7 +272,7 @@ extension RootShellView {
                 Logger(subsystem: "app.loopdy.mobile", category: "BotMode")
                     .error("Group chat create failed: \(String(reflecting: error), privacy: .public)")
                 guard isCurrentSignIn(owner) else { return }
-                actionErrorMessage = "The group chat couldn't be created. Check the host, then try again."
+                actionErrorMessage = "The group chat couldn't be created. Check the computer, then try again."
             }
         }
     }

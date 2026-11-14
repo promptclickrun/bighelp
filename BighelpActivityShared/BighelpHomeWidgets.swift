@@ -247,7 +247,7 @@ struct BighelpActiveSessionsWidget: Widget {
             }
         }
         .configurationDisplayName("Active Chats")
-        .description("See which chats your agents are working on, and what they're doing.")
+        .description("See which chats your bots are working on, and what they're doing.")
         .supportedFamilies(Self.families)
         .bighelpWidgetPlacement()
     }
@@ -400,7 +400,7 @@ struct BighelpNewChatWidget: Widget {
             }
         }
         .configurationDisplayName("New Chat")
-        .description("Start a new chat in one tap, with your default agent or one you choose.")
+        .description("Start a new chat in one tap, with your default bot or one you choose.")
         .supportedFamilies(Self.families)
         .bighelpWidgetPlacement()
     }

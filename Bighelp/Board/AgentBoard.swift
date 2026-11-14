@@ -889,7 +889,7 @@ final class AgentBoardStore {
         } catch is CancellationError {
         } catch {
             guard generation == self.generation else { return }
-            logState = .failed("Couldn't load this agent's history.")
+            logState = .failed("Couldn't load this bot's history.")
         }
     }
 

@@ -132,12 +132,12 @@ enum SessionSubagentDetailPresentation: Equatable {
 
     static func statusTitle(for record: SessionRecord) -> String {
         switch state(for: record) {
-        case .waiting: return "Waiting for child session"
+        case .waiting: return "Waiting for child chat"
         case .live: return "Active subagent"
-        case .completed: return "Completed child session"
-        case .failed: return "Failed child session"
-        case .cancelled: return "Cancelled child session"
-        case .recorded: return "Saved child session; outcome unavailable"
+        case .completed: return "Completed child chat"
+        case .failed: return "Failed child chat"
+        case .cancelled: return "Cancelled child chat"
+        case .recorded: return "Saved child chat; outcome unavailable"
         }
     }
 }

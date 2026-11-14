@@ -240,7 +240,7 @@ struct WorkflowsHomeView: View {
     private func waitingText(_ run: WorkflowRunSummary) -> String {
         let since = run.waiting?.since ?? run.updatedAt
         let waited = since.map { "Waiting \(WorkflowWords.duration(Date.now.timeIntervalSince($0)))" } ?? "Waiting"
-        return "\(waited), with no agent running while it waits."
+        return "\(waited), with no bot running while it waits."
     }
 
     // MARK: Runs
@@ -282,8 +282,8 @@ struct WorkflowsHomeView: View {
                     Text("No workflows yet")
                         .font(.bighelp(.headline))
                     Text(context.canEdit
-                         ? "A workflow passes work from one agent to the next and asks you before anything is final. Create one from scratch, or start from a template below."
-                         : "A workflow passes work from one agent to the next and asks you before anything is final. Start from a template below.")
+                         ? "A workflow passes work from one bot to the next and asks you before anything is final. Create one from scratch, or start from a template below."
+                         : "A workflow passes work from one bot to the next and asks you before anything is final. Start from a template below.")
                         .font(.bighelp(.subheadline))
                         .foregroundStyle(theme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -389,7 +389,7 @@ struct WorkflowsHomeView: View {
         }
         let roles = workflow.needsSetupRoles.count
         if roles > 0 {
-            parts.append(roles == 1 ? "1 role needs an agent" : "\(roles) roles need an agent")
+            parts.append(roles == 1 ? "1 role needs a bot" : "\(roles) roles need a bot")
         } else {
             parts.append(workflow.stageCount == 1 ? "1 stage" : "\(workflow.stageCount) stages")
             if let last = workflow.lastRunAt { parts.append("last run \(WorkflowWords.ago(last)) ago") }
@@ -513,7 +513,7 @@ struct WorkflowSaveTemplatePrompt: ViewModifier {
                     }
                 }
             } message: { _ in
-                Text("A template keeps the stages and inputs, not which agent does each role.")
+                Text("A template keeps the stages and inputs, not which bot does each role.")
             }
             .onChange(of: source?.id, initial: true) { _, _ in
                 if let source { name = String(source.name.prefix(WorkflowTemplate.nameLimit)) }

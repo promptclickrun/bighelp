@@ -17,7 +17,7 @@ final class CarPlayVoiceUITests: XCTestCase {
 
         app.buttons["carplay.talk"].tap()
         XCTAssertTrue(wait(for: phase, label: "listening"), "It connects and listens: \(phase.label)")
-        XCTAssertNotEqual(app.staticTexts["carplay.agent"].label, "your agent", "It talks to the default agent")
+        XCTAssertNotEqual(app.staticTexts["carplay.agent"].label, "your bot", "It talks to the default agent")
 
         app.buttons["carplay.mute"].tap()
         XCTAssertTrue(app.buttons["Unmute"].waitForExistence(timeout: 5), "Mute holds the microphone")

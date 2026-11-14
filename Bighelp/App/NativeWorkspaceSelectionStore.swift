@@ -156,7 +156,7 @@ final class NativeWorkspaceSelectionStore {
             errorMessage = nil
             return false
         } catch {
-            errorMessage = "Saved native workspace data could not be opened. It has not been replaced or adopted by another account."
+            errorMessage = "Saved computer data could not be opened. It has not been replaced or adopted by another account."
             return false
         }
     }

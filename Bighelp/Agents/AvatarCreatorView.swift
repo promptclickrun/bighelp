@@ -1330,7 +1330,7 @@ struct AvatarCreatorView: View {
             }
             Text(model.blobShape.isLocked
                  ? "Face locked. It stays the same even if the name changes."
-                 : "The face comes from the agent’s name. Hermes Desktop shows the same face.")
+                 : "The face comes from the bot’s name. Hermes Desktop shows the same face.")
                 .font(.bighelp(.footnote))
                 .foregroundStyle(theme.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)

@@ -23,7 +23,7 @@ final class BighelpManagedNativeActivityRuntime {
         var nativeParentFinished = false
         var nativeTurns = Set<String>()
         var excludedCanonicalTurns = Set<String>()
-        var agentName = "Your agent"
+        var agentName = "Your bot"
         init(host: BighelpConfiguredHost, grantID: String, profile: String, session: String, localTurn: String, canonicalTurn: String?,
              coordinator: BighelpLiveActivityCoordinator, driver: BighelpManagedActivityDriver,
              registrar: BighelpManagedLiveActivityRegistrar) {
@@ -76,8 +76,8 @@ final class BighelpManagedNativeActivityRuntime {
               grant.state == "active", grant.expiresAt > Int(now().timeIntervalSince1970) else { return }
         let opaque = ManagedNotificationValidation.nativeSessionID(host: host, profile: profile, session: session)
         guard armed[opaque] == nil, !entries.values.contains(where: { $0.opaqueID == opaque && !$0.nativeParentFinished }),
-              let attributes = LoopdySessionActivityAttributes.make(sessionID: opaque, sessionTitle: "Active session",
-                                                                     agentID: profile, agentName: "Your agent") else { return }
+              let attributes = LoopdySessionActivityAttributes.make(sessionID: opaque, sessionTitle: "Active chat",
+                                                                     agentID: profile, agentName: "Your bot") else { return }
         let state = LoopdySessionActivityAttributes.ContentState(
             phase: .thinking, currentAction: "Sending your message", progress: 0, completedSteps: 0,
             activeSubagentCount: 0, latestTool: nil, timestamp: Int(now().timeIntervalSince1970))
@@ -134,7 +134,7 @@ final class BighelpManagedNativeActivityRuntime {
             // The service refused this card's registration, so no host update will ever reach it. The
             // phone keeps it current instead of leaving it frozen.
             if existing.driver.registrationRefused {
-                await existing.coordinator.receive(event.routed(to: existing.opaqueID), sessionTitle: "Active session",
+                await existing.coordinator.receive(event.routed(to: existing.opaqueID), sessionTitle: "Active chat",
                     agentID: profile, agentName: existing.agentName)
             }
             return
@@ -154,8 +154,8 @@ final class BighelpManagedNativeActivityRuntime {
                     try await cancel(host: host, profile: profile, storedSessionID: session,
                         originalLocalTurnID: selected.localTurn)
                 } else if selected.coordinator.activeSessionIDs.isEmpty || selected.driver.registrationRefused {
-                    await selected.coordinator.receive(event.routed(to: selected.opaqueID), sessionTitle: "Active session",
-                        agentID: profile, agentName: "Your agent")
+                    await selected.coordinator.receive(event.routed(to: selected.opaqueID), sessionTitle: "Active chat",
+                        agentID: profile, agentName: "Your bot")
                 } else {
                     await selected.coordinator.flushPendingOperations()
                 }
@@ -201,7 +201,7 @@ final class BighelpManagedNativeActivityRuntime {
         }
         // Coalescing and exact child/parent ownership are in the existing reducer.
         // The driver stops local content writes as soon as cloud ownership begins.
-        let configuredName = service.registry.workspace(for: host).profiles.first(where: { $0.id == profile })?.name ?? "Your agent"
+        let configuredName = service.registry.workspace(for: host).profiles.first(where: { $0.id == profile })?.name ?? "Your bot"
         if let attributes = LoopdySessionActivityAttributes.make(sessionID: entry.opaqueID, sessionTitle: "Chat",
             agentID: profile, agentName: configuredName) {
             var infos = BighelpActivitySessionInfo.load()
@@ -214,7 +214,7 @@ final class BighelpManagedNativeActivityRuntime {
         entry.agentName = configuredName
         entry.pendingEvent = event
         entry.lastEvent = event
-        await entry.coordinator.receive(event.routed(to: entry.opaqueID), sessionTitle: "Active session",
+        await entry.coordinator.receive(event.routed(to: entry.opaqueID), sessionTitle: "Active chat",
             agentID: profile, agentName: configuredName)
         if !entry.coordinator.activeSessionIDs.isEmpty {
             entry.pendingEvent = nil
@@ -427,7 +427,7 @@ final class BighelpManagedNativeActivityRuntime {
         for entry in Array(entries.values) {
             if let event = entry.pendingEvent, let client = entry.client,
                client.connected, client.projection.running, client.projection.turnID == event.turnID {
-                await entry.coordinator.receive(event.routed(to: entry.opaqueID), sessionTitle: "Active session",
+                await entry.coordinator.receive(event.routed(to: entry.opaqueID), sessionTitle: "Active chat",
                     agentID: entry.profile, agentName: entry.agentName)
                 if !entry.coordinator.activeSessionIDs.isEmpty { entry.pendingEvent = nil }
             }

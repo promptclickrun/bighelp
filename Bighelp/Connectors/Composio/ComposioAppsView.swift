@@ -35,7 +35,7 @@ struct ComposioAppsView: View {
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                 Text("Connect hundreds of apps with Composio")
                     .font(.bighelp(.headline))
-                Text("Sign in to Composio once. Then pick apps like your email, calendar or code, and your agent can use them.")
+                Text("Sign in to Composio once. Then pick apps like your email, calendar or code, and your bot can use them.")
                     .foregroundStyle(.secondary)
             }
             .padding(.vertical, BighelpTokens.space4)
@@ -85,7 +85,7 @@ struct ComposioAppsView: View {
     @ViewBuilder
     private var agentSection: some View {
         if let host = model.hostName {
-            let agent = model.agentName ?? "Your agent"
+            let agent = model.agentName ?? "Your bot"
             Section {
                 switch model.agent {
                 case .ready:
@@ -97,7 +97,7 @@ struct ComposioAppsView: View {
                             .font(.bighelp(.footnote)).foregroundStyle(.secondary)
                     }
                 case .needsPluginUpdate:
-                    Label("Update the bighelp plugin on \(host) so your agent can use these apps.",
+                    Label("Update the bighelp plugin on \(host) so your bot can use these apps.",
                           systemImage: "arrow.down.circle")
                         .accessibilityIdentifier("composio.agent.update-plugin")
                 case .unknown:
@@ -126,16 +126,16 @@ struct ComposioAppsView: View {
 
     private func agentDetail(_ host: String) -> String {
         switch model.agent {
-        case .needsSignIn: "Sign in to the same Composio account for your agent on \(host)."
-        case .cannotReach: "Your agent on \(host) can't reach Composio with its sign-in. Sign in again with the same Composio account."
-        default: "Turns on Composio on \(host), then you sign in to the same Composio account for your agent."
+        case .needsSignIn: "Sign in to the same Composio account for your bot on \(host)."
+        case .cannotReach: "Your bot on \(host) can't reach Composio with its sign-in. Sign in again with the same Composio account."
+        default: "Turns on Composio on \(host), then you sign in to the same Composio account for your bot."
         }
     }
 
     private var agentButtonTitle: String {
         switch model.agent {
-        case .needsSignIn, .cannotReach: "Sign in for my agent"
-        default: "Turn on for my agent"
+        case .needsSignIn, .cannotReach: "Sign in for my bot"
+        default: "Turn on for my bot"
         }
     }
 
@@ -280,7 +280,7 @@ struct ComposioAppDetailView: View {
             }
             if app.noAuth {
                 Section {
-                    Text("This app needs no account. Your agent can use it once Composio is on for your agent.")
+                    Text("This app needs no account. Your bot can use it once Composio is on for your bot.")
                         .foregroundStyle(.secondary)
                 }
             } else {
@@ -343,7 +343,7 @@ struct ComposioAppDetailView: View {
             }
             Button("Cancel", role: .cancel) { removing = nil }
         } message: {
-            Text("Your agent can't use this account until you connect it again.")
+            Text("Your bot can't use this account until you connect it again.")
         }
         .accessibilityIdentifier("composio.app.screen")
     }

@@ -329,8 +329,8 @@ struct ChatDestinationView: View {
                                  appState: appState) { referenceHub, sendReferences in
         ChatView(
             model: model,
-            agentName: identity?.name ?? model.workingAgentName ?? "Hermes agent",
-            agentRole: identity?.role ?? "Hermes agent",
+            agentName: identity?.name ?? model.workingAgentName ?? "Hermes bot",
+            agentRole: identity?.role ?? "Hermes bot",
             agentStatus: model.nativeConversationClient == nil ? "Hermes" : "Direct Hermes",
             agents: agents,
             dashboardModel: featureStore.dashboardModel,
@@ -967,7 +967,7 @@ struct ChatDestinationAgentResolver {
             .split(whereSeparator: \Character.isWhitespace)
             .joined(separator: " ")
         guard !normalized.isEmpty else { return nil }
-        return ChatDestinationAgentIdentity(name: normalized, role: "Hermes agent")
+        return ChatDestinationAgentIdentity(name: normalized, role: "Hermes bot")
     }
 }
 

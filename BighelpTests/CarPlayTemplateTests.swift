@@ -21,7 +21,7 @@ struct CarPlayTemplateTests {
             #expect((image?.size.width ?? 999) <= CarPlayFaces.voiceSize, "\(state.identifier) is 150 points at most")
             #expect((image?.size.height ?? 999) <= CarPlayFaces.voiceSize)
             if #available(iOS 26.4, *) {
-                #expect(state.actionButtons.map(\.title) == ["End", "Agents"])
+                #expect(state.actionButtons.map(\.title) == ["End", "Bots"])
             }
         }
         #expect(states[2].titleVariants?.first == "Atlas is working…")

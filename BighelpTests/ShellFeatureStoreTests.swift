@@ -1126,7 +1126,7 @@ struct ShellFeatureStoreTests {
         }
 
         #expect(runtimeDefaults.requestedAgentIDs == ["finance", "finance"])
-        #expect(controls.errorMessage == "Couldn’t load agent defaults. Check your Hermes connection and try again.")
+        #expect(controls.errorMessage == "Couldn’t load bot defaults. Check your Hermes connection and try again.")
     }
 
     @Test func reconnectRetryHydratesDefaultsForAnAlreadyPreparedChat() async {

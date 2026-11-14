@@ -73,7 +73,7 @@ struct WatchRootView: View {
                         WatchAgentOrb(name: agent.name, size: 24)
                         VStack(alignment: .leading, spacing: 0) {
                             Text(agent.name).font(.body)
-                            Text("Change agent").font(.caption2).foregroundStyle(WatchDesign.Color.secondaryText)
+                            Text("Change bot").font(.caption2).foregroundStyle(WatchDesign.Color.secondaryText)
                         }
                     }
                 }
@@ -209,7 +209,7 @@ struct WatchAgentPicker: View {
                 }
             }
         }
-        .navigationTitle("Agents")
+        .navigationTitle("Bots")
     }
 }
 

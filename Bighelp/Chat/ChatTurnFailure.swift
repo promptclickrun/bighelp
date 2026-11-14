@@ -147,7 +147,7 @@ struct ChatTurnFailurePresentation: Equatable, Sendable {
         case .tooLong:
             return Self(kind: kind, sentence: "This chat is too long for the model.", fixes: [.startNewChat])
         case .couldNotStart:
-            return Self(kind: kind, sentence: "Hermes couldn't start the agent. Check that an AI provider is set up.",
+            return Self(kind: kind, sentence: "Hermes couldn't start the bot. Check that an AI provider is set up.",
                         fixes: retry([.tryAgain, .checkProviders]))
         }
     }

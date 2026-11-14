@@ -58,7 +58,7 @@ extension ChatModel {
         let schedule = ChatScheduledRetry(id: UUID(), at: date)
         scheduledRetry = schedule
         let reminder = ChatRetryReminder(id: schedule.id, conversationID: conversationID,
-                                         agentName: workingAgentName ?? "Your agent", at: date)
+                                         agentName: workingAgentName ?? "Your bot", at: date)
         let remind = retryScheduling.remind
         Task { [weak self] in
             await remind(reminder) { self?.scheduledRetry?.id == schedule.id }

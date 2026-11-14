@@ -167,7 +167,7 @@ final class ProviderUsageStore {
 
     func load(refresh: Bool) async {
         guard let client else {
-            state = .unavailable("Connect to a host to see provider usage.")
+            state = .unavailable("Connect to a computer to see provider usage.")
             return
         }
         generation += 1
@@ -219,7 +219,7 @@ extension ProviderUsageStore {
     static func reason(_ error: any Error) -> String {
         switch error {
         case WorkspaceClientError.authenticationRequired, DirectHermesError.authenticationRequired:
-            "Your computer turned down bighelp's sign-in. Sign in to it again in Hosts."
+            "Your computer turned down bighelp's sign-in. Sign in to it again in Your computers."
         case DirectHermesError.timedOut:
             "Your computer took too long to answer. Try again in a moment."
         case _ where isConnectionHiccup(error):

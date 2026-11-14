@@ -112,8 +112,8 @@ struct SessionsView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: BighelpTokens.space20) {
-                        BighelpSearchField(text: $model.query, prompt: "Search sessions",
-                                           accessibilityLabel: "Search sessions",
+                        BighelpSearchField(text: $model.query, prompt: "Search chats",
+                                           accessibilityLabel: "Search chats",
                                            accessibilityIdentifier: "sessions.search")
                         if !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             Text("Searching loaded chats")
@@ -136,7 +136,7 @@ struct SessionsView: View {
             }
         }
         .background(theme.canvas.ignoresSafeArea())
-        .navigationTitle("Sessions")
+        .navigationTitle("Chats")
         .toolbar {
             #if targetEnvironment(macCatalyst)
             // A Mac list can't be pulled down to refresh.
@@ -188,7 +188,7 @@ struct SessionsView: View {
         ) { dialog in
             switch dialog {
             case .rename(let session):
-                TextField("Session name", text: $renameDraft)
+                TextField("Chat name", text: $renameDraft)
                     .accessibilityIdentifier("sessions.rename-field")
                 Button("Cancel", role: .cancel) {}
                 Button("Save") {
@@ -212,7 +212,7 @@ struct SessionsView: View {
             switch dialog {
             case .rename(let session):
                 Text(session.isBotChat
-                     ? "Renamed, this becomes a regular chat, and tapping the agent starts a new Bot Chat."
+                     ? "Renamed, this becomes a regular chat, and tapping the bot starts a new Bot Chat."
                      : "Enter a name up to \(SessionTitleRules.maximumLength) characters.")
             case .delete(let session):
                 Text("Delete “\(session.title)” permanently? This cannot be undone.")
@@ -330,7 +330,7 @@ struct SessionsView: View {
         @Bindable var model = model
         return List {
             if model.hasLoadedSessions || isSearching(model) {
-                BighelpSearchField(text: $model.query, prompt: "Search sessions", accessibilityLabel: "Search sessions",
+                BighelpSearchField(text: $model.query, prompt: "Search chats", accessibilityLabel: "Search chats",
                                    accessibilityIdentifier: "sessions.search")
                     .bighelpListSearchRow()
             }
@@ -419,12 +419,12 @@ struct SessionsView: View {
                 .accessibilityIdentifier("sessions.filter.type")
 
                 Picker(selection: $model.agentFilter) {
-                    Text("All agents").tag(SessionAgentFilter.all)
+                    Text("All bots").tag(SessionAgentFilter.all)
                     ForEach(model.availableAgents, id: \.id) { agent in
                         Text(agent.name).tag(SessionAgentFilter.agent(agent.id))
                     }
                 } label: {
-                    Label("Agent", systemImage: "person.crop.circle")
+                    Label("Bot", systemImage: "person.crop.circle")
                     Text(agentFilterTitle(model.agentFilter, model: model))
                 }
                 .pickerStyle(.menu)
@@ -538,12 +538,12 @@ struct SessionsView: View {
         }
     }
 
-    /// "Your agents": one tap starts a chat with that agent; the dashed tile
+    /// "Your bots": one tap starts a chat with that agent; the dashed tile
     /// starts a chat with the default agent.
     private func agentStrip(_ start: @escaping (String?) -> Void, activeAgentIDs: Set<String>) -> some View {
         Section {
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                sectionCaption("Your agents")
+                sectionCaption("Your bots")
                     .padding(.horizontal, BighelpTokens.space16)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: BighelpTokens.space16) {
@@ -992,7 +992,7 @@ struct SessionsView: View {
     private func filters(model: SessionsModel) -> some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space8) {
             Menu {
-                Button("All agents") { model.agentFilter = .all }
+                Button("All bots") { model.agentFilter = .all }
                 ForEach(model.availableAgents, id: \.id) { agent in
                     Button(agent.name) { model.agentFilter = .agent(agent.id) }
                 }
@@ -1002,7 +1002,7 @@ struct SessionsView: View {
                     .foregroundStyle(theme.primaryText)
                     .frame(minHeight: BighelpTokens.hitTarget)
             }
-            .accessibilityLabel("Agent filter")
+            .accessibilityLabel("Bot filter")
             .accessibilityValue(agentFilterTitle(model.agentFilter, model: model))
             .accessibilityIdentifier("sessions.filter.agent")
 
@@ -1062,12 +1062,12 @@ struct SessionsView: View {
             ) == .fullScreen {
                 BighelpThinkingOrb(
                     scenario: .searching,
-                    visibleLabel: "Loading sessions"
+                    visibleLabel: "Loading chats"
                 )
                     .frame(maxWidth: .infinity, minHeight: 200)
                     .accessibilityIdentifier("sessions.loading")
             } else {
-                ProgressView("Refreshing sessions")
+                ProgressView("Refreshing chats")
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier("sessions.refreshing")
                 loadedContent(model: model)
@@ -1095,7 +1095,7 @@ struct SessionsView: View {
             ) == .fullScreen {
                 BighelpThinkingOrb(
                     scenario: .searching,
-                    visibleLabel: "Loading sessions"
+                    visibleLabel: "Loading chats"
                 )
                     .frame(maxWidth: .infinity, minHeight: 200)
                     .accessibilityIdentifier("sessions.loading")
@@ -1122,14 +1122,14 @@ struct SessionsView: View {
         )
         if !model.hasLoadedSessions {
             emptyState(
-                title: "No sessions yet",
+                title: "No chats yet",
                 detail: "Your durable conversations will appear here after you send a message.",
                 identifier: "sessions.empty"
             )
         } else if sections.isEmpty {
             emptyState(
-                title: "No matching sessions",
-                detail: "Try a different keyword, agent, project, or type.",
+                title: "No matching chats",
+                detail: "Try a different keyword, bot, project, or type.",
                 identifier: "sessions.empty-results"
             )
         } else {
@@ -1372,8 +1372,8 @@ struct SessionsView: View {
 
     private func agentFilterTitle(_ filter: SessionAgentFilter, model: SessionsModel) -> String {
         switch filter {
-        case .all: "All agents"
-        case .agent(let id): model.availableAgents.first(where: { $0.id == id })?.name ?? "Unavailable agent"
+        case .all: "All bots"
+        case .agent(let id): model.availableAgents.first(where: { $0.id == id })?.name ?? "Unavailable bot"
         }
     }
 
@@ -1381,7 +1381,7 @@ struct SessionsView: View {
         switch model.appFilter {
         case .codex where !isSearching(model): "Chats from Codex on this computer show here."
         case .claudeCode where !isSearching(model): "Chats from Claude Code on this computer show here."
-        default: "Try a different keyword, agent, project, or type."
+        default: "Try a different keyword, bot, project, or type."
         }
     }
 
@@ -1391,7 +1391,7 @@ struct SessionsView: View {
     }
 
     private func filterAccessibilityValue(_ model: SessionsModel) -> String {
-        guard hasActiveFilters(model) else { return "All sessions" }
+        guard hasActiveFilters(model) else { return "All chats" }
         return [
             model.typeFilter.title,
             agentFilterTitle(model.agentFilter, model: model),
@@ -1431,11 +1431,11 @@ struct SessionsView: View {
             } catch SessionCatalogError.invalidTitle {
                 mutationFailures += 1
                 actionDialog = .error(
-                    "Enter a session name between 1 and \(SessionTitleRules.maximumLength) characters."
+                    "Enter a chat name between 1 and \(SessionTitleRules.maximumLength) characters."
                 )
             } catch {
                 mutationFailures += 1
-                actionDialog = .error("bighelp could not update this session. Try again.")
+                actionDialog = .error("bighelp could not update this chat. Try again.")
             }
         }
     }

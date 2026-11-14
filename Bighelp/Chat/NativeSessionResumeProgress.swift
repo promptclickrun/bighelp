@@ -72,7 +72,7 @@ final class NativeSessionResumeProgressPresentation {
             guard indicator == nil else { return }
             indicator = NativeSessionResumeProgressIndicator(
                 requestID: progress.requestID,
-                message: "Restoring session history…"
+                message: "Restoring chat history…"
             )
         case .complete, .failed:
             guard indicator?.requestID == progress.requestID else { return }

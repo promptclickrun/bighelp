@@ -49,7 +49,7 @@ final class AgentDuplicateModel: Identifiable {
         guard !isPreparing, !isSubmitting, result == nil, isCurrent() else { return }
         let destination = destinationProfileID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !destination.isEmpty, destination != source.id else {
-            errorMessage = "Enter a different profile identifier for the new agent."
+            errorMessage = "Enter a different profile identifier for the new bot."
             return
         }
         generation += 1

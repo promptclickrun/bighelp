@@ -220,8 +220,8 @@ struct ScheduledTaskEditorView: View {
                             .foregroundStyle(theme.primaryText)
                         if let task {
                             Text(task.hostExecution == nil
-                                 ? "Tasks stay with their agent. Use Duplicate on the task to hand it to someone else."
-                                 : "Tasks stay with their agent.")
+                                 ? "Tasks stay with their bot. Use Duplicate on the task to hand it to someone else."
+                                 : "Tasks stay with their bot.")
                                 .bighelpFont(.metadata)
                                 .foregroundStyle(theme.secondaryText)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -230,11 +230,11 @@ struct ScheduledTaskEditorView: View {
                 }
                 .frame(minHeight: BighelpTokens.hitTarget)
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Agent, \(selectedAgent.name)")
+                .accessibilityLabel("Bot, \(selectedAgent.name)")
                 .accessibilityIdentifier("scheduled-task.editor.summary-header")
             }
         } header: {
-            ScheduledTaskSectionCaption(title: "Which agent?")
+            ScheduledTaskSectionCaption(title: "Which bot?")
         }
         .listRowBackground(theme.surface)
     }
@@ -291,7 +291,7 @@ struct ScheduledTaskEditorView: View {
         } header: {
             ScheduledTaskSectionCaption(title: "When?")
         } footer: {
-            Text("Your agent confirms the exact next run after you save.")
+            Text("Your bot confirms the exact next run after you save.")
                 .bighelpFont(.metadata)
                 .foregroundStyle(theme.secondaryText)
         }

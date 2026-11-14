@@ -112,7 +112,7 @@ struct BighelpUsageWorkflowsWidgetTests {
 
         await UsageWidgetPublisher.refresh(sources, gateways: [nil], directory: folder)
         #expect(BighelpUsageSnapshot.load(gateway: home, in: folder).totals == nil)
-        #expect(BighelpUsageSnapshot.load(gateway: home, in: folder).note == "Couldn't read every agent's usage.")
+        #expect(BighelpUsageSnapshot.load(gateway: home, in: folder).note == "Couldn't read every bot's usage.")
 
         next.value = full
         await UsageWidgetPublisher.refresh(sources, gateways: [nil], directory: folder)

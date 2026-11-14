@@ -93,8 +93,8 @@ struct CredentialVaultView: View {
     private var intro: some View {
         if model.agents.count > 1 {
             SimpleBotsCard {
-                SimpleBotsRow(title: String(localized: "Agent")) {
-                    Picker(String(localized: "Agent"), selection: Binding(get: { model.agentID },
+                SimpleBotsRow(title: String(localized: "Bot")) {
+                    Picker(String(localized: "Bot"), selection: Binding(get: { model.agentID },
                                                                           set: { id in Task { await model.select(agentID: id) } })) {
                         ForEach(model.agents) { Text($0.name).tag($0.id) }
                     }
@@ -886,7 +886,7 @@ private struct CredentialVaultUnlockView: View {
                         .onSubmit(unlock)
                         .accessibilityIdentifier("vault.master-password")
                 } footer: {
-                    Text("Unlocks \(source.displayName) on your computer so your agent can use its logins. bighelp doesn't keep your master password.")
+                    Text("Unlocks \(source.displayName) on your computer so your bot can use its logins. bighelp doesn't keep your master password.")
                 }
                 if let message = model.message {
                     Section { Text(message).foregroundStyle(.secondary) }
@@ -959,7 +959,7 @@ extension RootShellView {
     func makeHomeCredentialVault() -> CredentialVaultModel? {
         guard let service = makeCredentialVaultService() else { return nil }
         var list = agents.profiles.map { CredentialVaultModel.Agent(id: $0.id, name: $0.name) }
-        if list.isEmpty { list = [.init(id: "default", name: "Default agent")] }
+        if list.isEmpty { list = [.init(id: "default", name: "Default bot")] }
         return CredentialVaultModel(service: service, agents: list, agentID: homeAgent?.id ?? "default")
     }
 

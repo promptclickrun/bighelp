@@ -33,7 +33,7 @@ struct WatchChatView: View {
                         WatchBubble(message: message).id(message.id)
                     }
                     if isWorking {
-                        WatchThinking(name: chat?.agentName ?? store.agent?.name ?? "Your agent",
+                        WatchThinking(name: chat?.agentName ?? store.agent?.name ?? "Your bot",
                                       activity: chat?.activity, isSending: sessionID == nil).id("thinking")
                     }
                     if let problem = store.problem(in: key) ?? phoneNotice {

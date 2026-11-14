@@ -51,7 +51,7 @@ struct UsageStoreTests {
         store.configure(reader: reader, scope: "home")
         await store.load(refresh: false)
 
-        reader.result = [try Self.host(cost: 0, failure: "Couldn't reach this host.")]
+        reader.result = [try Self.host(cost: 0, failure: "Couldn't reach this computer.")]
         await store.load(refresh: true)
         #expect(store.summary?.totals.cost == 2, "The last result stays")
         #expect(store.state == .unavailable("Couldn't refresh. Showing the last result."))
@@ -60,11 +60,11 @@ struct UsageStoreTests {
 
     @Test func aComputerThatCantBeReadSaysWhyWhenNothingElseShows() async throws {
         let reader = ScriptedUsageReader()
-        reader.result = [try Self.host(cost: 0, failure: "Couldn't reach this host.")]
+        reader.result = [try Self.host(cost: 0, failure: "Couldn't reach this computer.")]
         let store = UsageStore()
         store.configure(reader: reader, scope: "home")
         await store.load(refresh: false)
-        #expect(store.state == .unavailable("Couldn't reach this host."))
+        #expect(store.state == .unavailable("Couldn't reach this computer."))
         #expect(store.summary == nil)
     }
 

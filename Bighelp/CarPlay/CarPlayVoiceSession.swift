@@ -34,7 +34,7 @@ final class CarPlayVoiceSession {
 
     /// Nothing runs until `start`.
     private(set) var phase: Phase = .paused
-    private(set) var agentName = "your agent"
+    private(set) var agentName = "your bot"
     /// The agent being talked to, and its picture, for the car's screen.
     private(set) var agent: CarPlayAgent?
     private(set) var agentImageURL: URL?
@@ -119,7 +119,7 @@ final class CarPlayVoiceSession {
                 requestedID: agentID ?? continuity.agentID ?? preference.agentID, in: agents,
                 fallbackID: workspace.agents.resolvedAgent(explicitID: nil)?.id)
             else {
-                phase = .problem("Pick an agent in bighelp on your iPhone first.")
+                phase = .problem("Pick a bot in bighelp on your iPhone first.")
                 return releaseHostConnection()
             }
             if agentID == agent.id { preference.agentID = agent.id }

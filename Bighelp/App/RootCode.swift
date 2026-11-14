@@ -66,7 +66,7 @@ extension RootShellView {
     /// Opens a coding session's chat over where the person is; Back returns there.
     func openCodeSession(_ session: CodeSessionRecord) {
         guard let record = sessionCatalog.session(id: session.id) else {
-            actionErrorMessage = "This session isn't on this computer anymore."
+            actionErrorMessage = "This chat isn't on this computer anymore."
             return
         }
         openSession(record.summary)

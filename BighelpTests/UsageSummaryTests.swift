@@ -147,7 +147,7 @@ struct UsageSummaryTests {
                 AgentUsage(id: "ada", name: "Ada", report: ada), AgentUsage(id: "bo", name: "Bo", report: bo),
             ]),
             HostUsage(id: "studio", name: "Studio Mac", agents: [AgentUsage(id: "cy", name: "Cy", report: cy)]),
-            HostUsage(id: "office", name: "Office Linux", failure: "Couldn't reach this host."),
+            HostUsage(id: "office", name: "Office Linux", failure: "Couldn't reach this computer."),
         ]
     }
 
@@ -173,7 +173,7 @@ struct UsageSummaryTests {
         #expect(summary.isMultiHost)
         #expect(summary.hosts.map(\.title) == ["Home Hermes", "Studio Mac", "Office Linux"])
         #expect(summary.hosts[0].amount == UsageAmount(cost: 4.0, tokens: 4_500))
-        #expect(summary.hosts[2].failure == "Couldn't reach this host.", "A computer that can't be read says so")
+        #expect(summary.hosts[2].failure == "Couldn't reach this computer.", "A computer that can't be read says so")
         #expect(summary.agents.map(\.title) == ["Ada", "Cy", "Bo"], "Most expensive first")
         #expect(summary.agents.map(\.detail) == ["Home Hermes", "Studio Mac", "Home Hermes"])
 

@@ -155,7 +155,7 @@ final class FleetStore {
     /// Host names are only worth showing with more than one host.
     var showsHostNames: Bool { hosts.count > 1 }
 
-    func hostName(_ id: UUID) -> String { hosts.first { $0.id == id }?.name ?? "Host" }
+    func hostName(_ id: UUID) -> String { hosts.first { $0.id == id }?.name ?? "Computer" }
     func canOpen(_ hostID: UUID) -> Bool { reader.canOpen(hostID) }
     func select(_ hostID: UUID) { reader.select(hostID); syncHosts() }
 
@@ -257,7 +257,7 @@ final class FleetStore {
                 case .failure(is CancellationError):
                     statuses[id] = .idle
                 case .failure:
-                    statuses[id] = .unreachable("Couldn't reach this host.")
+                    statuses[id] = .unreachable("Couldn't reach this computer.")
                 }
             }
         }

@@ -404,7 +404,7 @@ final class ScheduledTasksStore {
 
     private func message(for error: Error) -> String {
         if error is CancellationError {
-            return "This request was cancelled. Refresh before trying again if the host may have received it."
+            return "This request was cancelled. Refresh before trying again if the computer may have received it."
         }
         return (error as? LocalizedError)?.errorDescription ?? "Unable to update this task. Try again."
     }

@@ -12,9 +12,9 @@ struct SessionSectionOrganizationTests {
         let running = SessionSectionOrganizer.sections(
             from: [ordinary, runningPin, working], organizeByProjects: false)
         #expect(running.map(\.key) == [.active, .sessions])
-        #expect(running.first?.title == "Active Sessions")
+        #expect(running.first?.title == "Active Chats")
         #expect(running.first?.sessions.map(\.id) == ["working", "pin"])
-        #expect(running.last?.title == "Sessions")
+        #expect(running.last?.title == "Chats")
         #expect(Set(running.flatMap(\.sessions).map(\.id)).count == 3)
 
         let settled = summary("working", created: 20, project: "work")

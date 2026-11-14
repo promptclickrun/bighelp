@@ -52,6 +52,19 @@ struct LoopdySessionActivityAttributes: Codable, Hashable, Sendable {
     let sessionTitle: String
     let agentID: String
     let agentName: String
+    /// This phone's card secret (`BighelpActivityCardKey.attributeKey`), so the card can open its rows'
+    /// sealed detail. iOS draws a Live Activity in its own copy of the widget extension, in a sandbox that
+    /// may not talk to the keychain (`deny mach-lookup com.apple.securityd` on an iPhone; the simulator
+    /// lets it). The app sets this as it starts a card and nowhere else. Attributes stay with the system on
+    /// the person's own devices: no push carries them, and bighelp saves this nowhere outside the keychain.
+    var cardKey: String? = nil
+
+    /// The same card without its secret, for anything bighelp keeps or passes around.
+    var withoutCardKey: LoopdySessionActivityAttributes {
+        var copy = self
+        copy.cardKey = nil
+        return copy
+    }
 
     var deepLink: URL {
         URL(string: "loopdy://chat/\(sessionID)")!
@@ -272,7 +285,7 @@ struct BighelpLiveActivityCard: View {
 
     var body: some View {
         if state.sessions != nil {
-            BighelpActivityRowsView(state: state, isStale: isStale, snapshot: snapshot)
+            BighelpActivityRowsView(state: state, isStale: isStale, snapshot: snapshot, cardKey: attributes.cardKey)
                 .foregroundStyle(BighelpActivityColors(snapshot: snapshot, scheme: scheme).primary)
                 .padding(12)
                 .background(BighelpActivityColors(snapshot: snapshot, scheme: scheme).canvas)

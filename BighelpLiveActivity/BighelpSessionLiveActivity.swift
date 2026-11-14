@@ -99,7 +99,7 @@ struct BighelpSessionLiveActivity: Widget {
         // The first chat's agent and the step it is on, when its detail opens (BighelpActivityDetail).
         let first = rows.first.flatMap { row in BighelpActivitySessionInfo.load()[row.id].map { (row, $0) } }
         let step = BighelpActivityDetailLevel.current == .statusOnly || context.isStale || attention
-            ? nil : rows.first.flatMap { $0.phase.isTerminal ? nil : $0.openDetail()?.tool }.map(BighelpActivityPose.init(tool:))
+            ? nil : rows.first.flatMap { $0.phase.isTerminal ? nil : $0.openDetail(cardKey: context.attributes.cardKey)?.tool }.map(BighelpActivityPose.init(tool:))
         return DynamicIsland {
             DynamicIslandExpandedRegion(.leading) {
                 Text("Bighelp").font(.system(.caption, design: .rounded, weight: .bold))
@@ -109,7 +109,8 @@ struct BighelpSessionLiveActivity: Widget {
                     .font(.caption.weight(.semibold)).foregroundStyle(attention ? .orange : .secondary)
             }
             DynamicIslandExpandedRegion(.bottom) {
-                BighelpActivityRowsView(state: context.state, isStale: context.isStale, maximumRows: 3, showsHeader: false)
+                BighelpActivityRowsView(state: context.state, isStale: context.isStale, maximumRows: 3, showsHeader: false,
+                                        cardKey: context.attributes.cardKey)
                     .padding(.vertical, 4)
             }
         } compactLeading: {

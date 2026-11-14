@@ -21,6 +21,39 @@ struct BighelpActivityDetailTests {
         key = SymmetricKey(data: try #require(BighelpActivityDetail.decode(vector.key)))
     }
 
+    /// An iPhone draws the card where the keychain can't be reached (the simulator lets it), so a card
+    /// carries its own copy of the secret in its attributes. A row opens with it and with no other.
+    @Test func aRowOpensWithTheKeyItsCardCarries() throws {
+        let master = SymmetricKey(size: .bits256)
+        let id = "native-" + String(repeating: "ab", count: 32)
+        let box = try AES.GCM.seal(Data(#"{"v":1,"b":1800000000,"s":2,"t":"web_search","n":"lamb prices"}"#.utf8),
+                                   using: BighelpActivityCardKey.rowKey(id, master: master),
+                                   authenticating: Data("bighelp-card-v1|1800000100".utf8))
+        var row = BighelpActivitySession(id: id, phase: .usingTool, timestamp: 1_800_000_100)
+        row.sealed = BighelpActivityDetail.encode(try #require(box.combined))
+        let cardKey = BighelpActivityDetail.encode(master.withUnsafeBytes { Data($0) })
+        #expect(row.openDetail(cardKey: cardKey)?.tool == "web_search")
+        let another = BighelpActivityDetail.encode(SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) })
+        #expect(row.openDetail(cardKey: another) == nil)
+        #expect(BighelpActivityCardKey.master(attributeKey: "not-a-key") == nil)
+        #expect(BighelpActivityCardKey.master(attributeKey: nil) == nil)
+    }
+
+    /// The key rides in the card's attributes only: a card started before cards carried one still
+    /// reads, and nothing Bighelp saves about a row keeps it.
+    @Test func aCardsKeyIsNeverInWhatBighelpSaves() throws {
+        var attributes = try #require(LoopdySessionActivityAttributes.make(
+            sessionID: "native-row", sessionTitle: "Chat", agentID: "agent", agentName: "Scout"))
+        let before = try JSONDecoder().decode(LoopdySessionActivityAttributes.self, from: JSONEncoder().encode(attributes))
+        #expect(before.cardKey == nil)
+        attributes.cardKey = "made-up-key"
+        let carried = try JSONDecoder().decode(LoopdySessionActivityAttributes.self, from: JSONEncoder().encode(attributes))
+        #expect(carried.cardKey == "made-up-key")
+        let saved = BighelpActivitySessionInfo(attributes: attributes, title: "Lamb prices").withoutCardKey
+        #expect(!String(decoding: try JSONEncoder().encode(saved), as: UTF8.self).contains("made-up-key"))
+        #expect(saved.attributes.agentName == "Scout")
+    }
+
     @Test func opensWhatTheComputerSealed() throws {
         let detail = try #require(BighelpActivityDetail.open(vector.sealed, timestamp: vector.timestamp, key: key))
         #expect(detail.started == 1_800_000_000)

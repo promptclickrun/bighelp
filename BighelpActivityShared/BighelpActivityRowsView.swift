@@ -11,6 +11,8 @@ struct BighelpActivityRowsView: View {
     var infos: [String: BighelpActivitySessionInfo] = BighelpActivitySessionInfo.load()
     /// Details by row ID, for tests and previews. Nil opens each row's own sealed detail.
     var details: [String: BighelpActivityDetail]? = nil
+    /// The card's secret, from its attributes (`LoopdySessionActivityAttributes.cardKey`).
+    var cardKey: String? = nil
     var level = BighelpActivityDetailLevel.current
     var showsNerdLine = BighelpActivityDetailLevel.showsNerdLine
     @Environment(\.colorScheme) private var scheme
@@ -27,7 +29,7 @@ struct BighelpActivityRowsView: View {
     /// The first chat and its detail, when the card may show one. Without it the card is the plain rows.
     private var hero: (row: BighelpActivitySession, detail: BighelpActivityDetail)? {
         guard level != .statusOnly, !typeSize.isAccessibilitySize, let row = ordered.first,
-              let detail = details.map({ $0[row.id] }) ?? row.openDetail() else { return nil }
+              let detail = details.map({ $0[row.id] }) ?? row.openDetail(cardKey: cardKey) else { return nil }
         return (row, detail)
     }
 

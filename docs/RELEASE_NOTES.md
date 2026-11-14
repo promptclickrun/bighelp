@@ -3,6 +3,25 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.87
+
+### New
+
+- **The lifter:** Bighelp has a new look. The lifter is the new mascot. He shows what a bot does: he thinks, searches, writes code and replies. The app icon, the wordmark and the colors are new on iPhone, iPad, Mac, Apple Watch and Vision Pro.
+- **Bighelp with a capital B:** the name of the app is now Bighelp in all text that you read. The Mac app is Bighelp.app. Alerts from your computer show the new name and the new icon with Bighelp plugin 3.55.0.
+
+### Changed
+
+- **One word for each thing:** all screens now say bot, chat, computer and project. Older screens said agent, session, host, gateway and workspace.
+- **Scheduled runs:** each scheduled run has a chat of its own. Bighelp now gets these chats from your computer only when Show Scheduled Runs is on. A run that works now still shows. The lists of chats load faster on a computer that runs many scheduled tasks.
+
+### Fixed
+
+- **A freeze with thousands of chats:** after a new install, Bighelp stopped responding when your computer had thousands of chats. It froze when a chat opened, when you typed and when you scrolled. When you left the app, iOS closed it. Bighelp now saves only the chats that changed.
+- **Too many writes to storage:** Bighelp wrote the full list of chats to your device again and again. With thousands of chats, that was more than 1 GB in a day. Bighelp now writes less data, less often.
+- **More than 10,000 chats:** when a computer had more than 10,000 chats, Bighelp showed only the Bot Chats. It now shows the newest chats of each bot.
+- **Live Activity with Bighelp closed:** for some turns, the Live Activity card moved only while Bighelp was open. It did not show the step in progress. The card now gets updates from your computer for these turns too.
+
 ## 2.6.86
 
 ### New

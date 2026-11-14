@@ -3,6 +3,12 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.90
+
+### Fixed
+
+- **Steps on the Live Activity:** on an iPhone, the Live Activity card now shows the step that the bot does and its last steps. It also shows a timer and the first lines of the reply. Before, the card showed only Thinking, Working and Done. The Dynamic Island shows the face of the bot and an icon for the step. The card that is on the screen when you update does not change. The next card shows the steps. Your computer needs Bighelp plugin 3.52.0 or later.
+
 ## 2.6.89
 
 ### New

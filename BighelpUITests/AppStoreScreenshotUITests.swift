@@ -195,8 +195,8 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
         sleep(3)
     }
 
-    /// A Feed, Goals or Ideas page with the agent's posts on it. A busy host can miss the
-    /// first load, which then stays failed until the page is pulled to refresh.
+    /// Juno's own Feed, Goals or Ideas board (Today › See all › Juno) with the bot's posts on it. A
+    /// busy host can miss the first load, which then stays failed until the page is pulled to refresh.
     @MainActor
     private func openBoard(_ identifier: String, showing text: String, in app: XCUIApplication) {
         openTab(identifier, in: app)
@@ -208,6 +208,13 @@ final class AppStoreScreenshotUITests: BighelpUITestCase {
             sleep(3)
         }
         XCTAssertTrue(post.exists, "\(text) is on the page")
+        // The bot's own board, where each item shows in full.
+        openTodayBoard(identifier.replacingOccurrences(of: "tab.", with: ""), in: app)
+        let juno = app.buttons["today.board-page.chip.default"].firstMatch
+        XCTAssertTrue(juno.waitForExistence(timeout: 10), "See all has Juno's chip")
+        juno.tap()
+        XCTAssertTrue(post.waitForExistence(timeout: 20), "\(text) is on Juno's board")
+        sleep(2)
     }
 
     /// The reply's card, reopening the chat from Chats once if the card hasn't drawn.

@@ -229,4 +229,16 @@ struct TodayBoardsStoreTests {
         let entries = TodayBoardsStore.entries(.idea, boards: ["mina": [done, gone, open]])
         #expect(entries.map(\.id) == ["mina/i3"])
     }
+
+    /// See all once listed every goal a bot ever finished. Those are on the bot's own Goals.
+    @Test func goalsThatAreDoneStayOffToday() {
+        let clock = Clock()
+        var finished = post("g1", minutesAgo: 1, clock: clock, kind: .goal)
+        finished.status = "done"
+        var active = post("g2", minutesAgo: 2, clock: clock, kind: .goal)
+        active.status = "active"
+        let new = post("g3", minutesAgo: 3, clock: clock, kind: .goal)
+        let entries = TodayBoardsStore.entries(.goal, boards: ["mina": [finished, active, new]])
+        #expect(entries.map(\.id) == ["mina/g2", "mina/g3"])
+    }
 }

@@ -111,7 +111,7 @@ final class TodayBoardsStore {
         if scope == self.scope, boards[agentID] != items { boards[agentID] = items }
     }
 
-    /// The newest items of `kind` across bots, as each bot's own board lists them.
+    /// The newest open items of `kind` across bots.
     func entries(_ kind: AgentBoardItem.Kind, agentIDs: [String]? = nil) -> [TodayBoardsEntry] {
         Self.entries(kind, boards: boards, agentIDs: agentIDs)
     }
@@ -122,8 +122,9 @@ final class TodayBoardsStore {
         // In named steps: as one expression the Vision Pro build couldn't type-check it in time.
         let entries: [TodayBoardsEntry] = ids.flatMap { id -> [TodayBoardsEntry] in
             let items: [AgentBoardItem] = boards[id] ?? []
-            // Ideas answered with Let's do it are under Completed on the bot's own board, not here.
-            let shown = items.filter { $0.kind == kind && !$0.dismissed && !$0.isCompleted }
+            // Only what is still open. Ideas answered with Let's do it and goals that are done are
+            // on the bot's own board (Completed, Done): See all once listed every goal ever finished.
+            let shown = items.filter { $0.kind == kind && !$0.dismissed && !$0.isCompleted && !$0.isDone }
             return shown.map { TodayBoardsEntry(agentID: id, item: $0) }
         }
         return entries.sorted { first, second in

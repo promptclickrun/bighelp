@@ -167,7 +167,9 @@ change in both repos.
     Needs you card and the Shared with bighelp card above it while something waits, and the Make a space box
     below (`TodayCreateBox`, hidden while the computer in use's plugin has no spaces). A panel is Feed, Ideas and
     Goals for every bot (`TodayBoardsPanel`; See all pushes `TodayBoardPage` as `AppRoute.board`) or a space
-    (docs/SPACES.md). Edit changes order, hiding and size and deletes a space (`TodayPanelLayoutStore`; a space's
+    (docs/SPACES.md). The panel and See all's All bots list only what is still open
+    (`TodayBoardsStore.entries`): no cleared post, no idea answered with Let's do it, no goal that is done.
+    Those are on the bot's own board. Edit changes order, hiding and size and deletes a space (`TodayPanelLayoutStore`; a space's
     own layout belongs to its computer). What a panel's long press offers, VoiceOver gets from the panel's Actions
     menu. A refusal (Update now too soon, a delete the computer refused) shows as one quiet line under the header
     (`TodayNotice`). A read where no bot answered is not a read: the boards keep loading rather than say "Nothing

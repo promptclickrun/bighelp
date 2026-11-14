@@ -27,7 +27,8 @@ for kind in ${=BIGHELP_STORE_DEVICES:-iphone ipad}; do
   [[ -n $udid ]] || { echo "$kind: no runtime for ${devices[$kind]}"; exit 1; }
   xcrun simctl shutdown $udid 2>/dev/null || true
   xcrun simctl erase $udid
-  xcrun simctl boot $udid
+  # Waits until it has started: the status bar can't be set on one that is still starting.
+  xcrun simctl bootstatus $udid -b > /dev/null
   xcrun simctl status_bar $udid override --time $clock --dataNetwork wifi --wifiMode active --wifiBars 3 \
     --cellularMode active --cellularBars 4 --operatorName "" --batteryState discharging --batteryLevel 100
   xcodebuild build-for-testing -project "$repo/Bighelp.xcodeproj" -scheme Bighelp -destination "id=$udid" \

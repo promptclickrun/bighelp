@@ -91,6 +91,33 @@ struct ScreenPostureTests {
         #expect(!AgentIslandAvailability.isShown(isPhone: false, posture: .standard))
     }
 
+    @Test func picturesTakeTheWholeDisplayOnlyWhereTheBarHasAColumn() {
+        // The cover screen and the inner one held wide stand the bar up in the trailing column, so
+        // a picture opens over the display there instead of inset in a sheet beside it.
+        #expect(ChatImageStackContent.isFullBleed(BighelpScreenGeometry(posture: .cover)))
+        #expect(ChatImageStackContent.isFullBleed(BighelpScreenGeometry(posture: .open)))
+        // Held upright (and half-folded as a laptop) the bar lies along the bottom, and the pictures
+        // keep their sheet so they stay clear of the fold.
+        #expect(!ChatImageStackContent.isFullBleed(BighelpScreenGeometry(posture: .openUpright)))
+        #expect(!ChatImageStackContent.isFullBleed(BighelpScreenGeometry(posture: .standard)))
+    }
+
+    @Test func aPictureKeepsTheWayItOpenedWhenTheScreenTurns() throws {
+        // The viewer's container and its body both read this one value, fixed when the picture
+        // opens. Reading the live posture instead is what would dismiss the cover on a turn and
+        // bring the pictures back as a sheet on the first one.
+        let picture = try ChatAttachment(id: "photo-0000000001", fileName: "a.png", mimeType: "image/png",
+                                         data: Data([0x89, 0x50, 0x4E, 0x47]))
+        let opened = ChatPhotoStart(images: [picture], index: 2,
+                                    screen: BighelpScreenGeometry(posture: .cover))
+        #expect(opened.presentsFullScreen)
+        #expect(opened.index == 2, "It opens on the picture that was chosen")
+        let inASheet = ChatPhotoStart(images: opened.images, index: 0,
+                                      screen: BighelpScreenGeometry(posture: .openUpright))
+        #expect(!inASheet.presentsFullScreen, "A screen with a bar along the bottom keeps the sheet")
+        #expect(ChatImageStackStart(index: 1, screen: BighelpScreenGeometry(posture: .open)).presentsFullScreen)
+    }
+
     @Test func theSwitcherSettingStartsOnForPhonesAndKeepsTheChoice() {
         let name = "chat-switcher-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!

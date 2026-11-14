@@ -77,6 +77,20 @@ extension View {
         #endif
     }
 
+    /// A sheet, or the whole display. The HIG allows full width where bars aren't needed, so on a
+    /// screen whose bar stands up in a side column (the Duo's cover and inner screens) a picture
+    /// opens over the display instead of inset in a sheet beside it.
+    ///
+    /// The container comes from the item (`presentsFullScreen`), never from the live posture: a
+    /// posture that changed mid-look would dismiss the cover, present a sheet, and start the
+    /// pictures over at the first one.
+    func bighelpMediaPresentation<Item: BighelpMediaPresentationItem, Media: View>(
+        item: Binding<Item?>, onDismiss: (() -> Void)? = nil,
+        @ViewBuilder content: @escaping (Item) -> Media
+    ) -> some View {
+        modifier(BighelpMediaPresentation(item: item, onDismiss: onDismiss, content: content))
+    }
+
     /// Keeps UIKit in sync when a reopened Catalyst popover closes in SwiftUI.
     func bighelpPopoverDismissal(isPresented: Binding<Bool>) -> some View {
         #if targetEnvironment(macCatalyst)
@@ -199,3 +213,35 @@ private struct BighelpMacPopoverDismissal: UIViewControllerRepresentable {
     }
 }
 #endif
+
+/// A picture opened for the whole display, over the column the screen keeps for its bar, or in a
+/// sheet where the bar lies along the bottom. The style is decided when it opens and carried by the
+/// item, so the viewer survives a turn or a fold with the picture it was showing.
+protocol BighelpMediaPresentationItem: Identifiable {
+    var presentsFullScreen: Bool { get }
+}
+
+/// A picture's presentation: a sheet, or the whole display.
+private struct BighelpMediaPresentation<Item: BighelpMediaPresentationItem, Media: View>: ViewModifier {
+    let item: Binding<Item?>
+    let onDismiss: (() -> Void)?
+    @ViewBuilder let content: (Item) -> Media
+
+    /// Both are attached all the time, each with the item only while it opened that way. Choosing
+    /// one with `if` gave the page a new identity as a picture opened and again as it closed.
+    func body(content base: Content) -> some View {
+        base
+            .bighelpSheet(item: binding(fullScreen: false), onDismiss: onDismiss, content: content)
+            .bighelpFullScreenCover(item: binding(fullScreen: true), onDismiss: onDismiss, content: content)
+    }
+
+    private func binding(fullScreen: Bool) -> Binding<Item?> {
+        Binding {
+            item.wrappedValue.flatMap { $0.presentsFullScreen == fullScreen ? $0 : nil }
+        } set: { newValue in
+            // Closing one presentation never clears an item the other one is showing.
+            if newValue == nil, let shown = item.wrappedValue, shown.presentsFullScreen != fullScreen { return }
+            item.wrappedValue = newValue
+        }
+    }
+}

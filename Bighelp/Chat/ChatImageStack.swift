@@ -40,6 +40,12 @@ enum ChatImageStackContent {
 
     static func position(_ index: Int, of count: Int) -> String { "\(index + 1) of \(count)" }
 
+    /// Whether pictures open over the whole display. On a screen that stands its bar up in a side
+    /// column (the Duo's cover and inner screens) the column would otherwise sit over the photo, and
+    /// the HIG allows full width where bars aren't needed. A screen with a bar along the bottom keeps
+    /// its sheet, so half-folded the pictures stay clear of the fold.
+    static func isFullBleed(_ screen: BighelpScreenGeometry) -> Bool { screen.usesSideBar }
+
     /// What saving several pictures to Photos says afterwards.
     static func savedMessage(saved: Int, of total: Int) -> String {
         if saved == total { return total == 1 ? "Saved to Photos." : "Saved \(total) photos to Photos." }
@@ -53,10 +59,11 @@ struct ChatImageStackView: View {
 
     @State private var viewerStart: ChatImageStackStart?
     @State private var saver = ChatImageStackSaver()
+    @Environment(\.bighelpScreen) private var screen
 
     var body: some View {
         Button {
-            viewerStart = ChatImageStackStart(index: 0)
+            viewerStart = ChatImageStackStart(index: 0, screen: screen)
         } label: {
             stack
         }
@@ -76,8 +83,8 @@ struct ChatImageStackView: View {
         }
         .task(id: images.map(\.id)) { saver.prepareShareFiles(images) }
         .onDisappear { saver.removeShareFiles() }
-        .bighelpSheet(item: $viewerStart) { start in
-            ChatImageStackViewer(images: images, startIndex: start.index)
+        .bighelpMediaPresentation(item: $viewerStart) { start in
+            ChatImageStackViewer(images: images, startIndex: start.index, fullBleed: start.presentsFullScreen)
                 .bighelpSheetSize(.large)
         }
         .chatImageStackAlert(saver)
@@ -167,36 +174,79 @@ enum ChatImageThumbnail {
     }
 }
 
-struct ChatImageStackStart: Identifiable {
+struct ChatImageStackStart: Identifiable, BighelpMediaPresentationItem {
     let id = UUID()
     let index: Int
+    /// Decided when it opens: turning or folding must not swap the cover for a sheet mid-look.
+    let presentsFullScreen: Bool
+
+    init(index: Int, screen: BighelpScreenGeometry) {
+        self.index = index
+        presentsFullScreen = ChatImageStackContent.isFullBleed(screen)
+    }
+}
+
+/// A picture opened on its own over the whole display: what to show, and which of them.
+struct ChatPhotoStart: Identifiable, BighelpMediaPresentationItem {
+    let id = UUID()
+    let images: [ChatAttachment]
+    let index: Int
+    let presentsFullScreen: Bool
+
+    init(images: [ChatAttachment], index: Int, screen: BighelpScreenGeometry) {
+        self.images = images
+        self.index = index
+        presentsFullScreen = ChatImageStackContent.isFullBleed(screen)
+    }
 }
 
 /// The stack opened: swipe through the pictures, or jump with the strip at the bottom. Save or
-/// share the one showing, or all of them.
+/// share the one showing, or all of them. Where the screen keeps a column for its bar (the Duo),
+/// the pictures take the whole display and the controls stand down the leading edge instead.
 struct ChatImageStackViewer: View {
     let images: [ChatAttachment]
+    /// How it was opened. Fixed for the look, so a turn or a fold keeps the picture on screen.
+    let fullBleed: Bool
 
     @State private var index: Int
     @State private var saver = ChatImageStackSaver()
     @Environment(\.dismiss) private var dismiss
 
-    init(images: [ChatAttachment], startIndex: Int) {
+    init(images: [ChatAttachment], startIndex: Int, fullBleed: Bool) {
         self.images = images
+        self.fullBleed = fullBleed
         _index = State(initialValue: min(max(startIndex, 0), max(images.count - 1, 0)))
     }
 
     var body: some View {
+        Group {
+            if fullBleed {
+                wholeDisplay
+            } else {
+                sheet
+            }
+        }
+        .chatImageStackAlert(saver)
+        .task { saver.prepareShareFiles(images) }
+        .onDisappear { saver.removeShareFiles() }
+    }
+
+    private var pages: some View {
+        TabView(selection: $index) {
+            ForEach(Array(images.enumerated()), id: \.offset) { offset, attachment in
+                ChatImageStackPage(attachment: attachment)
+                    .tag(offset)
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .accessibilityIdentifier("chat.image-stack.pages")
+    }
+
+    /// A sheet's version: the bar says which picture this is and holds Done, Save and Share.
+    private var sheet: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                TabView(selection: $index) {
-                    ForEach(Array(images.enumerated()), id: \.offset) { offset, attachment in
-                        ChatImageStackPage(attachment: attachment)
-                            .tag(offset)
-                    }
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .accessibilityIdentifier("chat.image-stack.pages")
+                pages
                 strip
             }
             .background(Color.black.ignoresSafeArea())
@@ -218,15 +268,7 @@ struct ChatImageStackViewer: View {
                         .bighelpToolbarText()
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button("Save This Photo", systemImage: "square.and.arrow.down") {
-                            Task { await saver.saveAll([images[index]]) }
-                        }
-                        Button("Save All \(images.count) Photos", systemImage: "square.and.arrow.down.on.square") {
-                            Task { await saver.saveAll(images) }
-                        }
-                        .accessibilityIdentifier("chat.image-stack.save-all")
-                    } label: {
+                    Menu { saveButtons } label: {
                         if saver.isSaving {
                             ProgressView().controlSize(.small)
                         } else {
@@ -238,16 +280,7 @@ struct ChatImageStackViewer: View {
                     .accessibilityIdentifier("chat.image-stack.save")
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        if let current = saver.shareURLs[index] {
-                            ShareLink(item: current) {
-                                Label("Share This Photo", systemImage: "square.and.arrow.up")
-                            }
-                        }
-                        ShareLink(items: saver.allShareURLs) {
-                            Label("Share All \(images.count) Photos", systemImage: "square.and.arrow.up.on.square")
-                        }
-                    } label: {
+                    Menu { shareButtons } label: {
                         Label("Share", systemImage: "square.and.arrow.up").labelStyle(.iconOnly)
                     }
                     .accessibilityLabel("Share")
@@ -255,9 +288,86 @@ struct ChatImageStackViewer: View {
                 }
             }
         }
-        .chatImageStackAlert(saver)
-        .task { saver.prepareShareFiles(images) }
-        .onDisappear { saver.removeShareFiles() }
+    }
+
+    /// The Duo's: the picture edge to edge, with no bar standing a column up over it. Close, Save
+    /// and Share go down the leading edge, above the fold's side of the column, and the thumbnails
+    /// stay at the bottom.
+    private var wholeDisplay: some View {
+        ZStack(alignment: .bottom) {
+            Color.black.ignoresSafeArea()
+            pages
+                .ignoresSafeArea()
+            VStack(alignment: .leading, spacing: BighelpTokens.space8) {
+                Button { dismiss() } label: { scrim("xmark") }
+                    .bighelpPlainButtonStyle(.circle)
+                    .accessibilityLabel("Close")
+                    .accessibilityIdentifier("chat.image-stack.close")
+                Menu { saveButtons } label: {
+                    if saver.isSaving {
+                        ProgressView().controlSize(.small).tint(.white).frame(width: scrimSize, height: scrimSize)
+                    } else {
+                        scrim("square.and.arrow.down")
+                    }
+                }
+                .disabled(saver.isSaving)
+                .accessibilityLabel("Save")
+                .accessibilityIdentifier("chat.image-stack.save")
+                Menu { shareButtons } label: { scrim("square.and.arrow.up") }
+                    .accessibilityLabel("Share")
+                    .accessibilityIdentifier("chat.image-stack.share")
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, BighelpTokens.space16)
+            .padding(.top, BighelpTokens.space16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(spacing: BighelpTokens.space8) {
+                Text(ChatImageStackContent.position(index, of: images.count))
+                    .font(.bighelp(.footnote).weight(.semibold))
+                    .foregroundStyle(.white)
+                    .monospacedDigit()
+                    .padding(.horizontal, BighelpTokens.space8)
+                    .padding(.vertical, BighelpTokens.space4)
+                    .background(.black.opacity(0.55), in: Capsule())
+                    .accessibilityIdentifier("chat.image-stack.position")
+                if images.count > 1 { strip }
+            }
+            .padding(.bottom, BighelpTokens.space8)
+        }
+    }
+
+    /// An action over a picture: white on its own dark circle, so it reads on any photo.
+    private func scrim(_ systemImage: String) -> some View {
+        Image(systemName: systemImage)
+            .font(.bighelp(.title3).weight(.semibold))
+            .foregroundStyle(.white)
+            .frame(width: scrimSize, height: scrimSize)
+            .background(.black.opacity(0.5), in: Circle())
+            .overlay(Circle().stroke(.white.opacity(0.25), lineWidth: BighelpTokens.hairline))
+            .contentShape(.circle)
+    }
+
+    private var scrimSize: CGFloat { BighelpTokens.hitTarget }
+
+    @ViewBuilder private var saveButtons: some View {
+        Button("Save This Photo", systemImage: "square.and.arrow.down") {
+            Task { await saver.saveAll([images[index]]) }
+        }
+        Button("Save All \(images.count) Photos", systemImage: "square.and.arrow.down.on.square") {
+            Task { await saver.saveAll(images) }
+        }
+        .accessibilityIdentifier("chat.image-stack.save-all")
+    }
+
+    @ViewBuilder private var shareButtons: some View {
+        if let current = saver.shareURLs[index] {
+            ShareLink(item: current) {
+                Label("Share This Photo", systemImage: "square.and.arrow.up")
+            }
+        }
+        ShareLink(items: saver.allShareURLs) {
+            Label("Share All \(images.count) Photos", systemImage: "square.and.arrow.up.on.square")
+        }
     }
 
     /// Every picture small, the one showing outlined; tap one to jump to it.

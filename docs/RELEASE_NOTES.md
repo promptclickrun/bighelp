@@ -3,6 +3,22 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.89
+
+### New
+
+- **Do it on a Feed post:** on the Feed of one bot, each post now has a row of its own. Swipe a post to the right and tap Do it. The chat of the bot gets "Let's do it!" with the post as a card. Swipe a post to the left to clear it. The menu of a post has Do it too.
+- **iPhone Duo, half-folded:** when the Duo is half-folded as a small laptop, a chat with one bot shows the bot below the message box. You see its face and the step that it does now. New chat and Bot page are there too. When you type, the keyboard uses that area.
+
+### Changed
+
+- **One More button in a toolbar:** on iOS 27, the actions of a project and of a workflow recipe are in the More menu of the system. Before, the iPhone Duo showed two More buttons, one above the other.
+
+### Fixed
+
+- **A cleared post on Today:** clear a post on the Feed of one bot. The post now leaves Today and All bots immediately. Before, it stayed there until you pulled down.
+- **iPhone Duo:** Bighelp no longer draws an activity island at the top of the Duo screen. The Duo has no island there, and the screen moved when the island opened.
+
 ## 2.6.88
 
 ### Fixed

@@ -41,6 +41,11 @@ xcodebuild build \
 When another build process is active, use a separate `-derivedDataPath` to avoid
 locking or corrupting shared incremental state.
 
+Batch builds. When several issues are in flight, work them in one branch and
+pay for one full build and one full test pass at the end, not one per change.
+Iterate with incremental builds and the suites a change touches; run the full
+matrix once over the whole batch. See AGENTS.md › Build and test › Batch the work.
+
 ## iPhone tools and input regressions
 
 Run the native permission, Apple service, mutation journal/coordinator and

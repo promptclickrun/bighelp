@@ -282,6 +282,19 @@ change in both repos.
 - The app needs Swift 6 and supports iOS 17 and later, and visionOS 26 and later. Keep Swift 6 concurrency
   correct.
 - Unit tests use Swift Testing and UI tests use XCUITest. Run the smallest relevant suite while you iterate.
+- **Batch the work: one build and one full test pass for many changes.** A full app build and test run on the
+  shared Mac is the most expensive step we have, so never pay it once per issue or PR.
+  - When several tasks are open at once, combine them into one larger effort: one branch, one PR that closes
+    every issue it covers, one full build, one full test pass and one release build.
+  - Group by what can ship together, not by topic. Unrelated fixes may share a batch; split one out only when it
+    blocks the rest, needs its own rollback or is urgent on its own.
+  - While you iterate, build incrementally in the batch's worktree and run only the suites the change touches.
+    Run the full build (every platform below that the batch touches: iPhone, Mac Catalyst, visionOS) and the full
+    suite once, at the end, over the whole batch.
+  - A fix found during that final pass goes into the same batch. Rerun only the failed and affected suites, not
+    the whole matrix, unless the fix touches shared code.
+  - Don't open a PR, start a build or ask for a release per change. A single small change waits for the next
+    batch unless it's urgent.
 - **Demo mode:** `-use-demo-fixtures -disable-demo-delays` runs the app with sample data and no host. Fixture clients
   are in `Bighelp/App/AppFixtureClients.swift` and `AppFixtureSetup.swift`. New host features need a demo client too,
   so UI tests and screenshots work without a host.
@@ -1386,14 +1399,17 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
     turn" or "Widget New Chat waits for the host instead of failing".
   - Commit your work before you stop.
 - **Pull requests:**
+  - One PR per batch, not per issue (see Build and test › Batch the work). It lists every issue it closes
+    (`Closes #1, closes #2`), and its commits stay small and logical inside it.
   - Explain the visible behavior and any trust-boundary impact.
   - List what you tested, and where: demo, real host or device. Give the results from the Mac, never a CI run, and
     never list a missing CI run as a blocker (see Build and test).
   - The maintainer merges.
 - **Versions** live in `project.yml`: `MARKETING_VERSION`, and `CURRENT_PROJECT_VERSION` in every target. Regenerate
   after bumping.
-- **Releases are batched.** Merge pull requests whenever they're ready; releasing is a separate step the
-  maintainer starts:
+- **Releases are batched.** A release is one app build (and at most one plugin release) for everything merged
+  since the last one, never one per feature or PR. Merge batched pull requests when they're ready; releasing is a
+  separate step the maintainer starts:
   - Internal TestFlight builds can go out whenever they're useful.
   - Public TestFlight builds go out only when the maintainer says so. They cover everything since the last public
     build, with one set of notes, because every build notifies every tester.
@@ -1407,4 +1423,5 @@ New code uses Bighelp names. Don't "finish" the rename on this list.
   - bug fixes
   - anything they need to do, like updating the plugin
 - **This repo is where the work happens.** There's no private copy or mirror. Every change has an issue and lands
-  through a squash-merged PR that closes it, so each TestFlight build's issues and PRs are here when it's uploaded.
+  through a squash-merged PR that closes it (one PR usually closes several), so each TestFlight build's issues and
+  PRs are here when it's uploaded.

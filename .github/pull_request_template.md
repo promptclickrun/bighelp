@@ -1,6 +1,10 @@
 ## Change
 
-Describe the user-visible outcome and the affected ownership or data boundaries.
+Closes #
+
+List every issue this PR closes. Combine related work into one PR so it costs
+one build and one test run, not one per issue. Describe the user-visible outcome
+and the affected ownership or data boundaries.
 
 ## Validation
 

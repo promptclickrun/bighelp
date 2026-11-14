@@ -47,8 +47,11 @@ struct ChatLaptopDesk: View {
         .accessibilityIdentifier("chat.laptop.desk")
     }
 
+    /// The face the chat's header shows, so the bot looks the same above and below the fold. Its
+    /// line names the step; the face only shows that it works.
     private func face(_ activity: AgentActivityKind, size: CGFloat) -> some View {
-        AgentLiveAvatar(agentID: agentID, displayName: name, imageURL: imageURL, activity: activity, size: size)
+        SimpleBotFace(agentID: agentID, name: name, imageURL: imageURL, size: size,
+                      activity: activity == .idle ? nil : .working(tool: nil))
     }
 
     private func lines(_ activity: AgentActivityKind, alignment: HorizontalAlignment) -> some View {

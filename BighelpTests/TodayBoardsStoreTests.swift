@@ -19,9 +19,9 @@ struct TodayBoardsStoreTests {
 
         func items(agentID: String) async throws -> [AgentBoardItem] {
             reads.append(agentID)
-            if failing.contains(agentID) { throw WorkspaceClientError.invalidRequest }
             let answer = boards[agentID] ?? []
             duringRead?(agentID)
+            if failing.contains(agentID) { throw WorkspaceClientError.invalidRequest }
             return answer
         }
 
@@ -179,6 +179,35 @@ struct TodayBoardsStoreTests {
         }
         await store.refresh(client: client, scope: "mac", botIDs: ["mina", "avery"])
         #expect(store.entries(.feed).map(\.item.id) == ["a1", "m2"], "The older answer doesn't bring the post back")
+    }
+
+    @Test func aLaterBotsAnswerDoesNotBringBackWhatAnEarlierBotsPageCleared() async {
+        let clock = Clock()
+        let store = TodayBoardsStore(now: { clock.now })
+        let first = post("m1", minutesAgo: 30, clock: clock), second = post("m2", minutesAgo: 5, clock: clock)
+        let client = Client(["mina": [first, second], "avery": [post("a1", minutesAgo: 1, clock: clock)]])
+        var cleared = first
+        cleared.dismissed = true
+        // Mina's answer is already in; her page clears the post while Avery's read is on its way.
+        client.duringRead = { id in
+            if id == "avery" { store.take([cleared, second], agentID: "mina", scope: "mac") }
+        }
+        await store.refresh(client: client, scope: "mac", botIDs: ["mina", "avery"])
+        #expect(store.entries(.feed).map(\.item.id) == ["a1", "m2"])
+    }
+
+    @Test func aFailedReadKeepsWhatTheBotsOwnPageChangedNotTheOlderCopy() async {
+        let clock = Clock()
+        let store = TodayBoardsStore(now: { clock.now })
+        let first = post("m1", minutesAgo: 30, clock: clock), second = post("m2", minutesAgo: 5, clock: clock)
+        let client = Client(["mina": [first, second]])
+        await store.refresh(client: client, scope: "mac", botIDs: ["mina"])
+        var cleared = first
+        cleared.dismissed = true
+        client.failing = ["mina"]
+        client.duringRead = { _ in store.take([cleared, second], agentID: "mina", scope: "mac") }
+        await store.refresh(client: client, scope: "mac", botIDs: ["mina"], force: true)
+        #expect(store.entries(.feed).map(\.item.id) == ["m2"], "Not the copy from before the read")
     }
 
     @Test func anotherComputersBoardIsTakenWithoutShowingHere() async {

@@ -142,6 +142,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     private let selectedFolderPath: SelectedFolderPath?
     private let onCreationStateChange: CreationStateChange?
     private let now: @MainActor () -> Date
+    private let listsScheduledRuns: @MainActor () -> Bool
     private var retired = false
     private var profiles: [String: Profile] = [:]
     private var bindings: [String: Binding] = [:]
@@ -172,8 +173,10 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         currentOwner: @escaping @MainActor () -> WorkspaceOwner?,
         selectedFolderPath: SelectedFolderPath? = nil,
         onCreationStateChange: CreationStateChange? = nil,
-        now: @escaping @MainActor () -> Date = Date.init
+        now: @escaping @MainActor () -> Date = Date.init,
+        listsScheduledRuns: @escaping @MainActor () -> Bool = { false }
     ) {
+        self.listsScheduledRuns = listsScheduledRuns
         self.workspace = workspace
         self.owner = owner
         self.currentOwner = currentOwner
@@ -282,8 +285,37 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     }
 
     func list() async throws -> [SessionRecord] {
-        try await list(options: .init())
+        try await list(options: catalogListOptions)
     }
+
+    /// The chats the app keeps a list of. A computer that runs scheduled tasks has a chat for
+    /// each run, thousands of them, and no list shows one unless the person asks (Sessions ›
+    /// Show Scheduled Runs). Hermes Desktop leaves them out of its recent chats the same way.
+    /// Reading, matching and saving every one made each list read ten times the work (#996).
+    /// A run that is working now still shows: live sessions are found on their own.
+    private var catalogListOptions: DirectHermesSessionListOptions {
+        var options = DirectHermesSessionListOptions()
+        if !listsScheduledRuns() { options.excludedSources.append("cron") }
+        return options
+    }
+
+    /// How many chats to take from each profile, newest first, when the computer lists more than
+    /// the app holds. A profile keeps all of its chats while they fit; the ones that don't share
+    /// what is left equally. `nil` is a profile whose page didn't say how many it has.
+    nonisolated static func listQuotas(totals: [Int?], capacity: Int) -> [Int] {
+        var quotas = Array(repeating: 0, count: totals.count)
+        var remaining = max(0, capacity)
+        let smallestFirst = totals.indices.sorted { (totals[$0] ?? .max) < (totals[$1] ?? .max) }
+        for (position, index) in smallestFirst.enumerated() {
+            quotas[index] = min(totals[index] ?? .max, remaining / (smallestFirst.count - position))
+            remaining -= quotas[index]
+        }
+        return quotas
+    }
+
+    /// The chats one list read keeps. Under `maximumSessions`, so the live sessions, unsent chats and
+    /// Bot Chats added after the read still fit.
+    nonisolated static let listCapacity = DirectHermesSessionValidation.maximumSessions - 512
 
     func list(options: DirectHermesSessionListOptions) async throws -> [SessionRecord] {
         try validate(options)
@@ -292,7 +324,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         let ownershipTicket = ownershipRevision
         let startingRevisions = bindings.compactMapValues { $0.ownership?.revision }
         let loaded = try await loadProfiles()
-        let discoversActiveSessions = options == DirectHermesSessionListOptions()
+        let discoversActiveSessions = options == DirectHermesSessionListOptions() || options == catalogListOptions
         let prefetch = DirectHermesCatalogPrefetch(
             fetch: { [weak self] operation, payload in
                 guard let self else { throw CancellationError() }
@@ -312,12 +344,26 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         var projectlessCWDs: Set<String> = []
         var unreadableRows = 0
         defer { Self.logUnreadableRows(unreadableRows) }
+        // Every profile's first page says how many chats it has. More than the app holds is no
+        // error: the list is then the newest of each profile, never no list at all (#1001).
+        var firstPages: [[String: BighelpJSONValue]] = []
         for profile in loaded {
+            firstPages.append(try await prefetch.value(.page(profile: profile.id, offset: 0), .sessionsList,
+                                                       listPagePayload(profile, offset: 0, options: options)))
+            try requireOwner()
+            guard listToken == token else { throw CancellationError() }
+        }
+        let quotas = Self.listQuotas(totals: firstPages.map { $0["total"]?.integer }, capacity: Self.listCapacity)
+        var leftOut = 0
+        defer { Self.logLeftOutRows(leftOut) }
+        for (position, profile) in loaded.enumerated() {
             var offset = 0
             var seen: Set<String> = []
-            while true {
-                let response = try await prefetch.value(.page(profile: profile.id, offset: offset), .sessionsList,
-                                                        listPagePayload(profile, offset: offset, options: options))
+            var taken = 0
+            while taken < quotas[position] {
+                let response = offset == 0 ? firstPages[position]
+                    : try await prefetch.value(.page(profile: profile.id, offset: offset), .sessionsList,
+                                               listPagePayload(profile, offset: offset, options: options))
                 // A page that came early doesn't wait on the network: give typing and menus their
                 // turn between pages, as one request after another did (#492).
                 await Task.yield()
@@ -329,11 +375,9 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                     throw WorkspaceClientError.invalidResponse
                 }
                 if let total = response["total"]?.integer {
-                    guard total >= 0, total <= DirectHermesSessionValidation.maximumSessions else {
-                        throw WorkspaceClientError.invalidResponse
-                    }
+                    guard total >= 0 else { throw WorkspaceClientError.invalidResponse }
                 }
-                for row in rows {
+                for row in rows where taken < quotas[position] {
                     guard let object = row.object else { throw WorkspaceClientError.invalidResponse }
                     // Hermes' idle sweep (`sessions.auto_archive`) archives a chat nobody touched for a few
                     // days. That's not the person's choice, so the chat stays; one someone archived doesn't.
@@ -382,6 +426,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                     guard pending[binding.record.id] == nil else { throw WorkspaceClientError.invalidResponse }
                     pending[binding.record.id] = binding
                     records.append(binding.record)
+                    taken += 1
                     guard records.count <= DirectHermesSessionValidation.maximumSessions else {
                         throw WorkspaceClientError.capacityExceeded
                     }
@@ -389,7 +434,11 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                 let hasMore = Self.pageHasMore(response, offset: offset, rows: rows.count)
                 if rows.isEmpty || !hasMore { break }
                 offset += response["limit"]?.integer ?? rows.count
-                guard offset <= DirectHermesSessionValidation.maximumSessions else { throw WorkspaceClientError.capacityExceeded }
+                // Pages of rows the list doesn't keep (archived, repeated) must still end.
+                guard offset <= DirectHermesSessionValidation.maximumSessions else { break }
+            }
+            if taken >= quotas[position], let total = firstPages[position]["total"]?.integer {
+                leftOut += max(0, total - taken)
             }
         }
         if !discoversActiveSessions {
@@ -2244,9 +2293,9 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             self.prefetchFolders(of: first, profile: profile, options: options, into: prefetch)
             // Without a total, the next page is known only from this one: `list` asks for each in turn.
             guard let rows = first["sessions"]?.array, first["offset"]?.integer == 0, first["limit"]?.integer == 100,
-                  let total = first["total"]?.integer, (0...DirectHermesSessionValidation.maximumSessions).contains(total),
+                  let total = first["total"]?.integer, total >= 0,
                   Self.pageHasMore(first, offset: 0, rows: rows.count) else { return }
-            for offset in stride(from: 100, to: total, by: 100) {
+            for offset in stride(from: 100, to: min(total, Self.listCapacity), by: 100) {
                 prefetch.start(.page(profile: profile.id, offset: offset), .sessionsList,
                                self.listPagePayload(profile, offset: offset, options: options)) { [weak self, weak prefetch] page in
                     guard let self, let prefetch else { return }

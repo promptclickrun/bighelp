@@ -131,7 +131,8 @@ final class NativeWorkspaceRuntime {
             throw DirectHermesError.secureStorageUnavailable
         }
         let bridge = try NativeWorkspaceSessionBridge(connections: connections, authority: authority, directory: root,
-                                                      protectedData: protectedData)
+                                                      protectedData: protectedData,
+                                                      listsScheduledRuns: { settings.showCronSessions })
         self.bridge = bridge
         let resumeProgress = NativeSessionResumeProgressCoordinator()
         self.resumeProgress = resumeProgress

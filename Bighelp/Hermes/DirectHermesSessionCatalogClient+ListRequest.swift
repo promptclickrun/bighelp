@@ -21,6 +21,13 @@ extension DirectHermesSessionCatalogClient {
         if let path = options.cwdPrefix { try DirectHermesSessionValidation.hostPath(path) }
     }
 
+    static func logLeftOutRows(_ count: Int) {
+        guard count > 0 else { return }
+        // The count only; never host data.
+        Logger(subsystem: "app.loopdy.mobile", category: "Sessions")
+            .notice("Session list kept the newest chats and left out \(count, privacy: .public) older rows")
+    }
+
     static func logUnreadableRows(_ count: Int) {
         guard count > 0 else { return }
         // The count only; never host data.

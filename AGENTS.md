@@ -835,6 +835,13 @@ Code mode.
     (`NativeWorkspaceInvalidationCoordinator.sessionsRefreshRestFactor`). A send, a reply that lands and leaving
     the app save at once.
   - `recentSummaries` is kept until the records change; many screens read it as they draw.
+  - The list of chats leaves out what no screen shows. Each scheduled run has a chat of its own (source `cron`),
+    and only Sessions › Show Scheduled Runs lists them, so the list read asks Hermes to leave them out until that
+    is on (`DirectHermesSessionCatalogClient.catalogListOptions`), as Hermes Desktop's recent chats do. A run that
+    is working still shows: live sessions are found on their own.
+  - More chats than the app holds is not an error. The list read takes the newest of each bot
+    (`listQuotas`, `listCapacity`) and logs how many it left out; it once failed, and the app showed no chats
+    at all (#1001).
 - **Kept chat rows:** a message row costs more than a 120 Hz frame to build, so the timeline keeps the 40 built
   rows nearest the screen by ID (`ChatTimelineBuiltRows`), never recycles a cell for another row, and builds the
   24 rows above while the chat is still. Cells host SwiftUI as a plain subview (`ChatTimelineCell`), not as their

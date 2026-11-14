@@ -175,6 +175,8 @@ struct SessionsView: View {
         .onChange(of: organizeByProjects) { _, _ in resetSectionDrag() }
         .onChange(of: settings.showCronSessions) { _, value in
             model.showsCronSessions = value
+            // The list of chats leaves scheduled runs out until they are asked for.
+            Task { await model.load() }
         }
         .onChange(of: renameDraft) { _, value in
             if value.count > SessionTitleRules.maximumLength {

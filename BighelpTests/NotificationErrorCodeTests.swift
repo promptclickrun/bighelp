@@ -39,7 +39,7 @@ import Testing
     @Test func messagesUsePlainBighelpWords() {
         for code in Code.allCases {
             let message = code.message
-            for banned in ["bighelp account", "Link", "OpenAI", "Anthropic", "BuzzKit", "APNs", "grant", "Loopdy", "loopdy"] {
+            for banned in ["Bighelp account", "Link", "OpenAI", "Anthropic", "BuzzKit", "APNs", "grant", "Loopdy", "loopdy"] {
                 #expect(!message.contains(banned), "\(code.rawValue) says \(banned)")
             }
         }

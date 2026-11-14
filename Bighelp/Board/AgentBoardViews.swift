@@ -427,7 +427,7 @@ struct BoardStateBanner: View {
     let state: AgentBoardStore.LoadState
     let context: AgentBoardContext
     /// For the agent: plugins before 3.0.0 only know the command's old name.
-    static let updateInstruction = "run `hermes bighelp update --restart` (on plugins before 3.0.0 the command is "
+    static let updateInstruction = "run `hermes Bighelp update --restart` (on plugins before 3.0.0 the command is "
         + "`hermes loopdy update --restart`)"
 
     var body: some View {
@@ -452,7 +452,7 @@ struct BoardStateBanner: View {
     /// The host (a Mac, a server or a cloud sandbox) runs an older plugin.
     private var pluginUpdate: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
-            Label("Your Hermes computer is running an older bighelp plugin", systemImage: "puzzlepiece.extension")
+            Label("Your Hermes computer is running an older Bighelp plugin", systemImage: "puzzlepiece.extension")
                 .font(.bighelp(.headline))
                 .foregroundStyle(theme.primaryText)
             Text("Update it in Settings, under this computer's Plugin version, or ask \(context.agentName) to do it. "
@@ -461,7 +461,7 @@ struct BoardStateBanner: View {
                 .foregroundStyle(theme.secondaryText)
             HStack(spacing: BighelpTokens.space12) {
                 Button {
-                    context.onAsk("Please update the bighelp plugin on this host: \(Self.updateInstruction), "
+                    context.onAsk("Please update the Bighelp plugin on this host: \(Self.updateInstruction), "
                         + "then restart every Hermes dashboard process (including launchd or systemd services) "
                         + "so they load it, and tell me when it's back.")
                 } label: {

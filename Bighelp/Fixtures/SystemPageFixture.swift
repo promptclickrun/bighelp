@@ -40,7 +40,7 @@ enum SystemPageFixture {
     private static func makePlugin() -> HostPluginUpdateModel {
         guard ProcessInfo.processInfo.arguments.contains(pluginNotLoadedArgument) else {
             return HostPluginUpdateFixture.model(.upToDate, installed: "2.17.0", running: "2.17.0",
-                                                 message: "bighelp plugin 2.17.0 is running.", canRestartHost: true)
+                                                 message: "Bighelp plugin 2.17.0 is running.", canRestartHost: true)
         }
         return HostPluginUpdateFixture.model(.restartNeeded, installed: "2.17.0", running: nil,
                                              message: HostPluginUpdateModel.notLoadedMessage(installed: "2.17.0"),

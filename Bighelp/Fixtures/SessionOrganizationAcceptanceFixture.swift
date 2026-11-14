@@ -9,8 +9,8 @@ enum SessionOrganizationAcceptanceFixture {
             record("new-pin", title: "Pinned newer", created: 20, pinned: true),
             record("old-active", title: "Active older", created: 30, active: true),
             record("new-active", title: "Active newer", created: 40, active: true),
-            record("demo-finance", title: "bighelp newer", created: 60, project: "demo-loopdy", name: "bighelp"),
-            record("loopdy-old", title: "bighelp older", created: 50, project: "demo-loopdy", name: "bighelp"),
+            record("demo-finance", title: "Bighelp newer", created: 60, project: "demo-loopdy", name: "Bighelp"),
+            record("loopdy-old", title: "Bighelp older", created: 50, project: "demo-loopdy", name: "Bighelp"),
             record("demo-travel", title: "Travel", created: 70, project: "demo-travel", name: "Travel Planning"),
         ]
     }

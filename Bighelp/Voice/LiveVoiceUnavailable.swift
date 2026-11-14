@@ -45,7 +45,7 @@ enum LiveVoiceUnavailable: String, Error, Equatable, Sendable {
         switch self {
         case .connecting: "Not connected yet"
         case .chatOpening: "This chat is still opening"
-        case .pluginNotInstalled: "The bighelp plugin is missing"
+        case .pluginNotInstalled: "The Bighelp plugin is missing"
         case .pluginNotLoaded: "Restart Hermes to finish"
         case .groupChat, .pluginUnreachable, .voiceNotOffered, .demo: "Live voice isn't available"
         }
@@ -54,19 +54,19 @@ enum LiveVoiceUnavailable: String, Error, Equatable, Sendable {
     var message: String {
         switch self {
         case .connecting:
-            "bighelp is still connecting to your computer. Try again in a moment."
+            "Bighelp is still connecting to your computer. Try again in a moment."
         case .chatOpening:
-            "bighelp is still opening this chat on your computer. Try again in a moment."
+            "Bighelp is still opening this chat on your computer. Try again in a moment."
         case .groupChat:
             "Live voice talks with one bot, and this chat has more than one."
         case .pluginNotInstalled:
-            "Live voice needs the bighelp plugin on your computer. Set it up in Settings › Voice, then try again."
+            "Live voice needs the Bighelp plugin on your computer. Set it up in Settings › Voice, then try again."
         case .pluginNotLoaded:
-            "The bighelp plugin is installed, but the Hermes dashboard on your computer hasn't loaded it yet. Restart the dashboard and the messaging gateway on your computer, then try again."
+            "The Bighelp plugin is installed, but the Hermes dashboard on your computer hasn't loaded it yet. Restart the dashboard and the messaging gateway on your computer, then try again."
         case .pluginUnreachable:
-            "bighelp couldn't reach the bighelp plugin on your computer just now. Try again in a moment."
+            "Bighelp couldn't reach the Bighelp plugin on your computer just now. Try again in a moment."
         case .voiceNotOffered:
-            "The Hermes on your computer doesn't offer live voice. Update Hermes and the bighelp plugin in Settings, on your computer's page, then try again."
+            "The Hermes on your computer doesn't offer live voice. Update Hermes and the Bighelp plugin in Settings, on your computer's page, then try again."
         case .demo:
             "Demo mode has no computer for live voice."
         }

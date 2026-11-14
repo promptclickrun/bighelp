@@ -156,7 +156,7 @@ struct WikiNativeTests {
     @Test func oldHostOperationNegotiationShowsPluginUpdateInstruction() {
         let failure = WikiError.safe(BighelpLinkLiveSocketError.hostUpdateRequired)
         #expect(failure == .remote("UNSUPPORTED_OPERATION"))
-        #expect(failure.localizedDescription.contains("Update its bighelp plugin"))
+        #expect(failure.localizedDescription.contains("Update its Bighelp plugin"))
     }
 
     @Test func preparedWikiConnectPreservesHostUpdateRequiredWithoutFallback() async throws {

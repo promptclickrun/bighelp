@@ -116,7 +116,7 @@ struct SpatialAvatarVolume: View {
             statusChip
             if !model.isMainWindowOpen {
                 // Simple mode: the way back to the whole app.
-                Button("Open bighelp", systemImage: "macwindow") {
+                Button("Open Bighelp", systemImage: "macwindow") {
                     openWindow(id: SpatialAvatarSceneID.main)
                 }
                 .font(.bighelp(.callout))

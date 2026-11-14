@@ -61,7 +61,7 @@ extension RootShellView {
             do {
                 try await center.place(share, at: destination, agentName: agentName)
             } catch {
-                actionErrorMessage = String(localized: "bighelp couldn't open this share. Try again.")
+                actionErrorMessage = String(localized: "Bighelp couldn't open this share. Try again.")
                 await center.refresh()
                 return
             }

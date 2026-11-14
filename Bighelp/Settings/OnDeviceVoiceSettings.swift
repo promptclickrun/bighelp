@@ -73,7 +73,7 @@ struct OnDeviceVoiceRows: View {
                 Label("Download voice (\(model.downloadSize))", systemImage: "arrow.down.circle")
             }
             .accessibilityIdentifier("voice.settings.on-device-download")
-            Text("Downloads once, then speaks offline. Keep bighelp open while it downloads. Wi-Fi is best.")
+            Text("Downloads once, then speaks offline. Keep Bighelp open while it downloads. Wi-Fi is best.")
                 .bighelpFont(.metadata)
                 .foregroundStyle(.secondary)
         case .downloading(let fraction):

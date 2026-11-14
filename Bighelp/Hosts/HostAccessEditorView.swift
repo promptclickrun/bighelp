@@ -45,7 +45,7 @@ struct HostCustomHeaderFields: View {
         Button("Add header", systemImage: "plus") { rows.append(HostCustomHeaderRow()) }
             .disabled(rows.count >= 16)
             .accessibilityIdentifier("host-access.add-header")
-        Text("For a reverse proxy that checks its own headers, like Pangolin or an nginx rule. bighelp sends them with every request and connection to this address only, and keeps them in Keychain.")
+        Text("For a reverse proxy that checks its own headers, like Pangolin or an nginx rule. Bighelp sends them with every request and connection to this address only, and keeps them in Keychain.")
             .bighelpFont(.metadata).foregroundStyle(theme.secondaryText)
     }
 }
@@ -157,11 +157,11 @@ struct HostAccessEditorView: View {
                     Button("Save", action: save).accessibilityIdentifier("host-access.save")
                 }
             }
-            .confirmationDialog("Remove everything bighelp sends to get past a proxy?",
+            .confirmationDialog("Remove everything Bighelp sends to get past a proxy?",
                                 isPresented: $isRemoveConfirmationPresented, titleVisibility: .visible) {
                 Button("Remove All", role: .destructive) { apply(access: nil, headers: []) }
             } message: {
-                Text("If a proxy or Cloudflare Access still protects this address, bighelp won't be able to connect.")
+                Text("If a proxy or Cloudflare Access still protects this address, Bighelp won't be able to connect.")
             }
         }
     }

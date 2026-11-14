@@ -91,7 +91,7 @@ struct CapabilitiesStatusSections: View {
                 Label(message, systemImage: "questionmark.circle")
                     .fixedSize(horizontal: false, vertical: true)
             } footer: {
-                Text("Unavailable features remain off; bighelp does not substitute a local implementation.")
+                Text("Unavailable features remain off; Bighelp does not substitute a local implementation.")
             }
         }
         if let errorMessage {

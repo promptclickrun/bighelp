@@ -120,7 +120,7 @@ struct ChatStreamingTextTests {
     }
 
     @Test func copyTextIsMadeOnlyWhenRead() {
-        let document = MarkdownDocument("Use **bighelp** and [open settings](https://example.com).")
+        let document = MarkdownDocument("Use **Bighelp** and [open settings](https://example.com).")
         let interaction = ChatBubbleInteraction(document: document, canFork: false)
         #expect(interaction.copyText == document.visiblePlainText)
         #expect(ChatBubbleInteraction(document: document, canFork: false, canonicalSource: "Source").copyText == "Source")

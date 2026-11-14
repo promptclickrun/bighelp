@@ -103,7 +103,7 @@ struct DirectHermesCustomHeader: Codable, Equatable, Hashable, Sendable {
             case .invalidName(let name):
                 "“\(name)” isn't a valid header name. Use letters, numbers and dashes, like X-Access-Id."
             case .reserved(let name):
-                "bighelp sets \(name) itself. For a proxy's username and password or a Cloudflare Access service token, use those options instead."
+                "Bighelp sets \(name) itself. For a proxy's username and password or a Cloudflare Access service token, use those options instead."
             case .invalidValue(let name):
                 "The value for \(name) can't be empty, contain line breaks, or be longer than 4,096 characters."
             case .duplicate(let name):

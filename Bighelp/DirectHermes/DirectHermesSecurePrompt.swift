@@ -73,7 +73,7 @@ struct DirectHermesSecurePrompt: Identifiable {
             if let prompt, !prompt.isEmpty { return prompt }
             return "Enter this value only if you want Hermes to store it for the named environment variable."
         case .sudo:
-            return "Hermes will pass this password to sudo for the waiting terminal command. bighelp does not save it."
+            return "Hermes will pass this password to sudo for the waiting terminal command. Bighelp does not save it."
         case .mcpSetup(let action):
             let verb = switch action {
             case .install: "install and enable"
@@ -1100,7 +1100,7 @@ private struct DirectHermesSecurePromptView: View {
                     loginSection
                 case .vaultUnlock:
                     secureValueSection(label: "Master password", submitTitle: "Unlock",
-                        footer: "Unlocks it on your computer for this session only. bighelp doesn't keep your master password or add it to chat.")
+                        footer: "Unlocks it on your computer for this session only. Bighelp doesn't keep your master password or add it to chat.")
                 }
 
                 if let errorMessage = store.errorMessage {
@@ -1162,9 +1162,9 @@ private struct DirectHermesSecurePromptView: View {
             if let footer {
                 Text(footer)
             } else if prompt.isAgentRequest, let name = prompt.envVar {
-                Text("Saved privately on your computer as \(name). Your bot can use it in commands but never sees what you type, and bighelp doesn't keep it or add it to chat.")
+                Text("Saved privately on your computer as \(name). Your bot can use it in commands but never sees what you type, and Bighelp doesn't keep it or add it to chat.")
             } else {
-                Text("This value is sent only to the waiting request. bighelp does not save it, add it to chat, or copy it to the clipboard.")
+                Text("This value is sent only to the waiting request. Bighelp does not save it, add it to chat, or copy it to the clipboard.")
             }
         }
     }
@@ -1187,7 +1187,7 @@ private struct DirectHermesSecurePromptView: View {
         } header: {
             Text("One-time code")
         } footer: {
-            Text("Hermes types the code into the waiting page on your computer. Your bot never sees it, and bighelp doesn't keep it or add it to chat.")
+            Text("Hermes types the code into the waiting page on your computer. Your bot never sees it, and Bighelp doesn't keep it or add it to chat.")
         }
     }
 
@@ -1213,7 +1213,7 @@ private struct DirectHermesSecurePromptView: View {
         } header: {
             Text("Login")
         } footer: {
-            Text("Saved in Hermes' vault on your computer for this site only, then filled into the page. Your bot never sees the password, and bighelp doesn't keep it or add it to chat.")
+            Text("Saved in Hermes' vault on your computer for this site only, then filled into the page. Your bot never sees the password, and Bighelp doesn't keep it or add it to chat.")
         }
     }
 
@@ -1238,7 +1238,7 @@ private struct DirectHermesSecurePromptView: View {
                 } header: {
                     Text("Required credentials")
                 } footer: {
-                    Text("Credential values are submitted only with this approved install and are never read back into bighelp.")
+                    Text("Credential values are submitted only with this approved install and are never read back into Bighelp.")
                 }
             }
             Section {
@@ -1293,7 +1293,7 @@ private struct DirectHermesSecurePromptView: View {
         case .mcpSetup(.enable):
             "This enables only the named configured server for the requesting profile."
         case .mcpSetup(.authorize):
-            "Authorization starts only after you choose Start authorization. bighelp does not expand the server's requested scope."
+            "Authorization starts only after you choose Start authorization. Bighelp does not expand the server's requested scope."
         case .secret, .sudo, .vaultCode, .vaultSaveLogin, .vaultUnlock:
             ""
         }

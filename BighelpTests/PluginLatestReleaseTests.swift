@@ -30,7 +30,7 @@ struct PluginLatestReleaseTests {
     }
 
     static func releaseJSON(tag: String = "v3.0.0", draft: Bool = false, prerelease: Bool = false,
-                            body: String = "## 3.0.0: bighelp names\n\n- Tools say **bighelp**.") -> Data {
+                            body: String = "## 3.0.0: Bighelp names\n\n- Tools say **Bighelp**.") -> Data {
         try! JSONSerialization.data(withJSONObject: ["tag_name": tag, "draft": draft, "prerelease": prerelease, "body": body])
     }
 
@@ -103,8 +103,8 @@ struct PluginLatestReleaseTests {
 
     @Test func whatsNewReadsAsPlainLines() throws {
         let release = PluginRelease(version: "3.0.0", pin: try HostPluginPin(revision: Self.commit),
-                                    notes: "## 3.0.0: bighelp names\n\n- Tools say **bighelp**.\n* `hermes bighelp` works.")
-        #expect(release.whatsNew == "3.0.0: bighelp names\n\n• Tools say bighelp.\n• hermes bighelp works.")
+                                    notes: "## 3.0.0: Bighelp names\n\n- Tools say **Bighelp**.\n* `hermes Bighelp` works.")
+        #expect(release.whatsNew == "3.0.0: Bighelp names\n\n• Tools say Bighelp.\n• hermes Bighelp works.")
     }
 
     // MARK: Helpers

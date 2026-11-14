@@ -43,7 +43,7 @@ final class LiveKanbanService: KanbanService {
 
     init(host: WorkspaceAuthority, currentOwner: @escaping @MainActor () -> WorkspaceOwner?,
          makeClient: @escaping @MainActor (WorkspaceOwner) -> DirectHermesKanbanClient?,
-         author: String = "bighelp") {
+         author: String = "Bighelp") {
         self.host = host
         self.currentOwner = currentOwner
         self.makeClient = makeClient

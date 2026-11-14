@@ -79,7 +79,7 @@ final class VoiceModel {
 
     init(
         conversationID: String,
-        agentName: String = "bighelp",
+        agentName: String = "Bighelp",
         status: VoiceStatus = .listening,
         isAgentRunActive: Bool? = nil,
         mode: VoiceMode = .pressToTalk,

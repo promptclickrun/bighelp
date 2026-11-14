@@ -233,7 +233,7 @@ final class FleetPluginFixture: HostPluginUpdating {
     func update() async -> Bool {
         guard state == .updateAvailable else { return false }
         state = .updating
-        message = "Installing bighelp plugin \(latestVersion ?? "")…"
+        message = "Installing Bighelp plugin \(latestVersion ?? "")…"
         await pause()
         if failsUpdate {
             state = .failed
@@ -253,7 +253,7 @@ final class FleetPluginFixture: HostPluginUpdating {
         await pause()
         runningVersion = installedVersion
         state = .upToDate
-        message = "bighelp plugin \(runningVersion ?? "") is installed and running."
+        message = "Bighelp plugin \(runningVersion ?? "") is installed and running."
     }
 
     private func pause() async {

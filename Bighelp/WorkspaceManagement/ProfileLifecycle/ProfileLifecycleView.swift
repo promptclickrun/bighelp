@@ -242,7 +242,7 @@ struct ProfileLifecycleView: View {
             .disabled(store.isBusy || importPath.isEmpty)
         } header: { Text("Advanced · Import & export") }
           footer: {
-              Text("These stock APIs exchange paths on the selected Hermes backend. Hermes performs archive confinement, validation, and scanning. bighelp does not open, extract, or reinterpret the archive.")
+              Text("These stock APIs exchange paths on the selected Hermes backend. Hermes performs archive confinement, validation, and scanning. Bighelp does not open, extract, or reinterpret the archive.")
           }
     }
 
@@ -256,7 +256,7 @@ struct ProfileLifecycleView: View {
                 Text(command.command).font(.bighelp(.body).monospaced()).textSelection(.enabled)
             }
         } header: { Text("Advanced · Host setup") }
-          footer: { Text("This is a read-only command supplied by Hermes. bighelp does not execute it or open a host terminal.") }
+          footer: { Text("This is a read-only command supplied by Hermes. Bighelp does not execute it or open a host terminal.") }
     }
 
     @ViewBuilder
@@ -364,7 +364,7 @@ struct ProfileLifecycleView: View {
                     }
                     .disabled(store.isBusy)
                 } footer: {
-                    Text("Hermes rejects unsafe, missing, malformed, or colliding archives. bighelp waits for the imported profile to appear in a fresh catalog before notifying shared app state.")
+                    Text("Hermes rejects unsafe, missing, malformed, or colliding archives. Bighelp waits for the imported profile to appear in a fresh catalog before notifying shared app state.")
                 }
             }
             .navigationTitle("Review Profile Import")

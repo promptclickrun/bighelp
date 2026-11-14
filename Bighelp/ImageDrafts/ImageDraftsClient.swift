@@ -32,7 +32,7 @@ enum ImageDraftFailureReason: String, Codable, CaseIterable, Sendable {
     /// What `{{reason}}` says.
     var message: String {
         switch self {
-        case .permissionDenied: "bighelp isn't allowed to add it. You can allow it in Settings."
+        case .permissionDenied: "Bighelp isn't allowed to add it. You can allow it in Settings."
         case .destinationUnavailable: "That account or calendar isn't available. Choose another one."
         case .invalidFields: "Some details can't be saved as they are. Check them and try again."
         case .writeFailed: "Try again in a moment."

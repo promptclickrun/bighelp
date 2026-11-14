@@ -40,7 +40,7 @@ struct HermesLogsView: View {
                 ContentUnavailableView {
                     Label("Logs unavailable", systemImage: "doc.text.magnifyingglass")
                 } description: {
-                    Text("This Hermes host does not expose the authenticated bounded GET /api/logs endpoint. bighelp did not fall back to host files or a console.")
+                    Text("This Hermes host does not expose the authenticated bounded GET /api/logs endpoint. Bighelp did not fall back to host files or a console.")
                 } actions: {
                     Button("Try Again") { Task { await store.refresh() } }
                 }
@@ -70,7 +70,7 @@ struct HermesLogsView: View {
         List {
             Section("Workspace") {
                 LabeledContent("Host", value: store.hostName)
-                Text("Logs are host-wide and private. bighelp keeps only this in-memory window, marks it sensitive, and discards it when this screen closes.")
+                Text("Logs are host-wide and private. Bighelp keeps only this in-memory window, marks it sensitive, and discards it when this screen closes.")
                     .font(.bighelp(.footnote))
                     .foregroundStyle(.secondary)
             }
@@ -100,7 +100,7 @@ struct HermesLogsView: View {
                             .frame(minHeight: BighelpTokens.hitTarget)
                     } else if store.appliedQuery?.lineLimit == HermesLogQuery.maximumLineLimit,
                               store.entries.count == HermesLogQuery.maximumLineLimit {
-                        Text("Reached bighelp’s 500-line maximum window.")
+                        Text("Reached Bighelp’s 500-line maximum window.")
                             .font(.bighelp(.footnote))
                             .foregroundStyle(.secondary)
                     }
@@ -116,7 +116,7 @@ struct HermesLogsView: View {
 
             if let query = store.appliedQuery {
                 Section("Window") {
-                    Text("\(store.entries.count) lines returned from the requested last \(query.lineLimit). Hermes applies level, component, and text filters on the server before bighelp displays the bounded result.")
+                    Text("\(store.entries.count) lines returned from the requested last \(query.lineLimit). Hermes applies level, component, and text filters on the server before Bighelp displays the bounded result.")
                         .font(.bighelp(.footnote))
                         .foregroundStyle(.secondary)
                 }

@@ -41,7 +41,7 @@ struct CarPlaySettingsSection: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("CarPlay starts a voice chat with this bot.")
                 if agentsFailed {
-                    Text("bighelp couldn't read this computer's bots. Check that it's on.")
+                    Text("Bighelp couldn't read this computer's bots. Check that it's on.")
                 }
             }
         }

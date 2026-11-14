@@ -125,7 +125,7 @@ struct SkillHubPageView: View {
                 if review.scan.policy == .block {
                     CatalogPrimaryButton(title: String(localized: "Blocked by Hermes' scan"), isEnabled: false) {}
                         .accessibilityIdentifier("skill.add")
-                    note("Hermes blocked this skill, so it can't be added. bighelp never forces it.")
+                    note("Hermes blocked this skill, so it can't be added. Bighelp never forces it.")
                 } else {
                     CatalogPrimaryButton(title: model.isBusy ? String(localized: "Adding…")
                                                              : String(localized: "Add to \(profileName)"),

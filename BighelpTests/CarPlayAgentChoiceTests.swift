@@ -162,7 +162,7 @@ struct CarPlayHomeTests {
         let defaults = try #require(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
         let preference = CarPlayAgentPreference(defaults: defaults)
-        #expect(preference.hostID == nil, "The one bighelp is using, until one is picked")
+        #expect(preference.hostID == nil, "The one Bighelp is using, until one is picked")
         let host = UUID()
         preference.hostID = host
         #expect(CarPlayAgentPreference(defaults: defaults).hostID == host)

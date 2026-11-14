@@ -222,7 +222,7 @@ enum DriveCatalog {
 
     private static var settingsPlaces: [DrivePlace] {
         [
-            settings("settings", String(localized: "Settings"), String(localized: "All of bighelp's settings."),
+            settings("settings", String(localized: "Settings"), String(localized: "All of Bighelp's settings."),
                      keywords: ["settings", "preferences", "options"], full: []),
             settings("settings.appearance", String(localized: "Appearance"),
                      String(localized: "Colors, light and dark mode, text size and layout."),
@@ -258,11 +258,11 @@ enum DriveCatalog {
                      keywords: ["show me around", "driving", "agents open pages", "bots open pages"],
                      full: [connections, deviceAccess],
                      point: (String(localized: "Show you around"), "permissions.device-tools.navigation")),
-            settings("settings.permissions.appearance", String(localized: "Change how bighelp looks"),
+            settings("settings.permissions.appearance", String(localized: "Change how Bighelp looks"),
                      String(localized: "The switch that lets bots change light or dark mode and your chat color."),
                      keywords: ["agent appearance", "agents change theme", "bot appearance", "bots change theme"],
                      full: [connections, deviceAccess],
-                     point: (String(localized: "Change how bighelp looks"), "permissions.device-tools.appearance")),
+                     point: (String(localized: "Change how Bighelp looks"), "permissions.device-tools.appearance")),
             settings("settings.apps", String(localized: "Apps & skills"),
                      String(localized: "What your bots can use: this device, your apps, skills, plugins and saved logins."),
                      keywords: ["apps", "connect", "connections", "connectors", "integrations", "email", "gmail", "composio"],

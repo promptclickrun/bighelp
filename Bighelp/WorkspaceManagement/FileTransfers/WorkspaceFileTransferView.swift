@@ -178,7 +178,7 @@ struct WorkspaceFileTransferView: View {
                     store.workspaceRoot == nil ? "Workspace folder unavailable" : "No managed files",
                     systemImage: "folder",
                     description: Text(store.workspaceRoot == nil
-                        ? "bighelp shows files only from the folder this agent works in, and this computer hasn't confirmed it."
+                        ? "Bighelp shows files only from the folder this agent works in, and this computer hasn't confirmed it."
                         : "Upload a file or create a folder inside this host’s configured workspace.")
                 )
             }

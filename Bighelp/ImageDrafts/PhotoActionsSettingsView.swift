@@ -121,7 +121,7 @@ struct PhotoActionsSettingsView: View {
             }
             .accessibilityIdentifier("photo-actions.reset.confirm")
         } message: { preset in
-            Text("\(preset.settingsTitle) goes back to bighelp's own text. Device access doesn't change.")
+            Text("\(preset.settingsTitle) goes back to Bighelp's own text. Device access doesn't change.")
         }
         .alert("Photo actions", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
         } message: {
@@ -134,7 +134,7 @@ struct PhotoActionsSettingsView: View {
     private var status: some View {
         switch entry.load {
         case .needsPluginUpdate:
-            Label("Update the bighelp plugin on this computer to use Photo actions.", systemImage: "arrow.down.circle")
+            Label("Update the Bighelp plugin on this computer to use Photo actions.", systemImage: "arrow.down.circle")
                 .font(.bighelp(.subheadline))
                 .foregroundStyle(theme.warning)
                 .listRowBackground(theme.surface)
@@ -499,7 +499,7 @@ struct PhotoActionsPreview: View {
                     ImageDraftReviewNote(text: ImageActionTemplate.render(effective.messages.review, values: values))
                     ImageDraftCheckBox(lines: [String(localized: "Last name: missing")],
                                        note: ImageActionTemplate.render(effective.messages.missingFields, values: values))
-                    Text("bighelp always shows this box and Save and Discard.")
+                    Text("Bighelp always shows this box and Save and Discard.")
                         .font(.bighelp(.footnote))
                         .foregroundStyle(theme.secondaryText)
                     caption("In the chat")

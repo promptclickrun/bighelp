@@ -711,7 +711,7 @@ struct ChatView: View {
                 sessionTitleErrorMessage = "Enter a chat name between 1 and \(SessionTitleRules.maximumLength) characters."
                 sessionTitleDialog = .error
             } catch {
-                sessionTitleErrorMessage = "bighelp could not rename this chat. Try again."
+                sessionTitleErrorMessage = "Bighelp could not rename this chat. Try again."
                 sessionTitleDialog = .error
             }
         }

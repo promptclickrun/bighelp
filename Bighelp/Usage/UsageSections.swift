@@ -95,7 +95,7 @@ struct UsageHeroCard: View {
             let whole = total.value(metric)
             let share = whole > 0 ? focusRow.amount.value(metric) / whole : 0
             let part = "\(UsageFormat.percent(share)) of \(metric == .cost ? "cost" : "tokens") over \(rangeText)"
-            return focusSeries == nil ? part + ". Update the bighelp plugin to chart it by day." : part
+            return focusSeries == nil ? part + ". Update the Bighelp plugin to chart it by day." : part
         }
         if metric == .tokens { return "Uncached input plus output" }
         if summary.totals.billedCost > 0 {
@@ -366,7 +366,7 @@ struct UsageWhenSection: View {
                     if let hours = summary.hours {
                         hourChart(hours)
                     } else if summary.hoursNeedPlugin {
-                        Text("Update the bighelp plugin to see the hours you use it.")
+                        Text("Update the Bighelp plugin to see the hours you use it.")
                             .font(.bighelp(.footnote))
                             .foregroundStyle(theme.tertiaryText)
                             .accessibilityIdentifier("usage.hours.update-plugin")

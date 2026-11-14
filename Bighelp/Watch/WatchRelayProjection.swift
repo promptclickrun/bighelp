@@ -6,7 +6,7 @@ enum WatchRelayProjection {
     static func needs(_ items: [DashboardAttentionItem], agentNames: [String: String],
                       now: Date = .now) -> [WatchNeed] {
         let needs: [WatchNeed] = items.compactMap { item in
-            let agent = WatchWire.bounded(item.agentID.flatMap { agentNames[$0] } ?? "bighelp", bytes: WatchLimits.name)
+            let agent = WatchWire.bounded(item.agentID.flatMap { agentNames[$0] } ?? "Bighelp", bytes: WatchLimits.name)
             switch item.interaction {
             case .approval(let summary):
                 guard !summary.isExpired(at: now) else { return nil }
@@ -64,7 +64,7 @@ enum WatchRelayProjection {
                     id: summary.id,
                     title: WatchWire.bounded(summary.title.isEmpty ? "New chat" : summary.title, bytes: WatchLimits.title),
                     agentID: agentID,
-                    agentName: WatchWire.bounded(agentID.flatMap { agentNames[$0] } ?? "bighelp", bytes: WatchLimits.name),
+                    agentName: WatchWire.bounded(agentID.flatMap { agentNames[$0] } ?? "Bighelp", bytes: WatchLimits.name),
                     preview: WatchWire.bounded(summary.preview, bytes: WatchLimits.preview),
                     updatedAt: summary.updatedAt,
                     isWorking: summary.isActive || isSending(summary.id)
@@ -92,7 +92,7 @@ enum WatchRelayProjection {
         return WatchChat(
             sessionID: record.id,
             title: WatchWire.bounded(record.title.isEmpty ? "New chat" : record.title, bytes: WatchLimits.title),
-            agentName: WatchWire.bounded(agentID.flatMap { agentNames[$0] } ?? "bighelp", bytes: WatchLimits.name),
+            agentName: WatchWire.bounded(agentID.flatMap { agentNames[$0] } ?? "Bighelp", bytes: WatchLimits.name),
             messages: Array(unique.suffix(WatchLimits.messages)),
             isWorking: isWorking,
             activity: isWorking ? ChatActivityPresentation.liveLabel(for: activityEvents)

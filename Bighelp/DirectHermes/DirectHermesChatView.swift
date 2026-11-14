@@ -552,7 +552,7 @@ struct DirectHermesSupportView: View {
                 }
                 Section("Separate integrations") {
                     Text("Wiki, Cards and forms, phone tools, voice, project changes, and notifications need their own supported integrations. They are never silently forwarded through Link.")
-                    Text("Standalone computers do not yet expose attachments, full provider picking, multi-question clarification, or subagent control windows in bighelp. Hermes may support more than this client shows.")
+                    Text("Standalone computers do not yet expose attachments, full provider picking, multi-question clarification, or subagent control windows in Bighelp. Hermes may support more than this client shows.")
                 }
                 Section("History & recovery") {
                     Text("Saved history can have tool summaries without live IDs or results and may be less detailed than the live stream. Local text and uncertain submissions stay bound to the exact account, computer, and profile.")

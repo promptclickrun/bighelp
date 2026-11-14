@@ -91,7 +91,7 @@ struct HostUpdatesSections: View {
             Button("Update Hermes") { Task { await store.applyReviewedUpdate() } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Hermes installs the update and may restart, so bighelp can disconnect for a moment.")
+            Text("Hermes installs the update and may restart, so Bighelp can disconnect for a moment.")
         }
         .pluginRestartPrompt($restartPrompt)
         .modifier(GatewayCommandConfirmation(command: $gatewayCommand, store: store))
@@ -101,7 +101,7 @@ struct HostUpdatesSections: View {
                 .accessibilityIdentifier("system.dashboard.restart.confirm")
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("bighelp disconnects for a moment and reconnects. Replies in progress on your computer stop.")
+            Text("Bighelp disconnects for a moment and reconnects. Replies in progress on your computer stop.")
         }
     }
 
@@ -172,7 +172,7 @@ struct HostUpdatesSections: View {
 
     @ViewBuilder
     private func pluginRows(_ plugin: HostPluginUpdateModel) -> some View {
-        LabeledContent("bighelp plugin", value: plugin.installedVersion ?? "—")
+        LabeledContent("Bighelp plugin", value: plugin.installedVersion ?? "—")
             .accessibilityIdentifier("settings.plugin.installed")
         if let running = plugin.runningVersion, running != plugin.installedVersion {
             LabeledContent("Running", value: running)
@@ -253,7 +253,7 @@ struct HostUpdatesSections: View {
                 Text("Restart")
             } footer: {
                 if plugin?.state == .restartNeeded {
-                    Text("The dashboard serves bighelp's connection and the bighelp plugin. A new or updated plugin takes effect after the dashboard and messaging restart.")
+                    Text("The dashboard serves Bighelp's connection and the Bighelp plugin. A new or updated plugin takes effect after the dashboard and messaging restart.")
                 }
             }
         } else if store.isLoading {
@@ -269,7 +269,7 @@ struct HostUpdatesSections: View {
         if plugin.canRestartHost {
             BighelpActionRow(title: String(localized: "Restart dashboard"),
                              detail: plugin.state == .restarting ? String(localized: "Restarting…")
-                                 : String(localized: "bighelp reconnects"),
+                                 : String(localized: "Bighelp reconnects"),
                              systemImage: "arrow.clockwise") { confirmsDashboardRestart = true }
                 .disabled(plugin.isWorking || !store.canAct)
                 .accessibilityIdentifier("system.dashboard.restart")
@@ -279,8 +279,8 @@ struct HostUpdatesSections: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Restart the dashboard on your computer")
                     Text(plugin.isLoaded
-                         ? "This dashboard can't restart from bighelp."
-                         : "The dashboard hasn't loaded the bighelp plugin yet, so only your computer can restart it.")
+                         ? "This dashboard can't restart from Bighelp."
+                         : "The dashboard hasn't loaded the Bighelp plugin yet, so only your computer can restart it.")
                         .font(.bighelp(.footnote))
                         .foregroundStyle(.secondary)
                 }
@@ -618,9 +618,9 @@ private struct GatewayCommandConfirmation: ViewModifier {
         case .start:
             String(localized: "Hermes starts messaging for this bot.")
         case .stop:
-            String(localized: "Messaging stops until you start it again. Chats in bighelp keep working.")
+            String(localized: "Messaging stops until you start it again. Chats in Bighelp keep working.")
         case .restart:
-            String(localized: "Messaging pauses for a moment while it restarts. bighelp may reconnect.")
+            String(localized: "Messaging pauses for a moment while it restarts. Bighelp may reconnect.")
         }
     }
 }

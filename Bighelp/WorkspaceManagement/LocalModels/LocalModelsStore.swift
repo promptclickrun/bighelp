@@ -78,7 +78,7 @@ final class LocalModelsStore {
                 return "Hermes will download and install the \(backend ?? "automatically selected") llama.cpp runtime on the selected host. This can use network bandwidth and host disk space."
             case .quickstart(let model):
                 let choice = model?.displayName ?? "the host’s recommended model"
-                return "Hermes will prepare \(choice), installing a runtime and downloading model files when needed. The host reports the download size and job progress; bighelp will not repeat an uncertain request."
+                return "Hermes will prepare \(choice), installing a runtime and downloading model files when needed. The host reports the download size and job progress; Bighelp will not repeat an uncertain request."
             case .download(let model):
                 return "Hermes will download \(model.displayName) (\(model.sizeLabel)) to the selected host. This can incur network transfer and consume host disk space."
             case .downloadBrowsed(let repository, let group):
@@ -92,7 +92,7 @@ final class LocalModelsStore {
             case .delete(let model):
                 return "Hermes will permanently remove its managed files for \(model.id) and clear related growth state. The original of a sideloaded link remains outside managed storage."
             case .server(.start):
-                return "Hermes will enable and start its local model server on the selected host. \(BighelpPlatform.isMac ? "bighelp itself starts no server." : "No server is started on this iPhone or iPad.")"
+                return "Hermes will enable and start its local model server on the selected host. \(BighelpPlatform.isMac ? "Bighelp itself starts no server." : "No server is started on this iPhone or iPad.")"
             case .server(.stop):
                 return "Hermes will stop the selected host’s local model server, unload all resident models, and disable automatic start until it is turned on again."
             }
@@ -378,14 +378,14 @@ final class LocalModelsStore {
                     break
                 } catch {
                     guard self.ownsScope else { break }
-                    self.errorMessage = "bighelp could not refresh Local Models jobs. Existing job IDs are retained; no operation was repeated."
+                    self.errorMessage = "Bighelp could not refresh Local Models jobs. Existing job IDs are retained; no operation was repeated."
                     break
                 }
             }
             guard self.ownsScope else { return }
             self.pollingTask = nil
             if self.jobs.contains(where: { $0.state == .running }) {
-                self.successMessage = "Hermes still reports Local Models work in progress. Pull to refresh later; bighelp will not repeat it."
+                self.successMessage = "Hermes still reports Local Models work in progress. Pull to refresh later; Bighelp will not repeat it."
             }
         }
     }
@@ -493,7 +493,7 @@ final class LocalModelsStore {
             if let confirmed {
                 successMessage = confirmed
             } else {
-                errorMessage = "The request outcome is unknown. Jobs, status, and catalog were refreshed, but they do not uniquely confirm this operation. bighelp did not repeat it."
+                errorMessage = "The request outcome is unknown. Jobs, status, and catalog were refreshed, but they do not uniquely confirm this operation. Bighelp did not repeat it."
             }
             startPollingIfNeeded()
         } catch {

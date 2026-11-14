@@ -19,7 +19,7 @@ extension BighelpShortcutBoardSection: AppEnum {
 }
 
 extension BighelpShortcutDestination: AppEnum {
-    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Place in bighelp")
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Place in Bighelp")
     static let caseDisplayRepresentations: [Self: DisplayRepresentation] = [
         .chats: .init(title: "Chats", image: .init(systemName: "bubble.left.and.bubble.right")),
         .agents: .init(title: "Bots", subtitle: "Your bots and group chats", image: .init(systemName: "person.2")),
@@ -175,7 +175,7 @@ struct BighelpShortcutWorkflowQuery: EntityQuery {
 struct BighelpOpenWorkflowIntent: AppIntent {
     static let title: LocalizedStringResource = "Open workflow"
     static let description = IntentDescription(
-        "Opens one of your workflows in bighelp, or its Run sheet to start a run. Pinned workflows come first.",
+        "Opens one of your workflows in Bighelp, or its Run sheet to start a run. Pinned workflows come first.",
         categoryName: "Workflows"
     )
     static let openAppWhenRun = true
@@ -211,7 +211,7 @@ struct BighelpOpenWorkflowIntent: AppIntent {
 struct BighelpNewChatIntent: AppIntent {
     static let title: LocalizedStringResource = "New chat"
     static let description = IntentDescription(
-        "Opens bighelp on a new chat with the bot you choose, on the computer you choose.",
+        "Opens Bighelp on a new chat with the bot you choose, on the computer you choose.",
         categoryName: "Chat"
     )
     static let openAppWhenRun = true
@@ -273,7 +273,7 @@ struct BighelpContinueChatIntent: AppIntent {
 struct BighelpOpenGroupChatIntent: AppIntent {
     static let title: LocalizedStringResource = "Open group chat"
     static let description = IntentDescription(
-        "Opens one of your group chats in bighelp.",
+        "Opens one of your group chats in Bighelp.",
         categoryName: "Chat"
     )
     static let openAppWhenRun = true
@@ -376,7 +376,7 @@ struct BighelpAddKanbanTaskIntent: AppIntent {
 struct BighelpHostStatusIntent: AppIntent {
     static let title: LocalizedStringResource = "Get computer status"
     static let description = IntentDescription(
-        "Says whether bighelp can reach your computer, how many bots it has and how many chats are working. Checking a computer doesn't switch bighelp to it.",
+        "Says whether Bighelp can reach your computer, how many bots it has and how many chats are working. Checking a computer doesn't switch Bighelp to it.",
         categoryName: "Automation"
     )
     static let openAppWhenRun = false
@@ -435,9 +435,9 @@ struct BighelpBoardItemsIntent: AppIntent {
 // MARK: - Navigation
 
 struct BighelpOpenSectionIntent: AppIntent {
-    static let title: LocalizedStringResource = "Open in bighelp"
+    static let title: LocalizedStringResource = "Open in Bighelp"
     static let description = IntentDescription(
-        "Opens bighelp on Chats, Bots, Feed, Ideas, Goals, Projects, Kanban, Workflows, Scheduled tasks or Settings.",
+        "Opens Bighelp on Chats, Bots, Feed, Ideas, Goals, Projects, Kanban, Workflows, Scheduled tasks or Settings.",
         categoryName: "Navigation"
     )
     static let openAppWhenRun = true
@@ -453,7 +453,7 @@ struct BighelpOpenSectionIntent: AppIntent {
     var gateway: BighelpShortcutGatewayEntity?
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Open \(\.$section) on \(\.$gateway) in bighelp")
+        Summary("Open \(\.$section) on \(\.$gateway) in Bighelp")
     }
 
     @Dependency private var service: BighelpShortcutService
@@ -469,7 +469,7 @@ struct BighelpOpenSectionIntent: AppIntent {
 struct BighelpSwitchAgentIntent: AppIntent {
     static let title: LocalizedStringResource = "Switch bot"
     static let description = IntentDescription(
-        "Makes the bot the one bighelp opens on, the same as picking it in the app.",
+        "Makes the bot the one Bighelp opens on, the same as picking it in the app.",
         categoryName: "Bots"
     )
     static let openAppWhenRun = false
@@ -492,14 +492,14 @@ struct BighelpSwitchAgentIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         try await service.useGateway(gateway?.hostID, for: agent.reference)
         let switched = try await service.switchAgent(to: agent.reference.agentID)
-        return .result(dialog: "bighelp now opens on \(switched.name).")
+        return .result(dialog: "Bighelp now opens on \(switched.name).")
     }
 }
 
 struct BighelpOpenAgentIntent: AppIntent {
     static let title: LocalizedStringResource = "Open bot"
     static let description = IntentDescription(
-        "Opens the bot's home in bighelp: its latest chat, with Feed, Ideas and Goals a tap away.",
+        "Opens the bot's home in Bighelp: its latest chat, with Feed, Ideas and Goals a tap away.",
         categoryName: "Bots"
     )
     static let openAppWhenRun = true

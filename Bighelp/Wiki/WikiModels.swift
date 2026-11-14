@@ -354,7 +354,7 @@ enum WikiError: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .unavailable: "Wiki is unavailable for this host. Connect a compatible, authorized host to use Wiki."
-        case .creationUnsupported: "This host does not support creating Wiki files. Update its bighelp plugin and reconnect. Existing file editing is still available."
+        case .creationUnsupported: "This host does not support creating Wiki files. Update its Bighelp plugin and reconnect. Existing file editing is still available."
         case .ownerChanged: "The Wiki identity, host or authorization changed. Reopen Wiki for the current owner."
         case .invalidResponse: "The host returned an invalid or inconsistent Wiki response. Nothing was silently truncated."
         case .invalidPath: "This link is outside the authorized Wiki or is not a supported document path."
@@ -365,15 +365,15 @@ enum WikiError: Error, LocalizedError, Equatable {
             switch code {
             case "READ_ONLY": "The host refused this write. Your draft is retained; export a copy or ask the host owner about permissions and file metadata."
             case "WIKI_NOT_ALLOWED", "INVALID_GRANT", "UNAUTHORIZED", "FORBIDDEN", "ROOT_NOT_ALLOWED", "WIKI_NOT_FOUND", "ACCESS_DENIED": "This folder is unavailable for this identity and profile. Retry the connection or choose another folder."
-            case "WIKI_AUTHORITY_CONFLICT": "This folder is registered under a different Wiki authority. Disconnect it there or choose another folder. bighelp will not adopt that registration."
+            case "WIKI_AUTHORITY_CONFLICT": "This folder is registered under a different Wiki authority. Disconnect it there or choose another folder. Bighelp will not adopt that registration."
             case "FOLDER_SUGGESTIONS_UNAVAILABLE": "Folder suggestions are unavailable on this connection. Enter the exact folder path to connect."
             case "OPERATION_UNCONFIRMED": "The host did not confirm this operation. Check its existing save status before retrying."
             case "OPERATION_CONFLICT": "This operation ID belongs to different content. Review the retained draft and save status before continuing."
             case "LOCAL_DISCONNECT_CLEANUP_FAILED": "Disconnected on Hermes, but local cleanup could not finish. Older local preferences cannot restore host access. Reopen Wiki to retry local cleanup."
             case "REVISION_STALE", "REVISION_CONFLICT", "CONFLICT": "The source or its grant changed. Reload the current version; your draft is retained."
-            case "WIKI_UNAVAILABLE": "Wiki is unavailable on this host. Update its bighelp plugin and reconnect."
+            case "WIKI_UNAVAILABLE": "Wiki is unavailable on this host. Update its Bighelp plugin and reconnect."
             case "STATE_UNAVAILABLE", "STATE_BUSY": "The host Wiki storage is unavailable. Retry or ask the host owner to check its private storage permissions."
-            case "unsupported_operation", "UNSUPPORTED_OPERATION", "OPERATION_UNSUPPORTED", "UNSUPPORTED_CAPABILITY", "CAPABILITY_UNSUPPORTED": "This host does not support connecting Wiki folders. Update its bighelp plugin and reconnect."
+            case "unsupported_operation", "UNSUPPORTED_OPERATION", "OPERATION_UNSUPPORTED", "UNSUPPORTED_CAPABILITY", "CAPABILITY_UNSUPPORTED": "This host does not support connecting Wiki folders. Update its Bighelp plugin and reconnect."
             case "WIKI_OWNER_REQUIRED", "WIKI_OWNER_CHANGED": "The Wiki host authorization changed. Reopen Wiki for the current host."
             case "WIKI_AMBIGUOUS": "This folder has multiple Wiki registrations. Ask the host owner to resolve the duplicate registrations."
             case "SECRET_SCAN_BLOCKED": "The host blocked this file because it may contain credentials. Review it on your host before opening it here."

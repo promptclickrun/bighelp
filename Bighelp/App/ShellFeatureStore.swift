@@ -1768,7 +1768,7 @@ final class ShellFeatureStore {
             id: "\(conversationID)-voice-\(sequence)",
             model: VoiceModel(
                 conversationID: conversationID,
-                agentName: agent?.name ?? "bighelp",
+                agentName: agent?.name ?? "Bighelp",
                 status: (chatModels[conversationID]?.isSending == true || session?.isActive == true) ? .working : .listening,
                 isAgentRunActive: chatModels[conversationID]?.isSending == true || session?.isActive == true,
                 mode: mode,

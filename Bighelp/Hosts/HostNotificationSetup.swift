@@ -120,7 +120,7 @@ enum BighelpChannelAlerts {
         var title: String {
             switch self {
             case .all: String(localized: "All channels")
-            case .bighelp: String(localized: "Only bighelp")
+            case .bighelp: String(localized: "Only Bighelp")
             case .choose: String(localized: "Choose")
             }
         }
@@ -278,10 +278,10 @@ enum HostNotificationState: String, Codable, Sendable {
         case .permissionDenied: "This computer doesn't allow plugin installation."
         case .managementRejected: "This computer rejected installation. Check Hermes for details."
         case .unsupported: "This Hermes version doesn't support in-app installation."
-        case .replacementRequired: "Update the existing bighelp plugin on this computer."
+        case .replacementRequired: "Update the existing Bighelp plugin on this computer."
         case .outcomeUnknown: "Couldn't confirm setup. Check again, or use Set Up Again to start over."
         case .notConnected: "Can't reach this computer. Reconnect and check setup again."
-        case .releaseUnavailable: "Couldn't reach GitHub for the newest bighelp plugin. Check the internet connection and try again."
+        case .releaseUnavailable: "Couldn't reach GitHub for the newest Bighelp plugin. Check the internet connection and try again."
         case .signInChanged: "This computer's sign-in changed. Sign in to this computer again, then check setup."
         }
     }
@@ -436,13 +436,13 @@ final class HostNotificationSetupModel {
         guard !enrollNotifications else { return state.message }
         return switch state {
         case .notConfigured:
-            "Add optional bighelp features to this computer."
+            "Add optional Bighelp features to this computer."
         case .installed, .enabled:
             "Plugin installed."
         case .verificationRequired:
             "Check the installed plugin."
         case .prerequisitesRequired:
-            "Update bighelp to install this plugin."
+            "Update Bighelp to install this plugin."
         default:
             state.message
         }
@@ -475,7 +475,7 @@ final class HostNotificationSetupModel {
             enrollNotifications ? String(localized: "Verify Notification Setup") : nil
         case .notConfigured:
             enrollNotifications ? String(localized: "Enable Notifications")
-                : String(localized: "Install bighelp Plugin")
+                : String(localized: "Install Bighelp Plugin")
         case .backendRestartRequired:
             String(localized: "Check After Backend Restart")
         case .managementRejected:

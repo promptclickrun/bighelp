@@ -95,7 +95,7 @@ struct HermesKanbanAdministrationView: View {
                 if store.activeWorkers.isEmpty { Text("No active workers.").foregroundStyle(.secondary) }
             }
             Section {
-                Text("This mounted API has no template CRUD, workflow CRUD, or separate review-policy route. bighelp preserves workflow IDs/steps on tasks, filters board reads by those exact fields, and uses the typed task Review state for handoff.")
+                Text("This mounted API has no template CRUD, workflow CRUD, or separate review-policy route. Bighelp preserves workflow IDs/steps on tasks, filters board reads by those exact fields, and uses the typed task Review state for handoff.")
                     .font(.bighelp(.footnote)).foregroundStyle(.secondary)
             } header: { Text("Advanced · Host limits") }
         }
@@ -679,7 +679,7 @@ struct HermesKanbanTaskAdministrationView: View {
                     Text("No worker log metadata returned.").foregroundStyle(.secondary)
                 }
             } header: { Text("Advanced · Worker log") } footer: {
-                Text("bighelp intentionally discards raw worker log content because this mounted route has no redacted mode; secret-bearing output is never displayed.")
+                Text("Bighelp intentionally discards raw worker log content because this mounted route has no redacted mode; secret-bearing output is never displayed.")
             }
             Section("Delete task") {
                 Button("Review Permanent Delete", role: .destructive) {

@@ -26,7 +26,7 @@ struct HTMLAppTests {
         elements.merge(extraElements) { $1 }
         return [
             "schema": .string("loopdy.card"), "version": .integer(1), "title": .string("Trip budget"),
-            "spoken_summary": .string("An app to open in bighelp: Trip budget."), "data_sources": .array([]),
+            "spoken_summary": .string("An app to open in Bighelp: Trip budget."), "data_sources": .array([]),
             "root": .string("app"), "elements": .object(elements),
             "content_hash": .string(String(repeating: "a", count: 64)),
             "card_id": .string(String(repeating: "b", count: 32)),

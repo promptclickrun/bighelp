@@ -55,7 +55,7 @@ struct AIDataConsentSheet: View {
                 .bighelpFont(.sectionTitle, weight: .semibold)
                 .foregroundStyle(theme.primaryText)
                 .accessibilityAddTraits(.isHeader)
-            Text("bighelp sends what you share (messages, files, photos, voice, and location if you turn it on) to your Hermes computer and the AI providers you set up on it.")
+            Text("Bighelp sends what you share (messages, files, photos, voice, and location if you turn it on) to your Hermes computer and the AI providers you set up on it.")
                 .bighelpFont(.body)
                 .foregroundStyle(theme.secondaryText)
                 .multilineTextAlignment(.center)

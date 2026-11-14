@@ -143,7 +143,7 @@ struct RawConfigurationView: View {
         Section {
             Label("Full-document replacement", systemImage: "doc.badge.gearshape")
             Text("Hermes parses the proposal as a YAML mapping, then atomically rewrites config.yaml. The stock raw endpoint does not run the broader configuration-structure validator and does not create a backup.")
-            Text("Saving can change live approval-mode indicators. Other settings may apply only to a new session or gateway lifecycle. bighelp does not restart anything after this save.")
+            Text("Saving can change live approval-mode indicators. Other settings may apply only to a new session or gateway lifecycle. Bighelp does not restart anything after this save.")
         } header: {
             Text("About saving")
         } footer: {
@@ -241,7 +241,7 @@ private struct RawConfigurationReviewView: View {
                 Section("Final impact") {
                     Label("This replaces the complete file. Omitted keys are removed. Comments and explicit defaults may be normalized by Hermes readback.", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
-                    Text("The endpoint does not create a backup and bighelp will not restart a session, gateway, or host process. A successful PUT is not accepted until GET /api/config/raw returns the target path again.")
+                    Text("The endpoint does not create a backup and Bighelp will not restart a session, gateway, or host process. A successful PUT is not accepted until GET /api/config/raw returns the target path again.")
                 }
             }
             .listStyle(.insetGrouped)

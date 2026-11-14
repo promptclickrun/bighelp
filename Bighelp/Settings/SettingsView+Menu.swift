@@ -46,7 +46,7 @@ extension SettingsView {
                 NavigationLink {
                     settingsDone(PendingShareListView(center: .shared, context: pendingShares))
                 } label: {
-                    rowLabel(String(localized: "Shared with bighelp"), detail: "\(PendingShareCenter.shared.waitingCount)",
+                    rowLabel(String(localized: "Shared with Bighelp"), detail: "\(PendingShareCenter.shared.waitingCount)",
                              symbol: "square.and.arrow.down.fill", showsChevron: BighelpPlatform.drawsOwnLinkChevron)
                         .bighelpSettingsLinkLabel()
                 }

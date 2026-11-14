@@ -89,7 +89,7 @@ struct SimpleBotFilesTab: View {
                 SimpleBotsMessageCard(title: String(localized: "Opening \(botName)'s files…"), isLoading: true)
             case .needsPluginUpdate:
                 SimpleBotsMessageCard(systemImage: "arrow.down.circle",
-                                      title: String(localized: "Update the bighelp plugin to see files"),
+                                      title: String(localized: "Update the Bighelp plugin to see files"),
                                       detail: String(localized: "Update it on your computer in Settings, then come back here."))
             case .failed(let message):
                 SimpleBotsMessageCard(systemImage: "exclamationmark.triangle", title: String(localized: "Files didn't load"),
@@ -233,7 +233,7 @@ struct SimpleBotMediaTab: View {
                                   detail: String(localized: "Photos and videos show up here once it's back."))
         case .unavailable:
             SimpleBotsMessageCard(systemImage: "arrow.down.circle",
-                                  title: String(localized: "Update the bighelp plugin to see media"),
+                                  title: String(localized: "Update the Bighelp plugin to see media"),
                                   detail: String(localized: "Update it on your computer in Settings, then come back here."))
         case .failed(let message):
             SimpleBotsMessageCard(systemImage: "exclamationmark.triangle", title: String(localized: "Media didn't load"),

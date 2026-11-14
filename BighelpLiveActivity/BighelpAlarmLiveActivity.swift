@@ -85,7 +85,7 @@ private struct BighelpAlarmCard: View {
                         .foregroundStyle(colors.secondary)
                         .lineLimit(1)
                     Spacer(minLength: 6)
-                    Text("bighelp")
+                    Text("Bighelp")
                         .font(.system(.caption, design: .rounded, weight: .bold))
                         .foregroundStyle(colors.accent)
                         .accessibilityHidden(true)

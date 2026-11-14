@@ -9,7 +9,7 @@ enum ImageDraftWriteFence {
     static let fencedOperations: Set<String> = ["contacts.create", "calendar.create"]
     static let code = "review_required"
     static let note = "This chat has a picture from the person. Don't add contacts or events read from a picture "
-        + "directly: call bighelp_draft_contact or bighelp_draft_event so the person reviews it in bighelp first."
+        + "directly: call bighelp_draft_contact or bighelp_draft_event so the person reviews it in Bighelp first."
 
     static func refuses(operation: String, chatHoldsPicture: Bool) -> Bool {
         chatHoldsPicture && fencedOperations.contains(operation)

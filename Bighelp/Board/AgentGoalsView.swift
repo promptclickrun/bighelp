@@ -219,12 +219,12 @@ struct AgentGoalsView: View {
     /// Older plugins keep goals without categories: they all show under Other.
     private var categoriesNeedUpdate: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-            Label("Update the bighelp plugin on your computer to sort goals by category.",
+            Label("Update the Bighelp plugin on your computer to sort goals by category.",
                   systemImage: "puzzlepiece.extension")
                 .font(.bighelp(.subheadline))
                 .foregroundStyle(theme.secondaryText)
             Button {
-                context.onAsk("Please update the bighelp plugin on this host: \(BoardStateBanner.updateInstruction), "
+                context.onAsk("Please update the Bighelp plugin on this host: \(BoardStateBanner.updateInstruction), "
                     + "then restart every Hermes dashboard process (including launchd or systemd services) "
                     + "so they load it, and tell me when it's back.")
             } label: {

@@ -259,7 +259,7 @@ import UserNotifications
         #expect(fixture.host.notificationScope != fixture.host.accountScope)
         #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.accountID
                 == "fixture-notification-installation")
-        #expect(fixture.bindingRequests == 0, "The retired bighelp account is never bound")
+        #expect(fixture.bindingRequests == 0, "The retired Bighelp account is never bound")
     }
 
     @Test func explicitSetupReplacesRevokedProviderIdentityAndCompletesEnrollment() async throws {
@@ -1332,7 +1332,7 @@ import UserNotifications
 
         fixture.hostAPI.channelsPreference = true
         await fixture.service.applyAlertPreferences()
-        #expect(fixture.hostAPI.channelPuts == [.init(other: false, choices: [:])], "Only bighelp")
+        #expect(fixture.hostAPI.channelPuts == [.init(other: false, choices: [:])], "Only Bighelp")
         #expect(fixture.ledger.record(host: fixture.host, profile: "default")?.channelAlertsSent
             == .init(other: false, choices: [:]))
         await fixture.service.applyAlertPreferences()
@@ -1351,7 +1351,7 @@ import UserNotifications
         fixture.hostAPI.reportedChannels = [["id": "telegram", "name": "Telegram"], ["id": "imsg", "name": "iMessage"],
                                             ["id": "bighelp", "name": "bighelp"], ["id": "Bad Name", "name": "Nope"]]
         #expect(await fixture.service.notificationChannels().map(\.id) == ["imsg", "telegram"],
-                "By name, without bighelp or names that aren't channels")
+                "By name, without Bighelp or names that aren't channels")
     }
 
     /// Quiet Hours go to the computer when notifications turn on, again only when they change,

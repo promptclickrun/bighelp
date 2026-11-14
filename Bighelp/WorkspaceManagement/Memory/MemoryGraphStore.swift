@@ -453,7 +453,7 @@ final class MemoryGraphStore {
             let token = UUID()
             curatorActionGeneration = token
             guard let actionStatusClient else {
-                successMessage = "Hermes admitted the Curator run and bighelp retained its launch process, but completion tracking is unavailable until the parent injects the shared Host Operations status client."
+                successMessage = "Hermes admitted the Curator run and Bighelp retained its launch process, but completion tracking is unavailable until the parent injects the shared Host Operations status client."
                 return
             }
             let hostReceipt: HermesHostActionReceipt
@@ -472,7 +472,7 @@ final class MemoryGraphStore {
                 correlation: .pendingIdentity,
                 updateSummary: nil
             )
-            successMessage = "Hermes admitted the Curator run. Completion is pending; bighelp retained the host’s per-run launch identity."
+            successMessage = "Hermes admitted the Curator run. Completion is pending; Bighelp retained the host’s per-run launch identity."
             curatorTrackingTask?.cancel()
             curatorTrackingTask = Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -487,7 +487,7 @@ final class MemoryGraphStore {
                     guard self.canPublishCuratorAction(token) else { return }
                     self.curatorTrackingTask = nil
                     self.successMessage = nil
-                    self.errorMessage = "bighelp could not confirm the Curator run. Its exact launch receipt is retained; refresh Curator and Knowledge instead of starting it again."
+                    self.errorMessage = "Bighelp could not confirm the Curator run. Its exact launch receipt is retained; refresh Curator and Knowledge instead of starting it again."
                 }
             }
         } catch is CancellationError {
@@ -512,14 +512,14 @@ final class MemoryGraphStore {
         } catch {
             guard canPublishCuratorAction(token) else { return }
             successMessage = nil
-            errorMessage = "bighelp could not refresh the retained Curator run. Its exact launch receipt remains available; the action was not repeated."
+            errorMessage = "Bighelp could not refresh the retained Curator run. Its exact launch receipt remains available; the action was not repeated."
         }
     }
 
     private func finishCuratorAction(_ status: HermesHostActionStatus, token: UUID) async {
         guard canPublishCuratorAction(token) else { return }
         guard status.phase != .running else {
-            successMessage = "Hermes still reports the Curator run as running. Its exact launch receipt is retained; bighelp did not repeat the action."
+            successMessage = "Hermes still reports the Curator run as running. Its exact launch receipt is retained; Bighelp did not repeat the action."
             return
         }
 
@@ -534,7 +534,7 @@ final class MemoryGraphStore {
             successMessage = nil
             switch status.phase {
             case .succeeded:
-                errorMessage = "Hermes reported the Curator run succeeded, but Curator and Knowledge could not be read back. Completion is not confirmed in bighelp. Refresh before acting again."
+                errorMessage = "Hermes reported the Curator run succeeded, but Curator and Knowledge could not be read back. Completion is not confirmed in Bighelp. Refresh before acting again."
             case .failed(let code):
                 errorMessage = "Hermes reported the Curator run failed with exit code \(code), and Curator and Knowledge could not be refreshed. The action was not retried."
             case .outcomeUnknown:
@@ -554,13 +554,13 @@ final class MemoryGraphStore {
         switch status.phase {
         case .succeeded:
             errorMessage = nil
-            successMessage = "Hermes reported the Curator run succeeded for \(correlation), and bighelp refreshed Curator and Knowledge."
+            successMessage = "Hermes reported the Curator run succeeded for \(correlation), and Bighelp refreshed Curator and Knowledge."
         case .failed(let code):
             successMessage = nil
-            errorMessage = "Hermes reported the Curator run failed with exit code \(code) for \(correlation). bighelp refreshed Curator and Knowledge and did not retry the action."
+            errorMessage = "Hermes reported the Curator run failed with exit code \(code) for \(correlation). Bighelp refreshed Curator and Knowledge and did not retry the action."
         case .outcomeUnknown:
             successMessage = nil
-            errorMessage = "Hermes stopped reporting the Curator run as running but has no durable exit result for \(correlation). bighelp refreshed Curator and Knowledge and did not retry the action."
+            errorMessage = "Hermes stopped reporting the Curator run as running but has no durable exit result for \(correlation). Bighelp refreshed Curator and Knowledge and did not retry the action."
         case .running:
             break
         }

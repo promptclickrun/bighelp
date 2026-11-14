@@ -290,7 +290,7 @@ struct BighelpPinnedAgentsWidgetView: View {
                 .font(.title3)
                 .foregroundStyle(colors.accent.opacity(0.75))
                 .widgetAccentable()
-            Text("No pinned bots yet. Pin bots in bighelp to see them here.")
+            Text("No pinned bots yet. Pin bots in Bighelp to see them here.")
                 .font(.caption)
                 .foregroundStyle(colors.secondary)
                 .multilineTextAlignment(.center)

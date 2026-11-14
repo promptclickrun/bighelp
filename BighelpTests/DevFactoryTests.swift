@@ -189,7 +189,7 @@ struct DevFactoryStoreTests {
         let store = DevFactoryStore(scopeID: "demo", client: client)
         await store.load()
         let template = try #require(store.templates.first { $0.id == "fix-test-pr" })
-        let setup = DevFactoryRecipeSetup(name: "Fix in bighelp",
+        let setup = DevFactoryRecipeSetup(name: "Fix in Bighelp",
                                           projects: [.init(key: "bighelp", label: "bighelp", path: "/Users/demo/code/bighelp")],
                                           agentID: "default")
 
@@ -197,7 +197,7 @@ struct DevFactoryStoreTests {
 
         #expect(store.errorMessage == nil)
         let recipe = try #require(store.recipes.first { $0.id == id })
-        #expect(recipe.revision != nil && recipe.name == "Fix in bighelp")
+        #expect(recipe.revision != nil && recipe.name == "Fix in Bighelp")
         #expect(recipe.projects.map(\.key) == ["bighelp"])
     }
 

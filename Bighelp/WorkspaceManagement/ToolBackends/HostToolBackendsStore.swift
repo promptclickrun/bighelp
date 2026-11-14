@@ -44,7 +44,7 @@ final class HostToolBackendsStore {
                     : "Hermes reports that this backend still needs setup: \(backend.detail)"
                 return "Hermes will persist \(backend.label) as the terminal execution backend for the selected profile. \(readiness) Existing terminal sessions are not migrated by this selection."
             case .requestComputerUsePermissions:
-                return "Hermes will launch CuaDriver’s permission flow on the selected host Mac. You must approve Accessibility and Screen Recording in macOS on that host. \(BighelpPlatform.isMac ? "bighelp" : "This iPhone or iPad") cannot grant Mac permissions."
+                return "Hermes will launch CuaDriver’s permission flow on the selected host Mac. You must approve Accessibility and Screen Recording in macOS on that host. \(BighelpPlatform.isMac ? "Bighelp" : "This iPhone or iPad") cannot grant Mac permissions."
             }
         }
     }
@@ -269,7 +269,7 @@ final class HostToolBackendsStore {
             if readback.isReady == true {
                 successMessage = "The host reports that CuaDriver now has the required OS permissions and Computer Use is ready."
             } else {
-                errorMessage = "The host permission process ended, but Computer Use is not ready. Check Accessibility and Screen Recording on the host Mac; \(BighelpPlatform.isMac ? "bighelp" : "the phone") did not grant either permission."
+                errorMessage = "The host permission process ended, but Computer Use is not ready. Check Accessibility and Screen Recording on the host Mac; \(BighelpPlatform.isMac ? "Bighelp" : "the phone") did not grant either permission."
             }
         } catch {
             guard ownsScope else { return }
@@ -288,11 +288,11 @@ final class HostToolBackendsStore {
             case .selectBackend(let backend) where nextTerminal.activeBackendID == backend.id:
                 successMessage = "Host readback confirms \(backend.label) is selected."
             case .requestComputerUsePermissions where nextComputer.isReady == true:
-                successMessage = "The host now reports Computer Use ready. This status came from the host OS; \(BighelpPlatform.isMac ? "bighelp" : "the phone") did not grant Mac permissions."
+                successMessage = "The host now reports Computer Use ready. This status came from the host OS; \(BighelpPlatform.isMac ? "Bighelp" : "the phone") did not grant Mac permissions."
             case .requestComputerUsePermissions:
-                errorMessage = "The launch outcome is unknown. Check the host Mac for CuaDriver or macOS dialogs, then refresh; bighelp did not repeat the request."
+                errorMessage = "The launch outcome is unknown. Check the host Mac for CuaDriver or macOS dialogs, then refresh; Bighelp did not repeat the request."
             case .selectBackend:
-                errorMessage = "The selection outcome is unknown and host readback does not confirm it. bighelp did not repeat the request."
+                errorMessage = "The selection outcome is unknown and host readback does not confirm it. Bighelp did not repeat the request."
             }
         } catch {
             guard accepts(token) else { return }
@@ -329,6 +329,6 @@ final class HostToolBackendsStore {
 
     private func publishGrantError(_ error: any Error) {
         guard ownsScope, !(error is CancellationError) else { return }
-        errorMessage = "bighelp could not confirm the host permission process. Check the host Mac and refresh Computer Use status; do not assume \(BighelpPlatform.isMac ? "bighelp" : "the phone") granted permission."
+        errorMessage = "Bighelp could not confirm the host permission process. Check the host Mac and refresh Computer Use status; do not assume \(BighelpPlatform.isMac ? "Bighelp" : "the phone") granted permission."
     }
 }

@@ -67,7 +67,7 @@ struct AvatarCreatorTests {
 
     @Test func catalogCharactersOfferCharacterColorAndMoves() throws {
         let entries = AvatarCatalog.bundled.avatars(in: .bighelp, at: .now)
-        #expect(entries.count >= 10, "The shipped catalog has bighelp's characters")
+        #expect(entries.count >= 10, "The shipped catalog has Bighelp's characters")
         let model = AvatarCreatorModel(appearance: CompanionAppearance(character: .lobster))
         #expect(model.tabs == [.character, .color, .extras, .moves], "An older bundled look keeps its tabs")
         model.tab = .extras

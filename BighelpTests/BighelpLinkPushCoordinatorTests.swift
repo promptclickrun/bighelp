@@ -290,7 +290,7 @@ struct BighelpLinkPushCoordinatorTests {
 
     @Test func retiredSchemaV1RelayDeepLinkIsRejected() {
         let open = BighelpProactiveNotificationOpen(userInfo: [
-            "aps": ["alert": ["title": "Generic", "body": "Open bighelp"]],
+            "aps": ["alert": ["title": "Generic", "body": "Open Bighelp"]],
             "loopdy": [
                 "schema_version": 1,
                 "event_id": "channel.message:fixture_0002",
@@ -407,12 +407,12 @@ final class NotificationDelegateAPNSTapTests: XCTestCase {
 
         let delegate = BighelpLinkApplicationDelegate()
         await delegate.receiveNotificationTap(userInfo: [
-            "aps": ["alert": ["title": "Generic", "body": "Open bighelp"]],
+            "aps": ["alert": ["title": "Generic", "body": "Open Bighelp"]],
             "loopdy": ["version": 2, "eventId": event,
                        "eventType": "session.completed", "grantId": grant],
         ])
         await delegate.receiveNotificationTap(userInfo: [
-            "aps": ["alert": ["title": "Generic", "body": "Open bighelp"]],
+            "aps": ["alert": ["title": "Generic", "body": "Open Bighelp"]],
             "loopdy": [
                 "schema_version": 1,
                 "event_id": "channel.message:delegate-tap",

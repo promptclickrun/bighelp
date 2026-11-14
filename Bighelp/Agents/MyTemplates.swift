@@ -126,7 +126,7 @@ enum MyTemplatesSaveError: Error, Equatable {
         case .tooLong: "This bot's instructions are too long for a template."
         case .holdsSecret: "Templates can't hold keys or passwords. Take them out of this bot's instructions, then try again."
         case .full: "Your computer keeps up to 40 templates. Delete one in Templates, then try again."
-        case .needsPluginUpdate: "Update the bighelp plugin to save templates."
+        case .needsPluginUpdate: "Update the Bighelp plugin to save templates."
         case .noConnection: "Connect to your computer to save templates."
         case .failed: "The template wasn't saved. Check your computer, then try again."
         }

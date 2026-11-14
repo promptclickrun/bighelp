@@ -32,7 +32,7 @@ final class PinnedAgentsWidgetUITests: BighelpUITestCase {
     func testUnknownComputersAndAgentsSayWhyPlainly() throws {
         let app = launchInBackground()
         app.open(URL(string: "loopdy://agent-chat?agent=finance&host=0D0D0D0D-0000-4000-8000-0000000000FF")!)
-        expectMessage("That computer isn't in bighelp anymore.", in: app)
+        expectMessage("That computer isn't in Bighelp anymore.", in: app)
         app.open(URL(string: "loopdy://agent-chat?agent=deleted-agent")!)
         expectMessage("That agent isn't on this computer anymore.", in: app)
         app.open(URL(string: "loopdy://agent-chat?agent=deleted-agent&host=\(Self.homeHermes)")!)

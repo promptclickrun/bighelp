@@ -631,7 +631,7 @@ struct ShellFeatureStoreTests {
         var session = record(id: context.sessionId)
         session.isActive = true
         session.workspaceID = "project-loopdy"
-        session.workspaceName = "bighelp iOS"
+        session.workspaceName = "Bighelp iOS"
         session.sessionContext = context
         let persisted = try JSONDecoder().decode(
             SessionRecord.self,
@@ -658,7 +658,7 @@ struct ShellFeatureStoreTests {
             agentID: "finance",
             sessionID: context.sessionId,
             workspaceID: "project-loopdy",
-            workspaceName: "bighelp iOS"
+            workspaceName: "Bighelp iOS"
         ))
     }
 

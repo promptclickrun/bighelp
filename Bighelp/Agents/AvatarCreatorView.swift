@@ -64,7 +64,7 @@ final class AvatarCreatorModel {
         var title: String {
             switch self {
             case .bots: "Bots"
-            case .bighelp: "bighelp"
+            case .bighelp: "Bighelp"
             case .hermes: "hermes"
             case .petdex: "petdex"
             case .photo: "Photo"

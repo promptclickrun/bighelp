@@ -204,7 +204,7 @@ final class BighelpLiveAlertListener {
         self.listening = nil
         let payload = Self.stopPayload(listenerID: listenerID, grants: listening.grants)
         Task { @MainActor in
-            let background = UIApplication.shared.beginBackgroundTask(withName: "bighelp instant alerts")
+            let background = UIApplication.shared.beginBackgroundTask(withName: "Bighelp instant alerts")
             _ = try? await listening.workspace.perform(.liveAlertsStop, payload: payload, owner: listening.owner)
             if background != .invalid { UIApplication.shared.endBackgroundTask(background) }
         }

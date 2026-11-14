@@ -97,13 +97,13 @@ final class CarPlayVoiceController: NSObject, CPInterfaceControllerDelegate {
         guard #available(iOS 26.4, *) else {
             // Voice apps arrived in CarPlay with iOS 26.4.
             let info = CPInformationTemplate(
-                title: "bighelp", layout: .leading,
+                title: "Bighelp", layout: .leading,
                 items: [CPInformationItem(title: nil, detail: "Update your iPhone to talk to your bot in CarPlay.")],
                 actions: [])
             interface.setRootTemplate(info, animated: false, completion: nil)
             return
         }
-        let home = CPListTemplate(title: "bighelp", listHeader: header(for: content()), sections: [],
+        let home = CPListTemplate(title: "Bighelp", listHeader: header(for: content()), sections: [],
                                   assistantCellConfiguration: nil)
         self.home = home
         interface.setRootTemplate(home, animated: false, completion: nil)
@@ -187,7 +187,7 @@ final class CarPlayVoiceController: NSObject, CPInterfaceControllerDelegate {
     // MARK: Home
 
     private func content() -> CarPlayHeaderContent {
-        CarPlayHeaderContent(agentID: session.agent?.id, name: session.agent?.name ?? "bighelp",
+        CarPlayHeaderContent(agentID: session.agent?.id, name: session.agent?.name ?? "Bighelp",
                              status: CarPlayHeaderContent.status(phase: session.phase, step: session.step),
                              earlierSteps: session.earlierSteps, isTalking: CarPlayHeaderContent.isTalking(session.phase))
     }

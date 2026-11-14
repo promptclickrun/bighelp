@@ -61,7 +61,7 @@ final class HermesKanbanStore {
             case .removeAttachment(let value):
                 "Permanently remove \(value.attachment.filename) from task \(value.taskID). The task revision will be checked again first."
             case .terminateRun(let value):
-                "Stop run \(value.run.id) for task \(value.run.taskID). Hermes will reclaim the task and bighelp will verify the ended run."
+                "Stop run \(value.run.id) for task \(value.run.taskID). Hermes will reclaim the task and Bighelp will verify the ended run."
             case .dispatch(let value):
                 "Ask Hermes to dispatch up to \(value.maximum) tasks from the reviewed board. It currently has \(value.readyCount) ready task\(value.readyCount == 1 ? "" : "s")."
             case .administration(let value):
@@ -242,23 +242,23 @@ final class HermesKanbanStore {
             switch expected {
             case .create(let approved):
                 taskDetail = try await client.create(approved: approved)
-                successMessage = "Hermes created the task and bighelp verified its detail readback."
+                successMessage = "Hermes created the task and Bighelp verified its detail readback."
             case .edit(let approved):
                 taskDetail = try await client.edit(approved: approved)
-                successMessage = "Hermes applied the task change and bighelp verified the new revision."
+                successMessage = "Hermes applied the task change and Bighelp verified the new revision."
             case .removeAttachment(let approved):
                 try await client.removeAttachment(approved: approved)
                 taskDetail = try await client.task(id: approved.taskID, board: approved.boardSlug)
-                successMessage = "Hermes removed the attachment and bighelp verified it is absent."
+                successMessage = "Hermes removed the attachment and Bighelp verified it is absent."
             case .terminateRun(let approved):
                 _ = try await client.terminateRun(approved: approved)
                 taskDetail = try await client.task(id: approved.run.taskID, board: approved.boardSlug)
-                successMessage = "Hermes ended the run and bighelp verified the task is no longer running."
+                successMessage = "Hermes ended the run and Bighelp verified the task is no longer running."
             case .dispatch(let approved):
                 let result = try await client.nudgeDispatcher(approved: approved)
                 boardSnapshot = result.board
                 dispatchReceipt = result.receipt
-                successMessage = "Hermes processed the dispatch request and returned a typed receipt. bighelp refreshed the authoritative board."
+                successMessage = "Hermes processed the dispatch request and returned a typed receipt. Bighelp refreshed the authoritative board."
             case .administration(let approved):
                 let statusID = UUID()
                 operationStatus = .init(
@@ -271,9 +271,9 @@ final class HermesKanbanStore {
                 operationStatus = .init(
                     id: statusID, title: approved.actionTitle, target: approved.message,
                     startedAt: operationStatus?.startedAt ?? Date(),
-                    phase: .completed("Hermes returned a typed result and bighelp completed authoritative readback.")
+                    phase: .completed("Hermes returned a typed result and Bighelp completed authoritative readback.")
                 )
-                successMessage = "Hermes completed the reviewed Kanban operation and bighelp verified its readback."
+                successMessage = "Hermes completed the reviewed Kanban operation and Bighelp verified its readback."
             }
             guard accepts(token) else { return }
             if let slug = boardSnapshot?.board.slug {

@@ -125,7 +125,7 @@ final class WatchAppUITests: XCTestCase {
     @MainActor
     func testThroughThePairedIPhone() throws {
         guard ProcessInfo.processInfo.environment["BIGHELP_WATCH_LIVE_PHONE"] != nil else {
-            throw XCTSkip("Needs the paired iPhone simulator running bighelp")
+            throw XCTSkip("Needs the paired iPhone simulator running Bighelp")
         }
         let app = XCUIApplication()
         app.launch()

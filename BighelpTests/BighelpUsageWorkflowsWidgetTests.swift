@@ -89,11 +89,11 @@ struct BighelpUsageWorkflowsWidgetTests {
         let reads = Box(0)
         let sources = UsageWidgetPublisher.Sources(inUseID: { home }, readInUse: {
             reads.value += 1
-            return HostUsage(id: home, name: "Home", failure: "bighelp isn't connected to this computer right now.")
+            return HostUsage(id: home, name: "Home", failure: "Bighelp isn't connected to this computer right now.")
         }, others: nil)
         await UsageWidgetPublisher.refresh(sources, gateways: [nil], directory: folder)
         #expect(BighelpUsageSnapshot.load(gateway: home, in: folder).note
-                == "bighelp isn't connected to this computer right now.", "With no numbers yet, the widget says why")
+                == "Bighelp isn't connected to this computer right now.", "With no numbers yet, the widget says why")
         await UsageWidgetPublisher.refresh(sources, gateways: [nil], directory: folder)
         #expect(reads.value == 2, "Nothing was read the first time, so the next refresh reads again")
     }

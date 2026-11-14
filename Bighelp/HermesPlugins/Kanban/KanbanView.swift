@@ -22,7 +22,7 @@ struct HermesKanbanView: View {
                 List {
                     Section("Workspace") {
                         LabeledContent("Host", value: store.hostName)
-                        Text("bighelp reads the mounted Hermes Kanban board directly. Bot Mode rooms are not used as task data.")
+                        Text("Bighelp reads the mounted Hermes Kanban board directly. Bot Mode rooms are not used as task data.")
                             .font(.bighelp(.footnote))
                             .foregroundStyle(.secondary)
                     }

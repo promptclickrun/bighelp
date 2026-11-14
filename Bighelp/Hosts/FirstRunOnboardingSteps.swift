@@ -134,7 +134,7 @@ struct FirstRunPluginStep: View {
     var body: some View {
         FirstRunStepLayout(
             systemImage: "puzzlepiece.extension.fill",
-            title: alreadyInstalled ? "The bighelp plugin is on" : "Add the bighelp plugin",
+            title: alreadyInstalled ? "The Bighelp plugin is on" : "Add the Bighelp plugin",
             subtitle: alreadyInstalled
                 ? "Your computer already has it. Here's what it adds."
                 : "Optional. It adds extras to Hermes on your computer. You can add it later in Settings.",

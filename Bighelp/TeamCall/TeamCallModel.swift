@@ -541,7 +541,7 @@ final class TeamCallModel: Identifiable {
 
     private static func microphoneMessage(_ error: VoiceInputLevelError?) -> String {
         switch error {
-        case .permissionDenied: "bighelp can't use the microphone. Allow it in Settings to talk."
+        case .permissionDenied: "Bighelp can't use the microphone. Allow it in Settings to talk."
         case .speechPermissionDenied, .speechUnavailable:
             "Speech recognition isn't available. Allow it in Settings, or switch Speech to text to Hermes in Voice settings."
         case .interrupted: "The call was interrupted. End it and start again."

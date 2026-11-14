@@ -121,7 +121,7 @@ final class WatchRelay: NSObject {
             agentID = record.agentIDs.first
         }
         guard let agent = workspace.agents.resolvedAgent(explicitID: agentID) else { throw WatchRelayError.agentGone }
-        let (sessionID, chat) = try await BighelpShortcutService.holdingHostConnection(named: "bighelp Watch") {
+        let (sessionID, chat) = try await BighelpShortcutService.holdingHostConnection(named: "Bighelp Watch") {
             try await workspace.readyChat(agentID: agent.id, reusing: outgoing.sessionID)
         }
         remember(outgoing.id, sessionID: sessionID)
@@ -132,7 +132,7 @@ final class WatchRelay: NSObject {
         let known = Set(chat.items.map(\.id))
         chat.draft = text
         Task { @MainActor [weak self] in
-            await BighelpShortcutService.holdingHostConnection(named: "bighelp Watch reply") {
+            await BighelpShortcutService.holdingHostConnection(named: "Bighelp Watch reply") {
                 await chat.send()
             }
             workspace.featureStore.flushChatPersistence()
@@ -157,7 +157,7 @@ final class WatchRelay: NSObject {
     private func board(agentID: String, kind: WatchBoardKind) async throws -> [WatchBoardItem] {
         _ = try await connected()
         guard let client = boards() else { throw WatchRelayError.boardUnavailable }
-        let items = try await BighelpShortcutService.holdingHostConnection(named: "bighelp Watch board") {
+        let items = try await BighelpShortcutService.holdingHostConnection(named: "Bighelp Watch board") {
             try await client.items(agentID: agentID)
         }
         return WatchRelayProjection.board(items, kind: kind)
@@ -173,7 +173,7 @@ final class WatchRelay: NSObject {
         }
         guard let decision = ApprovalDecision(rawValue: choice.rawValue),
               summary.allowedDecisions.contains(decision) else { throw WatchRelayError.needGone }
-        await BighelpShortcutService.holdingHostConnection(named: "bighelp Watch approval") {
+        await BighelpShortcutService.holdingHostConnection(named: "Bighelp Watch approval") {
             await dashboard.respondToApproval(itemID: needID, decision: decision)
         }
         guard dashboard.snapshot?.attentionItems.contains(where: { $0.id == needID }) != true else {
@@ -194,7 +194,7 @@ final class WatchRelay: NSObject {
         guard !answer.isEmpty, request.allowsCustomResponse || request.choices.contains(answer) else {
             throw WatchRelayError.empty
         }
-        await BighelpShortcutService.holdingHostConnection(named: "bighelp Watch answer") {
+        await BighelpShortcutService.holdingHostConnection(named: "Bighelp Watch answer") {
             await dashboard.respondToClarification(itemID: needID, response: answer)
         }
         guard dashboard.snapshot?.attentionItems.contains(where: { $0.id == needID }) != true else {
@@ -217,7 +217,7 @@ final class WatchRelay: NSObject {
         }
         let content = UNMutableNotificationContent()
         content.title = "Open on iPhone"
-        content.body = link.title.isEmpty ? "Tap to open it in bighelp." : link.title
+        content.body = link.title.isEmpty ? "Tap to open it in Bighelp." : link.title
         content.userInfo = [WatchOpenRequest.urlKey: url.absoluteString]
         content.interruptionLevel = .active
         try await center.add(UNNotificationRequest(identifier: "bighelp.watch.open", content: content, trigger: nil))
@@ -284,7 +284,7 @@ extension WatchRelay: WCSessionDelegate {
         }
         Task { @MainActor [weak self] in
             guard let self else { return reply.call([:]) }
-            let answer = await BighelpShortcutService.holdingHostConnection(named: "bighelp Watch") {
+            let answer = await BighelpShortcutService.holdingHostConnection(named: "Bighelp Watch") {
                 await self.handle(request)
             }
             reply.call(WatchRelay.payload(for: answer))
@@ -318,19 +318,19 @@ enum WatchRelayError: Error, Equatable {
 
     var message: String {
         switch self {
-        case .noHost: "Set up bighelp on your iPhone first."
+        case .noHost: "Set up Bighelp on your iPhone first."
         case .unreachable: "Your computer isn't answering. Check that it's on and online."
         case .chatGone: "That chat isn't on your computer anymore."
         case .agentGone: "That bot isn't available anymore."
         case .needGone: "This was already answered or expired."
         case .notSent: "Your message didn't go through. Try again."
-        case .notConfirmed: "Your answer wasn't confirmed. Check bighelp on your iPhone."
+        case .notConfirmed: "Your answer wasn't confirmed. Check Bighelp on your iPhone."
         case .empty: "Say or type something first."
-        case .boardUnavailable: "Update the bighelp plugin on your computer to see this."
-        case .cantOpen: "bighelp can't open that on your iPhone."
-        case .notificationsOff: "Open bighelp on your iPhone. Turn on its notifications to open things from your Watch."
+        case .boardUnavailable: "Update the Bighelp plugin on your computer to see this."
+        case .cantOpen: "Bighelp can't open that on your iPhone."
+        case .notificationsOff: "Open Bighelp on your iPhone. Turn on its notifications to open things from your Watch."
         case .tooBig: "That's too much to show on your Watch. Open it on your iPhone."
-        case .update: "Update bighelp on your iPhone and Watch."
+        case .update: "Update Bighelp on your iPhone and Watch."
         }
     }
 }

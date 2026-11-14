@@ -96,7 +96,7 @@ enum UsageWidgetPublisher {
             read = true
         case .needsPluginUpdate:
             snapshot.plans = nil
-            snapshot.plansNote = "Update the bighelp plugin on your computer to see plans and limits."
+            snapshot.plansNote = "Update the Bighelp plugin on your computer to see plans and limits."
             read = true
         case .unavailable:
             complete = false

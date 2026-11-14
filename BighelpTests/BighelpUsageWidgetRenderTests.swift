@@ -218,7 +218,7 @@ struct BighelpUsageWidgetRenderTests {
         named[0].name = "Personal Claude"
         named[1].name = "Work Codex"
         var update = usage(nil)
-        update.plansNote = "Update the bighelp plugin on your computer to see plans and limits."
+        update.plansNote = "Update the Bighelp plugin on your computer to see plans and limits."
         return [
             State(name: "Plenty left", snapshot: usage(plans())),
             State(name: "Near a limit", snapshot: usage(plans(sessionUsed: 86))),

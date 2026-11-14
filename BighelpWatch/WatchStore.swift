@@ -75,13 +75,13 @@ final class WatchStore {
             home = fresh
             homeProblem = switch fresh.status {
             case .ready: nil
-            case .noHost: "Set up bighelp on your iPhone first."
+            case .noHost: "Set up Bighelp on your iPhone first."
             case .unreachable: "Your computer isn't answering. Check that it's on and online."
             }
         case .failed(let message):
             homeProblem = message
         default:
-            homeProblem = "Update bighelp on your iPhone and Watch."
+            homeProblem = "Update Bighelp on your iPhone and Watch."
         }
     }
 
@@ -194,7 +194,7 @@ final class WatchStore {
         case .failed(let message):
             boardProblems[kind] = message
         default:
-            boardProblems[kind] = "Update bighelp on your iPhone and Watch."
+            boardProblems[kind] = "Update Bighelp on your iPhone and Watch."
         }
     }
 
@@ -205,7 +205,7 @@ final class WatchStore {
         switch await phone.ask(.open(link)) {
         case .done: nil
         case .failed(let message): message
-        default: "bighelp can't open that on your iPhone."
+        default: "Bighelp can't open that on your iPhone."
         }
     }
 

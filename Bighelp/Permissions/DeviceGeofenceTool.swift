@@ -431,11 +431,11 @@ struct GeofencePermissionExtras: View {
     private static func text(for note: DeviceGeofenceAccessNote) -> LocalizedStringKey {
         switch note {
         case .watchedWhenClosed:
-            "Always allowed: places are watched even when bighelp is closed."
+            "Always allowed: places are watched even when Bighelp is closed."
         case .watchedWhenOpen:
-            "Watched only while bighelp is open; to watch them when it is closed, allow location Always in Settings."
+            "Watched only while Bighelp is open; to watch them when it is closed, allow location Always in Settings."
         case .needsPreciseLocation:
-            "iOS can't watch places while your location is approximate, so turn on Precise Location for bighelp in Settings."
+            "iOS can't watch places while your location is approximate, so turn on Precise Location for Bighelp in Settings."
         }
     }
 }

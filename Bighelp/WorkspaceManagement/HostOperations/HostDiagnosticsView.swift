@@ -55,7 +55,7 @@ struct HostDiagnosticsView: View {
                     .frame(minHeight: BighelpTokens.hitTarget)
                 }
             } header: { Text("Checks") } footer: {
-                Text("Hermes runs these as background host actions. bighelp reads only completion status here; raw action logs are not imported into the app’s public diagnostics projection.")
+                Text("Hermes runs these as background host actions. Bighelp reads only completion status here; raw action logs are not imported into the app’s public diagnostics projection.")
             }
 
             Section {
@@ -81,7 +81,7 @@ struct HostDiagnosticsView: View {
             } header: {
                 Text("Optional support share")
             } footer: {
-                Text("This is an external upload to Nous support storage. Hermes forces redaction, but the bundle can still contain system and diagnostic context. bighelp asks for confirmation on every upload and never attaches extra client files automatically.")
+                Text("This is an external upload to Nous support storage. Hermes forces redaction, but the bundle can still contain system and diagnostic context. Bighelp asks for confirmation on every upload and never attaches extra client files automatically.")
             }
         }
         .listStyle(.insetGrouped)
@@ -114,7 +114,7 @@ struct HostDiagnosticsView: View {
             Button("Share with Nous") { Task { await store.shareDiagnosticsWithNous() } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Hermes will collect recent host diagnostics, force-redact secrets and email addresses, and upload the bundle to Nous support storage. bighelp sends no custom attachment and stores no standing consent.")
+            Text("Hermes will collect recent host diagnostics, force-redact secrets and email addresses, and upload the bundle to Nous support storage. Bighelp sends no custom attachment and stores no standing consent.")
         }
     }
 
@@ -197,9 +197,9 @@ struct HostDiagnosticsView: View {
         case .configMigrate:
             "Hermes will run its supported configuration migration on the host. This may rewrite configuration defaults. Completion will be polled; the action is never retried automatically."
         case .dump:
-            "Hermes will create its diagnostic dump on the host. bighelp will not download or upload the dump automatically."
+            "Hermes will create its diagnostic dump on the host. Bighelp will not download or upload the dump automatically."
         default:
-            "Hermes will run this host check in the background. bighelp will poll its fixed action status and will not expose raw host logs."
+            "Hermes will run this host check in the background. Bighelp will poll its fixed action status and will not expose raw host logs."
         }
     }
 }

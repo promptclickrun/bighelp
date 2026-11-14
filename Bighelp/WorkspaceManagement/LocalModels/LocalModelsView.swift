@@ -323,7 +323,7 @@ struct LocalModelsView: View {
         } header: {
             Text("Advanced · Browse models")
         } footer: {
-            Text("Search runs on Hermes. bighelp sends only selected GGUF paths and never runs repository code.")
+            Text("Search runs on Hermes. Bighelp sends only selected GGUF paths and never runs repository code.")
         }
     }
 

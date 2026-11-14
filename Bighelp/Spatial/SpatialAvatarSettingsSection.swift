@@ -40,7 +40,7 @@ struct SpatialAvatarSettingsSection: View {
         } header: {
             Text("In your space")
         } footer: {
-            Text("\(settings.spatialAvatarPinchAction.detail) Simple mode closes bighelp's window and leaves just your bot; Open bighelp under it brings the window back. To move your bot, pinch and hold the bar under it and drag. Let go near a table and it stays anchored there.")
+            Text("\(settings.spatialAvatarPinchAction.detail) Simple mode closes Bighelp's window and leaves just your bot; Open Bighelp under it brings the window back. To move your bot, pinch and hold the bar under it and drag. Let go near a table and it stays anchored there.")
                 .bighelpFont(.metadata)
         }
         .listRowBackground(theme.surface)

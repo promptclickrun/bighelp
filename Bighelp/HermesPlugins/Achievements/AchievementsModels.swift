@@ -37,13 +37,13 @@ enum HermesAchievementsError: Error, Equatable, LocalizedError {
         case .invalidResponse:
             "Hermes returned an invalid Achievements response."
         case .capacityExceeded:
-            "The Achievements response exceeded bighelp’s bounded native limit."
+            "The Achievements response exceeded Bighelp’s bounded native limit."
         case .reviewChanged:
             "Achievements changed after review. Refresh and review the current state."
         case .resetNotVerified:
             "Hermes did not provide authoritative readback for the reset. Do not retry until the current status is refreshed."
         case .scanStillRunning:
-            "The achievements scan is still running. bighelp will continue showing its reported status without claiming completion."
+            "The achievements scan is still running. Bighelp will continue showing its reported status without claiming completion."
         case .scanFailed(let reason):
             reason
         }

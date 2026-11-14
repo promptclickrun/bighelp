@@ -41,7 +41,7 @@ extension ChatAttachmentError {
                 break
             }
         }
-        return "bighelp could not read that attachment. Choose another file and try again."
+        return "Bighelp could not read that attachment. Choose another file and try again."
     }
 }
 

@@ -268,7 +268,7 @@ struct ShortcutsPermissionExtras: View {
                 }
                 .buttonStyle(.borderless)
                 .accessibilityIdentifier("permissions.device-tools.shortcuts.names")
-                Text("Your bot can run only the shortcuts you add here; bighelp opens Shortcuts to run one and comes back after.")
+                Text("Your bot can run only the shortcuts you add here; Bighelp opens Shortcuts to run one and comes back after.")
                     .bighelpFont(.metadata).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

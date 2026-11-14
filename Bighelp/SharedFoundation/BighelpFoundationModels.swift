@@ -150,7 +150,7 @@ final class BighelpFoundationWorkspace {
             BighelpFoundationSession(
                 id: "loopdy-foundation",
                 title: "Native Mac foundation",
-                agentName: "bighelp",
+                agentName: "Bighelp",
                 updatedAt: referenceDate,
                 events: [
                     .init(

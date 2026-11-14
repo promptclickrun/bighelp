@@ -302,7 +302,7 @@ enum AdvancedOptionsCatalog {
                 detail: String(localized: "Your bot asks before it keeps a note."),
                 kind: .toggle(.boolean),
                 defaultValue: .boolean(false),
-                visibility: .whileOn(note: String(localized: "bighelp can't show notes waiting for your OK yet, so your bot keeps none. Turn this off to let it remember.")))),
+                visibility: .whileOn(note: String(localized: "Bighelp can't show notes waiting for your OK yet, so your bot keeps none. Turn this off to let it remember.")))),
             .page(.memory),
         ])
 

@@ -980,7 +980,7 @@ struct SimpleBotsHomeView: View {
                 if showsTop, !home.top.isEmpty { topRow(home) }
                 // A computer whose plugin can't keep the order: it stays on this device only.
                 Text(BotsAppStateSync.shared.phoneOnlyScopes.contains(context.scope)
-                     ? "Drag your bots and group chats into the order you want, then tap Save. To keep this order on your other devices too, update the bighelp plugin on this computer." as LocalizedStringKey
+                     ? "Drag your bots and group chats into the order you want, then tap Save. To keep this order on your other devices too, update the Bighelp plugin on this computer." as LocalizedStringKey
                      : "Drag your bots and group chats into the order you want, then tap Save.")
                     .font(.bighelp(.footnote))
                     .foregroundStyle(theme.secondaryText)

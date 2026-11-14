@@ -372,10 +372,10 @@ struct BighelpShortcutActionsTests {
 
     @Test func hostStatusWithoutAComputerOrConnectionSaysSo() async throws {
         let (harness, _, _) = try await harness()
-        #expect(await harness.service.hostStatus() == "No computer is set up in bighelp yet.")
+        #expect(await harness.service.hostStatus() == "No computer is set up in Bighelp yet.")
         let offline = try await ShortcutServiceHarness(prepareConnection: { throw URLError(.notConnectedToInternet) })
         offline.service.hostServices.hostName = { "Studio Mac" }
-        #expect(await offline.service.hostStatus() == "bighelp can't reach Studio Mac right now.")
+        #expect(await offline.service.hostStatus() == "Bighelp can't reach Studio Mac right now.")
     }
 
     // MARK: Shortcut tiles

@@ -251,7 +251,7 @@ enum HermesSessionMaintenanceError: Error, Equatable, LocalizedError, Sendable {
         case .nativeReadbackRequired: "This destructive action requires the Direct connection’s exact HTTP readback support."
         case .transferTooLarge: "This chat package exceeds the current authenticated native transport limit."
         case .confirmedCloseNeedsReconciliation:
-            "Hermes closed the live runtime and preserved its stored history, but bighelp could not retire the old native binding. Refresh Chats; do not repeat the close operation."
+            "Hermes closed the live runtime and preserved its stored history, but Bighelp could not retire the old native binding. Refresh Chats; do not repeat the close operation."
         }
     }
 }

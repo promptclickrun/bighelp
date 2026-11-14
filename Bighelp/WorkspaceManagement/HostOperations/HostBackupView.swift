@@ -18,7 +18,7 @@ struct HostBackupView: View {
                 LabeledContent("Host", value: store.hostName)
                 LabeledContent("Profile", value: store.profileID)
             } header: { Text("Workspace") } footer: {
-                Text("Backups are created inside Hermes’ dashboard backup directory. bighelp can download only the archive path returned by its own confirmed backup receipt.")
+                Text("Backups are created inside Hermes’ dashboard backup directory. Bighelp can download only the archive path returned by its own confirmed backup receipt.")
             }
 
             if let message = store.errorMessage {
@@ -51,7 +51,7 @@ struct HostBackupView: View {
             Button("Create Backup") { Task { await store.createBackup() } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Hermes will create one timestamped ZIP in its managed dashboard backup directory. The immediate response admits a background action; bighelp waits for completion before enabling download.")
+            Text("Hermes will create one timestamped ZIP in its managed dashboard backup directory. The immediate response admits a background action; Bighelp waits for completion before enabling download.")
         }
         .confirmationDialog(
             "Prune rollback checkpoints?",

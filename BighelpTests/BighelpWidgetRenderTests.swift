@@ -76,7 +76,7 @@ struct BighelpWidgetRenderTests {
 
     @Test func everyWidgetRendersNonEmptyAtItsSizes() throws {
         let snapshot = BighelpWidgetSnapshot(defaultAgentID: "default", defaultAgentName: "Juno", sessions: [
-            .init(id: "a", title: "Fix the bighelp build", agentName: "Juno", status: "Running tests",
+            .init(id: "a", title: "Fix the Bighelp build", agentName: "Juno", status: "Running tests",
                   preview: nil, isRunning: true, updatedAt: .now.addingTimeInterval(-40)),
             .init(id: "b", title: "Weekend plans", agentName: "Juno", status: "Replied",
                   preview: "Saturday looks clear after 2 PM.", isRunning: false, updatedAt: .now.addingTimeInterval(-900)),

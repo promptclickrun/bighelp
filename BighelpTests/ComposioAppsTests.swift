@@ -202,7 +202,7 @@ struct ComposioAppsTests {
         #expect(try #require(await model.startConnect("slack")).host == "example.com")
         #expect(model.openSignIn?.slug == "slack", "The page stays open while Composio waits")
         await model.checkSignIn()
-        #expect(model.openSignIn != nil, "Coming back to bighelp only looks; it doesn't end the sign-in")
+        #expect(model.openSignIn != nil, "Coming back to Bighelp only looks; it doesn't end the sign-in")
         #expect(await model.waitForSignIn(), "The new account closes the page")
         #expect(model.isConnected("slack") && model.openSignIn == nil)
         #expect(model.connectedApps.first?.slug == "slack")

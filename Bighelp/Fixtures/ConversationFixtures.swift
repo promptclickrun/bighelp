@@ -95,7 +95,7 @@ class ConversationFixtureClient: AttachmentConversationClient, CompactingConvers
             sender: .agent(id: canonicalAgentID, snapshot: agentSnapshot),
             content: content,
             // As a live Hermes reply: the time it arrived (#856).
-            metadata: TimelineMetadata(source: "bighelp demo data", freshness: "Updated just now", timestamp: Date())
+            metadata: TimelineMetadata(source: "Bighelp demo data", freshness: "Updated just now", timestamp: Date())
         )
     }
 }
@@ -135,7 +135,7 @@ enum ConversationFixtures {
                               result: "{\"sample\":true}", sourceOrder: 4 + index)
         }
         return SessionRecord(id: sessionID, kind: .direct, agentIDs: ["finance"], title: "UI V3 Preview",
-                             workspaceID: "demo-loopdy", workspaceName: "bighelp",
+                             workspaceID: "demo-loopdy", workspaceName: "Bighelp",
                              sessionRuntime: .init(model: "gpt-5.6", provider: "openai", observedAt: Date()),
                              items: items, activityEvents: activity, hasAcceptedMessage: true)
     }
@@ -164,7 +164,7 @@ enum ConversationFixtures {
             agentIDs: ["finance"],
             title: "Reaction interaction preview",
             workspaceID: "demo-loopdy",
-            workspaceName: "bighelp",
+            workspaceName: "Bighelp",
             sessionRuntime: .init(model: "gpt-5.6", provider: "openai", observedAt: Date()),
             items: items,
             hasAcceptedMessage: true
@@ -202,7 +202,7 @@ enum ConversationFixtures {
                 metadata: .init(source: "UI preview", timestamp: now.addingTimeInterval(Double(index - 3) * 60), sourceOrder: index))
         }
         return SessionRecord(id: "demo-finance", kind: .direct, agentIDs: ["finance"], title: "Kyoto trip",
-            workspaceID: "demo-loopdy", workspaceName: "bighelp",
+            workspaceID: "demo-loopdy", workspaceName: "Bighelp",
             sessionContext: .init(sessionId: "demo-finance", model: "gpt-5.6", contextUsed: 29100,
                 contextMax: 1000000, contextPercent: 3, compressions: 0, isCompacting: false,
                 updatedAt: Int(now.timeIntervalSince1970)),
@@ -697,7 +697,7 @@ enum ConversationFixtures {
                 role: .assistant,
                 sender: sender,
                 content: .message("Good morning. I’ve gathered your fixture priorities, spending, and schedule in one place."),
-                metadata: TimelineMetadata(source: "bighelp demo data", freshness: "Updated 2 min ago")
+                metadata: TimelineMetadata(source: "Bighelp demo data", freshness: "Updated 2 min ago")
             ),
             TimelineItem(
                 id: "fixture-\(conversationID)-budget",
@@ -715,7 +715,7 @@ enum ConversationFixtures {
             role: .assistant,
             sender: .agent(id: senderID, snapshot: .init(name: "Assistant")),
             content: .weatherAndTasks(weatherAndTasks),
-            metadata: .init(source: "bighelp demo data", freshness: "Updated just now")
+            metadata: .init(source: "Bighelp demo data", freshness: "Updated just now")
         )
     }
 

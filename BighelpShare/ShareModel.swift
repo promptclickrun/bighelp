@@ -46,7 +46,7 @@ final class ShareModel: ObservableObject {
     func start(_ providers: [NSItemProvider]) {
         guard reading == nil else { return }
         guard let inbox else {
-            phase = .failed(String(localized: "bighelp can't save shares on this device. Open bighelp and try again."))
+            phase = .failed(String(localized: "Bighelp can't save shares on this device. Open Bighelp and try again."))
             return
         }
         guard !providers.isEmpty else {
@@ -108,15 +108,15 @@ final class ShareModel: ObservableObject {
         case .timedOut:
             return String(localized: "This didn't arrive in time. Try sharing it again.")
         case .unsupported:
-            return String(localized: "bighelp can't take this kind of item.")
+            return String(localized: "Bighelp can't take this kind of item.")
         case .share(let error):
             switch error {
             case .nothingToShare:
                 return String(localized: "There was nothing to share.")
             case .tooManyFiles(let limit):
-                return String(localized: "bighelp takes up to \(limit) photos and files at a time.")
+                return String(localized: "Bighelp takes up to \(limit) photos and files at a time.")
             case .fileTooLarge(_, let limit):
-                return String(localized: "This is over \(Self.size(limit)), the most bighelp can take.")
+                return String(localized: "This is over \(Self.size(limit)), the most Bighelp can take.")
             case .shareTooLarge(let limit):
                 return String(localized: "Together these are over \(Self.size(limit)). Share fewer at a time.")
             case .textTooLong:
@@ -124,15 +124,15 @@ final class ShareModel: ObservableObject {
             case .noteTooLong:
                 return String(localized: "Your note is too long.")
             case .tooManyLinks(let limit):
-                return String(localized: "bighelp takes up to \(limit) links at a time.")
+                return String(localized: "Bighelp takes up to \(limit) links at a time.")
             case .unreadable:
-                return String(localized: "bighelp couldn't read this.")
+                return String(localized: "Bighelp couldn't read this.")
             case .emptyFile:
                 return String(localized: "This file is empty.")
             case .inboxFull(let shares):
-                return String(localized: "bighelp is holding \(shares) shares you haven't sent. Open bighelp, send or delete some, then share this again.")
+                return String(localized: "Bighelp is holding \(shares) shares you haven't sent. Open Bighelp, send or delete some, then share this again.")
             case .storageUnavailable, .gone, .finished:
-                return String(localized: "bighelp couldn't save this. Nothing was saved.")
+                return String(localized: "Bighelp couldn't save this. Nothing was saved.")
             case .cancelled:
                 return String(localized: "Cancelled.")
             }

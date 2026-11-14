@@ -186,7 +186,7 @@ struct HTMLAppWebView: UIViewRepresentable {
                                    didReceive message: WKScriptMessage) async -> (Any?, String?) {
             guard message.frameInfo.isMainFrame, !isFinished, let parent,
                   let body = message.body as? [String: Any], let kind = body["kind"] as? String else {
-                return (nil, "bighelp didn't understand that.")
+                return (nil, "Bighelp didn't understand that.")
             }
             switch kind {
             case "getData":
@@ -195,14 +195,14 @@ struct HTMLAppWebView: UIViewRepresentable {
                 guard parent.sendsAnswers else { return (nil, "This app can't send answers.") }
                 guard let json = body["answer"] as? String, json.utf8.count <= HTMLAppBridge.maximumMessageBytes,
                       let answer = try? HTMLAppAnswer(json: json) else {
-                    return (nil, "bighelp can't send that. Send text, or names with text, numbers, yes or no, or lists of text.")
+                    return (nil, "Bighelp can't send that. Send text, or names with text, numbers, yes or no, or lists of text.")
                 }
                 return (await parent.onAnswer(answer), nil)
             case "close":
                 parent.onClose()
                 return (true, nil)
             default:
-                return (nil, "bighelp doesn't know \(kind.prefix(40)).")
+                return (nil, "Bighelp doesn't know \(kind.prefix(40)).")
             }
         }
     }

@@ -102,7 +102,7 @@ enum ClipboardImageImportError: Error, Equatable, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noReadableImage:
-            "bighelp could not read that image from the clipboard. Copy it again and try pasting."
+            "Bighelp could not read that image from the clipboard. Copy it again and try pasting."
         case .tooManyImages:
             "Paste up to 10 images at a time."
         case .sourceTooLarge:
@@ -125,7 +125,7 @@ enum ClipboardImageImportError: Error, Equatable, LocalizedError {
                 break
             }
         }
-        return "bighelp could not read that image from the clipboard. Copy it again and try pasting."
+        return "Bighelp could not read that image from the clipboard. Copy it again and try pasting."
     }
 }
 

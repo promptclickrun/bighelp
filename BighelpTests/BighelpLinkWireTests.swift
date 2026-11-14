@@ -156,7 +156,7 @@ struct BighelpLinkWireTests {
               "agentId": "default",
               "agentName": "Juno",
               "title": "Morning briefing",
-              "body": "Open bighelp to view the briefing.",
+              "body": "Open Bighelp to view the briefing.",
               "sentAt": 1788000001,
               "card": {
                 "schema": "loopdy.generative_ui",

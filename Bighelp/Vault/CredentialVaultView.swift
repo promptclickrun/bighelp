@@ -164,7 +164,7 @@ struct CredentialVaultView: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             SimpleBotsCard {
-                SimpleBotsRow(title: String(localized: "Kept on your computer. bighelp doesn't keep a copy."),
+                SimpleBotsRow(title: String(localized: "Kept on your computer. Bighelp doesn't keep a copy."),
                               leading: Image(systemName: "lock")) { EmptyView() }
                 SimpleBotsDivider()
                 SimpleBotsRow(title: String(localized: "Before \(model.agentName) pays with a card, you're asked every time."),
@@ -578,7 +578,7 @@ private struct CredentialVaultItemPage: View {
         }
         CredentialVaultNote(text: model.canLink
             ? String(localized: "Adding a website copies it on your computer. You don't type it again.")
-            : String(localized: "To add a website without typing it again, update the bighelp plugin on your computer."))
+            : String(localized: "To add a website without typing it again, update the Bighelp plugin on your computer."))
 
         SimpleBotsCard {
             CredentialVaultLinkRow(title: String(localized: "Change details"), systemImage: "pencil",
@@ -886,7 +886,7 @@ private struct CredentialVaultUnlockView: View {
                         .onSubmit(unlock)
                         .accessibilityIdentifier("vault.master-password")
                 } footer: {
-                    Text("Unlocks \(source.displayName) on your computer so your bot can use its logins. bighelp doesn't keep your master password.")
+                    Text("Unlocks \(source.displayName) on your computer so your bot can use its logins. Bighelp doesn't keep your master password.")
                 }
                 if let message = model.message {
                     Section { Text(message).foregroundStyle(.secondary) }
@@ -1005,7 +1005,7 @@ private struct CredentialVaultImportView: View {
                             }
                         }
                     } footer: {
-                        Text("Passwords go straight to the vault on your computer for \(model.agentName). bighelp doesn't keep them.")
+                        Text("Passwords go straight to the vault on your computer for \(model.agentName). Bighelp doesn't keep them.")
                     }
                     if !pending.logins.isEmpty {
                         Section("Logins") {

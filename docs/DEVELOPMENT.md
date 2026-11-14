@@ -75,7 +75,7 @@ xcodebuild build \
   -scheme BighelpCatalyst \
   -destination 'platform=macOS,variant=Mac Catalyst' \
   -derivedDataPath /tmp/bighelp-mac-dd
-open /tmp/bighelp-mac-dd/Build/Products/Debug-maccatalyst/bighelp.app --args -use-demo-fixtures -disable-demo-delays
+open /tmp/bighelp-mac-dd/Build/Products/Debug-maccatalyst/Bighelp.app --args -use-demo-fixtures -disable-demo-delays
 ```
 
 `-start-chat-mid-session` opens a demo chat whose agent is still working, for trying Command-Return.

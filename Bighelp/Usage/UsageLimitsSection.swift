@@ -147,13 +147,13 @@ struct UsageLimitsSection: View {
                     .padding(.horizontal, BighelpTokens.space20)
             }
             if store.state == .needsPluginUpdate {
-                UsageMessageCard(title: "Update the bighelp plugin\(hostName.map { " on \($0)" } ?? "") to see plans and limits.")
+                UsageMessageCard(title: "Update the Bighelp plugin\(hostName.map { " on \($0)" } ?? "") to see plans and limits.")
             } else if let report = store.report {
                 let providers = ProviderUsagePresentation.visible(report.providers, hidden: hidden,
                                                                order: ProviderUsagePreferences.order(orderRaw))
                 if report.providers.isEmpty {
                     UsageMessageCard(title: "No AI plans found\(hostName.map { " on \($0)" } ?? "").",
-                                     detail: "bighelp shows coding tools on the computer and providers set up in Hermes.")
+                                     detail: "Bighelp shows coding tools on the computer and providers set up in Hermes.")
                 } else if providers.isEmpty {
                     UsageMessageCard(title: "Every plan is hidden.", action: ("Choose", onChoose))
                 } else {
@@ -201,7 +201,7 @@ struct UsageLimitsSection: View {
                 }
             }
         case .needsPluginUpdate?:
-            UsageMessageCard(title: "Update the bighelp plugin on \(host.name) to see its plans and limits.")
+            UsageMessageCard(title: "Update the Bighelp plugin on \(host.name) to see its plans and limits.")
         case .unavailable(let message)?:
             UsageMessageCard(title: host.name, detail: message)
         case nil:

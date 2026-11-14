@@ -43,7 +43,7 @@ struct DashboardActivityDetailView: View {
         case .loading:
             note(String(localized: "Loading…"))
         case .unsupported:
-            note(String(localized: "Update the bighelp plugin on this computer to see what this did."))
+            note(String(localized: "Update the Bighelp plugin on this computer to see what this did."))
         case .gone:
             note(String(localized: "The computer no longer has a record of this."))
         case .failed:

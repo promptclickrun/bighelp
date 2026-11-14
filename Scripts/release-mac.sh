@@ -63,16 +63,16 @@ cat > "$out/ExportOptions.plist" <<PLIST
 PLIST
 xcodebuild -exportArchive -archivePath "$out/bighelp.xcarchive" -exportPath "$out/export" \
   -exportOptionsPlist "$out/ExportOptions.plist" -allowProvisioningUpdates -quiet
-app=$out/export/bighelp.app
+app=$out/export/Bighelp.app
 codesign --verify --deep --strict "$app"
 info() { /usr/libexec/PlistBuddy -c "Print :$1" "$app/Contents/Info.plist"; }
 [[ $(info CFBundleVersion) == "$build" ]] || { print -u2 "The app's build isn't $build."; exit 1; }
 
 # Drag-to-Applications disk image, signed itself so Gatekeeper checks the download too.
 # Stapling fails unless Apple accepted the notarization.
-ditto "$app" "$out/dmg/bighelp.app"
+ditto "$app" "$out/dmg/Bighelp.app"
 ln -s /Applications "$out/dmg/Applications"
-hdiutil create -volname bighelp -srcfolder "$out/dmg" -format UDZO -ov "$dmg" -quiet
+hdiutil create -volname Bighelp -srcfolder "$out/dmg" -format UDZO -ov "$dmg" -quiet
 codesign --sign "$identity" --timestamp "$dmg"
 if (( notarize )); then
   asc notarization submit --file "$dmg" --wait --output table
@@ -91,7 +91,7 @@ signature=$(ed_key | "$sparkle/sign_update" --ed-key-file - -p "$dmg")
 if [[ -n $notes_file ]]; then
   cp "$notes_file" "$out/notes.md"
 else
-  print "bighelp for Mac $version ($build). Open the disk image and drag bighelp to Applications." > "$out/notes.md"
+  print "Bighelp for Mac $version ($build). Open the disk image and drag Bighelp to Applications." > "$out/notes.md"
 fi
 feed=(--download-url "${feed_base:-$public/download/$tag}/${dmg:t}")
 [[ -n $feed_base ]] || feed+=(--release-url "$public/tag/$tag")
@@ -107,4 +107,4 @@ print "Built $dmg with ${dmg:t}.sha256 and appcast.xml"
 # The release goes to this checkout's GitHub repo, tagged at the commit that was built.
 cd "$repo"
 gh release create "$tag" "$dmg" --target "$(git rev-parse HEAD)" \
-  --title "bighelp for Mac $version ($build)" --notes-file "$out/notes.md" "${draft[@]}"
+  --title "Bighelp for Mac $version ($build)" --notes-file "$out/notes.md" "${draft[@]}"

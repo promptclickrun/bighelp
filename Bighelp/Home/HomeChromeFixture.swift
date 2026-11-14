@@ -136,7 +136,7 @@ struct HomeChromeFixture: View {
         return HomeSidebarContext(
             items: HomeTabItem.standard(view: view, todayHasNew: true), selection: tab, onSelect: { tab = $0 },
             recent: recent, onSeeAll: {},
-            more: [HomeSidebarLink(id: "shared", title: "Shared with bighelp", symbol: "tray.and.arrow.down",
+            more: [HomeSidebarLink(id: "shared", title: "Shared with Bighelp", symbol: "tray.and.arrow.down",
                                    detail: "2", showsDot: true, action: {})],
             onNewChat: {}, onOpenSettings: {})
     }

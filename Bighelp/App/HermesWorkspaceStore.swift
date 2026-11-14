@@ -177,7 +177,7 @@ final class HermesWorkspaceStore {
             }
             guard let fullPath = HermesFolderPath.expanded(folderPath, home: homePath) else {
                 guard generation == loadGeneration else { return false }
-                errorMessage = "bighelp couldn't find the home folder on your computer. Type the full path, starting with /."
+                errorMessage = "Bighelp couldn't find the home folder on your computer. Type the full path, starting with /."
                 return false
             }
             var created = try await client.create(

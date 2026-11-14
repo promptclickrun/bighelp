@@ -366,7 +366,7 @@ struct HermesKanbanAdministrationReview: Identifiable, Equatable, Sendable {
         case .reassignTask(let board, let task, let profile, let reclaim, _, _):
             "Route “\(task.title)” on \(board) to \(profile ?? "Unassigned")\(reclaim ? " and release its active claim first" : "")."
         case .reclaimTask(let board, let task, _, _):
-            "Release the active worker claim for “\(task.title)” on \(board). bighelp will verify the run and task readback."
+            "Release the active worker claim for “\(task.title)” on \(board). Bighelp will verify the run and task readback."
         case .specifyTask(let board, let task, _):
             "Ask the configured auxiliary model to refine triage task “\(task.title)” on \(board). Keep this operation pending until Hermes returns its outcome."
         case .decomposeTask(let board, let task, _):

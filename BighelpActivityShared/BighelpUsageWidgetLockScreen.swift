@@ -115,7 +115,7 @@ struct UsageLockScreenView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Usage").font(.headline)
                     Text(!entry.snapshot.hasData ? "No numbers yet"
-                         : entry.snapshot.plans == nil && entry.snapshot.plansNote != nil ? "Update the bighelp plugin"
+                         : entry.snapshot.plans == nil && entry.snapshot.plansNote != nil ? "Update the Bighelp plugin"
                          : "No plans with limits")
                         .font(.caption).lineLimit(2)
                 }

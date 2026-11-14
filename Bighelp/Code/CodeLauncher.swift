@@ -146,7 +146,7 @@ struct CodeChatSessionStarter: CodeSessionStarting {
             try await BighelpShortcutService.awaitTransportReady(chat)
             try await features.setSessionYOLO(true, sessionID: sessionID, agentID: agentID)
         } catch {
-            NSLog("bighelp: YOLO for a new IDE session failed: %@", String(describing: error))
+            NSLog("Bighelp: YOLO for a new IDE session failed: %@", String(describing: error))
             throw CodeStartError.yoloRefused
         }
     }

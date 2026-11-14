@@ -11,7 +11,7 @@ import Foundation
 /// It lives in the app, so iOS starts bighelp in the background to run it; it asks for nothing
 /// from iOS and reaches no host.
 struct BighelpFocusFilter: SetFocusFilterIntent {
-    static let title: LocalizedStringResource = "bighelp"
+    static let title: LocalizedStringResource = "Bighelp"
     static let description = IntentDescription(
         "Tell your bots about this Focus, and keep their alerts quiet while it is on.",
         categoryName: "Focus"
@@ -28,9 +28,9 @@ struct BighelpFocusFilter: SetFocusFilterIntent {
 
     var displayRepresentation: DisplayRepresentation {
         guard let name = BighelpFocusFilterState.clean(name, limit: BighelpFocusFilterState.maximumNameLength) else {
-            return DisplayRepresentation(title: "bighelp")
+            return DisplayRepresentation(title: "Bighelp")
         }
-        return DisplayRepresentation(title: "bighelp", subtitle: "\(name)")
+        return DisplayRepresentation(title: "Bighelp", subtitle: "\(name)")
     }
 
     func perform() async throws -> some IntentResult {

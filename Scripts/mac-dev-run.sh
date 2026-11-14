@@ -47,7 +47,7 @@ done
 bundle_id=app.loopdy.mobile.dev-$name
 work=$root/$name
 derived=$work/DerivedData
-app=$work/bighelp.app
+app=$work/Bighelp.app
 log=$work/app.log
 lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 
@@ -83,9 +83,9 @@ if (( build )); then
     -destination 'platform=macOS,variant=Mac Catalyst' -derivedDataPath "$derived" \
     CODE_SIGNING_ALLOWED=NO -quiet
   # The build product carries the real app's ID; keep Launch Services from offering it for that ID.
-  $lsregister -u "$derived/Build/Products/Debug-maccatalyst/bighelp.app" 2>/dev/null || true
+  $lsregister -u "$derived/Build/Products/Debug-maccatalyst/Bighelp.app" 2>/dev/null || true
 fi
-built=$derived/Build/Products/Debug-maccatalyst/bighelp.app
+built=$derived/Build/Products/Debug-maccatalyst/Bighelp.app
 [[ -d $built ]] || { print -u2 "No build at $built; run without --no-build."; exit 1; }
 
 quit_copy
@@ -121,6 +121,6 @@ for _ in {1..100}; do
   [[ -n $pid ]] && break
   sleep 0.1
 done
-[[ -n ${pid:-} ]] || { print -u2 "bighelp didn't start; see $log"; exit 1; }
+[[ -n ${pid:-} ]] || { print -u2 "Bighelp didn't start; see $log"; exit 1; }
 print "Running $bundle_id from $app (log: $log)"
 print "$pid"

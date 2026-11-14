@@ -1651,19 +1651,19 @@
         }
       }
     },
-    "Add the bighelp plugin": {
+    "Add the Bighelp plugin": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Add the bighelp plugin"
+            "value": "Add the Bighelp plugin"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "添加 bighelp 插件"
+            "value": "添加 Bighelp 插件"
           }
         }
       }
@@ -2450,19 +2450,19 @@
         }
       }
     },
-    "Any bot on your computer can use this while its chat is open, and for a short time after you leave bighelp.": {
+    "Any bot on your computer can use this while its chat is open, and for a short time after you leave Bighelp.": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Any bot on your computer can use this while its chat is open, and for a short time after you leave bighelp."
+            "value": "Any bot on your computer can use this while its chat is open, and for a short time after you leave Bighelp."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "你电脑上的任何机器人都可以在其聊天打开时使用，离开 bighelp 后的短时间内也可以。"
+            "value": "你电脑上的任何机器人都可以在其聊天打开时使用，离开 Bighelp 后的短时间内也可以。"
           }
         }
       }
@@ -3742,19 +3742,19 @@
         }
       }
     },
-    "Change how bighelp looks": {
+    "Change how Bighelp looks": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Change how bighelp looks"
+            "value": "Change how Bighelp looks"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "更改 bighelp 的外观"
+            "value": "更改 Bighelp 的外观"
           }
         }
       }
@@ -4112,19 +4112,19 @@
         }
       }
     },
-    "Chat with the Hermes bots running on your computer. No separate bighelp account required.": {
+    "Chat with the Hermes bots running on your computer. No separate Bighelp account required.": {
       "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Chat with the Hermes bots running on your computer. No separate bighelp account required."
+            "value": "Chat with the Hermes bots running on your computer. No separate Bighelp account required."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "与电脑上运行的 Hermes 机器人聊天，无需另建 bighelp 账户。"
+            "value": "与电脑上运行的 Hermes 机器人聊天，无需另建 Bighelp 账户。"
           }
         }
       }
@@ -4146,19 +4146,19 @@
         }
       }
     },
-    "Chats in bighelp always notify you.": {
+    "Chats in Bighelp always notify you.": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Chats in bighelp always notify you."
+            "value": "Chats in Bighelp always notify you."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "bighelp 中的聊天始终会通知你。"
+            "value": "Bighelp 中的聊天始终会通知你。"
           }
         }
       }
@@ -6298,19 +6298,19 @@
         }
       }
     },
-    "Dev Factory needs a newer bighelp plugin on this computer. Update it in Settings, on your computer's page.": {
+    "Dev Factory needs a newer Bighelp plugin on this computer. Update it in Settings, on your computer's page.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dev Factory needs a newer bighelp plugin on this computer. Update it in Settings, on your computer's page."
+            "value": "Dev Factory needs a newer Bighelp plugin on this computer. Update it in Settings, on your computer's page."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Dev Factory 需要这台电脑上有更新的 bighelp 插件。请在“设置”中这台电脑的页面上更新。"
+            "value": "Dev Factory 需要这台电脑上有更新的 Bighelp 插件。请在“设置”中这台电脑的页面上更新。"
           }
         }
       }
@@ -6519,19 +6519,19 @@
         }
       }
     },
-    "Drag your bots and group chats into the order you want, then tap Save. To keep this order on your other devices too, update the bighelp plugin on this computer.": {
+    "Drag your bots and group chats into the order you want, then tap Save. To keep this order on your other devices too, update the Bighelp plugin on this computer.": {
       "comment": "Rearrange in Bots mode when this computer's plugin can't keep the order (#857); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Drag your bots and group chats into the order you want, then tap Save. To keep this order on your other devices too, update the bighelp plugin on this computer."
+            "value": "Drag your bots and group chats into the order you want, then tap Save. To keep this order on your other devices too, update the Bighelp plugin on this computer."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "将机器人和群聊拖到你想要的顺序，然后轻点“保存”。要在你的其他设备上也保留这个顺序，请更新这台电脑上的 bighelp 插件。"
+            "value": "将机器人和群聊拖到你想要的顺序，然后轻点“保存”。要在你的其他设备上也保留这个顺序，请更新这台电脑上的 Bighelp 插件。"
           }
         }
       }
@@ -6893,19 +6893,19 @@
         }
       }
     },
-    "Every channel but bighelp": {
+    "Every channel but Bighelp": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Every channel but bighelp"
+            "value": "Every channel but Bighelp"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "除 bighelp 外的所有渠道"
+            "value": "除 Bighelp 外的所有渠道"
           }
         }
       }
@@ -8066,19 +8066,19 @@
         }
       }
     },
-    "Hermes installs the update and may restart, so bighelp can disconnect for a moment.": {
+    "Hermes installs the update and may restart, so Bighelp can disconnect for a moment.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hermes installs the update and may restart, so bighelp can disconnect for a moment."
+            "value": "Hermes installs the update and may restart, so Bighelp can disconnect for a moment."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Hermes 会安装更新并可能重启，因此 bighelp 可能会短暂断开连接。"
+            "value": "Hermes 会安装更新并可能重启，因此 Bighelp 可能会短暂断开连接。"
           }
         }
       }
@@ -8355,19 +8355,19 @@
         }
       }
     },
-    "How much of your space shows through bighelp": {
+    "How much of your space shows through Bighelp": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "How much of your space shows through bighelp"
+            "value": "How much of your space shows through Bighelp"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "透过 bighelp 能看到多少周围空间"
+            "value": "透过 Bighelp 能看到多少周围空间"
           }
         }
       }
@@ -8644,19 +8644,19 @@
         }
       }
     },
-    "Install bighelp Plugin": {
+    "Install Bighelp Plugin": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Install bighelp Plugin"
+            "value": "Install Bighelp Plugin"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "安装 bighelp 插件"
+            "value": "安装 Bighelp 插件"
           }
         }
       }
@@ -9647,19 +9647,19 @@
         }
       }
     },
-    "Make bighelp feel like yours": {
+    "Make Bighelp feel like yours": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Make bighelp feel like yours"
+            "value": "Make Bighelp feel like yours"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "让 bighelp 更合你心意"
+            "value": "让 Bighelp 更合你心意"
           }
         }
       }
@@ -10089,36 +10089,36 @@
         }
       }
     },
-    "Messaging pauses for a moment while it restarts. bighelp may reconnect.": {
+    "Messaging pauses for a moment while it restarts. Bighelp may reconnect.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Messaging pauses for a moment while it restarts. bighelp may reconnect."
+            "value": "Messaging pauses for a moment while it restarts. Bighelp may reconnect."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "消息服务重启时会暂停片刻。bighelp 可能会重新连接。"
+            "value": "消息服务重启时会暂停片刻。Bighelp 可能会重新连接。"
           }
         }
       }
     },
-    "Messaging stops until you start it again. Chats in bighelp keep working.": {
+    "Messaging stops until you start it again. Chats in Bighelp keep working.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Messaging stops until you start it again. Chats in bighelp keep working."
+            "value": "Messaging stops until you start it again. Chats in Bighelp keep working."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "消息服务会停止，直到你再次启动。bighelp 中的聊天仍可使用。"
+            "value": "消息服务会停止，直到你再次启动。Bighelp 中的聊天仍可使用。"
           }
         }
       }
@@ -11991,87 +11991,87 @@
         }
       }
     },
-    "Notifications are off, and this device's notification data was deleted. To stop bighelp asking iOS for alerts too, turn them off in iOS Settings.": {
+    "Notifications are off, and this device's notification data was deleted. To stop Bighelp asking iOS for alerts too, turn them off in iOS Settings.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Notifications are off, and this device's notification data was deleted. To stop bighelp asking iOS for alerts too, turn them off in iOS Settings."
+            "value": "Notifications are off, and this device's notification data was deleted. To stop Bighelp asking iOS for alerts too, turn them off in iOS Settings."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "通知已关闭，此设备的通知数据已删除。如果也想让 bighelp 不再向 iOS 请求提醒，请在 iOS 设置中关闭通知。"
+            "value": "通知已关闭，此设备的通知数据已删除。如果也想让 Bighelp 不再向 iOS 请求提醒，请在 iOS 设置中关闭通知。"
           }
         }
       }
     },
-    "Notifications are off, and this device's notification data was deleted. bighelp couldn't read this device's old notification key, so the notification service may keep its old registration. If alerts still come, turn them off for bighelp in iOS Settings.": {
+    "Notifications are off, and this device's notification data was deleted. Bighelp couldn't read this device's old notification key, so the notification service may keep its old registration. If alerts still come, turn them off for Bighelp in iOS Settings.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Notifications are off, and this device's notification data was deleted. bighelp couldn't read this device's old notification key, so the notification service may keep its old registration. If alerts still come, turn them off for bighelp in iOS Settings."
+            "value": "Notifications are off, and this device's notification data was deleted. Bighelp couldn't read this device's old notification key, so the notification service may keep its old registration. If alerts still come, turn them off for Bighelp in iOS Settings."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "通知已关闭，此设备的通知数据已删除。bighelp 无法读取此设备旧的通知密钥，因此通知服务可能仍保留旧的注册信息。如果仍收到提醒，请在 iOS 设置中关闭 bighelp 的通知。"
+            "value": "通知已关闭，此设备的通知数据已删除。Bighelp 无法读取此设备旧的通知密钥，因此通知服务可能仍保留旧的注册信息。如果仍收到提醒，请在 iOS 设置中关闭 Bighelp 的通知。"
           }
         }
       }
     },
-    "Notifications are off. %@ still has a copy of this device's notification data. It can't send you anything, and bighelp removes it the next time it can reach it.": {
+    "Notifications are off. %@ still has a copy of this device's notification data. It can't send you anything, and Bighelp removes it the next time it can reach it.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Notifications are off. %@ still has a copy of this device's notification data. It can't send you anything, and bighelp removes it the next time it can reach it."
+            "value": "Notifications are off. %@ still has a copy of this device's notification data. It can't send you anything, and Bighelp removes it the next time it can reach it."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "通知已关闭。%@仍保留此设备通知数据的副本。它无法再向你发送任何内容，bighelp 会在下次能连接到它时将其删除。"
+            "value": "通知已关闭。%@仍保留此设备通知数据的副本。它无法再向你发送任何内容，Bighelp 会在下次能连接到它时将其删除。"
           }
         }
       }
     },
-    "Notifications are off. %@ still have a copy of this device's notification data. It can't send you anything, and bighelp removes it the next time it can reach them.": {
+    "Notifications are off. %@ still have a copy of this device's notification data. It can't send you anything, and Bighelp removes it the next time it can reach them.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Notifications are off. %@ still have a copy of this device's notification data. It can't send you anything, and bighelp removes it the next time it can reach them."
+            "value": "Notifications are off. %@ still have a copy of this device's notification data. It can't send you anything, and Bighelp removes it the next time it can reach them."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "通知已关闭。%@仍保留此设备通知数据的副本。它们无法再向你发送任何内容，bighelp 会在下次能连接到它们时将其删除。"
+            "value": "通知已关闭。%@仍保留此设备通知数据的副本。它们无法再向你发送任何内容，Bighelp 会在下次能连接到它们时将其删除。"
           }
         }
       }
     },
-    "Notifications are off. Some computers couldn't be reached yet; bighelp will finish there later.": {
+    "Notifications are off. Some computers couldn't be reached yet; Bighelp will finish there later.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Notifications are off. Some computers couldn't be reached yet; bighelp will finish there later."
+            "value": "Notifications are off. Some computers couldn't be reached yet; Bighelp will finish there later."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "通知已关闭。暂时无法连接部分电脑，bighelp 稍后会在这些电脑上完成操作。"
+            "value": "通知已关闭。暂时无法连接部分电脑，Bighelp 稍后会在这些电脑上完成操作。"
           }
         }
       }
@@ -12433,19 +12433,19 @@
         }
       }
     },
-    "Only bighelp": {
+    "Only Bighelp": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Only bighelp"
+            "value": "Only Bighelp"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "仅 bighelp"
+            "value": "仅 Bighelp"
           }
         }
       }
@@ -15777,19 +15777,19 @@
         }
       }
     },
-    "Saved values stay on %@ and never show in bighelp.": {
+    "Saved values stay on %@ and never show in Bighelp.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Saved values stay on %@ and never show in bighelp."
+            "value": "Saved values stay on %@ and never show in Bighelp."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "已保存的值保留在%@上，绝不会在 bighelp 中显示。"
+            "value": "已保存的值保留在%@上，绝不会在 Bighelp 中显示。"
           }
         }
       }
@@ -16779,19 +16779,19 @@
         }
       }
     },
-    "Shared with bighelp": {
+    "Shared with Bighelp": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Shared with bighelp"
+            "value": "Shared with Bighelp"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "分享给 bighelp"
+            "value": "分享给 Bighelp"
           }
         }
       }
@@ -17029,7 +17029,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "带你熟悉 bighelp"
+            "value": "带你熟悉 Bighelp"
           }
         }
       }
@@ -17272,19 +17272,19 @@
         }
       }
     },
-    "Sign-ins and keys stay on %@. bighelp never sees them.": {
+    "Sign-ins and keys stay on %@. Bighelp never sees them.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sign-ins and keys stay on %@. bighelp never sees them."
+            "value": "Sign-ins and keys stay on %@. Bighelp never sees them."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "登录信息和密钥保留在%@上，bighelp 不会看到它们。"
+            "value": "登录信息和密钥保留在%@上，Bighelp 不会看到它们。"
           }
         }
       }
@@ -18852,19 +18852,19 @@
         }
       }
     },
-    "The bighelp plugin is on": {
+    "The Bighelp plugin is on": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The bighelp plugin is on"
+            "value": "The Bighelp plugin is on"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "bighelp 插件已启用"
+            "value": "Bighelp 插件已启用"
           }
         }
       }
@@ -19073,36 +19073,36 @@
         }
       }
     },
-    "The dashboard hasn't loaded the bighelp plugin yet, so only your computer can restart it.": {
+    "The dashboard hasn't loaded the Bighelp plugin yet, so only your computer can restart it.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The dashboard hasn't loaded the bighelp plugin yet, so only your computer can restart it."
+            "value": "The dashboard hasn't loaded the Bighelp plugin yet, so only your computer can restart it."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "控制面板尚未载入 bighelp 插件，因此只能在你的电脑上重启它。"
+            "value": "控制面板尚未载入 Bighelp 插件，因此只能在你的电脑上重启它。"
           }
         }
       }
     },
-    "The dashboard serves bighelp's connection and the bighelp plugin. A new or updated plugin takes effect after the dashboard and messaging restart.": {
+    "The dashboard serves Bighelp's connection and the Bighelp plugin. A new or updated plugin takes effect after the dashboard and messaging restart.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The dashboard serves bighelp's connection and the bighelp plugin. A new or updated plugin takes effect after the dashboard and messaging restart."
+            "value": "The dashboard serves Bighelp's connection and the Bighelp plugin. A new or updated plugin takes effect after the dashboard and messaging restart."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "控制面板负责提供 bighelp 的连接和 bighelp 插件。新安装或更新的插件会在控制面板和消息服务重启后生效。"
+            "value": "控制面板负责提供 Bighelp 的连接和 Bighelp 插件。新安装或更新的插件会在控制面板和消息服务重启后生效。"
           }
         }
       }
@@ -19124,36 +19124,36 @@
         }
       }
     },
-    "The key is sent once to the serving bot and is never read back into bighelp.": {
+    "The key is sent once to the serving bot and is never read back into Bighelp.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The key is sent once to the serving bot and is never read back into bighelp."
+            "value": "The key is sent once to the serving bot and is never read back into Bighelp."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "密钥只会发送一次给提供服务的机器人，绝不会读回 bighelp。"
+            "value": "密钥只会发送一次给提供服务的机器人，绝不会读回 Bighelp。"
           }
         }
       }
     },
-    "The live reflection is available when bighelp is running on a device with camera access.": {
+    "The live reflection is available when Bighelp is running on a device with camera access.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The live reflection is available when bighelp is running on a device with camera access."
+            "value": "The live reflection is available when Bighelp is running on a device with camera access."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "在可使用相机的设备上运行 bighelp 时，才能使用实时反光效果。"
+            "value": "在可使用相机的设备上运行 Bighelp 时，才能使用实时反光效果。"
           }
         }
       }
@@ -19497,19 +19497,19 @@
         }
       }
     },
-    "This computer has a MoA privacy-filter override. The pinned write API cannot preserve it, so bighelp keeps this page read-only.": {
+    "This computer has a MoA privacy-filter override. The pinned write API cannot preserve it, so Bighelp keeps this page read-only.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This computer has a MoA privacy-filter override. The pinned write API cannot preserve it, so bighelp keeps this page read-only."
+            "value": "This computer has a MoA privacy-filter override. The pinned write API cannot preserve it, so Bighelp keeps this page read-only."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "这台电脑设置了 MoA 隐私过滤覆盖项。固定版本的写入 API 无法保留它，因此 bighelp 会将此页面保持为只读。"
+            "value": "这台电脑设置了 MoA 隐私过滤覆盖项。固定版本的写入 API 无法保留它，因此 Bighelp 会将此页面保持为只读。"
           }
         }
       }
@@ -19531,19 +19531,19 @@
         }
       }
     },
-    "This dashboard can't restart from bighelp.": {
+    "This dashboard can't restart from Bighelp.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This dashboard can't restart from bighelp."
+            "value": "This dashboard can't restart from Bighelp."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "无法从 bighelp 重启此控制面板。"
+            "value": "无法从 Bighelp 重启此控制面板。"
           }
         }
       }
@@ -19565,19 +19565,19 @@
         }
       }
     },
-    "This device stops getting notifications from bighelp. Its notification data is deleted from bighelp's notification service and from every computer that sends it notifications. You can turn them on again later.": {
+    "This device stops getting notifications from Bighelp. Its notification data is deleted from Bighelp's notification service and from every computer that sends it notifications. You can turn them on again later.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This device stops getting notifications from bighelp. Its notification data is deleted from bighelp's notification service and from every computer that sends it notifications. You can turn them on again later."
+            "value": "This device stops getting notifications from Bighelp. Its notification data is deleted from Bighelp's notification service and from every computer that sends it notifications. You can turn them on again later."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "此设备将不再收到 bighelp 的通知。它的通知数据会从 bighelp 的通知服务以及所有向它发送通知的电脑中删除。你之后可以重新开启通知。"
+            "value": "此设备将不再收到 Bighelp 的通知。它的通知数据会从 Bighelp 的通知服务以及所有向它发送通知的电脑中删除。你之后可以重新开启通知。"
           }
         }
       }
@@ -20007,19 +20007,19 @@
         }
       }
     },
-    "Turn off to see everything bighelp can do.": {
+    "Turn off to see everything Bighelp can do.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Turn off to see everything bighelp can do."
+            "value": "Turn off to see everything Bighelp can do."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "关闭后可查看 bighelp 的全部功能。"
+            "value": "关闭后可查看 Bighelp 的全部功能。"
           }
         }
       }
@@ -20347,53 +20347,53 @@
         }
       }
     },
-    "Update the bighelp plugin on your computer to choose from its voices. Until then, the bot keeps the voice it has.": {
+    "Update the Bighelp plugin on your computer to choose from its voices. Until then, the bot keeps the voice it has.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Update the bighelp plugin on your computer to choose from its voices. Until then, the bot keeps the voice it has."
+            "value": "Update the Bighelp plugin on your computer to choose from its voices. Until then, the bot keeps the voice it has."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "请更新电脑上的 bighelp 插件，以选择其中的声音。在此之前，机器人会保留现有的声音。"
+            "value": "请更新电脑上的 Bighelp 插件，以选择其中的声音。在此之前，机器人会保留现有的声音。"
           }
         }
       }
     },
-    "Update the bighelp plugin to see files": {
+    "Update the Bighelp plugin to see files": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Update the bighelp plugin to see files"
+            "value": "Update the Bighelp plugin to see files"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "更新 bighelp 插件即可查看文件"
+            "value": "更新 Bighelp 插件即可查看文件"
           }
         }
       }
     },
-    "Update the bighelp plugin to see media": {
+    "Update the Bighelp plugin to see media": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Update the bighelp plugin to see media"
+            "value": "Update the Bighelp plugin to see media"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "更新 bighelp 插件即可查看媒体"
+            "value": "更新 Bighelp 插件即可查看媒体"
           }
         }
       }
@@ -22319,189 +22319,189 @@
         }
       }
     },
-    "bighelp and its colorful bot companions": {
+    "Bighelp and its colorful bot companions": {
       "comment": "Simplified Chinese draft for the word sweep (#990); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "bighelp and its colorful bot companions"
+            "value": "Bighelp and its colorful bot companions"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "bighelp 和多彩的机器人伙伴"
+            "value": "Bighelp 和多彩的机器人伙伴"
           }
         }
       }
     },
-    "bighelp asks iOS only after you choose Allow.": {
+    "Bighelp asks iOS only after you choose Allow.": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "bighelp asks iOS only after you choose Allow."
+            "value": "Bighelp asks iOS only after you choose Allow."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "只有在你选择“允许”后，bighelp 才会向 iOS 请求。"
+            "value": "只有在你选择“允许”后，Bighelp 才会向 iOS 请求。"
           }
         }
       }
     },
-    "bighelp asks macOS only after you choose Allow.": {
+    "Bighelp asks macOS only after you choose Allow.": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "bighelp asks macOS only after you choose Allow."
+            "value": "Bighelp asks macOS only after you choose Allow."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "只有在你选择“允许”后，bighelp 才会向 macOS 请求。"
+            "value": "只有在你选择“允许”后，Bighelp 才会向 macOS 请求。"
           }
         }
       }
     },
-    "bighelp couldn't read this computer's bots. Check that it's on.": {
+    "Bighelp couldn't read this computer's bots. Check that it's on.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "bighelp couldn't read this computer's bots. Check that it's on."
+            "value": "Bighelp couldn't read this computer's bots. Check that it's on."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "bighelp 无法读取这台电脑上的机器人。请确认电脑已开机。"
+            "value": "Bighelp 无法读取这台电脑上的机器人。请确认电脑已开机。"
           }
         }
       }
     },
-    "bighelp disconnects for a moment and reconnects. Replies in progress on your computer stop.": {
+    "Bighelp disconnects for a moment and reconnects. Replies in progress on your computer stop.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "bighelp disconnects for a moment and reconnects. Replies in progress on your computer stop."
+            "value": "Bighelp disconnects for a moment and reconnects. Replies in progress on your computer stop."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "bighelp 会短暂断开并重新连接。你电脑上正在进行的回复会停止。"
+            "value": "Bighelp 会短暂断开并重新连接。你电脑上正在进行的回复会停止。"
           }
         }
       }
     },
-    "bighelp itself": {
+    "Bighelp itself": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "bighelp itself"
+            "value": "Bighelp itself"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "bighelp 本身"
+            "value": "Bighelp 本身"
           }
         }
       }
     },
-    "bighelp keeps your sign-in and preferences, clears what it saved from this computer, then downloads your bots and chats again.": {
+    "Bighelp keeps your sign-in and preferences, clears what it saved from this computer, then downloads your bots and chats again.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "bighelp keeps your sign-in and preferences, clears what it saved from this computer, then downloads your bots and chats again."
+            "value": "Bighelp keeps your sign-in and preferences, clears what it saved from this computer, then downloads your bots and chats again."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "bighelp 会保留你的登录信息和偏好设置，清除从这台电脑保存的内容，然后重新下载你的机器人和聊天。"
+            "value": "Bighelp 会保留你的登录信息和偏好设置，清除从这台电脑保存的内容，然后重新下载你的机器人和聊天。"
           }
         }
       }
     },
-    "bighelp only": {
+    "Bighelp only": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "bighelp only"
+            "value": "Bighelp only"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "仅限 bighelp"
+            "value": "仅限 Bighelp"
           }
         }
       }
     },
-    "bighelp plugin": {
+    "Bighelp plugin": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "bighelp plugin"
+            "value": "Bighelp plugin"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "bighelp 插件"
+            "value": "Bighelp 插件"
           }
         }
       }
     },
-    "bighelp reconnects": {
+    "Bighelp reconnects": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "bighelp reconnects"
+            "value": "Bighelp reconnects"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "bighelp 会重新连接"
+            "value": "Bighelp 会重新连接"
           }
         }
       }
     },
-    "bighelp sends what you share (messages, files, photos, voice, and location if you turn it on) to your Hermes computer and the AI providers you set up on it.": {
+    "Bighelp sends what you share (messages, files, photos, voice, and location if you turn it on) to your Hermes computer and the AI providers you set up on it.": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "bighelp sends what you share (messages, files, photos, voice, and location if you turn it on) to your Hermes computer and the AI providers you set up on it."
+            "value": "Bighelp sends what you share (messages, files, photos, voice, and location if you turn it on) to your Hermes computer and the AI providers you set up on it."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "bighelp 会将你分享的内容（消息、文件、照片、语音，以及启用后的位置）发送到运行 Hermes 的电脑和你在该电脑上配置的 AI 服务商。"
+            "value": "Bighelp 会将你分享的内容（消息、文件、照片、语音，以及启用后的位置）发送到运行 Hermes 的电脑和你在该电脑上配置的 AI 服务商。"
           }
         }
       }

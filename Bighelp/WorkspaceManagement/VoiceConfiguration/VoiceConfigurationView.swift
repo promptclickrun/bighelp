@@ -248,7 +248,7 @@ struct VoiceConfigurationView: View {
                let reason = store.voiceCatalog.unavailableReason, !reason.isEmpty {
                 Text(reason)
             } else {
-                Text("Saving changes only the selected host profile’s TTS provider and voice. It does not change bighelp’s live-voice provider or sign-in mode.")
+                Text("Saving changes only the selected host profile’s TTS provider and voice. It does not change Bighelp’s live-voice provider or sign-in mode.")
             }
         }
     }
@@ -308,7 +308,7 @@ struct VoiceConfigurationView: View {
             Text("Dictation")
         } footer: {
             Text(store.supportsFullRelayTranscription
-                ? "Record or import up to two minutes of finalized audio, then explicitly transcribe it. Review the editable transcript before using it; bighelp never sends the transcript automatically."
+                ? "Record or import up to two minutes of finalized audio, then explicitly transcribe it. Review the editable transcript before using it; Bighelp never sends the transcript automatically."
                 : "Record or import up to two minutes of finalized audio, then explicitly transcribe it. Short recordings use the existing authenticated JSON route; larger host-relay recordings require the fixed voice-media transport extension.")
         }
     }
@@ -394,7 +394,7 @@ struct VoiceConfigurationView: View {
         } header: {
             Text("Advanced · Live voice")
         } footer: {
-            Text("This is read-only discovery. bighelp’s existing Codex subscription live voice remains the primary selected system, and its optional API-key mode remains explicit. This screen does not mount stock GPT-Live, switch engines, or add a fallback.")
+            Text("This is read-only discovery. Bighelp’s existing Codex subscription live voice remains the primary selected system, and its optional API-key mode remains explicit. This screen does not mount stock GPT-Live, switch engines, or add a fallback.")
         }
         .accessibilityIdentifier("voice.configuration.stock-live-status")
     }

@@ -628,7 +628,7 @@ private final class DeferredInitialWorkspaceCatalogClient: HermesWorkspaceCatalo
                 HermesWorkspaceSummary(
                     id: "loopdy",
                     name: "bighelp",
-                    description: "bighelp workspace",
+                    description: "Bighelp workspace",
                     folderCount: 1,
                     isActive: true
                 ),

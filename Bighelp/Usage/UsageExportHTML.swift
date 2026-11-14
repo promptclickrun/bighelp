@@ -57,7 +57,7 @@ enum UsageExportHTML {
         body += breakdown("By model", summary.models, snapshot, palette, showsDetail: false)
         body += breakdown("By bot", summary.agents, snapshot, palette, showsDetail: summary.isMultiHost)
         if summary.isMultiHost { body += breakdown("By computer", summary.hosts, snapshot, palette, showsDetail: false) }
-        body += "<footer>Numbers from Hermes on each computer. Costs are Hermes' estimates. Shared from bighelp.</footer>\n"
+        body += "<footer>Numbers from Hermes on each computer. Costs are Hermes' estimates. Shared from Bighelp.</footer>\n"
         return """
         <!DOCTYPE html>
         <html lang="en">
@@ -65,7 +65,7 @@ enum UsageExportHTML {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="color-scheme" content="light">
-        <title>\(escape("bighelp Usage · \(snapshot.dateRangeText)"))</title>
+        <title>\(escape("Bighelp Usage · \(snapshot.dateRangeText)"))</title>
         <style>
         \(style(palette))
         </style>

@@ -1695,7 +1695,7 @@ struct DirectHermesSessionCatalogClientTests {
     /// chat looks like a broken one; it shows as an ordinary chat set aside, like after New Bot Chat.
     @Test func aBotChatHermesSetAsideShowsAsAnOrdinaryChatWithItsHistory() async throws {
         var displaced = try #require(Self.session(id: "bot-old").object)
-        displaced["title"] = .string("Bot Chat (bighelp bot-old)")
+        displaced["title"] = .string("Bot Chat (Bighelp bot-old)")
         displaced["source"] = .string("bighelp")
         displaced["last_active"] = .number(50)
         var live = try #require(Self.session(id: "local-new").object)
@@ -1727,11 +1727,11 @@ struct DirectHermesSessionCatalogClientTests {
             return .object(value)
         }
         let rows = try [
-            row("a", title: "Bot Chat (bighelp b)"),
+            row("a", title: "Bot Chat (Bighelp b)"),
             row("c", title: "Bot Chat (notes)"),
-            row("d", title: "Bot Chat notes (bighelp d)"),
+            row("d", title: "Bot Chat notes (Bighelp d)"),
             row("e", title: "Bot Chat (tui e)", source: "tui"),
-            row("local-new", title: "Bot Chat (bighelp local-new)"),
+            row("local-new", title: "Bot Chat (Bighelp local-new)"),
         ]
         let workspace = try SessionWorkspaceStub()
         workspace.handler = { operation, _ in
@@ -1745,9 +1745,9 @@ struct DirectHermesSessionCatalogClientTests {
         func title(_ id: String) -> String? { records.first { $0.remoteStoredID == id }?.title }
         #expect(title("a") == SessionRecord.retiredBotChatTitle(at: Date(timeIntervalSince1970: 2)))
         #expect(title("c") == "Bot Chat (notes)")
-        #expect(title("d") == "Bot Chat notes (bighelp d)")
+        #expect(title("d") == "Bot Chat notes (Bighelp d)")
         #expect(title("e") == "Bot Chat (tui e)")
-        #expect(title("local-new") == "Bot Chat (bighelp local-new)")
+        #expect(title("local-new") == "Bot Chat (Bighelp local-new)")
     }
 
     /// Without a source Hermes labels the chat "tui" and tells the agent it's in a terminal: no files,

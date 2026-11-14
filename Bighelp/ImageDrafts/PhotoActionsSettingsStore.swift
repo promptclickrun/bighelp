@@ -14,7 +14,7 @@ enum PhotoActionsSaveError: Error, Equatable {
 
     var message: String {
         switch self {
-        case .needsPluginUpdate: String(localized: "Update the bighelp plugin to change Photo actions.")
+        case .needsPluginUpdate: String(localized: "Update the Bighelp plugin to change Photo actions.")
         case .changedElsewhere: String(localized: "These settings changed on another device. This is the latest; make your change again.")
         case .invalid: String(localized: "Some of this text can't be saved. Check the messages marked in red.")
         case .noConnection: String(localized: "Can't reach the computer. Try again when it's connected.")

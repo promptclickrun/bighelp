@@ -81,7 +81,7 @@ struct MCPManagementView: View {
                 } header: {
                     Text(HermesTools.heading(String(localized: "Add more"), catalog.count))
                 } footer: {
-                    Text("Only declared fields are sent to Hermes. Secrets are not saved in bighelp.")
+                    Text("Only declared fields are sent to Hermes. Secrets are not saved in Bighelp.")
                 }
             }
             if !snapshot.diagnostics.isEmpty, !ManagementSearch.isActive(search), filter == .all {
@@ -289,7 +289,7 @@ private struct MCPCatalogInstallView: View {
                     Button("Install this catalog server") { install(values, enabled) }
                         .disabled(isBusy || missingRequiredValue)
                 } footer: {
-                    Text("Only this entry and its declared fields are sent to Hermes. Values are not stored in bighelp.")
+                    Text("Only this entry and its declared fields are sent to Hermes. Values are not stored in Bighelp.")
                 }
             }
             .bighelpFormSurface()
@@ -519,7 +519,7 @@ private struct MCPServerCredentialEditorView: View {
                     } header: {
                         Text("New credential")
                     } footer: {
-                        Text("Blank uses Hermes’s default variable. The saved value is never read into bighelp; this field is cleared after use.")
+                        Text("Blank uses Hermes’s default variable. The saved value is never read into Bighelp; this field is cleared after use.")
                     }
                     Section {
                         Button("Review API key update") { confirmsUpdate = true }
@@ -556,7 +556,7 @@ private struct MCPServerCredentialEditorView: View {
                 }
                 Button("Cancel", role: .cancel) { }
             } message: {
-                Text("Success appears only after Hermes acknowledges this server and profile and bighelp reads the configuration back.")
+                Text("Success appears only after Hermes acknowledges this server and profile and Bighelp reads the configuration back.")
             }
         }
     }

@@ -71,7 +71,7 @@ struct BighelpActivityRowsView: View {
                     .font(.caption2.weight(.semibold)).lineLimit(1)
             } else if showsHeader {
                 HStack(spacing: 8) {
-                    Text("bighelp").font(.system(.caption, design: .rounded, weight: .bold))
+                    Text("Bighelp").font(.system(.caption, design: .rounded, weight: .bold))
                     Spacer(minLength: 6)
                     Text(isStale && activeCount > 0 ? "Updates paused" : activeCount == 0 ? "Chats finished" : "\(activeCount) active")
                         .font(.caption.weight(.semibold))

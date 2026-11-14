@@ -102,7 +102,7 @@ struct BighelpSessionLiveActivity: Widget {
             ? nil : rows.first.flatMap { $0.phase.isTerminal ? nil : $0.openDetail()?.tool }.map(BighelpActivityPose.init(tool:))
         return DynamicIsland {
             DynamicIslandExpandedRegion(.leading) {
-                Text("bighelp").font(.system(.caption, design: .rounded, weight: .bold))
+                Text("Bighelp").font(.system(.caption, design: .rounded, weight: .bold))
             }
             DynamicIslandExpandedRegion(.trailing) {
                 Text(context.isStale ? "Paused" : attention ? "Needs you" : "\(count) active")
@@ -117,7 +117,7 @@ struct BighelpSessionLiveActivity: Widget {
                 BighelpActivityAvatar(agentID: info.attributes.agentID, name: info.attributes.agentName, diameter: 24)
                     .accessibilityHidden(false).accessibilityLabel(info.attributes.agentName)
             } else {
-                Image(systemName: "bubble.left.and.bubble.right.fill").accessibilityLabel("bighelp")
+                Image(systemName: "bubble.left.and.bubble.right.fill").accessibilityLabel("Bighelp")
             }
         } compactTrailing: {
             if let step {

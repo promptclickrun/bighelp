@@ -25,8 +25,8 @@ struct DevFactoryHomeView: View {
         List {
             if store.isAvailable == false {
                 Section {
-                    ContentUnavailableView("Update the bighelp plugin", systemImage: "shippingbox",
-                        description: Text("Dev Factory needs a newer bighelp plugin on this computer. Update it in Settings, on your computer's page."))
+                    ContentUnavailableView("Update the Bighelp plugin", systemImage: "shippingbox",
+                        description: Text("Dev Factory needs a newer Bighelp plugin on this computer. Update it in Settings, on your computer's page."))
                 }
             } else {
                 if let error = store.errorMessage {

@@ -199,7 +199,7 @@ enum ArchivedChatDeleteRefusal {
             return "Couldn't delete this chat. " + (HermesRefusalMessage.sentence(in: error) ?? "Try again.")
         }
         // bighelp's own chats let go shortly after the app does; there's nowhere for the person to close them.
-        guard let app = SessionOrigin.label(source), app != "bighelp" else {
+        guard let app = SessionOrigin.label(source), app != "Bighelp" else {
             return "Still open. Try again in a moment."
         }
         return "Still open in \(app). Close it there, then try again."

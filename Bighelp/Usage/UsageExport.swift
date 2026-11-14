@@ -85,7 +85,7 @@ extension UsageExportSnapshot {
                 switch providerUsage.state {
                 case .needsPluginUpdate:
                     return Computer(id: computer.id, name: computer.name, providers: [],
-                                    note: "Update the bighelp plugin to see plans and limits.")
+                                    note: "Update the Bighelp plugin to see plans and limits.")
                 default:
                     guard let report = providerUsage.report else {
                         let note: String = if case .unavailable(let message) = providerUsage.state { message }
@@ -106,7 +106,7 @@ extension UsageExportSnapshot {
                                 note: providers.isEmpty ? "No AI plans to show." : nil, used: used(providers))
             case .needsPluginUpdate?:
                 return Computer(id: computer.id, name: computer.name, providers: [],
-                                note: "Update the bighelp plugin on \(computer.name) to see its plans and limits.")
+                                note: "Update the Bighelp plugin on \(computer.name) to see its plans and limits.")
             case .unavailable(let message)?:
                 return Computer(id: computer.id, name: computer.name, providers: [], note: message)
             case nil:

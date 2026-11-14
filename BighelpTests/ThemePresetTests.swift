@@ -62,7 +62,7 @@ struct ThemePresetTests {
             let followed = context(.warm, dark: dark, followsTheme: true, bubble: .teal)
             #expect(resolve(followed, dark: dark) == resolve(old, dark: dark),
                     "Warm has no accent of its own, so Theme leaves your teal")
-            #expect(resolve(old, dark: dark).messageSurfaceHex == nil, "bighelp's own see-through agent messages")
+            #expect(resolve(old, dark: dark).messageSurfaceHex == nil, "Bighelp's own see-through agent messages")
         }
     }
 

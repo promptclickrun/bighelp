@@ -25,11 +25,11 @@ enum AgentFileFailure: String, Codable, Equatable, Sendable {
     var reason: String {
         switch self {
         case .unreachable: String(localized: "Your computer didn't answer.")
-        case .updatePlugin: String(localized: "Update the bighelp plugin on your computer to see it.")
+        case .updatePlugin: String(localized: "Update the Bighelp plugin on your computer to see it.")
         case .missing: String(localized: "It's no longer on your computer.")
         case .refused: String(localized: "Your computer didn't share it.")
         case .tooBig: String(localized: "It's too big to show here.")
-        case .unreadable: String(localized: "bighelp can't open it.")
+        case .unreadable: String(localized: "Bighelp can't open it.")
         case .stalled: String(localized: "It's taking too long.")
         case .unknown: String(localized: "Something went wrong.")
         }

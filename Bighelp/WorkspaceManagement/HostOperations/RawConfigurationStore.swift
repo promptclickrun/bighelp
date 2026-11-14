@@ -105,7 +105,7 @@ final class RawConfigurationStore {
             if error as? HostOperationsError == .outcomeUnknown {
                 saveOutcomeNeedsReview = true
                 review = nil
-                errorMessage = "Hermes did not provide complete acknowledgement and readback. Reload the selected profile before deciding whether to edit again; bighelp will not resend the replacement."
+                errorMessage = "Hermes did not provide complete acknowledgement and readback. Reload the selected profile before deciding whether to edit again; Bighelp will not resend the replacement."
             } else {
                 errorMessage = Self.message(error)
             }

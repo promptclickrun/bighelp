@@ -63,7 +63,7 @@ struct DeviceAccessInlineCard: View {
     private var extra: some View {
         switch kind {
         case .geofences:
-            Text("This needs Location set to Always, so bighelp hears about a place even while it's closed. iOS asks next.")
+            Text("This needs Location set to Always, so Bighelp hears about a place even while it's closed. iOS asks next.")
                 .font(.bighelp(.footnote))
                 .foregroundStyle(theme.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)

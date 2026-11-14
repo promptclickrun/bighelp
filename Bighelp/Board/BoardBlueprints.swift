@@ -364,7 +364,7 @@ struct BoardBlueprintsSheet: View {
         let uses = TemplateUsage.shared.count(blueprint.id)
         var details: [String] = []
         if showsSource {
-            details.append(blueprint.isOfficial ? "bighelp" : blueprint.credit.map { "by @\($0)" } ?? "Community")
+            details.append(blueprint.isOfficial ? "Bighelp" : blueprint.credit.map { "by @\($0)" } ?? "Community")
         }
         if showsCategory { details.append(blueprint.category.title) }
         if uses > 0 { details.append(uses == 1 ? "Used once" : "Used \(uses) times") }

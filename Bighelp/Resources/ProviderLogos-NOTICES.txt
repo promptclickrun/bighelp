@@ -1,4 +1,4 @@
-bighelp Provider Mark Third-Party Notices
+Bighelp Provider Mark Third-Party Notices
 
 The following licenses apply to the identified provider-mark source files.
 

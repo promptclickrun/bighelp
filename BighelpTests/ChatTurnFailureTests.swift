@@ -253,7 +253,7 @@ struct ChatTurnFailureTests {
         try await harness.waitForReminder()
         harness.appIsActive = false
         try await harness.passScheduledTime()
-        #expect(harness.submits == 1, "Nothing is sent while bighelp is away.")
+        #expect(harness.submits == 1, "Nothing is sent while Bighelp is away.")
         #expect(harness.reminders.cancelled.isEmpty, "The reminder tells the person instead.")
 
         // Back after the reset: Try again is theirs to tap.

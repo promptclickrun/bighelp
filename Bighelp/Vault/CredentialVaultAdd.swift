@@ -262,7 +262,7 @@ final class CredentialVaultAddModel: Identifiable {
             return String(localized: "This needs a newer Hermes on your computer.")
         }
         if case WorkspaceClientError.unavailable = error {
-            return String(localized: "Update the bighelp plugin on your computer to use a saved one here, or add a new one.")
+            return String(localized: "Update the Bighelp plugin on your computer to use a saved one here, or add a new one.")
         }
         return switch part {
         case .login: String(localized: "The login didn't save. Everything's still here, so try again.")
@@ -571,7 +571,7 @@ struct CredentialVaultEditView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                    Text("For your security, bighelp never reads back what's saved. Enter the \(secretWords) again to save your changes; the old copy goes once the new one is saved.")
+                    Text("For your security, Bighelp never reads back what's saved. Enter the \(secretWords) again to save your changes; the old copy goes once the new one is saved.")
                         .font(.bighelp(.subheadline))
                         .foregroundStyle(theme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)

@@ -36,7 +36,7 @@ struct WatchRootView: View {
                     Section { WatchNotice(text: problem) }
                 }
             }
-            .navigationTitle("bighelp")
+            .navigationTitle("Bighelp")
             .navigationDestination(for: WatchRoute.self) { route in destination(route) }
             .refreshable { await store.refreshHome() }
         }

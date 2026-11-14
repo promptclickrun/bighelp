@@ -22,7 +22,7 @@ func routeUnsolicitedAssistantMessage(
         ),
         content: .message(message.text),
         metadata: TimelineMetadata(
-            source: "Hermes · bighelp",
+            source: "Hermes · Bighelp",
             freshness: "Just now",
             delivery: message.delivery == .draft ? "Streaming" : "Delivered",
             timestamp: Date(timeIntervalSince1970: TimeInterval(message.sentAt))

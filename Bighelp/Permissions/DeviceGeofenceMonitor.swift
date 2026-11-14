@@ -69,7 +69,7 @@ enum DeviceGeofenceError: DeviceToolFailure, Equatable, LocalizedError, Sendable
         switch self {
         case .limitReached: "The phone already watches as many places as iOS allows."
         case .notFound: "The phone doesn't watch a place with that ID."
-        case .preciseLocationRequired: "Precise Location is off for bighelp, and iOS can't watch places without it."
+        case .preciseLocationRequired: "Precise Location is off for Bighelp, and iOS can't watch places without it."
         case .storageUnavailable: "The phone couldn't save the place."
         }
     }
@@ -317,7 +317,7 @@ final class DeviceGeofenceMonitor {
             return
         }
         // Background time first: telling the chat takes longer than iOS leaves a woken app.
-        let finishBackgroundTask = backgroundTask("bighelp place")
+        let finishBackgroundTask = backgroundTask("Bighelp place")
         place.lastEventAt = event.date
         if place.repeats {
             places[index] = place

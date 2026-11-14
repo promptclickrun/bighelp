@@ -141,7 +141,7 @@ struct BighelpNotificationSettingsView: View {
             .accessibilityIdentifier("settings.notifications.turn-off.confirm")
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This device stops getting notifications from bighelp. Its notification data is deleted from bighelp's notification service and from every computer that sends it notifications. You can turn them on again later.")
+            Text("This device stops getting notifications from Bighelp. Its notification data is deleted from Bighelp's notification service and from every computer that sends it notifications. You can turn them on again later.")
         }
         .task(id: presentationScope) {
             configureNotificationSetup()
@@ -251,8 +251,8 @@ struct BighelpNotificationSettingsView: View {
         guard !hosts.isEmpty else { return nil }
         let names = Self.list(hosts)
         return hosts.count == 1
-            ? String(localized: "Notifications are off. \(names) still has a copy of this device's notification data. It can't send you anything, and bighelp removes it the next time it can reach it.")
-            : String(localized: "Notifications are off. \(names) still have a copy of this device's notification data. It can't send you anything, and bighelp removes it the next time it can reach them.")
+            ? String(localized: "Notifications are off. \(names) still has a copy of this device's notification data. It can't send you anything, and Bighelp removes it the next time it can reach it.")
+            : String(localized: "Notifications are off. \(names) still have a copy of this device's notification data. It can't send you anything, and Bighelp removes it the next time it can reach them.")
     }
 
     /// "Studio", "Studio and Laptop", "Studio, Laptop and Den".
@@ -276,12 +276,12 @@ struct BighelpNotificationSettingsView: View {
             BighelpNotificationLastFailure.clear()
             if result.registrationLeftOnService {
                 // Honest about what wasn't done: the old key couldn't be read, so it wasn't cancelled.
-                turnOffMessage = String(localized: "Notifications are off, and this device's notification data was deleted. bighelp couldn't read this device's old notification key, so the notification service may keep its old registration. If alerts still come, turn them off for bighelp in iOS Settings.")
+                turnOffMessage = String(localized: "Notifications are off, and this device's notification data was deleted. Bighelp couldn't read this device's old notification key, so the notification service may keep its old registration. If alerts still come, turn them off for Bighelp in iOS Settings.")
             } else if result.unreachableHosts.isEmpty {
-                turnOffMessage = String(localized: "Notifications are off, and this device's notification data was deleted. To stop bighelp asking iOS for alerts too, turn them off in iOS Settings.")
+                turnOffMessage = String(localized: "Notifications are off, and this device's notification data was deleted. To stop Bighelp asking iOS for alerts too, turn them off in iOS Settings.")
             } else {
                 turnOffMessage = awaitingCleanupMessage(turnOff)
-                    ?? String(localized: "Notifications are off. Some computers couldn't be reached yet; bighelp will finish there later.")
+                    ?? String(localized: "Notifications are off. Some computers couldn't be reached yet; Bighelp will finish there later.")
             }
         } catch {
             turnOffStep = nil
@@ -992,7 +992,7 @@ struct BighelpPluginCapabilitiesSection: View {
         Section {
             if showsPluginSummary {
                 capabilityRow(
-                    title: "bighelp plugin",
+                    title: "Bighelp plugin",
                     systemImage: "puzzlepiece.extension",
                     status: pluginStatus,
                     detail: pluginDetail
@@ -1097,10 +1097,10 @@ struct BighelpPluginCapabilitiesSection: View {
             detail = "The computer reports Watch support. No Apple Watch is paired with this iPhone."
         } else if !WCSession.default.isWatchAppInstalled {
             status = "Available · App not installed"
-            detail = "An Apple Watch is paired, but the bighelp Watch app is not installed."
+            detail = "An Apple Watch is paired, but the Bighelp Watch app is not installed."
         } else {
             status = WCSession.default.isReachable ? "Installed · Reachable" : "Installed · Not currently reachable"
-            detail = "The computer reports Watch support and the bighelp Watch app is installed. Reachability can change when the app is not active."
+            detail = "The computer reports Watch support and the Bighelp Watch app is installed. Reachability can change when the app is not active."
         }
         return capabilityRow(title: "Apple Watch", systemImage: "applewatch", status: status, detail: detail)
     }
@@ -1138,7 +1138,7 @@ struct BighelpPluginCapabilitiesSection: View {
     private func deviceAccessDetail(_ capability: DeviceToolCapability) -> String {
         switch permissionCenter.deviceTools.status(for: capability) {
         case .notRequested:
-            "bighelp’s computer grant is on; iOS access has not been requested in this session."
+            "Bighelp’s computer grant is on; iOS access has not been requested in this session."
         case .available:
             "The computer grant and iOS access are available on this iPhone."
         case .denied:
@@ -1279,7 +1279,7 @@ struct BighelpChannelAlertsSection: View {
                         Text(known.isEmpty ? "Other channels" : "New channels")
                             .bighelpFont(.body)
                             .foregroundStyle(theme.primaryText)
-                        Text(known.isEmpty ? "Every channel but bighelp" : "Channels your bots add later")
+                        Text(known.isEmpty ? "Every channel but Bighelp" : "Channels your bots add later")
                             .bighelpFont(.metadata)
                             .foregroundStyle(theme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
@@ -1296,7 +1296,7 @@ struct BighelpChannelAlertsSection: View {
         } header: {
             Text("Channels")
         } footer: {
-            Text("Chats in bighelp always notify you.")
+            Text("Chats in Bighelp always notify you.")
                 .bighelpFont(.metadata)
                 .foregroundStyle(theme.secondaryText)
         }

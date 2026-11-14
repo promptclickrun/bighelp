@@ -79,7 +79,7 @@ protocol AgentListPlacementWriting {
 extension AgentProfile {
     static let bighelpLinkDefault = AgentProfile(
         id: "default",
-        name: "bighelp",
+        name: "Bighelp",
         role: "Default bot",
         summary: "Your default Hermes bot.",
         instructions: "",

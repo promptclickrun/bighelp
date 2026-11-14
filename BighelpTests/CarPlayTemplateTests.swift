@@ -35,7 +35,7 @@ struct CarPlayTemplateTests {
         let header = CPListTemplateDetailsHeader(
             thumbnail: CPThumbnailImage(image: face), title: content.name, subtitle: content.status,
             bodyVariants: [NSAttributedString(string: content.earlierSteps.joined(separator: "\n"))], actionButtons: [])
-        let home = CPListTemplate(title: "bighelp", listHeader: header, sections: [], assistantCellConfiguration: nil)
+        let home = CPListTemplate(title: "Bighelp", listHeader: header, sections: [], assistantCellConfiguration: nil)
         #expect(home.listHeader?.title == "Atlas")
         #expect(home.listHeader?.subtitle == "Searching the web…")
     }

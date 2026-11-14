@@ -37,7 +37,7 @@ final class AppReviewHostUITests: BighelpUITestCase {
             // Plugin screens show their error within a few seconds of opening.
             sleep(6)
             save("2-\(name)", app)
-            for failure in ["Your Hermes computer is running an older bighelp plugin", "Workflows aren't available",
+            for failure in ["Your Hermes computer is running an older Bighelp plugin", "Workflows aren't available",
                             "Hermes returned an unsupported or invalid response"] {
                 XCTAssertFalse(text(failure, in: app).exists, "\(name): \(failure)")
             }

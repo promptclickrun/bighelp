@@ -50,7 +50,7 @@ enum PluginUpdateClientError: Error, LocalizedError {
     case unsupported, invalidResponse
     var errorDescription: String? {
         switch self {
-        case .unsupported: "This computer needs the initial updater-capable bighelp plugin installed before it can update from the app."
+        case .unsupported: "This computer needs the initial updater-capable Bighelp plugin installed before it can update from the app."
         case .invalidResponse: "The computer has not provided matching update confirmation. No completion was recorded."
         }
     }
@@ -106,7 +106,7 @@ final class PluginUpdateStore {
     var isReconnecting: Bool { (isPending && message != nil) || status?.phase == .waitingForActivation }
     var title: String {
         if isPending, message != nil { return "Reconnecting" }
-        return status?.phase.title ?? (isWorking ? "Checking computer" : "bighelp Plugin")
+        return status?.phase.title ?? (isWorking ? "Checking computer" : "Bighelp Plugin")
     }
 
     func invalidate() { valid = false }

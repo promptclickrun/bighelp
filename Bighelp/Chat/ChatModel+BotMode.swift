@@ -76,7 +76,7 @@ extension ChatModel {
             if unconfirmed {
                 // The room's recovery sends it again under the same key, so
                 // the draft stays empty: sending it by hand could double it.
-                failureMessage = "Delivery is unconfirmed. bighelp will retry this same message."
+                failureMessage = "Delivery is unconfirmed. Bighelp will retry this same message."
             } else {
                 if draft.isEmpty { draft = message }
                 failureMessage = "Message could not be delivered. Try again."

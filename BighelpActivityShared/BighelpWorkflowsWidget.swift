@@ -191,7 +191,7 @@ struct BighelpWorkflowsWidgetView: View {
     }
 
     private var emptyText: String {
-        if entry.snapshot.generatedAt == .distantPast { return "Open bighelp to see your running workflows here." }
+        if entry.snapshot.generatedAt == .distantPast { return "Open Bighelp to see your running workflows here." }
         if !entry.snapshot.isAvailable { return "Workflows aren't set up on this computer." }
         return "No workflows running right now."
     }

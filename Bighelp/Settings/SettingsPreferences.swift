@@ -7,7 +7,7 @@ enum BighelpInterfaceVersion: String, CaseIterable, Identifiable, Sendable {
     var title: String { rawValue.uppercased() }
     var detail: String {
         switch self {
-        case .v1: "The original bighelp interface."
+        case .v1: "The original Bighelp interface."
         case .v2: "Coordinated controls and native glass."
         case .v3: "A cleaner conversation, compact composer, and coordinated native controls."
         }
@@ -54,7 +54,7 @@ enum VoiceMode: String, CaseIterable, Identifiable, Sendable {
     var detail: String {
         switch self {
         case .pressToTalk:
-            "Speak naturally. bighelp sends your message when you pause, and waits longer the longer you talk. \(BighelpPlatform.isMac ? "Click" : "Tap") Send now to send sooner."
+            "Speak naturally. Bighelp sends your message when you pause, and waits longer the longer you talk. \(BighelpPlatform.isMac ? "Click" : "Tap") Send now to send sooner."
         case .walkieTalkie:
             "Hold Speak while talking, then release to send your turn."
         }

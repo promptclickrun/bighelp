@@ -57,7 +57,7 @@ final class HostPluginUpdateModel {
     /// Short line for the Settings menu and the computers list.
     var attentionTitle: String? {
         switch state {
-        case .updateAvailable: "bighelp plugin update available"
+        case .updateAvailable: "Bighelp plugin update available"
         case .restartNeeded: "Restart Hermes so the plugin takes effect"
         default: nil
         }
@@ -130,14 +130,14 @@ final class HostPluginUpdateModel {
         }
         defer { registry.endPluginManagement(hostID: hostID, owner: lock) }
         state = .updating
-        message = "Installing bighelp plugin \(latestVersion ?? "")…"
+        message = "Installing Bighelp plugin \(latestVersion ?? "")…"
         var updateFailed = false
         do { _ = try await connection.workspace.managePlugins(pin.updateParameters) } catch { updateFailed = true }
         // Trust what the host now reports, not the install call's outcome.
         guard let installed = try? await installedPlugin(connection.workspace), installed.found else {
             fail(updateFailed
                  ? "The update didn't finish. Check your computer connection and try again."
-                 : "bighelp couldn't confirm the update. Check again in a moment.")
+                 : "Bighelp couldn't confirm the update. Check again in a moment.")
             return false
         }
         installedVersion = installed.version
@@ -169,7 +169,7 @@ final class HostPluginUpdateModel {
         }
         switch state {
         case .upToDate:
-            said.append("bighelp plugin \(runningVersion ?? installedVersion ?? "") is running.")
+            said.append("Bighelp plugin \(runningVersion ?? installedVersion ?? "") is running.")
         case .restartNeeded where dashboardRestarted:
             said.append("It still runs plugin \(runningVersion ?? "an older version"). Restart the dashboard on your computer to finish.")
         case .restartNeeded:
@@ -190,7 +190,7 @@ final class HostPluginUpdateModel {
         await finishRestart()
         guard state != .failed else { return }
         message = restarted
-            ? "The Hermes dashboard restarted." + (state == .upToDate ? " bighelp plugin \(runningVersion ?? installedVersion ?? "") is running." : "")
+            ? "The Hermes dashboard restarted." + (state == .upToDate ? " Bighelp plugin \(runningVersion ?? installedVersion ?? "") is running." : "")
             : "The Hermes dashboard didn't restart. Restart it on your computer."
     }
 
@@ -259,7 +259,7 @@ final class HostPluginUpdateModel {
             if !workspace.isConnected { await workspace.reconnect() }
         }
         guard let connection = currentConnection() else {
-            fail("Connect to this computer to check its bighelp plugin.")
+            fail("Connect to this computer to check its Bighelp plugin.")
             return
         }
         do {
@@ -275,13 +275,13 @@ final class HostPluginUpdateModel {
             if case WorkspaceClientError.unavailable(.pluginRequired) = error { isLoaded = false } else { isLoaded = true }
         }
         guard let installed = try? await installedPlugin(connection.workspace) else {
-            fail("bighelp couldn't read this computer's plugins. Check again in a moment.")
+            fail("Bighelp couldn't read this computer's plugins. Check again in a moment.")
             return
         }
         installedVersion = installed.version
         guard installed.found else {
             state = .notInstalled
-            message = "The bighelp plugin isn't installed on this computer."
+            message = "The Bighelp plugin isn't installed on this computer."
             return
         }
         var releaseError: (any Error)?
@@ -418,7 +418,7 @@ struct HostPluginUpdateSection: View {
                     .accessibilityIdentifier("settings.plugin.check")
             }
         } header: {
-            Text("bighelp plugin")
+            Text("Bighelp plugin")
         }
         .pluginRestartPrompt($restartPrompt)
     }
@@ -451,8 +451,8 @@ struct PluginRestartPrompt: ViewModifier {
     @Binding var model: HostPluginUpdateModel?
     var onFinished: @MainActor (_ restarted: Bool) async -> Void = { _ in }
 
-    static let restartBothMessage = "The plugin takes effect only after the Hermes dashboard and the messaging gateway restart. Replies in progress on your computer stop, and bighelp reconnects."
-    static let restartGatewayMessage = "The plugin takes effect only after the Hermes dashboard and the messaging gateway restart. bighelp can restart the gateway now. Then restart the dashboard on your computer."
+    static let restartBothMessage = "The plugin takes effect only after the Hermes dashboard and the messaging gateway restart. Replies in progress on your computer stop, and Bighelp reconnects."
+    static let restartGatewayMessage = "The plugin takes effect only after the Hermes dashboard and the messaging gateway restart. Bighelp can restart the gateway now. Then restart the dashboard on your computer."
 
     func body(content: Content) -> some View {
         content.alert("Restart Hermes to finish?",
@@ -500,7 +500,7 @@ enum HostPluginUpdateFixture {
                 HostPluginUpdateSection(model: model(.restarting, installed: "2.17.1", running: "2.17.0",
                                                      message: "Restarting Hermes…"))
                 HostPluginUpdateSection(model: model(.upToDate, installed: "2.17.0", running: "2.17.0",
-                                                     message: "bighelp plugin 2.17.0 is installed and running."))
+                                                     message: "Bighelp plugin 2.17.0 is installed and running."))
             }
             .navigationTitle("Plugin updates")
         }

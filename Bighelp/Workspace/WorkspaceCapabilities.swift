@@ -50,7 +50,7 @@ enum WorkspaceUnavailableReason: String, Equatable, Sendable {
         case .authenticationRequired: "Sign in to this Hermes computer again."
         case .unsupportedHost: "This computer does not support this feature."
         case .unsupportedOperation: "This operation is unavailable on this computer."
-        case .pluginRequired: "This feature requires a compatible bighelp plugin on the computer."
+        case .pluginRequired: "This feature requires a compatible Bighelp plugin on the computer."
         case .driverUnavailable: "The computer's room driver is not running."
         case .permissionRequired: "This feature requires an explicit permission grant."
         case .policyRestricted: "The computer's policy does not permit this operation."

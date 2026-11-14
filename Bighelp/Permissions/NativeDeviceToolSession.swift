@@ -453,17 +453,17 @@ enum DeviceToolChannelNote {
         let wants = [
             needsNewerPlugin.contains(.location) ? "share your location" : nil,
             others.isEmpty ? nil : "use \(ListFormatter.localizedString(byJoining: others.map(\.title)))",
-            needsNewerPlugin.contains(.appearance) ? "let bots change how bighelp looks" : nil,
-            needsNewerPlugin.contains(.navigation) ? "let bots show you around bighelp" : nil,
+            needsNewerPlugin.contains(.appearance) ? "let bots change how Bighelp looks" : nil,
+            needsNewerPlugin.contains(.navigation) ? "let bots show you around Bighelp" : nil,
         ].compactMap { $0 }
         guard !wants.isEmpty else { return nil }
-        return "To \(wants.joined(separator: " and ")), update the bighelp plugin on this computer."
+        return "To \(wants.joined(separator: " and ")), update the Bighelp plugin on this computer."
     }
 
     static func failed(enabled: Set<DeviceToolCapability>, needsNewerPlugin: Set<DeviceToolCapability>) -> String? {
         if !needsNewerPlugin.isEmpty, needsNewerPlugin == enabled { return connected(needsNewerPlugin: needsNewerPlugin) }
         guard enabled.contains(where: \.sharesPersonalData) else { return nil }
-        return "Device access is not connected. Check the bighelp plugin on this computer, then reopen the chat."
+        return "Device access is not connected. Check the Bighelp plugin on this computer, then reopen the chat."
     }
 }
 

@@ -179,7 +179,7 @@ struct BighelpBotsWidgetView: View {
         let shown = Array(bots.prefix(Self.capacity(family)))
         Group {
             if shown.isEmpty {
-                Text("Add bots in bighelp, then choose them here.")
+                Text("Add bots in Bighelp, then choose them here.")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(colors.secondary)
                     .multilineTextAlignment(.center)

@@ -101,7 +101,7 @@ final class DirectHermesManagementLiveTests: XCTestCase {
         let scope = try await files.workspaceScope()
         let expectedRoot = try XCTUnwrap(config["workspace_path"])
         XCTAssertEqual(Data(scope.root.utf8), Data(expectedRoot.utf8))
-        let payload = Data("bighelp confined workspace round trip\n".utf8)
+        let payload = Data("Bighelp confined workspace round trip\n".utf8)
         let uploaded = try await files.upload(bytes: payload, fileName: "scope-proof.txt",
             mimeType: "text/plain", to: scope.root)
         let downloaded = try await files.download(uploaded)

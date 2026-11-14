@@ -24,7 +24,7 @@ final class ComposioSignInHostUITests: BighelpUITestCase {
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         let continueButton = springboard.alerts.buttons["Continue"]
         XCTAssertTrue(continueButton.waitForExistence(timeout: 20), "The system sign-in sheet asks to open Composio")
-        XCTAssertEqual(app.state, .runningForeground, "bighelp didn't crash")
+        XCTAssertEqual(app.state, .runningForeground, "Bighelp didn't crash")
         springboard.alerts.buttons["Cancel"].tap()
         XCTAssertTrue(signIn.waitForExistence(timeout: 10), "Cancelling returns to Sign in to Composio")
         XCTAssertEqual(app.state, .runningForeground)

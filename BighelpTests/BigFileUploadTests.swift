@@ -237,7 +237,7 @@ struct BigFileUploadTests {
                                       sleep: { _ in waits.add() }).upload(file, agentID: "default")
         }
         #expect(waits.value == 0)
-        #expect(BigFileUploadFailure.proxyLimitNeedsPlugin.message.contains("Update the bighelp plugin"))
+        #expect(BigFileUploadFailure.proxyLimitNeedsPlugin.message.contains("Update the Bighelp plugin"))
     }
 
     @Test func smallPiecesThatAreRefusedTooStopWithTheReason() async throws {

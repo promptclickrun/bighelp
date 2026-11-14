@@ -116,7 +116,7 @@ struct PendingShareListView: View {
         List {
             if center.entries.isEmpty {
                 Section {
-                    Text("Nothing is waiting. Things you share with bighelp from other apps show up here until you send or delete them.")
+                    Text("Nothing is waiting. Things you share with Bighelp from other apps show up here until you send or delete them.")
                         .font(.bighelp(.body))
                         .foregroundStyle(theme.secondaryText)
                         .listRowBackground(theme.surface)
@@ -146,7 +146,7 @@ struct PendingShareListView: View {
         }
         .scrollContentBackground(.hidden)
         .background(theme.canvas.ignoresSafeArea())
-        .navigationTitle("Shared with bighelp")
+        .navigationTitle("Shared with Bighelp")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if let close {
@@ -273,7 +273,7 @@ struct PendingShareReviewView: View {
         .scrollContentBackground(.hidden)
         .background(theme.canvas.ignoresSafeArea())
         .navigationTitle(onLater != nil && center.waitingCount > 1
-                         ? "Shared with bighelp (\(center.waitingCount))" : "Shared with bighelp")
+                         ? "Shared with Bighelp (\(center.waitingCount))" : "Shared with Bighelp")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if let onLater {
@@ -368,7 +368,7 @@ struct PendingShareReviewView: View {
                 case .notSent:
                     Text("You put this in a chat with \(placement.agentName) before, and it wasn't sent.")
                 case .maybeSent:
-                    Text("bighelp can't tell whether this reached \(placement.agentName). Look in that chat before you send it again.")
+                    Text("Bighelp can't tell whether this reached \(placement.agentName). Look in that chat before you send it again.")
                 }
             }
         }
@@ -494,7 +494,7 @@ struct PendingShareReviewView: View {
                 // Back to the list it came from; a review on its own moves on by itself.
                 if onLater == nil { dismiss() }
             } catch {
-                notice = String(localized: "bighelp couldn't delete this share. Try again.")
+                notice = String(localized: "Bighelp couldn't delete this share. Try again.")
             }
         }
     }

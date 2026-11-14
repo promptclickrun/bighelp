@@ -116,7 +116,7 @@ struct ModelsMixtureOfAgentsView: View {
                         }
                         .disabled(store.isBusy)
                         if !configuration.privacyFilter.isEmpty {
-                            Label("This computer has a MoA privacy-filter override. The pinned write API cannot preserve it, so bighelp keeps this page read-only.", systemImage: "lock")
+                            Label("This computer has a MoA privacy-filter override. The pinned write API cannot preserve it, so Bighelp keeps this page read-only.", systemImage: "lock")
                                 .font(.bighelp(.footnote)).foregroundStyle(.secondary)
                         }
                     }

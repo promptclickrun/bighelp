@@ -48,7 +48,7 @@ extension SettingsView {
     private var transparency: some View {
         VStack(alignment: .leading, spacing: BighelpTokens.space8) {
             settingLabel(String(localized: "Transparency"),
-                         detail: String(localized: "How much of your space shows through bighelp"))
+                         detail: String(localized: "How much of your space shows through Bighelp"))
             HStack(spacing: BighelpTokens.space12) {
                 Image(systemName: "square.fill")
                     .foregroundStyle(theme.secondaryText)
@@ -116,7 +116,7 @@ extension SettingsView {
 
     private var reflectiveVisionStatus: String {
         reflectiveVisionCamera?.state.statusText
-            ?? String(localized: "The live reflection is available when bighelp is running on a device with camera access.")
+            ?? String(localized: "The live reflection is available when Bighelp is running on a device with camera access.")
     }
 
     var workspace: some View {

@@ -513,7 +513,7 @@ private struct WebhookCreateForm: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                 TextField("Description", text: $description, axis: .vertical)
-                Text("Use lowercase letters, numbers, hyphens, or underscores. Existing names cannot be overwritten from bighelp.")
+                Text("Use lowercase letters, numbers, hyphens, or underscores. Existing names cannot be overwritten from Bighelp.")
                     .font(.bighelp(.footnote)).foregroundStyle(.secondary)
             }
             Section("Events") {
@@ -601,7 +601,7 @@ private struct WebhookSecretReceiptView: View {
                     .textSelection(.enabled)
                     .privacySensitive()
                     .accessibilityLabel("Webhook signing secret")
-                Text("Save this secret directly in the service that will send events. bighelp discards it when you close this sheet and cannot retrieve it again.")
+                Text("Save this secret directly in the service that will send events. Bighelp discards it when you close this sheet and cannot retrieve it again.")
                     .font(.bighelp(.footnote)).foregroundStyle(.secondary)
             }
         }

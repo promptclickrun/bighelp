@@ -93,7 +93,7 @@ enum SessionOrigin {
         let raw = source.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !raw.isEmpty, raw.utf8.count <= 64 else { return nil }
         switch raw {
-        case "bighelp", "loopdy": return "bighelp"
+        case "bighelp", "loopdy": return "Bighelp"
         case "desktop", "hermes-desktop", "hermes_desktop": return "Hermes Desktop"
         case "tui": return "TUI"
         case "cli": return "CLI"

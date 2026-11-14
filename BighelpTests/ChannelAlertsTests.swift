@@ -39,7 +39,7 @@ struct ChannelAlertsTests {
     @Test func onlyRealChannelNamesAreKeptAndSent() {
         #expect(BighelpChannelAlerts.isChannel("imsg"))
         #expect(BighelpChannelAlerts.isChannel("whatsapp_cloud"))
-        #expect(!BighelpChannelAlerts.isChannel("bighelp"), "bighelp always notifies, so it has no switch")
+        #expect(!BighelpChannelAlerts.isChannel("bighelp"), "Bighelp always notifies, so it has no switch")
         #expect(!BighelpChannelAlerts.isChannel("Telegram"))
         #expect(!BighelpChannelAlerts.isChannel("_imsg"))
         #expect(!BighelpChannelAlerts.isChannel("i message"))

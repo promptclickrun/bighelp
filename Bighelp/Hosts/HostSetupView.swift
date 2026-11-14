@@ -30,7 +30,7 @@ enum HostSetupAccessError: LocalizedError {
         case .proxyPasswordRejected:
             "That username and password didn't work. Check them and try again."
         case .blockedBeforeSignIn:
-            "Something in front of Hermes, like a proxy or firewall, turned bighelp away. If it needs a password or a Cloudflare Access token, add it under More options."
+            "Something in front of Hermes, like a proxy or firewall, turned Bighelp away. If it needs a password or a Cloudflare Access token, add it under More options."
         case .invalidProxyCredentials:
             "Check the username and password. A username can't contain a colon."
         case .customHeader(let message):
@@ -40,7 +40,7 @@ enum HostSetupAccessError: LocalizedError {
         case .cloudflareAccessTokenRejected:
             "Cloudflare Access didn't accept that service token. Check the Client ID and secret, and that a Service Auth policy allows it."
         case .loginPage:
-            "This address opens a login page bighelp can't use. Try the address that reaches Hermes directly."
+            "This address opens a login page Bighelp can't use. Try the address that reaches Hermes directly."
         }
     }
 }

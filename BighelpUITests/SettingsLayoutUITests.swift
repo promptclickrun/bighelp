@@ -97,7 +97,7 @@ final class SettingsLayoutUITests: BighelpUITestCase {
             XCTAssertTrue(done.waitForExistence(timeout: 5), "The info button shows the description in a sheet")
             save("10-device-access-about-\(appearance)", app)
             done.tap()
-            reach(header("bighelp itself", in: app), in: app)
+            reach(header("Bighelp itself", in: app), in: app)
             reach(app.switches["permissions.device-tools.navigation"].firstMatch, in: app)
             app.terminate()
         }

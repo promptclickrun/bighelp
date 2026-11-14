@@ -7,7 +7,7 @@
     <key>BighelpBuzzKitAPIURL</key>
     <string>https://api.buzzkit.dev</string>
     <key>CFBundleDisplayName</key>
-    <string>bighelp</string>
+    <string>Bighelp</string>
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleExecutable</key>
@@ -119,11 +119,11 @@
         </dict>
     </dict>
     <key>NSLocalNetworkUsageDescription</key>
-    <string>bighelp connects directly to the Hermes computer you choose on your home network, VPN or Tailscale.</string>
+    <string>Bighelp connects directly to the Hermes computer you choose on your home network, VPN or Tailscale.</string>
     <key>NSHealthShareUsageDescription</key>
-    <string>When you turn on Apple Health in Device access, bighelp reads the Health data you allow and shares it with your Hermes computer and the AI provider on it, to answer your health and fitness questions. bighelp never changes your Health data.</string>
+    <string>When you turn on Apple Health in Device access, Bighelp reads the Health data you allow and shares it with your Hermes computer and the AI provider on it, to answer your health and fitness questions. Bighelp never changes your Health data.</string>
     <key>NSHealthUpdateUsageDescription</key>
-    <string>bighelp never writes to Apple Health. It only reads the Health data you allow, after you turn on Apple Health in Device access.</string>
+    <string>Bighelp never writes to Apple Health. It only reads the Health data you allow, after you turn on Apple Health in Device access.</string>
     <key>NSCalendarsFullAccessUsageDescription</key>
     <string>When you enable Calendar tools, your selected agent can read, create, update, and delete calendar events on your request.</string>
     <key>NSRemindersFullAccessUsageDescription</key>
@@ -138,11 +138,11 @@
     <key>BighelpNativeBrowserAuthenticationEnabled</key>
     <true/>
     <key>NSCameraUsageDescription</key>
-    <string>bighelp uses the camera to scan short-lived pairing codes, power Reflective Vision, and capture photos or scan documents you intentionally attach to chats.</string>
+    <string>Bighelp uses the camera to scan short-lived pairing codes, power Reflective Vision, and capture photos or scan documents you intentionally attach to chats.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>bighelp shares your location with your agent only when you allow it and the agent asks, for things like finding places near you, and watches places you name while bighelp is open.</string>
+    <string>Bighelp shares your location with your agent only when you allow it and the agent asks, for things like finding places near you, and watches places you name while Bighelp is open.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>When you enable Arriving and leaving, bighelp tells your agent when you arrive at or leave the places you name, even when bighelp is closed. It never tracks where you go.</string>
+    <string>When you enable Arriving and leaving, Bighelp tells your agent when you arrive at or leave the places you name, even when Bighelp is closed. It never tracks where you go.</string>
     <key>NSLocationTemporaryUsageDescriptionDictionary</key>
     <dict>
         <key>AgentRequest</key>
@@ -151,17 +151,17 @@
     <key>NSLocationDefaultAccuracyReduced</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>
-    <string>bighelp uses your microphone for live voice conversations with your selected Hermes agent.</string>
+    <string>Bighelp uses your microphone for live voice conversations with your selected Hermes agent.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>When you enable Photos tools, your selected agent can find and look at your photos, save pictures, and sort them into albums on your request. You can limit it to the photos you choose.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
-    <string>bighelp saves images, GIFs, and videos to Photos only when you choose Save to Photos.</string>
+    <string>Bighelp saves images, GIFs, and videos to Photos only when you choose Save to Photos.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<true/>
     <key>NSSpeechRecognitionUsageDescription</key>
-    <string>bighelp transcribes your voice on device and sends only your words to your selected Hermes agent.</string>
+    <string>Bighelp transcribes your voice on device and sends only your words to your selected Hermes agent.</string>
     <key>NSUserActivityTypes</key>
     <array>
         <string>app.loopdy.mobile.open</string>

@@ -326,7 +326,7 @@ final class HostOperationsStore {
                 if let receipt = try? client.receipt(forActionName: HermesHostAction.importArchive.rawValue) {
                     register(receipt, title: "backup import", admitted: false)
                 }
-                errorMessage = "Hermes did not confirm whether the reviewed import started. bighelp discarded any uploaded bytes, retained the action slot for read-only status checks, and will not enable another import in this presentation."
+                errorMessage = "Hermes did not confirm whether the reviewed import started. Bighelp discarded any uploaded bytes, retained the action slot for read-only status checks, and will not enable another import in this presentation."
             } else {
                 publish(error, token: token)
             }
@@ -625,11 +625,11 @@ final class HostOperationsStore {
            importOutcomeNeedsReview {
             switch status.phase {
             case .succeeded:
-                errorMessage = "Hermes reports that the named import action slot last exited successfully, but the lost acknowledgement cannot prove it belongs to the reviewed import. bighelp will not replay it."
+                errorMessage = "Hermes reports that the named import action slot last exited successfully, but the lost acknowledgement cannot prove it belongs to the reviewed import. Bighelp will not replay it."
             case .failed(let code):
-                errorMessage = "Hermes reports exit code \(code) for the named import action slot, but the lost acknowledgement cannot prove it belongs to the reviewed import. bighelp will not replay it."
+                errorMessage = "Hermes reports exit code \(code) for the named import action slot, but the lost acknowledgement cannot prove it belongs to the reviewed import. Bighelp will not replay it."
             case .outcomeUnknown:
-                errorMessage = "Hermes has no durable result for the named import action slot. The reviewed import outcome remains unknown and bighelp will not replay it."
+                errorMessage = "Hermes has no durable result for the named import action slot. The reviewed import outcome remains unknown and Bighelp will not replay it."
             case .running:
                 break
             }
@@ -665,7 +665,7 @@ final class HostOperationsStore {
         } catch {
             guard ownsScope else { return }
             if receipt.action == .gatewayRestart || receipt.action == .hermesUpdate {
-                errorMessage = "The action may have interrupted this connection. Reconnect to the same host, then read its action and runtime status; bighelp did not replay it."
+                errorMessage = "The action may have interrupted this connection. Reconnect to the same host, then read its action and runtime status; Bighelp did not replay it."
             }
         }
     }
@@ -716,7 +716,7 @@ final class HostOperationsStore {
     private func publishTrackingError(_ error: any Error, receipt: HermesHostActionReceipt) {
         guard ownsScope else { return }
         if error is CancellationError { return }
-        errorMessage = "bighelp could not confirm \(receipt.action.rawValue). Its receipt is retained; refresh status instead of launching it again."
+        errorMessage = "Bighelp could not confirm \(receipt.action.rawValue). Its receipt is retained; refresh status instead of launching it again."
     }
 
     private static func message(_ error: any Error) -> String {

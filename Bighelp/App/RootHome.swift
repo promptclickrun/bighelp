@@ -124,7 +124,7 @@ extension RootShellView {
                     }
                 } catch is CancellationError {
                 } catch {
-                    actionErrorMessage = String(localized: "bighelp couldn't change this chat. Try again.")
+                    actionErrorMessage = String(localized: "Bighelp couldn't change this chat. Try again.")
                 }
             }
         case .fleetChat(let chat):
@@ -414,7 +414,7 @@ extension RootShellView {
                                          action: { afterClosingHomeSheets { isNeedsYouPresented = true } }))
         }
         if let shared = pendingSharesMenuRow {
-            links.append(HomeSidebarLink(id: "shared", title: String(localized: "Shared with bighelp"),
+            links.append(HomeSidebarLink(id: "shared", title: String(localized: "Shared with Bighelp"),
                                          symbol: "tray.and.arrow.down", detail: "\(shared.count)", showsDot: true,
                                          action: shared.open))
         }

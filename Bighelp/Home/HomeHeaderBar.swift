@@ -208,7 +208,10 @@ struct HomeHeaderBar: View {
 struct HomeHeaderBackground: View {
     @BighelpThemeReader private var theme
 
-    private static let fade: CGFloat = 16
+    /// How far the fade reaches over the page. A control that is the first thing under the header
+    /// (a search field, a row of chips) starts this far down: nearer, the fade lies over its top
+    /// edge while the page is at rest, and it looks cut off.
+    static let fade: CGFloat = 16
 
     var body: some View {
         theme.canvas

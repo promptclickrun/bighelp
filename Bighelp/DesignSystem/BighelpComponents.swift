@@ -602,8 +602,8 @@ extension View {
     /// A main screen's search field: the first row of its list, under the title, with any
     /// filter chips below it. It stays put while you type (results fill in under it), and
     /// the bottom bar never moves for it (`SearchPlacementUITests`).
-    func bighelpListSearchRow() -> some View {
-        listRowInsets(EdgeInsets(top: BighelpTokens.space4, leading: BighelpTokens.space16,
+    func bighelpListSearchRow(top: CGFloat = BighelpTokens.space4) -> some View {
+        listRowInsets(EdgeInsets(top: top, leading: BighelpTokens.space16,
                                  bottom: BighelpTokens.space8, trailing: BighelpTokens.space16))
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)

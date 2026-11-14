@@ -326,7 +326,7 @@ final class BotScreenViewerModel {
     static func sentence(for end: BotScreenStreamEnd) -> String {
         switch end {
         case .screenGone: "The screen was turned off."
-        case .notAllowed: "Your computer didn't let bighelp open the screen."
+        case .notAllowed: "Your computer didn't let Bighelp open the screen."
         case .noServer: "Your computer's screen sharing didn't answer. Check that it's on, then try again."
         case .controlTaken, .ticketRefused: "Someone else keeps taking control of the screen."
         case .dropped: "Lost the connection to the screen."
@@ -337,7 +337,7 @@ final class BotScreenViewerModel {
     static func endingSentence(for error: any Error) -> String? {
         switch error {
         case RFBError.unsupportedSecurity:
-            "This screen asks for a sign-in bighelp can't send. Turn on a VNC password for it."
+            "This screen asks for a sign-in Bighelp can't send. Turn on a VNC password for it."
         case WorkspaceClientError.unavailable(.unsupportedOperation):
             "This computer's Hermes doesn't have screens yet."
         case WorkspaceClientError.rejected:

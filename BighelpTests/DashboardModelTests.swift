@@ -736,7 +736,7 @@ private final class SuspendedExternalRefreshDashboardSource: DashboardDataSource
         DashboardSnapshot(
             attentionItems: waiting ? [DashboardAttentionItem(
                 id: "delivered-while-away",
-                title: "Delivered while bighelp was away",
+                title: "Delivered while Bighelp was away",
                 detail: "A question arrived in the background.",
                 urgency: .important,
                 createdAt: Date()

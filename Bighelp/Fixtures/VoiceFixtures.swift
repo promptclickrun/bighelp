@@ -56,7 +56,7 @@ enum VoiceFixture {
         ),
         VoiceTranscriptRow(
             id: "voice-transcript-loopdy-0942",
-            speaker: "bighelp",
+            speaker: "Bighelp",
             time: "9:42 AM",
             text: "Your top priorities are the vendor approval, budget review, and Seattle itinerary."
         )

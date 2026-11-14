@@ -34,7 +34,7 @@ final class VoiceShortcutUITests: BighelpUITestCase {
         app.open(URL(string: "loopdy://voice?agent=research&host=\(Self.studioMac)")!)
         expectMessage("Studio Mac is a sample host in this demo.", in: app)
         app.open(URL(string: "loopdy://voice?host=0D0D0D0D-0000-4000-8000-0000000000FF")!)
-        expectMessage("That computer isn't in bighelp anymore.", in: app)
+        expectMessage("That computer isn't in Bighelp anymore.", in: app)
         XCTAssertFalse(app.descendants(matching: .any)["voice.screen"].exists)
     }
 

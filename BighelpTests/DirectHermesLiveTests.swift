@@ -44,7 +44,7 @@ final class DirectHermesLiveTests: XCTestCase {
             let members = template.members.filter { ["default", "doofy"].contains($0.memberID) }
             XCTAssertEqual(members.count, 2)
             creationAttempted = true
-            _ = try await client.groupsCreate(roomID: roomID, name: "bighelp temporary Swift acceptance", members: members)
+            _ = try await client.groupsCreate(roomID: roomID, name: "Bighelp temporary Swift acceptance", members: members)
             _ = try await store.openNativeRoom(roomID: roomID)
             print("NATIVE_GROUP_STAGE opened")
             let target = try XCTUnwrap(members.first { $0.memberID == "default" })
@@ -180,7 +180,7 @@ final class DirectHermesLiveTests: XCTestCase {
                                         target: ["kind": .string("local"), "profile": .string($0)])
             }
             created = true
-            _ = try await client.groupsCreate(roomID: roomID, name: "bighelp temporary stop check", members: members)
+            _ = try await client.groupsCreate(roomID: roomID, name: "Bighelp temporary stop check", members: members)
             _ = try await store.openNativeRoom(roomID: roomID)
 
             // Hermes applies the stop; the app never sees its answer.

@@ -53,7 +53,7 @@ struct ComposioAppsView: View {
                 Text(message).font(.bighelp(.footnote)).foregroundStyle(.secondary)
             }
         } footer: {
-            Text("You sign in on Composio's own page with your own Composio account. bighelp never sees your password.")
+            Text("You sign in on Composio's own page with your own Composio account. Bighelp never sees your password.")
         }
     }
 
@@ -97,7 +97,7 @@ struct ComposioAppsView: View {
                             .font(.bighelp(.footnote)).foregroundStyle(.secondary)
                     }
                 case .needsPluginUpdate:
-                    Label("Update the bighelp plugin on \(host) so your bot can use these apps.",
+                    Label("Update the Bighelp plugin on \(host) so your bot can use these apps.",
                           systemImage: "arrow.down.circle")
                         .accessibilityIdentifier("composio.agent.update-plugin")
                 case .unknown:

@@ -108,7 +108,7 @@ struct CapabilityManagementStateTests {
         await harness.launch()
         #expect(harness.status()?.phase == .succeeded)
         #expect(harness.state.successMessage == nil)
-        #expect(harness.state.errorMessage?.contains("Completion is not confirmed in bighelp") == true)
+        #expect(harness.state.errorMessage?.contains("Completion is not confirmed in Bighelp") == true)
         #expect(fixture.events == ["launch", "status", "load"])
     }
 

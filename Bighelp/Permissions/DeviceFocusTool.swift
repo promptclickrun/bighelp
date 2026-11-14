@@ -8,7 +8,7 @@ import SwiftUI
 final class DeviceFocusTool: DeviceCapabilityTool {
     let capability = DeviceToolCapability.focus
 
-    static let hint = "The person sets this up in iOS Settings, under Focus, by adding bighelp's Focus filter to a "
+    static let hint = "The person sets this up in iOS Settings, under Focus, by adding Bighelp's Focus filter to a "
         + "Focus. A Focus without that filter shows as not active, even while it is on."
 
     private let store: BighelpFocusFilterStore
@@ -74,7 +74,7 @@ struct FocusPermissionExtras: View {
 
     var body: some View {
         if permissions.isEnabled(.focus) {
-            Text("To share a Focus, add bighelp's filter to it in iOS Settings › Focus, then pick its name, its note for your bots and whether their alerts stay quiet.")
+            Text("To share a Focus, add Bighelp's filter to it in iOS Settings › Focus, then pick its name, its note for your bots and whether their alerts stay quiet.")
                 .bighelpFont(.metadata).foregroundStyle(.secondary)
                 .accessibilityIdentifier("permissions.device-tools.focus.setup")
         }

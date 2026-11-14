@@ -119,7 +119,7 @@ final class CarPlayVoiceSession {
                 requestedID: agentID ?? continuity.agentID ?? preference.agentID, in: agents,
                 fallbackID: workspace.agents.resolvedAgent(explicitID: nil)?.id)
             else {
-                phase = .problem("Pick a bot in bighelp on your iPhone first.")
+                phase = .problem("Pick a bot in Bighelp on your iPhone first.")
                 return releaseHostConnection()
             }
             if agentID == agent.id { preference.agentID = agent.id }
@@ -172,7 +172,7 @@ final class CarPlayVoiceSession {
             follow()
         } catch {
             guard current == generation else { return }
-            phase = .problem("bighelp couldn't reach your computer. Check that it's on and online.")
+            phase = .problem("Bighelp couldn't reach your computer. Check that it's on and online.")
             releaseHostConnection()
         }
     }
@@ -210,7 +210,7 @@ final class CarPlayVoiceSession {
     }
 
     private static let permissionProblem =
-        "Open bighelp on your iPhone once and allow the microphone and speech recognition."
+        "Open Bighelp on your iPhone once and allow the microphone and speech recognition."
 
     func toggleMute() {
         isMuted.toggle()
@@ -281,7 +281,7 @@ final class CarPlayVoiceSession {
             case .idle, .preparing, .connecting: .connecting
             case .live: live.workStatus == .working ? .working : .listening
             case .interrupted, .ended: .paused
-            case .failed: .problem(live.errorMessage ?? "Live voice isn't available. Choose Take turns in bighelp's Settings.")
+            case .failed: .problem(live.errorMessage ?? "Live voice isn't available. Choose Take turns in Bighelp's Settings.")
             }
             return
         }
@@ -294,7 +294,7 @@ final class CarPlayVoiceSession {
         case .unavailable: phase = .problem("Voice isn't available right now.")
         }
         if voice.meterState == .unavailable {
-            phase = .problem("bighelp can't hear you. Check microphone access for bighelp on your iPhone.")
+            phase = .problem("Bighelp can't hear you. Check microphone access for Bighelp on your iPhone.")
         } else if voice.allowsInputMonitoring, voice.meterState == .idle {
             Task { await voice.startMonitoring() }
         }
@@ -331,7 +331,7 @@ enum CarPlayConnectStep: Equatable {
 
     var problem: String {
         switch self {
-        case .computer: "bighelp couldn't reach your computer. Check that it's on and online."
+        case .computer: "Bighelp couldn't reach your computer. Check that it's on and online."
         case .chat: "Your computer answered, but the chat didn't start. Try again."
         case .voice: "The chat is ready, but voice didn't start. Try again."
         }

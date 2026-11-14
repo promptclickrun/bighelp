@@ -35,7 +35,7 @@ struct ProjectChangesStoreTests {
             agentID: "default",
             sessionID: "session-project-reopen",
             restoredWorkspaceID: "project-loopdy",
-            restoredWorkspaceName: "bighelp iOS",
+            restoredWorkspaceName: "Bighelp iOS",
             loadedWorkspaceID: nil,
             loadedWorkspaceName: nil
         )
@@ -44,7 +44,7 @@ struct ProjectChangesStoreTests {
             agentID: "default",
             sessionID: "session-project-reopen",
             workspaceID: "project-loopdy",
-            workspaceName: "bighelp iOS"
+            workspaceName: "Bighelp iOS"
         ))
     }
 
@@ -53,7 +53,7 @@ struct ProjectChangesStoreTests {
             agentID: "default",
             sessionID: "session-project-reopen",
             workspaceID: "project-loopdy",
-            workspaceName: "bighelp iOS"
+            workspaceName: "Bighelp iOS"
         )
         let client = DeferredProjectGitClient()
         let store = ProjectChangesStore(client: client, refreshDebounce: .milliseconds(1))
@@ -91,7 +91,7 @@ struct ProjectChangesStoreTests {
                 agentID: "default",
                 sessionID: "session-project-git",
                 workspaceID: "project-loopdy",
-                workspaceName: "bighelp iOS"
+                workspaceName: "Bighelp iOS"
             ),
             enabled: true
         )
@@ -100,7 +100,7 @@ struct ProjectChangesStoreTests {
             fileCount: 2,
             insertions: 62,
             deletions: 5,
-            workspaceName: "bighelp iOS",
+            workspaceName: "Bighelp iOS",
             branch: "main"
         ))
         #expect(client.statusRequests == ["project-loopdy"])
@@ -111,12 +111,12 @@ struct ProjectChangesStoreTests {
             fileCount: 12,
             insertions: 100,
             deletions: 8,
-            workspaceName: "bighelp AI V2",
+            workspaceName: "Bighelp AI V2",
             branch: "main"
         )
 
         #expect(ProjectChangesRailPresentation.visibleLabels(for: summary) == ["12 files", "+100", "−8"])
-        #expect(!ProjectChangesRailPresentation.accessibilityLabel(for: summary).contains("bighelp AI V2"))
+        #expect(!ProjectChangesRailPresentation.accessibilityLabel(for: summary).contains("Bighelp AI V2"))
         #expect(ProjectChangesRailPresentation.accessibilityLabel(for: summary).contains("12 files"))
     }
 
@@ -136,7 +136,7 @@ struct ProjectChangesStoreTests {
             agentID: "default",
             sessionID: "session-project-git",
             workspaceID: "project-loopdy",
-            workspaceName: "bighelp iOS"
+            workspaceName: "Bighelp iOS"
         )
         let loadingClient = DeferredProjectGitClient()
         let loadingStore = ProjectChangesStore(client: loadingClient)
@@ -400,10 +400,10 @@ struct ProjectChangesStoreTests {
                     kind: .addition,
                     oldLine: nil,
                     newLine: 1,
-                    content: "# bighelp"
+                    content: "# Bighelp"
                 )],
                 nextOffset: nil,
-                previewContent: "# bighelp"
+                previewContent: "# Bighelp"
             )
         )
         let store = ProjectChangesStore(client: client)
@@ -421,7 +421,7 @@ struct ProjectChangesStoreTests {
         #expect(client.statusTokensUsedForDiff == [oldToken, newToken])
         #expect(client.statusRequestCount == 2)
         #expect(store.diff?.path == "README.md")
-        #expect(store.diff?.previewContent == "# bighelp")
+        #expect(store.diff?.previewContent == "# Bighelp")
         #expect(store.errorMessage == nil)
     }
 
@@ -519,8 +519,8 @@ struct ProjectChangesStoreTests {
 
         #expect(client.diffOffsets == [0, 1, 0])
         #expect(client.diffLimits == [1, 1, 1])
-        #expect(store.diff?.lines.map(\.content) == ["# bighelp refreshed"])
-        #expect(store.diff?.previewContent == "# bighelp refreshed")
+        #expect(store.diff?.lines.map(\.content) == ["# Bighelp refreshed"])
+        #expect(store.diff?.previewContent == "# Bighelp refreshed")
         #expect(store.diff?.nextOffset == 1)
         #expect(store.preparedOperation == nil)
         #expect(store.pendingMutation == nil)
@@ -1029,10 +1029,10 @@ private final class PagingStaleProjectGitClient: ProjectGitClient {
                     kind: .addition,
                     oldLine: nil,
                     newLine: 1,
-                    content: refreshed ? "# bighelp refreshed" : "# bighelp"
+                    content: refreshed ? "# Bighelp refreshed" : "# Bighelp"
                 )],
                 nextOffset: 1,
-                previewContent: refreshed ? "# bighelp refreshed" : "# bighelp\n\nText"
+                previewContent: refreshed ? "# Bighelp refreshed" : "# Bighelp\n\nText"
             )
         }
         return ProjectGitDiffPage(

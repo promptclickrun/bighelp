@@ -80,7 +80,7 @@ enum HermesKanbanError: Error, Equatable, LocalizedError {
         case .invalidResponse:
             "Hermes returned an invalid Kanban response. Refresh before trying again."
         case .capacityExceeded:
-            "The Kanban response or attachment exceeds bighelp’s bounded native limit."
+            "The Kanban response or attachment exceeds Bighelp’s bounded native limit."
         case .reviewChanged:
             "The board, task, or run changed after review. Refresh and review the current state."
         case .mutationNotVerified:
@@ -90,7 +90,7 @@ enum HermesKanbanError: Error, Equatable, LocalizedError {
         case .attachmentTransportRequired:
             "This Kanban attachment action requires the fixed authenticated multipart/binary transport."
         case .eventTransportUnavailable:
-            "The separate Kanban event WebSocket is unavailable; bighelp will use bounded polling."
+            "The separate Kanban event WebSocket is unavailable; Bighelp will use bounded polling."
         case .pollingLimitReached:
             "Live Kanban polling reached its safety limit. Refresh to continue."
         }

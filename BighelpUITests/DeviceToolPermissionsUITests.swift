@@ -106,7 +106,7 @@ final class DeviceToolPermissionsUITests: BighelpUITestCase {
         let on = NSPredicate(format: "value == '1'")
         expectation(for: on, evaluatedWith: toggle)
         waitForExpectations(timeout: 5)
-        let note = app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Only while bighelp is open'"))
+        let note = app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Only while Bighelp is open'"))
         XCTAssertTrue(note.firstMatch.waitForExistence(timeout: 5))
         XCTAssertEqual(app.alerts.count, 0)
         capture("device-access-location-on-\(appearance)", in: app)

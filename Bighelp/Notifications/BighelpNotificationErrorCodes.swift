@@ -167,7 +167,7 @@ enum BighelpNotificationErrorCode: String, CaseIterable, Codable, Sendable {
 
     private static let turnOff = "Turn off notifications at the bottom of Settings › Notifications, then turn them on again."
     private static let setUpAgain = "Use Set Up Again."
-    private static let updateApp = "Update bighelp."
+    private static let updateApp = "Update Bighelp."
     private static let sendUs = "If it still happens, send us this code and its details."
     /// The system this device runs, which registers it for notifications.
     private static var system: String {
@@ -197,138 +197,138 @@ enum BighelpNotificationErrorCode: String, CaseIterable, Codable, Sendable {
         switch self {
         case .offline: "This device is offline. Connect to Wi-Fi or mobile data, then try again."
         case .serviceUnreachable:
-            "bighelp can't reach its notification service from this device. Check that this device is online and that no VPN or DNS filter blocks it, then try again."
-        case .serviceTimedOut: "bighelp's notification service took too long to answer. Wait a minute, then try again."
+            "Bighelp can't reach its notification service from this device. Check that this device is online and that no VPN or DNS filter blocks it, then try again."
+        case .serviceTimedOut: "Bighelp's notification service took too long to answer. Wait a minute, then try again."
         case .serviceInsecure:
-            "This device couldn't make a secure connection to bighelp's notification service. Check the device's date and time, and turn off any VPN or filter that inspects web traffic. Then try again."
+            "This device couldn't make a secure connection to Bighelp's notification service. Check the device's date and time, and turn off any VPN or filter that inspects web traffic. Then try again."
         case .serviceAnswerUnreadable:
-            "bighelp's notification service sent an answer bighelp can't read. If this Wi-Fi has a sign-in page, sign in with Safari first, or use another network. Then try again."
-        case .serviceProblem: "bighelp's notification service has a problem right now. Try again later."
-        case .serviceBusy: "bighelp's notification service is busy. Wait a few minutes, then try again."
+            "Bighelp's notification service sent an answer Bighelp can't read. If this Wi-Fi has a sign-in page, sign in with Safari first, or use another network. Then try again."
+        case .serviceProblem: "Bighelp's notification service has a problem right now. Try again later."
+        case .serviceBusy: "Bighelp's notification service is busy. Wait a few minutes, then try again."
         case .networkProblem: "A network problem stopped setup. Check this device's connection, then try again."
         case .serviceRequestRefused:
-            "bighelp's notification service doesn't accept a request from this version of bighelp. \(Self.updateApp) \(Self.sendUs)"
+            "Bighelp's notification service doesn't accept a request from this version of Bighelp. \(Self.updateApp) \(Self.sendUs)"
         case .serviceRefusedUnknown:
-            "bighelp's notification service turned down a step for a reason this version of bighelp doesn't know. \(Self.updateApp) \(Self.sendUs)"
+            "Bighelp's notification service turned down a step for a reason this version of Bighelp doesn't know. \(Self.updateApp) \(Self.sendUs)"
         case .signUpKeyConflict:
-            "bighelp's notification service already has a different key for this device. \(Self.turnOff)"
-        case .signUpRepeated: "bighelp's notification service got the same sign-up twice. Try again."
+            "Bighelp's notification service already has a different key for this device. \(Self.turnOff)"
+        case .signUpRepeated: "Bighelp's notification service got the same sign-up twice. Try again."
         case .signUpClockWrong, .grantClockWrong:
             "This device's clock is wrong. In \(Self.settingsApp), go to General › Date & Time and turn on Set Automatically. Then try again."
         case .signUpRateLimited: "This network made too many notification sign-ups in the last hour. Wait one hour, then try again."
-        case .signUpUnavailable: "bighelp's notification service can't take new sign-ups right now. Try again later."
+        case .signUpUnavailable: "Bighelp's notification service can't take new sign-ups right now. Try again later."
         case .signUpKeyRejected:
-            "bighelp's notification service didn't accept this device's new key. \(Self.updateApp) \(Self.sendUs)"
+            "Bighelp's notification service didn't accept this device's new key. \(Self.updateApp) \(Self.sendUs)"
         case .signInRejected:
-            "bighelp's notification service didn't accept this device's sign-in. Usually this device's clock is wrong: in \(Self.settingsApp), go to General › Date & Time and turn on Set Automatically. Then try again."
-        case .signUpEnded: "bighelp's notification service ended this device's notification sign-up. \(Self.turnOff)"
-        case .signatureRejected: "bighelp's notification service didn't accept this device's notification key. \(Self.turnOff)"
-        case .requestRepeated: "bighelp's notification service got the same request twice. Try again."
+            "Bighelp's notification service didn't accept this device's sign-in. Usually this device's clock is wrong: in \(Self.settingsApp), go to General › Date & Time and turn on Set Automatically. Then try again."
+        case .signUpEnded: "Bighelp's notification service ended this device's notification sign-up. \(Self.turnOff)"
+        case .signatureRejected: "Bighelp's notification service didn't accept this device's notification key. \(Self.turnOff)"
+        case .requestRepeated: "Bighelp's notification service got the same request twice. Try again."
         case .oldSignUpNotRemoved:
-            "bighelp's notification service didn't confirm that it removed this device's old sign-up. Try again later."
+            "Bighelp's notification service didn't confirm that it removed this device's old sign-up. Try again later."
         case .pushCleanupUnavailable:
-            "bighelp's notification service couldn't finish removing this device from the push service. Try again later."
+            "Bighelp's notification service couldn't finish removing this device from the push service. Try again later."
         case .directPushRefused:
-            "bighelp's notification service didn't accept this device's notification address. bighelp will try again later. Alerts still arrive."
+            "Bighelp's notification service didn't accept this device's notification address. Bighelp will try again later. Alerts still arrive."
         case .directPushUnreachable:
-            "bighelp couldn't reach its notification service to register this device's notification address. bighelp will try again later. Alerts still arrive."
+            "Bighelp couldn't reach its notification service to register this device's notification address. Bighelp will try again later. Alerts still arrive."
         case .directPushActivityFailed:
-            "bighelp couldn't register a Live Activity with its notification service. The next update will try again. Alerts still arrive."
+            "Bighelp couldn't register a Live Activity with its notification service. The next update will try again. Alerts still arrive."
         case .directPushRemoveFailed:
-            "bighelp couldn't remove this device's notification address from its notification service. The service removes it by itself after a while."
+            "Bighelp couldn't remove this device's notification address from its notification service. The service removes it by itself after a while."
 
         case .permissionOff:
-            "Notifications for bighelp are off. In \(Self.settingsApp), go to Notifications › bighelp and turn on Allow Notifications. Then try again."
-        case .permissionRequestFailed: "\(Self.system) didn't answer when bighelp asked to send notifications. Try again."
+            "Notifications for Bighelp are off. In \(Self.settingsApp), go to Notifications › Bighelp and turn on Allow Notifications. Then try again."
+        case .permissionRequestFailed: "\(Self.system) didn't answer when Bighelp asked to send notifications. Try again."
         case .apnsRegistrationFailed:
             "\(Self.system) couldn't register this device for notifications. Check that the device is online and signed in to your Apple Account, then try again. Restarting the device can help."
         case .apnsTimedOut: "\(Self.system) took too long to register this device for notifications. Check the device's connection, then try again."
-        case .apnsTokenMissing: "\(Self.system) didn't give bighelp this device's notification address. Try again."
+        case .apnsTokenMissing: "\(Self.system) didn't give Bighelp this device's notification address. Try again."
         case .pushRegistrationFailed: "The push service couldn't register this device. Wait a minute, then try again."
         case .pushSubscriptionUnconfirmed: "The push service didn't confirm this device's registration. Try again."
-        case .alertChoicesNotMoved: "bighelp couldn't move your saved alert choices to the push service. Try again."
-        case .pushRegistrationUnfinished: "This device's registration didn't finish before bighelp checked it. Try again."
+        case .alertChoicesNotMoved: "Bighelp couldn't move your saved alert choices to the push service. Try again."
+        case .pushRegistrationUnfinished: "This device's registration didn't finish before Bighelp checked it. Try again."
         case .pushSignInLost: "This device's sign-in with the push service stopped during setup. Try again."
         case .pushServiceUnreachable:
-            "bighelp can't reach the push service from this device. Check that this device is online and that no VPN or DNS filter blocks it, then try again."
+            "Bighelp can't reach the push service from this device. Check that this device is online and that no VPN or DNS filter blocks it, then try again."
         case .pushSignInRefused: "The push service didn't accept this device's sign-in. Wait a minute, then try again."
-        case .pushServiceAnswerUnreadable: "The push service sent an answer bighelp can't read. Try again later."
-        case .pushServiceNotStarted: "The push service didn't start in bighelp. Quit bighelp and open it again."
+        case .pushServiceAnswerUnreadable: "The push service sent an answer Bighelp can't read. Try again later."
+        case .pushServiceNotStarted: "The push service didn't start in Bighelp. Quit Bighelp and open it again."
         case .pushKeyMissing, .pushAddressInvalid:
-            "This copy of bighelp can't use notifications. Install bighelp from the App Store or TestFlight."
-        case .pushEnvironmentChanged: "bighelp changed how it gets notifications. Quit bighelp and open it again."
+            "This copy of Bighelp can't use notifications. Install Bighelp from the App Store or TestFlight."
+        case .pushEnvironmentChanged: "Bighelp changed how it gets notifications. Quit Bighelp and open it again."
         case .pushEnvironmentUnknown:
-            "bighelp doesn't know which push service to use. Quit bighelp and open it again. \(Self.sendUs)"
+            "Bighelp doesn't know which push service to use. Quit Bighelp and open it again. \(Self.sendUs)"
         case .demoMode: "Notifications don't work in demo mode."
-        case .providerNotReady: "bighelp's notification service isn't ready to send notifications right now. Try again later."
+        case .providerNotReady: "Bighelp's notification service isn't ready to send notifications right now. Try again later."
         case .pushSubscriberUnknown: "The push service doesn't know this device yet. Wait a minute, then try again."
         case .pushSubscriberUnverified: "The push service hasn't confirmed this device's sign-in yet. Wait a minute, then try again."
         case .noPushCredential:
-            "bighelp's notification service can't send to this kind of bighelp build right now. Try again later. \(Self.sendUs)"
+            "Bighelp's notification service can't send to this kind of Bighelp build right now. Try again later. \(Self.sendUs)"
         case .pushDeviceUnmatched: "The push service has a different notification address for this device. Try again."
         case .pushDeviceDisabled:
-            "The push service has notifications turned off for this device. Check that notifications for bighelp are on in \(Self.settingsApp), then try again."
+            "The push service has notifications turned off for this device. Check that notifications for Bighelp are on in \(Self.settingsApp), then try again."
         case .pushDeviceInactive: "The push service marked this device as inactive. Try again."
         case .pushWrongEnvironment:
-            "The push service has this device registered for another kind of bighelp build (TestFlight or App Store). Try again."
+            "The push service has this device registered for another kind of Bighelp build (TestFlight or App Store). Try again."
         case .pushTopicsIncomplete: "The push service doesn't have every alert type for this device yet. Wait a minute, then try again."
         case .pushSubscriptionMismatch: "The push service confirmed a different registration for this device. Try again."
         case .pushCheckFailed: "The push service's check of this device didn't pass. Wait a minute, then try again."
-        case .pushServiceOutOfReach: "bighelp's notification service can't reach the push service right now. Try again later."
+        case .pushServiceOutOfReach: "Bighelp's notification service can't reach the push service right now. Try again later."
         case .pushServiceDataUnreadable:
-            "bighelp's notification service got an answer from the push service that it can't use. Try again later."
+            "Bighelp's notification service got an answer from the push service that it can't use. Try again later."
         case .pushRecordsMismatch: "The push service's records for this device don't match. Try again."
         case .pushRegistrationsAmbiguous: "The push service has more than one registration for this device. \(Self.turnOff)"
         case .pushServiceNotConfigured:
-            "bighelp's notification service isn't set up to use the push service right now. Try again later. \(Self.sendUs)"
-        case .keychainUnavailable: "bighelp couldn't open this device's keychain. Unlock the device, then try again."
-        case .savedSetupDamaged: "bighelp's saved notification setup on this device is damaged. \(Self.turnOff)"
-        case .saveFailed: "bighelp couldn't save notification setup on this device. Check that the device has free space, then try again."
-        case .loadFailed: "bighelp couldn't load notification setup on this device. Quit bighelp and open it again."
+            "Bighelp's notification service isn't set up to use the push service right now. Try again later. \(Self.sendUs)"
+        case .keychainUnavailable: "Bighelp couldn't open this device's keychain. Unlock the device, then try again."
+        case .savedSetupDamaged: "Bighelp's saved notification setup on this device is damaged. \(Self.turnOff)"
+        case .saveFailed: "Bighelp couldn't save notification setup on this device. Check that the device has free space, then try again."
+        case .loadFailed: "Bighelp couldn't load notification setup on this device. Quit Bighelp and open it again."
 
         case .computerNotConnected:
-            "bighelp can't reach this computer. Check that the computer is on and Hermes is running, then try again."
+            "Bighelp can't reach this computer. Check that the computer is on and Hermes is running, then try again."
         case .computerConnectionFailed:
-            "bighelp lost the connection to this computer. Check the computer's address, your VPN or Tailscale, and that Hermes is running. Then try again."
+            "Bighelp lost the connection to this computer. Check the computer's address, your VPN or Tailscale, and that Hermes is running. Then try again."
         case .computerTimedOut: "This computer took too long to answer. Try again."
-        case .computerInsecure: "bighelp couldn't check this computer's secure connection. Check the computer's HTTPS certificate, then try again."
+        case .computerInsecure: "Bighelp couldn't check this computer's secure connection. Check the computer's HTTPS certificate, then try again."
         case .computerAnswerUnreadable:
-            "This computer sent an answer bighelp can't read. Update the bighelp plugin on the computer, then try again."
+            "This computer sent an answer Bighelp can't read. Update the Bighelp plugin on the computer, then try again."
         case .hermesProblem: "Hermes on this computer had a problem. Look in Hermes' logs, then try again."
         case .computerBusy: "This computer is getting too many requests. Wait a minute, then try again."
-        case .computerSignInRefused: "This computer didn't accept bighelp's sign-in. Sign in to this computer again, then try again."
+        case .computerSignInRefused: "This computer didn't accept Bighelp's sign-in. Sign in to this computer again, then try again."
         case .notificationRoutesMissing:
-            "This computer doesn't have the notification part of the bighelp plugin. Update the plugin and restart Hermes, then try again."
+            "This computer doesn't have the notification part of the Bighelp plugin. Update the plugin and restart Hermes, then try again."
         case .computerSignInChanged: "This computer's sign-in changed. Sign in to this computer again, then try again."
         case .pluginRefusedUnknown:
-            "The bighelp plugin on this computer turned down a step. Update the plugin, then try again. \(Self.sendUs)"
+            "The Bighelp plugin on this computer turned down a step. Update the plugin, then try again. \(Self.sendUs)"
         case .pluginRequestRefused:
-            "The bighelp plugin on this computer doesn't accept a request from this version of bighelp. Update bighelp and the plugin. \(Self.sendUs)"
+            "The Bighelp plugin on this computer doesn't accept a request from this version of Bighelp. Update Bighelp and the plugin. \(Self.sendUs)"
         case .pluginReleaseUnavailable:
-            "bighelp couldn't reach GitHub to get the newest bighelp plugin. Check this device's internet connection, then try again."
-        case .duplicatePlugins: "This computer has more than one bighelp plugin. Remove the extra one in Hermes, then try again."
+            "Bighelp couldn't reach GitHub to get the newest Bighelp plugin. Check this device's internet connection, then try again."
+        case .duplicatePlugins: "This computer has more than one Bighelp plugin. Remove the extra one in Hermes, then try again."
         case .earlierInstallUnfinished:
             "An earlier plugin install on this computer didn't finish. Use Set Up Again in Settings › Notifications."
         case .pluginInstallUnsupported:
-            "This version of Hermes can't install plugins for bighelp. Update Hermes, or install the bighelp plugin on the computer. Then try again."
+            "This version of Hermes can't install plugins for Bighelp. Update Hermes, or install the Bighelp plugin on the computer. Then try again."
         case .pluginInstallNotAllowed:
-            "This computer doesn't let bighelp install plugins. Allow it in Hermes, or install the bighelp plugin on the computer. Then try again."
-        case .pluginRejected: "Hermes on this computer refused the bighelp plugin. Look in Hermes for the reason, then try again."
+            "This computer doesn't let Bighelp install plugins. Allow it in Hermes, or install the Bighelp plugin on the computer. Then try again."
+        case .pluginRejected: "Hermes on this computer refused the Bighelp plugin. Look in Hermes for the reason, then try again."
         case .pluginChangeRefused: "Hermes on this computer refused to change its plugins. Look in Hermes for the reason, then try again."
         case .pluginInstallMayBeRunning: "The plugin install may still be running on this computer. Wait a minute, then try again."
         case .pluginInstallUnconfirmed:
             "This computer didn't confirm the plugin install. Try again. If it still happens, use Set Up Again."
-        case .pluginNotTurnedOn: "The bighelp plugin didn't turn on. Turn it on in Hermes, then try again."
+        case .pluginNotTurnedOn: "The Bighelp plugin didn't turn on. Turn it on in Hermes, then try again."
         case .restartHermes:
             "Restart the Hermes dashboard and the messaging gateway on this computer, then try again."
-        case .pluginTooOld: "The bighelp plugin on this computer is too old for notifications. Update the plugin, then try again."
+        case .pluginTooOld: "The Bighelp plugin on this computer is too old for notifications. Update the plugin, then try again."
         case .computerCannotReachService:
-            "This computer can't reach bighelp's notification service. Check the computer's internet connection and that no firewall blocks it, then try again."
+            "This computer can't reach Bighelp's notification service. Check the computer's internet connection and that no firewall blocks it, then try again."
         case .computerRedirected:
-            "This computer's network sent its connection to bighelp's notification service somewhere else. Check the computer's proxy settings, then try again."
+            "This computer's network sent its connection to Bighelp's notification service somewhere else. Check the computer's proxy settings, then try again."
         case .computerServiceAnswerUnreadable:
-            "This computer got an answer from bighelp's notification service that it can't read. Check the computer's network and proxy, then try again."
-        case .serviceRefusedComputer: "bighelp's notification service turned down this computer's request. \(Self.setUpAgain)"
+            "This computer got an answer from Bighelp's notification service that it can't read. Check the computer's network and proxy, then try again."
+        case .serviceRefusedComputer: "Bighelp's notification service turned down this computer's request. \(Self.setUpAgain)"
         case .grantKeyMismatchOnComputer: "This device's notification permission doesn't match this computer's key. \(Self.setUpAgain)"
         case .grantUnreadableOnComputer: "This computer got a notification permission it can't read. Try again later."
         case .grantExpiredOnComputer:
@@ -336,65 +336,65 @@ enum BighelpNotificationErrorCode: String, CaseIterable, Codable, Sendable {
         case .enrollmentLimit: "This computer already sends notifications to the most devices it can. Send us this code and its details."
         case .enrollmentConflict: "This computer has a different copy of this device's notification permission. \(Self.setUpAgain)"
         case .privateStorageRequired:
-            "The bighelp plugin can't keep its notification files private on this computer. Check the permissions of Hermes' home folder, then try again."
+            "The Bighelp plugin can't keep its notification files private on this computer. Check the permissions of Hermes' home folder, then try again."
         case .platformUnsupported:
-            "Hermes on this computer runs on a system that bighelp notifications don't support yet. Send us this code and its details."
-        case .computerKeyDamaged: "The bighelp plugin's notification key on this computer is damaged. Send us this code and its details."
+            "Hermes on this computer runs on a system that Bighelp notifications don't support yet. Send us this code and its details."
+        case .computerKeyDamaged: "The Bighelp plugin's notification key on this computer is damaged. Send us this code and its details."
         case .enrollmentInactive: "This computer doesn't have this device's notification permission anymore. \(Self.setUpAgain)"
         case .enrollmentChanged: "This computer's copy of this device's notification permission changed. \(Self.setUpAgain)"
         case .recipientKeyRefused: "This computer didn't accept this device's alert key. \(Self.updateApp) \(Self.sendUs)"
         case .chatScopeRefused: "This computer refused alerts for the open chat's bot. \(Self.setUpAgain)"
         case .chatAlertsRefused: "This computer couldn't turn on alerts for the open chat. Try again."
         case .claimMismatch: "This computer confirmed a different notification permission. \(Self.setUpAgain)"
-        case .enrollmentChangedDuringCheck: "This computer's notification setup changed while bighelp checked it. Try again."
+        case .enrollmentChangedDuringCheck: "This computer's notification setup changed while Bighelp checked it. Try again."
         case .recipientKeyUnconfirmed: "This computer didn't confirm this device's alert key. Try again."
         case .chatAlertsUnconfirmed: "This computer didn't confirm alerts for the open chat. Try again."
 
         case .grantRetryConflict:
-            "bighelp's notification service has an earlier try with different details for this computer. \(Self.setUpAgain)"
+            "Bighelp's notification service has an earlier try with different details for this computer. \(Self.setUpAgain)"
         case .grantLimit:
             "This device has too many notification permissions, or two of them conflict. \(Self.setUpAgain) \(Self.sendUs)"
-        case .grantUnknown: "bighelp's notification service doesn't know this computer's notification permission. \(Self.setUpAgain)"
-        case .grantChanged: "The notification permission changed while bighelp updated it. Try again."
+        case .grantUnknown: "Bighelp's notification service doesn't know this computer's notification permission. \(Self.setUpAgain)"
+        case .grantChanged: "The notification permission changed while Bighelp updated it. Try again."
         case .grantSenderConflict:
-            "Another notification permission already uses this computer's key with bighelp's notification service. \(Self.setUpAgain)"
+            "Another notification permission already uses this computer's key with Bighelp's notification service. \(Self.setUpAgain)"
         case .grantInactive: "This computer's notification permission isn't active anymore. \(Self.setUpAgain)"
-        case .oldSignUpKind: "This device's notification sign-up is from an older version of bighelp. \(Self.turnOff)"
-        case .oldAccountRetired: "This device's notification sign-up uses a kind of sign-in that bighelp retired. \(Self.turnOff)"
+        case .oldSignUpKind: "This device's notification sign-up is from an older version of Bighelp. \(Self.turnOff)"
+        case .oldAccountRetired: "This device's notification sign-up uses a kind of sign-in that Bighelp retired. \(Self.turnOff)"
         case .computerKeyChanged: "This computer's notification key changed since this device was set up. \(Self.setUpAgain)"
         case .oldGrantNotRemoved:
-            "bighelp's notification service didn't confirm that it removed an old notification permission. Try again."
+            "Bighelp's notification service didn't confirm that it removed an old notification permission. Try again."
         case .manyOldGrants: "This computer has more than one old notification permission. \(Self.setUpAgain)"
         case .manyMatchingGrants: "This computer has more than one notification permission for this device. \(Self.setUpAgain)"
         case .grantDiffersFromSaved: "The notification permission doesn't match the one saved on this device. \(Self.setUpAgain)"
         case .savedGrantRequestDamaged:
             "The notification permission request saved on this device is damaged or out of date. \(Self.setUpAgain)"
-        case .newGrantDiffers: "The new notification permission doesn't match what bighelp asked for. \(Self.setUpAgain)"
-        case .grantFailedChecks: "The notification permission didn't pass bighelp's checks. \(Self.setUpAgain)"
+        case .newGrantDiffers: "The new notification permission doesn't match what Bighelp asked for. \(Self.setUpAgain)"
+        case .grantFailedChecks: "The notification permission didn't pass Bighelp's checks. \(Self.setUpAgain)"
         case .grantBelongsToOtherComputer:
             "This notification permission belongs to another computer on this device. \(Self.setUpAgain)"
         case .earlierRemovalPending: "An earlier change to notifications isn't finished. Wait a minute, then try again."
 
         case .turnOffServiceUnreachable:
-            "Notifications aren't fully off yet, because bighelp can't reach its notification service. Check this device's connection, then try again."
+            "Notifications aren't fully off yet, because Bighelp can't reach its notification service. Check this device's connection, then try again."
         case .turnOffUnconfirmed:
-            "Notifications aren't fully off yet, because bighelp's notification service didn't confirm. Try again later."
+            "Notifications aren't fully off yet, because Bighelp's notification service didn't confirm. Try again later."
         case .turnOffRefused:
-            "Notifications aren't fully off yet, because bighelp's notification service turned down the request. Try again. \(Self.sendUs)"
+            "Notifications aren't fully off yet, because Bighelp's notification service turned down the request. Try again. \(Self.sendUs)"
         case .turnOffPhoneDataFailed:
-            "Notifications aren't fully off yet, because bighelp couldn't delete their data on this device. Unlock the device, then try again."
+            "Notifications aren't fully off yet, because Bighelp couldn't delete their data on this device. Unlock the device, then try again."
         case .turnOffInterrupted: "Turning off notifications stopped before it finished. Try again."
         case .setUpAgainComputerKeptCopy:
-            "Set Up Again couldn't reach this computer to delete its old copy. bighelp tries again later. The old copy can't send anything."
+            "Set Up Again couldn't reach this computer to delete its old copy. Bighelp tries again later. The old copy can't send anything."
         case .setUpAgainServiceKeptGrant:
-            "Set Up Again couldn't remove the old notification permission from bighelp's notification service. bighelp tries again later."
+            "Set Up Again couldn't remove the old notification permission from Bighelp's notification service. Bighelp tries again later."
         case .setUpAgainCouldNotListGrants:
-            "Set Up Again couldn't check bighelp's notification service for old notification permissions. The next setup replaces them."
+            "Set Up Again couldn't check Bighelp's notification service for old notification permissions. The next setup replaces them."
         case .setUpAgainCouldNotClearPhone: "Set Up Again couldn't clear this computer's old setup on this device. The next setup replaces it."
 
         case .interrupted: "Setup stopped because something changed while it ran. Try again."
         case .alreadyRunning: "Setup is already running for this computer. Wait for it to finish."
-        case .appProblem: "bighelp hit a problem of its own. \(Self.updateApp) \(Self.sendUs)"
+        case .appProblem: "Bighelp hit a problem of its own. \(Self.updateApp) \(Self.sendUs)"
         case .unexpected: "Something unexpected stopped setup. Try again. \(Self.sendUs)"
         }
     }
@@ -964,7 +964,7 @@ enum BighelpNotificationFailureReport {
     static func text(code: BighelpNotificationErrorCode, step: BighelpNotificationSetupStep, kind: String,
                      app: String = appVersion, system: String = systemVersion) -> String {
         """
-        bighelp notification setup
+        Bighelp notification setup
         Code: \(code.rawValue)
         Step: \(step.title) (\(step.rawValue))
         Error: \(kind)

@@ -7,7 +7,7 @@ struct VoiceSettingsWorkspaceClientTests {
     @Test func codexLiveVoiceSettingsExplainBighelpPluginRequirementAndInstallEntryPoint() {
         #expect(CodexLiveVoiceSettingsPresentation.title == "Codex Live Voice")
         #expect(CodexLiveVoiceSettingsPresentation.detail(for: .missing)
-            .contains("requires the bighelp plugin"))
+            .contains("requires the Bighelp plugin"))
         #expect(CodexLiveVoiceSettingsPresentation.installAccessibilityIdentifier
             == "settings.install-loopdy-plugin-for-live-voice")
     }

@@ -24,7 +24,7 @@ struct PermissionsSettingsView: View {
                 AgentAppearancePermissionRow(permissions: center.deviceTools) { about = $0 }
                 AgentNavigationPermissionRow(permissions: center.deviceTools) { about = $0 }
             } header: {
-                Text("bighelp itself")
+                Text("Bighelp itself")
             } footer: {
                 Text("Only while that bot’s chat is open.")
                     .bighelpFont(.metadata)
@@ -39,8 +39,8 @@ struct PermissionsSettingsView: View {
                 Text(BighelpPlatform.isMac ? "macOS permissions" : "iOS permissions")
             } footer: {
                 Text(BighelpPlatform.isMac
-                     ? "bighelp asks macOS only after you choose Allow."
-                     : "bighelp asks iOS only after you choose Allow.")
+                     ? "Bighelp asks macOS only after you choose Allow."
+                     : "Bighelp asks iOS only after you choose Allow.")
                     .bighelpFont(.metadata)
             }
             .listRowBackground(theme.surface)
@@ -198,7 +198,7 @@ private struct DeviceToolPermissionRow: View {
                     // The page's opening line says where the data goes; when a bot can read it is here.
                     onAbout(DeviceAccessAbout(
                         id: "device-tools.\(kind.rawValue)", title: kind.title, detail: kind.detail,
-                        note: String(localized: "Any bot on your computer can use this while its chat is open, and for a short time after you leave bighelp.")))
+                        note: String(localized: "Any bot on your computer can use this while its chat is open, and for a short time after you leave Bighelp.")))
                 }
             }
 
@@ -210,10 +210,10 @@ private struct DeviceToolPermissionRow: View {
                 }
                 .accessibilityIdentifier("permissions.device-tools.\(kind.rawValue).settings")
             } else if kind == .health, permissions.isEnabled(kind) {
-                Text("Choose which kinds bighelp can read in the Health app under Sharing; an empty answer can mean no data or no access.")
+                Text("Choose which kinds Bighelp can read in the Health app under Sharing; an empty answer can mean no data or no access.")
                     .bighelpFont(.metadata).foregroundStyle(.secondary)
             } else if kind == .location, permissions.isEnabled(kind) {
-                Text("Only while bighelp is open, and only a rough area if you keep your location approximate.")
+                Text("Only while Bighelp is open, and only a rough area if you keep your location approximate.")
                     .bighelpFont(.metadata).foregroundStyle(.secondary)
             } else if permissions.scope != nil, permissions.status(for: kind) == .unavailable {
                 Text("Unavailable on this device.").bighelpFont(.metadata).foregroundStyle(.secondary)
@@ -241,7 +241,7 @@ private struct AgentAppearancePermissionRow: View {
     let permissions: DeviceToolPermissions
     let onAbout: (DeviceAccessAbout) -> Void
 
-    private var title: String { String(localized: "Change how bighelp looks") }
+    private var title: String { String(localized: "Change how Bighelp looks") }
     private var detail: String {
         String(localized: "When you ask, your bot can switch light or dark mode and change your chat color. You can change it back in Appearance.")
     }

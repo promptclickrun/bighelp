@@ -81,7 +81,7 @@ final class DemoHostTextFiles: HostTextFileAccess {
         - Reduce Motion: the placeholder must not shimmer.
         """,
         "README.md": """
-        # bighelp
+        # Bighelp
 
         A sample project for the demo. Open **Changes** to see what a session did.
         """,

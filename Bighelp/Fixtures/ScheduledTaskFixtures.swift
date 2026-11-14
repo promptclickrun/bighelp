@@ -22,7 +22,7 @@ final class ScheduledTasksFixtureClient: ScheduledTasksClient {
     func deliveryTargets() async throws -> [ScheduledTaskDeliveryTarget] {
         [
             .local,
-            ScheduledTaskDeliveryTarget(id: "loopdy", name: "bighelp", homeTargetSet: true),
+            ScheduledTaskDeliveryTarget(id: "loopdy", name: "Bighelp", homeTargetSet: true),
             ScheduledTaskDeliveryTarget(id: "slack", name: "Slack", homeTargetSet: false),
         ]
     }

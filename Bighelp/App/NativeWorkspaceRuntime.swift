@@ -930,7 +930,7 @@ final class NativeWorkspaceRuntime {
         } catch {
             guard !retired, refreshID == request else { return }
             errorMessage = error is WorkspaceClientError
-                ? error.localizedDescription : "bighelp could not load this computer's data. No other computer or transport was used."
+                ? error.localizedDescription : "Bighelp could not load this computer's data. No other computer or transport was used."
         }
     }
 

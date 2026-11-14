@@ -50,7 +50,7 @@ extension UsageWidgetEntry {
     }
 
     /// No numbers yet: why, or that they come on their own.
-    var waiting: String { snapshot.note ?? "Your numbers show here once bighelp reads them." }
+    var waiting: String { snapshot.note ?? "Your numbers show here once Bighelp reads them." }
 
     /// Layouts about one plan; the rest show several.
     static func showsOnePlan(_ layout: UsageWidgetLayout) -> Bool {
@@ -102,7 +102,7 @@ struct BighelpUsageWidgetView: View {
     /// Why there's nothing to draw: the plugin can't read plans, or the computer has none.
     private func plansMessage(_ layout: UsageWidgetLayout) -> String? {
         guard let plans = entry.snapshot.plans else {
-            return entry.snapshot.plansNote ?? entry.snapshot.note ?? "Your plans show here once bighelp reads them."
+            return entry.snapshot.plansNote ?? entry.snapshot.note ?? "Your plans show here once Bighelp reads them."
         }
         return plans.isEmpty ? "No plans found on your computer." : nil
     }

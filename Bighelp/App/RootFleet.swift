@@ -62,8 +62,8 @@ extension RootShellView {
             } catch is CancellationError {
             } catch {
                 actionErrorMessage = switch change {
-                case .rename: "bighelp couldn't rename this chat. Try again."
-                case .archive: "bighelp couldn't archive this chat. Try again."
+                case .rename: "Bighelp couldn't rename this chat. Try again."
+                case .archive: "Bighelp couldn't archive this chat. Try again."
                 }
             }
         }

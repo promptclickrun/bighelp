@@ -56,7 +56,7 @@ struct SimpleBotsTests {
         #expect(night.chosenBubbleHex == "3A3A3F", "Ink is everyone's default, Bots mode or not")
         let lavender = BighelpTheme.resolve(appearance: BighelpAppearanceContext(appearance: .dark, bubbleColor: .lavender),
                                             colorScheme: .dark, contrast: .standard)
-        #expect(lavender.chosenBubbleHex == nil, "Lavender, picked, is bighelp's own violet")
+        #expect(lavender.chosenBubbleHex == nil, "Lavender, picked, is Bighelp's own violet")
         let savedInk = BighelpTheme.resolve(appearance: BighelpAppearanceContext(appearance: .light, bubbleColor: .graphite),
                                             colorScheme: .light, contrast: .standard)
         #expect(savedInk.chosenBubbleHex == "111111", "Ink saved by an older build is the same Ink")

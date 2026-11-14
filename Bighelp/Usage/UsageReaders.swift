@@ -103,7 +103,7 @@ final class LiveUsageReader: UsageReading {
             }
             if attempt < 20 { try? await Task.sleep(for: .milliseconds(500)) }
         }
-        return HostUsage(id: hostID, name: hostName, failure: "bighelp isn't connected to this computer right now.")
+        return HostUsage(id: hostID, name: hostName, failure: "Bighelp isn't connected to this computer right now.")
     }
 }
 

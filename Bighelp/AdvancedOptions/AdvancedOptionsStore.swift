@@ -23,7 +23,7 @@ final class AdvancedOptionsStore {
             switch self {
             case .notSaved: String(localized: "The computer didn't save that. Try again in a moment.")
             case .notKept: String(localized: "The computer didn't keep that setting. Try again.")
-            case .sentUnchecked: String(localized: "Sent to your computer, but bighelp couldn't check it was kept.")
+            case .sentUnchecked: String(localized: "Sent to your computer, but Bighelp couldn't check it was kept.")
             case .outOfDate: String(localized: "Couldn't reach your computer. These may be out of date.")
             }
         }

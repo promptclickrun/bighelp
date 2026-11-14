@@ -211,11 +211,11 @@ final class WorkflowsStore {
     static func reason(_ error: any Error) -> String {
         switch error {
         case WorkspaceClientError.authenticationRequired, DirectHermesError.authenticationRequired:
-            "Your computer turned down bighelp's sign-in. Sign in to it again in Your computers."
+            "Your computer turned down Bighelp's sign-in. Sign in to it again in Your computers."
         case DirectHermesError.timedOut:
             "Your computer took too long to answer. Try again in a moment."
         case _ where ProviderUsageStore.isConnectionHiccup(error):
-            "bighelp isn't connected to your computer right now. Try again in a moment."
+            "Bighelp isn't connected to your computer right now. Try again in a moment."
         case WorkspaceClientError.outcomeUnknown:
             // The host may be busy (503) or the answer was lost: look before trying again.
             "Your computer didn't confirm it. Check the runs before you try again."

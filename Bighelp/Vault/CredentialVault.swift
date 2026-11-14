@@ -516,7 +516,7 @@ final class CredentialVaultModel: Identifiable {
     static func linkFailure(_ error: any Error) -> String {
         switch error {
         case WorkspaceClientError.unavailable:
-            String(localized: "Update the bighelp plugin on your computer to use this on another website.")
+            String(localized: "Update the Bighelp plugin on your computer to use this on another website.")
         default:
             String(localized: "Your computer didn't add the website. Try again.")
         }

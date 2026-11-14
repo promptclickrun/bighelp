@@ -20,7 +20,7 @@ enum HTMLAppsFixture {
     static func fenced(_ app: HTMLAppCard) -> String {
         var document: [String: BighelpJSONValue] = [
             "schema": .string("loopdy.card"), "version": .integer(1), "title": .string(app.title),
-            "spoken_summary": .string("An app to open in bighelp: \(app.title)."), "data_sources": .array([]),
+            "spoken_summary": .string("An app to open in Bighelp: \(app.title)."), "data_sources": .array([]),
             "root": .string("app"),
             "elements": .object(["app": .object([
                 "type": .string(HTMLAppWire.type),

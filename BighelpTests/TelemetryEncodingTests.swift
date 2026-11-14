@@ -214,7 +214,7 @@ struct TelemetryEncodingTests {
     }
 
     @Test func gzipSurvivesARoundTripAndRejectsDamage() throws {
-        let text = Data(String(repeating: "bighelp telemetry ", count: 400).utf8)
+        let text = Data(String(repeating: "Bighelp telemetry ", count: 400).utf8)
         let zipped = try #require(TelemetryGzip.compress(text))
         #expect(TelemetryGzip.decompress(zipped) == text)
         var damaged = zipped

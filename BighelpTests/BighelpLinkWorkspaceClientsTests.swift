@@ -129,12 +129,12 @@ struct BighelpLinkWorkspaceClientsTests {
             case .projectsCreate:
                 #expect(request.payload == [
                     "agentId": .string("default"),
-                    "name": .string("bighelp Native"),
+                    "name": .string("Bighelp Native"),
                     "folderPath": .string("/srv/workspaces/loopdy-native"),
                 ])
                 return try Self.result(for: request, payload: Self.workspaceCatalog(
                     activeID: "project-loopdy",
-                    rows: [("project-loopdy", "bighelp Native", 1, true)]
+                    rows: [("project-loopdy", "Bighelp Native", 1, true)]
                 ))
             case .projectsArchive:
                 #expect(request.payload == [
@@ -169,7 +169,7 @@ struct BighelpLinkWorkspaceClientsTests {
         let client = BighelpLinkHermesWorkspaceClient(messaging: messaging)
 
         let created = try await client.create(
-            name: "bighelp Native",
+            name: "Bighelp Native",
             folderPath: "/srv/workspaces/loopdy-native",
             agentID: "default"
         )
@@ -212,7 +212,7 @@ struct BighelpLinkWorkspaceClientsTests {
             case .projectsCreate:
                 return try Self.result(for: request, payload: Self.workspaceCatalog(
                     activeID: "project-loopdy",
-                    rows: [("project-loopdy", "bighelp Native", 1, true)]
+                    rows: [("project-loopdy", "Bighelp Native", 1, true)]
                 ))
             case .projectsArchive:
                 return try Self.result(for: request, payload: Self.workspaceCatalog(
@@ -233,7 +233,7 @@ struct BighelpLinkWorkspaceClientsTests {
             agentID: "default"
         )
         let created = await store.create(
-            name: "bighelp Native",
+            name: "Bighelp Native",
             folderPath: "/srv/workspaces/loopdy-native",
             agentID: "default"
         )

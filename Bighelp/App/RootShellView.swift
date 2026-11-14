@@ -1215,7 +1215,7 @@ struct RootShellView: View {
     private func holdsLinkForItsComputer(_ url: URL) -> Bool {
         guard let hostID = BighelpIncomingURLRoute.hostID(in: url), let fleet else { return false }
         guard let host = fleet.reader.hosts.first(where: { $0.id == hostID }) else {
-            actionErrorMessage = "That computer isn't in bighelp anymore."
+            actionErrorMessage = "That computer isn't in Bighelp anymore."
             return true
         }
         guard !host.isSelected else { return false }
@@ -1235,7 +1235,7 @@ struct RootShellView: View {
             sessionRestoreTask?.cancel()
             // Only a card this phone no longer owns, or whose computer is gone, gets here.
             do { try managedNotifications.openActivity(opaqueSessionID: sessionID) }
-            catch { actionErrorMessage = "This chat can't be opened from here anymore. Find it in bighelp instead." }
+            catch { actionErrorMessage = "This chat can't be opened from here anymore. Find it in Bighelp instead." }
             return
         }
         // Demo data opens links the way a real host does.
@@ -1615,7 +1615,7 @@ struct RootShellView: View {
                 appState.activateConversation(id: branch.id, source: .fork)
             } catch {
                 model.branchContinuation = nil
-                model.failureMessage = "This chat is open in another Hermes process, and bighelp couldn't continue it in a new chat. Start a new chat to go on. Your text has been kept."
+                model.failureMessage = "This chat is open in another Hermes process, and Bighelp couldn't continue it in a new chat. Start a new chat to go on. Your text has been kept."
             }
         }
     }

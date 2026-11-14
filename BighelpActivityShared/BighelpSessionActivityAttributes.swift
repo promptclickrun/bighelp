@@ -131,7 +131,7 @@ struct BighelpActivityPresentation: Equatable {
         pose = isStale && !state.phase.isTerminal ? .idle : BighelpActivityPose(phase: state.phase, tool: state.latestTool)
         if isStale && !state.phase.isTerminal {
             status = "Updates paused"
-            detail = "Open bighelp for current status"
+            detail = "Open Bighelp for current status"
             symbolName = "pause.circle"
             return
         }
@@ -165,7 +165,7 @@ struct BighelpActivityPresentation: Equatable {
         if children > 0 {
             detail = children == 1 ? "1 bot still working" : "\(children) bots still working"
         } else if state.phase == .waiting {
-            detail = "Open bighelp to continue"
+            detail = "Open Bighelp to continue"
         } else {
             detail = nil
         }
@@ -295,7 +295,7 @@ struct BighelpLiveActivityCard: View {
                         .foregroundStyle(colors.secondary)
                         .lineLimit(1)
                     Spacer(minLength: 6)
-                    Text("bighelp")
+                    Text("Bighelp")
                         .font(.system(.caption, design: .rounded, weight: .bold))
                         .foregroundStyle(colors.accent)
                         .accessibilityHidden(true)
@@ -329,7 +329,7 @@ struct BighelpLiveActivityCard: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(presentation.accessibilityLabel)
-        .accessibilityHint("Opens the conversation in bighelp")
+        .accessibilityHint("Opens the conversation in Bighelp")
     }
 
     /// The agent's picture in a ring of where the work stands, with what it's

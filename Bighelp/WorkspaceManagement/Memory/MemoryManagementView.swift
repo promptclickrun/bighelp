@@ -526,7 +526,7 @@ private struct MemoryProviderConfigurationView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
             case .unsupported(let kind):
-                Label("This host field type (\(kind)) is not editable in bighelp.", systemImage: "exclamationmark.triangle")
+                Label("This host field type (\(kind)) is not editable in Bighelp.", systemImage: "exclamationmark.triangle")
                     .font(.bighelp(.footnote))
                     .foregroundStyle(.secondary)
             }

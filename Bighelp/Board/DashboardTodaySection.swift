@@ -94,7 +94,7 @@ struct DashboardTodaySection: View {
         case .loading:
             note(String(localized: "Loading…"))
         case .unsupported:
-            note(String(localized: "Update the bighelp plugin on this computer to see what \(agentName) runs in the background."))
+            note(String(localized: "Update the Bighelp plugin on this computer to see what \(agentName) runs in the background."))
         case .failed:
             note(String(localized: "Today's work didn't load. It tries again in a moment."))
         case .loaded(let all):

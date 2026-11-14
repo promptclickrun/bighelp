@@ -67,7 +67,7 @@ struct HostHooksView: View {
             LabeledContent("Selected profile", value: store.profileID)
             LabeledContent("Unscoped ops target", value: store.operationTargetProfileID ?? "Not verified")
         } header: { Text("Workspace") } footer: {
-            Text("Hook routes mutate the serving backend’s profile home and do not accept a profile parameter. bighelp requires that exact target from connection discovery; it never substitutes the selected picker label. The client uses only the stock event, command, matcher, timeout, and approve fields and invents no switches or aliases.")
+            Text("Hook routes mutate the serving backend’s profile home and do not accept a profile parameter. Bighelp requires that exact target from connection discovery; it never substitutes the selected picker label. The client uses only the stock event, command, matcher, timeout, and approve fields and invents no switches or aliases.")
         }
     }
 
@@ -214,7 +214,7 @@ struct HostHooksView: View {
         } header: {
             Text("New hook")
         } footer: {
-            Text("Consent defaults off in bighelp. Review the exact command and scope before allowing code execution.")
+            Text("Consent defaults off in Bighelp. Review the exact command and scope before allowing code execution.")
         }
     }
 

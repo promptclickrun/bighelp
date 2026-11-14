@@ -83,7 +83,7 @@ struct UsageExportHeader: View {
                     .font(.bighelp(.largeTitle).weight(.bold))
                     .foregroundStyle(theme.primaryText)
                 Spacer(minLength: BighelpTokens.space8)
-                Text("bighelp")
+                Text("Bighelp")
                     .font(.bighelp(.subheadline).weight(.semibold))
                     .foregroundStyle(theme.action)
             }
@@ -381,8 +381,8 @@ enum UsageExportRenderer {
         let theme = BighelpTheme.resolve(appearance: light, colorScheme: .light, contrast: .standard)
         let data = NSMutableData()
         var box = CGRect(origin: .zero, size: page)
-        let info = [kCGPDFContextTitle: "bighelp Usage · \(snapshot.dateRangeText)",
-                    kCGPDFContextCreator: "bighelp"] as CFDictionary
+        let info = [kCGPDFContextTitle: "Bighelp Usage · \(snapshot.dateRangeText)",
+                    kCGPDFContextCreator: "Bighelp"] as CFDictionary
         guard let consumer = CGDataConsumer(data: data as CFMutableData),
               let context = CGContext(consumer: consumer, mediaBox: &box, info) else { return nil }
         for (index, blocks) in pages.enumerated() {

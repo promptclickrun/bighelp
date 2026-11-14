@@ -308,7 +308,7 @@ final class ProviderHostSignInStore {
             default: return "\(hostName) couldn't start the sign-in. Try again."
             }
         case .unavailable?:
-            return "Update the bighelp plugin on \(hostName) to sign in from your \(BighelpPlatform.isMac ? "Mac" : "phone")."
+            return "Update the Bighelp plugin on \(hostName) to sign in from your \(BighelpPlatform.isMac ? "Mac" : "phone")."
         case .outcomeUnknown?, .transportUnavailable?:
             return "\(client) couldn't start on \(hostName). Check that the computer is online and try again."
         default:

@@ -515,7 +515,7 @@ struct ClearCacheConfirmation: ViewModifier {
             Button("Clear and refresh", role: .destructive, action: onConfirm)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("bighelp keeps your sign-in and preferences, clears what it saved from this computer, then downloads your bots and chats again.")
+            Text("Bighelp keeps your sign-in and preferences, clears what it saved from this computer, then downloads your bots and chats again.")
         }
     }
 }

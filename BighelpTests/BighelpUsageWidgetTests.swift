@@ -181,7 +181,7 @@ struct BighelpUsageWidgetTests {
         #expect(BighelpPlanNames.name(of: "claude", gateway: home, in: kept) == "Personal Claude")
         #expect(BighelpPlanNames.name(of: "claude", gateway: gone, in: kept) == nil)
         #expect(BighelpPlanNames.name(of: "claude", gateway: "current", in: kept) == "Demo Claude",
-                "Only gateways bighelp lists can be gone")
+                "Only gateways Bighelp lists can be gone")
     }
 
     @Test func aRenameReachesFilesFromBeforePlansHadKeys() throws {

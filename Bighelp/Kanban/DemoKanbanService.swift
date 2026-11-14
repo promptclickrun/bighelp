@@ -160,7 +160,7 @@ final class DemoKanbanService: KanbanService {
 
     private func seed() {
         catalog = [
-            Self.board("launch", "bighelp launch", summary: "Everything for launch week", color: "#7B52E0", current: true),
+            Self.board("launch", "Bighelp launch", summary: "Everything for launch week", color: "#7B52E0", current: true),
             Self.board("home", "Home", summary: "House and family", color: "#2FA58B"),
             Self.board("japan", "Japan trip", summary: "Spring, two weeks", color: "#E5624F"),
         ]

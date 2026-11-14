@@ -361,7 +361,7 @@ struct ProviderConnectView: View {
                     } header: {
                         Text("Sign in with an account")
                     } footer: {
-                        Text("You approve on the provider's own page. bighelp never sees your password.")
+                        Text("You approve on the provider's own page. Bighelp never sees your password.")
                     }
                 }
                 if !overview.keyChoices.isEmpty {
@@ -505,7 +505,7 @@ struct ProviderComputerSignInView: View {
         case .terminalOnly:
             "Hermes doesn't sign in to \(name) from \(BighelpPlatform.isMac ? "this Mac" : "the phone"). It takes one command on the computer running Hermes."
         case .pluginUpdate:
-            "Update the bighelp plugin on \(hostName) to sign in to \(name) from your \(BighelpPlatform.isMac ? "Mac" : "phone"). Until then, it takes one command on the computer."
+            "Update the Bighelp plugin on \(hostName) to sign in to \(name) from your \(BighelpPlatform.isMac ? "Mac" : "phone"). Until then, it takes one command on the computer."
         case .needsTool(let client, _):
             "\(name) signs in with \(client), which isn't installed on \(hostName) yet. Once it is, you can sign in from here."
         }

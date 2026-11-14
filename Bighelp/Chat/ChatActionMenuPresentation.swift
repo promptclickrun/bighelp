@@ -88,7 +88,7 @@ struct ChatAttachmentMenu<Label: View>: View {
 
 enum ChatReferenceDocumentBuilder {
     static func markdown(for record: SessionRecord) throws -> String {
-        var result = "# \(record.title)\n\nReferenced bighelp session: `\(record.id)`\n"
+        var result = "# \(record.title)\n\nReferenced Bighelp session: `\(record.id)`\n"
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
 

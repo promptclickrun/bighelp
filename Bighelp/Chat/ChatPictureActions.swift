@@ -83,7 +83,7 @@ private struct ChatPictureActions: ViewModifier {
         var id: String { rawValue }
         var message: String {
             switch self {
-            case .needsPermission: "Allow bighelp to add to Photos in Settings to save pictures."
+            case .needsPermission: "Allow Bighelp to add to Photos in Settings to save pictures."
             case .failed: "The picture couldn't be saved to Photos."
             }
         }

@@ -332,7 +332,7 @@ struct WorkflowStageEditor: View {
             }
         case .unknown:
             Section {
-                Text("This kind of stage needs a newer bighelp.")
+                Text("This kind of stage needs a newer Bighelp.")
                     .foregroundStyle(theme.secondaryText)
             }
         }

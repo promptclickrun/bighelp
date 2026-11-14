@@ -25,13 +25,13 @@ extension DirectHermesSessionError: LocalizedError {
         case .workspaceNotConfirmed:
             "Your computer didn't start the chat in this bot's project folder. Check the project in Projects, then try again."
         case .projectFolderUnusable:
-            "bighelp can't use this bot's project folder. Check the project in Projects, then try again."
+            "Bighelp can't use this bot's project folder. Check the project in Projects, then try again."
         case .canonicalMissing:
             "This bot's own chat couldn't be found on your computer."
         case .creationPersistenceRequired, .sessionNotPersisted:
-            "bighelp couldn't keep track of the new chat. Try again."
+            "Bighelp couldn't keep track of the new chat. Try again."
         case .invalidResponse, .historyChanged:
-            "Your computer answered in a way bighelp didn't expect. Try again."
+            "Your computer answered in a way Bighelp didn't expect. Try again."
         case .nativeRowDeletionOnly:
             "This chat can only be deleted here, not changed."
         case .modelNotConfirmed(let model):

@@ -357,10 +357,10 @@ final class DirectHermesBrowserAuthentication: NSObject, ASWebAuthenticationPres
     #if targetEnvironment(macCatalyst)
     /// bighelp's own link scheme; opening it brings the app back from the browser.
     private static let returnURL = URL(string: "app.loopdy.mobile://signed-in")!
-    private static let receivedMessage = "<p>Signed in. <a href=\"app.loopdy.mobile://signed-in\">Return to bighelp</a>"
+    private static let receivedMessage = "<p>Signed in. <a href=\"app.loopdy.mobile://signed-in\">Return to Bighelp</a>"
         + " and close this tab.</p>"
     #else
-    private static let receivedMessage = "<p>Sign-in received. Return to bighelp.</p>"
+    private static let receivedMessage = "<p>Sign-in received. Return to Bighelp.</p>"
     #endif
 
     /// The sheet's completion, which AuthenticationServices may call on its own
@@ -404,7 +404,7 @@ final class DirectHermesBrowserAuthentication: NSObject, ASWebAuthenticationPres
                 for other in Array(connections.keys) where other != id { close(other) }
                 incoming.deadline?.cancel()
                 incoming.deadline = timeout(seconds: 2) { [weak self] in self?.responseFinished() }
-                let body = "<!doctype html><meta name=\"viewport\" content=\"width=device-width\"><title>bighelp</title>"
+                let body = "<!doctype html><meta name=\"viewport\" content=\"width=device-width\"><title>Bighelp</title>"
                     + Self.receivedMessage
                 let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: \(body.utf8.count)\r\nCache-Control: no-store\r\nPragma: no-cache\r\nReferrer-Policy: no-referrer\r\nContent-Security-Policy: default-src 'none'; frame-ancestors 'none'\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n" + body
                 incoming.connection.send(content: Data(response.utf8), completion: .contentProcessed { [weak self] _ in

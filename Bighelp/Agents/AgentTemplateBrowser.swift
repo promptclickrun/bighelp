@@ -188,7 +188,7 @@ struct AgentTemplateRow: View {
     private var details: [String] {
         var parts: [String] = []
         if showsSource {
-            if !template.isCommunity { parts.append("bighelp") }
+            if !template.isCommunity { parts.append("Bighelp") }
             else if let credit = template.credit { parts.append(String(localized: "by @\(credit)")) }
             else { parts.append(String(localized: "Community")) }
         }

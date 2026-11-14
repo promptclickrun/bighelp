@@ -140,7 +140,7 @@ final class DemoSessionCatalogClient: SessionCatalogClient {
             agentIDs: ["finance"],
             title: "Finance",
             workspaceID: "demo-loopdy",
-            workspaceName: "bighelp",
+            workspaceName: "Bighelp",
             items: ConversationFixtures.initialItems(conversationID: "demo-finance", agentID: "finance", agentName: "Avery Park"),
             isUnread: false,
             hasAcceptedMessage: true

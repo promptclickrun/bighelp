@@ -231,7 +231,7 @@ struct PairingManagementView: View {
                     } header: {
                         Text("Workspace")
                     } footer: {
-                        Text("Messaging pairing approves people who can contact Hermes. It does not register this \(BighelpPlatform.isMac ? "Mac" : "phone") for bighelp notifications.")
+                        Text("Messaging pairing approves people who can contact Hermes. It does not register this \(BighelpPlatform.isMac ? "Mac" : "phone") for Bighelp notifications.")
                     }
                 }
                 .bighelpFormSurface()
@@ -299,7 +299,7 @@ struct PairingManagementView: View {
                                             isDisabled: !store.canAct) { store.review = .approve(request) }
                     } else {
                         HermesToolStatus(text: String(localized: "Can't approve here"))
-                            .accessibilityHint("This legacy request has no exact request ID and cannot be approved from bighelp.")
+                            .accessibilityHint("This legacy request has no exact request ID and cannot be approved from Bighelp.")
                     }
                 }
             }

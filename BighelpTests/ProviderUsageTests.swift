@@ -214,7 +214,7 @@ struct ProviderUsageTests {
 
     /// The message says what went wrong, in plain words.
     @Test(arguments: [
-        (WorkspaceClientError.authenticationRequired as any Error, "turned down bighelp's sign-in"),
+        (WorkspaceClientError.authenticationRequired as any Error, "turned down Bighelp's sign-in"),
         (DirectHermesError.timedOut(outcomeUnknown: false) as any Error, "took too long"),
         (WorkspaceClientError.transportUnavailable as any Error, "isn't connected"),
         (WorkspaceClientError.invalidResponse as any Error, "couldn't be loaded"),

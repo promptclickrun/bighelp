@@ -5,7 +5,7 @@ import UIKit
 /// out at the bottom left as a chat-bubble tail. It lives in chrome and loaders, never as
 /// a chat participant. The kit's motions are `BighelpNoodleMotion`.
 enum BighelpBrand {
-    static let appName = "bighelp"
+    static let appName = "Bighelp"
 
     static let ember = Color(hex: "FF8A7A")
     static let ink = Color(hex: "1C1A19")

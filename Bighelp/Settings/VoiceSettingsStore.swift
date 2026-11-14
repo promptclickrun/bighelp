@@ -341,7 +341,7 @@ final class VoiceSettingsStore {
 
     private func sampleMessage(for error: any Error) -> String {
         if case VoiceSettingsError.unsupported = error {
-            return "Update the bighelp plugin on your computer to play samples."
+            return "Update the Bighelp plugin on your computer to play samples."
         }
         let title = selectedProvider?.title ?? "This provider"
         switch error {
@@ -379,7 +379,7 @@ final class VoiceSettingsStore {
     private func message(for error: any Error, saving: Bool) -> String {
         switch error {
         case VoiceSettingsError.unsupported:
-            "Update the bighelp plugin on your computer to edit voice settings."
+            "Update the Bighelp plugin on your computer to edit voice settings."
         case VoiceSettingsError.conflict:
             "Voice settings changed on your computer. Reload them before saving again."
         default:

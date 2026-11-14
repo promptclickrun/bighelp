@@ -33,7 +33,7 @@ enum PluginReleaseError: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .unreachable:
-            "bighelp couldn't reach GitHub to find the newest plugin. Check the internet connection and try again."
+            "Bighelp couldn't reach GitHub to find the newest plugin. Check the internet connection and try again."
         case .invalidResponse:
             "GitHub's answer about the newest plugin didn't look right. Try again later."
         }

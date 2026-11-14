@@ -16,13 +16,13 @@ enum CodexLiveVoiceSettingsPresentation {
     static func detail(for availability: CodexLiveVoicePluginAvailability) -> String {
         switch availability {
         case .unknown:
-            "Codex Live Voice requires the bighelp plugin. Connect to a paired computer to verify plugin readiness."
+            "Codex Live Voice requires the Bighelp plugin. Connect to a paired computer to verify plugin readiness."
         case .missing:
-            "Codex Live Voice requires the bighelp plugin on the selected computer. Install it to use live voice with your Codex subscription."
+            "Codex Live Voice requires the Bighelp plugin on the selected computer. Install it to use live voice with your Codex subscription."
         case .ready:
-            "The bighelp plugin is ready for Codex Live Voice on the selected computer."
+            "The Bighelp plugin is ready for Codex Live Voice on the selected computer."
         case .unavailable:
-            "Codex Live Voice requires the bighelp plugin, but this computer has not provided a verified readiness result."
+            "Codex Live Voice requires the Bighelp plugin, but this computer has not provided a verified readiness result."
         }
     }
 }
@@ -629,7 +629,7 @@ struct VoiceOptionPicker: View {
         switch store.hostCatalog {
         case .loading: String(localized: "Getting \(providerTitle) voices from your computer…")
         case .needsPluginUpdate:
-            String(localized: "Update the bighelp plugin on your computer to choose from its voices. Until then, the bot keeps the voice it has.")
+            String(localized: "Update the Bighelp plugin on your computer to choose from its voices. Until then, the bot keeps the voice it has.")
         case .unavailable(let reason): reason
         case .loaded, nil: nil
         }

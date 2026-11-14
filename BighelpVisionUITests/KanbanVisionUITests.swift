@@ -15,7 +15,7 @@ final class KanbanVisionUITests: XCTestCase {
         openKanbanFromMenu(app)
         let window = app.descendants(matching: .any)["kanban.window"].firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 15), "Kanban opens its own window")
-        XCTAssertTrue(app.buttons["home.drawer.open"].firstMatch.exists, "bighelp's own window stays open")
+        XCTAssertTrue(app.buttons["home.drawer.open"].firstMatch.exists, "Bighelp's own window stays open")
         for lane in ["later", "ready", "working", "needsYou", "done"] {
             XCTAssertTrue(app.descendants(matching: .any)["kanban.lane.\(lane)"].firstMatch.waitForExistence(timeout: 10), lane)
         }

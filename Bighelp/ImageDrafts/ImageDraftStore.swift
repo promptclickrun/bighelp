@@ -414,7 +414,7 @@ final class ImageDraftStore {
             default: return "This draft can't be saved now. Close it and try again."
             }
         case .invalidApproval: return "Check the details, then save again."
-        case .needsPluginUpdate: return "Update the bighelp plugin to save drafts from photos."
+        case .needsPluginUpdate: return "Update the Bighelp plugin to save drafts from photos."
         case .unavailable: return "Couldn't reach your computer. Nothing was saved; try again."
         case .mismatched: return "This card doesn't match the draft the bot made. Ask for it again."
         default: return nil

@@ -37,21 +37,21 @@ enum WorkspaceClientError: Error, Equatable, LocalizedError, Sendable {
     static func workspaceFilesMessage(_ code: String?) -> String? {
         switch code {
         case workspacePluginOutdated:
-            "bighelp needs the newest bighelp plugin on this computer to find this bot's folder. Update it in "
+            "Bighelp needs the newest Bighelp plugin on this computer to find this bot's folder. Update it in "
                 + "Settings, under this computer's Plugin version. If it's already up to date, restart Hermes to "
                 + "finish the update, then try again."
         case "workspace_not_configured":
             "This bot's chats start in a folder that isn't its own, like Hermes's program folder or the "
-                + "computer's top folder, so bighelp won't show it. Make a folder named “workspace” in the bot's "
+                + "computer's top folder, so Bighelp won't show it. Make a folder named “workspace” in the bot's "
                 + "Hermes folder, or choose a working folder for the bot in Hermes, then try again."
         case "workspace_in_container":
-            "This bot works inside a container, so its files aren't on the computer bighelp can read."
+            "This bot works inside a container, so its files aren't on the computer Bighelp can read."
         case "workspace_on_remote":
-            "This bot works on another computer over SSH, so its files aren't on the computer bighelp can read."
+            "This bot works on another computer over SSH, so its files aren't on the computer Bighelp can read."
         case "workspace_windows_unsupported":
-            "bighelp can't show a bot's files from a Windows computer yet."
+            "Bighelp can't show a bot's files from a Windows computer yet."
         case "workspace_hermes_folder":
-            "This bot works in Hermes's own folder, which holds its settings and keys, so bighelp won't show it. "
+            "This bot works in Hermes's own folder, which holds its settings and keys, so Bighelp won't show it. "
                 + "Make a folder named “workspace” in it for the bot's files, then try again."
         case "workspace_unavailable":
             "This bot's working folder is missing on its computer, or Hermes can't open it."
@@ -60,7 +60,7 @@ enum WorkspaceClientError: Error, Equatable, LocalizedError, Sendable {
         case "workspace_identity_changed", "workspace_changed":
             "This bot's working folder just changed. Try again."
         case "workspace_identity_unavailable", "workspace_files_unavailable":
-            "This computer's Hermes can't share a bot's files yet. Update Hermes and the bighelp plugin."
+            "This computer's Hermes can't share a bot's files yet. Update Hermes and the Bighelp plugin."
         default:
             nil
         }

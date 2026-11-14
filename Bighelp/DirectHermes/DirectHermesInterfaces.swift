@@ -384,9 +384,9 @@ enum DirectHermesError: Error, LocalizedError, Sendable, Equatable {
         case .secureStorageChanged: "The saved computer connection changed. Reopen the current connection before continuing."
         case .redirectRefused: "The computer redirected the connection. Enter its final HTTPS address instead."
         case .invalidAccessCredentials: "Enter the Cloudflare Access client ID and client secret from your service token."
-        case .cloudflareAccessDenied: "Cloudflare Access didn't let bighelp through. Check the service token's client ID and secret, and that your Access policy allows it (Service Auth)."
+        case .cloudflareAccessDenied: "Cloudflare Access didn't let Bighelp through. Check the service token's client ID and secret, and that your Access policy allows it (Service Auth)."
         case .hostNameRefused:
-            "Hermes turned bighelp away because it answers only to its local address. In Hermes, set dashboard.public_url to this https:// address and set up a Hermes sign-in, then restart Hermes."
+            "Hermes turned Bighelp away because it answers only to its local address. In Hermes, set dashboard.public_url to this https:// address and set up a Hermes sign-in, then restart Hermes."
         case .webPageInsteadOfHermes(let throughCloudflare):
             throughCloudflare
                 ? "Cloudflare answered with a web page instead of Hermes. Check that your Access policy allows the service token (Service Auth) and that the tunnel sends this address to Hermes."
@@ -399,7 +399,7 @@ enum DirectHermesError: Error, LocalizedError, Sendable, Equatable {
         case .tlsRequired: "The secure connection could not be verified. Check the computer's HTTPS certificate."
         case .rateLimited: "The computer is limiting sign-in attempts. Wait before trying again."
         case .serverUnavailable: "The computer authentication service is unavailable. Try again later."
-        case .browserAuthenticationUnavailable: "Browser sign-in could not start on this device. Keep bighelp in the foreground, or use a password or provider-issued access token."
+        case .browserAuthenticationUnavailable: "Browser sign-in could not start on this device. Keep Bighelp in the foreground, or use a password or provider-issued access token."
         case .nativeTokenExchangeUncertain: "The computer sign-in could not be confirmed. Start a new sign-in; the one-time code will not be reused."
         case .disconnected(let unknown), .timedOut(let unknown), .cancelled(let unknown):
             unknown ? "The connection ended before the computer confirmed the action. It may have been accepted. Check the conversation before sending again." : "The computer request did not complete. Reconnect or try again."

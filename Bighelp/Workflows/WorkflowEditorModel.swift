@@ -418,7 +418,7 @@ final class WorkflowEditorModel {
         } catch WorkspaceClientError.rejected(let code, _) where code == "inputs_invalid" {
             message = "Fill in what each run needs, then save again."
         } catch WorkspaceClientError.unavailable(.unsupportedOperation) {
-            message = "Update the bighelp plugin on your computer to schedule workflows."
+            message = "Update the Bighelp plugin on your computer to schedule workflows."
         } catch {
             message = WorkflowsStore.reason(error)
         }

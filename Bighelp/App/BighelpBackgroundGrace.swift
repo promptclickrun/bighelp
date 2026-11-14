@@ -27,7 +27,7 @@ final class BighelpBackgroundGrace {
         // The Mac doesn't suspend the app in the background, and it won't quit while a
         // background task runs: Quit (and an update's relaunch) waited out the whole grace.
         if backgroundTask == .invalid, !BighelpPlatform.isMac {
-            backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "bighelp keeps its connection") {
+            backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Bighelp keeps its connection") {
                 // iOS wants its time back early: close now rather than be frozen mid-socket.
                 MainActor.assumeIsolated { BighelpBackgroundGrace.shared.expire() }
             }

@@ -79,7 +79,7 @@ struct FleetSettingsView: View {
     private var pluginSection: some View {
         Section {
             let count = store.pluginCandidates.count
-            BighelpActionRow(title: "Update bighelp Plugin", detail: summary(count, \.pluginJob),
+            BighelpActionRow(title: "Update Bighelp Plugin", detail: summary(count, \.pluginJob),
                              systemImage: "puzzlepiece.extension.fill",
                              isWorking: store.hosts.contains { $0.pluginJob.kind == .working }) {
                 Task { await store.updatePluginEverywhere() }
@@ -93,7 +93,7 @@ struct FleetSettingsView: View {
                                         ? .init(title: "Update") { Task { await store.updatePlugin(on: host.id) } } : nil)
             }
         } header: {
-            Text("bighelp plugin")
+            Text("Bighelp plugin")
         } footer: {
             Text("Each computer keeps running the old plugin until it restarts.")
         }
@@ -166,9 +166,9 @@ struct FleetSettingsView: View {
     private func confirmMessage(_ confirmation: Confirmation) -> String {
         switch confirmation {
         case .updateHermes:
-            "Each computer installs the update and may restart, so bighelp can disconnect for a moment."
+            "Each computer installs the update and may restart, so Bighelp can disconnect for a moment."
         case .updateHermesOn:
-            "It installs the update and may restart, so bighelp can disconnect for a moment."
+            "It installs the update and may restart, so Bighelp can disconnect for a moment."
         case .restartGatewayOn:
             "Messaging pauses for a moment on that computer. Replies in progress may stop."
         case .restartGateways:

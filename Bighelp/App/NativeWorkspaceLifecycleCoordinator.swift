@@ -21,7 +21,7 @@ enum NativeWorkspaceLifecycleError: Error, Equatable, LocalizedError, Sendable {
         case .durableSessionUnavailable:
             "Hermes confirmed this stored chat, but the current profile catalog could not resolve its exact durable identity. Refresh Chats before trying again."
         case .profileStateCouldNotBeVerified:
-            "bighelp could not verify every saved draft for this profile, so the profile change was not sent."
+            "Bighelp could not verify every saved draft for this profile, so the profile change was not sent."
         case .protectedProfileState(_, let sessionIDs):
             "Resolve or save the pending work in \(sessionIDs.count) profile chat(s) before renaming or deleting this profile. No profile change was sent."
         case .profileBusy:
@@ -31,7 +31,7 @@ enum NativeWorkspaceLifecycleError: Error, Equatable, LocalizedError, Sendable {
                 ? "This bot is in the group chat “\(titles[0])”. Delete that group first, then delete the bot. Nothing was deleted."
                 : "This bot is in \(titles.count) group chats. Delete those groups first, then delete the bot. Nothing was deleted."
         case .sharedStateMismatch:
-            "Hermes confirmed the profile change, but the shared bighelp stores did not reconcile to the exact readback. Reopen Profiles; do not repeat the server operation."
+            "Hermes confirmed the profile change, but the shared Bighelp stores did not reconcile to the exact readback. Reopen Profiles; do not repeat the server operation."
         }
     }
 }

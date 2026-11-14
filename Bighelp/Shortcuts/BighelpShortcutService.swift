@@ -88,49 +88,49 @@ enum BighelpShortcutServiceError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .connectionUnavailable:
-            "bighelp couldn't reach your computer. Check that it's online and connected, then try again."
+            "Bighelp couldn't reach your computer. Check that it's online and connected, then try again."
         case .agentUnavailable:
             "That bot is not available in Hermes."
         case .sessionUnavailable:
-            "bighelp could not create the chat."
+            "Bighelp could not create the chat."
         case .modelUnavailable:
             "That model is not available for this chat."
         case .reasoningUnavailable:
             "That reasoning level is not available for this chat."
         case .deliveryFailed:
-            "Hermes could not complete the message. Open bighelp and try again."
+            "Hermes could not complete the message. Open Bighelp and try again."
         case .responseUnavailable:
-            "No final text response was received. Open the chat in bighelp to check its progress."
+            "No final text response was received. Open the chat in Bighelp to check its progress."
         case .emptyMessage:
             "Enter a message for your bot."
         case .scheduledTaskUnavailable:
             "That scheduled task isn't on your computer anymore."
         case .scheduledTaskFailed:
-            "bighelp couldn't start that scheduled task. Check that your computer is connected, then try again."
+            "Bighelp couldn't start that scheduled task. Check that your computer is connected, then try again."
         case .groupChatUnavailable:
             "That group chat isn't on your computer anymore."
         case .boardUnavailable:
-            "Update the bighelp plugin on your computer to see this."
+            "Update the Bighelp plugin on your computer to see this."
         case .kanbanUnavailable:
             "This computer doesn't have Kanban. Update Hermes to use it."
         case .kanbanNoBoard:
-            "Make a Kanban board in bighelp first."
+            "Make a Kanban board in Bighelp first."
         case .kanbanFailed:
-            "bighelp couldn't add the card. Check that your computer is connected, then try again."
+            "Bighelp couldn't add the card. Check that your computer is connected, then try again."
         case .emptyTitle:
             "Enter a title for the card."
         case .workflowsUnavailable:
-            "This computer doesn't have Workflows. Update the bighelp plugin to use them."
+            "This computer doesn't have Workflows. Update the Bighelp plugin to use them."
         case .workflowUnavailable:
             "That workflow isn't on your computer anymore."
         case .gatewayUnavailable:
-            "That computer isn't in bighelp anymore. Pick another one in the Shortcut."
+            "That computer isn't in Bighelp anymore. Pick another one in the Shortcut."
         case .gatewayUnreachable:
-            "bighelp couldn't reach that computer. Check that it's online, then try again."
+            "Bighelp couldn't reach that computer. Check that it's online, then try again."
         case .agentNotOnGateway:
             "That bot isn't on the computer this Shortcut uses. Pick the bot again."
         case .aiDataNotAgreed:
-            "Open bighelp and agree to share data with your Hermes computer and its AI providers first."
+            "Open Bighelp and agree to share data with your Hermes computer and its AI providers first."
         }
     }
 }
@@ -343,7 +343,7 @@ final class BighelpShortcutService: @unchecked Sendable {
         Self.holdsHostConnection += 1
         // Ask iOS for background execution while the reply streams, so the
         // socket is not frozen when Shortcuts owns the foreground.
-        let backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "bighelp Shortcut")
+        let backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Bighelp Shortcut")
         defer {
             Self.holdsHostConnection -= 1
             if backgroundTask != .invalid { UIApplication.shared.endBackgroundTask(backgroundTask) }

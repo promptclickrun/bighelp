@@ -279,7 +279,7 @@ final class DeviceToolHandoff {
     static let liveBackgroundTime: BackgroundTime = { onExpire in
         guard !BighelpPlatform.isMac else { return {} }
         let task = LiveBackgroundTask()
-        task.identifier = UIApplication.shared.beginBackgroundTask(withName: "bighelp phone tool") {
+        task.identifier = UIApplication.shared.beginBackgroundTask(withName: "Bighelp phone tool") {
             MainActor.assumeIsolated {
                 // Give the time back first, so a late callback is not held up by it.
                 task.end()

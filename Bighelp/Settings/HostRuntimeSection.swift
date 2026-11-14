@@ -34,7 +34,7 @@ struct HostRuntimeSection: View {
                     LabeledContent("Hermes CLI on PATH", value: status.hermes.cliVersion ?? "Unknown")
                     LabeledContent("Hermes updates", value: status.hermes.updateState.title)
                     LabeledContent("Hermes restart", value: status.hermes.restartState.title)
-                    LabeledContent("bighelp plugin running", value: status.plugin.runningVersion)
+                    LabeledContent("Bighelp plugin running", value: status.plugin.runningVersion)
                     LabeledContent("Plugin active revision", value: status.plugin.activeRevision.map { String($0.prefix(12)) } ?? "Unknown")
                     LabeledContent("Plugin installed revision", value: status.plugin.installedRevision.map { String($0.prefix(12)) } ?? "Unknown")
                     LabeledContent("Plugin restart", value: status.plugin.restartState.title)
@@ -91,13 +91,13 @@ struct HostRuntimeSection: View {
             return "Restart the Hermes gateway on the computer when active work can be interrupted, then reconnect and check again."
         }
         if status?.plugin.restartState == .required {
-            return "The installed bighelp plugin differs from the active plugin. Restart the gateway on the computer when active work can be interrupted, then reconnect and check again. For plugin updates, use Settings → Connectivity → Updates."
+            return "The installed Bighelp plugin differs from the active plugin. Restart the gateway on the computer when active work can be interrupted, then reconnect and check again. For plugin updates, use Settings → Connectivity → Updates."
         }
         if agents?.errorMessage != nil {
             return "Bots could not be loaded. Check again or inspect the gateway. Existing chats and cached bots remain available; this does not prove Hermes is outdated."
         }
         if status?.hermes.updateState == .available {
-            return "Update Hermes on the computer, then restart when active work can be interrupted. Reconnect and check again. Updating the bighelp plugin does not update Hermes."
+            return "Update Hermes on the computer, then restart when active work can be interrupted. Reconnect and check again. Updating the Bighelp plugin does not update Hermes."
         }
         switch currentStore?.availability {
         case .supported:
@@ -107,7 +107,7 @@ struct HostRuntimeSection: View {
             }
             return "Bot compatibility is not established. Unknown version or update details do not prove the computer is outdated."
         case .unsupported:
-            return "This computer does not advertise diagnostics. That does not establish whether Hermes is current. Check the gateway on the computer; bighelp plugin updates are separate in Settings → Connectivity → Updates."
+            return "This computer does not advertise diagnostics. That does not establish whether Hermes is current. Check the gateway on the computer; Bighelp plugin updates are separate in Settings → Connectivity → Updates."
         case .unavailable:
             return "The computer did not provide a verified status. Check the connection and try again. No update or restart was requested."
         case .unknown, nil:

@@ -204,7 +204,7 @@ struct MessagingOnboardingView: View {
                 .disabled(!store.canAct)
             }
             Section("About setup") {
-                Text("Messaging pairing is managed by Hermes. It is separate from bighelp notification registration.")
+                Text("Messaging pairing is managed by Hermes. It is separate from Bighelp notification registration.")
                     .font(.bighelp(.footnote))
                     .foregroundStyle(.secondary)
             }
@@ -366,7 +366,7 @@ private struct MessagingPlatformConfigurationView: View {
             Button("Apply to Hermes") { save() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Only the listed fields are sent to this Hermes profile. Stored secret values are never read back into bighelp.")
+            Text("Only the listed fields are sent to this Hermes profile. Stored secret values are never read back into Bighelp.")
         }
         .onDisappear {
             replacements.removeAll(keepingCapacity: false)

@@ -166,11 +166,11 @@ enum DirectHermesManagedFilesError: Error, Equatable, LocalizedError {
         case .invalidResponse:
             "Hermes returned an invalid managed-file response. Refresh before trying again."
         case .scopeUnavailable:
-            "This computer didn't confirm which folder your bot works in, so bighelp opened no files."
+            "This computer didn't confirm which folder your bot works in, so Bighelp opened no files."
         case .scopeChanged:
             "Hermes’ managed-files policy changed after this folder was opened. Reopen Files to establish the current boundary."
         case .fileTooLarge(let limit):
-            "This file exceeds bighelp’s bounded native transfer limit of \(ByteCountFormatter.string(fromByteCount: Int64(limit), countStyle: .file))."
+            "This file exceeds Bighelp’s bounded native transfer limit of \(ByteCountFormatter.string(fromByteCount: Int64(limit), countStyle: .file))."
         case .ownerChanged:
             "The selected computer or account changed. Reopen Files."
         case .transferTransportRequired:

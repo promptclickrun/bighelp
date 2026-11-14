@@ -341,7 +341,7 @@ extension BighelpShortcutService {
 
     /// Runs a scheduled task now, the same as Run now on its page.
     func runScheduledTask(id: String) async throws -> BighelpShortcutScheduledTask {
-        try await Self.holdingHostConnection(named: "bighelp Shortcut") {
+        try await Self.holdingHostConnection(named: "Bighelp Shortcut") {
             let workspace = try await liveWorkspace()
             let store = try await loadedScheduledTasks(in: workspace)
             guard let task = store.tasks.first(where: {
@@ -382,7 +382,7 @@ extension BighelpShortcutService {
     // MARK: Feed, Ideas and Goals
 
     func boardItems(_ section: BighelpShortcutBoardSection, agentID: String?) async throws -> BighelpShortcutBoardResult {
-        try await Self.holdingHostConnection(named: "bighelp Shortcut") {
+        try await Self.holdingHostConnection(named: "Bighelp Shortcut") {
             let workspace = try await liveWorkspace()
             let agent = try resolveAgent(explicitID: agentID, in: workspace)
             guard let client = hostServices.boards() else { throw BighelpShortcutServiceError.boardUnavailable }
@@ -409,7 +409,7 @@ extension BighelpShortcutService {
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { throw BighelpShortcutServiceError.emptyTitle }
         let notes = String(notes.trimmingCharacters(in: .whitespacesAndNewlines).prefix(8_000))
-        return try await Self.holdingHostConnection(named: "bighelp Shortcut") {
+        return try await Self.holdingHostConnection(named: "Bighelp Shortcut") {
             let workspace = try await liveWorkspace()
             if let assigneeID, !workspace.agents.profiles.contains(where: { $0.id == assigneeID }) {
                 throw BighelpShortcutServiceError.agentUnavailable
@@ -436,11 +436,11 @@ extension BighelpShortcutService {
     /// switched to: checking on it must not move bighelp there.
     func hostStatus(gatewayID: UUID?) async -> String {
         let gateway: BighelpShortcutGateway?
-        do { gateway = try self.gateway(gatewayID) } catch { return "That computer isn't in bighelp anymore." }
+        do { gateway = try self.gateway(gatewayID) } catch { return "That computer isn't in Bighelp anymore." }
         guard let gateway, !gateway.isInUse else { return await hostStatus() }
         let name = String(gateway.name.prefix(80))
         guard let agents = try? await gatewayDirectory.agents(on: gateway.id, reachOnly: true) else {
-            return "bighelp can't reach \(name) right now."
+            return "Bighelp can't reach \(name) right now."
         }
         return ["Connected to \(name).", agents.count == 1 ? "1 bot." : "\(agents.count) bots."]
             .joined(separator: "\n")
@@ -449,13 +449,13 @@ extension BighelpShortcutService {
     /// A few plain lines about the computer. Never keys, tokens or paths.
     func hostStatus() async -> String {
         guard let hostName = hostServices.hostName()?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !hostName.isEmpty else { return "No computer is set up in bighelp yet." }
+              !hostName.isEmpty else { return "No computer is set up in Bighelp yet." }
         let name = String(hostName.prefix(80))
         let workspace: BighelpShortcutWorkspace
         do {
             workspace = try await liveWorkspace()
         } catch {
-            return "bighelp can't reach \(name) right now."
+            return "Bighelp can't reach \(name) right now."
         }
         if !workspace.catalog.hasLoadedState { try? await workspace.catalog.load() }
         let agents = workspace.agents.profiles.count

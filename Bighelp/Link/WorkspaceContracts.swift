@@ -95,7 +95,7 @@ enum HermesCapabilityCompatibilityError: LocalizedError {
     case updateRequired
 
     var errorDescription: String? {
-        "This computer supports browsing only. Update Hermes and deploy the matching bighelp plugin on the computer to edit, create, import, or manage capabilities."
+        "This computer supports browsing only. Update Hermes and deploy the matching Bighelp plugin on the computer to edit, create, import, or manage capabilities."
     }
 }
 

@@ -37,7 +37,7 @@ extension ChatModel {
         }
     }
 
-    static let unsavedShareMessage = String(localized: "bighelp couldn't save where your shared items are going, so nothing was sent. Your message is back in the message box.")
+    static let unsavedShareMessage = String(localized: "Bighelp couldn't save where your shared items are going, so nothing was sent. Your message is back in the message box.")
 
     var shareLedger: PendingShareLedger {
         get { shareLedgerStorage ?? PendingShareLedger(conversationID: conversationID) }

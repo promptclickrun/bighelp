@@ -272,7 +272,7 @@ struct SessionMaintenanceView: View {
             .disabled(store.isBusy)
         } header: { Text("Cleanup") }
           footer: {
-              Text("Preview is a stock Hermes dry run. Before pruning, bighelp repeats the identical dry run and requires the complete target snapshot to match.")
+              Text("Preview is a stock Hermes dry run. Before pruning, Bighelp repeats the identical dry run and requires the complete target snapshot to match.")
           }
     }
 
@@ -406,7 +406,7 @@ struct SessionMaintenanceView: View {
             }
         } header: { Text("Advanced · Foreign history") }
           footer: {
-              Text("Hermes scans only its supported tool folders and returns opaque handles. bighelp never sends a computer path or imports before you review the bounded preview.")
+              Text("Hermes scans only its supported tool folders and returns opaque handles. Bighelp never sends a computer path or imports before you review the bounded preview.")
           }
     }
 
@@ -474,7 +474,7 @@ struct SessionMaintenanceView: View {
                     .disabled(store.isBusy)
                     .accessibilityIdentifier("session-maintenance.owner-backfill.confirm")
                 } footer: {
-                    Text("The stock route has no dry run, so the exact affected count is returned only after confirmation. bighelp rechecks this store summary first, sends this exact profile, then requires an idempotent readback to stamp zero additional rows. Existing non-empty owners are never overwritten.")
+                    Text("The stock route has no dry run, so the exact affected count is returned only after confirmation. Bighelp rechecks this store summary first, sends this exact profile, then requires an idempotent readback to stamp zero additional rows. Existing non-empty owners are never overwritten.")
                 }
             }
             .navigationTitle("Review Legacy Ownership")
@@ -503,7 +503,7 @@ struct SessionMaintenanceView: View {
                     }
                     .disabled(store.isBusy)
                 } footer: {
-                    Text("bighelp re-reads every target and requires its exact reviewed snapshot before sending one bulk-delete request. Every ID must then read back as absent.")
+                    Text("Bighelp re-reads every target and requires its exact reviewed snapshot before sending one bulk-delete request. Every ID must then read back as absent.")
                 }
             }
             .navigationTitle("Review Selected Chats")
@@ -526,7 +526,7 @@ struct SessionMaintenanceView: View {
                     }
                     .disabled(review.count == 0 || store.isBusy)
                 } footer: {
-                    Text("Hermes defines this target set as ended, non-archived chats with no message rows. bighelp requires the count to remain exact before deletion and zero afterward.")
+                    Text("Hermes defines this target set as ended, non-archived chats with no message rows. Bighelp requires the count to remain exact before deletion and zero afterward.")
                 }
             }
             .navigationTitle("Review Empty Chats")
@@ -593,7 +593,7 @@ struct SessionMaintenanceView: View {
                     }
                     .disabled(store.isBusy)
                 } footer: {
-                    Text("Existing IDs are skipped by Hermes. Imported history is read back by exact ID before bighelp offers to open it.")
+                    Text("Existing IDs are skipped by Hermes. Imported history is read back by exact ID before Bighelp offers to open it.")
                 }
             }
             .navigationTitle("Review Import")

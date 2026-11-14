@@ -59,13 +59,13 @@ enum ReflectiveVisionCameraState: Equatable, Sendable {
         case .active:
             "Live reflection active. Camera frames stay on this device and are never recorded."
         case .unavailable(.permissionDenied):
-            "Camera access is off. bighelp is using the standard theme visuals."
+            "Camera access is off. Bighelp is using the standard theme visuals."
         case .unavailable(.restricted):
-            "Camera access is restricted. bighelp is using the standard theme visuals."
+            "Camera access is restricted. Bighelp is using the standard theme visuals."
         case .unavailable(.noCamera):
-            "No camera is available. bighelp is using the standard theme visuals."
+            "No camera is available. Bighelp is using the standard theme visuals."
         case .unavailable(.configurationFailed):
-            "The camera could not start. bighelp is using the standard theme visuals."
+            "The camera could not start. Bighelp is using the standard theme visuals."
         }
     }
 

@@ -1743,7 +1743,7 @@ enum WorkflowWords {
         case "storage_full": "Your computer is out of room for workflow files."
         case "storage_unavailable", "store_unavailable": "Your computer can't open its workflow files right now."
         case "runner_unavailable": "Your computer can't run workflow stages. Update Hermes, then try again."
-        case "workflows_unavailable": "Workflows aren't on for this computer. Update the bighelp plugin."
+        case "workflows_unavailable": "Workflows aren't on for this computer. Update the Bighelp plugin."
         case "workflow_not_found", "run_not_found": "This isn't on your computer any more."
         case "queue_full": "Too many runs are waiting to start. Try again when some have finished."
         case "inputs_invalid": "Some of the details for this run aren't right. Check them and try again."
@@ -1788,11 +1788,11 @@ enum WorkflowWords {
             ("This computer can't open its workflow files right now.",
              "Make sure Hermes' folder on this computer has free space and can be written to, then try again.")
         case "service_manager_missing":
-            ("This computer can't keep workflows running when bighelp is closed.",
+            ("This computer can't keep workflows running when Bighelp is closed.",
              "Workflows need a Mac, or Linux with systemd.")
         default:
             ("This computer can't run workflows right now.",
-             "Update Hermes and the bighelp plugin on this computer, then try again.")
+             "Update Hermes and the Bighelp plugin on this computer, then try again.")
         }
     }
 

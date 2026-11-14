@@ -56,7 +56,7 @@ struct BighelpWidgetGateway: AppEntity {
 
     var displayRepresentation: DisplayRepresentation {
         id == Self.inUseID
-            ? DisplayRepresentation(title: "Computer in use", subtitle: "The one you're using in bighelp")
+            ? DisplayRepresentation(title: "Computer in use", subtitle: "The one you're using in Bighelp")
             : DisplayRepresentation(title: "\(name)")
     }
 }
@@ -78,7 +78,7 @@ struct BighelpWidgetGatewayQuery: EntityQuery {
 /// The Gateway choice of widgets that have only that one.
 struct GatewayWidgetIntent: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "Computer"
-    static let description = IntentDescription("Show one computer, or the one you're using in bighelp.")
+    static let description = IntentDescription("Show one computer, or the one you're using in Bighelp.")
 
     @Parameter(title: "Computer")
     var gateway: BighelpWidgetGateway?

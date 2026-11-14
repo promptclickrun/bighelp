@@ -80,9 +80,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.loopdy.mobile
+        # The Mac menu bar and Finder show the product name too: Bighelp.app, "Bighelp".
         PRODUCT_NAME: Bighelp
-        # The Mac menu bar and Finder show the product name: bighelp.app, "bighelp".
-        PRODUCT_NAME[sdk=macosx*]: bighelp
         PRODUCT_MODULE_NAME: Bighelp
         SWIFT_EMIT_LOC_STRINGS: YES
         LOCALIZATION_PREFERS_STRING_CATALOGS: YES

@@ -545,13 +545,13 @@ struct BighelpAppComposition {
                 let owner = LiveVoiceOwner(hostID: "fixture-host", authorizationID: "inert-ui-fixture",
                     agentID: session.agentIDs.first ?? "fixture-agent", sessionID: session.id)
                 if keepsReport {
-                    return .success(DemoLiveVoiceReportCall.model(owner: owner, agentName: agent?.name ?? "bighelp"))
+                    return .success(DemoLiveVoiceReportCall.model(owner: owner, agentName: agent?.name ?? "Bighelp"))
                 }
                 let control = LiveVoiceControlClient(owner: owner, operation: { _, _ in
                     // Never reaches the peer, microphone, network or provider.
                     throw LiveVoiceControlError.unavailable
                 }, isOwnerCurrent: { $0 == owner })
-                return .success(LiveVoiceModel(agentName: agent?.name ?? "bighelp", client: control,
+                return .success(LiveVoiceModel(agentName: agent?.name ?? "Bighelp", client: control,
                     makePeer: { BighelpRealtimeAudioPeer(captureEnabled: false) }))
             }
         }

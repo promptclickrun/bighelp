@@ -37,7 +37,7 @@ struct CompanionSettingsView: View {
 
                 Toggle("Adventurous Pet", isOn: $store.isAdventurous)
                     .tint(theme.action)
-                    .accessibilityHint("Lets the pet explore the message box while bighelp is open.")
+                    .accessibilityHint("Lets the pet explore the message box while Bighelp is open.")
                     .accessibilityIdentifier("companion.adventurous")
             } footer: {
                 Text("Adventurous Pet explores the message box. It stays put with Reduce Motion.")

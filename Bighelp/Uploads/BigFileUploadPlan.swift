@@ -18,7 +18,7 @@ enum BigFileUploads {
 
     /// What to say when a file is too big for this computer's plugin.
     static let updatePluginMessage =
-        "Files over 8 MB need the newest bighelp plugin on this computer. Update it in Settings, under this computer's "
+        "Files over 8 MB need the newest Bighelp plugin on this computer. Update it in Settings, under this computer's "
             + "Plugin version, then try again."
     static let tooLargeMessage = "Each file can be up to 256 MB."
 
@@ -172,7 +172,7 @@ enum BigFileUploadFailure: Equatable, Sendable {
         case .connection: "Not sent. The connection to the computer dropped."
         case .proxyLimit: "Not sent. A proxy in front of Hermes on the computer refuses the pieces of this file."
         case .proxyLimitNeedsPlugin:
-            "Not sent. A proxy in front of Hermes on the computer refuses big pieces. Update the bighelp plugin "
+            "Not sent. A proxy in front of Hermes on the computer refuses big pieces. Update the Bighelp plugin "
                 + "on the computer to send this file in smaller pieces."
         case .other: "Not sent. The computer didn't take this file."
         }

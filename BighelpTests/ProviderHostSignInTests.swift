@@ -178,7 +178,7 @@ struct ProviderHostSignInTests {
         #expect(store.errorMessage == "Claude Code isn't installed on Test Mac.")
         client.startError = .unavailable(.unsupportedOperation)
         await store.start(providerID: "claude-code")
-        #expect(store.errorMessage == "Update the bighelp plugin on Test Mac to sign in from your phone.")
+        #expect(store.errorMessage == "Update the Bighelp plugin on Test Mac to sign in from your phone.")
         client.listError = .unavailable(.pluginRequired)
         await store.load()
         #expect(!store.isSupported)

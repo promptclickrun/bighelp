@@ -158,7 +158,7 @@ struct TemplateSortMenu: View {
             .accessibilityIdentifier("\(identifier).order")
             if offersOfficialOnly {
                 Toggle(isOn: $officialOnly) {
-                    Label("bighelp only", systemImage: "checkmark.seal")
+                    Label("Bighelp only", systemImage: "checkmark.seal")
                 }
                 .accessibilityIdentifier("\(identifier).official")
             }

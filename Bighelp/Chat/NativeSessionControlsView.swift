@@ -435,7 +435,7 @@ struct NativeSessionControlsView: View {
         } footer: {
             Text(isSessionRunning
                  ? "Tool changes require an idle chat."
-                 : "A change rebuilds the live bot and clears its process-local visible history. bighelp preserves the canonical transcript and confirms the new tool state before another change.")
+                 : "A change rebuilds the live bot and clears its process-local visible history. Bighelp preserves the canonical transcript and confirms the new tool state before another change.")
         }
     }
 
@@ -893,9 +893,9 @@ private enum NativeSessionDestructiveAction {
     var explanation: String {
         switch self {
         case .compression:
-            "Hermes may replace older chat history with a compressed summary. bighelp will refresh canonical chat history after Hermes acknowledges the change."
+            "Hermes may replace older chat history with a compressed summary. Bighelp will refresh canonical chat history after Hermes acknowledges the change."
         case .undo:
-            "Hermes will remove the latest chat message. bighelp will refresh canonical chat history after Hermes acknowledges the change."
+            "Hermes will remove the latest chat message. Bighelp will refresh canonical chat history after Hermes acknowledges the change."
         case .goalClear:
             "Hermes Clear removes the current standing goal. Hermes has no separate goal-delete action, and this does not delete chat messages or chat history."
         case .loopStop:
@@ -907,7 +907,7 @@ private enum NativeSessionDestructiveAction {
         case .subgoalClear:
             "This removes every current subgoal."
         case .toolset(let name, let enabled):
-            "Hermes will \(enabled ? "enable" : "disable") \(name), persist the CLI tool configuration, and rebuild this idle live chat. Stock Hermes clears process-local visible history, attachments, edit snapshots, and chat-scoped model, reasoning, and service-tier overrides before re-deriving them from config, then emits fresh chat info. bighelp preserves the canonical transcript and requires live tool-state readback before another change."
+            "Hermes will \(enabled ? "enable" : "disable") \(name), persist the CLI tool configuration, and rebuild this idle live chat. Stock Hermes clears process-local visible history, attachments, edit snapshots, and chat-scoped model, reasoning, and service-tier overrides before re-deriving them from config, then emits fresh chat info. Bighelp preserves the canonical transcript and requires live tool-state readback before another change."
         }
     }
 }

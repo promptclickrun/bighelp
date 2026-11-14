@@ -13,7 +13,7 @@ struct AgentShortcutsView: View {
                 Section("Set up in Shortcuts") {
                         instruction(
                             "Choose an action",
-                            detail: "Add Send a chat with bighelp, or Start a bighelp voice chat.",
+                            detail: "Add Send a chat with Bighelp, or Start a Bighelp voice chat.",
                             symbol: "plus.app"
                         )
                         instruction(
@@ -23,7 +23,7 @@ struct AgentShortcutsView: View {
                         )
                         instruction(
                             "Review before running",
-                            detail: "Chat sends your message. Voice chat opens bighelp and starts voice mode.",
+                            detail: "Chat sends your message. Voice chat opens Bighelp and starts voice mode.",
                             symbol: "checkmark.bubble"
                         )
                 }

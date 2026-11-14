@@ -329,7 +329,7 @@ struct BighelpKanbanWidgetView: View {
                     header
                     if entry.cards.isEmpty {
                         Spacer(minLength: 0)
-                        Text(entry.snapshot.cards.isEmpty ? "Open Kanban in bighelp to see your boards here."
+                        Text(entry.snapshot.cards.isEmpty ? "Open Kanban in Bighelp to see your boards here."
                              : "Nothing here right now.")
                             .font(.caption).foregroundStyle(colors.secondary)
                         Spacer(minLength: 0)

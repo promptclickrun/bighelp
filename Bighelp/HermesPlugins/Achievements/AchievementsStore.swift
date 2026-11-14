@@ -109,7 +109,7 @@ final class HermesAchievementsStore {
                         .filter(\.isUnlocked)
                         .sorted { ($0.unlockedAt ?? .distantPast) > ($1.unlockedAt ?? .distantPast) }
                         .prefix(20).map { $0 }
-                    successMessage = "Hermes finished the scan. bighelp verified run \(status.runCount) and loaded its resulting catalog."
+                    successMessage = "Hermes finished the scan. Bighelp verified run \(status.runCount) and loaded its resulting catalog."
                     describe(status)
                 case .running(let status):
                     self.status = status
@@ -126,7 +126,7 @@ final class HermesAchievementsStore {
                 self.status = status
                 catalog = nil
                 recentUnlocks = []
-                successMessage = "Hermes reset achievement unlock state and bighelp verified the snapshot and checkpoint are no longer reported."
+                successMessage = "Hermes reset achievement unlock state and Bighelp verified the snapshot and checkpoint are no longer reported."
                 statusMessage = "A new scan has not been claimed. Choose Rescan after reviewing that separate action."
             }
         } catch is CancellationError {

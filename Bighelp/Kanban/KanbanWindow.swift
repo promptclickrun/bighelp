@@ -59,8 +59,8 @@ struct KanbanWindowRoot: View {
                 KanbanScreen(model: model, isNerdMode: settings.nerdModeEnabled, initialTaskID: coordinator.taskID)
                     .id(coordinator.generation)
             } else {
-                ContentUnavailableView("Open Kanban from bighelp", systemImage: "rectangle.split.3x1",
-                                       description: Text("Choose Kanban in bighelp's menu to bring your board here."))
+                ContentUnavailableView("Open Kanban from Bighelp", systemImage: "rectangle.split.3x1",
+                                       description: Text("Choose Kanban in Bighelp's menu to bring your board here."))
             }
         }
         .accessibilityIdentifier("kanban.window")

@@ -378,7 +378,7 @@ private enum BoardFileNotice: String, Identifiable {
     var message: String {
         switch self {
         case .filesFailure: "The file wasn't saved to Files."
-        case .photosPermission: "Allow bighelp to add to Photos in Settings to save pictures."
+        case .photosPermission: "Allow Bighelp to add to Photos in Settings to save pictures."
         case .photosFailure: "The picture couldn't be saved to Photos."
         case .photosSaved: "Saved to Photos."
         }

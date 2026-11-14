@@ -78,7 +78,7 @@ struct TodaySharesCard: View {
             HStack(spacing: BighelpTokens.space12) {
                 TodayCardSymbol(systemImage: "square.and.arrow.down", tint: theme.secondaryText)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Shared with bighelp")
+                    Text("Shared with Bighelp")
                         .font(.bighelp(.body, weight: .semibold))
                         .foregroundStyle(theme.primaryText)
                     Text("\(shares.count) waiting")

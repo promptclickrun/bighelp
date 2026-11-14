@@ -48,7 +48,7 @@ final class WatchPhone: NSObject, WatchPhoneTalking {
     private nonisolated static func replyHandler(_ once: WatchOnce) -> @Sendable ([String: Any]) -> Void {
         { reply in
             let decoded = (try? WatchWire.decode(WatchReply.self, key: WatchWire.replyKey, from: reply))
-                ?? .failed("Update bighelp on your iPhone and Watch.")
+                ?? .failed("Update Bighelp on your iPhone and Watch.")
             once.resume(decoded)
         }
     }

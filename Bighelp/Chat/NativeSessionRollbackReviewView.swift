@@ -150,9 +150,9 @@ struct NativeSessionRollbackReviewView: View {
 
     private var restoreConfirmationMessage: String {
         if let filePathValue {
-            return "Hermes will restore \(filePathValue) from checkpoint \(checkpoint.hash). Review the diff above. bighelp must refresh canonical chat history after acknowledgement."
+            return "Hermes will restore \(filePathValue) from checkpoint \(checkpoint.hash). Review the diff above. Bighelp must refresh canonical chat history after acknowledgement."
         }
-        return "Hermes will restore checkpoint \(checkpoint.hash). Review the exact diff above. bighelp must refresh canonical chat history after acknowledgement."
+        return "Hermes will restore checkpoint \(checkpoint.hash). Review the exact diff above. Bighelp must refresh canonical chat history after acknowledgement."
     }
 
     private var restoreDisabled: Bool {

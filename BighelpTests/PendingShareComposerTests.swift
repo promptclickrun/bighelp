@@ -286,7 +286,7 @@ struct PendingShareComposerTests {
         let destination = PendingShareDestination(scope: "scope-a", agentID: "juno", sessionID: nil)
         let now = Date()
         try await center.place(first, at: destination, agentName: "Juno", now: now)
-        #expect(center.next(now: now) == nil, "The next review waits until bighelp comes back to the front")
+        #expect(center.next(now: now) == nil, "The next review waits until Bighelp comes back to the front")
         await center.refresh()
         #expect(center.next(now: now)?.id == second.id, "The first is on its way to its chat")
         try await center.place(second, at: destination, agentName: "Juno", now: now)

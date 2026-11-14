@@ -8,6 +8,11 @@ controls in the person's own color. Cream ("Center stage") and Graphite ("After 
 The app is a simple messaging experience for personal assistant agents. Earlier bighelp/iOS 27 Builder references
 are historical (`docs/ui-v3-design.md`).
 
+In anything a person reads (the name under the icon, copy, alerts, widgets, permission prompts, the plugin's
+messages), the app's name is **Bighelp**, with a capital B (`BighelpBrand.appName`). Values that are stored or sent
+stay lowercase: the session source `bighelp`, settings keys, IDs, the `window.bighelp` bridge, URLs and domains
+(bighelp.app). The Noodle's lowercase b is the logo, not the name.
+
 ## Simplicity means hierarchy, not concealment
 
 - Use concise, distinct headers and coherent sections. Group by the person's task, not the code's store or transport boundaries.

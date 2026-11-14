@@ -236,7 +236,7 @@ struct FirstRunOnboardingView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.isHeader)
 
-                    Text("Chat with the Hermes bots running on your computer. No separate bighelp account required.")
+                    Text("Chat with the Hermes bots running on your computer. No separate Bighelp account required.")
                         .bighelpFont(.body)
                         .foregroundStyle(theme.secondaryText)
                         .multilineTextAlignment(.center)
@@ -288,7 +288,7 @@ struct FirstRunOnboardingView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: BighelpTokens.space24) {
                 VStack(alignment: .leading, spacing: BighelpTokens.space8) {
-                    Text("Make bighelp feel like yours")
+                    Text("Make Bighelp feel like yours")
                         .bighelpFont(.display)
                         .foregroundStyle(theme.primaryText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -494,7 +494,7 @@ private struct FirstRunCompanionConstellation: View {
         }
         .frame(height: 286)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("bighelp and its colorful bot companions")
+        .accessibilityLabel("Bighelp and its colorful bot companions")
     }
 
     private var gradientColors: [Color] {

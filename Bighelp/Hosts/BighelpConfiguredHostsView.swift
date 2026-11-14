@@ -258,7 +258,7 @@ struct BighelpConfiguredHostView<Extras: View>: View {
             await updateModel?.check()
         }
         .modifier(HostRenamePrompt(host: $renaming, registry: registry))
-        .alert("Remove this computer from bighelp?", isPresented: $showsRemove) {
+        .alert("Remove this computer from Bighelp?", isPresented: $showsRemove) {
             Button("Remove", role: .destructive) {
                 guard let host else { return }
                 do { try registry.remove(host); dismiss() }

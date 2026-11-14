@@ -53,7 +53,7 @@ struct HostImportView: View {
             LabeledContent("Selected profile", value: store.profileID)
             LabeledContent("Import target", value: store.operationTargetProfileID ?? "Not verified")
         } header: { Text("Destination") } footer: {
-            Text("Import restores the profile used by the connected Hermes server, which may differ from the profile selected in bighelp. bighelp verifies that target before confirmation. Switching hosts invalidates the review.")
+            Text("Import restores the profile used by the connected Hermes server, which may differ from the profile selected in Bighelp. Bighelp verifies that target before confirmation. Switching hosts invalidates the review.")
         }
     }
 
@@ -88,7 +88,7 @@ struct HostImportView: View {
             Section {
                 Label("Serving profile not verified", systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
-                Text("bighelp could not verify which profile this Hermes server uses. Hooks and backup import remain unavailable until read-only discovery confirms the target; your selected profile is not used as a guess.")
+                Text("Bighelp could not verify which profile this Hermes server uses. Hooks and backup import remain unavailable until read-only discovery confirms the target; your selected profile is not used as a guess.")
             }
         }
     }
@@ -99,7 +99,7 @@ struct HostImportView: View {
                 .foregroundStyle(.orange)
             Label("May restore declared memory-provider files under the host user’s home folder.", systemImage: "folder.badge.gearshape")
             Label("May install or start a stopped messaging gateway after restore.", systemImage: "antenna.radiowaves.left.and.right")
-            Text("bighelp never restarts hermes serve, never sends a separate gateway lifecycle request, and never retries an unconfirmed import.")
+            Text("Bighelp never restarts hermes serve, never sends a separate gateway lifecycle request, and never retries an unconfirmed import.")
             DisclosureGroup("Technical limits") {
                 Text("Hermes skips machine-specific runtime files and uses live-safe database restoration where possible. Partial per-file failure is reported through the background action status.")
                 Text("The dashboard import endpoint has no dry run or archive-manifest review API.")
@@ -126,7 +126,7 @@ struct HostImportView: View {
         } header: {
             Text("From the host")
         } footer: {
-            Text("POST /api/ops/import accepts an existing host filesystem path. bighelp preserves the reviewed path exactly and does not offer arbitrary file operations.")
+            Text("POST /api/ops/import accepts an existing host filesystem path. Bighelp preserves the reviewed path exactly and does not offer arbitrary file operations.")
         }
     }
 
@@ -173,7 +173,7 @@ struct HostImportView: View {
             readTask?.cancel()
             readTask = Task { await readSelectedArchive(url) }
         } catch {
-            selectionError = "bighelp could not open that private ZIP selection. No file content was retained in the error."
+            selectionError = "Bighelp could not open that private ZIP selection. No file content was retained in the error."
         }
     }
 
@@ -204,7 +204,7 @@ struct HostImportView: View {
         } catch let error as HostOperationsError {
             selectionError = error.localizedDescription
         } catch {
-            selectionError = "bighelp could not read that private ZIP. No file content was retained in the error."
+            selectionError = "Bighelp could not read that private ZIP. No file content was retained in the error."
         }
     }
 
@@ -248,8 +248,8 @@ private struct HostImportReviewView: View {
                 Section("Final impact") {
                     Text("Target: the serving backend’s reviewed Hermes home (`\(review.targetProfileID)`) on the original connection. The endpoint receives `force=true` only after this confirmation because its spawned CLI has no interactive stdin.")
                     Text("Configuration, skills, sessions, databases, cron state, and other backup members may be overwritten. Some external memory-provider state can be restored under the host user’s home directory.")
-                    Text("bighelp will retain the returned import action receipt and poll status without replay. If acknowledgement is lost, uploaded bytes are discarded and another import is disabled for this presentation.")
-                    Text("bighelp sends no restart or start call. Hermes’ stock importer itself may ensure a stopped messaging gateway is installed/running after restore.")
+                    Text("Bighelp will retain the returned import action receipt and poll status without replay. If acknowledgement is lost, uploaded bytes are discarded and another import is disabled for this presentation.")
+                    Text("Bighelp sends no restart or start call. Hermes’ stock importer itself may ensure a stopped messaging gateway is installed/running after restore.")
                 }
             }
             .navigationTitle("Review Backup Import")

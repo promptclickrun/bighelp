@@ -238,7 +238,7 @@ struct CoreFilesView: View {
             problem = nil
         } catch is CancellationError {
         } catch WorkspaceClientError.unavailable(.unsupportedOperation) {
-            problem = String(localized: "Update the bighelp plugin on your computer to see these files.")
+            problem = String(localized: "Update the Bighelp plugin on your computer to see these files.")
         } catch {
             problem = String(localized: "The files didn't load. Check your connection, then try again.")
         }

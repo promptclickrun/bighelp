@@ -57,7 +57,7 @@ final class WorkspaceArtifactsStore {
     var scopeUnavailableReason: String {
         suppliedScopeOwnerMismatch
             ? "Artifacts are unavailable because the supplied workspace boundary belongs to a different host or connection generation. Reopen Artifacts for the current workspace."
-            : "This host has not confirmed its configured workspace. Update its bighelp plugin and check the workspace folder in Hermes settings."
+            : "This host has not confirmed its configured workspace. Update its Bighelp plugin and check the workspace folder in Hermes settings."
     }
 
     func retire() {
@@ -102,7 +102,7 @@ final class WorkspaceArtifactsStore {
             return
         }
         guard let size = entry.size, (1...ChatAttachment.maximumAgentBytes).contains(size) else {
-            openErrorMessage = "This file cannot be opened in bighelp because its size is empty, unknown, or above the native preview limit."
+            openErrorMessage = "This file cannot be opened in Bighelp because its size is empty, unknown, or above the native preview limit."
             return
         }
 
@@ -533,7 +533,7 @@ private struct WorkspaceArtifactOpenView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: BighelpTokens.space16) {
                     ChatAttachmentGallery(attachments: [attachment], alignsTrailing: false)
-                    Text("\(BighelpPlatform.isMac ? "Click" : "Tap") the file above to open bighelp's native preview and save options.")
+                    Text("\(BighelpPlatform.isMac ? "Click" : "Tap") the file above to open Bighelp's native preview and save options.")
                         .font(.bighelp(.footnote))
                         .foregroundStyle(.secondary)
                 }

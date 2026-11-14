@@ -614,7 +614,7 @@ final class LiveVoiceModel {
         case .authenticationRequired?:
             return "Sign in to your computer again, then try live voice."
         case .unavailable?:
-            return "Update the bighelp plugin on your computer to talk with Gemini Live."
+            return "Update the Bighelp plugin on your computer to talk with Gemini Live."
         case .rejected(let code, _)? where code == "voice_already_active":
             return "Another live voice call is still open with your computer. End it, then try again."
         case .rejected(let code, _)? where code == "profile_not_found":
@@ -649,7 +649,7 @@ final class LiveVoiceModel {
         case "authentication_failed", "ambiguous_auth":
             "Codex sign-in on your computer didn't work. Run `hermes auth add openai-codex` there, then try again."
         case "credentials_unavailable":
-            "bighelp couldn't read this bot's Codex sign-in on your computer. Update the bighelp plugin and restart Hermes, then try again."
+            "Bighelp couldn't read this bot's Codex sign-in on your computer. Update the Bighelp plugin and restart Hermes, then try again."
         case "access_denied":
             "Your Codex account can't start live voice right now."
         case "rate_limited":

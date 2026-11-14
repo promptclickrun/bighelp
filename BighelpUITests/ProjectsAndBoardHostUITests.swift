@@ -30,7 +30,7 @@ final class ProjectsAndBoardHostUITests: BighelpUITestCase {
         XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
         sleep(35) // past the 25-second grace: the app closes its connection
         app.activate()
-        let older = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "older bighelp plugin")).firstMatch
+        let older = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "older Bighelp plugin")).firstMatch
         var sawOlder = false
         let deadline = Date().addingTimeInterval(20)
         while Date() < deadline, !sawOlder {

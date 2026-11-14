@@ -119,7 +119,7 @@ struct ConfiguredWorkspaceArtifactsView: View {
     static func message(for error: Error) -> String {
         switch error as? WorkspaceClientError {
         case .unavailable(.unsupportedOperation)?, .unavailable(.pluginRequired)?:
-            "This host's bighelp plugin doesn't share workspace files yet. Update it in Settings, under this "
+            "This host's Bighelp plugin doesn't share workspace files yet. Update it in Settings, under this "
                 + "computer's Plugin version, then try again."
         case .rejected(let code, _)? where WorkspaceClientError.workspaceFilesMessage(code) != nil:
             WorkspaceClientError.workspaceFilesMessage(code) ?? ""

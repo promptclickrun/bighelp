@@ -889,7 +889,7 @@ private enum CapabilityActionCopy {
         trackingAvailable: Bool
     ) -> String {
         let correlation = receipt.processID != nil || receipt.actionID != nil
-            ? "bighelp retained the host’s per-run launch identity."
+            ? "Bighelp retained the host’s per-run launch identity."
             : "Only the named host action slot was returned; its status cannot identify one exact run."
         let tracking = trackingAvailable
             ? "Completion is pending."
@@ -903,13 +903,13 @@ private enum CapabilityActionCopy {
     }
 
     static func stillRunning(_ status: HermesHostActionStatus) -> String {
-        "Hermes still reports \(status.action.rawValue) as running. Its launch receipt is retained; bighelp did not repeat the action."
+        "Hermes still reports \(status.action.rawValue) as running. Its launch receipt is retained; Bighelp did not repeat the action."
     }
 
     static func terminalReadbackFailed(_ status: HermesHostActionStatus) -> String {
         switch status.phase {
         case .succeeded:
-            "Hermes reported \(status.action.rawValue) succeeded, but the affected capability snapshot could not be read back. Completion is not confirmed in bighelp. Refresh before acting again."
+            "Hermes reported \(status.action.rawValue) succeeded, but the affected capability snapshot could not be read back. Completion is not confirmed in Bighelp. Refresh before acting again."
         case .failed(let code):
             "Hermes reported \(status.action.rawValue) failed with exit code \(code), and the affected capability snapshot could not be refreshed. The action was not retried."
         case .outcomeUnknown:
@@ -933,13 +933,13 @@ private enum CapabilityActionCopy {
         switch status.phase {
         case .succeeded:
             error = nil
-            success = "Hermes reported \(status.action.rawValue) succeeded for \(correlation), and bighelp refreshed the affected capability snapshot."
+            success = "Hermes reported \(status.action.rawValue) succeeded for \(correlation), and Bighelp refreshed the affected capability snapshot."
         case .failed(let code):
             success = nil
-            error = "Hermes reported \(status.action.rawValue) failed with exit code \(code) for \(correlation). bighelp refreshed the affected capability snapshot and did not retry the action."
+            error = "Hermes reported \(status.action.rawValue) failed with exit code \(code) for \(correlation). Bighelp refreshed the affected capability snapshot and did not retry the action."
         case .outcomeUnknown:
             success = nil
-            error = "Hermes stopped reporting \(status.action.rawValue) as running but has no durable exit result for \(correlation). bighelp refreshed the affected capability snapshot and did not retry the action."
+            error = "Hermes stopped reporting \(status.action.rawValue) as running but has no durable exit result for \(correlation). Bighelp refreshed the affected capability snapshot and did not retry the action."
         case .running:
             success = stillRunning(status)
         }
@@ -947,6 +947,6 @@ private enum CapabilityActionCopy {
 
     static func trackingFailed(_ receipt: CapabilityActionReceipt) -> String {
         _ = receipt
-        return "bighelp could not confirm the retained capability action. Its exact launch receipt is retained; refresh status or authoritative capability state instead of starting it again."
+        return "Bighelp could not confirm the retained capability action. Its exact launch receipt is retained; refresh status or authoritative capability state instead of starting it again."
     }
 }

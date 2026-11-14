@@ -258,7 +258,7 @@ final class FixtureProjectGitClient: ProjectGitClient {
             ),
             workspaces: [ProjectGitWorkspaceCapabilities(
                 workspaceID: workspaceID,
-                label: workspaceID == "loopdy" ? "bighelp" : "Workspace",
+                label: workspaceID == "loopdy" ? "Bighelp" : "Workspace",
                 visibility: "private",
                 operations: [.status],
                 remotes: ["origin"],

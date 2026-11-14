@@ -144,7 +144,7 @@ struct PluginCatalogPageView: View {
                     confirmsInstall = true
                 }
                 .accessibilityIdentifier("plugin.install")
-                Text("Plugins change every agent on this computer. Hermes runs its own security review, and bighelp never forces an install.")
+                Text("Plugins change every agent on this computer. Hermes runs its own security review, and Bighelp never forces an install.")
                     .font(.bighelp(.footnote))
                     .foregroundStyle(theme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)

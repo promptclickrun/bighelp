@@ -751,7 +751,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         openNewGroupChat(app)
         let name = app.textFields["bot-mode.create.title"]
         XCTAssertTrue(name.waitForExistence(timeout: 10))
-        name.tap(); name.typeText("bighelp verification 117")
+        name.tap(); name.typeText("Bighelp verification 117")
         app.buttons["bot-mode.create.participant.default"].tap()
         app.buttons["bot-mode.create.participant.nova"].tap()
         app.buttons["bot-mode.create.submit"].tap()
@@ -778,7 +778,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         XCTAssertTrue(sentTree.contains("Nova NEWGROUP117 OK"))
         app.terminate(); app.launch()
         showBots(in: app)
-        let group = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "bighelp verification 117")).firstMatch
+        let group = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Bighelp verification 117")).firstMatch
         XCTAssertTrue(group.waitForExistence(timeout: 20)); group.tap()
         XCTAssertTrue(composer.waitForExistence(timeout: 20))
         let reopenedTree = app.debugDescription
@@ -937,7 +937,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         capture("real-host-root-116", app)
         XCTAssertTrue(available, "The real saved host must expose its normal workspace controls.")
         showChats(in: app)
-        let knownSession = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Confirm bighelp direct-connect message")).firstMatch
+        let knownSession = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Confirm Bighelp direct-connect message")).firstMatch
         XCTAssertTrue(knownSession.waitForExistence(timeout: 20))
         knownSession.tap()
         let composer = app.textViews["chat.composer.text"]
@@ -1069,7 +1069,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
         getStarted.tap()
         agreeToAIDataIfAsked(app)
         let address = app.textFields["host-setup.address"]
-        XCTAssertTrue(address.waitForExistence(timeout: 15), "A fresh native workspace must not require a bighelp account.")
+        XCTAssertTrue(address.waitForExistence(timeout: 15), "A fresh native workspace must not require a Bighelp account.")
         guard address.exists else { capture("native-production-entry", app); return }
         address.tap()
         address.typeText(try XCTUnwrap(ProcessInfo.processInfo.environment["NATIVE_PROBE_ADDRESS_OVERRIDE"] ?? config["address"]))
@@ -1444,7 +1444,7 @@ final class NativeWorkspaceProductionUITests: BighelpUITestCase {
             for _ in 0..<6 where !voice.exists || !voice.isHittable { app.swipeUp() }
             guard voice.waitForExistence(timeout: 15) else { XCTFail("Voice plugin status must be visible."); return }
             XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
-                predicate: NSPredicate(format: "label CONTAINS %@", "bighelp plugin connected."), object: voice
+                predicate: NSPredicate(format: "label CONTAINS %@", "Bighelp plugin connected."), object: voice
             )], timeout: 20), .completed)
             capture("native-reviewed-plugin-voice-ready", app)
             // The sheet's own Back: the screen behind Settings has a navigation bar too.

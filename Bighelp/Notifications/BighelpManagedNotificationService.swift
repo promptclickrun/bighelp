@@ -27,13 +27,13 @@ struct BighelpManagedNotificationSetupError: Error, LocalizedError, Equatable, S
     var errorDescription: String? {
         let base: String = switch stage {
         case .providerBootstrap:
-            "Notification setup is unavailable. Update bighelp and try again."
+            "Notification setup is unavailable. Update Bighelp and try again."
         case .providerIdentity:
             "Notification setup failed. Try again."
         case .notificationPermission:
-            "Allow notifications for bighelp in Settings, then try again."
+            "Allow notifications for Bighelp in Settings, then try again."
         case .deviceRegistration:
-            "bighelp could not register this device for notifications. Check notification access and try again."
+            "Bighelp could not register this device for notifications. Check notification access and try again."
         case .providerReadiness:
             "The notification provider has not confirmed this device yet. Try again."
         }

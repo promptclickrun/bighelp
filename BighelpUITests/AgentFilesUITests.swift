@@ -84,7 +84,7 @@ final class AgentFilesUITests: BighelpUITestCase {
             openFiles(of: agent, in: app)
             XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH %@", "Opening"))
                 .firstMatch.waitForNonExistence(timeout: 30), agent)
-            XCTAssertFalse(app.staticTexts["Update the bighelp plugin to see files"].exists,
+            XCTAssertFalse(app.staticTexts["Update the Bighelp plugin to see files"].exists,
                            "\(agent): the plugin reads every agent's folder")
             let rows = app.buttons.matching(identifier: "simple-bots.files.item")
                 .allElementsBoundByIndex.prefix(5).map(\.label)

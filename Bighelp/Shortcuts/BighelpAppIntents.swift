@@ -58,8 +58,8 @@ struct BighelpShortcutGatewayQuery: EntityQuery {
 
 struct LoopdyShortcutAgentEntity: AppEntity {
     static let typeDisplayRepresentation = TypeDisplayRepresentation(
-        name: "bighelp bot",
-        numericFormat: "\(placeholder: .int) bighelp bots"
+        name: "Bighelp bot",
+        numericFormat: "\(placeholder: .int) Bighelp bots"
     )
     static let defaultQuery = BighelpShortcutAgentQuery()
 
@@ -244,7 +244,7 @@ enum BighelpShortcutAttachmentBuilder {
 struct SendLoopdyChatIntent: AppIntent {
     static let title: LocalizedStringResource = "Ask a bot"
     static let description = IntentDescription(
-        "Starts a new chat with your bot on the computer you choose, with any pictures or files you add. Wait for response returns the answer to Shortcuts without opening bighelp. Turn it off to send and continue right away.",
+        "Starts a new chat with your bot on the computer you choose, with any pictures or files you add. Wait for response returns the answer to Shortcuts without opening Bighelp. Turn it off to send and continue right away.",
         categoryName: "Chat"
     )
     static let openAppWhenRun = false
@@ -308,7 +308,7 @@ struct SendLoopdyChatIntent: AppIntent {
         let output: String
         switch result.delivery {
         case .queued:
-            output = "Sent to \(result.agentName). bighelp will notify you as the chat progresses."
+            output = "Sent to \(result.agentName). Bighelp will notify you as the chat progresses."
         case .completed(let response):
             output = response
         }
@@ -437,7 +437,7 @@ struct BighelpAppShortcuts: AppShortcutsProvider {
                 "Show \(\.$section) in \(.applicationName)",
                 "Open a page in \(.applicationName)",
             ],
-            shortTitle: "Open in bighelp",
+            shortTitle: "Open in Bighelp",
             systemImageName: "square.grid.2x2"
         )
         AppShortcut(

@@ -87,7 +87,7 @@ struct MyTemplatesTests {
             await #expect(throws: MyTemplatesSaveError.needsPluginUpdate) {
                 try await store.save(name: "Budget Buddy", from: .financeFixture)
             }
-            #expect(MyTemplatesSaveError.needsPluginUpdate.message == "Update the bighelp plugin to save templates.")
+            #expect(MyTemplatesSaveError.needsPluginUpdate.message == "Update the Bighelp plugin to save templates.")
         }
     }
 

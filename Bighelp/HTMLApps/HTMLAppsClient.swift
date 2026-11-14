@@ -25,9 +25,9 @@ enum HTMLAppsError: Error, Equatable {
 
     var message: String {
         switch self {
-        case .needsPluginUpdate: "Update the bighelp plugin on this computer to open apps."
+        case .needsPluginUpdate: "Update the Bighelp plugin on this computer to open apps."
         case .notFound: "This app isn't on the computer anymore."
-        case .noConnection: "bighelp can't reach the computer right now."
+        case .noConnection: "Bighelp can't reach the computer right now."
         case .changed, .failed: "The app didn't open."
         }
     }

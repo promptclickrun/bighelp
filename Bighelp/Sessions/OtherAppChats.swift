@@ -110,7 +110,7 @@ final class OtherAppChatsStore {
         } catch is CancellationError {
             return nil
         } catch {
-            errorMessage = "This chat couldn't be opened in bighelp. Check that the computer is connected, then try again."
+            errorMessage = "This chat couldn't be opened in Bighelp. Check that the computer is connected, then try again."
             return nil
         }
     }

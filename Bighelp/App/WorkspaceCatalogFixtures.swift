@@ -14,7 +14,7 @@ final class FixtureSkillsAndToolsClient: HermesSkillsAndToolsCatalogClient {
         let enabled = enabledStates[key] ?? true
         return HermesCapabilityControl(agentID: agentID, kind: kind, itemID: id,
             isEnabled: enabled, canToggle: id != "loopdy",
-            reason: id == "loopdy" ? "bighelp carries this control connection." : "",
+            reason: id == "loopdy" ? "Bighelp carries this control connection." : "",
             scope: "Fixture profile", activation: "Applies to new fixture sessions.",
             revision: digest("\(key):\(enabled)"))
     }
@@ -53,10 +53,10 @@ final class FixtureSkillsAndToolsClient: HermesSkillsAndToolsCatalogClient {
             },
             plugins: [.init(
                 id: "loopdy",
-                name: "bighelp",
+                name: "Bighelp",
                 kind: "platform",
                 version: "Demo",
-                description: "Secure bighelp Link channel.",
+                description: "Secure Bighelp Link channel.",
                 isEnabled: true,
                 capabilityCount: 6
             )],
@@ -254,7 +254,7 @@ final class FixtureHermesWorkspaceClient: HermesWorkspaceCatalogClient {
         var rows: [HermesWorkspaceSummary] = [
             .init(
                 id: "loopdy",
-                name: "bighelp",
+                name: "Bighelp",
                 description: "Product workspace",
                 folderCount: 1,
                 isActive: false

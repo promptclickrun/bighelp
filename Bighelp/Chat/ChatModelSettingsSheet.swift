@@ -413,7 +413,7 @@ private struct ChatContextPage: View {
                 breakdown = try await load()
             } catch is CancellationError {
             } catch DirectHermesError.invalidResponse {
-                failure = String(localized: "Your computer answered in a way this version of bighelp can't read. Update bighelp, then try again.")
+                failure = String(localized: "Your computer answered in a way this version of Bighelp can't read. Update Bighelp, then try again.")
             } catch {
                 failure = String(localized: "Your computer didn't answer. Try again.")
             }

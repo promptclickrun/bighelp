@@ -895,14 +895,14 @@ extension ChatModel {
         }
         if refusal.code == 4090, !refusal.reachedSessionLimit, bearsShares {
             // A branch would send it without its shared items, so it doesn't go on there by itself.
-            failureMessage = "This chat is open in another Hermes process, so bighelp didn't send this. Send it in another chat; your shared items are kept."
+            failureMessage = "This chat is open in another Hermes process, so Bighelp didn't send this. Send it in another chat; your shared items are kept."
         } else if refusal.code == 4090, !refusal.reachedSessionLimit {
             // Another Hermes process holds this chat (a leftover connection, or a job Hermes
             // runs in it). Retrying meets the same refusal, so it goes on in a branch.
             branchContinuation = ChatBranchContinuation(
                 message: message, submissionID: refusal.submissionID,
                 hasAttachments: !attachments.isEmpty || !orderedAttachments.isEmpty)
-            failureMessage = "This chat is open in another Hermes process, so bighelp is continuing it in a new chat with the same history. Your text has been kept."
+            failureMessage = "This chat is open in another Hermes process, so Bighelp is continuing it in a new chat with the same history. Your text has been kept."
         } else {
             failureMessage = refusal.code == 4090
                 ? "Hermes is at its limit of open chats. Finish a chat in another Hermes window, then send again. Your text has been kept; it was not sent again."

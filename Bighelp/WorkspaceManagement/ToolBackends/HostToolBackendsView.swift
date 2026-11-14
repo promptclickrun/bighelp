@@ -125,7 +125,7 @@ struct HostToolBackendsView: View {
                                   detail: "Allows CuaDriver on the host Mac to capture app windows.")
                     permissionRow("Screen capture check", value: status.canCaptureScreen,
                                   detail: "Runtime confirmation that host screen capture is usable.")
-                    Text("macOS grants attach to CuaDriver’s host identity, not to bighelp\(BighelpPlatform.isMac ? "" : " and not to this phone").")
+                    Text("macOS grants attach to CuaDriver’s host identity, not to Bighelp\(BighelpPlatform.isMac ? "" : " and not to this phone").")
                         .font(.bighelp(.footnote))
                         .foregroundStyle(.secondary)
                 }
@@ -165,9 +165,9 @@ struct HostToolBackendsView: View {
                 Text("Advanced · Computer Use")
             } footer: {
                 if status.hostPlatform == "darwin" {
-                    Text("Requesting permissions only launches the supported CuaDriver flow. You must interact with macOS on the host. bighelp never reports that \(BighelpPlatform.isMac ? "it" : "iOS") granted Mac Accessibility or Screen Recording.")
+                    Text("Requesting permissions only launches the supported CuaDriver flow. You must interact with macOS on the host. Bighelp never reports that \(BighelpPlatform.isMac ? "it" : "iOS") granted Mac Accessibility or Screen Recording.")
                 } else {
-                    Text("Windows and Linux do not use the macOS TCC grant flow. Hermes reports CuaDriver health instead; bighelp does not manufacture a permission toggle.")
+                    Text("Windows and Linux do not use the macOS TCC grant flow. Hermes reports CuaDriver health instead; Bighelp does not manufacture a permission toggle.")
                 }
             }
         }

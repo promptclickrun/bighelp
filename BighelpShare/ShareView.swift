@@ -13,7 +13,7 @@ struct ShareView: View {
             Group {
                 if model.phase == .saved { saved } else { form }
             }
-            .navigationTitle("Save for bighelp")
+            .navigationTitle("Save for Bighelp")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if model.phase != .saved {
@@ -57,7 +57,7 @@ struct ShareView: View {
                 if model.noteIsTooLong {
                     Text("Your note is too long.").foregroundStyle(.red)
                 } else {
-                    Text("Nothing is sent yet. In bighelp you choose the bot and chat, look it over, and send it yourself.")
+                    Text("Nothing is sent yet. In Bighelp you choose the bot and chat, look it over, and send it yourself.")
                 }
             }
         }
@@ -69,9 +69,9 @@ struct ShareView: View {
                 .font(.system(size: 40))
                 .foregroundStyle(.tint)
                 .accessibilityHidden(true)
-            Text("Saved for bighelp")
+            Text("Saved for Bighelp")
                 .font(.headline)
-            Text("Open bighelp to choose the bot and chat, then send it. It stays on this device until you send it or delete it.")
+            Text("Open Bighelp to choose the bot and chat, then send it. It stays on this device until you send it or delete it.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

@@ -286,7 +286,7 @@ private struct MemoryNodeDetailView: View {
                 if matchingDetail?.kind == .skill {
                     Text("Hermes archives learned skills instead of deleting them. A Curator restore can recover this skill.")
                 } else {
-                    Text("Hermes will permanently remove only the selected memory chunk, then bighelp will require an authoritative graph readback.")
+                    Text("Hermes will permanently remove only the selected memory chunk, then Bighelp will require an authoritative graph readback.")
                 }
             }
         }

@@ -24,7 +24,7 @@ enum HermesSkillUploadError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .folderNeedsPluginUpdate:
-            "To upload a skill folder (.zip), update bighelp's plugin on this computer. A single SKILL.md file uploads now."
+            "To upload a skill folder (.zip), update Bighelp's plugin on this computer. A single SKILL.md file uploads now."
         case .missingName:
             "This SKILL.md has no name. Add a name: line to its header, between the --- lines."
         case .invalidName(let name):

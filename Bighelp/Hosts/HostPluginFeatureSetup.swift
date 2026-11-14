@@ -4,7 +4,7 @@ enum HostPluginFeature: String, Hashable, Sendable {
     case liveVoice, deviceAccess
 
     var capability: String { self == .liveVoice ? "native-voice-v1" : "native-device-tools-v1" }
-    var title: String { self == .liveVoice ? "bighelp plugin" : "Device access" }
+    var title: String { self == .liveVoice ? "Bighelp plugin" : "Device access" }
     /// Device access shows the plugin only while there's something to do or wait for; Voice
     /// settings always show its status line, since every voice mode needs the plugin.
     var showsOnlyWhenNeeded: Bool { self == .deviceAccess }
@@ -119,7 +119,7 @@ struct HostPluginFeatureSection: View {
                 }
             }
         } header: {
-            Text(lead == nil ? feature.title : "bighelp plugin")
+            Text(lead == nil ? feature.title : "Bighelp plugin")
         } footer: {
             if feature == .deviceAccess, showsRows, offersInstall {
                 Text(BighelpPlatform.isMac
@@ -211,7 +211,7 @@ struct HostPluginFeatureSection: View {
                     isCurrent: owns
                 ) else { return }
                 ready = true
-                status = "bighelp plugin connected."
+                status = "Bighelp plugin connected."
                 return
             }
         } catch {
@@ -226,25 +226,25 @@ struct HostPluginFeatureSection: View {
             ).filter { $0.name == "loopdy" }
             guard owns() else { return }
             if matches.isEmpty {
-                status = "The bighelp plugin is not installed on this computer."
-                action = "Install bighelp Plugin"
+                status = "The Bighelp plugin is not installed on this computer."
+                action = "Install Bighelp Plugin"
             } else if matches.count == 1, let installed = matches.first {
                 let latest = try? await GitHubPluginReleaseSource.shared.latest(refresh: false)
                 guard owns() else { return }
                 if let latest, let current = installed.version,
                    HostPluginPin.compare(current, latest.version) == .orderedAscending {
-                    status = "This computer has bighelp plugin \(current). Version \(latest.version) is available."
-                    action = "Update bighelp Plugin"
+                    status = "This computer has Bighelp plugin \(current). Version \(latest.version) is available."
+                    action = "Update Bighelp Plugin"
                 } else if installed.configuredEnabled {
                     status = nativeResponded
                         ? "The plugin is installed and answers, but it doesn't offer this feature on this computer. The Hermes dashboard's log on your computer says why. Restart the dashboard on your computer, then check again."
                         : Self.unreachableMessage(nativeFailure)
                 } else {
-                    status = "The bighelp plugin is installed but disabled."
-                    action = "Enable bighelp Plugin"
+                    status = "The Bighelp plugin is installed but disabled."
+                    action = "Enable Bighelp Plugin"
                 }
             } else {
-                status = "Hermes reported more than one bighelp plugin. Review the installed plugins on your computer."
+                status = "Hermes reported more than one Bighelp plugin. Review the installed plugins on your computer."
             }
         } catch {
             guard owns() else { return }
@@ -260,9 +260,9 @@ struct HostPluginFeatureSection: View {
         case WorkspaceClientError.unavailable(.pluginRequired)?:
             "The plugin is installed, but the Hermes dashboard on your computer hasn't loaded it yet. Restart the dashboard and the messaging gateway on your computer, then check again."
         case WorkspaceClientError.authenticationRequired?:
-            "The plugin is installed, but this computer turned down bighelp's sign-in. Sign in to the computer again, then check again."
+            "The plugin is installed, but this computer turned down Bighelp's sign-in. Sign in to the computer again, then check again."
         default:
-            "The plugin is installed, but this computer didn't answer bighelp just now. Check again in a moment."
+            "The plugin is installed, but this computer didn't answer Bighelp just now. Check again in a moment."
         }
     }
 
@@ -307,7 +307,7 @@ struct HostPluginInstallationSection: View {
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("hosts.plugin-install.complete")
             } else if showsReview {
-                Text("This installs the newest bighelp plugin release from GitHub, or turns on the one that's already there. An older plugin is replaced, which overwrites any local changes to it; a newer one is kept.")
+                Text("This installs the newest Bighelp plugin release from GitHub, or turns on the one that's already there. An older plugin is replaced, which overwrites any local changes to it; a newer one is kept.")
                     .fixedSize(horizontal: false, vertical: true)
                 if let release = model.release {
                     LabeledContent("Version", value: release.version)
@@ -317,9 +317,9 @@ struct HostPluginInstallationSection: View {
                         Text(release.pin.revision).bighelpFont(.code).textSelection(.enabled)
                     }
                 }
-                Text("Hermes' own security scanner checks the plugin before it's installed, and bighelp confirms the exact version landed.")
+                Text("Hermes' own security scanner checks the plugin before it's installed, and Bighelp confirms the exact version landed.")
                     .fixedSize(horizontal: false, vertical: true)
-                Text("Installing doesn't turn on notifications. The plugin takes effect after the Hermes dashboard and the messaging gateway restart, and bighelp asks to restart them once it's in.")
+                Text("Installing doesn't turn on notifications. The plugin takes effect after the Hermes dashboard and the messaging gateway restart, and Bighelp asks to restart them once it's in.")
                     .fixedSize(horizontal: false, vertical: true)
                 if let actionTitle = model.actionTitle {
                     Button(actionTitle) { Task { await install() } }
@@ -348,7 +348,7 @@ struct HostPluginInstallationSection: View {
                     .accessibilityIdentifier("hosts.plugin-install.restart-status")
             }
         } header: {
-            Text("bighelp Plugin")
+            Text("Bighelp Plugin")
         } footer: {
             Text("Plugin installation is separate from notification enrollment. Basic chat and Artifacts remain available without it.")
         }
@@ -361,7 +361,7 @@ struct HostPluginInstallationSection: View {
 
     private var pluginReviewTitle: String {
         switch model.state {
-        case .notConfigured: "Install bighelp Plugin"
+        case .notConfigured: "Install Bighelp Plugin"
         case .outcomeUnknown: "Review and Check Installed State"
         default: "Review Plugin Setup"
         }

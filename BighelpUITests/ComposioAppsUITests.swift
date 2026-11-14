@@ -48,7 +48,7 @@ final class ComposioAppsUITests: BighelpUITestCase {
             app.activate()
             sleep(4)
             let pageCancel = signInPageCancel(in: app)
-            XCTAssertTrue(pageCancel.exists, "Coming back to bighelp doesn't close the page")
+            XCTAssertTrue(pageCancel.exists, "Coming back to Bighelp doesn't close the page")
             evidence("composio-page-open-\(appearance)", app)
             if pageCancel.exists { pageCancel.tap() }
             XCTAssertTrue(connect.waitForExistence(timeout: 10))

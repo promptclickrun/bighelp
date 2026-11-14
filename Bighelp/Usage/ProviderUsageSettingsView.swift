@@ -81,7 +81,7 @@ struct ProviderUsageSettingsView: View {
 
     private var emptyText: String {
         switch store?.state {
-        case .needsPluginUpdate?: "Update the bighelp plugin on your computer to see its plans."
+        case .needsPluginUpdate?: "Update the Bighelp plugin on your computer to see its plans."
         case .unavailable(let message)?: message
         case .loaded?: "No AI plans found on your computer."
         default: "Looking for plans on your computer…"

@@ -698,7 +698,7 @@ struct ProviderAccountsView: View {
         } header: {
             Text("Providers")
         } footer: {
-            Text("Sign-ins and keys stay on \(store.hostName). bighelp never sees them.")
+            Text("Sign-ins and keys stay on \(store.hostName). Bighelp never sees them.")
         }
     }
 
@@ -945,7 +945,7 @@ struct ProviderAccountsView: View {
             }
             if rows.isEmpty { Text("No provider key fields were reported.").foregroundStyle(.secondary) }
         } footer: {
-            Text("Saved values stay on \(store.hostName) and never show in bighelp.")
+            Text("Saved values stay on \(store.hostName) and never show in Bighelp.")
         }
     }
 
@@ -1273,7 +1273,7 @@ private struct ProviderPoolCredentialEditorView: View {
                 SecureField("API key", text: $apiKey)
                     .textInputAutocapitalization(.never).autocorrectionDisabled().privacySensitive()
             } header: { Text("Account") } footer: {
-                Text("The key is sent once to the serving bot and is never read back into bighelp.")
+                Text("The key is sent once to the serving bot and is never read back into Bighelp.")
             }
             Section {
                 Button("Review account credential") { confirm = true }

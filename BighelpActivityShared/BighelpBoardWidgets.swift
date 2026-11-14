@@ -18,7 +18,7 @@ struct BoardWidgetAgent: AppEntity {
 
     var displayRepresentation: DisplayRepresentation {
         id == Self.autoID
-            ? DisplayRepresentation(title: "Auto", subtitle: "The bot you're using in bighelp")
+            ? DisplayRepresentation(title: "Auto", subtitle: "The bot you're using in Bighelp")
             : DisplayRepresentation(title: "\(name)")
     }
 }
@@ -200,7 +200,7 @@ struct BighelpBoardWidgetView: View {
     private var rectangular: some View {
         VStack(alignment: .leading, spacing: 1) {
             Label {
-                Text("\(section.title) · \(board?.agentName ?? "bighelp")")
+                Text("\(section.title) · \(board?.agentName ?? "Bighelp")")
             } icon: {
                 BighelpTabGlyphShape(glyph: section.glyph, selected: true).frame(width: 20, height: 20)
             }
@@ -208,7 +208,7 @@ struct BighelpBoardWidgetView: View {
             if let first = board?.items.first {
                 Text(first.title).font(.caption).lineLimit(2)
             } else {
-                Text(board?.isLoaded == false ? "Open bighelp to load it" : "Nothing yet")
+                Text(board?.isLoaded == false ? "Open Bighelp to load it" : "Nothing yet")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -218,7 +218,7 @@ struct BighelpBoardWidgetView: View {
 
     private func header(compact: Bool) -> some View {
         HStack(spacing: 7) {
-            BighelpWidgetAvatar(agentID: board?.agentID, name: board?.agentName ?? "bighelp", diameter: compact ? 22 : 26)
+            BighelpWidgetAvatar(agentID: board?.agentID, name: board?.agentName ?? "Bighelp", diameter: compact ? 22 : 26)
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 4) {
                     BighelpTabGlyphShape(glyph: section.glyph, selected: true)
@@ -243,7 +243,7 @@ struct BighelpBoardWidgetView: View {
         let text: String
         if let board {
             text = board.isLoaded ? section.emptyText(name: board.agentName)
-                : "Open bighelp to load \(board.agentName)'s \(section.title)."
+                : "Open Bighelp to load \(board.agentName)'s \(section.title)."
         } else {
             text = "This bot isn't on your computer anymore. Edit the widget to pick another."
         }

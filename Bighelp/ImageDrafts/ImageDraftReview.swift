@@ -108,7 +108,7 @@ enum ImageDraftSaveBlocker: Hashable, Sendable {
             case .lineBreak: return "\(name) must be one line."
             case .phone: return "\(name) can only have digits, spaces and + ( ) - ."
             case .email: return "\(name) doesn't look like an email address."
-            case .date: return "\(name) isn't a date bighelp can read."
+            case .date: return "\(name) isn't a date Bighelp can read."
             case .timeZone: return "Choose a time zone from the list."
             case .endBeforeStart: return "The end must be after the start."
             }

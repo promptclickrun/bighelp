@@ -231,11 +231,11 @@ final class LiveDeviceGeofenceNotifier: DeviceGeofenceNotifying {
         default: return
         }
         let content = UNMutableNotificationContent()
-        content.title = String(localized: "bighelp couldn't tell your bot")
+        content.title = String(localized: "Bighelp couldn't tell your bot")
         let name = place.name.trimmingCharacters(in: .whitespacesAndNewlines)
         content.body = arrived
-            ? String(localized: "You arrived at \(name). bighelp couldn't reach your computer to let your bot know.")
-            : String(localized: "You left \(name). bighelp couldn't reach your computer to let your bot know.")
+            ? String(localized: "You arrived at \(name). Bighelp couldn't reach your computer to let your bot know.")
+            : String(localized: "You left \(name). Bighelp couldn't reach your computer to let your bot know.")
         content.threadIdentifier = "bighelp.places"
         try? await center.add(UNNotificationRequest(
             identifier: "bighelp.place.failed.\(UUID().uuidString.lowercased())", content: content, trigger: nil))

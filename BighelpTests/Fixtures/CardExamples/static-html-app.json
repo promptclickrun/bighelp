@@ -2,7 +2,7 @@
   "schema": "loopdy.card",
   "version": 1,
   "title": "Trip planner",
-  "spoken_summary": "An app to open in bighelp: Trip planner.",
+  "spoken_summary": "An app to open in Bighelp: Trip planner.",
   "data_sources": [],
   "root": "app",
   "elements": {

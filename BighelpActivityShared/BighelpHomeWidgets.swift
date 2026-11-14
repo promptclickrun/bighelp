@@ -191,7 +191,7 @@ struct BighelpActiveSessionsView: View {
                 }
             }
             .accessibilityLabel(stale && !running.isEmpty
-                ? "\(running.count) bighelp chats, updates paused" : "\(running.count) active bighelp chats")
+                ? "\(running.count) Bighelp chats, updates paused" : "\(running.count) active Bighelp chats")
             .widgetURL(snapshot.sessionsURL)
         case .accessoryRectangular:
             VStack(alignment: .leading, spacing: 2) {

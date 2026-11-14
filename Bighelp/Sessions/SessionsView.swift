@@ -1435,7 +1435,7 @@ struct SessionsView: View {
                 )
             } catch {
                 mutationFailures += 1
-                actionDialog = .error("bighelp could not update this chat. Try again.")
+                actionDialog = .error("Bighelp could not update this chat. Try again.")
             }
         }
     }

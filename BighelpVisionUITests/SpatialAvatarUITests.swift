@@ -18,7 +18,7 @@ final class SpatialAvatarUITests: XCTestCase {
     func test0StartsInBighelpAndSimpleModeIsYourChoice() throws {
         let app = launch(pinch: "type")
         let menu = app.buttons["home.drawer.open"].firstMatch
-        XCTAssertTrue(menu.waitForExistence(timeout: 20), "bighelp opens in its own window")
+        XCTAssertTrue(menu.waitForExistence(timeout: 20), "Bighelp opens in its own window")
         let avatar = app.descendants(matching: .any)["spatial-avatar.avatar"].firstMatch
         XCTAssertFalse(avatar.waitForExistence(timeout: 5), "The agent doesn't step in by itself")
         save("0-starts-in-bighelp", app)
@@ -27,7 +27,7 @@ final class SpatialAvatarUITests: XCTestCase {
         XCTAssertTrue(avatar.waitForExistence(timeout: 15), "Simple mode brings the agent into the room")
         let openApp = app.buttons["spatial-avatar.open-app"].firstMatch
         XCTAssertTrue(openApp.waitForExistence(timeout: 10), "The agent offers the way back")
-        XCTAssertFalse(menu.exists, "bighelp's window closes in simple mode")
+        XCTAssertFalse(menu.exists, "Bighelp's window closes in simple mode")
         save("0-simple-mode", app)
         // XCUITest can't tap inside a volume once it's the app's only window ("invalid scene
         // world transform"), so Open bighelp is checked on a device, not here.
@@ -37,7 +37,7 @@ final class SpatialAvatarUITests: XCTestCase {
     func test2PinchToTypeSendsAndShowsTheReply() throws {
         let app = showAgentBesideBighelp(pinch: "type")
         let avatar = app.descendants(matching: .any)["spatial-avatar.avatar"].firstMatch
-        XCTAssertTrue(avatar.waitForExistence(timeout: 20), "The agent steps in beside bighelp")
+        XCTAssertTrue(avatar.waitForExistence(timeout: 20), "The agent steps in beside Bighelp")
         let status = app.descendants(matching: .any)["spatial-avatar.status"].firstMatch
         XCTAssertTrue(status.waitForExistence(timeout: 10))
         waitFor(status, labelContains: "Pinch to type")
@@ -143,7 +143,7 @@ final class SpatialAvatarUITests: XCTestCase {
     @MainActor
     private func enterSimpleMode(_ app: XCUIApplication) {
         let menu = app.buttons["home.drawer.open"].firstMatch
-        XCTAssertTrue(menu.waitForExistence(timeout: 20), "bighelp opens in its own window")
+        XCTAssertTrue(menu.waitForExistence(timeout: 20), "Bighelp opens in its own window")
         menu.tap()
         let row = app.buttons["menu.simple-mode"].firstMatch
         let list = app.collectionViews.firstMatch

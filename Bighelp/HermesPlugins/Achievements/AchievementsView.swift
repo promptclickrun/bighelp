@@ -122,7 +122,7 @@ struct HermesAchievementsView: View {
                 if review.action == .reset {
                     Text("Clear \(review.unlockedCount) recorded unlocks and the cached scan/checkpoint for \(review.totalCount) achievements. The current scanner revision is checked again before reset.")
                 } else {
-                    Text("Force a synchronous scan of the complete Hermes session history. Large histories can take minutes; bighelp will show running or failed status without claiming success early.")
+                    Text("Force a synchronous scan of the complete Hermes session history. Large histories can take minutes; Bighelp will show running or failed status without claiming success early.")
                 }
             }
         }

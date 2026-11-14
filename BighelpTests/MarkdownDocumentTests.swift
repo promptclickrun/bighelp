@@ -52,9 +52,9 @@ struct MarkdownDocumentTests {
     }
 
     @Test func visiblePlainTextStripsMarkdownDecorationButRetainsAnswerMeaning() {
-        let document = MarkdownDocument("Use **bighelp Link** and read [the guide](https://example.com).\n\n- One\n- Two")
+        let document = MarkdownDocument("Use **Bighelp Link** and read [the guide](https://example.com).\n\n- One\n- Two")
 
-        #expect(document.visiblePlainText == "Use bighelp Link and read the guide.\n\nOne\nTwo")
+        #expect(document.visiblePlainText == "Use Bighelp Link and read the guide.\n\nOne\nTwo")
     }
 
     @Test func malformedMarkdownFallsBackToReadableVisibleText() {
@@ -74,7 +74,7 @@ struct MarkdownDocumentTests {
     }
 
     @Test func bubbleInteractionReusesTheAlreadyParsedDocument() {
-        let document = MarkdownDocument("Use **bighelp** and [settings](https://loopdy.app).")
+        let document = MarkdownDocument("Use **Bighelp** and [settings](https://loopdy.app).")
         let interaction = ChatBubbleInteraction(document: document, canFork: true)
         #expect(interaction.copyText == document.visiblePlainText)
         #expect(interaction.menuActions == [.copy, .selectText, .forkFromHere])
@@ -82,11 +82,11 @@ struct MarkdownDocumentTests {
 
     @Test func bubbleInteractionsCopyVisibleRichTextAndExposeForkOnlyWhenAllowed() {
         let interaction = ChatBubbleInteraction(
-            markdown: "Use **bighelp Link** and [open settings](https://loopdy.app).",
+            markdown: "Use **Bighelp Link** and [open settings](https://loopdy.app).",
             canFork: true
         )
 
-        #expect(interaction.copyText == "Use bighelp Link and open settings.")
+        #expect(interaction.copyText == "Use Bighelp Link and open settings.")
         #expect(interaction.menuActions == [.copy, .selectText, .forkFromHere])
         #expect(
             ChatBubbleInteraction(markdown: "Draft", canFork: false).menuActions
@@ -107,7 +107,7 @@ struct MarkdownDocumentTests {
 
     @Test func markdownLinksKeepTheirDestinationWhenBareURLDetectionRuns() throws {
         let attributed = ChatInlineMarkdown.attributedText(
-            "Open [the bighelp guide](https://loopdy.app/guide)."
+            "Open [the Bighelp guide](https://loopdy.app/guide)."
         )
         let links = attributed.runs.compactMap(\.link)
 

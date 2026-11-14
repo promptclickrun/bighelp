@@ -591,7 +591,7 @@ struct SessionsModelTests {
                     id: "active",
                     isActive: true,
                     workspaceID: "project-loopdy",
-                    workspaceName: "bighelp iOS"
+                    workspaceName: "Bighelp iOS"
                 ),
                 session(
                     id: "pinned",
@@ -604,13 +604,13 @@ struct SessionsModelTests {
                     id: "loopdy-new",
                     updatedAt: Self.fixtureDate.addingTimeInterval(-20),
                     workspaceID: "project-loopdy",
-                    workspaceName: "bighelp iOS"
+                    workspaceName: "Bighelp iOS"
                 ),
                 session(
                     id: "loopdy-old",
                     updatedAt: Self.fixtureDate.addingTimeInterval(-40),
                     workspaceID: "project-loopdy",
-                    workspaceName: "bighelp iOS"
+                    workspaceName: "Bighelp iOS"
                 ),
                 session(
                     id: "infra",
@@ -630,7 +630,7 @@ struct SessionsModelTests {
         let sections = model.filteredSections(organizeByProjects: true)
 
         #expect(sections.map(\.title) == [
-            "Active Chats", "Pinned", "bighelp iOS", "Hermes Infrastructure", "Unassigned",
+            "Active Chats", "Pinned", "Bighelp iOS", "Hermes Infrastructure", "Unassigned",
         ])
         #expect(sections.map { $0.sessions.map(\.id) } == [
             ["active"],

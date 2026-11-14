@@ -613,8 +613,8 @@ struct ImageDraftReviewSheet: View {
         } footer: {
             if let options, options.access != .granted {
                 Text(options.access == .notDetermined
-                     ? (isContact ? "To list your accounts, bighelp asks iOS for Contacts access once. You don't need it to save."
-                                  : "To list your calendars, bighelp asks iOS for Calendar access once. You don't need it to save.")
+                     ? (isContact ? "To list your accounts, Bighelp asks iOS for Contacts access once. You don't need it to save."
+                                  : "To list your calendars, Bighelp asks iOS for Calendar access once. You don't need it to save.")
                      : (isContact ? "Save opens Contacts' own New Contact screen, filled in. Its Done saves it."
                                   : "Save opens Calendar's own New Event screen, filled in, with its own calendar choice. Its Add saves it."))
                     .font(.bighelp(.footnote))
@@ -662,8 +662,8 @@ struct ImageDraftReviewSheet: View {
             } header: {
                 AgentStudioCaption(isContact ? "Already in Contacts?" : "Already in Calendar?")
             } footer: {
-                Text(isContact ? "Save adds a new contact. bighelp never changes or merges the one you have."
-                               : "Save adds a new event. bighelp never changes the one you have.")
+                Text(isContact ? "Save adds a new contact. Bighelp never changes or merges the one you have."
+                               : "Save adds a new event. Bighelp never changes the one you have.")
                     .font(.bighelp(.footnote))
                     .foregroundStyle(theme.secondaryText)
             }
@@ -672,8 +672,8 @@ struct ImageDraftReviewSheet: View {
         case .cannotCheck?:
             Section {
             } footer: {
-                Text(isContact ? "Without Contacts access, bighelp can't check whether this person is already saved."
-                               : "Without Calendar access, bighelp can't check whether this event is already saved.")
+                Text(isContact ? "Without Contacts access, Bighelp can't check whether this person is already saved."
+                               : "Without Calendar access, Bighelp can't check whether this event is already saved.")
                     .font(.bighelp(.footnote))
                     .foregroundStyle(theme.secondaryText)
             }

@@ -69,7 +69,7 @@ struct LiveVoiceFailureRecoveryTests {
             == "Codex sign-in on your computer didn't work. Run `hermes auth add openai-codex` there, then try again.")
         // A multi-profile host that can't read the agent's own sign-in (#14).
         #expect(LiveVoiceModel.safeMessage(WorkspaceClientError.rejected(code: "voice_provider_credentials_unavailable"))
-            == "bighelp couldn't read this bot's Codex sign-in on your computer. Update the bighelp plugin and restart Hermes, then try again.")
+            == "Bighelp couldn't read this bot's Codex sign-in on your computer. Update the Bighelp plugin and restart Hermes, then try again.")
         #expect(LiveVoiceModel.safeMessage(WorkspaceClientError.rejected(code: "voice_provider_setup_timeout"))
             == "Codex took too long to start the call. Try again.")
         #expect(LiveVoiceModel.safeMessage(WorkspaceClientError.rejected(code: "voice_provider_failed"))

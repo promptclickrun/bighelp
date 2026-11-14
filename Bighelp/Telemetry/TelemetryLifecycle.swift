@@ -44,7 +44,7 @@ final class TelemetryLifecycle {
     private func sendBeforeSuspending() {
         guard Telemetry.isRecording else { return }
         endBackgroundTask()
-        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "bighelp usage") {
+        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Bighelp usage") {
             MainActor.assumeIsolated { TelemetryLifecycle.shared.endBackgroundTask() }
         }
         Task { @MainActor in

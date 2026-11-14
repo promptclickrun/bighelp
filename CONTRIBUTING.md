@@ -11,7 +11,9 @@ sections below describe legacy compatibility code, not a selectable chat path.
 1. Read [Architecture](docs/ARCHITECTURE.md).
 2. For security-sensitive work, follow [SECURITY.md](SECURITY.md) instead of
    opening a public issue.
-3. Keep changes focused and include tests for changed behavior.
+3. Keep each change focused and include tests for changed behavior. When you
+   have several related fixes, send them as one pull request that closes all
+   their issues: every pull request costs a full build and test run on a Mac.
 4. For chat, composer, card, theme, or chat-persistence work, read the
    [Chat interaction contract](docs/CHAT_INTERACTION_CONTRACT.md) and use its
    [regression recipe](docs/DEVELOPMENT.md#chat-regression-checks).

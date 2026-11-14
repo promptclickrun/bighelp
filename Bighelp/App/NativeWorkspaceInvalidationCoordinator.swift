@@ -274,12 +274,23 @@ final class NativeWorkspaceInvalidationCoordinator {
     private let now: @MainActor () -> ContinuousClock.Instant
     private let sleep: @MainActor (Duration) async -> Void
     private var lastSessionsRefreshEnded: ContinuousClock.Instant?
+    private var lastSessionsRefreshTook: Duration = .zero
 
     /// A host running scheduled tasks says `sessions.changed` after every run, every few seconds
     /// when many are due. One refresh per gap folds such a burst into one list read.
-    // atalho: 5 s is a guess until measured on a host with thousands of scheduled runs (#492);
-    // raise it if that host still refreshes back to back, lower it if the list lags behind.
     static let scheduledRunsRefreshGap: Duration = .seconds(5)
+
+    /// Measured on a host with 6,900 chats (#996): one list read is 69 pages and over a second
+    /// of main-thread work, so a read every 5 s was most of what the app did. The app rests
+    /// this many times as long as the last read took before the next one, up to
+    /// `longestSessionsRefreshGap`. A short list reads in well under a second and keeps the 5 s.
+    static let sessionsRefreshRestFactor = 5
+    static let longestSessionsRefreshGap: Duration = .seconds(30)
+
+    private var sessionsRefreshGap: Duration {
+        max(minimumSessionsRefreshGap,
+            min(lastSessionsRefreshTook * Self.sessionsRefreshRestFactor, Self.longestSessionsRefreshGap))
+    }
 
     init(
         currentSource: @escaping @MainActor () -> NativeWorkspaceEventSource?,
@@ -330,6 +341,7 @@ final class NativeWorkspaceInvalidationCoordinator {
         pendingRefreshes.removeAll(keepingCapacity: false)
         resumeFlights.removeAll(keepingCapacity: false)
         lastSessionsRefreshEnded = nil
+        lastSessionsRefreshTook = .zero
         source = nil
     }
 
@@ -358,16 +370,18 @@ final class NativeWorkspaceInvalidationCoordinator {
             switch refresh {
             case .sessions:
                 if let ended = lastSessionsRefreshEnded {
-                    let wait = minimumSessionsRefreshGap - (now() - ended)
+                    let wait = sessionsRefreshGap - (now() - ended)
                     if wait > .zero { await sleep(wait) }
                     guard generation == token, source == incoming, currentSource() == incoming, !Task.isCancelled else { return }
                 }
                 // This read covers changes received during the cooldown. Only changes
                 // arriving after it starts need a trailing read.
                 pendingRefreshes.remove(refresh)
+                let started = now()
                 await refreshSessions(incoming)
                 guard generation == token, source == incoming, currentSource() == incoming, !Task.isCancelled else { return }
                 lastSessionsRefreshEnded = now()
+                lastSessionsRefreshTook = now() - started
             case .scheduledTasks:
                 // Management reads have their own flight so a session cooldown cannot delay them.
                 pendingRefreshes.remove(refresh)

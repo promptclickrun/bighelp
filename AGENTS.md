@@ -823,6 +823,18 @@ Code mode.
     (`BighelpTheme.resolve`), the model summary's reasoning options.
   - A reply that lands is saved with `SessionCatalogStore.checkpointNow()`, which encodes off the main thread;
     `flushPersistence` is for leaving the app or the chat.
+- **A computer can list thousands of chats:** one that runs scheduled tasks lists a chat for each run (6,900 on
+  the host behind #996). Nothing done at a save, a list read or a draw may cost a file, or a walk of the list, for
+  each chat. Measure with that many (`SessionCatalogLargeWorkspaceTests`, a seeded host):
+  - A save writes only what changed. Chats with nothing in them share one content revision
+    (`SessionContentRepository.emptyContentRevision`), and a loaded chat is known unchanged from what the last
+    save wrote for it, not from the six-entry cache. On the first run after an install every chat is loaded and
+    empty: each save once wrote a file for each, on the main thread, until the watchdog ended the app.
+  - The list of chats is one file, written whole. Automatic saves wait in step with its size
+    (`SessionCatalogStore.checkpointDelay`), and a list read rests in step with how long the last one took
+    (`NativeWorkspaceInvalidationCoordinator.sessionsRefreshRestFactor`). A send, a reply that lands and leaving
+    the app save at once.
+  - `recentSummaries` is kept until the records change; many screens read it as they draw.
 - **Kept chat rows:** a message row costs more than a 120 Hz frame to build, so the timeline keeps the 40 built
   rows nearest the screen by ID (`ChatTimelineBuiltRows`), never recycles a cell for another row, and builds the
   24 rows above while the chat is still. Cells host SwiftUI as a plain subview (`ChatTimelineCell`), not as their

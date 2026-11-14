@@ -84,6 +84,28 @@ struct NativeInvalidationAndReactionTests {
         #expect(clock.waits == [.seconds(5)])
     }
 
+    /// A list of thousands of chats takes seconds to read. The next read waits in step with that.
+    @Test(.timeLimit(.minutes(1)))
+    func aSlowListReadRestsLongerBeforeTheNextOne() async throws {
+        let source = try makeSource()
+        let clock = InvalidationTestClock()
+        var refreshes = 0
+        let coordinator = NativeWorkspaceInvalidationCoordinator(currentSource: { source }, refreshSessions: { _ in
+            refreshes += 1
+            clock.now += .seconds(4)
+        }, refreshScheduledTasks: { _ in }, publish: { _, _ in },
+            minimumSessionsRefreshGap: .seconds(5), now: { clock.now }, sleep: { await clock.sleep($0) })
+        defer { coordinator.suspend(); clock.releaseAll() }
+        let event = try change("sessions.changed")
+        #expect(coordinator.receive(event, source: source))
+        try await waitUntil { refreshes == 1 }
+        #expect(coordinator.receive(event, source: source))
+        try await waitUntil { clock.waits.count == 1 }
+        #expect(clock.waits == [.seconds(20)], "Five times the four seconds the read took.")
+        clock.advanceAndRelease(.seconds(20))
+        try await waitUntil { refreshes == 2 }
+    }
+
     @Test(arguments: [false, true])
     func aRetiredRefreshCannotSetTheNextConnectionsCooldown(switchHost: Bool) async throws {
         let first = try makeSource()

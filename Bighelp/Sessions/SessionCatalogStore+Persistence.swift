@@ -6,12 +6,25 @@ extension SessionCatalogStore {
         guard repository != nil, persistenceCheckpointTask == nil else { return }
         let id = UUID()
         persistenceCheckpointID = id
-        let delay = persistenceCheckpointDelay
+        let delay = checkpointDelay
         persistenceCheckpointTask = Task { [weak self] in
             do { try await Task.sleep(for: delay) } catch { return }
             await self?.writePersistenceCheckpoint(id: id)
         }
     }
+
+    /// How long changes wait for the next automatic save. The list of chats is written whole,
+    /// and for thousands of chats that is megabytes: on a computer that reports a change every
+    /// few seconds, a save every two seconds wrote a gigabyte within minutes. So the wait grows
+    /// with the size of the last save. A send, a reply that lands and leaving the app still
+    /// save at once.
+    var checkpointDelay: Duration {
+        let paced = Duration.seconds(Double(repository?.lastSaveByteCount ?? 0) / Self.checkpointBytesPerSecond)
+        return max(persistenceCheckpointDelay, min(paced, Self.longestCheckpointDelay))
+    }
+
+    static let checkpointBytesPerSecond: Double = 256 * 1024
+    static let longestCheckpointDelay: Duration = .seconds(30)
 
     /// Saves at once without holding the main thread for the encoding. For the moment a reply
     /// lands: saving every chat there and then (`flushPersistence`) stalled the chat on screen just

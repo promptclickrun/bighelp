@@ -939,7 +939,12 @@ sections can crash only on devices ("Thread stack size exceeded").
   (`splitColumnWidth`), and what it opens is pushed on the app's one stack beside it, so `path`, the active chat
   and every top-of-stack rule work as on iPhone. The list is the shell's own view, drawn again from its stores
   (`BighelpLiveColumn`); the stack's root shows `BighelpSplitPlaceholder` instead of a second copy of the list.
-- Upright with the fold active (`isLaptop`): `ChatView` keeps everything under the fold for the message box.
+- Upright with the fold active (`isLaptop`): `ChatView` keeps everything under the fold for the message box. Under
+  the box, a chat with one bot shows the bot's face, what it's doing, New chat and Bot page (`ChatLaptopDesk`).
+  Typing, a blank New chat and a group chat keep that half clear.
+- The app draws no island of its own on the Duo (`AgentIslandAvailability`): the camera and the status are in the
+  trailing column, so nothing is across the top to cover. The connection pill and the drive overlay take their
+  places for a phone without an island there.
 - The Duo's simulator needs the iOS 27.1 runtime and starts folded; tests can't open or fold it, and DeviceHub's
   controls don't take scripted clicks. `-bighelp.debug.screen-posture` and `-bighelp.debug.fold-halfway` show the
   open and half-folded layouts on an iPad simulator (`DuoLayoutUITests`).

@@ -149,13 +149,30 @@ final class DuoLayoutUITests: BighelpUITestCase {
             let window = app.windows.firstMatch.frame
             XCTAssertGreaterThan(field.frame.minY, window.midY, "The message box sits under the fold")
             XCTAssertLessThan(field.frame.minY, window.midY + 120, "Just under it")
+            // The half under the fold is a desk: the bot and what it's doing, then New chat and Bot
+            // page, under the message box.
+            XCTAssertTrue(element("chat.laptop.desk", in: app).waitForExistence(timeout: 5),
+                          "The half under the fold carries the desk")
+            XCTAssertEqual(element("chat.laptop.status", in: app).label, "Avery Park, Here for you",
+                           "It says who the bot is and what it's doing, once")
+            for id in ["chat.laptop.new-chat", "chat.laptop.bot-page"] {
+                let button = app.buttons[id]
+                XCTAssertTrue(button.waitForExistence(timeout: 5), "\(id) is in reach under the fold")
+                XCTAssertGreaterThan(button.frame.minY, field.frame.maxY, "\(id) sits under the message box")
+                XCTAssertLessThan(button.frame.maxY, window.maxY, "\(id) is on screen")
+            }
             sleep(1)
             save("laptop-chat-\(appearance)", app)
             if appearance == "light" {
                 field.tap()
                 XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
                 XCTAssertGreaterThan(field.frame.minY, window.midY, "Typing, it rests on the keyboard, still under the fold")
+                XCTAssertFalse(element("chat.laptop.desk", in: app).exists, "Typing, the desk gets out of the way")
                 save("laptop-typing-light", app)
+            } else {
+                app.buttons["chat.laptop.bot-page"].tap()
+                XCTAssertTrue(app.buttons["simple-bots.profile.more"].waitForExistence(timeout: 10),
+                              "Bot page opens the bot's page")
             }
             app.terminate()
         }

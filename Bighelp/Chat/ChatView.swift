@@ -546,19 +546,31 @@ struct ChatView: View {
                     // and the bar keep their own height.
                     Spacer(minLength: headerHeight).layoutPriority(laptopDeckHeight > 0 ? 1 : 0)
                     VStack(spacing: 0) {
-                        // Half-folded like a laptop: everything under the fold is the message box's.
-                        // Typing, it rests on the keyboard; otherwise it sits just under the fold.
+                        // Half-folded like a laptop, the half under the fold is the desk: the message box
+                        // sits just under the fold, and the bot with what it's doing fills the rest
+                        // (`ChatLaptopDesk`). Typing, the box rests on the keyboard instead.
                         if laptopDeckHeight > 0, isDraftFocused { Spacer(minLength: 0) }
                         composer
                             .fixedSize(horizontal: false, vertical: !(referenceHub ?? fallbackReferenceHub).isPresented)
                             #if targetEnvironment(macCatalyst)
                             .popover(isPresented: sessionControlsPresented(from: .composer)) { macSessionControls }
                             #endif
-                        if laptopDeckHeight > 0, !isDraftFocused { Spacer(minLength: 0) }
+                        if laptopDeckHeight > 0, !isDraftFocused {
+                            if showsLaptopDesk {
+                                ChatLaptopDesk(model: model, agentID: homeAgentID, name: agentName,
+                                               imageURL: resolvedIdentityParticipants.first?.imageURL,
+                                               onNewChat: onNewChatTap,
+                                               onBotPage: { homeChrome.onProfile(homeAgentID) })
+                                    .frame(maxHeight: .infinity, alignment: .top)
+                            } else {
+                                Spacer(minLength: 0)
+                            }
+                        }
                         newChatChoices
                     }
-                    // The messages stop at the fold: the timeline keeps clear of all of this.
-                    .frame(minHeight: laptopDeckHeight)
+                    // The messages stop at the fold: the timeline keeps clear of all of this, and the
+                    // message box starts at the fold itself.
+                    .frame(minHeight: laptopDeckHeight, alignment: .top)
                     // The Skills and commands list takes the room under the header before the spacer
                     // does. Offered an equal share, a long list showed about two rows.
                     .layoutPriority((referenceHub ?? fallbackReferenceHub).isPresented && laptopDeckHeight == 0 ? 1 : 0)
@@ -590,6 +602,12 @@ struct ChatView: View {
     private var laptopDeckHeight: CGFloat {
         guard screen.isLaptop, let fold = screen.fold else { return 0 }
         return max(0, safeBottomInWindow - fold.maxY)
+    }
+
+    /// The desk shows for a chat with one bot that the shell pushed. A blank New chat keeps its To
+    /// row, people list and choices, and a group chat has no one bot to show.
+    private var showsLaptopDesk: Bool {
+        homeChrome.isPushedChat && !model.isBotMode && newChat == nil
     }
 
     /// One home: the bots to pick from, over a new chat's empty messages until something is sent.

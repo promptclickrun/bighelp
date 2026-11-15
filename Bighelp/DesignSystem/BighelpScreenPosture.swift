@@ -142,6 +142,7 @@ struct BighelpScreenPostureReader: ViewModifier {
     static func geometry(_ measured: Measured, horizontal: UserInterfaceSizeClass?,
                          vertical: UserInterfaceSizeClass?) -> BighelpScreenGeometry {
         var measured = measured
+        if BighelpScreenDebug.withholdsOcclusion { measured.occlusion = nil }
         let posture = BighelpScreenDebug.posture ?? BighelpScreenPosture.classify(
             isPhone: BighelpScreenPosture.isPhone, horizontal: horizontal, vertical: vertical, size: measured.size)
         let isLandscape = measured.size.width > measured.size.height
@@ -204,6 +205,16 @@ enum BighelpScreenDebug {
         UserDefaults.standard.string(forKey: "bighelp.debug.screen-posture").flatMap(BighelpScreenPosture.init(rawValue:))
         #else
         nil
+        #endif
+    }
+
+    /// A screen whose system reports no camera and status area, which the system's API allows:
+    /// `-bighelp.debug.no-occlusion YES`. The system's column itself stays.
+    static var withholdsOcclusion: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "bighelp.debug.no-occlusion")
+        #else
+        false
         #endif
     }
 

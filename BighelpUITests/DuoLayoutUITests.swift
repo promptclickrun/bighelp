@@ -131,6 +131,58 @@ final class DuoLayoutUITests: BighelpUITestCase {
         }
     }
 
+    /// The system says where the camera and the status end in its column, and its API may say
+    /// nothing. A chat's column (work in another chat, then the chats' faces) must then start where
+    /// it starts with the report, never under the status.
+    @MainActor
+    func testCoverScreenChatColumnStaysUnderTheStatusWithNoReportOfItsEnd() throws {
+        let reported = try chatColumn(appearance: "light", withholdsStatusArea: false, saveAs: nil)
+        print("DUO-COLUMN reported pill=\(reported.pill) switcher=\(reported.switcher)")
+        var withheld: [(appearance: String, pill: CGRect, switcher: CGRect)] = []
+        // Both pictures first, so a failure still leaves light and dark to look at.
+        for appearance in appearances {
+            let column = try chatColumn(appearance: appearance, withholdsStatusArea: true,
+                                        saveAs: "cover-chat-column-no-status-report-\(appearance)")
+            print("DUO-COLUMN withheld \(appearance) pill=\(column.pill) switcher=\(column.switcher)")
+            withheld.append((appearance, column.pill, column.switcher))
+        }
+        for column in withheld {
+            XCTAssertEqual(column.pill.minY, reported.pill.minY, accuracy: 1,
+                           "\(column.appearance): the pill starts under the status, as with the report")
+            XCTAssertEqual(column.switcher.minY, reported.switcher.minY, accuracy: 1,
+                           "\(column.appearance): the chats' faces start where they do with the report")
+            XCTAssertEqual(column.pill.midX, reported.pill.midX, accuracy: 1, "\(column.appearance): in the same column")
+        }
+    }
+
+    /// A chat's side column with work in another chat: Avery starts a turn that really runs, then
+    /// Mina's chat opens from the list, so getting there never depends on the column under test.
+    /// Returns where the pill and the chats' faces are.
+    @MainActor
+    private func chatColumn(appearance: String, withholdsStatusArea: Bool,
+                            saveAs name: String?) throws -> (pill: CGRect, switcher: CGRect) {
+        let app = makeApp()
+        app.launchArguments = demo + ["-start-chat", "-test-tool-stream", "-test-tool-stream-hold", "90",
+                                      "-loopdy.demo.appearance", appearance]
+            + (withholdsStatusArea ? ["-bighelp.debug.no-occlusion", "YES"] : [])
+        app.launch()
+        defer { app.terminate() }
+        try requireCoverScreen(app)
+        _ = send("Check the March budget", in: app)
+        app.buttons["chat.back"].firstMatch.tap()
+        let mina = app.buttons.matching(NSPredicate(format: "identifier ENDSWITH %@", "demo-travel")).firstMatch
+        XCTAssertTrue(mina.waitForExistence(timeout: 10), "The list has Mina's chat")
+        mina.tap()
+        XCTAssertTrue(waitForLabel("Mina Shah", of: app.buttons["chat.identity"].firstMatch), "Mina's chat opens")
+        let pill = app.buttons["chat.working-elsewhere"].firstMatch
+        XCTAssertTrue(pill.waitForExistence(timeout: 10), "The column says Avery works in another chat")
+        let switcher = element("chat-switcher", in: app)
+        XCTAssertTrue(switcher.exists, "The chats' faces are under it")
+        sleep(1)
+        if let name { save(name, app) }
+        return (pill.frame, switcher.frame)
+    }
+
     @MainActor
     func testIPadBotSwitcherStaysBelowStatusBar() throws {
         XCUIDevice.shared.orientation = .landscapeLeft

@@ -3,6 +3,24 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.91
+
+### New
+
+- **Heavyweight, a new look for Thinking:** the Thinking control has a new look with the lifter. He holds a box that becomes larger as the level goes up, and the box shows the name of the level. Above Medium he shakes, and he shakes more at each higher level. At the lowest level he puts the box down. Heavyweight is the look that you get if you picked none. A look that you picked does not change. Go to Settings › Appearance › Thinking to see all the looks.
+- **Videos from Photo Library:** in a chat, tap + and then Photo Library. You can now select videos as well as photos. A video over 8 MB goes in pieces, as a big file does.
+
+### Changed
+
+- **Text size of messages:** chat messages now have the same text size as the other text in the app. Before, they were one step smaller. A size that you picked does not change. Go to Settings › Appearance › Chat layout to change it.
+- **Today shows only open items:** the Feed, Ideas and Goals panel on Today now shows only the items that are still open. The All bots list behind See all does the same. A completed goal, an idea that you started and a post that you cleared are on the board of their bot.
+
+### Fixed
+
+- **Big files:** while Bighelp is open, a big file now goes directly to your computer, at the speed of your connection. Before, iOS decided when each piece went, and a file of 50 MB could take some minutes. When you leave the app, iOS continues to send the file as before.
+- **Try again on a big file:** when your computer has a file, Try again on its message does not send the file again.
+- **Live voice:** a live voice call now shows that it connected up to 1 second sooner.
+
 ## 2.6.90
 
 ### Fixed

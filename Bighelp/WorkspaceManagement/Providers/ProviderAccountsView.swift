@@ -15,6 +15,14 @@ final class ProviderAccountsStore {
     private(set) var operationTitle: String?
     private(set) var errorMessage: String?
     private(set) var successMessage: String?
+    /// How the last Refresh model lists went. It shows under that button, which is at the end of the
+    /// page: the messages above show at the top, out of sight from there. Any other action clears it.
+    private(set) var catalogRefresh: CatalogRefresh?
+
+    enum CatalogRefresh: Equatable {
+        case working, done
+        case failed(String)
+    }
     private(set) var isRetired = false
     /// Accounts only a terminal on the host signs in to, run by the plugin with the provider's own tool.
     let hostSignIn: ProviderHostSignInStore?
@@ -124,6 +132,7 @@ final class ProviderAccountsStore {
         operationTitle = nil
         errorMessage = nil
         successMessage = nil
+        catalogRefresh = nil
     }
 
     func clearCredentialValidation() { credentialValidation = nil }
@@ -327,15 +336,20 @@ final class ProviderAccountsStore {
     /// pickers list models a provider added since Hermes last looked.
     func refreshModelCatalogs() async {
         guard begin("Refreshing model catalogs") else { return }
+        catalogRefresh = .working
         defer { finish() }
         do {
             _ = try await client.listProviders(profileID: profileID, refresh: true)
             guard ownsScope else { return }
-            try await reloadAfterMutation(message: "Hermes refreshed every provider's model catalog.")
+            try await reloadAfterMutation(message: "")
+            // Said under the button, not at the top of the page.
+            successMessage = nil
+            catalogRefresh = .done
         } catch is CancellationError {
+            catalogRefresh = nil
         } catch {
             guard ownsScope else { return }
-            errorMessage = Self.message(error)
+            catalogRefresh = .failed(Self.message(error))
         }
     }
 
@@ -533,6 +547,7 @@ final class ProviderAccountsStore {
         operationTitle = title
         errorMessage = nil
         successMessage = nil
+        catalogRefresh = nil
         return true
     }
 
@@ -788,6 +803,19 @@ struct ProviderAccountsView: View {
                 .accessibilityIdentifier("providers.refresh-model-catalogs")
         } header: {
             Text("Advanced")
+        } footer: {
+            // The result, beside the button that asked for it: the page's own messages are at its top.
+            if let refresh = store.catalogRefresh {
+                Group {
+                    switch refresh {
+                    case .working: Text("Refreshing the model lists…")
+                    case .done: Label("Hermes refreshed every provider's model list.", systemImage: "checkmark.circle")
+                    case .failed(let message): Label(message, systemImage: "exclamationmark.triangle")
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("providers.refresh-model-catalogs.result")
+            }
         }
     }
 

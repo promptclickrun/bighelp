@@ -30,7 +30,7 @@ struct ChatLayoutPreferencesTests {
         #expect(ChatTextSize(rawValue: 2) == .larger)
     }
 
-    @Test func messagesStartOneStepSmallerButASavedSizeStays() throws {
+    @Test func messagesStartAtTheAppsTextSizeAndASavedSizeStays() throws {
         let suite = "bighelp.tests.chat-text-size.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -38,11 +38,11 @@ struct ChatLayoutPreferencesTests {
             AppStorage(wrappedValue: ChatTextSize.defaultSize, ChatLayoutPreferences.textSizeKey, store: defaults).wrappedValue
         }
 
-        #expect(ChatTextSize.defaultSize == .small)
-        #expect(current() == .small)
-        // Someone who picked the old default keeps it.
-        defaults.set(ChatTextSize.standard.rawValue, forKey: ChatLayoutPreferences.textSizeKey)
+        #expect(ChatTextSize.defaultSize == .standard)
         #expect(current() == .standard)
+        // Someone who picked Small, the default before, keeps it.
+        defaults.set(ChatTextSize.small.rawValue, forKey: ChatLayoutPreferences.textSizeKey)
+        #expect(current() == .small)
         defaults.set(ChatTextSize.larger.rawValue, forKey: ChatLayoutPreferences.textSizeKey)
         #expect(current() == .larger)
     }
@@ -172,14 +172,13 @@ struct ChatLayoutPreferencesTests {
         #expect(Set(factors).count == factors.count)
     }
 
-    /// Chat messages size on top of the app's text size, so they get one step
-    /// smaller from the app's default alone, not two.
-    @Test func defaultMessageTextIsOneStepSmaller() throws {
+    /// Chat messages size on top of the app's text size and, out of the box, add
+    /// nothing to it: they are one step under the iPhone's own size, as the app is.
+    @Test func defaultMessageTextIsTheAppsTextSize() throws {
         let (defaults, suite) = try freshDefaults()
         defer { defaults.removePersistentDomain(forName: suite) }
 
         let typeSize = BighelpInterfaceSize(defaults: defaults, isMac: false).dynamicTypeSize(onTopOf: .large)
-        #expect(ChatTextSize.defaultSize == .small)
         let style = ChatNativeMarkdownStyle(
             primaryText: .label, secondaryText: .secondaryLabel, accent: .systemBlue,
             codeBackground: .secondarySystemBackground, proseLineSpacing: 5,
@@ -187,8 +186,8 @@ struct ChatLayoutPreferencesTests {
             textScale: ChatTextSize.defaultSize.scale)
         let rendered = ChatNativeMarkdownAttributedBuilder.build(document: MarkdownDocument("Hello"), style: style)
         let font = try #require(rendered.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)
-        // 16pt before #729, on an iPhone at its own default text size.
-        #expect(font.pointSize == 15)
+        // The app's body size on an iPhone at its own default text size (17pt there).
+        #expect(font.pointSize == 16)
     }
 
     private func freshDefaults() throws -> (UserDefaults, String) {

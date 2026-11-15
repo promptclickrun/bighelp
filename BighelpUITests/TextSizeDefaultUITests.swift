@@ -92,8 +92,8 @@ final class TextSizeDefaultUITests: BighelpUITestCase {
         chatLayout.tap()
         let messageSize = app.sliders["chat-layout.text-size"].firstMatch
         XCTAssertTrue(messageSize.waitForExistence(timeout: 5))
-        // Messages size on top of the app's text size, so their own default stays.
-        XCTAssertEqual(messageSize.value as? String, "Small")
+        // Messages size on top of the app's text size and, out of the box, add nothing to it.
+        XCTAssertEqual(messageSize.value as? String, "Medium")
         capture("\(name)-chat-layout-\(appearance)", in: app)
     }
 

@@ -99,6 +99,61 @@ final class DuoLayoutUITests: BighelpUITestCase {
         }
     }
 
+    /// The Duo has no island to widen, so the working agent rides at the top of the side column,
+    /// under the camera and above the chats' faces, and a tap opens the chat it is working in.
+    @MainActor
+    func testCoverScreenShowsTheWorkingAgentInTheColumn() throws {
+        for appearance in appearances {
+            let app = makeApp()
+            app.launchArguments = demo + ["-loopdy.home.landing", "bots", "-test-bot-activity",
+                                          "-test-island-activity", "coding",
+                                          "-loopdy.demo.appearance", appearance]
+            app.launch()
+            try requireCoverScreen(app)
+            let mina = app.buttons["simple-bots.bot.travel"]
+            XCTAssertTrue(mina.waitForExistence(timeout: 20))
+            mina.tap()
+            let identity = app.buttons["chat.identity"]
+            XCTAssertTrue(identity.waitForExistence(timeout: 10))
+            XCTAssertEqual(identity.label, "Mina Shah", "Mina's chat is the open one")
+            // The demo's home agent is working elsewhere: a face and its line, not the app's island.
+            let pill = element("strip.agent", in: app)
+            XCTAssertTrue(pill.waitForExistence(timeout: 10), "The working agent sits in the column")
+            XCTAssertEqual(pill.label, "Avery Park, Writing code", "It says who is working and what they are doing")
+            let window = app.windows.firstMatch.frame
+            XCTAssertGreaterThan(pill.frame.minX, window.maxX - 90, "In the side column")
+            XCTAssertGreaterThan(pill.frame.minY, window.minY + 40, "Under the camera and the status")
+            let switcher = element("chat-switcher", in: app)
+            if switcher.exists {
+                XCTAssertLessThanOrEqual(pill.frame.maxY, switcher.frame.minY,
+                                         "The agent sits above the chats' faces")
+                XCTAssertLessThan(abs(pill.frame.midX - switcher.frame.midX), 4, "In the same column")
+            }
+            sleep(1)
+            save("cover-strip-agent-\(appearance)", app)
+            if appearance == "light" {
+                pill.tap()
+                XCTAssertTrue(identity.waitForLabel("Avery Park", timeout: 10),
+                              "A tap opens the chat where it is working")
+                save("cover-strip-agent-opens-chat-light", app)
+            }
+            app.terminate()
+        }
+    }
+
+    /// Nothing is drawn there while the agent rests, so the column costs nothing then.
+    @MainActor
+    func testCoverScreenLeavesTheColumnToTheChatsWhileTheAgentRests() throws {
+        let app = makeApp()
+        app.launchArguments = demo + ["-start-chat", "-loopdy.demo.appearance", "light"]
+        app.launch()
+        try requireCoverScreen(app)
+        XCTAssertTrue(element("chat.composer.field", in: app).waitForExistence(timeout: 20), "The chat opens")
+        XCTAssertFalse(element("strip.agent", in: app).exists, "Nobody is working: no face in the column")
+        save("cover-strip-idle-light", app)
+        app.terminate()
+    }
+
     // MARK: Open and half-folded (an iPad simulator standing in)
 
     @MainActor
@@ -240,6 +295,16 @@ private extension XCUIElement {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if exists, isSelected { return true }
+            usleep(200_000)
+        }
+        return false
+    }
+
+    /// Waits for a new label (a chat's header naming another agent).
+    func waitForLabel(_ label: String, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if exists, self.label == label { return true }
             usleep(200_000)
         }
         return false

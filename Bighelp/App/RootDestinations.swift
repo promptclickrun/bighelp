@@ -109,6 +109,9 @@ extension RootShellView {
             let switcher = chatSwitcherColumn(for: conversationID,
                                               agentID: model.memberIDs.count == 1 ? model.memberIDs.first : nil)
             let newChat = newChatSlot(forChat: conversationID, model: model)
+            // The Duo's column under the camera: who is working (the island has nothing to widen
+            // into there), then the chats beside this one.
+            let showsWorkingAgent = screen.posture == .cover
             ChatDestinationView(
                 model: model,
                 appState: appState,
@@ -150,7 +153,17 @@ extension RootShellView {
             .environment(\.agentHomeChrome, .pushedChat(onProfile: { openBotPage(fromChat: $0) }))
             .environment(\.chatDissolveTransition, chatDissolve)
             .environment(connectionKeeper)
-            .bighelpSideColumn(screen, isShown: switcher != nil) { switcher }
+            .bighelpSideColumn(screen, isShown: switcher != nil || showsWorkingAgent) {
+                VStack(spacing: BighelpTokens.space12) {
+                    if showsWorkingAgent {
+                        AgentStripWorking(working: { workingAgentActivity },
+                                          open: { openWorkingChat($0) })
+                    }
+                    if let switcher {
+                        switcher
+                    }
+                }
+            }
         case (.scheduledTasks, .scheduledTasks(let store)?):
             ScheduledTasksView(store: store, agents: agents, onOpen: openScheduledTask)
         case (.scheduledTask(let id, let agentID), .scheduledTasks(let store)?):

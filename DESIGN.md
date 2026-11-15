@@ -202,9 +202,12 @@ The expanded Dynamic Island shows three rows, while the compact island keeps a q
 The iPhone Duo follows how it's held (`BighelpScreenPosture`). Folded, the cover screen is wide and short, with the
 camera and status in a column on its trailing edge: the places go down that column as iOS's own toolbar items
 (`HomeStripTabs`), under the screen's own buttons, which iOS moves there too, so chats get their height back, and
-a chat's column holds the chat switcher instead (`BighelpChatSwitcher`: the bots on top of the Bots view, or a coding
-session's other sessions, each with its live state; Settings › Chat › Chat switcher, on by default there and opt-in on
-iPad and Mac in landscape). Open and held wide, the first tab's list (the Bots view or the Chats view) sits left of the
+a chat's column holds the working agent at its top, under the camera — its face acting out the work with a line
+naming it, a tap opens the chat, and nothing at all while it rests, where the Dynamic Island would say it on a
+phone that has one (`AgentStripPill`) — then the chat switcher (`BighelpChatSwitcher`: the bots on top of the Bots
+view, or a coding session's other sessions, each with its live state; Settings › Chat › Chat switcher, on by
+default there and opt-in on iPad and Mac in landscape). Open and held wide, the first tab's list (the Bots view or
+the Chats view) sits left of the
 fold and what it opens sits right of it, like a book (`BighelpSplitColumn`); nothing crosses the fold. Held upright
 it's a big phone, never the cover screen's layout, and half-folded like a small laptop a chat keeps its messages
 above the fold and its message box and keyboard below it. Half of the open screen in iOS's Split View gets the cover

@@ -18,10 +18,12 @@ extension RootShellView {
         return .idle
     }
 
-    /// Who the island shows: the open chat's agent while it works, else the
-    /// home agent's latest direct chat.
-    var islandActivity: AgentIslandActivity? {
-        guard settings.agentIslandEnabled else { return nil }
+    /// Who is working right now: the open chat's agent while it works, else the
+    /// home agent's latest direct chat. Nil when nobody is.
+    ///
+    /// The island shows this when it is turned on. The Duo has no island to turn on, and its side
+    /// strip is where the same answer goes, so the setting is applied by `islandActivity`, not here.
+    var workingAgentActivity: AgentIslandActivity? {
         #if DEBUG
         // "-test-island-activity coding": the home agent looks busy, for screenshots.
         let arguments = ProcessInfo.processInfo.arguments
@@ -45,9 +47,15 @@ extension RootShellView {
                                    imageURL: agents.avatarURL(for: agent), kind: kind)
     }
 
-    /// Touch and hold the island: go to the chat that is working.
-    func openIslandChat() {
-        guard let activity = agentIsland?.activity else { return }
+    /// The island's copy: the same answer, only while Settings › Chat › Agent in the Dynamic Island
+    /// is on (the strip has no island to be on or off).
+    var islandActivity: AgentIslandActivity? {
+        guard settings.agentIslandEnabled else { return nil }
+        return workingAgentActivity
+    }
+
+    /// Go to the chat that is working: the island and the Duo's strip both lead there.
+    func openWorkingChat(_ activity: AgentIslandActivity) {
         if case .chat(let id)? = appState.path.last,
            featureStore.preparedChatModel(id: id)?.memberIDs.first == activity.agentID { return }
         if let working = sessionCatalog.recentSummaries(includeCronSessions: false).first(where: {
@@ -58,6 +66,12 @@ extension RootShellView {
         } else {
             openCanonicalAgentChat(activity.agentID)
         }
+    }
+
+    /// Touch and hold the island: go to the chat that is working.
+    func openIslandChat() {
+        guard let activity = agentIsland?.activity else { return }
+        openWorkingChat(activity)
     }
 
     /// The primary bot's own chat, pushed: an old Activity link, or an alert that names no chat

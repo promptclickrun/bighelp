@@ -180,10 +180,12 @@ struct SessionContentRepositoryTests {
         #expect(try reader.loadSession(id: record.id) == record)
         let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
             .filter { $0.pathExtension == "json" }
-        #expect(files.count == 2)
+        // The root, its one part, the chat's content, and the marker where the one-file list was.
+        #expect(files.count == 4)
         for file in files {
             let payload = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
-            #expect(payload["schemaVersion"] as? Int == 2)
+            let isMarker = file.lastPathComponent == "\(name)-catalog-v1.json"
+            #expect(payload["schemaVersion"] as? Int == (isMarker ? SessionContentRepository.retiredListSchemaVersion : 2))
         }
         let before = try Dictionary(uniqueKeysWithValues: files.map { ($0, try Data(contentsOf: $0)) })
         let legacyWriter = SessionContentRepository(directory: directory, name: name)

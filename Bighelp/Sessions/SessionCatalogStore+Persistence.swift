@@ -13,11 +13,12 @@ extension SessionCatalogStore {
         }
     }
 
-    /// How long changes wait for the next automatic save. The list of chats is written whole,
-    /// and for thousands of chats that is megabytes: on a computer that reports a change every
-    /// few seconds, a save every two seconds wrote a gigabyte within minutes. So the wait grows
-    /// with the size of the last save. A send, a reply that lands and leaving the app still
-    /// save at once.
+    /// How long changes wait for the next automatic save. A save that changes rows all over
+    /// the list (a list read on a computer with thousands of chats) writes megabytes: on a
+    /// computer that reports a change every few seconds, a save every two seconds wrote a
+    /// gigabyte within minutes. So the wait grows with the size of the last save; a save that
+    /// wrote one part of the list waits the least. A send, a reply that lands and leaving the
+    /// app still save at once.
     var checkpointDelay: Duration {
         let paced = Duration.seconds(Double(repository?.lastSaveByteCount ?? 0) / Self.checkpointBytesPerSecond)
         return max(persistenceCheckpointDelay, min(paced, Self.longestCheckpointDelay))

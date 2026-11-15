@@ -173,6 +173,19 @@ struct SessionListPartsTests {
         #expect(try SessionContentRepository(directory: directory).load().map(\.id) == chats.map(\.id))
     }
 
+    /// Saved lists name a row's part by this hash, so it must give the same answer in every build.
+    @Test func aChatsPartNeverChanges() {
+        #expect(SessionListParts.part(of: "session-7", among: 64) == 6)
+        #expect(SessionListParts.part(of: "open-chat", among: 64) == 44)
+        #expect(SessionListParts.part(of: "chat-👨‍👨‍👦", among: 256) == 92)
+        #expect(SessionListParts.part(of: "", among: 1) == 0)
+        #expect(SessionListParts.count(for: 128, current: 0) == 1)
+        #expect(SessionListParts.count(for: 129, current: 1) == 2)
+        #expect(SessionListParts.count(for: 7_000, current: 1) == 64)
+        #expect(SessionListParts.count(for: 5, current: 64) == 64, "Parts never get fewer.")
+        #expect(SessionListParts.count(for: 1_000_000, current: 1) == SessionListParts.maximumCount)
+    }
+
     // MARK: Helpers
 
     private static func folder() -> URL {

@@ -15,19 +15,19 @@ extension RootShellView {
         var models = Dictionary(featureStore.workingChatModels.map { ($0.conversationID, $0) },
                                 uniquingKeysWith: { first, _ in first })
         var working: [WorkingChat] = []
-        // Working chats are among the newest, so this stops near the top of a long list.
-        for summary in summaries {
+        // A chat at work is among the newest, so only the top of the list is read: this runs with
+        // every streamed piece and must not grow with the number of chats. Only listed chats count,
+        // which leaves out helpers' and scheduled runs' own sessions.
+        for summary in summaries.prefix(Self.workingChatScan) where summary.kind == .direct {
             guard !models.isEmpty else { break }
             guard let model = models.removeValue(forKey: summary.id), let agentID = model.memberIDs.first else { continue }
             working.append(WorkingChat(conversationID: summary.id, agentID: agentID, kind: model.liveActivityKind))
         }
-        // A chat the list doesn't hold yet still counts, after the listed ones.
-        for model in models.values.sorted(by: { $0.conversationID < $1.conversationID }) {
-            guard let agentID = model.memberIDs.first else { continue }
-            working.append(WorkingChat(conversationID: model.conversationID, agentID: agentID, kind: model.liveActivityKind))
-        }
         return working
     }
+
+    /// How far down the list of chats a chat at work is looked for.
+    private static var workingChatScan: Int { 48 }
 
     /// The chat on screen, when the top of the stack is one.
     private var openConversationID: String? {

@@ -13,8 +13,11 @@ struct AgentBoardContext {
     let onSwitchAgent: () -> Void
     /// Opens a chat with this agent with the text in its message box.
     let onAsk: (String) -> Void
-    /// Opens a chat with this agent and sends the text there (Let's do it).
+    /// Opens a chat with this agent and sends the text there (Do it on a post).
     let onSend: (String) -> Void
+    /// Opens a NEW chat with this agent, the text in its message box to add to before sending
+    /// (Let's do it on an idea: an idea started is a job of its own). Nil asks in the bot's chat.
+    var onAskNewChat: ((String) -> Void)? = nil
     /// Opens a chat with this agent with a blueprint in its message box, its blanks as chips.
     let onBlueprint: (String) -> Void
     /// Opens this agent's chat, from New chat on a board in a sheet.
@@ -1161,15 +1164,16 @@ private struct IdeaHeroTile: View {
         .accessibilityIdentifier("board.idea.lets-do-it.\(idea.id)")
     }
 
-    /// As on the idea's page: the yes is recorded by the idea's ID, and the chat that opens gets
-    /// only the readable text. Older plugins go straight to the chat.
+    /// As on the idea's page: the yes is recorded by the idea's ID, and a new chat opens with
+    /// only the readable text in its message box, so notes can be added before it is sent.
+    /// Older plugins go straight to the chat.
     private func letsDoIt() async {
         isAccepting = true
         let outcome = await context.store.accept(idea)
         isAccepting = false
         guard outcome != .failed else { acceptFailed = true; return }
         acceptFailed = false
-        context.onSend(idea.letsDoItMessage)
+        (context.onAskNewChat ?? context.onAsk)(idea.letsDoItMessage)
     }
 }
 
@@ -1343,15 +1347,16 @@ struct IdeaDetailSheet: View {
         }
     }
 
-    /// The yes is recorded when the person taps, by the idea's ID; then "Let's do it!" goes to
-    /// the chat with the idea as a card. Older plugins skip straight to the chat, as before.
+    /// The yes is recorded when the person taps, by the idea's ID; then a new chat opens with
+    /// "Let's do it!" and the idea as a card in its message box, to add notes before sending.
+    /// Older plugins skip straight to the chat, as before.
     private func letsDoIt() async {
         isAccepting = true
         let outcome = await context.store.accept(idea)
         isAccepting = false
         guard outcome != .failed else { acceptFailed = true; return }
         dismiss()
-        context.onSend(idea.letsDoItMessage)
+        (context.onAskNewChat ?? context.onAsk)(idea.letsDoItMessage)
     }
 
     @BighelpThemeReader private var theme

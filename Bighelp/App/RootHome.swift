@@ -261,6 +261,7 @@ extension RootShellView {
                                onProfile: { appState.open(.simpleBotProfile(agentID: id)) }, onSwitchAgent: {},
                                onAsk: { askSimpleBot(id, $0, fillsBlanks: false) },
                                onSend: { askSimpleBot(id, $0, fillsBlanks: false, sendsAtOnce: true) },
+                               onAskNewChat: { startNewChat(withBot: id, text: $0) },
                                onBlueprint: { askSimpleBot(id, $0, fillsBlanks: true) })
                        },
                        shellBoardKey: { agentBoardClientKey },

@@ -13,6 +13,14 @@ extension RootShellView {
         startNewChat(explicitAgentID: nil, tracksNewChat: true)
     }
 
+    /// A new chat with this bot, the text in its message box to add notes before sending: an
+    /// idea that was said Let's do it to starts a job of its own, not a turn in the bot's chat.
+    func startNewChat(withBot agentID: String, text: String) {
+        appState.leaveComposerText(text)
+        newChatSession.start()
+        startNewChat(explicitAgentID: agentID, tracksNewChat: true)
+    }
+
     /// New chat's parts for its own blank chat, and nil for every other chat. Decided from the
     /// chat's id, never from its messages: the chat stops drawing them once something is sent.
     func newChatSlot(forChat id: String, model: ChatModel) -> ChatNewChatSlot? {

@@ -87,8 +87,10 @@ struct SimpleBotDashboardHooks {
     let configureShellBoard: @MainActor (RootShellView.AgentBoardClientKey) async -> Void
     /// Opens the bot's chat with the text in its message box (bot ID, text); nothing is sent.
     let onAsk: (String, String) -> Void
-    /// Opens the bot's chat and sends the text there (Let's do it).
+    /// Opens the bot's chat and sends the text there (Do it on a post).
     let onSend: (String, String) -> Void
+    /// Opens a new chat with the bot, the text in its message box (Let's do it on an idea).
+    var onAskNewChat: ((String, String) -> Void)? = nil
     /// Opens the bot's chat with a blueprint in its message box, its blanks as chips.
     let onBlueprint: (String, String) -> Void
 }
@@ -1271,7 +1273,9 @@ struct SimpleBotProfileView: View {
             agentID: id, agentName: profile.name, imageURL: context.agents.avatarURL(for: profile),
             activity: .idle, store: store,
             onProfile: {}, onSwitchAgent: {},
-            onAsk: { hooks.onAsk(id, $0) }, onSend: { hooks.onSend(id, $0) }, onBlueprint: { hooks.onBlueprint(id, $0) },
+            onAsk: { hooks.onAsk(id, $0) }, onSend: { hooks.onSend(id, $0) },
+            onAskNewChat: hooks.onAskNewChat.map { send in { text in send(id, text) } },
+            onBlueprint: { hooks.onBlueprint(id, $0) },
             onNewChat: { context.onOpenChat(id) })
     }
 

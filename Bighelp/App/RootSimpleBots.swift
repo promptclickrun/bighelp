@@ -320,6 +320,7 @@ extension RootShellView {
                 configureShellBoard: { await configureAgentBoard($0) },
                 onAsk: { id, text in askSimpleBot(id, text, fillsBlanks: false) },
                 onSend: { id, text in askSimpleBot(id, text, fillsBlanks: false, sendsAtOnce: true) },
+                onAskNewChat: { id, text in startNewChat(withBot: id, text: text) },
                 onBlueprint: { id, text in askSimpleBot(id, text, fillsBlanks: true) }),
             editUnavailableReason: editReason,
             makeEditor: { profile in

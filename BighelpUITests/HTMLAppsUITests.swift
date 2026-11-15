@@ -82,6 +82,14 @@ final class HTMLAppsUITests: BighelpUITestCase {
         let browser = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
         XCTAssertTrue(browser.wait(for: .runningForeground, timeout: 15), "The person's tap opens the link outside Bighelp")
         browser.terminate()
+
+        // A link to a new window asks through another call, which can't wait for the tap's report.
+        app.activate()
+        let newWindowLink = app.webViews.links["Travel rules"].firstMatch
+        XCTAssertTrue(newWindowLink.waitForExistence(timeout: 20), "The page has a link to a new window")
+        newWindowLink.tap()
+        XCTAssertTrue(browser.wait(for: .runningForeground, timeout: 15), "A tapped link to a new window opens outside too")
+        browser.terminate()
     }
 
     // MARK: Helpers

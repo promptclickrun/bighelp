@@ -120,8 +120,10 @@ struct HTMLAppWebView: UIViewRepresentable {
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
             guard let url = action.request.url else { return .cancel }
             let isMainFrame = action.targetFrame?.isMainFrame != false
-            // Asked only where it decides: a link in the main frame. A script's click finds no tap.
-            let tapped = isMainFrame && action.navigationType == .linkActivated ? await linkTaps.takeWaiting(for: url) : false
+            // Asked only where it decides: a web link in the main frame. A script's click finds no tap.
+            let isWebLink = isMainFrame && action.navigationType == .linkActivated
+                && ["http", "https"].contains(url.scheme?.lowercased() ?? "")
+            let tapped = isWebLink ? await linkTaps.takeWaiting(for: url) : false
             let decision = HTMLAppNavigationPolicy.decide(
                 url: url, appID: appID, isMainFrame: isMainFrame, navigationType: action.navigationType,
                 personTapped: tapped)

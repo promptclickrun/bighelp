@@ -583,10 +583,14 @@ The Thinking control (`BighelpThinkingControl`, `Bighelp/DesignSystem/ThinkingSl
 slider does: a tap on the track or a level's name picks it, a sideways drag follows the finger with a tick per level
 and sends one change on release, a vertical swipe scrolls the sheet, VoiceOver adjusts it, the Mac's arrow keys step
 a level, and the largest text sizes get a plain list. Hermes' automatic level is the Auto button beside the value,
-not a point on the track. It wears one of six looks of our own (`BighelpThinkingLook`: Noodle, Train of Thought,
-Clockwork, Meadow, Ink Bloom, Wide Awake), picked in Settings › Appearance › Thinking, where each can be tried.
-A look's colors climb with the level (Noodle and Train of Thought turn from the person's color toward its opposite)
-and every look stands still at the lowest level. These drawings repaint while they show, which bighelp avoids
+not a point on the track. It wears one of seven looks of our own (`BighelpThinkingLook`: Heavyweight, Noodle, Train
+of Thought, Clockwork, Meadow, Ink Bloom, Wide Awake), picked in Settings › Appearance › Thinking, where each can be
+tried. Heavyweight is the look out of the box: the lifter stands on a stage over a slim rail and holds a box that
+grows with the level and names it; above Medium he shakes, harder at each level, and at the lowest level the box is
+on the floor beside him. He is drawn in code in the kit's shapes and colors (coral; the box ink by day, cream after
+dark) on every theme, and it is the one look taller than a track (`HeavyweightPose.height`; New chat's sweep draws it
+in one track's height, without the rail). A look's colors climb with the level (Noodle and Train of Thought turn from
+the person's color toward its opposite) and every look stands still at the lowest level. These drawings repaint while they show, which bighelp avoids
 everywhere else: at most 60 frames a second, only on screen, never under Reduce Motion, and paused once the control
 rests at the bottom.
 

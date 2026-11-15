@@ -328,7 +328,7 @@ struct ChatDissolveLookBand: View {
     @State private var level = 0.2
 
     var body: some View {
-        ThinkingSliderTrack(look: look, level: level, followsFinger: false, accent: accent)
+        ThinkingSliderTrack(look: look, level: level, followsFinger: false, accent: accent, isCompact: true)
             // A view outside any scene reads as in the background, which holds the track still.
             .environment(\.scenePhase, .active)
             .onAppear { level = 1 }

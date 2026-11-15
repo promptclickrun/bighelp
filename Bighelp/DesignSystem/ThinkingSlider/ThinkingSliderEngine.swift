@@ -80,6 +80,8 @@ final class ThinkingSliderStore {
     var offset = 0.0
     /// Wide Awake's eyes, following the drag.
     var gaze = 0.0
+    /// Heavyweight's box: 0 on the floor beside the lifter, 1 over his head.
+    var lift = 0.0
 
     /// The width a layout (gears, grass) was built for.
     var layoutWidth = 0.0
@@ -97,6 +99,9 @@ final class ThinkingSliderStore {
     var keyWords: [GraphicsContext.ResolvedText] = []
     /// Wide Awake's sleeping "z"s.
     var sleepMarks: [GraphicsContext.ResolvedText] = []
+    /// Heavyweight's level name on the box, and what it was resolved for.
+    var caption: GraphicsContext.ResolvedText?
+    var captionKey = ""
 
     /// The frame at `time`, with the level eased toward `target`. A held timeline (Reduce Motion, a
     /// cover, off screen, resting) snaps to the target with no time passing, so a still picture still

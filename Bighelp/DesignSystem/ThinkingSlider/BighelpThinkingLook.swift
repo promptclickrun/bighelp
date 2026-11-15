@@ -2,17 +2,20 @@ import SwiftUI
 
 /// The looks the Thinking control can wear. Each draws on a `Canvas` every frame while it is on
 /// screen and the agent is asked to think, and stands still at the bottom level and under Reduce
-/// Motion. New cases keep their raw value, which may be stored on the device.
+/// Motion. New cases keep their raw value, which may be stored on the device. The order is the
+/// settings page's, the default first.
 enum BighelpThinkingLook: String, CaseIterable, Identifiable, Sendable {
-    case noodle, trainOfThought, clockwork, meadow, inkBloom, wideAwake
+    case heavyweight, noodle, trainOfThought, clockwork, meadow, inkBloom, wideAwake
 
-    static let defaultLook: BighelpThinkingLook = .noodle
+    /// The look of anyone who never picked one (Noodle before the lifter brand).
+    static let defaultLook: BighelpThinkingLook = .heavyweight
 
     var id: Self { self }
 
     /// A proper name, like an app icon's, so it reads the same in every language.
     var name: String {
         switch self {
+        case .heavyweight: "Heavyweight"
         case .noodle: "Noodle"
         case .trainOfThought: "Train of Thought"
         case .clockwork: "Clockwork"
@@ -25,6 +28,7 @@ enum BighelpThinkingLook: String, CaseIterable, Identifiable, Sendable {
     /// One short sentence for the settings page.
     var summary: String {
         switch self {
+        case .heavyweight: String(localized: "The lifter holds up a box that grows, and shakes under it.")
         case .noodle: String(localized: "One stroke that loops tighter and turns to your color's opposite.")
         case .trainOfThought: String(localized: "Little words drift toward a cursor, faster as it thinks harder.")
         case .clockwork: String(localized: "Gears that spin faster, then overheat and rattle.")
@@ -34,8 +38,22 @@ enum BighelpThinkingLook: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// How tall the look is in the control. Every look is one track but Heavyweight, which has a
+    /// stage over its rail.
+    var height: CGFloat {
+        self == .heavyweight ? HeavyweightPose.height : ThinkingSliderMetrics.height
+    }
+
+    /// What the track's drawing is cut to: the track's pill, or all of a taller look.
+    func trackShape(in size: CGSize) -> Path {
+        size.height > ThinkingSliderMetrics.height
+            ? Path(CGRect(origin: .zero, size: size))
+            : Path(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: size.height / 2, style: .continuous)
+    }
+
     func drawTrack(_ context: inout GraphicsContext, _ frame: ThinkingSliderFrame, _ store: ThinkingSliderStore, _ paint: ThinkingPaint) {
         switch self {
+        case .heavyweight: Self.drawHeavyweight(&context, frame, store, paint)
         case .noodle: Self.drawNoodle(&context, frame, store, paint)
         case .trainOfThought: Self.drawTrain(&context, frame, store, paint)
         case .clockwork: Self.drawClockwork(&context, frame, store, paint)
@@ -48,6 +66,7 @@ enum BighelpThinkingLook: String, CaseIterable, Identifiable, Sendable {
     /// Some thumbs keep state of their own (Wide Awake's gaze and steam), so they get the store too.
     func drawThumb(_ context: inout GraphicsContext, _ frame: ThinkingSliderFrame, _ store: ThinkingSliderStore, _ paint: ThinkingPaint) {
         switch self {
+        case .heavyweight: Self.drawHeavyweightThumb(&context, frame, store, paint)
         case .noodle: Self.drawNoodleThumb(&context, frame, store, paint)
         case .trainOfThought: Self.drawTrainThumb(&context, frame, store, paint)
         case .clockwork: Self.drawClockworkThumb(&context, frame, store, paint)
@@ -59,7 +78,12 @@ enum BighelpThinkingLook: String, CaseIterable, Identifiable, Sendable {
 }
 
 /// What a look paints with, worked out once per view update: day or night, and the person's color.
+/// Heavyweight also shows the level's short name and a dot per level.
 struct ThinkingPaint: Equatable, Sendable {
     let isDark: Bool
     let accent: ThinkingAccent
+    /// The short name of the level shown ("Med"), where the track knows it.
+    var caption: String?
+    /// How many levels the ladder has, or 0 where the track isn't on one.
+    var steps = 0
 }

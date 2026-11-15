@@ -10,6 +10,9 @@ struct ChatAttachmentGallery: View {
     let alignsTrailing: Bool
 
     @State private var previewAttachment: ChatAttachment?
+    /// A picture opened on its own, over the whole display (the Duo).
+    @State private var photoViewer: ChatPhotoStart?
+    @Environment(\.bighelpScreen) private var screen
 
     var body: some View {
         // A horizontal scroll view fills its width and pins content to the
@@ -27,6 +30,19 @@ struct ChatAttachmentGallery: View {
         .bighelpSheet(item: $previewAttachment) { attachment in
             ChatAttachmentPreviewView(attachment: attachment)
                 .bighelpSheetSize(.large)
+        }
+        .bighelpMediaPresentation(item: $photoViewer) { start in
+            ChatImageStackViewer(images: start.images, startIndex: start.index, fullBleed: start.presentsFullScreen)
+        }
+    }
+
+    /// A picture goes straight to the photo viewer where it can take the whole display (the Duo);
+    /// everything else keeps the preview sheet, with its file name and save options.
+    private func open(_ attachment: ChatAttachment) {
+        if attachment.kind == .image, ChatImageStackContent.isFullBleed(screen) {
+            photoViewer = ChatPhotoStart(images: [attachment], index: 0, screen: screen)
+        } else {
+            previewAttachment = attachment
         }
     }
 
@@ -50,7 +66,7 @@ struct ChatAttachmentGallery: View {
                     }
                 } else {
                     Button {
-                        previewAttachment = attachment
+                        open(attachment)
                     } label: {
                         attachmentView(attachment)
                     }

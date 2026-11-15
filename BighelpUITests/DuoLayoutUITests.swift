@@ -263,6 +263,14 @@ final class DuoLayoutUITests: BighelpUITestCase {
             XCTAssertLessThan(close.frame.midX, window.midX, "Down the leading edge, clear of the column")
             sleep(1)
             save("cover-photos-\(appearance)", app)
+            // A swipe moves one whole page: the next picture then fills the pager, with nothing beside it.
+            pages.swipeLeft()
+            XCTAssertTrue(waitForLabel("2 of 4", of: position), "A swipe goes to the next picture")
+            XCTAssertEqual(next.frame.width, pages.frame.width, accuracy: 1, "The second page is the pager's width too")
+            XCTAssertEqual(next.frame.minX, pages.frame.minX, accuracy: 1, "It rests where the pager starts")
+            pages.swipeRight()
+            XCTAssertTrue(waitForLabel("1 of 4", of: position), "And a swipe back returns")
+            XCTAssertEqual(first.frame.minX, pages.frame.minX, accuracy: 1, "The first page rests where it was")
             if appearance == "light" {
                 app.buttons["chat.image-stack.thumbnail.2"].tap()
                 XCTAssertEqual(element("chat.image-stack.position", in: app).label, "3 of 4",
@@ -273,9 +281,12 @@ final class DuoLayoutUITests: BighelpUITestCase {
                 XCTAssertTrue(app.buttons["Save This Photo"].exists)
                 save("cover-photos-save-light", app)
                 pages.tap()
-                close.tap()
-                XCTAssertTrue(pages.waitForNonExistence(timeout: 5), "Close leaves the photos")
             }
+            close.tap()
+            XCTAssertTrue(pages.waitForNonExistence(timeout: 5), "Close leaves the photos")
+            // The viewer hid the system's status items; the chat has them back.
+            sleep(1)
+            save("cover-photos-closed-\(appearance)", app)
             app.terminate()
         }
     }

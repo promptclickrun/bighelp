@@ -63,9 +63,9 @@ enum ChatTextSize: Int, CaseIterable, Identifiable, Sendable {
     case large = 1
     case larger = 2
 
-    /// Messages size on top of the app's text size (Appearance); out of the box, one
-    /// step under it. A size someone picked is saved and stays, even when it's this one.
-    static let defaultSize: ChatTextSize = .small
+    /// Messages size on top of the app's text size (Appearance); out of the box, the
+    /// same size (one step under it before). A size someone picked is saved and stays.
+    static let defaultSize: ChatTextSize = .standard
 
     var id: Self { self }
 

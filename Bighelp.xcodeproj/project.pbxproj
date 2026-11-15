@@ -610,6 +610,7 @@
 		484E290C7AF098BA39B26C7F /* LinkPreviewLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7717E4DECC27FF02102FEFEE /* LinkPreviewLoader.swift */; };
 		486C974071404BED690FA982 /* KanbanAdministrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39ABA20DFBC9888E9D43DEFE /* KanbanAdministrationView.swift */; };
 		488842D2C3364326FEF38717 /* HomeTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25550A0A0F3821ADED7FEDBE /* HomeTabBar.swift */; };
+		489006A0ACA31F3F99CB3D9C /* ThinkingHeavyweightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43F4AB2A2168DFBF91657BE1 /* ThinkingHeavyweightTests.swift */; };
 		489352B8790D5EFB6EB1B943 /* HostManagementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B79E147B2F0C41D20965E73 /* HostManagementTests.swift */; };
 		489E33414695B4DAFEBDBCCE /* GeminiLiveAudioPeer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C416CC342BB5C934FA2EC1BC /* GeminiLiveAudioPeer.swift */; };
 		48B33D61FCBA1FF8BC658F00 /* AgentFaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C75B8692B6E78F7A91E68F0 /* AgentFaceTests.swift */; };
@@ -1743,6 +1744,7 @@
 		CFDA4DE204A0F1BEA7F14ADC /* BighelpTabGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC11665E89F25A9F0B6B70C /* BighelpTabGlyph.swift */; };
 		D02216DC644596F5F2CDAACD /* ChatAttachmentMenuUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E1B6FEA123ABC335C807E5C /* ChatAttachmentMenuUITests.swift */; };
 		D03E70D2E968432CAB945230 /* GeminiLivePlayerRestartTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB545DEB88099F0D05789AF1 /* GeminiLivePlayerRestartTests.swift */; };
+		D0624AC426DC83279F8BE9FC /* ThinkingLookHeavyweight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FF39AD2FBAF5A4641ED21C2 /* ThinkingLookHeavyweight.swift */; };
 		D092244D061D543D007B9F92 /* WikiDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F605047400252670A1610388 /* WikiDraftStore.swift */; };
 		D0A185AF92F9D96A22F30250 /* SimpleBotsAppearanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A3BBD4EAE2A44378C37BEE0 /* SimpleBotsAppearanceUITests.swift */; };
 		D0AC686A15F5FA50431BC875 /* RawConfigurationEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A26CF36B1A30E3091497D85 /* RawConfigurationEditor.swift */; };
@@ -2814,6 +2816,7 @@
 		43C94BD61162D35FD4205BA8 /* BighelpGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpGlyph.swift; sourceTree = "<group>"; };
 		43DC33ACEF48388887235EEE /* OnDeviceVoiceSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceVoiceSettings.swift; sourceTree = "<group>"; };
 		43E999D974BD5735B4179BF6 /* live-earthquakes.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "live-earthquakes.json"; sourceTree = "<group>"; };
+		43F4AB2A2168DFBF91657BE1 /* ThinkingHeavyweightTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThinkingHeavyweightTests.swift; sourceTree = "<group>"; };
 		4433E549C2FF144608504128 /* runs-script-only.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "runs-script-only.json"; sourceTree = "<group>"; };
 		443A7C01587F2C21EA5FAA7E /* DirectHermesProjectLifecycleClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesProjectLifecycleClient.swift; sourceTree = "<group>"; };
 		4440411763E09D8DF72C65A9 /* BighelpCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpCardView.swift; sourceTree = "<group>"; };
@@ -3604,6 +3607,7 @@
 		9F6A78A03D128C51B25B5CC3 /* BighelpAppSpaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BighelpAppSpaces.swift; sourceTree = "<group>"; };
 		9F825A925559FC87FEB69271 /* HTMLAppsHostUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLAppsHostUITests.swift; sourceTree = "<group>"; };
 		9FBA20053C60D44A1CEB6548 /* DirectHermesContextBreakdownTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesContextBreakdownTests.swift; sourceTree = "<group>"; };
+		9FF39AD2FBAF5A4641ED21C2 /* ThinkingLookHeavyweight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThinkingLookHeavyweight.swift; sourceTree = "<group>"; };
 		A0003AA20865E5C603817C0C /* ScheduledTasksStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledTasksStoreTests.swift; sourceTree = "<group>"; };
 		A004480D232CF549915BBCB7 /* DirectHermesVoiceMediaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectHermesVoiceMediaTests.swift; sourceTree = "<group>"; };
 		A01085590690393D7B1FF73F /* UsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageView.swift; sourceTree = "<group>"; };
@@ -4703,6 +4707,7 @@
 				DCB14C56580BE75E57FF26D4 /* BighelpThinkingControl.swift */,
 				8E7481EB926BB814A9312940 /* BighelpThinkingLook.swift */,
 				32CB21AAA8E67876D78BC09D /* ThinkingLadder.swift */,
+				9FF39AD2FBAF5A4641ED21C2 /* ThinkingLookHeavyweight.swift */,
 				1FE06AD250F9089751D8DB83 /* ThinkingLooksLines.swift */,
 				F743DA1E968F0FFED28C304F /* ThinkingLooksScenes.swift */,
 				E024549DABF034C2D3D3F4E6 /* ThinkingSliderEngine.swift */,
@@ -6075,6 +6080,7 @@
 				00FA0C85FE811846698B3681 /* TemplateCategoryTests.swift */,
 				A8B4B7166870C2C9A3CC6E33 /* TemplateVariablesTests.swift */,
 				7E96E0B1F96BAC7D40775D94 /* ThemePresetTests.swift */,
+				43F4AB2A2168DFBF91657BE1 /* ThinkingHeavyweightTests.swift */,
 				617258D76E52A913FC6044EF /* ThinkingLadderTests.swift */,
 				6D97ED75999EE9AF01D2C143 /* TodayBoardsStoreTests.swift */,
 				6E2FCD0CE3A5F9E9513CB461 /* TodayPanelLayoutTests.swift */,
@@ -9139,6 +9145,7 @@
 				DEDBAB57A6DC112EBA75BF84 /* TemplateVariables.swift in Sources */,
 				B029863CD8921100A037E162 /* ThinkingLadder.swift in Sources */,
 				AF4FB33A09548E8D14BDFB42 /* ThinkingLevelSender.swift in Sources */,
+				D0624AC426DC83279F8BE9FC /* ThinkingLookHeavyweight.swift in Sources */,
 				66DB76018BAA1C176FEA478A /* ThinkingLookSettingsView.swift in Sources */,
 				45C4627332D10751B96EA38F /* ThinkingLooksLines.swift in Sources */,
 				2B8EBA772AE58A240B6C5AF0 /* ThinkingLooksScenes.swift in Sources */,
@@ -9871,6 +9878,7 @@
 				21F25270508AFA9EF341568C /* TemplateCategoryTests.swift in Sources */,
 				CEA5D7A18CF42D4A70EAC195 /* TemplateVariablesTests.swift in Sources */,
 				140C29760EC97CD5A42B96F6 /* ThemePresetTests.swift in Sources */,
+				489006A0ACA31F3F99CB3D9C /* ThinkingHeavyweightTests.swift in Sources */,
 				F88B25D1899CB2B2E234711D /* ThinkingLadderTests.swift in Sources */,
 				207937BD6C0C3D5FC8176224 /* TodayBoardsStoreTests.swift in Sources */,
 				02AF109D3DD981434BF2219B /* TodayPanelLayoutTests.swift in Sources */,

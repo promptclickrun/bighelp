@@ -18,6 +18,12 @@ struct ThinkingSliderTrack: View {
     let accent: Color
     /// Holds the animation for a cover the track can't see for itself.
     let isPaused: Bool
+    /// The short name of the level shown, for a look that writes it (Heavyweight's box).
+    let caption: String?
+    /// How many levels the ladder has, for a look that marks them.
+    let steps: Int
+    /// One track's height for every look: New chat's sweep, where a taller look doesn't fit.
+    let isCompact: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
@@ -29,12 +35,18 @@ struct ThinkingSliderTrack: View {
     /// True once the level has stayed at the bottom long enough for every look to stand still.
     @State private var hasRested = false
 
-    init(look: BighelpThinkingLook, level: Double, followsFinger: Bool, accent: Color, isPaused: Bool = false) {
+    init(
+        look: BighelpThinkingLook, level: Double, followsFinger: Bool, accent: Color, isPaused: Bool = false,
+        caption: String? = nil, steps: Int = 0, isCompact: Bool = false
+    ) {
         self.look = look
         self.level = level
         self.followsFinger = followsFinger
         self.accent = accent
         self.isPaused = isPaused
+        self.caption = caption
+        self.steps = steps
+        self.isCompact = isCompact
     }
 
     var body: some View {
@@ -51,14 +63,12 @@ struct ThinkingSliderTrack: View {
                     followsFinger: followsFinger, size: size, isHeld: isHeld, isStill: isStill
                 )
                 var track = context
-                track.clip(to: Path(
-                    roundedRect: CGRect(origin: .zero, size: size), cornerRadius: size.height / 2, style: .continuous
-                ))
+                track.clip(to: look.trackShape(in: size))
                 look.drawTrack(&track, frame, store, paint)
                 look.drawThumb(&context, frame, store, paint)
             }
         }
-        .frame(height: ThinkingSliderMetrics.height)
+        .frame(height: isCompact ? ThinkingSliderMetrics.height : look.height)
         .onAppear { isOnScreen = true }
         .onDisappear { isOnScreen = false }
         .task(id: level == 0) {
@@ -81,7 +91,8 @@ struct ThinkingSliderTrack: View {
             accent: ThinkingAccent(
                 red: Double(min(max(resolved.red, 0), 1)), green: Double(min(max(resolved.green, 0), 1)),
                 blue: Double(min(max(resolved.blue, 0), 1)), isDark: theme.isDarkPalette
-            )
+            ),
+            caption: caption, steps: steps
         )
     }
 }
@@ -94,6 +105,8 @@ struct ThinkingInteractiveTrack: View {
     let ladder: ThinkingLadder
     let accent: Color
     let isPaused: Bool
+    /// The short name of the level shown, for a look that writes it.
+    let caption: String?
     @Binding var drag: ThinkingSliderDrag
     /// A level picked by a tap or a release. Never the current one.
     let onSelect: (Int) -> Void
@@ -102,12 +115,13 @@ struct ThinkingInteractiveTrack: View {
 
     init(
         look: BighelpThinkingLook, ladder: ThinkingLadder, accent: Color, isPaused: Bool = false,
-        drag: Binding<ThinkingSliderDrag>, onSelect: @escaping (Int) -> Void
+        caption: String? = nil, drag: Binding<ThinkingSliderDrag>, onSelect: @escaping (Int) -> Void
     ) {
         self.look = look
         self.ladder = ladder
         self.accent = accent
         self.isPaused = isPaused
+        self.caption = caption
         _drag = drag
         self.onSelect = onSelect
     }
@@ -120,7 +134,7 @@ struct ThinkingInteractiveTrack: View {
     var body: some View {
         ThinkingSliderTrack(
             look: look, level: shownPosition, followsFinger: drag.position != nil && !drag.isLanded,
-            accent: accent, isPaused: isPaused
+            accent: accent, isPaused: isPaused, caption: caption, steps: ladder.levels.count
         )
         .overlay {
             ThinkingTouchSurface(

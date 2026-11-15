@@ -82,7 +82,9 @@ struct BighelpThinkingControl: View {
             // A look draws left to right and reads touches the same way, so its labels keep that
             // order too, in right-to-left languages as well.
             VStack(spacing: BighelpTokens.space8) {
-                ThinkingInteractiveTrack(look: look, ladder: ladder, accent: accent, isPaused: isCovered, drag: $drag) { index in
+                ThinkingInteractiveTrack(
+                    look: look, ladder: ladder, accent: accent, isPaused: isCovered, caption: caption(ladder), drag: $drag
+                ) { index in
                     if let level = ladder.commit(at: index) { onCommit(level) }
                 }
                 // A new look starts from fresh state, not another look's particles.
@@ -151,6 +153,12 @@ struct BighelpThinkingControl: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    /// The short name a look writes in its drawing: the level shown, or Auto while that is on.
+    private func caption(_ ladder: ThinkingLadder) -> String? {
+        if let index = shownIndex, ladder.levels.indices.contains(index) { return shortTitle(for: ladder.levels[index]) }
+        return isAutomatic ? automatic?.title : nil
     }
 
     private func valueTitle(_ ladder: ThinkingLadder) -> String {

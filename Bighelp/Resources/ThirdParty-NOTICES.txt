@@ -114,7 +114,7 @@ hermex, Thinking slider
 Upstream: https://github.com/uzairansaruzi/hermex (HermesMobile/Features/Chat/ThinkingControl.swift, ThinkingSliderLooks.swift)
 Used for: how the Thinking control works (Bighelp/DesignSystem/ThinkingSlider: the ladder, the
 drag, the track and its drawing loop) and the order levels are sent in
-(Bighelp/Chat/ThinkingLevelSender.swift). The six looks are our own.
+(Bighelp/Chat/ThinkingLevelSender.swift). The looks are our own.
 
 MIT License
 

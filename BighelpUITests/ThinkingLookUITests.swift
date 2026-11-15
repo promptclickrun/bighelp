@@ -19,14 +19,14 @@ final class ThinkingLookUITests: BighelpUITestCase {
             for _ in 0..<8 where !thinking.exists || !thinking.isHittable { studio.swipeUp() }
             thinking.tap()
 
-            // Noodle is the look out of the box (the pass before puts it back).
-            let noodle = app.buttons["thinking-look.pick.noodle"]
-            XCTAssertTrue(noodle.waitForExistence(timeout: 5))
-            XCTAssertTrue(noodle.isSelected)
+            // Heavyweight is the look out of the box (the pass before puts it back).
+            let heavyweight = app.buttons["thinking-look.pick.heavyweight"]
+            XCTAssertTrue(heavyweight.waitForExistence(timeout: 5))
+            XCTAssertTrue(heavyweight.isSelected)
             save("thinking-high-\(appearance)", app)
 
             // The buttons on top put every look on one level.
-            let first = app.descendants(matching: .any)["thinking-look.try.noodle"].firstMatch
+            let first = app.descendants(matching: .any)["thinking-look.try.heavyweight"].firstMatch
             XCTAssertEqual(first.value as? String, "High")
             app.buttons["thinking-look.set-all.ultra"].tap()
             XCTAssertEqual(first.value as? String, "Ultra")
@@ -36,7 +36,9 @@ final class ThinkingLookUITests: BighelpUITestCase {
             let start = first.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5))
             start.press(forDuration: 0.1, thenDragTo: first.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)))
             XCTAssertEqual(first.value as? String, "Off")
-            let second = app.descendants(matching: .any)["thinking-look.try.trainOfThought"].firstMatch
+            save("thinking-off-\(appearance)", app)
+            let second = app.descendants(matching: .any)["thinking-look.try.noodle"].firstMatch
+            for _ in 0..<3 where !second.exists { app.descendants(matching: .any)["thinking-look"].firstMatch.swipeUp() }
             XCTAssertEqual(second.value as? String, "Ultra")
 
             // The name line picks the look.
@@ -45,13 +47,13 @@ final class ThinkingLookUITests: BighelpUITestCase {
             for _ in 0..<6 where !clockwork.exists || !clockwork.isHittable { page.swipeUp() }
             clockwork.tap()
             XCTAssertTrue(clockwork.isSelected)
-            XCTAssertFalse(noodle.isSelected)
             save("thinking-picked-\(appearance)", app)
 
-            // The pick is kept on the device, so the next pass starts from Noodle again.
-            for _ in 0..<6 where !noodle.isHittable { page.swipeDown() }
-            noodle.tap()
-            XCTAssertTrue(noodle.isSelected)
+            // The pick is kept on the device, so the next pass starts from Heavyweight again.
+            for _ in 0..<6 where !heavyweight.exists || !heavyweight.isHittable { page.swipeDown() }
+            XCTAssertFalse(heavyweight.isSelected)
+            heavyweight.tap()
+            XCTAssertTrue(heavyweight.isSelected)
             app.terminate()
         }
     }

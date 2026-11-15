@@ -62,7 +62,7 @@ struct BighelpScreenGeometry: Equatable, Sendable {
     /// The system's column on the trailing edge (camera and status), measured from the window's
     /// trailing edge. Zero where there is none.
     var trailingColumnWidth: CGFloat = 0
-    /// Where the column's empty part starts, under the camera and the status.
+    /// Where the column's empty part starts, under the camera and the status (`columnFreeTop`).
     var trailingColumnFreeTop: CGFloat = 0
     /// The fold, in the window's coordinates, where the screen has one.
     var fold: CGRect?
@@ -92,6 +92,20 @@ struct BighelpScreenGeometry: Equatable, Sendable {
     /// The width the side bar and the switcher take. The system's column when it's wide
     /// enough, else this much is kept free beside the page.
     static let sideColumnWidth: CGFloat = 60
+
+    /// How far down its column the iPhone Duo's camera and status reach: the height of the area
+    /// the system reports there (84 × 174 points).
+    static let statusAreaHeight: CGFloat = 174
+
+    /// Where the system's column is free. The system reports where the camera and the status end,
+    /// but not always: for the first moments after launch, and whenever its API returns no area,
+    /// the column's inset is there with no report. Their height is kept clear then, or whatever
+    /// goes in the column would start under the status and take no taps. A screen with no column
+    /// of the system's (half of the open screen in Split View) has nothing to clear.
+    static func columnFreeTop(reportedEnd: CGFloat?, systemColumnWidth: CGFloat) -> CGFloat {
+        if let reportedEnd { return reportedEnd }
+        return systemColumnWidth >= sideColumnWidth ? statusAreaHeight : 0
+    }
 }
 
 extension EnvironmentValues {
@@ -142,6 +156,7 @@ struct BighelpScreenPostureReader: ViewModifier {
     static func geometry(_ measured: Measured, horizontal: UserInterfaceSizeClass?,
                          vertical: UserInterfaceSizeClass?) -> BighelpScreenGeometry {
         var measured = measured
+        if BighelpScreenDebug.withholdsOcclusion { measured.occlusion = nil }
         let posture = BighelpScreenDebug.posture ?? BighelpScreenPosture.classify(
             isPhone: BighelpScreenPosture.isPhone, horizontal: horizontal, vertical: vertical, size: measured.size)
         let isLandscape = measured.size.width > measured.size.height
@@ -161,7 +176,8 @@ struct BighelpScreenPostureReader: ViewModifier {
             size: measured.size,
             trailingColumnWidth: max(measured.trailingInset,
                                      measured.occlusion.map { max(0, measured.size.width - $0.minX) } ?? 0),
-            trailingColumnFreeTop: measured.occlusion.map(\.maxY) ?? 0,
+            trailingColumnFreeTop: BighelpScreenGeometry.columnFreeTop(
+                reportedEnd: measured.occlusion.map(\.maxY), systemColumnWidth: measured.trailingInset),
             fold: measured.fold,
             isFoldActive: measured.isFoldActive,
             isLandscape: isLandscape
@@ -204,6 +220,16 @@ enum BighelpScreenDebug {
         UserDefaults.standard.string(forKey: "bighelp.debug.screen-posture").flatMap(BighelpScreenPosture.init(rawValue:))
         #else
         nil
+        #endif
+    }
+
+    /// A screen whose system reports no camera and status area, which the system's API allows:
+    /// `-bighelp.debug.no-occlusion YES`. The system's column itself stays.
+    static var withholdsOcclusion: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "bighelp.debug.no-occlusion")
+        #else
+        false
         #endif
     }
 

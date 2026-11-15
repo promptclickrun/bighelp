@@ -949,6 +949,12 @@ sections can crash only on devices ("Thread stack size exceeded").
   places are toolbar items (`HomeStripTabs`, `.bottomBar`), so iOS stacks them there too; a column of our own
   drawn over the strip lay on top of the screen's own buttons. A chat has no bar, so
   `BighelpChatSwitcher` (Settings › Chat › Chat switcher) takes the strip there.
+- The system reports the camera and status area of its column (`.occlusion`: 84 × 174 points on the cover
+  screen), but not always: for about the first two seconds after launch, and whenever its API returns no area, the
+  column's inset is there with no report. `BighelpScreenGeometry.columnFreeTop` then keeps
+  `statusAreaHeight` (174 points) clear. Without that, a chat's column started 8 points from the top, under the
+  status, where it also took no taps. `-bighelp.debug.no-occlusion YES` withholds the report in a DEBUG build
+  (`DuoLayoutUITests`).
 - The cover screen has no island, so the top of a chat's column says who works in another chat
   (`WorkingChatPill`, above the switcher): a face and a line naming the work, a tap opens that chat, and nothing
   is drawn while no other chat works. The open chat's own work is never there: its header says it. It reads the

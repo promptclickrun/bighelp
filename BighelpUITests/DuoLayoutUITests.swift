@@ -7,6 +7,11 @@ import XCTest
 /// isn't for. Set BIGHELP_DUO_EVIDENCE (TEST_RUNNER_…) to a folder to save the screenshots.
 final class DuoLayoutUITests: BighelpUITestCase {
     private let demo = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3"]
+    /// How far down its column the Duo's camera and status reach: the app's
+    /// `BighelpScreenGeometry.statusAreaHeight`. A UI test can't read the app's constant, so
+    /// `testCoverScreenChatColumnStaysUnderTheStatusWithNoReportOfItsEnd` checks it against what the
+    /// system reports.
+    private static let statusAreaHeight: CGFloat = 174
     private let appearances = ["light", "dark"]
 
     // MARK: Cover screen (the Duo's simulator)
@@ -23,7 +28,8 @@ final class DuoLayoutUITests: BighelpUITestCase {
             XCTAssertTrue(today.waitForExistence(timeout: 20), "The places show")
             let window = app.windows.firstMatch.frame
             XCTAssertGreaterThan(today.frame.minX, window.maxX - 90, "In the side strip")
-            XCTAssertGreaterThan(today.frame.minY, window.minY + 150, "Under the camera and the status")
+            XCTAssertGreaterThanOrEqual(today.frame.minY, window.minY + Self.statusAreaHeight,
+                                        "Under the camera and the status")
             let chat = app.buttons["home.tab.conversations"].firstMatch
             XCTAssertLessThan(abs(chat.frame.midX - today.frame.midX), 4, "One above the other")
             save("cover-chat-\(appearance)", app)
@@ -93,7 +99,8 @@ final class DuoLayoutUITests: BighelpUITestCase {
             XCTAssertTrue(pill.label.hasPrefix("Avery Park, "), "Who, then what: \(pill.label)")
             let window = app.windows.firstMatch.frame
             XCTAssertGreaterThan(pill.frame.minX, window.maxX - 90, "In the side column")
-            XCTAssertGreaterThan(pill.frame.minY, window.minY + 150, "Under the camera and the status")
+            XCTAssertGreaterThanOrEqual(pill.frame.minY, window.minY + Self.statusAreaHeight,
+                                        "Under the camera and the status")
             let switcher = element("chat-switcher", in: app)
             XCTAssertTrue(switcher.exists, "The chats' faces stay")
             XCTAssertLessThanOrEqual(pill.frame.maxY, switcher.frame.minY, "Above the chats' faces")
@@ -138,6 +145,10 @@ final class DuoLayoutUITests: BighelpUITestCase {
     func testCoverScreenChatColumnStaysUnderTheStatusWithNoReportOfItsEnd() throws {
         let reported = try chatColumn(appearance: "light", withholdsStatusArea: false, saveAs: nil)
         print("DUO-COLUMN reported pill=\(reported.pill) switcher=\(reported.switcher)")
+        // The column starts 8 points under the area the system reports: the height the app keeps
+        // clear without a report is that area's.
+        XCTAssertEqual(reported.pill.minY, Self.statusAreaHeight + 8, accuracy: 1,
+                       "The system reports a status area as tall as the app takes it to be")
         var withheld: [(appearance: String, pill: CGRect, switcher: CGRect)] = []
         // Both pictures first, so a failure still leaves light and dark to look at.
         for appearance in appearances {

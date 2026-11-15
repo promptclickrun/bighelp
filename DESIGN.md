@@ -207,7 +207,8 @@ session's other sessions, each with its live state; Settings › Chat › Chat s
 iPad and Mac in landscape). The Duo has no Dynamic Island, so the top of that column, under the camera, says who
 works in another chat (`WorkingChatPill`): the agent's face acting out the work and a line naming it, in a stop as wide
 as the chats' faces. A tap opens the chat where the work is. Nothing is drawn while no other chat works, and the open
-chat's own work is never there: its header says that. It is a view in the column, never a toolbar item. Open and held wide, the first tab's list (the Bots view or the Chats view) sits left of the
+chat's own work is never there: its header says that. It is a view in the column, never a toolbar item. The column starts under the camera and the status, which reach
+174 points down it, also while the system doesn't report where they end. Open and held wide, the first tab's list (the Bots view or the Chats view) sits left of the
 fold and what it opens sits right of it, like a book (`BighelpSplitColumn`); nothing crosses the fold. Held upright
 it's a big phone, never the cover screen's layout, and half-folded like a small laptop a chat keeps its messages
 above the fold and its message box and keyboard below it. Half of the open screen in iOS's Split View gets the cover

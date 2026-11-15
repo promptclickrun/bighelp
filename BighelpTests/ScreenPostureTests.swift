@@ -45,6 +45,41 @@ struct ScreenPostureTests {
         #expect(BighelpScreenGeometry(posture: .open, size: CGSize(width: 951, height: 669)).splitColumnWidth == 340)
     }
 
+    @Test func theColumnStaysClearOfTheStatusWhenTheSystemReportsNoEndForIt() {
+        // The system's report is taken as it is.
+        #expect(BighelpScreenGeometry.columnFreeTop(reportedEnd: 174, systemColumnWidth: 84) == 174)
+        #expect(BighelpScreenGeometry.columnFreeTop(reportedEnd: 120, systemColumnWidth: 84) == 120)
+        // A column with no report (the first moments after launch): the area's own height.
+        #expect(BighelpScreenGeometry.columnFreeTop(reportedEnd: nil, systemColumnWidth: 84)
+            == BighelpScreenGeometry.statusAreaHeight)
+        // What the Duo reports, and what the guides say.
+        #expect(BighelpScreenGeometry.statusAreaHeight == 174)
+        // Half of the open screen in Split View has no column of the system's: nothing to clear.
+        #expect(BighelpScreenGeometry.columnFreeTop(reportedEnd: nil, systemColumnWidth: 0) == 0)
+    }
+
+    @Test func aMeasuredCoverScreenKeepsItsReportAndFallsBackWithoutOne() {
+        // The posture comes from the device, so this reads as written only on a phone.
+        guard BighelpScreenPosture.isPhone, BighelpScreenDebug.posture == nil else { return }
+        var measured = BighelpScreenPostureReader.Measured(
+            size: CGSize(width: 466, height: 678), trailingInset: 84,
+            occlusion: CGRect(x: 382, y: 0, width: 84, height: 174))
+        func screen() -> BighelpScreenGeometry {
+            BighelpScreenPostureReader.geometry(measured, horizontal: .compact, vertical: .regular)
+        }
+        let reported = screen()
+        #expect(reported.posture == .cover)
+        #expect(reported.trailingColumnWidth == 84)
+        #expect(reported.trailingColumnFreeTop == 174)
+        // No report: the same screen, so nothing in the column moves.
+        measured.occlusion = nil
+        #expect(screen() == reported)
+        // Split View's half: no column, as before.
+        measured.trailingInset = 0
+        #expect(screen().trailingColumnWidth == 0)
+        #expect(screen().trailingColumnFreeTop == 0)
+    }
+
     @Test func theSideBarIsForScreensWithAStatusColumn() {
         #expect(BighelpScreenGeometry(posture: .cover).usesSideBar)
         #expect(BighelpScreenGeometry(posture: .open).usesSideBar)

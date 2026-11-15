@@ -687,7 +687,9 @@ change in both repos.
   `bighelp-app://<app id>/` origin in a full-screen web view (`HTMLAppWebView`) and renders it as made: any site or
   library loads, while the camera and microphone are refused. Only a link the person taps, to an `http` or `https`
   address, opens outside; every other way off the page is dropped (`HTMLAppNavigationPolicy`: a script's own
-  navigation or `window.open`, and every other scheme, bighelp's own links included). Its only way to
+  navigation or `window.open`, and every other scheme, bighelp's own links included). A link a script clicks is
+  dropped too: WebKit reports it as a link like any other, so the tap itself is checked, in a script world the page
+  can't reach, by the browser's own mark for the person's events (`HTMLAppLinkTaps`, `isTrusted`). Its only way to
   the app is `window.bighelp` (`HTMLAppBridge`): data the plugin serves (read every 5 s while a live app is open) and
   `sendAnswer`, which shows the exact message and sends only on the person's Send, as their next message.
 - **Spaces** ([docs/SPACES.md](docs/SPACES.md), plugin `native-spaces-v1`): a space is a live panel on Today. A bot

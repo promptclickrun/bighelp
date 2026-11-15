@@ -47,7 +47,8 @@ handler. bighelp renders what the agent made:
   libraries.
 - Each app has its own origin, so its storage is its own. All apps share one website data store,
   apart from the rest of bighelp's web views.
-- Links and new windows open outside bighelp. The page cannot replace itself with another site.
+- A web link opens outside bighelp, and only when the person taps it. A link that a script clicks goes nowhere
+  (`HTMLAppLinkTaps`). The page cannot replace itself with another site.
   Frames in the page load as the page asks.
 - The camera and the microphone are refused. `alert` and `confirm` show as iOS alerts.
 - The page follows the app's light or dark look through `prefers-color-scheme`. A page without a

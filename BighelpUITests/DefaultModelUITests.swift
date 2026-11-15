@@ -71,10 +71,11 @@ final class DefaultModelUITests: BighelpUITestCase {
             XCTAssertTrue(refresh.waitForExistence(timeout: 10), "Last, in Advanced")
             evidence("provider-keys-\(appearance)", app)
             refresh.tap()
-            // The page says so at its top, above the providers.
-            let confirmed = app.descendants(matching: .any)["providers.confirmed"].firstMatch
-            for _ in 0..<8 where !confirmed.exists { list.swipeDown() }
-            XCTAssertTrue(confirmed.waitForExistence(timeout: 10), "Hermes refreshed the catalogs")
+            // The page says so beside the button, with no scroll back to the top.
+            let result = app.descendants(matching: .any)["providers.refresh-model-catalogs.result"].firstMatch
+            XCTAssertTrue(result.waitForExistence(timeout: 10), "Hermes refreshed the lists")
+            XCTAssertTrue(result.isHittable, "The result is on screen with the button")
+            XCTAssertTrue(result.label.contains("refreshed"), result.label)
             evidence("provider-keys-refreshed-\(appearance)", app)
             app.terminate()
         }

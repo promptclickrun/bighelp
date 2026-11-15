@@ -44,6 +44,10 @@ struct HTMLAppWebView: UIViewRepresentable {
         content.addUserScript(WKUserScript(source: HTMLAppBridge.script, injectionTime: .atDocumentStart,
                                            forMainFrameOnly: true, in: .page))
         content.addScriptMessageHandler(coordinator, contentWorld: .page, name: HTMLAppBridge.handlerName)
+        // The person's taps on links, seen from a world the page's scripts can't reach, frames included.
+        content.addUserScript(WKUserScript(source: HTMLAppLinkTaps.script, injectionTime: .atDocumentStart,
+                                           forMainFrameOnly: false, in: HTMLAppLinkTaps.world))
+        content.add(coordinator.linkTaps, contentWorld: HTMLAppLinkTaps.world, name: HTMLAppLinkTaps.handlerName)
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = coordinator
@@ -82,6 +86,8 @@ struct HTMLAppWebView: UIViewRepresentable {
         var parent: HTMLAppWebView?
         weak var webView: WKWebView?
         var openURL: OpenURLAction?
+        /// The person's own taps on links: a web address opens outside only for one of them.
+        let linkTaps = HTMLAppLinkTaps()
         private var isLoaded = false
         private var delivered: String?
         /// The data waiting for the page to load.
@@ -113,9 +119,14 @@ struct HTMLAppWebView: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
             guard let url = action.request.url else { return .cancel }
+            let isMainFrame = action.targetFrame?.isMainFrame != false
+            // Asked only where it decides: a web link in the main frame. A script's click finds no tap.
+            let isWebLink = isMainFrame && action.navigationType == .linkActivated
+                && ["http", "https"].contains(url.scheme?.lowercased() ?? "")
+            let tapped = isWebLink ? await linkTaps.takeWaiting(for: url) : false
             let decision = HTMLAppNavigationPolicy.decide(
-                url: url, appID: appID, isMainFrame: action.targetFrame?.isMainFrame != false,
-                navigationType: action.navigationType)
+                url: url, appID: appID, isMainFrame: isMainFrame, navigationType: action.navigationType,
+                personTapped: tapped)
             switch decision {
             case .allowInPage:
                 return .allow
@@ -143,9 +154,11 @@ struct HTMLAppWebView: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                      for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+            // A link to a new window: this call can't wait, so the tap's report is taken as it is now.
             if let url = action.request.url,
                HTMLAppNavigationPolicy.decide(url: url, appID: appID, isMainFrame: true,
-                                              navigationType: action.navigationType) == .openOutside {
+                                              navigationType: action.navigationType,
+                                              personTapped: linkTaps.take(for: url)) == .openOutside {
                 openURL?(url)
             }
             return nil

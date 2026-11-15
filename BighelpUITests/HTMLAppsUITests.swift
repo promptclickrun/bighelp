@@ -68,6 +68,30 @@ final class HTMLAppsUITests: BighelpUITestCase {
         XCTAssertTrue(open.waitForExistence(timeout: 5), "Done goes back to the chat")
     }
 
+    /// A web link the person taps in an app's page opens outside Bighelp. (A link a script clicks
+    /// opens nothing: `HTMLAppLinkTapTests`.)
+    @MainActor
+    func testATappedWebLinkOpensOutsideBighelp() throws {
+        let app = launch(appearance: "light")
+        let open = app.buttons.matching(identifier: "html-app.open").firstMatch
+        XCTAssertTrue(reveal(open, in: app).waitForExistence(timeout: 15))
+        open.tap()
+        let link = app.webViews.links["Packing list"].firstMatch
+        XCTAssertTrue(link.waitForExistence(timeout: 20), "The page has a web link")
+        link.tap()
+        let browser = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
+        XCTAssertTrue(browser.wait(for: .runningForeground, timeout: 15), "The person's tap opens the link outside Bighelp")
+        browser.terminate()
+
+        // A link to a new window asks through another call, which can't wait for the tap's report.
+        app.activate()
+        let newWindowLink = app.webViews.links["Travel rules"].firstMatch
+        XCTAssertTrue(newWindowLink.waitForExistence(timeout: 20), "The page has a link to a new window")
+        newWindowLink.tap()
+        XCTAssertTrue(browser.wait(for: .runningForeground, timeout: 15), "A tapped link to a new window opens outside too")
+        browser.terminate()
+    }
+
     // MARK: Helpers
 
     @MainActor

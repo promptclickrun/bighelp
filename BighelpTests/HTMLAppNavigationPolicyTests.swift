@@ -9,10 +9,33 @@ struct HTMLAppNavigationPolicyTests {
     static let appID = "a_0123456789abcdef0123456789abcdef"
     static let otherID = "a_ffffffffffffffffffffffffffffffff"
 
-    private func decide(_ text: String, mainFrame: Bool = true,
-                        _ type: WKNavigationType = .other) -> HTMLAppNavigationPolicy.Decision {
+    /// `tapped` is the person's own tap on the link, which a real tap always carries.
+    private func decide(_ text: String, mainFrame: Bool = true, _ type: WKNavigationType = .other,
+                        tapped: Bool = true) -> HTMLAppNavigationPolicy.Decision {
         HTMLAppNavigationPolicy.decide(url: URL(string: text)!, appID: Self.appID, isMainFrame: mainFrame,
-                                       navigationType: type)
+                                       navigationType: type, personTapped: tapped)
+    }
+
+    /// WebKit reports a link a script clicked as a link too. Without the person's tap it goes nowhere.
+    @Test func aLinkAScriptClickedGoesNowhere() {
+        #expect(decide("https://example.com/page", .linkActivated, tapped: false) == .drop)
+        #expect(decide("https://example.com/page", .linkActivated, tapped: true) == .openOutside)
+    }
+
+    @MainActor @Test func aTapStandsOnceForItsOwnAddressAndOnlyForAMoment() {
+        let taps = HTMLAppLinkTaps()
+        let link = URL(string: "https://example.com/page")!
+        let start = Date(timeIntervalSince1970: 1_000)
+        #expect(!taps.take(for: link, at: start), "No tap, no way out")
+        taps.note("https://example.com/page", at: start)
+        #expect(!taps.take(for: URL(string: "https://example.com/other")!, at: start), "A tap is for its own address")
+        taps.note("https://example.com/page", at: start)
+        #expect(taps.take(for: link, at: start.addingTimeInterval(0.2)))
+        #expect(!taps.take(for: link, at: start.addingTimeInterval(0.3)), "One tap opens one page")
+        taps.note("https://example.com/page", at: start)
+        #expect(!taps.take(for: link, at: start.addingTimeInterval(HTMLAppLinkTaps.lifetime + 1)), "An old tap is no tap")
+        taps.note(String(repeating: "x", count: 9_000), at: start)
+        #expect(!taps.take(for: link, at: start))
     }
 
     @Test(arguments: [

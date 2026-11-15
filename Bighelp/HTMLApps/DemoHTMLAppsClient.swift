@@ -137,6 +137,7 @@ enum DemoHTMLApps {
       <div class="card" id="parts"></div>
       <button id="send">Send my pick</button>
       <p class="muted" id="note"></p>
+      <p class="muted"><a href="https://example.com/">Packing list</a> · <a href="https://example.com/rules" target="_blank">Travel rules</a></p>
     <script>
       const total = 2400;
       const parts = [["Travel", 1100], ["Food", 800], ["Fun", 500]];

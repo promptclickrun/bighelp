@@ -162,6 +162,23 @@ final class DuoLayoutUITests: BighelpUITestCase {
         }
     }
 
+    /// A device can report no occlusion for a moment while its status changes. The column used
+    /// to start at 8 pt then, under the camera and the status; their height is kept clear anyway.
+    @MainActor
+    func testCoverScreenColumnStaysClearWithoutAReportedOcclusion() throws {
+        let app = makeApp()
+        app.launchArguments = demo + ["-bighelp.debug.no-occlusion", "YES"]
+        app.launch()
+        try requireCoverScreen(app)
+        let today = app.buttons["home.tab.today"].firstMatch
+        XCTAssertTrue(today.waitForExistence(timeout: 20), "The places show")
+        let window = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(today.frame.minY, window.minY + 150,
+                             "Never under the camera and the status, reported or not")
+        save("cover-no-occlusion", app)
+        app.terminate()
+    }
+
     // MARK: Open and half-folded (an iPad simulator standing in)
 
     @MainActor

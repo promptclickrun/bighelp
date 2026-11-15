@@ -20,6 +20,15 @@ private struct BighelpSideColumnLayout<Column: View>: ViewModifier {
     let isShown: Bool
     let column: Column
 
+    /// Where the column's free part starts. The system says where the camera and the status
+    /// end; when it doesn't report them, their documented height is kept clear anyway, so the
+    /// strip never starts under the status.
+    private var columnTopClearance: CGFloat {
+        let measured = screen.trailingColumnFreeTop
+        guard screen.trailingColumnWidth >= BighelpScreenGeometry.sideColumnWidth else { return measured }
+        return max(measured, BighelpScreenGeometry.statusColumnHeight)
+    }
+
     func body(content: Content) -> some View {
         content
             // The system's column already keeps the page clear; elsewhere make room.
@@ -29,7 +38,7 @@ private struct BighelpSideColumnLayout<Column: View>: ViewModifier {
                     // Centered in the system's column (84 pt on the Duo), or the room kept for it.
                     column
                         .frame(width: max(screen.trailingColumnWidth, BighelpScreenGeometry.sideColumnWidth))
-                        .padding(.top, max(screen.trailingColumnFreeTop + BighelpTokens.space8, 8))
+                        .padding(.top, max(columnTopClearance + BighelpTokens.space8, 8))
                         // Only the system's side column supplies its own top clearance.
                         .ignoresSafeArea(.container, edges: screen.usesSideBar ? [.trailing, .top] : .trailing)
                         .transition(.move(edge: .trailing).combined(with: .opacity))

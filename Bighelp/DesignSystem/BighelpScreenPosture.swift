@@ -92,6 +92,11 @@ struct BighelpScreenGeometry: Equatable, Sendable {
     /// The width the side bar and the switcher take. The system's column when it's wide
     /// enough, else this much is kept free beside the page.
     static let sideColumnWidth: CGFloat = 60
+
+    /// How much of the top of the system's column the camera and the status take, as the Duo
+    /// reports it. Kept clear when the system doesn't say where they end, so nothing starts
+    /// underneath them.
+    static let statusColumnHeight: CGFloat = 150
 }
 
 extension EnvironmentValues {
@@ -148,6 +153,7 @@ struct BighelpScreenPostureReader: ViewModifier {
         // Everywhere but the Duo, only which way up the window is: resizing a Mac window or
         // dragging iPad's Split View doesn't redraw every screen that reads this.
         guard posture != .standard else { return BighelpScreenGeometry(isLandscape: isLandscape) }
+        if BighelpScreenDebug.ignoresOcclusion { measured.occlusion = nil }
         if BighelpScreenDebug.foldsHalfway, measured.size.width > 0 {
             // DEBUG: a half-folded screen, as the simulator can't fold one.
             let size = measured.size
@@ -204,6 +210,16 @@ enum BighelpScreenDebug {
         UserDefaults.standard.string(forKey: "bighelp.debug.screen-posture").flatMap(BighelpScreenPosture.init(rawValue:))
         #else
         nil
+        #endif
+    }
+
+    /// DEBUG and UI tests: a screen whose occlusion the system doesn't report, which is what a
+    /// device does while the status is changing. `-bighelp.debug.no-occlusion YES`.
+    static var ignoresOcclusion: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "bighelp.debug.no-occlusion")
+        #else
+        false
         #endif
     }
 

@@ -1,12 +1,15 @@
 import SwiftUI
 import UIKit
 
-/// Who is working and on what, for the island.
+/// Who is working and on what, for the island and for the pill in the iPhone Duo's side column.
 struct AgentIslandActivity: Equatable {
     let agentID: String
     let name: String
     let imageURL: URL?
     let kind: AgentActivityKind
+    /// The chat the work is in. An agent can have several, so "open the working chat" goes by this
+    /// and not by the agent. Nil only for the demo's forced activity, which is in no chat.
+    var conversationID: String?
 }
 
 private struct AgentActivityInIslandKey: EnvironmentKey {

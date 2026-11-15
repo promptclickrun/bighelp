@@ -212,7 +212,14 @@ final class CanvasStreamingFixtureClient: ConversationFixtureClient, StreamingCo
             _ = model.acceptActivity(event.updating(lifecycle: .succeeded, summary: "Source inspected", detail: result, occurredAt: index * 2 + 1))
         }
         // `-test-tool-stream-slow`: the turn stays live long enough for a screenshot of its notes.
-        if args.contains("-test-tool-stream-slow") { try await Task.sleep(for: .seconds(8)) }
+        // `-test-tool-stream-hold <seconds>`: that long, for a test that leaves the chat while it works.
+        let hold = args.firstIndex(of: "-test-tool-stream-hold")
+            .flatMap { args.indices.contains($0 + 1) ? Int(args[$0 + 1]) : nil }
+        if let hold {
+            try await Task.sleep(for: .seconds(hold))
+        } else if args.contains("-test-tool-stream-slow") {
+            try await Task.sleep(for: .seconds(8))
+        }
         var tail = "LIVE TOOL STREAM TAIL\n"
         monitor.beginAnswerUpdates()
         if let notification = ProcessInfo.processInfo.environment["BIGHELP_TOOL_STREAM_TAIL_NOTIFICATION"] {

@@ -6,16 +6,39 @@ import SwiftUI
 extension RootShellView {
     var homeAgent: AgentProfile? { agents.resolvedAgent(explicitID: nil) }
 
-    /// What the home agent is doing right now, from its recent direct chats.
-    var homeActivity: AgentActivityKind {
-        guard let agent = homeAgent else { return .idle }
-        for summary in sessionCatalog.recentSummaries(includeCronSessions: false).prefix(12)
-        where summary.kind == .direct && summary.agentIDs.first == agent.id {
-            if let model = featureStore.preparedChatModel(id: summary.id), model.isSending {
-                return model.liveActivityKind
-            }
+    /// The one-agent chats this device holds whose agent works now, newest first. It reads the
+    /// chats' own live state, so nothing is asked of the computer to learn it.
+    var workingChats: [WorkingChat] {
+        // The list is read first: a chat that starts work changes it, which is what has the island
+        // and the Duo's column look again.
+        let summaries = sessionCatalog.recentSummaries(includeCronSessions: false)
+        var models = Dictionary(featureStore.workingChatModels.map { ($0.conversationID, $0) },
+                                uniquingKeysWith: { first, _ in first })
+        var working: [WorkingChat] = []
+        // A chat at work is among the newest, so only the top of the list is read: this runs with
+        // every streamed piece and must not grow with the number of chats. Only listed chats count,
+        // which leaves out helpers' and scheduled runs' own sessions.
+        for summary in summaries.prefix(Self.workingChatScan) where summary.kind == .direct {
+            guard !models.isEmpty else { break }
+            guard let model = models.removeValue(forKey: summary.id), let agentID = model.memberIDs.first else { continue }
+            working.append(WorkingChat(conversationID: summary.id, agentID: agentID, kind: model.liveActivityKind))
         }
-        return .idle
+        return working
+    }
+
+    /// How far down the list of chats a chat at work is looked for.
+    private static var workingChatScan: Int { 48 }
+
+    /// The chat on screen, when the top of the stack is one.
+    private var openConversationID: String? {
+        if case .chat(let id)? = appState.path.last { return id }
+        return nil
+    }
+
+    private func activity(for chat: WorkingChat) -> AgentIslandActivity? {
+        guard let profile = agents.profiles.first(where: { $0.id == chat.agentID }) else { return nil }
+        return AgentIslandActivity(agentID: chat.agentID, name: profile.name, imageURL: agents.avatarURL(for: profile),
+                                   kind: chat.kind, conversationID: chat.conversationID)
     }
 
     /// Who the island shows: the open chat's agent while it works, else the
@@ -32,32 +55,42 @@ extension RootShellView {
                                        imageURL: agents.avatarURL(for: agent), kind: kind)
         }
         #endif
-        if case .chat(let id)? = appState.path.last, let model = featureStore.preparedChatModel(id: id),
-           !model.isBotMode, model.isSending, let agentID = model.memberIDs.first,
-           let profile = agents.profiles.first(where: { $0.id == agentID }) {
-            return AgentIslandActivity(agentID: agentID, name: profile.name,
-                                       imageURL: agents.avatarURL(for: profile), kind: model.liveActivityKind)
+        return WorkingChatPick.island(openConversationID: openConversationID, working: workingChats,
+                                      homeAgentID: homeAgent?.id).flatMap(activity(for:))
+    }
+
+    /// An agent working in a chat other than `conversationID`, for that chat's side column on the
+    /// iPhone Duo (`WorkingChatPill`). Any agent's: the chat itself says its own work. It has no
+    /// setting: the Duo has no island to turn on or off.
+    func workElsewhere(than conversationID: String) -> AgentIslandActivity? {
+        WorkingChatPick.elsewhere(than: conversationID, working: workingChats).flatMap(activity(for:))
+    }
+
+    /// Go to the chat where the work is: the island's touch and hold, and the Duo's pill. By the
+    /// chat, not the agent, so work in one of an agent's chats opens from another of its chats.
+    func openWorkingChat(_ activity: AgentIslandActivity) {
+        let openID = openConversationID
+        let destination = WorkingChatDestination.resolve(
+            workingConversationID: activity.conversationID, agentID: activity.agentID, openConversationID: openID,
+            openAgentID: openID.flatMap { featureStore.preparedChatModel(id: $0)?.memberIDs.first })
+        switch destination {
+        case .stay:
+            return
+        case .chat(let conversationID):
+            if let session = sessionCatalog.session(id: conversationID) {
+                openSessionSelection(session.summary)
+            } else {
+                openCanonicalAgentChat(activity.agentID)
+            }
+        case .agentChat(let agentID):
+            openCanonicalAgentChat(agentID)
         }
-        guard let agent = homeAgent else { return nil }
-        let kind = homeActivity
-        guard kind.isWorking else { return nil }
-        return AgentIslandActivity(agentID: agent.id, name: agent.name,
-                                   imageURL: agents.avatarURL(for: agent), kind: kind)
     }
 
     /// Touch and hold the island: go to the chat that is working.
     func openIslandChat() {
         guard let activity = agentIsland?.activity else { return }
-        if case .chat(let id)? = appState.path.last,
-           featureStore.preparedChatModel(id: id)?.memberIDs.first == activity.agentID { return }
-        if let working = sessionCatalog.recentSummaries(includeCronSessions: false).first(where: {
-            $0.kind == .direct && $0.agentIDs.first == activity.agentID
-                && featureStore.preparedChatModel(id: $0.id)?.isSending == true
-        }) {
-            openSessionSelection(working)
-        } else {
-            openCanonicalAgentChat(activity.agentID)
-        }
+        openWorkingChat(activity)
     }
 
     /// The primary bot's own chat, pushed: an old Activity link, or an alert that names no chat

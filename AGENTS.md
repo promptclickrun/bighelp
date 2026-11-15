@@ -949,6 +949,16 @@ sections can crash only on devices ("Thread stack size exceeded").
   places are toolbar items (`HomeStripTabs`, `.bottomBar`), so iOS stacks them there too; a column of our own
   drawn over the strip lay on top of the screen's own buttons. A chat has no bar, so
   `BighelpChatSwitcher` (Settings › Chat › Chat switcher) takes the strip there.
+- The cover screen has no island, so the top of a chat's column says who works in another chat
+  (`WorkingChatPill`, above the switcher): a face and a line naming the work, a tap opens that chat, and nothing
+  is drawn while no other chat works. The open chat's own work is never there: its header says it. It reads the
+  chats' own live state (`RootShellView.workingChats`), with no request and nothing stored, and shows only where
+  the column is there anyway (`WorkingChatPill.isShown`), so work that starts never moves the page. It is a view
+  in the column, never a toolbar item.
+- "Go to the working chat" goes by the chat, never by the agent: the pill's tap and the Dynamic Island's touch and
+  hold share `openWorkingChat`, and the activity they show carries its chat (`AgentIslandActivity.conversationID`,
+  `WorkingChatDestination`). One agent can work in a chat while another of its chats is open; comparing agents
+  made that tap do nothing (#1029).
 - Open wide: `BighelpSplitColumn` shows the tab's list in its own `NavigationStack` up to the fold
   (`splitColumnWidth`), and what it opens is pushed on the app's one stack beside it, so `path`, the active chat
   and every top-of-stack rule work as on iPhone. The list is the shell's own view, drawn again from its stores

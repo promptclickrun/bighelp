@@ -1,7 +1,7 @@
 import XCTest
 
 /// The iPhone Duo. The cover-screen tests run on the Duo's simulator, which starts folded: the bar in
-/// the side column and the switcher beside a chat. A test can't open
+/// the side column, and beside a chat the switcher with work in another chat above it. A test can't open
 /// or fold that simulator, so the open screen and the half-folded laptop run on an iPad simulator with
 /// `-bighelp.debug.screen-posture` and `-bighelp.debug.fold-halfway`. Each test skips on a screen it
 /// isn't for. Set BIGHELP_DUO_EVIDENCE (TEST_RUNNER_…) to a folder to save the screenshots.
@@ -64,6 +64,69 @@ final class DuoLayoutUITests: BighelpUITestCase {
                 XCTAssertTrue(jordan.waitForSelection(timeout: 10), "A tap opens Jordan's chat")
                 XCTAssertTrue(app.buttons["chat.back"].exists, "Back still goes home")
             }
+            app.terminate()
+        }
+    }
+
+    /// The Duo has no island, so a chat's column says who works in another chat: a face and a
+    /// line under the camera, above the chats' faces. A tap opens the chat where the work is.
+    @MainActor
+    func testCoverScreenColumnShowsWorkInAnotherChat() throws {
+        for appearance in appearances {
+            let app = makeApp()
+            app.launchArguments = demo + ["-start-chat", "-test-tool-stream", "-test-tool-stream-hold", "90",
+                                          "-loopdy.demo.appearance", appearance]
+            app.launch()
+            try requireCoverScreen(app)
+            // Avery starts work in his chat: a turn that really runs.
+            let sent = send("Check the March budget", in: app)
+            // Mina's chat, from the switcher beside it.
+            let mina = app.buttons.matching(identifier: "chat-switcher.stop")
+                .matching(NSPredicate(format: "label == %@", "Mina Shah")).firstMatch
+            XCTAssertTrue(mina.waitForExistence(timeout: 10), "The switcher is beside the chat")
+            mina.tap()
+            let identity = app.buttons["chat.identity"].firstMatch
+            XCTAssertTrue(waitForLabel("Mina Shah", of: identity), "Mina's chat is the open one")
+
+            let pill = app.buttons["chat.working-elsewhere"].firstMatch
+            XCTAssertTrue(pill.waitForExistence(timeout: 10), "The column says Avery works in another chat")
+            XCTAssertTrue(pill.label.hasPrefix("Avery Park, "), "Who, then what: \(pill.label)")
+            let window = app.windows.firstMatch.frame
+            XCTAssertGreaterThan(pill.frame.minX, window.maxX - 90, "In the side column")
+            XCTAssertGreaterThan(pill.frame.minY, window.minY + 150, "Under the camera and the status")
+            let switcher = element("chat-switcher", in: app)
+            XCTAssertTrue(switcher.exists, "The chats' faces stay")
+            XCTAssertLessThanOrEqual(pill.frame.maxY, switcher.frame.minY, "Above the chats' faces")
+            XCTAssertLessThan(abs(pill.frame.midX - switcher.frame.midX), 4, "In one column with them")
+            sleep(1)
+            save("cover-working-elsewhere-\(appearance)", app)
+
+            pill.tap()
+            XCTAssertTrue(sent.waitForExistence(timeout: 10), "A tap opens the chat where Avery works")
+            XCTAssertTrue(waitForLabel("Avery Park", of: identity))
+            // That chat says its own work: nothing is left for its column to say.
+            XCTAssertTrue(pill.waitForNonExistence(timeout: 5), "The working chat's own column is quiet")
+            app.terminate()
+        }
+    }
+
+    /// Nothing is drawn while no other chat works: not at rest, and not for the open chat's own work.
+    @MainActor
+    func testCoverScreenColumnIsQuietWhileNoOtherChatWorks() throws {
+        for appearance in appearances {
+            let app = makeApp()
+            app.launchArguments = demo + ["-start-chat", "-test-tool-stream", "-test-tool-stream-hold", "20",
+                                          "-loopdy.demo.appearance", appearance]
+            app.launch()
+            try requireCoverScreen(app)
+            XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 20), "The chat opens")
+            let pill = app.buttons["chat.working-elsewhere"].firstMatch
+            XCTAssertTrue(element("chat-switcher", in: app).waitForExistence(timeout: 10))
+            XCTAssertFalse(pill.exists, "Every bot rests: the column holds only the chats' faces")
+            save("cover-idle-\(appearance)", app)
+            _ = send("Check the March budget", in: app)
+            sleep(2)
+            XCTAssertFalse(pill.exists, "The open chat's own work stays out of its column")
             app.terminate()
         }
     }
@@ -217,6 +280,31 @@ final class DuoLayoutUITests: BighelpUITestCase {
     private func requireWideScreen(_ app: XCUIApplication) throws {
         let frame = app.windows.firstMatch.frame
         try XCTSkipUnless(min(frame.width, frame.height) > 600, "Runs on an iPad simulator standing in for the open Duo")
+    }
+
+    /// Sends a message in the open chat and returns its row. With `-test-tool-stream` the bot then
+    /// works for as long as `-test-tool-stream-hold` says.
+    @MainActor
+    private func send(_ text: String, in app: XCUIApplication) -> XCUIElement {
+        let input = app.textViews["Message"]
+        XCTAssertTrue(input.waitForExistence(timeout: 20), "The chat opens")
+        input.tap()
+        input.typeText(text)
+        app.buttons["chat.send"].tap()
+        let sent = app.textViews["You: \(text)"]
+        XCTAssertTrue(sent.waitForExistence(timeout: 10), "The message is in the chat")
+        return sent
+    }
+
+    /// Waits for a label (a chat's header naming its bot).
+    @MainActor
+    private func waitForLabel(_ label: String, of element: XCUIElement, timeout: TimeInterval = 10) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if element.exists, element.label == label { return true }
+            usleep(200_000)
+        }
+        return false
     }
 
     @MainActor

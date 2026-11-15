@@ -1,7 +1,22 @@
 import SwiftUI
 
 // The switcher beside a chat (`BighelpChatSwitcher`): a coding session's other sessions, else the bots.
+// On the iPhone Duo's cover screen the column starts with work in another chat (`WorkingChatPill`).
 extension RootShellView {
+    /// The side column for the chat with `conversationID`: work in another chat on top, where the
+    /// Duo's cover screen has no island to say it, then the switcher. Nil where neither shows.
+    func chatSideColumn(for conversationID: String, agentID: String?) -> AnyView? {
+        let switcher = chatSwitcherColumn(for: conversationID, agentID: agentID)
+        let showsWork = WorkingChatPill.isShown(screen: screen, hasSwitcher: switcher != nil)
+        guard switcher != nil || showsWork else { return nil }
+        return AnyView(VStack(spacing: BighelpTokens.space8) {
+            if showsWork {
+                WorkingChatPill(working: { workElsewhere(than: conversationID) }, open: { openWorkingChat($0) })
+            }
+            if let switcher { switcher }
+        })
+    }
+
     /// The column for the chat with `conversationID`, where one shows: nil with the switcher turned
     /// off, or with fewer than two places to go.
     func chatSwitcherColumn(for conversationID: String, agentID: String?) -> AnyView? {

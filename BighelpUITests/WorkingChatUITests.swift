@@ -45,7 +45,15 @@ final class WorkingChatUITests: BighelpUITestCase {
         } else {
             XCTAssertTrue(island.exists, "The island or the Duo's column says Avery is working")
             XCTAssertTrue(island.label.hasPrefix("Avery Park"), island.label)
-            island.press(forDuration: 1.0)
+            // A tap beside the camera opens the big stage. That it grows shows touches reach the
+            // island here, so a hold that then goes nowhere is the app's doing, not the test's.
+            let compact = island.frame.height
+            island.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)).tap()
+            let grown = Date().addingTimeInterval(5)
+            while Date() < grown, island.frame.height < compact + 20 { usleep(200_000) }
+            XCTAssertGreaterThan(island.frame.height, compact + 20, "A tap opens the island's stage")
+            // Touch and hold on the stage, under the camera.
+            island.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8)).press(forDuration: 1.0)
         }
         XCTAssertTrue(sent.waitForExistence(timeout: 10), "The chat where Avery works opens")
         XCTAssertEqual(chatIdentity(in: app).label, "Avery Park")

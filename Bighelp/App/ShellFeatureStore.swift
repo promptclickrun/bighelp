@@ -430,6 +430,11 @@ final class ShellFeatureStore {
     /// The retained model for a chat, whether or not it is on screen.
     func preparedChatModel(id: String) -> ChatModel? { chatModels[id] }
 
+    /// The retained one-agent chats whose agent is working now, on screen or not, in no order.
+    var workingChatModels: [ChatModel] {
+        chatModels.values.filter { $0.isSending && !$0.isBotMode && $0.memberIDs.count == 1 }
+    }
+
     /// A chat's agent and text, while it's never sent anything: what a fresh session needs to
     /// take its place if Hermes drops it while the app is away.
     func unsentChat(id: String) -> (agentID: String, text: String)? {

@@ -2,7 +2,8 @@ import SwiftUI
 import UIKit
 
 // The iPhone Duo's side strip, the column on the trailing edge under the camera and the status: room
-// for the chat switcher. The home's places are toolbar items there (`HomeStripTabs`).
+// for work in another chat (`WorkingChatPill`) and the chat switcher. The home's places are toolbar
+// items there (`HomeStripTabs`).
 
 extension View {
     /// Keeps a column free on the trailing edge and puts `column` in it, under the camera and the

@@ -241,10 +241,20 @@ final class DuoLayoutUITests: BighelpUITestCase {
             let pages = element("chat.image-stack.pages", in: app)
             XCTAssertTrue(pages.waitForExistence(timeout: 10), "The photos open")
             let window = app.windows.firstMatch.frame
-            XCTAssertGreaterThan(pages.frame.width, window.width - 40,
-                                "The picture takes the display instead of a sheet inset for the bar")
+            XCTAssertGreaterThan(pages.frame.width, window.width - 120,
+                                "The picture takes the display, up to the camera and status column")
             XCTAssertFalse(app.navigationBars["1 of 4"].exists,
                            "No bar stands a column up over the picture")
+            // A page is the pager's width, so no other photo shows beside this one at rest.
+            let first = element("chat.image-stack.page.0", in: app)
+            XCTAssertTrue(first.waitForExistence(timeout: 5), "The pictures are pages of their own")
+            XCTAssertEqual(first.frame.width, pages.frame.width, accuracy: 1,
+                           "A page is as wide as the pager, so the next photo can't show beside it")
+            let next = element("chat.image-stack.page.1", in: app)
+            if next.exists {
+                XCTAssertGreaterThanOrEqual(next.frame.minX, pages.frame.maxX - 1,
+                                            "The next photo starts past the pager's edge")
+            }
             let position = element("chat.image-stack.position", in: app)
             XCTAssertTrue(position.waitForExistence(timeout: 5), "The pictures say which is showing")
             XCTAssertEqual(position.label, "1 of 4")

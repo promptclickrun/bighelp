@@ -235,6 +235,9 @@ struct ChatImageStackViewer: View {
         TabView(selection: $index) {
             ForEach(Array(images.enumerated()), id: \.offset) { offset, attachment in
                 ChatImageStackPage(attachment: attachment)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("chat.image-stack.page.\(offset)")
                     .tag(offset)
             }
         }
@@ -290,14 +293,14 @@ struct ChatImageStackViewer: View {
         }
     }
 
-    /// The Duo's: the picture edge to edge, with no bar standing a column up over it. Close, Save
-    /// and Share go down the leading edge, above the fold's side of the column, and the thumbnails
-    /// stay at the bottom.
+    /// The Duo's: the picture over the display, up to the column the camera and the status keep.
+    /// Close, Save and Share go down the leading edge, and the thumbnails stay at the bottom.
     private var wholeDisplay: some View {
         ZStack(alignment: .bottom) {
             Color.black.ignoresSafeArea()
+            // The pager stops at the camera's column. Given the whole window it still laid its
+            // pages out inside the safe area, so the next photo's edge showed beside this one.
             pages
-                .ignoresSafeArea()
             VStack(alignment: .leading, spacing: BighelpTokens.space8) {
                 Button { dismiss() } label: { scrim("xmark") }
                     .bighelpPlainButtonStyle(.circle)
@@ -334,6 +337,9 @@ struct ChatImageStackViewer: View {
             }
             .padding(.bottom, BighelpTokens.space8)
         }
+        // The system's items are drawn for the app's own appearance, so on the black behind a
+        // picture the time goes dark on dark. A photo needs none of them.
+        .statusBarHidden()
     }
 
     /// An action over a picture: white on its own dark circle, so it reads on any photo.

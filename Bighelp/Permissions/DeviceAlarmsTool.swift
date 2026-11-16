@@ -87,9 +87,10 @@ final class DeviceAlarmLabelStore: DeviceAlarmLabelStoring {
         var labels = read()
         labels[Self.key(id)] = label
         if labels.count > Self.maximumLabels {
-            for key in labels.keys.sorted().prefix(labels.count - Self.maximumLabels) where key != Self.key(id) {
-                labels[key] = nil
-            }
+            // Never the label just set. It is left out before the count, so the bound holds when its
+            // key sorts first too: skipped inside the prefix, it left one label too many.
+            let others = labels.keys.filter { $0 != Self.key(id) }.sorted()
+            for key in others.prefix(labels.count - Self.maximumLabels) { labels[key] = nil }
         }
         write(labels)
     }

@@ -118,7 +118,7 @@ final class DashboardModel {
         }
         guard attention != current.attentionItems else { return }
         snapshot = DashboardSnapshot(
-            attentionItems: attention, completedItems: current.completedItems, agents: current.agents
+            attentionItems: attention, agents: current.agents
         )
     }
 
@@ -160,7 +160,6 @@ final class DashboardModel {
             if !dismissedIDs.isEmpty, let current = snapshot {
                 snapshot = DashboardSnapshot(
                     attentionItems: current.attentionItems.filter { !dismissedIDs.contains($0.id) },
-                    completedItems: current.completedItems,
                     agents: current.agents
                 )
             }
@@ -177,7 +176,6 @@ final class DashboardModel {
                 // must not erase what waits on the person.
                 snapshot = DashboardSnapshot(
                     attentionItems: current.attentionItems,
-                    completedItems: current.completedItems,
                     agents: current.agents
                 )
                 state = .loaded
@@ -478,7 +476,6 @@ final class DashboardModel {
         guard let snapshot else { return }
         self.snapshot = DashboardSnapshot(
             attentionItems: snapshot.attentionItems.filter { $0.id != id },
-            completedItems: snapshot.completedItems,
             agents: snapshot.agents
         )
     }
@@ -492,7 +489,6 @@ final class DashboardModel {
                 !resolvedClarificationIDs.contains($0.id)
                     && DashboardWorkProjection.isActionable($0, at: referenceDate)
             },
-            completedItems: snapshot.completedItems,
             agents: snapshot.agents
         )
     }

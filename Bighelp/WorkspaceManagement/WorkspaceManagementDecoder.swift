@@ -191,43 +191,6 @@ enum WorkspaceManagementDecoder {
         return try .init(path: currentPath, root: root, parent: parent, entries: unique(entries))
     }
 
-    /// Decodes the stock managed-file response while confining this feature to
-    /// the literal Hermes workspace. An unrestricted host response never turns
-    /// into UI access above `/workspace`.
-    static func workspaceArtifacts(_ payload: Object, expectedPath: String) throws -> WorkspaceFileListing {
-        let workspaceRoot = "/workspace"
-        guard contains(root: workspaceRoot, path: expectedPath) else {
-            throw WorkspaceManagementError.fileRootNotConfined
-        }
-        let listing = try files(
-            payload,
-            expectedPath: expectedPath,
-            expectedRoot: nil,
-            maximumEntries: maximumFileRows
-        )
-        guard contains(root: workspaceRoot, path: listing.path),
-              listing.entries.allSatisfy({ contains(root: workspaceRoot, path: $0.path) }) else {
-            throw WorkspaceManagementError.fileRootNotConfined
-        }
-        if expectedPath == workspaceRoot {
-            guard listing.parent == nil || listing.parent == "/" else {
-                throw WorkspaceManagementError.invalidResponse
-            }
-        } else {
-            guard let separator = expectedPath.lastIndex(of: "/") else {
-                throw WorkspaceManagementError.invalidResponse
-            }
-            let expectedParent = String(expectedPath[..<separator])
-            guard listing.parent == expectedParent else { throw WorkspaceManagementError.invalidResponse }
-        }
-        return .init(
-            path: listing.path,
-            root: workspaceRoot,
-            parent: expectedPath == workspaceRoot ? nil : listing.parent,
-            entries: listing.entries
-        )
-    }
-
     private static func fileModifiedAt(_ value: BighelpJSONValue?) throws -> Date? {
         guard let value, value != .null else { return nil }
         guard let seconds = value.number, seconds.isFinite,

@@ -377,7 +377,6 @@ private final class NotificationReceiptDashboardSource: DashboardDataSource {
                     agentID: "juno"
                 ),
             ],
-            completedItems: [],
             agents: []
         )
     }
@@ -395,7 +394,6 @@ private final class SuspendedNotificationDashboardSource: DashboardDataSource {
         await gate.run()
         return DashboardSnapshot(
             attentionItems: [],
-            completedItems: [],
             agents: []
         )
     }

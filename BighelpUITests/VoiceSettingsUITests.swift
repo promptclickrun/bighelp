@@ -37,7 +37,12 @@ final class VoiceSettingsUITests: BighelpUITestCase {
             save("voice-providers-\(appearance)", app)
             phonon.tap()
 
+            // The voice's rows are under the provider's: they may be below the screen's edge.
             let download = app.buttons["voice.settings.on-device-download"]
+            for _ in 0..<6 where !(download.exists && download.isHittable) {
+                app.swipeUp(velocity: .slow)
+                _ = download.waitForExistence(timeout: 1)
+            }
             XCTAssertTrue(download.waitForExistence(timeout: 5))
             XCTAssertFalse(app.buttons["voice.settings.save"].isEnabled, "Save before the voice is downloaded")
             save("voice-phonon-download-\(appearance)", app)

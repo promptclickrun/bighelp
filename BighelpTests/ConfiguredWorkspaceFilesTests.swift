@@ -1,129 +1,44 @@
 import Foundation
-import SwiftUI
 import Testing
-import UIKit
 @testable import Bighelp
 
-/// Files in the agent home reads the selected agent's own folder (DESIGN.md › Navigation and
-/// simplicity), and the folder chooser saves for the agent Files reads, never another one (#518).
+/// A bot's Files reads that bot's own folder (#518): each request names the bot, except the bot that
+/// serves the plugin, which never names itself, so plugins older than 3.20.0 keep working for it.
 @MainActor
 struct ConfiguredWorkspaceFilesTests {
-    @Test func theSelectedAgentsFolderIsReadByBothClients() async throws {
+    @Test func theSelectedAgentsFolderIsReadForThatAgent() async throws {
         let host = try FilesHostFake()
         host.readsOtherAgents = true
-        let workspace = try await host.source.open(.init(owner: host.owner, agentID: "research"),
-                                                   currentOwner: { host.owner })
-        #expect(workspace.scope.root == FilesHostFake.root(for: "research"))
-        _ = try await workspace.performer.perform(.filesRecent, payload: [:], owner: host.owner)
-        _ = try await workspace.performer.perform(.filesList, payload: ["path": .string(workspace.scope.root)],
-                                                  owner: host.owner)
-        #expect(host.fileRequests.map(\.route) == ["scope", "recent", "list"])
+        let files = host.files(of: "research")
+        let scope = try await files.workspaceScope()
+        #expect(scope.root == FilesHostFake.root(for: "research"))
+        let listed = try await files.list()
+        #expect(listed.files.map(\.name) == ["research.md"])
+        #expect(host.fileRequests.first?.route == "scope")
+        #expect(host.fileRequests.contains { $0.route == "list" })
         #expect(host.fileRequests.allSatisfy { $0.profile == "research" })
     }
 
-    /// The serving agent never names itself, so plugins older than 3.20.0 keep working for it.
     @Test func theServingAgentsFolderIsReadWithoutNamingIt() async throws {
         let host = try FilesHostFake()
-        let workspace = try await host.source.open(.init(owner: host.owner, agentID: "default"),
-                                                   currentOwner: { host.owner })
-        _ = try await workspace.performer.perform(.filesRecent, payload: [:], owner: host.owner)
-        #expect(workspace.scope.root == FilesHostFake.root(for: "default"))
-        #expect(host.fileRequests.map(\.route) == ["scope", "recent"])
+        let files = host.files(of: "default")
+        let scope = try await files.workspaceScope()
+        _ = try await files.list()
+        #expect(scope.root == FilesHostFake.root(for: "default"))
+        #expect(host.fileRequests.contains { $0.route == "list" })
         #expect(host.fileRequests.allSatisfy { $0.profile == nil })
     }
 
     @Test func anotherAgentOnAnOlderPluginSaysToUpdateIt() async throws {
         let host = try FilesHostFake()
         do {
-            _ = try await host.source.open(.init(owner: host.owner, agentID: "research"), currentOwner: { host.owner })
+            _ = try await host.files(of: "research").workspaceScope()
             Issue.record("An older plugin can't read another agent's folder")
         } catch {
             #expect(error as? WorkspaceClientError == .rejected(code: WorkspaceClientError.workspacePluginOutdated))
-            #expect(ConfiguredWorkspaceArtifactsView.message(for: error).contains("Update it in Settings"))
-            #expect(!WorkspaceFolderChooser.canFix(error), "A folder doesn't fix an old plugin")
+            #expect(SimpleBotFilesModel.phase(for: error) == .needsPluginUpdate)
         }
         #expect(host.fileRequests.isEmpty, "Nothing is read from the serving agent's folder instead")
-    }
-
-    /// The agent home's Files reads the selected agent, so its chooser saves that agent's folder.
-    @Test(arguments: ["research", "default"])
-    func theAgentHomesChooserSavesForTheSelectedAgent(agentID: String) async throws {
-        let host = try FilesHostFake()
-        try await host.loadContext()
-        let chooser = try #require(host.source.folderChooser(for: .init(owner: host.owner, agentID: agentID)))
-        try await chooser.save("/srv/agents/chosen")
-        #expect(host.savedWorkingFolders == [agentID: "/srv/agents/chosen"])
-    }
-
-    /// Nerd Mode's Artifacts reads the serving agent whichever agent is selected, so its chooser
-    /// saves the serving agent's folder; until the host names that agent, there's no chooser.
-    @Test func nerdModeArtifactsChooserSavesForTheServingAgent() async throws {
-        let host = try FilesHostFake()
-        let target = WorkspaceFilesTarget(owner: host.owner, agentID: nil)
-        #expect(host.source.folderChooser(for: target) == nil)
-        try await host.loadContext()
-        let chooser = try #require(host.source.folderChooser(for: target))
-        try await chooser.save("/srv/agents/chosen")
-        #expect(host.savedWorkingFolders == ["default": "/srv/agents/chosen"])
-    }
-
-    /// The person picks another agent while the last one's folder is still on its way.
-    @Test func aLateReplyForThePreviousAgentIsDropped() async throws {
-        let host = try FilesHostFake()
-        host.readsOtherAgents = true
-        let previous = WorkspaceFilesTarget(owner: host.owner, agentID: "default")
-        var current: WorkspaceFilesTarget? = previous
-        host.onScope = { current = .init(owner: host.owner, agentID: "research") }
-        let opened = try? await ConfiguredWorkspaceArtifactsView.open(previous, from: host.source,
-                                                                      currentTarget: { current })
-        #expect(opened == nil)
-        #expect(host.fileRequests.map(\.route) == ["scope"], "Nothing more is read for the previous agent")
-    }
-
-    /// Files stays on screen while the agent changes; it reads the new agent's folder.
-    @Test func aSameHostAgentSwitchReloadsTheFiles() async throws {
-        let host = try FilesHostFake()
-        host.readsOtherAgents = true
-        let selection = FilesSelection()
-        let controller = UIHostingController(rootView: FilesHarness(owner: host.owner, source: host.source,
-                                                                    selection: selection))
-        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 393, height: 852))
-        window.rootViewController = controller
-        window.isHidden = false
-        defer { window.isHidden = true }
-        try await waitUntil(controller) { host.fileRequests.contains { $0.route == "recent" && $0.profile == nil } }
-
-        selection.agentID = "research"
-        try await waitUntil(controller) { host.fileRequests.contains { $0.route == "recent" && $0.profile == "research" } }
-        #expect(host.fileRequests.filter { $0.route == "scope" }.last?.profile == "research")
-    }
-
-    private func waitUntil(_ controller: UIViewController, _ condition: () -> Bool) async throws {
-        for _ in 0..<300 where !condition() {
-            controller.view.layoutIfNeeded()
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        try #require(condition())
-    }
-}
-
-@MainActor
-@Observable
-private final class FilesSelection {
-    var agentID = "default"
-}
-
-/// Files the way the agent home builds it, with the selected agent read live.
-private struct FilesHarness: View {
-    let owner: WorkspaceOwner
-    let source: any ConfiguredWorkspaceSource
-    let selection: FilesSelection
-
-    var body: some View {
-        ConfiguredWorkspaceArtifactsView(hostName: "Test computer",
-            target: .init(owner: owner, agentID: selection.agentID), source: source,
-            currentTarget: { [owner, selection] in .init(owner: owner, agentID: selection.agentID) },
-            isEmbedded: true)
     }
 }
 
@@ -139,13 +54,11 @@ private final class FilesHostFake: DirectHermesRPC, DirectHermesAuthenticatedHTT
     var onEvent: ((DirectHermesEvent) -> Void)?
     /// Plugin 3.20.0 and later read another agent's folder when a request names it.
     var readsOtherAgents = false
-    var onScope: (@MainActor () -> Void)?
     private(set) var fileRequests: [FileRequest] = []
-    /// Working folders saved through Hermes' `config.set`, by agent.
-    private(set) var savedWorkingFolders: [String: String] = [:]
-    lazy var workspaceClient = DirectHermesWorkspaceClient(rpc: self, http: self, owner: owner,
-        capabilities: .init(owner: owner), currentOwner: { [owner] in owner })
-    var source: HostConfiguredWorkspace { .init(http: self, workspace: workspaceClient) }
+    /// The client a bot's Files tab makes for that bot.
+    func files(of agentID: String) -> DirectHermesManagedFilesClient {
+        DirectHermesManagedFilesClient(http: self, owner: owner, agentID: agentID, currentOwner: { [owner] in owner })
+    }
 
     static func root(for agentID: String) -> String { "/srv/agents/\(agentID)" }
 
@@ -155,18 +68,8 @@ private final class FilesHostFake: DirectHermesRPC, DirectHermesAuthenticatedHTT
                                authenticationGeneration: UUID(), connectionGeneration: UUID())
     }
 
-    /// The app reads the plugin's context through its workspace client soon after it connects.
-    func loadContext() async throws {
-        _ = try await workspaceClient.perform(.nativeContext, payload: [:], owner: owner)
-    }
-
     func request(_ method: String, params: [String: BighelpJSONValue]) async throws -> BighelpJSONValue {
-        guard method == "config.set", params["key"]?.string == "terminal.cwd",
-              let profile = params["profile"]?.string, let folder = params["value"]?.string else {
-            throw WorkspaceClientError.invalidRequest
-        }
-        savedWorkingFolders[profile] = folder
-        return .object(["key": .string("terminal.cwd")])
+        throw WorkspaceClientError.invalidRequest
     }
 
     func request(_ request: DirectHermesHTTPRequest) async throws -> BighelpJSONValue {
@@ -191,7 +94,6 @@ private final class FilesHostFake: DirectHermesRPC, DirectHermesAuthenticatedHTT
         } else {
             let profile = request.body?["profile"]?.string
             fileRequests.append(.init(route: request.path.components(separatedBy: "/").last ?? "", profile: profile))
-            if request.path.hasSuffix("/scope") { onScope?() }
             headers["X-Loopdy-Request-ID"] = try #require(requestGuard).requestIDHeader
             let agent = profile ?? "default"
             let root = Self.root(for: agent)

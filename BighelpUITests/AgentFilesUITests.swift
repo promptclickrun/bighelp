@@ -17,10 +17,13 @@ final class AgentFilesUITests: BighelpUITestCase {
             save("finance-\(appearance)", app)
 
             openFiles(of: "travel", in: app)
-            let itinerary = row("Itinerary.md", in: app)
-            XCTAssertTrue(itinerary.waitForExistence(timeout: 10), "Mina's own files")
+            XCTAssertTrue(row("Flights.csv", in: app).waitForExistence(timeout: 10), "Mina's own files")
             XCTAssertTrue(row("Notes.md", in: app).waitForNonExistence(timeout: 5), "Not Avery's")
             save("travel-\(appearance)", app)
+            // The trip's files are in its folder.
+            row("Lisbon trip", in: app).tap()
+            let itinerary = row("Itinerary.md", in: app)
+            XCTAssertTrue(itinerary.waitForExistence(timeout: 10), "The folder opens")
             itinerary.tap()
             XCTAssertTrue(app.navigationBars["Itinerary.md"].waitForExistence(timeout: 10), "The file opens")
             save("travel-open-\(appearance)", app)
@@ -28,7 +31,7 @@ final class AgentFilesUITests: BighelpUITestCase {
 
             openFiles(of: "home", in: app)
             XCTAssertTrue(row("Grocery list.txt", in: app).waitForExistence(timeout: 10), "Jordan's own files")
-            XCTAssertTrue(row("Itinerary.md", in: app).waitForNonExistence(timeout: 5), "Not Mina's")
+            XCTAssertTrue(row("Flights.csv", in: app).waitForNonExistence(timeout: 5), "Not Mina's")
             save("home-\(appearance)", app)
             app.terminate()
         }

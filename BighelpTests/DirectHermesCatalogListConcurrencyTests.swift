@@ -150,6 +150,8 @@ struct DirectHermesCatalogListConcurrencyTests {
         host.sendsHasMore = false
         host.pinnedOnEveryPage = DirectHermesSessionCatalogClientTests.session(id: "pinned", pinned: true)
         host.rows["alpha"] = Self.rows("alpha", count: 250)
+        // Hermes counts the pinned chat it adds to each page: the app takes as many chats as the total says.
+        host.reportedTotal["alpha"] = 251
         let workspace = try Self.workspace(host, names: ["alpha"])
 
         let records = try await DirectHermesSessionCatalogClientTests.client(workspace).list()

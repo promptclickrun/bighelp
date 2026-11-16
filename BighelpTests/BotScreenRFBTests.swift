@@ -173,10 +173,11 @@ struct BotScreenRFBTests {
         #expect(transport.closedWithHandBack == true, "Cancelling closes with 1000, which hands control back")
     }
 
-    @Test func aScreenThatWantsAPasswordIsRefusedPlainly() async throws {
+    /// A VNC password is a login bighelp can give (`ComputerScreenTests`); this one isn't.
+    @Test func aScreenWithALoginBighelpCantGiveIsRefusedPlainly() async throws {
         let transport = ScriptedTransport()
         transport.serve(Array("RFB 003.008\n".utf8))
-        transport.serve([1, 2])  // VNC password only
+        transport.serve([1, 30])  // Apple's own login only
         let session = RFBSession(transport: transport)
         await #expect(throws: RFBError.unsupportedSecurity) {
             try await session.run(onServerInit: { _ in }, onFrame: { _ in })

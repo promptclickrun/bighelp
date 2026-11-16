@@ -149,7 +149,7 @@ final class PetAvatarStore {
         loads[agentKey] = Task { @MainActor [weak self] in
             guard let self else { return }
             defer { self.loads[agentKey] = nil }
-            if !FileManager.default.fileExists(atPath: folder.appending(path: "idle.png").path()) {
+            if !FileManager.default.fileExists(atPath: folder.appending(path: "idle.png").path(percentEncoded: false)) {
                 guard let sheet = try? await loadSheet(), !Task.isCancelled,
                       let strips = try? await Task.detached(priority: .utility, operation: {
                           try PetdexSprite.strips(fromSheet: sheet)

@@ -86,19 +86,6 @@ struct HostConnectionStatusTests {
                 == (.disconnected, "Not connected"))
     }
 
-    @Test func aPluginUpdateIsReconnectingOnlyWhileHermesComesBack() async {
-        let name = UUID().uuidString
-        let defaults = UserDefaults(suiteName: name)!
-        defer { defaults.removePersistentDomain(forName: name) }
-        let client = RestartingPluginHost()
-        let store = PluginUpdateStore(scope: "device:host", client: client, defaults: defaults,
-                                      operationID: { "update_0123456789abcdef" })
-        #expect(HostConnectionStatus(pluginUpdate: store) == nil)
-        await store.start()
-        #expect(store.status?.phase == .waitingForActivation)
-        #expect(shown(HostConnectionStatus(pluginUpdate: store))! == (.reconnecting, "Reconnecting"))
-    }
-
     /// Only real values: a host's reason when it's down. No attempt count (the
     /// keeper retries for as long as the app is open), no latency (nothing
     /// measures it), and no version or reason where none was given.
@@ -127,18 +114,5 @@ struct HostConnectionStatusTests {
         #expect(blank?.detail?.attempt == nil)
         #expect(blank?.detail?.latencyMilliseconds == nil)
         #expect(blank?.detail?.hermesVersion == nil)
-    }
-}
-
-/// A host that accepts the update, then restarts Hermes to load it.
-@MainActor
-private final class RestartingPluginHost: PluginUpdateClient {
-    func start(operationID: String) async throws -> PluginUpdateStatus {
-        .init(operationID: operationID, phase: .waitingForActivation, targetRevision: nil, activeRevision: nil,
-              runtimeID: nil, message: "Waiting for Hermes")
-    }
-
-    func status(operationID: String?) async throws -> PluginUpdateStatus {
-        try await start(operationID: operationID ?? "")
     }
 }

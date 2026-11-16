@@ -249,18 +249,120 @@ final class LocalizationUITests: BighelpUITestCase {
         }
     }
 
+    /// German (#1056) on the screens people see first, in light and dark, at the largest text size
+    /// before the accessibility sizes (the device's XXXL, with bighelp's own step at Medium so it adds
+    /// none): German runs longer than English, so this is where a label would be cut. The screenshots are the check for that; the assertions prove the language took
+    /// and that the main controls can still be tapped. BIGHELP_LOCALIZATION_EVIDENCE
+    /// (TEST_RUNNER_…) saves the screenshots.
+    func testGermanKeyScreensInLightAndDarkAtLargeText() {
+        let large = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXXL",
+                     "-bighelp.appearance.text-size", "0"]
+        for appearance in ["light", "dark"] {
+            var app = localizedApp("de", appearance, extra: large + [
+                "-test-no-configured-hosts", "-force-signed-out-onboarding",
+                "-loopdy.onboarding.first-run-v1.step", "0", "-bighelp.privacy.ai-data-agreed", "NO"
+            ])
+            app.launch()
+            let start = app.buttons["onboarding.get-started"]
+            XCTAssertTrue(start.waitForExistence(timeout: 20))
+            XCTAssertEqual(start.label, "Los geht’s")
+            XCTAssertTrue(start.isHittable)
+            capture("welcome", "de", appearance)
+            start.tap()
+            let agree = app.buttons["onboarding.ai-consent.agree"]
+            XCTAssertTrue(agree.waitForExistence(timeout: 5))
+            XCTAssertEqual(agree.label, "Zustimmen und fortfahren")
+            for _ in 0..<4 where !agree.isHittable { app.swipeUp() }
+            XCTAssertTrue(agree.isHittable, "The agreement's button is reachable at large text")
+            capture("consent", "de", appearance)
+            agree.tap()
+            XCTAssertTrue(app.textFields["host-setup.address"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.staticTexts["Deinen Computer verbinden"].exists)
+            capture("connect", "de", appearance)
+            app.terminate()
+
+            app = localizedApp("de", appearance, extra: large + ["-loopdy.home.landing", "bots"])
+            app.launch()
+            let search = app.buttons["simple-bots.search"]
+            XCTAssertTrue(search.waitForExistence(timeout: 20))
+            XCTAssertEqual(search.label, "Bots suchen")
+            // The bar's three places stay whole, each with its German name.
+            for (id, name) in [("conversations", "Bots"), ("today", "Heute"), ("work", "Arbeit")] {
+                let tab = app.buttons["home.tab.\(id)"]
+                XCTAssertEqual(tab.label, name)
+                XCTAssertTrue(tab.isHittable, "\(name) is on the bar")
+            }
+            capture("bots", "de", appearance)
+            app.buttons["home.switch.chats"].firstMatch.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["chats.inbox"].firstMatch.waitForExistence(timeout: 10))
+            capture("chats", "de", appearance)
+            app.buttons["home.tab.today"].tap()
+            XCTAssertTrue(app.staticTexts["Heute"].firstMatch.waitForExistence(timeout: 10))
+            capture("today", "de", appearance)
+            app.buttons["home.tab.work"].tap()
+            XCTAssertTrue(app.descendants(matching: .any)["work.screen"].firstMatch.waitForExistence(timeout: 10))
+            capture("work", "de", appearance)
+            app.buttons["home.new-chat"].firstMatch.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["new-chat.to"].firstMatch.waitForExistence(timeout: 15))
+            capture("new-chat", "de", appearance)
+            app.terminate()
+
+            app.launchArguments += ["-start-chat"]
+            app.launch()
+            let attachment = app.buttons["chat.attachment"]
+            XCTAssertTrue(attachment.waitForExistence(timeout: 20))
+            XCTAssertEqual(attachment.label, "Zur Nachricht hinzufügen")
+            capture("chat", "de", appearance)
+            let editor = app.textViews["chat.composer.text"]
+            editor.tap()
+            editor.typeText("Settings / 海风")
+            XCTAssertEqual(editor.value as? String, "Settings / 海风", "Drafts are never localization keys.")
+            XCTAssertEqual(app.buttons["chat.send"].label, "Nachricht senden")
+            attachment.tap()
+            XCTAssertTrue(app.buttons["Kamera"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["Fotomediathek"].exists)
+            capture("chat-actions", "de", appearance)
+            app.terminate()
+
+            app = localizedApp("de", appearance, extra: large)
+            app.launch()
+            let person = app.buttons["simple-bots.settings"].firstMatch
+            XCTAssertTrue(person.waitForExistence(timeout: 20))
+            XCTAssertTrue(person.label.contains("Einstellungen"), person.label)
+            person.tap()
+            XCTAssertTrue(app.buttons["settings.you"].waitForExistence(timeout: 10))
+            capture("settings", "de", appearance)
+            app.descendants(matching: .any)["settings.screen"].firstMatch.swipeUp()
+            capture("settings-lower", "de", appearance)
+            let row = settingsRow("settings.themes", in: app)
+            XCTAssertTrue(row.waitForExistence(timeout: 5))
+            XCTAssertTrue(row.label.contains("Darstellung"), row.label)
+            for _ in 0..<3 where !row.isHittable { app.swipeDown() }
+            row.tap()
+            XCTAssertTrue(app.navigationBars["Darstellung"].waitForExistence(timeout: 5))
+            capture("appearance", "de", appearance)
+            app.terminate()
+        }
+    }
+
     private func localizedApp(_ language: String, _ appearance: String, extra: [String] = []) -> XCUIApplication {
         let app = makeApp()
+        let locale = ["en": "en_US", "zh-Hans": "zh_CN", "de": "de_DE"][language] ?? language
         app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.settings.nerd-mode", "NO",
                                "-loopdy.demo.appearance", appearance, "-AppleLanguages", "(\(language))",
-                               "-AppleLocale", language == "en" ? "en_US" : "zh_CN"] + extra
+                               "-AppleLocale", locale] + extra
         return app
     }
 
     private func capture(_ surface: String, _ language: String, _ appearance: String) {
-        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        let screenshot = XCUIScreen.main.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
         attachment.name = "localization-\(language)-\(appearance)-\(surface)"
         attachment.lifetime = .keepAlways
         add(attachment)
+        guard let folder = ProcessInfo.processInfo.environment["BIGHELP_LOCALIZATION_EVIDENCE"] else { return }
+        try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+        try? screenshot.pngRepresentation.write(to: URL(fileURLWithPath: folder)
+            .appendingPathComponent("\(language)-\(appearance)-\(surface).png"))
     }
 }

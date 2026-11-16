@@ -291,7 +291,8 @@ struct ChatsInboxView: View {
                 }
                 Image(systemName: "folder")
             }
-            .accessibilityLabel(row.projectName.map { "Move to Project…, now in \($0)" } ?? "Move to Project…")
+            .accessibilityLabel(row.projectName.map { String(localized: "Move to Project…, now in \($0)") }
+                ?? String(localized: "Move to Project…"))
             .accessibilityIdentifier("chats.action.move-project.\(row.id)")
         }
     }

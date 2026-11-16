@@ -310,16 +310,25 @@ struct DesignSystemTests {
         }
     }
 
-    /// Agent bubbles are a see-through neutral on every background, so no background or bubble
-    /// color can clash with them. They were a fixed warm beige by day and brown at night.
-    @Test func agentBubblesAreASeeThroughNeutralOnEveryBackground() {
-        let themes = BighelpLightBackground.allCases.map(\.neutral) + BighelpDarkBackground.allCases.map(\.neutral)
+    /// Agent bubbles are a see-through neutral on bighelp's own pages, so no bubble color can clash
+    /// with them. They were a fixed warm beige by day and brown at night. A theme's page brings the
+    /// theme's own bubble color instead.
+    @Test func agentBubblesAreASeeThroughNeutralOnBighelpsOwnPages() {
+        let pages = BighelpLightBackground.allCases.map(\.neutral) + BighelpDarkBackground.allCases.map(\.neutral)
             + [BighelpTheme.lightHighContrast, .darkHighContrast]
-        for theme in themes {
+        let own = pages.filter { $0.messageSurfaceHex == nil }
+        // Cream, Paper, Graphite, Black and the two high-contrast pages.
+        #expect(own.count == 6)
+        for theme in own {
             var (red, green, blue, alpha): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
             UIColor(theme.incomingMessageBackground).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
             #expect(red == green && green == blue, "Neutral on \(theme.canvasHex)")
             #expect(alpha > 0 && alpha < 0.2, "See-through on \(theme.canvasHex)")
+        }
+        for theme in pages {
+            guard let hex = theme.messageSurfaceHex else { continue }
+            #expect(UIColor(theme.incomingMessageBackground) == UIColor(Color(hex: hex)), "The theme's color on \(theme.canvasHex)")
+            #expect(theme.incomingMessageSolid == theme.incomingMessageBackground)
         }
     }
 

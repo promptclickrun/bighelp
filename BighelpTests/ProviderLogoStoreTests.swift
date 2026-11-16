@@ -129,7 +129,7 @@ struct ProviderLogoStoreTests {
             #expect(store.revision == nil)
             #expect(await network.requests.count == 1)
         }
-        let value = try fixture(revision: "unsupported", asset: "ProviderLogoNous")
+        let value = try fixture(revision: "unsupported", asset: "ProviderLogoNoSuchProvider")
         let network = ProviderLogoFixtureTransport(responses: value.responses)
         let store = ProviderLogoStore(manifestURL: value.url, cacheURL: nil, transport: network)
         await store.refreshIfNeeded()
@@ -260,7 +260,7 @@ struct ProviderLogoStoreTests {
         let data = try #require(renderer.uiImage?.pngData())
         let path = FileManager.default.temporaryDirectory.appending(path: "loopdy-provider-logos-live.png")
         try data.write(to: path, options: .atomic)
-        print("PROVIDER_LOGO_LIVE_EVIDENCE \(path.path()) revision=\(store.revision ?? "none")")
+        print("PROVIDER_LOGO_LIVE_EVIDENCE \(path.path(percentEncoded: false)) revision=\(store.revision ?? "none")")
     }
 
     private func renderedMark(store: ProviderLogoStore?, colorScheme: ColorScheme) throws -> Data {

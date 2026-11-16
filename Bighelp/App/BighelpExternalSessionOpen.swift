@@ -41,7 +41,7 @@ enum ExternalOpenHostWait {
     }
 
     static func message(unreachable: String, stillOn: String?) -> String {
-        guard let stillOn else { return "Couldn't reach \(unreachable). Check that it's on, then try again." }
+        guard let stillOn else { return String(localized: "Couldn't reach \(unreachable). Check that it's on, then try again.") }
         return FleetSwitchFallback.message(unreachable: unreachable, stillOn: stillOn)
     }
 }

@@ -130,7 +130,7 @@ struct DemoRepositoryTests {
 
         #expect(try repository.load() == [.defaultFixture])
         let backupURL = try #require(repository.lastRecoveryBackupURL)
-        #expect(FileManager.default.fileExists(atPath: backupURL.path()))
+        #expect(FileManager.default.fileExists(atPath: backupURL.path(percentEncoded: false)))
         #expect(repository.lastRecoveryErrorMessage != nil)
     }
 
@@ -278,7 +278,7 @@ struct DemoRepositoryTests {
             fileManager: fileManager
         )
 
-        #expect(FileManager.default.fileExists(atPath: legacyFile.path()))
+        #expect(FileManager.default.fileExists(atPath: legacyFile.path(percentEncoded: false)))
         #expect(defaults.integer(forKey: BighelpHostCacheMigration.defaultsKey) == 0)
 
         let scopedRepository = DemoRepository<[AgentProfile]>(
@@ -288,7 +288,7 @@ struct DemoRepositoryTests {
             scopeID: { "host-a" }
         )
         #expect(try scopedRepository.load() == [.defaultFixture])
-        #expect(FileManager.default.fileExists(atPath: legacyFile.path()))
+        #expect(FileManager.default.fileExists(atPath: legacyFile.path(percentEncoded: false)))
 
         BighelpHostCacheMigration.discardLegacyCachesForStartup(
             in: directory,
@@ -296,7 +296,7 @@ struct DemoRepositoryTests {
             fileManager: fileManager
         )
 
-        #expect(!FileManager.default.fileExists(atPath: legacyFile.path()))
+        #expect(!FileManager.default.fileExists(atPath: legacyFile.path(percentEncoded: false)))
         #expect(
             defaults.integer(forKey: BighelpHostCacheMigration.defaultsKey)
                 == BighelpHostCacheMigration.currentVersion
@@ -324,10 +324,10 @@ struct DemoRepositoryTests {
 
         for name in BighelpHostCacheMigration.legacyRepositoryNames {
             #expect(!FileManager.default.fileExists(
-                atPath: directory.appending(path: "\(name)-v1.json").path()
+                atPath: directory.appending(path: "\(name)-v1.json").path(percentEncoded: false)
             ))
             #expect(!FileManager.default.fileExists(
-                atPath: directory.appending(path: "\(name)-avatars").path()
+                atPath: directory.appending(path: "\(name)-avatars").path(percentEncoded: false)
             ))
         }
         #expect(defaults.data(forKey: "loopdy.models.recent") == nil)
@@ -344,7 +344,7 @@ struct DemoRepositoryTests {
             in: directory,
             defaults: defaults
         )
-        #expect(FileManager.default.fileExists(atPath: retained.path()))
+        #expect(FileManager.default.fileExists(atPath: retained.path(percentEncoded: false)))
     }
 
     @Test func lockedSaveThrowsTypedErrorWithoutTruncatingExistingRepository() throws {
@@ -444,6 +444,7 @@ struct DemoRepositoryTests {
         #expect(FileManager.default.fileExists(
             atPath: fileURLBackedDirectory.appending(path: "agents-v1.json").path
         ))
+        // The percent-encoded spelling on purpose: nothing may be written to a folder named "Application%20Support".
         #expect(!FileManager.default.fileExists(
             atPath: directory.appending(path: "agents-v1.json").path()
         ))
@@ -471,8 +472,8 @@ struct DemoRepositoryTests {
 
         try repository.removeOrphanedAvatarFiles(keeping: ["finance.png"])
 
-        #expect(FileManager.default.fileExists(atPath: retained.path()))
-        #expect(!FileManager.default.fileExists(atPath: orphaned.path()))
+        #expect(FileManager.default.fileExists(atPath: retained.path(percentEncoded: false)))
+        #expect(!FileManager.default.fileExists(atPath: orphaned.path(percentEncoded: false)))
     }
 
     @Test func orphanedAvatarCleanupRetainsNestedDirectories() throws {
@@ -493,8 +494,8 @@ struct DemoRepositoryTests {
 
         try repository.removeOrphanedAvatarFiles(keeping: [])
 
-        #expect(FileManager.default.fileExists(atPath: nestedDirectory.path()))
-        #expect(FileManager.default.fileExists(atPath: nestedFile.path()))
+        #expect(FileManager.default.fileExists(atPath: nestedDirectory.path(percentEncoded: false)))
+        #expect(FileManager.default.fileExists(atPath: nestedFile.path(percentEncoded: false)))
     }
 }
 

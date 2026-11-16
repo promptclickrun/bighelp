@@ -386,7 +386,7 @@ final class VoiceModel {
         }
     }
 
-    private static let endFailureMessage = "Voice chat could not end. Try again."
+    private static let endFailureMessage = String(localized: "Voice chat could not end. Try again.")
 
     var allowsInputMonitoring: Bool {
         isMonitoringAllowed && isActive
@@ -541,7 +541,7 @@ final class VoiceModel {
             // audio or capture must never become an agent cancellation request.
         } catch {
             guard isActive else { return }
-            turnErrorMessage = "Voice guidance could not be sent. Try speaking again."
+            turnErrorMessage = String(localized: "Voice guidance could not be sent. Try speaking again.")
         }
     }
 
@@ -637,7 +637,7 @@ final class VoiceModel {
             if let voiceError = error as? DirectHermesVoiceError, voiceError != .invalidAudioResponse {
                 turnErrorMessage = voiceError.errorDescription
             } else {
-                turnErrorMessage = "Voice response could not be completed. Try speaking again."
+                turnErrorMessage = String(localized: "Voice response could not be completed. Try speaking again.")
             }
             status = .listening
         }
@@ -704,7 +704,7 @@ final class VoiceModel {
         guard owns(generation), isActive else { return }
         if error == .hostTranscriptionFailed {
             isAwaitingWalkieTalkieTranscript = false
-            turnErrorMessage = "Your computer couldn't turn that into text. Try again, or switch Speech to text to This device in Voice settings."
+            turnErrorMessage = String(localized: "Your computer couldn't turn that into text. Try again, or switch Speech to text to This device in Voice settings.")
             if mode == .pressToTalk { restartListening() } else { stopMonitoring() }
             return
         }

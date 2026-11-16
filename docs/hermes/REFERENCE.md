@@ -287,7 +287,7 @@ TreeNode fields: `{id,label,path?,color?,icon?,isAuto:boolean,isNoProject:boolea
 
 Host folder strings are not Android-local paths. Project folders permit POSIX absolute paths, Windows drive absolute paths and UNC paths as returned by Hermes. Drive-relative/device paths, `.`/`..`, empty segments and controls are refused. File browsing below uses the separate POSIX confinement contract.
 
-Sources: [project catalog](../../Bighelp/DirectHermes/DirectHermesProjectClient.swift), [lifecycle/tree](../../Bighelp/DirectHermes/DirectHermesProjectLifecycleClient.swift), [decoder](../../Bighelp/WorkspaceManagement/WorkspaceManagementDecoder.swift). Tests: [projects](../../BighelpTests/DirectHermesProjectClientTests.swift), [folder chooser](../../BighelpTests/WorkspaceFolderChooserTests.swift).
+Sources: [project catalog](../../Bighelp/DirectHermes/DirectHermesProjectClient.swift), [lifecycle/tree](../../Bighelp/DirectHermes/DirectHermesProjectLifecycleClient.swift), [decoder](../../Bighelp/WorkspaceManagement/WorkspaceManagementDecoder.swift). Tests: [projects](../../BighelpTests/DirectHermesProjectClientTests.swift).
 
 ### Stock Git
 
@@ -338,7 +338,7 @@ Listing: `{path,root,locked_root,can_change_path,parent?,entries:[{path,name,is_
 
 Companion managed files (`/api/plugins/loopdy/workspace-files/capabilities`, POST `list|read`), native workspace-files, recent files and grant-based file APIs are separate contracts in [EXTENSIONS.md](EXTENSIONS.md) and [EXTENSIONS.md](EXTENSIONS.md).
 
-Sources: [workspace HTTP helpers](../../Bighelp/DirectHermes/DirectHermesWorkspaceClient.swift), [file decoder](../../Bighelp/WorkspaceManagement/WorkspaceManagementDecoder.swift), [managed file client](../../Bighelp/DirectHermes/DirectHermesManagedFilesClient.swift). Tests: [managed files](../../BighelpTests/DirectHermesManagedFilesTests.swift), [configured files](../../BighelpTests/ConfiguredWorkspaceFilesTests.swift), [artifacts](../../BighelpTests/WorkspaceArtifactsTests.swift).
+Sources: [workspace HTTP helpers](../../Bighelp/DirectHermes/DirectHermesWorkspaceClient.swift), [file decoder](../../Bighelp/WorkspaceManagement/WorkspaceManagementDecoder.swift), [managed file client](../../Bighelp/DirectHermes/DirectHermesManagedFilesClient.swift). Tests: [managed files](../../BighelpTests/DirectHermesManagedFilesTests.swift), [configured files](../../BighelpTests/ConfiguredWorkspaceFilesTests.swift).
 
 ## Skills, toolsets, plugins and MCP
 
@@ -401,7 +401,7 @@ The installed-plugin management UI instead uses the following unscoped dashboard
 
 InstalledPlugin: `{name,version?,description,source,runtime_status:"enabled"|"disabled"|"inactive",can_remove:boolean,can_update_git:boolean,auth_required:boolean,auth_command?,removed_reason?}`. PluginEntry: `{name,repo,sha,description,maintainer,tier,requires_hermes?,docs_url?,platforms:[string],capabilities:{provides_tools:[string],provides_hooks:[string],provides_middleware:[string],requires_env:[string]},installed:boolean,installed_sha?,update_available:boolean,runtime_status?}`. `sha` is exact 40 hex; install pins the reviewed commit. `requires_hermes` is catalog metadata, not the gateway's general availability gate.
 
-Source: [plugin lifecycle](../../Bighelp/DirectHermes/DirectHermesPluginLifecycleClient.swift). Tests: [plugin update workspace](../../BighelpTests/PluginUpdateWorkspaceClientTests.swift).
+Source: [plugin lifecycle](../../Bighelp/DirectHermes/DirectHermesPluginLifecycleClient.swift).
 
 ### MCP server configuration and OAuth
 

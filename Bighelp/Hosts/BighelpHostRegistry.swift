@@ -287,7 +287,11 @@ final class BighelpHostRegistry {
         }
     }
 
-    func beginSetup() { guard canConfigureHosts else { return }; errorMessage = nil; setupHostID = nil; isSetupPresented = true }
+    /// Add a computer. It starts clean: a computer connected earlier is not "just connected" here.
+    func beginSetup() {
+        guard canConfigureHosts else { return }
+        errorMessage = nil; setupHostID = nil; onboardingHostID = nil; isSetupPresented = true
+    }
 
     func beginAuthentication(for host: BighelpConfiguredHost) {
         guard canConfigureHosts, hosts.contains(where: { $0.id == host.id && $0.accountScope == host.accountScope }) else { return }

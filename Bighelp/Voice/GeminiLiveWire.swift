@@ -258,20 +258,21 @@ struct GeminiLiveClose: Error, Equatable, Sendable {
                   httpStatus: event["httpStatus"]?.integer, networkError: event["networkError"]?.integer)
     }
 
-    /// What the call screen says, with Gemini's own words when it gave a reason.
+    /// What the call screen says, with Gemini's own words when it gave a reason. Bighelp's words are
+    /// translated; Gemini's stay as Gemini sent them.
     var message: String {
-        let said = reason.map { " Gemini said: “\($0)”" } ?? ""
         if ready {
-            if networkError != nil { return "The connection to Gemini dropped. Work you started keeps going." }
-            if code == nil || code == URLSessionWebSocketTask.CloseCode.normalClosure.rawValue, reason == nil {
-                return "Gemini ended the call. Work you started keeps going."
-            }
-            return "Gemini ended the call.\(said) Work you started keeps going."
+            if networkError != nil { return String(localized: "The connection to Gemini dropped. Work you started keeps going.") }
+            guard let reason else { return String(localized: "Gemini ended the call. Work you started keeps going.") }
+            return String(localized: "Gemini ended the call. Gemini said: “\(reason)” Work you started keeps going.")
         }
-        if let httpStatus { return "Gemini refused the call (HTTP \(httpStatus))." }
-        if let reason { return "Gemini didn't start the call. Gemini said: “\(reason)”" }
-        if let code { return "Gemini didn't start the call (code \(code))." }
-        return "This \(BighelpPlatform.isMac ? "Mac" : "device") couldn't reach Gemini. Check its internet connection, then try again."
+        // Numbers as text: a status code takes no thousands separator.
+        if let httpStatus { return String(localized: "Gemini refused the call (HTTP \(String(httpStatus))).") }
+        if let reason { return String(localized: "Gemini didn't start the call. Gemini said: “\(reason)”") }
+        if let code { return String(localized: "Gemini didn't start the call (code \(String(code))).") }
+        return BighelpPlatform.isMac
+            ? String(localized: "This Mac couldn't reach Gemini. Check its internet connection, then try again.")
+            : String(localized: "This device couldn't reach Gemini. Check its internet connection, then try again.")
     }
 
     /// One line for the report and the log.

@@ -47,7 +47,6 @@ enum DashboardEventIntentPolicy {
 
 struct DashboardSnapshot: Equatable, Sendable {
     let attentionItems: [DashboardAttentionItem]
-    let completedItems: [DashboardCompletion]
     let agents: [DashboardAgent]
 }
 
@@ -288,129 +287,6 @@ struct DashboardAttentionItem: Identifiable, Equatable, Sendable {
             return request.sessionID
         }
         return sessionID
-    }
-}
-
-struct DashboardCompletion: Identifiable, Equatable, Sendable {
-    let id: String
-    let title: String
-    let detail: String
-    let taskID: String?
-    let jobID: String?
-    let agentName: String?
-    let status: String
-    let completedAt: Date
-    let completedLabel: String
-    let sessionID: String?
-    let agentID: String?
-    let childSessionID: String?
-    let parentSessionID: String?
-    let delegationID: String?
-    let turnID: String?
-
-    init(
-        id: String,
-        title: String,
-        detail: String,
-        taskID: String? = nil,
-        jobID: String? = nil,
-        agentName: String? = nil,
-        status: String = "completed",
-        completedAt: Date = .distantPast,
-        completedLabel: String,
-        sessionID: String? = nil,
-        agentID: String? = nil,
-        childSessionID: String? = nil,
-        parentSessionID: String? = nil,
-        delegationID: String? = nil,
-        turnID: String? = nil
-    ) {
-        self.id = id
-        self.title = title
-        self.detail = detail
-        self.taskID = taskID
-        self.jobID = jobID
-        self.agentName = agentName
-        self.status = status
-        self.completedAt = completedAt
-        self.completedLabel = completedLabel
-        self.sessionID = sessionID
-        self.agentID = agentID
-        self.childSessionID = childSessionID
-        self.parentSessionID = parentSessionID
-        self.delegationID = delegationID
-        self.turnID = turnID
-    }
-}
-
-enum DashboardCompletionProjection {
-    static func make(
-        id: String,
-        eventType: String,
-        detail: [String: String],
-        agentName: String,
-        createdAt: Date,
-        completedLabel: String,
-        fallbackTitle: String,
-        fallbackDetail: String,
-        sessionID: String? = nil,
-        agentID: String? = nil
-    ) -> DashboardCompletion {
-        let copy = eventType == "job.completed"
-            ? jobCopy(detail: detail)
-            : (
-                DashboardWorkProjection.meaningfulTitle(detail["title"])
-                    ?? (eventType == "delegation.completed" ? "Subagent task" : "Conversation"),
-                fallbackDetail
-            )
-        return DashboardCompletion(
-            id: id,
-            title: copy.0,
-            detail: copy.1,
-            taskID: normalized(detail["task_id"], maximum: 180),
-            jobID: normalized(detail["job_id"], maximum: 180),
-            agentName: agentName,
-            status: eventType,
-            completedAt: createdAt,
-            completedLabel: completedLabel,
-            sessionID: sessionID,
-            agentID: agentID,
-            childSessionID: coordinate(detail["child_session_id"]),
-            parentSessionID: coordinate(detail["parent_session_id"]),
-            delegationID: coordinate(detail["delegation_id"]),
-            turnID: coordinate(detail["turn_id"])
-        )
-    }
-
-    private static func coordinate(_ value: String?) -> String? {
-        guard let value, !value.isEmpty, value.utf8.count <= 180,
-              !value.contains("\0"), !value.contains(where: \.isWhitespace)
-        else { return nil }
-        return value
-    }
-
-    private static func jobCopy(detail: [String: String]) -> (String, String) {
-        let title = ["task_name", "task_title", "job_title"]
-            .compactMap { normalized(detail[$0], maximum: 160) }
-            .first
-            ?? distinctJobTitle(detail["title"])
-            ?? "Scheduled task"
-        let result = ["summary", "message", "result", "detail", "description"]
-            .compactMap { normalized(detail[$0], maximum: 240) }
-            .first { $0 != title }
-            ?? "No result details were provided."
-        return (title, result)
-    }
-
-    private static func distinctJobTitle(_ value: String?) -> String? {
-        guard let value = normalized(value, maximum: 160) else { return nil }
-        return ["Scheduled task completed", "Job completed"].contains(value) ? nil : value
-    }
-
-    private static func normalized(_ value: String?, maximum: Int) -> String? {
-        guard let value else { return nil }
-        let normalized = value.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        return normalized.isEmpty ? nil : String(normalized.prefix(maximum))
     }
 }
 

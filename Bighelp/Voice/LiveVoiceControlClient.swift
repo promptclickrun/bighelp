@@ -68,11 +68,11 @@ enum LiveVoiceControlError: Error, LocalizedError, Sendable {
     case geminiKeyMissing
     var errorDescription: String? {
         switch self {
-        case .invalidResponse: "Your computer sent back a voice answer the app couldn't use. Try again."
-        case .wrongOwner: "This voice call no longer belongs to this chat. Close voice and open it again."
-        case .unavailable: "Live voice isn't available on your computer right now. Try again, or take turns instead."
-        case .timedOut: "Your computer didn't answer in time. Try again."
-        case .geminiKeyMissing: "This bot has no Gemini API key on your computer. Add one as GEMINI_API_KEY, then try again."
+        case .invalidResponse: String(localized: "Your computer sent back a voice answer the app couldn't use. Try again.")
+        case .wrongOwner: String(localized: "This voice call no longer belongs to this chat. Close voice and open it again.")
+        case .unavailable: String(localized: "Live voice isn't available on your computer right now. Try again, or take turns instead.")
+        case .timedOut: String(localized: "Your computer didn't answer in time. Try again.")
+        case .geminiKeyMissing: String(localized: "This bot has no Gemini API key on your computer. Add one as GEMINI_API_KEY, then try again.")
         }
     }
 }

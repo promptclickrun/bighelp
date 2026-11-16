@@ -92,6 +92,27 @@ struct ChatBotModeIntegrationTests {
         #expect(model.failureMessage == "Group chats are unavailable for this Hermes connection.")
     }
 
+    /// New chat's text for a group chat it just made is sent as that chat opens. A group chat has no
+    /// one-bot connection, only its room: while the open waited for that connection, the text stayed
+    /// in the new chat's box and no bot got it.
+    @Test func aNewGroupChatsFirstMessageCanGoWithoutAOneBotConnection() async throws {
+        let model = ChatModel.testBotFixture(
+            draft: "Everyone, say hello",
+            roomMemberIDs: ["finance", "research"],
+            client: BotModeFixtureClient(),
+            executionEnabled: false,
+            conversationClient: NativeWorkspaceUnavailableClient()
+        )
+        let store = try #require(model.botModeRoomStore)
+        store.configureNativeClient(NativeBotModeTestClient(capabilities: .fixture()))
+        await store.refreshNativeCapabilities()
+
+        #expect(!model.directTransportIsReady, "The group chat's one-bot placeholder never connects")
+        #expect(model.isReadyToSendOnOpen)
+        model.draft = ""
+        #expect(!model.isReadyToSendOnOpen, "Nothing to send")
+    }
+
     @Test(arguments: [false, true])
     func verifiedHermesBotModeExecutesThroughHostedRoomsWithLocalHarnessDisabled(usesUnavailableDirectClient: Bool) async throws {
         let legacy = BotModeFixtureClient()

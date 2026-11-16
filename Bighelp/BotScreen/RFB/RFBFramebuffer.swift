@@ -106,7 +106,7 @@ struct RFBRect: Equatable, Sendable {
 enum RFBError: Error, Equatable {
     /// The server broke the protocol; the words are for logs, never for people.
     case protocolViolation(String)
-    /// The screen asks for a password or another login bighelp can't give.
+    /// The screen asks for a login bighelp can't give (anything but none or a VNC password).
     case unsupportedSecurity
     /// The server said no during the handshake.
     case refused(String)

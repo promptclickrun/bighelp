@@ -184,7 +184,10 @@ struct HostSetupView: View {
             #if DEBUG && (targetEnvironment(simulator) || targetEnvironment(macCatalyst))
             if await holdCheckForTesting() { return }
             #endif
-            if firstRunPresentation, connectedHost == nil,
+            // The computer that just connected becomes the one in use, and the shell then makes the
+            // screens under it again, this sheet too. It goes on from "connected": started over, it
+            // showed an empty address after a connection that worked.
+            if connectedHost == nil, hostToAuthenticate == nil,
                let onboardingHostID = registry.onboardingHostID,
                let host = registry.hosts.first(where: { $0.id == onboardingHostID }) {
                 connectedHost = host

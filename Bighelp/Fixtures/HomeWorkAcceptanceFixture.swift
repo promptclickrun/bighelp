@@ -49,20 +49,11 @@ final class HomeWorkAcceptanceFixture: DashboardDataSource, DashboardClarificati
         let request = DashboardClarificationRequest(eventID: "home-clarify-card", requestID: "home-clarify-request",
             sessionID: Self.clarifyID, question: "Which release channel should I use?",
             choices: ["TestFlight", "App Store"], allowsCustomResponse: true, isMultiSelect: false, expiresAt: expiresAt)
-        let completions = [
-            ("user-done", "session.completed", "Plan the next release"),
-            ("cron-done", "job.completed", "Morning briefing"),
-            ("child-done", "delegation.completed", "Review accessibility"),
-        ].enumerated().map { index, entry in
-            DashboardCompletionProjection.make(id: entry.0, eventType: entry.1, detail: ["title": entry.2],
-                agentName: "Avery", createdAt: Date.now.addingTimeInterval(-Double(index + 1) * 60),
-                completedLabel: "Completed recently", fallbackTitle: entry.2, fallbackDetail: "Finished")
-        }
         return DashboardSnapshot(attentionItems: dismissed ? [] : [
             DashboardAttentionItem(id: request.eventID, title: "Clarification needed", detail: request.question,
                 urgency: .important, sessionID: Self.clarifyID, agentID: "finance",
                 interaction: .clarification(request), createdAt: Date.now.addingTimeInterval(-30))
-        ], completedItems: completions, agents: [])
+        ], agents: [])
     }
 
     func respond(to request: DashboardClarificationRequest, response: String) async throws -> DashboardClarificationReceipt {

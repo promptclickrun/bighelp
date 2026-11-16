@@ -111,7 +111,8 @@ struct DirectHermesManagedFilesTests {
         } catch {
             #expect(error as? WorkspaceClientError == .rejected(code: "workspace_not_configured"))
             #expect(error.localizedDescription.contains("isn't its own"))
-            #expect(ConfiguredWorkspaceArtifactsView.message(for: error).contains("isn't its own"))
+            // What the bot's Files tab shows for it.
+            #expect(SimpleBotFilesModel.phase(for: error) == .failed(error.localizedDescription))
         }
     }
 
@@ -134,8 +135,12 @@ struct DirectHermesManagedFilesTests {
             Issue.record("The host refused, so there is no scope")
         } catch {
             #expect(error as? WorkspaceClientError == .rejected(code: code))
-            #expect(ConfiguredWorkspaceArtifactsView.message(for: error).contains(wording))
-            #expect(!ConfiguredWorkspaceArtifactsView.message(for: error).contains("Update it"))
+            guard case .failed(let message) = SimpleBotFilesModel.phase(for: error) else {
+                Issue.record("The Files tab says why, not \"update the plugin\"")
+                return
+            }
+            #expect(message.contains(wording))
+            #expect(!message.contains("Update it"))
         }
     }
 
@@ -151,7 +156,7 @@ struct DirectHermesManagedFilesTests {
             _ = try await client.workspaceScope()
             Issue.record("The host refused, so there is no scope")
         } catch {
-            let message = ConfiguredWorkspaceArtifactsView.message(for: error)
+            let message = error.localizedDescription
             #expect(message.contains("“workspace”"))
             #expect(!message.contains("terminal.cwd"))
         }
@@ -172,7 +177,8 @@ struct DirectHermesManagedFilesTests {
             Issue.record("The host refused, so there is no scope")
         } catch {
             #expect(error as? WorkspaceClientError == .rejected(code: WorkspaceClientError.workspacePluginOutdated))
-            let message = ConfiguredWorkspaceArtifactsView.message(for: error)
+            #expect(SimpleBotFilesModel.phase(for: error) == .needsPluginUpdate)
+            let message = error.localizedDescription
             #expect(message.contains("restart Hermes"))
             #expect(message.contains("Plugin version"))
             #expect(!message.contains("terminal.cwd"))
@@ -240,7 +246,7 @@ struct DirectHermesManagedFilesTests {
             Issue.record("The plugin can't share files, so there is no scope")
         } catch {
             #expect(error as? WorkspaceClientError == .unavailable(.unsupportedOperation))
-            #expect(ConfiguredWorkspaceArtifactsView.message(for: error).contains("Update it"))
+            #expect(SimpleBotFilesModel.phase(for: error) == .needsPluginUpdate)
         }
     }
 

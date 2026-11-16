@@ -25,14 +25,10 @@ final class ShortcutGatewaySwitchHostUITests: BighelpUITestCase {
         app.launchArguments = ["-test-no-configured-hosts", "-bighelp.hosts.all-hosts", "NO"]
         app.launch()
         try onboardOpenHost(app, address: try XCTUnwrap(probe["address_a"]))
-        addAnotherHost(in: app)
-        try addHost(app, address: try XCTUnwrap(probe["address_b"]), name: "Lab Hermes")
-        // Setup finishes over Settings; Done shows the home.
-        closeSettings(in: app)
-        XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 30))
+        try addAnotherOpenHost(app, address: try XCTUnwrap(probe["address_b"]))
         save("1-lab-in-use", app)
 
-        // Lab Hermes is in use; the Shortcut asks on the first host (named by its address).
+        // The second host is in use; the Shortcut asks on the first host (named by its address).
         app.terminate()
         let other = try XCTUnwrap(probe["address_a"]).components(separatedBy: ":")[0]
         app.launchArguments = ["-bighelp.hosts.all-hosts", "NO", "-test-shortcut-ask", other]
@@ -42,36 +38,6 @@ final class ShortcutGatewaySwitchHostUITests: BighelpUITestCase {
         save("2-answer", app)
         let text = answer.staticTexts.allElementsBoundByIndex.map(\.label).joined(separator: " ")
         XCTAssertTrue(text.contains("fixture complete"), "The agent on the other gateway answers: \(text)")
-    }
-
-    /// Settings › Your computers › Add a computer, after a fresh launch so setup's screens are gone.
-    @MainActor private func addAnotherHost(in app: XCUIApplication) {
-        app.terminate()
-        app.launch()
-        XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 30))
-        sleep(3)
-        openSettings(in: app)
-        settingsRow("settings.add-computer", in: app).tap()
-    }
-
-    @MainActor private func addHost(_ app: XCUIApplication, address: String, name: String) throws {
-        let field = app.textFields["host-setup.address"]
-        XCTAssertTrue(field.waitForExistence(timeout: 15))
-        field.tap()
-        field.typeText(address)
-        app.buttons["More options"].firstMatch.tap()
-        let nameField = app.textFields["host-setup.name"]
-        if nameField.waitForExistence(timeout: 3) {
-            nameField.tap()
-            nameField.typeText(name + "\n")
-        }
-        let connect = app.buttons["host-setup.connect-host"]
-        for _ in 0..<5 where !(connect.exists && connect.isHittable) { app.swipeUp() }
-        XCTAssertTrue(connect.waitForExistence(timeout: 8))
-        connect.tap()
-        let next = app.buttons["host-setup.continue"]
-        XCTAssertTrue(next.waitForExistence(timeout: 45), "Connected to \(address)")
-        next.tap()
     }
 
     @MainActor private func save(_ name: String, _ app: XCUIApplication) {

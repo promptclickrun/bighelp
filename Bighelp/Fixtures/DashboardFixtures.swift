@@ -77,20 +77,6 @@ struct DashboardFixtureSource: DashboardDataSource {
                         urgency: .needsReview
                     ),
                 ],
-            completedItems: [
-                DashboardCompletion(
-                    id: "completed-weekly-brief",
-                    title: "Weekly briefing prepared",
-                    detail: "Avery summarized priorities, spending, and follow-ups.",
-                    completedLabel: "Completed 18 min ago"
-                ),
-                DashboardCompletion(
-                    id: "completed-grocery-list",
-                    title: "Grocery list organized",
-                    detail: "Jordan grouped staples for this week's meals.",
-                    completedLabel: "Completed 42 min ago"
-                )
-            ],
             agents: [
                 DashboardAgent(
                     id: "finance",

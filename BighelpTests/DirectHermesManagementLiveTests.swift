@@ -108,16 +108,12 @@ final class DirectHermesManagementLiveTests: XCTestCase {
         XCTAssertEqual(downloaded.bytes, payload)
         let workspace = DirectHermesWorkspaceClient(rpc: transport, http: transport, owner: owner,
             capabilities: .init(owner: owner, values: [.filesRead: .available]), currentOwner: current)
-        let artifacts = WorkspaceArtifactsStore(hostName: "Disposable fixture", owner: owner,
-            scope: scope, performer: workspace, scopeValidator: { try await files.workspaceScope() },
-            isCurrent: { current() == owner })
-        await artifacts.refresh()
-        XCTAssertNil(artifacts.errorMessage)
-        XCTAssertTrue(artifacts.files.contains { Data($0.path.utf8) == Data(uploaded.path.utf8) })
+        let listed = try await files.list()
+        XCTAssertTrue(listed.files.contains { Data($0.path.utf8) == Data(uploaded.path.utf8) })
         try await files.delete(uploaded)
         let remaining = try await files.list()
         XCTAssertFalse(remaining.files.contains { Data($0.path.utf8) == Data(uploaded.path.utf8) })
-        print("NATIVE_MANAGEMENT_MUTATION_PASS Configured workspace upload, download, Artifacts and delete")
+        print("NATIVE_MANAGEMENT_MUTATION_PASS Configured workspace upload, download, list and delete")
         let stagingDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: stagingDirectory, withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700])

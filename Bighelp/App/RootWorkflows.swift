@@ -52,7 +52,7 @@ extension RootShellView {
     /// Opens Workflows over Work, so Back returns there.
     func openWorkflows() {
         guard prepareWorkflowsStore() != nil else {
-            actionErrorMessage = "Connect to your computer to use Workflows."
+            actionErrorMessage = String(localized: "Connect to your computer to use Workflows.")
             return
         }
         showOverWork([.workflows])
@@ -61,7 +61,7 @@ extension RootShellView {
     /// Opens one workflow (a Shortcut or a link): its flow, or its Run sheet straight away.
     func openWorkflow(id: String, startsRun: Bool) {
         guard prepareWorkflowsStore() != nil else {
-            actionErrorMessage = "Connect to your computer to use Workflows."
+            actionErrorMessage = String(localized: "Connect to your computer to use Workflows.")
             return
         }
         showOverWork([.workflows, .workflow(id: id, startsRun: startsRun)])

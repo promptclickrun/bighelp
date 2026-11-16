@@ -91,7 +91,7 @@ struct PluginListReadTests {
         let host = PluginHost()
         await PluginLifecycleManagementModel(client: host.client(), keptCopies: CapabilitiesKeptCopies(saved: saved)).load()
         // The copy is written off the main actor.
-        while (try? FileManager.default.contentsOfDirectory(atPath: folder.path()))?.isEmpty != false {
+        while (try? FileManager.default.contentsOfDirectory(atPath: folder.path(percentEncoded: false)))?.isEmpty != false {
             try await Task.sleep(for: .milliseconds(10))
         }
 

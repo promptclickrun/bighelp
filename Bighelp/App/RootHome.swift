@@ -347,7 +347,7 @@ extension RootShellView {
         switch target {
         case .codeSession(let id), .chat(let id):
             guard let record = sessionCatalog.session(id: id) else {
-                actionErrorMessage = "This chat isn't on this computer anymore."
+                actionErrorMessage = String(localized: "This chat isn't on this computer anymore.")
                 return
             }
             openSessionSelection(record.summary)

@@ -20,7 +20,8 @@ struct CompactChatComposerTests {
 
         #expect(editor.frame.minX >= -0.5)
         #expect(editor.frame.maxX <= mounted.window.bounds.maxX + 0.5)
-        #expect(editor.bounds.width <= mounted.window.bounds.width - 120)
+        // Send sits beside the text: the editor ends at least one control short of the edge.
+        #expect(editor.convert(editor.bounds, to: nil).maxX <= mounted.window.bounds.maxX - BighelpTokens.hitTarget)
         #expect(editor.textContainer.widthTracksTextView)
         #expect(editor.contentSize.width <= editor.bounds.width + 1)
     }

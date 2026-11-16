@@ -594,6 +594,14 @@ final class ChatModel {
         return nativeConversationClient?.isReadyForSubmission ?? true
     }
 
+    /// A draft left for this chat to send as it opens (a refused message's branch, a new group chat's
+    /// first message) can go now. A group chat has no one-bot connection, only its room: judged by
+    /// that connection it was never ready, and New chat's text stayed in the new group chat's box.
+    var isReadyToSendOnOpen: Bool {
+        guard !draft.isEmpty else { return false }
+        return isBotMode ? canSend : directTransportIsReady
+    }
+
     var canSend: Bool {
         // Hosted groups have their own authenticated client and readiness gates.
         // Their unused direct-chat placeholder must not disable the composer.

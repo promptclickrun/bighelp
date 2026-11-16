@@ -66,7 +66,9 @@ change in both repos.
     first tab takes the name of the person's default view (`settings.homeView`), and the header's Bots | Chats
     switch (`HomeViewSwitchPill`) changes the view for this run only. `HomeSelection` (`appState.home`, one for the
     whole app; `AppState()` in tests and previews makes its own) holds the tab, the view, New chat's picks
-    (`NewChatSession`) and Today's layout and boards, so they stay when the computer in use changes. A tab is a root: `AppState.select(_:)` closes whatever was pushed, and
+    (`NewChatSession`), Today's layout and boards and the Settings sheet (open or not, and its pages), so they
+    stay when the computer in use changes. A computer added in Settings becomes the one in use while its sheet
+    is open; any other change of computer closes Settings. A tab is a root: `AppState.select(_:)` closes whatever was pushed, and
     `select(_:thenOpen:)` shows a page over a tab for links, widgets and alerts (`showOverWork`, `showOverToday`).
   - The app opens on Settings › Chat › Opens on (Bots, Chats, Today or Work: `settings.homeLanding`, read once per
     launch as `launchHomeLanding` and applied by `HomeSelection.land`). With Today or Work, Chat › First tab shows
@@ -769,7 +771,12 @@ Code mode.
 - **Environment doesn't reach pushed screens:** values set on `RootShellView` or the NavigationStack root don't
   reach pushed screens (chats from `navigationDestination`, Settings `NavigationLink`s). Pass them at the push site.
 - **Root `.task(id:)` pauses:** it doesn't restart while a chat covers the root. Connection upkeep lives in
-  `WorkspaceConnectionKeeper`, injected per chat route.
+  `WorkspaceConnectionKeeper`, injected per chat route. A pushed page whose stores the root sets up needs one of
+  two things (#987, #1042). Its client takes the connection in use at each request (Kanban's
+  `LiveKanbanService`, Workflows' and Usage's `currentWorkspace` closures: `ReconnectedPagesTests`), so a
+  reconnect needs no setup. Or the page runs the setup itself: the board pages (`configureShellBoard`) and
+  Usage (`usageDestination`), which opens from its link before the sign-in is known and then said "Connect to
+  a computer" until you left it. `ReconnectedPagesHostUITests` checks all three pages on a real computer.
 - **`@ObservationIgnored` never refreshes views:** if a menu depends on something like "is a client configured",
   expose an observed flag.
 - **A `.sheet` on `EmptyView()` never presents:** hang sheets on

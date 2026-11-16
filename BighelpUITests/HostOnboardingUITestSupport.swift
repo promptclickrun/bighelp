@@ -38,6 +38,34 @@ extension BighelpUITestCase {
         XCTAssertTrue(continueAfterConnecting(app), "Connected")
     }
 
+    /// A second computer, after `onboardOpenHost`: Settings › Your computers › Add a computer, the
+    /// address, Continue, then Done. The app is launched again first, so setup's own screens are gone.
+    /// The computer added last is the one in use.
+    @MainActor func addAnotherOpenHost(_ app: XCUIApplication, address: String) throws {
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 30), "The home shows")
+        sleep(3)
+        openSettings(in: app)
+        settingsRow("settings.add-computer", in: app).tap()
+        let field = app.textFields["host-setup.address"]
+        XCTAssertTrue(field.waitForExistence(timeout: 15), "Add a computer asks for its address")
+        field.tap()
+        field.typeText(address)
+        let connect = app.buttons.matching(NSPredicate(
+            format: "identifier IN %@ AND label IN %@",
+            ["host-setup.connect-host", "host-setup.screen"], ["Continue", "Connect"])).firstMatch
+        for _ in 0..<5 where !(connect.exists && connect.isHittable) { app.swipeUp() }
+        connect.tap()
+        // Connected: the step has its own button to go on.
+        let next = app.buttons["host-setup.continue"]
+        XCTAssertTrue(next.waitForExistence(timeout: 45), "Connected to \(address)")
+        next.tap()
+        // Setup finishes over Settings; Done shows the home.
+        closeSettings(in: app)
+        XCTAssertTrue(app.buttons["home.new-chat"].firstMatch.waitForExistence(timeout: 30), "Back on the home")
+    }
+
     /// Connected: the step says so, and its button goes on through the plugin and home steps. The
     /// button reads Continue in first setup, like Connect's, so the step's own line tells them apart.
     @MainActor @discardableResult

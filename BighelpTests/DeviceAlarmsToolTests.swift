@@ -474,6 +474,13 @@ struct DeviceAlarmsToolTests {
         let stored = defaults.dictionary(forKey: DeviceAlarmLabelStore.key)?.count
         #expect(stored == DeviceAlarmLabelStore.maximumLabels)
 
+        // A new label whose key sorts before every other one: it stays, and the bound still holds.
+        // With a random key this was one label too many about once in two hundred runs.
+        let lowest = try #require(UUID(uuidString: "00000000-0000-0000-0000-000000000001"))
+        first.setLabel("Rice", for: lowest)
+        #expect(first.label(for: lowest) == "Rice")
+        #expect(defaults.dictionary(forKey: DeviceAlarmLabelStore.key)?.count == DeviceAlarmLabelStore.maximumLabels)
+
         let other = UUID()
         first.setLabel("Eggs", for: other)
         #expect(first.label(for: other) == "Eggs", "The newest label is never the one dropped")

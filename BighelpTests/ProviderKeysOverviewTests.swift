@@ -18,7 +18,9 @@ struct ProviderKeysOverviewTests {
         #expect(transport.catalogRefreshTimeouts.isEmpty, "Opening the screen reads the saved catalogs")
         await store.refreshModelCatalogs()
         #expect(transport.catalogRefreshTimeouts == [120])
-        #expect(store.successMessage == "Hermes refreshed every provider's model catalog.")
+        // The result is said under the button (`catalogRefresh`), not at the top of the page.
+        #expect(store.catalogRefresh == .done)
+        #expect(store.successMessage == nil)
         #expect(store.errorMessage == nil && !store.isBusy)
     }
 

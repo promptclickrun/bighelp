@@ -53,6 +53,37 @@ Registration must establish credential/grant authority before another row can fi
 
 The payload carries five visible rows, the total active count, and opaque membership suffixes for up to 64 active rows. Hidden rows are recovered only when that membership confirms them; local dismissal tombstones survive restoration. Physical token registration is serialized across all row owners and drains token rotations before releasing the queue. If a remote completion ends the physical card before a new row registers, still-running work gets a new physical card during an eligible live opportunity. All-finished cards dismiss after 30 seconds, or on the next app opening. Upgrade cleanup dismisses old per-chat native cards only after a shared start succeeds.
 
+## News opens the island
+
+The Dynamic Island opens by itself when a chat has news: it needs the person, it finished or it could not finish.
+An ordinary step never opens it.
+
+- **The moment.** The notification service keeps each row's last state. When a row's phase changes into `waiting`,
+  `completed` or `failed`, that one update is a moment. A host that sends the same state again makes no moment.
+- **The alert.** The push for a moment carries `aps.alert` with fixed words and no sound: the title "Bighelp" and
+  "A chat needs you.", "A chat finished." or "A chat could not finish." The words never come from a chat. iOS
+  opens the island for a few seconds, or shows the card as a banner on a phone that has no island.
+- **The row that leads.** The same push names the row in the state's `lead`. The service puts that row first, so
+  its sealed detail fits, and the card shows it first. Later updates carry no `lead`.
+- **A finished card stays for a moment.** iOS takes an ended card off the island at once. When the last active row
+  finishes, the service sends an update with the alert and keeps a pending end for the group. Its alarm sends the
+  end 30 seconds later, with a dismissal date of that time, so the card leaves at once. The end goes through the
+  same send queue and the same authorization checks as every send, and a pending end holds only IDs and
+  revisions. No end is sent if a row became active again, if the group already ended or if the authority is
+  gone. A host that sends a finished row again during the wait gets a plain update. An end that fails is not
+  sent again: the card then ends with its lease or when the app opens. A group whose last row finished without
+  a moment has no pending end and ends as before, with a dismissal date 30 seconds ahead.
+- **Priority.** A moment's push always goes at the normal priority. Only a new step alone goes at low priority.
+- **What the open island shows.** The bot, what happened, the words from the row's sealed detail, and buttons:
+  Deny and Approve beside a short command, Review for every other approval, Answer for a question, Open chat and
+  Reply for a finished reply, Open chat for a failure. A chat that only works keeps the plain rows.
+- **A yes needs the whole command.** The computer marks a waiting row's detail with what kind of answer waits. Only
+  a command it sent whole (one printable line of at most 90 characters) gets Approve, and only while the card may
+  show text. The app checks again before it answers the computer: one request waits in that chat, it is not
+  expired, the choice is allowed and the command is short. The buttons need the unlocked phone.
+- **Older builds.** `lead` and the detail's new field are optional. An older app shows the same rows as before
+  when the island opens.
+
 ## When the service refuses a card
 
 The service answers a phone's row DELETE for a card it never stored with 404 `notification_activity_unknown`, and a revision it doesn't expect with 409 `notification_activity_conflict` (both `{version, error: {code, message}}`). The host routes keep their own answers. The app treats the 404 as "already gone": it clears the saved revocation and does the same local cleanup a confirmed revoke does. A 409, a 5xx or any other answer stays pending and is retried at the next foreground.

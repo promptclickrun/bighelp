@@ -106,7 +106,7 @@ struct ChatsInboxView: View {
         // One sheet for the list, as the Sessions page has: a tap moves the chat, and the sheet
         // closes only once Hermes confirms it. The moved project shows here without waiting for
         // the next load (`ShellFeatureStore.recordMovedProject`).
-        .sheet(item: $projectMoveTarget) { row in
+        .bighelpSheet(item: $projectMoveTarget) { row in
             if let move = context.projectMove, case .session(let summary) = row.source,
                let agentID = summary.agentIDs.first {
                 MoveChatToProjectSheet(move: move, chatTitle: row.title, agentID: agentID,

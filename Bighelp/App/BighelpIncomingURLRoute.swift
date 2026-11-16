@@ -35,6 +35,13 @@ enum BighelpIncomingURLRoute: Equatable, Sendable {
     /// "loopdy://usage": Usage, from the Usage widget.
     case usage
 
+    /// The island's Reply: a chat link that also asks for the keyboard (`BighelpWidgetSnapshot.chatURL`).
+    static func asksForReply(_ url: URL) -> Bool {
+        guard case .chat? = parse(url) else { return false }
+        return URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.contains { $0.name == "reply" && $0.value == "1" } == true
+    }
+
     static func parse(_ url: URL) -> BighelpIncomingURLRoute? {
         let scheme = url.scheme?.lowercased()
         guard scheme == "loopdy" || scheme == "app.loopdy.mobile" else { return nil }

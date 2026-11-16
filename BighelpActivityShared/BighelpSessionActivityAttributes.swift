@@ -33,6 +33,9 @@ struct LoopdySessionActivityAttributes: Codable, Hashable, Sendable {
         var sessions: [BighelpActivitySession]? = nil
         var activeCount: Int? = nil
         var activeRows: [String]? = nil
+        /// The row with news (it needs the person, finished or could not finish), named by the
+        /// notification service on the one update that opens the island for it. It is shown first.
+        var lead: String? = nil
 
         static func initial(agentName: String, timestamp: Int) -> ContentState {
             let name = BighelpActivityText.personName(agentName) ?? "Your bot"

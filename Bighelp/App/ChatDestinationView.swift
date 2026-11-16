@@ -709,6 +709,10 @@ struct ChatDestinationView: View {
             if pending.fillsBlanks, model.beginBlueprintDraft(pending.text) { return }
             model.draft = pending.text
         }
+        .task(id: appState.pendingReplyConversationID) {
+            guard appState.consumeReplyRequest(for: model.conversationID) else { return }
+            attachmentFlow.composerFocusRequest &+= 1
+        }
         .task(id: appState.pendingVoiceConversationID) {
             // The request stays until voice can open, so withdrawing it (another computer, another
             // screen) cancels this wait.

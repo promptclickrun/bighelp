@@ -19,9 +19,7 @@ struct BighelpActivityRowsView: View {
     @Environment(\.isLuminanceReduced) private var luminanceReduced
     @Environment(\.dynamicTypeSize) private var typeSize
 
-    private var ordered: [BighelpActivitySession] {
-        (state.sessions ?? []).filter { BighelpActivityText.coordinate($0.id, maximum: 128) != nil }.sorted { ($0.priority, $0.id) < ($1.priority, $1.id) }
-    }
+    private var ordered: [BighelpActivitySession] { BighelpActivitySession.shown(state) }
     private var limit: Int { typeSize.isAccessibilitySize ? min(maximumRows, 1) : maximumRows }
     private var activeCount: Int { max(0, state.activeCount ?? ordered.filter { !$0.phase.isTerminal }.count) }
     private var attentionCount: Int { ordered.filter { $0.phase == .waiting && !stale($0) }.count }

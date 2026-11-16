@@ -27,6 +27,13 @@ struct BighelpActivitySession: Codable, Hashable, Sendable, Identifiable {
         self.init(id: id, phase: state.phase, timestamp: state.timestamp,
                   activeSubagentCount: state.activeSubagentCount, latestTool: state.latestTool)
     }
+    /// The card's rows in the order it shows them: the row with news first, then the ones that wait,
+    /// the ones that work and the finished ones.
+    static func shown(_ state: LoopdySessionActivityAttributes.ContentState) -> [Self] {
+        (state.sessions ?? []).filter { BighelpActivityText.coordinate($0.id, maximum: 128) != nil }.sorted {
+            ($0.id == state.lead ? 0 : 1, $0.priority, $0.id) < ($1.id == state.lead ? 0 : 1, $1.priority, $1.id)
+        }
+    }
     static func aggregate(_ rows: [Self], timestamp: Int) -> LoopdySessionActivityAttributes.ContentState {
         let ordered = rows.sorted { ($0.priority, $0.id) < ($1.priority, $1.id) }
         let running = ordered.filter { !$0.phase.isTerminal }

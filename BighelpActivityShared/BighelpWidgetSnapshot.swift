@@ -206,9 +206,11 @@ struct BighelpWidgetSnapshot: Codable, Equatable, Sendable {
         }
     }
 
-    static func chatURL(_ sessionID: String) -> URL {
+    /// `reply` opens the chat with the keyboard up (the island's Reply).
+    static func chatURL(_ sessionID: String, reply: Bool = false) -> URL {
         var components = URLComponents()
         components.scheme = "loopdy"; components.host = "chat"; components.path = "/" + sessionID
+        if reply { components.queryItems = [URLQueryItem(name: "reply", value: "1")] }
         return components.url ?? URL(string: "loopdy://home")!
     }
 

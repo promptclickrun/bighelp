@@ -26,16 +26,27 @@ struct BighelpActivityDetail: Equatable, Sendable {
     var trail: [Step] = []
     var say: String?
     var question: String?
+    /// What kind of answer `question` waits for. Nil from a computer that doesn't say.
+    var ask: Ask?
     var preview: String?
     var helperGoals: [String] = []
     var contextUsed: Int?
     var contextWindow: Int?
     var model: String?
 
+    enum Ask: String, Equatable, Sendable {
+        /// A question the person answers in words.
+        case question = "q"
+        /// A command, and `question` is all of it: Approve and Deny may sit beside it.
+        case command = "c"
+        /// An approval whose command the card doesn't show in full: it is read in the app first.
+        case approval = "a"
+    }
+
     private struct Wire: Decodable {
         struct Step: Decodable { var t: String?; var c: Int?; var n: String? }
         var b: Int?; var s: Int?; var t: String?; var n: String?; var tr: [Step]?
-        var say: String?; var q: String?; var p: String?; var h: [String]?
+        var say: String?; var q: String?; var a: String?; var p: String?; var h: [String]?
         var cu: Int?; var cm: Int?; var m: String?
     }
 
@@ -57,6 +68,8 @@ struct BighelpActivityDetail: Equatable, Sendable {
         }
         say = Self.line(wire.say, 160)
         question = Self.line(wire.q, 200)
+        // A command counts as whole only as the computer wrote it: one line, nothing folded or cut.
+        ask = wire.a.flatMap(Ask.init(rawValue:)).map { $0 == .command && question != wire.q ? .approval : $0 }
         preview = Self.line(wire.p, 280)
         helperGoals = (wire.h ?? []).prefix(2).compactMap { Self.line($0, 60) }
         contextUsed = wire.cu.flatMap { $0 > 0 ? $0 : nil }

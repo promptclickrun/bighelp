@@ -1515,6 +1515,19 @@ describe("Live Activity updates", () => {
     });
     expect(spec.ttlSeconds).toBe(60);
   });
+
+  it("puts an alert in the payload only when one is given, and never a sound", () => {
+    const base = { event: "update" as const, activityId, contentState: { a: 1 }, timestamp: 10, staleDate: 20 };
+    expect(liveActivitySpec(base, 10)!.payload).toEqual({
+      aps: { timestamp: 10, event: "update", "content-state": { a: 1 }, "stale-date": 20 },
+    });
+    const spec = liveActivitySpec({ ...base, alert: { title: "Bighelp", body: "A chat needs you." } }, 10)!;
+    expect(spec.payload).toEqual({
+      aps: { timestamp: 10, event: "update", "content-state": { a: 1 }, "stale-date": 20,
+        alert: { title: "Bighelp", body: "A chat needs you." } },
+    });
+    expect((spec.payload as { aps: object }).aps).not.toHaveProperty("sound");
+  });
 });
 
 // MARK: Retry queue

@@ -118,6 +118,15 @@ export function initializeUserLinkStorage(storage: DurableObjectStorage): void {
       last_timestamp INTEGER NOT NULL DEFAULT 0,
       ended INTEGER NOT NULL DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS managed_activity_moments (
+      activity_id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS managed_activity_pending_ends (
+      group_id TEXT PRIMARY KEY,
+      due_at INTEGER NOT NULL,
+      end_json TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS managed_notification_credentials (
       credential_id TEXT PRIMARY KEY,
       authorization_epoch INTEGER NOT NULL CHECK (authorization_epoch > 0),

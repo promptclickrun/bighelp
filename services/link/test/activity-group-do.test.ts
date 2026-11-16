@@ -1,4 +1,4 @@
-import { env, evictDurableObject, runInDurableObject } from "cloudflare:test";
+import { env, evictDurableObject, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { UserLinkNotificationStore } from "../src/user-link-notifications.js";
 import type { LinkEnv, UserLink } from "../src/user-link.js";
@@ -189,7 +189,8 @@ describe("shared activity owner integration", () => {
     await f.stub.revokeNotificationGrantAuthority({ grantId: b.activity.grantId,
       credentialId: f.credentialId, authorizationEpoch: 1, revision: 2 });
     await pending;
-    expect(f.payloads.at(-1)).toMatchObject({ event: "end", contentState: { activeCount: 0 } });
+    // The last chat finishing is a moment: the card updates now and ends after its wait.
+    expect(f.payloads.at(-1)).toMatchObject({ event: "update", contentState: { activeCount: 0 } });
     expect(f.payloads.at(-1)!.contentState.sessions.map((r) => r.id)).not.toContain(rowId(2));
   });
 
@@ -280,13 +281,18 @@ describe("shared activity owner integration", () => {
     await f.send(a, "completed");
     await expect(f.send(a, "thinking", now() + 1)).rejects.toThrow();
     await f.send(b, "completed");
-    expect(f.payloads.at(-1)).toMatchObject({ event: "end", contentState: { activeCount: 0 } });
+    expect(f.payloads.at(-1)).toMatchObject({ event: "update", contentState: { activeCount: 0 } });
   });
 
   it("refuses a new alias once a physical end has been dispatched", async () => {
     const f = await fixture();
     const a = await f.register(1);
     await f.send(a, "completed");
+    expect(f.payloads.at(-1)).toMatchObject({ event: "update" });
+    // The end comes from the alarm once the wait is over.
+    const clock = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 31_000);
+    try { await runDurableObjectAlarm(f.stub); } finally { clock.mockRestore(); }
+    expect(f.payloads.at(-1)).toMatchObject({ event: "end" });
     await expect(f.register(2, a.activity.grantId)).rejects.toThrow();
   });
 });

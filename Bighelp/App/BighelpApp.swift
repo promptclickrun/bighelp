@@ -310,6 +310,8 @@ struct BighelpApp: App {
             registry: hostRegistry
         )
         _notificationComposition = State(initialValue: notificationComposition)
+        Self.configureOutsideActions(composition.shortcutService, hostRegistry: hostRegistry,
+                                     notifications: notificationComposition)
 
         let priorNativeEvent = hostRegistry.onNativeEvent
         hostRegistry.onNativeEvent = { [weak nativeWorkspaces, weak notificationComposition] host, event in
@@ -348,6 +350,9 @@ struct BighelpApp: App {
         shortcutService = composition.shortcutService
         #if DEBUG
         BighelpShortcutAskProbe.runIfRequested(composition.shortcutService)
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        IslandMomentPreview.runIfRequested()
+        #endif
         #endif
         _reflectiveVisionCamera = State(initialValue: ReflectiveVisionCamera())
         usesDemoFixtures = composition.usesDemoFixtures
@@ -434,6 +439,32 @@ struct BighelpApp: App {
         )
     }
     #endif
+
+    /// A reply typed on an alert and the island's Approve and Deny reach the computer through the
+    /// same live host as Shortcuts, so they work with Bighelp closed.
+    private static func configureOutsideActions(_ shortcuts: BighelpShortcutService, hostRegistry: BighelpHostRegistry,
+                                                notifications: BighelpManagedNotificationComposition) {
+        var actions = ChatOutsideActions(
+            connect: { try await shortcuts.connectedWorkspace() },
+            selectedHostID: { [weak hostRegistry] in hostRegistry?.selectedHostID },
+            selectHost: { id in (try? shortcuts.useGateway(id)) != nil })
+        // An action can be what started the app: the saved notification setup may load a moment later.
+        @MainActor func service() async -> BighelpManagedNotificationService? {
+            for _ in 0..<20 {
+                if let service = notifications.service { return service }
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+            return notifications.service
+        }
+        actions.alertTarget = { open in await service()?.outsideTarget(for: open) }
+        actions.rowTarget = { rowID in await service()?.outsideTarget(opaqueSessionID: rowID) }
+        ChatOutsideActions.shared = actions
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        BighelpActivityActions.decide = { rowID, approves, command in
+            await ChatOutsideActions.shared?.receiveDecision(rowID: rowID, approves: approves, command: command)
+        }
+        #endif
+    }
 
     #if os(iOS)
     /// CarPlay's voice chat talks through the same live host as Shortcuts;

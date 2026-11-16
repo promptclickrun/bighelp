@@ -1251,6 +1251,32 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   Attention comes first; the payload holds five rows and a total count. A chat finishing cannot end another chat's card.
   The service aggregates scoped per-turn updates before sending to the shared native token (docs/LIVE_ACTIVITY_GROUPS.md).
   The finished card leaves about 30 seconds after all work ends, and opening the app clears it.
+- The Dynamic Island opens by itself for news (#1050): a chat needs the person, finished or could not finish.
+  The notification service sees a row's phase change into `waiting`, `completed` or `failed`, and that one update
+  carries an `alert` (fixed words, no sound) and names the row in the state's `lead`, which the card shows first
+  (`BighelpActivitySession.shown`). A step never does. The open island then shows that chat
+  (`BighelpIslandMoment`): its bot, what happened, the words from the sealed detail and buttons. iOS takes an ended
+  card off the island at once, so the last chat's finish goes as an update and the end follows 30 s later.
+  The simulator gets no pushes: `-test-island-moment command|approval|question|done|failed` shows each one.
+- A yes on the island needs the whole command on screen. The sealed detail says what waits
+  (`BighelpActivityDetail.Ask`, the plugin's `a`): only a command the computer sent whole, at most 90 characters,
+  that the card may show as text gets Deny and Approve (`BighelpActivityDecisionIntent`, a `LiveActivityIntent`
+  that runs in the app and needs the unlocked phone). Every other approval gets Review, a question Answer, a
+  finished reply Open chat and Reply (`chatURL(reply:)`, `ChatReplyRequest`: the chat opens with the keyboard up).
+  The intent carries the command the island showed, and the app answers only when that same command is the one
+  request that waits in the chat (`ChatOutsidePrompt.approval`: not expired, the choice allowed, the command
+  short). The island can stay on screen for minutes; a tap after the bot asked for something else answers
+  nothing and says so.
+- Words typed on an alert go to its chat with the app closed (#1051, `BighelpAlertReply`): a reply's alert takes
+  the person's next message, a question's alert its answer. The notification service extension adds the field
+  from the alert's kind, never from the push, so an older build shows no field whose words it would drop. The
+  field needs the unlocked phone: saved chats can't be read while it is locked.
+- Everything a person does to a chat from outside the app goes through `ChatOutsideActions`, on the Shortcuts
+  host path: the alert's words, the island's Approve and Deny. It never starts a chat, never moves a person who
+  is using the app to another computer, and says a failure in an alert on the phone with the words in it
+  (`ChatOutsideNotice`). Actions run one at a time and stop after 24 s, inside the time iOS gives one, so a
+  failure is always said. `BighelpShortcutWorkspace.sendFromOutside` is the one send, shared with Arriving and
+  leaving.
 - The card starts when the person taps Send (T3 Code's playbook, `BighelpManagedNativeActivityRuntime.arm`, a
   "Sending your message" row under the chat's own opaque ID): iOS starts a Live Activity only for an app in front,
   and a turn with a file starts once the file is up, often after the person left, so it got no card. A turn that

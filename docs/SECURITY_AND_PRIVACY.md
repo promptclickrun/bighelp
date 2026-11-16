@@ -320,6 +320,8 @@ updates.
 | Alert title/body | Device after decryption | Encrypted payload | Created by the authorized source |
 | Live Activity state | ActivityKit | Bounded state, encrypted at rest but readable during relay delivery and by Apple | Created from agent activity |
 | Live Activity detail (steps, a waiting question, reply lines) | Device after decryption, in the Live Activity extension | Encrypted bytes for a key the relay never has | Created and encrypted by the authorized source |
+| Live Activity alert (opens the Dynamic Island for news) | Shown by iOS; the open island draws from the state and the detail | Fixed words only ("A chat needs you.", "A chat finished.", "A chat could not finish."), readable by the relay and Apple | The relay adds it when a row's phase changes; no text from a chat |
+| Words typed on an alert, and Approve or Deny on the island | Sent by the app over its own connection | Not sent | Plaintext, as a message or an answer in that chat |
 | Static Card document and embedded values | Local transcript cache | Not sent | Generated and validated on the authorized Hermes host |
 | Live Card source URL, response, and request metadata | Not accepted in build 3 | Not accepted in build 3 | Not accepted in build 3 |
 | Preferences | UserDefaults | Not uploaded as preferences | Not required |

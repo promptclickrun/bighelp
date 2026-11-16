@@ -1,6 +1,7 @@
-import { env, runInDurableObject } from "cloudflare:test";
+import { env, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apnsIdFor, resetApnsTokenCache } from "../src/apns.js";
+import { ACTIVITY_END_DELAY_SECONDS, activityMomentAlert } from "../src/activity-group.js";
 import { resetApnsBreaker } from "../src/push-delivery.js";
 import { putPushTarget } from "../src/push-targets.js";
 import type { NotificationActivity, NotificationEgressSnapshot } from "../src/notification-grants.js";
@@ -89,10 +90,11 @@ async function fixture(mode: "off" | "on") {
     await runInDurableObject<UserLink, void>(stub, async (instance) => { await instance.registerNotificationActivity(input); });
     return { activity: input as NotificationActivity, authority };
   };
-  const send = (row: Awaited<ReturnType<typeof register>>, phase: string, more: { sealed?: string; quiet?: boolean } = {}) =>
+  const send = (row: Awaited<ReturnType<typeof register>>, phase: string,
+    more: { sealed?: string; quiet?: boolean; timestamp?: number } = {}) =>
     runInDurableObject<UserLink, unknown>(stub, async (instance) => instance.sendNotificationActivityGroup({
       ownerCoordinate, activityId: row.activity.activityId,
-      state: { id: row.activity.rowId!, phase, timestamp: now(), activeSubagentCount: 0,
+      state: { id: row.activity.rowId!, phase, timestamp: more.timestamp ?? now(), activeSubagentCount: 0,
         ...(more.sealed ? { sealed: more.sealed } : {}) },
       ...(more.quiet ? { quiet: true } : {}),
       externalId: "fixture-recipient", authority: { ...row.authority, activity: {
@@ -100,7 +102,7 @@ async function fixture(mode: "off" | "on") {
         leaseExpires: row.activity.leaseExpires,
       } },
     }));
-  return { groupId, credentialId, addTarget, register, send };
+  return { stub, groupId, credentialId, addTarget, register, send };
 }
 
 describe("direct delivery of the shared chat Live Activity", () => {
@@ -142,14 +144,21 @@ describe("direct delivery of the shared chat Live Activity", () => {
     expect(rows.find((row) => row.id === rowId(2))).not.toHaveProperty("sealed");
   });
 
-  it("ends the card with a dismissal date only when no chat is left", async () => {
+  it("ends the card at once, with a dismissal date, when a chat that was already finished is resent last", async () => {
+    // A group whose last chat finished before moments existed has no pending end: it ends as it always did.
     const f = await fixture("on");
     await f.addTarget(f.groupId);
     const a = await f.register(1);
-    await f.send(a, "completed");
+    const timestamp = now();
+    await runInDurableObject<UserLink, void>(f.stub, (_instance, state) => {
+      state.storage.sql.exec("UPDATE managed_activity_rows SET state_json=? WHERE activity_id=?",
+        JSON.stringify({ id: a.activity.rowId, phase: "completed", timestamp, activeSubagentCount: 0 }), a.activity.activityId);
+    });
+    await f.send(a, "completed", { timestamp });
     const aps = sent[0]!.body.aps;
     expect(aps).toMatchObject({ event: "end", "content-state": { activeCount: 0 } });
     expect(aps["dismissal-date"]).toBe(aps.timestamp + 30);
+    expect(aps).not.toHaveProperty("alert");
   });
 
   it("ignores a token registered under a chat's own alias: the card is addressed by its group", async () => {
@@ -199,5 +208,197 @@ describe("direct delivery of the shared chat Live Activity", () => {
       contentState: { groupId: off.groupId, activeCount: 2 },
     });
     expect(await env.ACCOUNTS.prepare("SELECT COUNT(*) AS n FROM push_sends").first()).toEqual({ n: 0 });
+  });
+});
+
+// MARK: Moments
+
+describe("a chat's moment on the shared card", () => {
+  const apsOf = (index: number) => sent[index]!.body.aps;
+  const priorityOf = (index: number) => sent[index]!.headers.get("apns-priority");
+  /** Moves the clock past the deferred end's wait, runs the Durable Object's alarm, then lets the clock go on. */
+  const runAlarmAfterWait = async (stub: DurableObjectStub<UserLink>) => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(Date.now() + (ACTIVITY_END_DELAY_SECONDS + 1) * 1_000);
+    try { return await runDurableObjectAlarm(stub); } finally { clock.mockRestore(); }
+  };
+
+  it("pushes an alert, silent, with the waiting chat first, when a chat starts waiting", async () => {
+    const f = await fixture("on");
+    await f.addTarget(f.groupId);
+    await f.register(1);
+    const b = await f.register(2);
+    await f.send(b, "waiting");
+    expect(apsOf(0).event).toBe("update");
+    expect(apsOf(0).alert).toEqual(activityMomentAlert("waiting"));
+    expect(apsOf(0).alert).toEqual({ title: "Bighelp", body: "A chat needs you." });
+    expect(apsOf(0)).not.toHaveProperty("sound");
+    expect(apsOf(0)["content-state"]).toMatchObject({ lead: rowId(2), activeCount: 2 });
+    expect(apsOf(0)["content-state"].sessions[0].id).toBe(rowId(2));
+    expect(priorityOf(0)).toBe("10");
+  });
+
+  it("sends no alert when the host resends the same waiting state", async () => {
+    const f = await fixture("on");
+    await f.addTarget(f.groupId);
+    const a = await f.register(1);
+    const timestamp = now();
+    await f.send(a, "waiting", { timestamp });
+    await f.send(a, "waiting", { timestamp: timestamp + 60 });
+    expect(apsOf(0)).toHaveProperty("alert");
+    expect(apsOf(1)).not.toHaveProperty("alert");
+    expect(apsOf(1)["content-state"]).not.toHaveProperty("lead");
+  });
+
+  it("sends no alert for a step, and says nothing about a chat that is not the news", async () => {
+    const f = await fixture("on");
+    await f.addTarget(f.groupId);
+    const a = await f.register(1);
+    await f.send(a, "using_tool");
+    await f.send(a, "responding");
+    expect(sent.map((call) => call.body.aps)).toSatisfy((all: Array<Record<string, unknown>>) =>
+      all.every((aps) => !("alert" in aps) && !("lead" in (aps["content-state"] as object))));
+  });
+
+  it("names the chat that finished while another still works, and keeps the card up", async () => {
+    const f = await fixture("on");
+    await f.addTarget(f.groupId);
+    const a = await f.register(1);
+    await f.register(2);
+    await f.send(a, "completed");
+    expect(apsOf(0).event).toBe("update");
+    expect(apsOf(0).alert).toEqual({ title: "Bighelp", body: "A chat finished." });
+    expect(apsOf(0)["content-state"]).toMatchObject({ lead: rowId(1), activeCount: 1 });
+    // Without the lead, the finished chat would sort after the one that still works.
+    expect(apsOf(0)["content-state"].sessions.map((row: { id: string }) => row.id)).toEqual([rowId(1), rowId(2)]);
+    await runAlarmAfterWait(f.stub);
+    expect(sent).toHaveLength(1);
+  });
+
+  it("says a chat could not finish", async () => {
+    const f = await fixture("on");
+    await f.addTarget(f.groupId);
+    const a = await f.register(1);
+    await f.register(2);
+    await f.send(a, "failed");
+    expect(apsOf(0).alert).toEqual({ title: "Bighelp", body: "A chat could not finish." });
+    expect(apsOf(0)["content-state"]).toMatchObject({ lead: rowId(1) });
+  });
+
+  it("keeps a moment at high priority even when the host marks the update quiet", async () => {
+    const f = await fixture("on");
+    await f.addTarget(f.groupId);
+    const a = await f.register(1);
+    const b = await f.register(2);
+    await f.send(a, "waiting", { quiet: true });
+    expect(priorityOf(0)).toBe("10");
+    await f.send(b, "completed", { quiet: true });
+    expect(priorityOf(1)).toBe("10");
+  });
+
+  it("updates, then ends 30 seconds later and at once, when the last chat finishes", async () => {
+    const f = await fixture("on");
+    await f.addTarget(f.groupId);
+    const a = await f.register(1);
+    await f.send(a, "completed");
+    expect(apsOf(0).event).toBe("update");
+    expect(apsOf(0)).not.toHaveProperty("dismissal-date");
+    expect(apsOf(0).alert).toEqual({ title: "Bighelp", body: "A chat finished." });
+    expect(apsOf(0)["content-state"]).toMatchObject({ activeCount: 0, lead: rowId(1) });
+    expect(sent).toHaveLength(1);
+    // The alarm is set for the end, ahead of the hour-away lease purge registration set.
+    await runInDurableObject<UserLink, void>(f.stub, async (_instance, state) => {
+      expect(await state.storage.getAlarm()).toBeLessThanOrEqual(Date.now() + (ACTIVITY_END_DELAY_SECONDS + 2) * 1_000);
+    });
+
+    expect(await runAlarmAfterWait(f.stub)).toBe(true);
+    expect(sent).toHaveLength(2);
+    const end = apsOf(1);
+    expect(end).toMatchObject({ event: "end", "content-state": { activeCount: 0 } });
+    expect(end).not.toHaveProperty("alert");
+    expect(end.timestamp).toBeGreaterThanOrEqual(apsOf(0).timestamp + ACTIVITY_END_DELAY_SECONDS);
+    // The card leaves now, not 30 seconds from now.
+    expect(end["dismissal-date"]).toBeLessThanOrEqual(end.timestamp);
+    await runInDurableObject<UserLink, void>(f.stub, (_instance, state) => {
+      expect(state.storage.sql.exec("SELECT COUNT(*) AS count FROM managed_activity_pending_ends").one().count).toBe(0);
+    });
+    // The group has ended: no chat can join it now.
+    await expect(f.register(2)).rejects.toThrow();
+  });
+
+  it("still ends the card after the finished chat's own activity is closed, as the update route closes it", async () => {
+    const f = await fixture("on");
+    await f.addTarget(f.groupId);
+    const a = await f.register(1);
+    await f.send(a, "thinking");
+    await f.send(a, "completed");
+    // The route marks a finished chat's activity ended as soon as its update is sent.
+    await runInDurableObject<UserLink, void>(f.stub, (_instance, state) => {
+      state.storage.sql.exec("UPDATE managed_notification_activities SET status='ended' WHERE activity_id=?",
+        a.activity.activityId);
+    });
+    const before = sent.length;
+    await runAlarmAfterWait(f.stub);
+    expect(sent.length).toBe(before + 1);
+    expect(apsOf(before).event).toBe("end");
+  });
+
+  it("keeps the moment for a host's retry when the first try never reached a push", async () => {
+    const f = await fixture("on");
+    await f.addTarget(f.groupId);
+    const a = await f.register(1);
+    await f.send(a, "thinking");
+    const timestamp = now() + 5;
+    const state = { id: a.activity.rowId!, phase: "completed", timestamp, activeSubagentCount: 0 };
+    // The first try stored the row and then failed before any push was reserved.
+    await runInDurableObject<UserLink, void>(f.stub, (instance) => {
+      (instance as unknown as { notificationState: { updateActivityGroup(id: string, row: unknown, credential: string): unknown } })
+        .notificationState.updateActivityGroup(a.activity.activityId, state, f.credentialId);
+    });
+    const before = sent.length;
+    await f.send(a, "completed", { timestamp });
+    // The retry is still news: the island opens, and the card stays for the wait.
+    expect(apsOf(before).event).toBe("update");
+    expect(apsOf(before).alert).toEqual(activityMomentAlert("completed"));
+    await f.send(a, "completed", { timestamp });
+    expect(apsOf(before + 1)).not.toHaveProperty("alert");
+  });
+
+  it("does not end the card when a chat started working before the wait was over", async () => {
+    const f = await fixture("on");
+    await f.addTarget(f.groupId);
+    const a = await f.register(1);
+    await f.send(a, "completed");
+    await f.register(2);
+    expect(await runAlarmAfterWait(f.stub)).toBe(true);
+    expect(sent).toHaveLength(1);
+    expect(order).toEqual(["apns"]);
+  });
+
+  it("does not end the card early when the host resends the finished chat", async () => {
+    const f = await fixture("on");
+    await f.addTarget(f.groupId);
+    const a = await f.register(1);
+    const timestamp = now();
+    await f.send(a, "completed", { timestamp });
+    await f.send(a, "completed", { timestamp });
+    expect(apsOf(1).event).toBe("update");
+    expect(apsOf(1)).not.toHaveProperty("alert");
+    expect(apsOf(1)).not.toHaveProperty("dismissal-date");
+    expect(await runAlarmAfterWait(f.stub)).toBe(true);
+    expect(sent).toHaveLength(3);
+    expect(apsOf(2).event).toBe("end");
+  });
+
+  it("sends nothing for an end whose credential was revoked in the wait", async () => {
+    const f = await fixture("on");
+    await f.addTarget(f.groupId);
+    const a = await f.register(1);
+    await f.send(a, "completed");
+    await f.stub.revokeNotificationCredential({ credentialId: f.credentialId, authorizationEpoch: 2 });
+    await runAlarmAfterWait(f.stub);
+    expect(sent).toHaveLength(1);
+    await runInDurableObject<UserLink, void>(f.stub, (_instance, state) => {
+      expect(state.storage.sql.exec("SELECT COUNT(*) AS count FROM managed_activity_pending_ends").one().count).toBe(0);
+    });
   });
 });

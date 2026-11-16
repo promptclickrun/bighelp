@@ -178,6 +178,18 @@ import UserNotifications
         #expect(fakes.clearedEvents.count == 1)
     }
 
+    /// A reply about one saved chat takes the person's words (#1051), in place of the buttons its push brought.
+    @Test func aSealedReplyAboutAChatGetsATextField() async throws {
+        let (info, plaintext) = try Self.sealedPush()
+        let fakes = Fakes()
+        fakes.opened = plaintext
+        let (_, delivered) = run(fakes, Self.request(info, thread: String(repeating: "A", count: 43)))
+        let content = try #require(await delivered.settled().first)
+        #expect(content.categoryIdentifier == BighelpAlertReply.replyCategory)
+        let registered = await fakes.categories.categories()
+        #expect(registered.contains { $0.identifier == BighelpAlertReply.replyCategory })
+    }
+
     @Test func aSealedAlertShownLiveByTheAppIsQuiet() async throws {
         let (info, plaintext) = try Self.sealedPush()
         let fakes = Fakes()

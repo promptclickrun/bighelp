@@ -41,6 +41,8 @@ final class AppState {
     /// because the person stepped out of its chat.
     var deviceToolConversationID: String? { activatedConversationID }
     private(set) var pendingVoiceConversationID: String?
+    /// The chat whose message box takes the keyboard as it opens (the island's Reply).
+    private(set) var pendingReplyConversationID: String?
     /// Text a board "Ask" or "Discuss" leaves in the next new chat's composer.
     var pendingComposerText: String?
     /// The open chat's agent and text when the app left, while that chat had sent nothing.
@@ -180,6 +182,17 @@ final class AppState {
         pendingVoiceConversationID = conversationID
     }
 
+    func requestReply(in conversationID: String) {
+        pendingReplyConversationID = conversationID
+    }
+
+    @discardableResult
+    func consumeReplyRequest(for conversationID: String) -> Bool {
+        guard pendingReplyConversationID == conversationID else { return false }
+        pendingReplyConversationID = nil
+        return true
+    }
+
     /// Another computer: its pages close and the tab stays. The connections screen stays up while
     /// you switch computers from it.
     func resetForHostBoundary() {
@@ -187,6 +200,7 @@ final class AppState {
         if !showsOnlyConnections { path.removeAll() }
         activatedConversationID = nil
         pendingVoiceConversationID = nil
+        pendingReplyConversationID = nil
         clearComposerText()
         dropPendingShare()
     }
@@ -195,6 +209,7 @@ final class AppState {
         path.removeAll()
         activatedConversationID = nil
         pendingVoiceConversationID = nil
+        pendingReplyConversationID = nil
         clearComposerText()
         dropPendingShare()
     }
@@ -300,4 +315,20 @@ struct PendingShareHandoff: Identifiable {
     let since: Date
     /// No chat took it (a host or account change, or it waited too long); it's offered again.
     let onDropped: @MainActor (String) -> Void
+}
+
+/// "Reply" on the Dynamic Island opens a chat and asks for the keyboard. The link names a Live
+/// Activity row, and the chat it stands for is known only once the shell opens it, so the request
+/// waits here for that open. It is good for a short time: an open that comes later is another tap.
+@MainActor
+enum ChatReplyRequest {
+    private static var notedAt: Date?
+
+    static func note(at date: Date = .now) { notedAt = date }
+
+    static func take(at date: Date = .now) -> Bool {
+        defer { notedAt = nil }
+        guard let notedAt else { return false }
+        return date.timeIntervalSince(notedAt) >= 0 && date.timeIntervalSince(notedAt) < 10
+    }
 }

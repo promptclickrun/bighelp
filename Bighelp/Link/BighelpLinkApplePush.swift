@@ -303,14 +303,14 @@ final class BighelpLinkApplicationDelegate: NSObject, UIApplicationDelegate,
     ) -> Bool {
         let center = UNUserNotificationCenter.current()
         center.delegate = self
-        center.setNotificationCategories([
+        center.setNotificationCategories(BighelpAlertReply.categories.union([
             UNNotificationCategory(
                 identifier: BighelpProactiveNotificationRequest.categoryIdentifier,
                 actions: [],
                 intentIdentifiers: [],
                 options: []
             ),
-        ])
+        ]))
         // Configure only after bighelp installs its delegate so BuzzKit captures and
         // forwards to it. Missing injected configuration remains a truthful state.
         _ = BighelpBuzzKitRuntime.shared.configureIfPossible()
@@ -352,6 +352,24 @@ final class BighelpLinkApplicationDelegate: NSObject, UIApplicationDelegate,
     ) {
         if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
             Telemetry.featureUsed(.notificationOpened)
+        }
+        // Words typed on the alert go to its chat with the app still closed. iOS gets its answer
+        // once they are sent, which keeps the app running until then.
+        if response.actionIdentifier == BighelpAlertReply.actionID {
+            let content = response.notification.request.content
+            let text = (response as? UNTextInputNotificationResponse)?.userText ?? ""
+            let alert = BighelpProactiveNotificationOpen(userInfo: content.userInfo)
+            let agentName = content.title, thread = content.threadIdentifier
+            Task { @MainActor in
+                if let actions = ChatOutsideActions.shared {
+                    await actions.receiveReply(text, alert: alert, agentName: agentName, thread: thread)
+                } else {
+                    // Never drop the words without a word.
+                    await ChatOutsideNotice.post(.unavailable, text: text, agentName: agentName, thread: thread)
+                }
+                completionHandler()
+            }
+            return
         }
         // A question or approval alert opens its chat, where the request pops up.
         if response.actionIdentifier == UNNotificationDefaultActionIdentifier,

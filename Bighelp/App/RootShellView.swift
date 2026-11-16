@@ -1153,6 +1153,7 @@ struct RootShellView: View {
             // approvals and questions now live in the bot's chat.
             openPrimaryBotChat()
         case .chat(let sessionID):
+            if BighelpIncomingURLRoute.asksForReply(url) { ChatReplyRequest.note() }
             openIncomingChat(sessionID: sessionID)
         case .agent(let tab, let agentID):
             // From the Watch and the widgets: that bot's Feed, Ideas or Goals over Today. The
@@ -1489,6 +1490,8 @@ struct RootShellView: View {
 
     func openSession(_ session: SessionSummary) {
         let route = AppRoute.chat(conversationID: session.id)
+        // The island's Reply: this chat's message box takes the keyboard once it shows.
+        if ChatReplyRequest.take() { appState.requestReply(in: session.id) }
         let simpleBotsOpening = beginSimpleBotsChatOpening(session)
         defer { noteSimpleBotsChatOpened(simpleBotsOpening, route: route) }
         // On screen already (a notification or link about it): keep it as it is, any load it

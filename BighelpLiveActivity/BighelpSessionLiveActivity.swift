@@ -92,7 +92,10 @@ struct BighelpSessionLiveActivity: Widget {
     }
 
     private func sharedIsland(_ context: ActivityViewContext<LoopdySessionActivityAttributes>) -> DynamicIsland {
-        let rows = context.state.sessions ?? []
+        let rows = BighelpActivitySession.shown(context.state)
+        // A chat with news takes the open island: who it is, what happened, and what to do about it.
+        let moment = BighelpIslandMoment(state: context.state, isStale: context.isStale,
+                                         infos: BighelpActivitySessionInfo.load(), cardKey: context.attributes.cardKey)
         let attention = !context.isStale && rows.contains { $0.phase == .waiting }
         let count = context.state.activeCount ?? rows.filter { !$0.phase.isTerminal }.count
         let symbol = context.isStale ? "pause.circle" : attention ? "questionmark.circle.fill" : count == 0 ? "checkmark.circle" : "circle.dashed"
@@ -102,16 +105,30 @@ struct BighelpSessionLiveActivity: Widget {
             ? nil : rows.first.flatMap { $0.phase.isTerminal ? nil : $0.openDetail(cardKey: context.attributes.cardKey)?.tool }.map(BighelpActivityPose.init(tool:))
         return DynamicIsland {
             DynamicIslandExpandedRegion(.leading) {
-                Text("Bighelp").font(.system(.caption, design: .rounded, weight: .bold))
+                if let moment {
+                    BighelpIslandMomentSender(moment: moment)
+                } else {
+                    Text("Bighelp").font(.system(.caption, design: .rounded, weight: .bold))
+                }
             }
             DynamicIslandExpandedRegion(.trailing) {
-                Text(context.isStale ? "Paused" : attention ? "Needs you" : "\(count) active")
-                    .font(.caption.weight(.semibold)).foregroundStyle(attention ? .orange : .secondary)
+                if let moment {
+                    BighelpIslandMomentStatus(moment: moment)
+                } else {
+                    Text(context.isStale ? "Paused" : attention ? "Needs you" : "\(count) active")
+                        .font(.caption.weight(.semibold)).foregroundStyle(attention ? .orange : .secondary)
+                }
             }
             DynamicIslandExpandedRegion(.bottom) {
-                BighelpActivityRowsView(state: context.state, isStale: context.isStale, maximumRows: 3, showsHeader: false,
-                                        cardKey: context.attributes.cardKey)
-                    .padding(.vertical, 4)
+                if let moment {
+                    BighelpIslandMomentBody(moment: moment)
+                        .padding(.top, 4)
+                        .accessibilityElement(children: .contain)
+                } else {
+                    BighelpActivityRowsView(state: context.state, isStale: context.isStale, maximumRows: 3, showsHeader: false,
+                                            cardKey: context.attributes.cardKey)
+                        .padding(.vertical, 4)
+                }
             }
         } compactLeading: {
             if let (_, info) = first {

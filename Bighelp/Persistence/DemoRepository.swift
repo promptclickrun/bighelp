@@ -195,12 +195,13 @@ final class DemoRepository<Value: Codable> {
 
     /// A sibling uses the same scope and protected-file policy. Callers choose
     /// fixed names (never raw session IDs) and commit their manifest last.
-    func child<Child: Codable>(name: String, seed: Child) -> DemoRepository<Child> {
+    /// `schemaVersion` is for a sibling that must not be readable by this repository's version.
+    func child<Child: Codable>(name: String, seed: Child, schemaVersion: Int? = nil) -> DemoRepository<Child> {
         DemoRepository<Child>(
             directory: directory, name: name, seed: seed, fileManager: fileManager,
             fileProtection: fileProtection, protectedDataAvailability: protectedDataAvailability,
             migrations: Array(migrationsByVersion.values), scopeID: scopeID,
-            currentSchemaVersion: currentSchemaVersion
+            currentSchemaVersion: schemaVersion ?? currentSchemaVersion
         )
     }
 

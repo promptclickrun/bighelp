@@ -859,7 +859,13 @@ Code mode.
     (`SessionContentRepository.emptyContentRevision`), and a loaded chat is known unchanged from what the last
     save wrote for it, not from the six-entry cache. On the first run after an install every chat is loaded and
     empty: each save once wrote a file for each, on the main thread, until the watchdog ended the app.
-  - The list of chats is one file, written whole. Automatic saves wait in step with its size
+  - The list of chats is a small root file and the rows in parts (`SessionListParts`, by a hash of the chat's
+    ID; parts double as the list grows, and a list under 129 chats has one). A part file never changes once
+    written, and replacing the root is the commit, so a save writes only the parts whose rows changed: as one
+    file, one changed row wrote all of it, megabytes for thousands of chats (#1000). A new field on a row must
+    stay out of what changes on every save, or every part is written again. A build from before parts refuses
+    the list (a marker stands where its one file was): it shows the computer's own list and saves nothing on
+    the device, never an older copy. Automatic saves wait in step with the size of the last save
     (`SessionCatalogStore.checkpointDelay`), and a list read rests in step with how long the last one took
     (`NativeWorkspaceInvalidationCoordinator.sessionsRefreshRestFactor`). A send, a reply that lands and leaving
     the app save at once.

@@ -110,12 +110,48 @@ struct SessionCatalogLargeWorkspaceTests {
         #expect(!catalog.hasUnsavedChanges)
         #expect(firstWrites <= 1, "Chats with nothing in them share one content file.")
         #expect(secondWrites == 0, "A change to one row rewrites no chat's content.")
-        #expect(files.count <= 3)
+        #expect(files.count <= 70, "The rows are in parts, never a file each.")
         #expect(second < .milliseconds(250), "Leaving the app must not hold the main thread.")
+        print("LARGE_WORKSPACE_INSTALL oneRowSaveBytes=\(repository.lastSaveByteCount)")
+        #expect(repository.lastSaveByteCount < 400_000, "A change to one row writes its part of the list, not all of it.")
         let reopened = SessionContentRepository(directory: directory, name: "native-sessions-v2", currentSchemaVersion: 2)
         #expect(try reopened.load().count == Self.installedChatCount)
         #expect(try reopened.loadSession(id: "session-7")?.isUnread == false)
         #expect(try reopened.loadSession(id: "session-8")?.items.isEmpty == true)
+    }
+
+    /// One changed row among thousands: what the save writes and how long it takes, next to
+    /// encoding every row, which the list as one file did on each save (#1000).
+    @Test(.timeLimit(.minutes(2)))
+    func aChangeToOneRowAmongThousandsWritesOnlyItsPart() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = SessionContentRepository(directory: directory, name: "native-sessions-v2", currentSchemaVersion: 2)
+        try repository.save(Self.scheduledChats(preview: true, count: Self.installedChatCount))
+        let wholeListBytes = repository.lastSaveByteCount
+        var rows = try repository.load()
+        let clock = ContinuousClock()
+        let wholeListEncoding = try clock.measure {
+            _ = try DemoRepository<[SessionRecord]>.encodeForSave(rows, schemaVersion: 2)
+        }
+
+        rows[7].title = "Renamed"
+        let save = try clock.measure { try repository.save(rows) }
+        let bytes = repository.lastSaveByteCount
+        let reopened = SessionContentRepository(directory: directory, name: "native-sessions-v2", currentSchemaVersion: 2)
+        var loaded: [SessionRecord] = []
+        let load = try clock.measure { loaded = try reopened.load() }
+        // What telling the changed part costs: the rows divided, and each part compared.
+        var divided = SessionListParts.divide(rows, into: 64)
+        let dividing = clock.measure { divided = SessionListParts.divide(rows, into: 64) }
+        let before = SessionListParts.divide(loaded, into: 64)
+        let comparing = clock.measure { _ = zip(divided.parts, before.parts).filter { $0 != $1 }.count }
+        print("LARGE_WORKSPACE_PARTS chats=\(rows.count) wholeListBytes=\(wholeListBytes) oneRowBytes=\(bytes)"
+            + " wholeListEncoding=\(wholeListEncoding) oneRowSave=\(save) load=\(load)"
+            + " dividing=\(dividing) comparing=\(comparing)")
+        #expect(bytes * 20 < wholeListBytes, "A change to one row writes its part of the list, not all of it.")
+        #expect(loaded == rows)
+        #expect(load < .milliseconds(500), "Opening the list reads every part once.")
     }
 
     /// The same first run with a chat open: checkpoints while typing must leave the main actor free.

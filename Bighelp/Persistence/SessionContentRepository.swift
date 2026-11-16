@@ -53,6 +53,12 @@ enum SessionContentRepositoryError: Error, Equatable {
 /// A protected metadata manifest points to immutable, session-specific revisions.
 /// Content is written first; atomic manifest replacement is the only commit.
 /// Failed adoption leaves the old manifest and every referenced revision intact.
+/// The manifest itself is a small root file and the rows in parts (`SessionListParts`): each
+/// part is a file that never changes once written, and replacing the root is the commit. A
+/// save writes only the parts whose rows changed; as one file, one changed row wrote megabytes.
+/// Builds before parts kept the rows in one file. Its place now holds a marker those builds
+/// refuse (`retiredListSchemaVersion`), so one of them shows the computer's own list and
+/// saves nothing here, never an older copy.
 /// A chat with nothing in it has no revision of its own: all of them point to
 /// `emptyContentRevision`. A host's list is mostly chats this device never opened, and
 /// a file for each made every save write thousands of files on the main thread.
@@ -66,11 +72,29 @@ final class SessionContentRepository: SessionCatalogRepository {
         var records: [SessionRecord] = []
     }
 
-    /// The manifest's revision alone. Committing checks the file is still the one the plan was
-    /// made from; decoding its thousands of rows for that took the main actor for most of a save.
-    private struct ManifestRevision: Codable, Sendable {
+    /// The root file: which part files hold the rows, and the order the rows go in.
+    private struct Root: Codable, Sendable {
+        var revision: UUID?
+        /// One entry a part. A part with no rows has no file.
+        var parts: [UUID?] = []
+        /// One byte a row, in the list's order: the part the row is in. Rows keep their order
+        /// inside a part, so the list comes back exactly as it was saved.
+        var order = Data()
+    }
+
+    /// The root's revision alone, read through a repository of its own: committing checks the
+    /// file is still the one the plan was made from, without that counting as a read of the rows.
+    private struct RootRevision: Codable, Sendable {
         var revision: UUID?
     }
+
+    /// What stands where builds before parts kept the list.
+    private struct RetiredList: Codable, Sendable {
+        var movedTo = "catalog-root"
+    }
+
+    /// No build's schema version gets this high, so every build refuses the marker's file.
+    nonisolated static let retiredListSchemaVersion = 1_000_000
 
     private struct Content: Codable, Equatable, Sendable {
         var draft: String
@@ -116,6 +140,9 @@ final class SessionContentRepository: SessionCatalogRepository {
         let epoch: UUID
         let baseRevision: UUID?
         let manifest: Manifest
+        /// The rows and the parts the plan was made from, to tell which parts it changes.
+        let baseRecords: [SessionRecord]
+        let baseParts: [UUID?]
         let content: [UUID: Content]
         /// Each chat that was saved with its content loaded, and the revision that holds it.
         let loaded: [String: SavedContent]
@@ -125,10 +152,46 @@ final class SessionContentRepository: SessionCatalogRepository {
                 EncodedWrite(revision: revision,
                              data: try DemoRepository<Content>.prepareEncoding(value, schemaVersion: schemaVersion))
             }
-            return try PreparedSave(
-                scope: scope, epoch: epoch, baseRevision: baseRevision,
-                manifest: DemoRepository<Manifest>.prepareEncoding(manifest, schemaVersion: schemaVersion), writes: writes
+            return PreparedSave(
+                scope: scope, epoch: epoch, baseRevision: baseRevision, baseParts: baseParts,
+                list: try EncodedList(rows: manifest.records, revision: manifest.revision, baseRows: baseRecords,
+                                      baseParts: baseParts, schemaVersion: schemaVersion),
+                writes: writes
             )
+        }
+    }
+
+    /// The list as a save writes it: the root, and a new file for each part whose rows changed.
+    private struct EncodedList: Sendable {
+        let root: DemoRepositoryPreparedEncoding
+        /// What `root` encodes, to read the parts back before the root is written.
+        let rootValue: Root
+        let parts: [UUID?]
+        let writes: [EncodedWrite]
+
+        /// `baseParts` is empty when no parts are on disk yet; every part is then written.
+        init(rows: [SessionRecord], revision: UUID?, baseRows: [SessionRecord], baseParts: [UUID?],
+             schemaVersion: Int) throws {
+            let count = SessionListParts.count(for: rows.count, current: baseParts.count)
+            let divided = SessionListParts.divide(rows, into: count)
+            // More rows than the parts are for: every row has a new part, so all are written.
+            let before = baseParts.count == count ? SessionListParts.divide(baseRows, into: count).parts : nil
+            var parts = [UUID?](repeating: nil, count: count)
+            var writes: [EncodedWrite] = []
+            for index in 0..<count where !divided.parts[index].isEmpty {
+                if let before, let kept = baseParts[index], before[index] == divided.parts[index] {
+                    parts[index] = kept
+                    continue
+                }
+                let part = UUID()
+                parts[index] = part
+                writes.append(EncodedWrite(revision: part, data: try DemoRepository<[SessionRecord]>.prepareEncoding(
+                    divided.parts[index], schemaVersion: schemaVersion)))
+            }
+            self.parts = parts
+            self.writes = writes
+            rootValue = Root(revision: revision, parts: parts, order: divided.order)
+            root = try DemoRepository<Root>.prepareEncoding(rootValue, schemaVersion: schemaVersion)
         }
     }
 
@@ -141,7 +204,8 @@ final class SessionContentRepository: SessionCatalogRepository {
         let scope: String
         let epoch: UUID
         let baseRevision: UUID?
-        let manifest: DemoRepositoryPreparedEncoding
+        let baseParts: [UUID?]
+        let list: EncodedList
         let writes: [EncodedWrite]
     }
 
@@ -176,13 +240,20 @@ final class SessionContentRepository: SessionCatalogRepository {
 
     private let legacy: DemoRepository<[SessionRecord]>
     private let protectedDataAvailability: any BighelpProtectedDataAvailabilityProviding
-    private let manifestRepository: DemoRepository<Manifest>
-    private let manifestRevisionRepository: DemoRepository<ManifestRevision>
+    private let rootRepository: DemoRepository<Root>
+    private let rootRevisionRepository: DemoRepository<RootRevision>
+    /// The one file builds before parts kept the list in, and the marker that takes its place.
+    private let oneFileListRepository: DemoRepository<Manifest>
+    private let retiredListRepository: DemoRepository<RetiredList>
     private let name: String
     private let seed: [SessionRecord]
     private var scope: String?
     private var epoch = UUID()
     private var manifest: Manifest?
+    /// The parts the root on disk lists for `manifest`. Empty while the list has no root yet.
+    private var savedParts: [UUID?] = []
+    /// The scopes whose one-file list this process has retired, or tried to.
+    private var retiredListScopes: Set<String> = []
     /// Only payloads explicitly loaded or changed in this process are retained.
     private var contentCache: [UUID: ResidentContent] = [:]
     private var contentCacheOrder: [UUID] = []
@@ -230,8 +301,11 @@ final class SessionContentRepository: SessionCatalogRepository {
         self.protectedDataAvailability = protectedDataAvailability
         self.name = name
         self.seed = seed
-        manifestRepository = legacy.child(name: "\(name)-catalog", seed: Manifest())
-        manifestRevisionRepository = legacy.child(name: "\(name)-catalog", seed: ManifestRevision())
+        rootRepository = legacy.child(name: "\(name)-catalog-root", seed: Root())
+        rootRevisionRepository = legacy.child(name: "\(name)-catalog-root", seed: RootRevision())
+        oneFileListRepository = legacy.child(name: "\(name)-catalog", seed: Manifest())
+        retiredListRepository = legacy.child(name: "\(name)-catalog", seed: RetiredList(),
+                                             schemaVersion: Self.retiredListSchemaVersion)
         self.maximumResidentContentEntries = maximumResidentContentEntries
         self.maximumResidentContentBytes = maximumResidentContentBytes
     }
@@ -240,6 +314,7 @@ final class SessionContentRepository: SessionCatalogRepository {
         scope = nil
         epoch = UUID()
         manifest = nil
+        savedParts = []
         forgetLoadedContent()
         preparedCheckpoint = nil
     }
@@ -248,7 +323,10 @@ final class SessionContentRepository: SessionCatalogRepository {
         try selectScope()
         // Another repository instance or the account eraser may have changed durable state
         // since our last load, so the cached manifest stands only while its file is the same.
-        if !manifestRepository.holdsKnownFile { manifest = nil }
+        if !rootRepository.holdsKnownFile {
+            manifest = nil
+            savedParts = []
+        }
         try ensureManifest()
         let retained = Set((manifest?.records ?? []).compactMap(\.localContentRevision))
         retainResidentContent(revisions: retained)
@@ -259,9 +337,9 @@ final class SessionContentRepository: SessionCatalogRepository {
         return manifest?.records ?? []
     }
 
-    /// Removes content files no row points to. A save ended part-way (the watchdog, a crash,
-    /// a full disk) leaves the files it wrote before the manifest, and a save only removes the
-    /// revisions it retires itself.
+    /// Removes content files no row points to, and part files the root doesn't list. A save
+    /// ended part-way (the watchdog, a crash, a full disk) leaves the files it wrote before the
+    /// root, and a save only removes the revisions it retires itself.
     @discardableResult
     func removeUnreferencedContent() async -> Int {
         guard let sweep = unreferencedContentSweep() else { return 0 }
@@ -277,8 +355,9 @@ final class SessionContentRepository: SessionCatalogRepository {
         guard let scope, let manifest, (try? legacy.storageScopeIdentifier()) == scope,
               let directory = try? legacy.scopedDirectory(),
               protectedDataAvailability.isProtectedDataAvailable else { return nil }
-        let referenced = Set(manifest.records.compactMap(\.localContentRevision))
-        let prefix = "\(name)-content-", suffix = "-v1.json"
+        // A part's revision is never one of a content file's, so one set serves both kinds.
+        let referenced = Set(manifest.records.compactMap(\.localContentRevision)).union(savedParts.compactMap { $0 })
+        let prefixes = ["\(name)-content-", "\(name)-catalog-part-"], suffix = "-v1.json"
         let cutoff = Date.now.addingTimeInterval(-60)
         return {
             let files = (try? FileManager.default.contentsOfDirectory(
@@ -287,7 +366,7 @@ final class SessionContentRepository: SessionCatalogRepository {
             var removed = 0
             for file in files {
                 let fileName = file.lastPathComponent
-                guard fileName.hasPrefix(prefix), fileName.hasSuffix(suffix),
+                guard let prefix = prefixes.first(where: fileName.hasPrefix), fileName.hasSuffix(suffix),
                       let revision = UUID(uuidString: String(fileName.dropFirst(prefix.count).dropLast(suffix.count))),
                       revision != Self.emptyContentRevision, !referenced.contains(revision),
                       let modified = try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
@@ -392,22 +471,28 @@ final class SessionContentRepository: SessionCatalogRepository {
         guard prepared.scope == scope, prepared.epoch == epoch else {
             throw SessionContentRepositoryError.staleCheckpoint
         }
-        // The file this repository last read or wrote holds the manifest it has in memory.
+        // The root this repository last read or wrote holds the manifest it has in memory.
         // Reading megabytes of rows back from disk to learn one revision held the main thread.
         let currentRevision: UUID?
-        if let manifest, manifestRepository.holdsKnownFile {
+        if let manifest, rootRepository.holdsKnownFile {
             currentRevision = manifest.revision
         } else {
-            currentRevision = try manifestRevisionRepository.loadExistingPreservingSource()?.revision
+            currentRevision = try rootRevisionRepository.loadExistingPreservingSource()?.revision
         }
         guard currentRevision == prepared.baseRevision else {
             throw SessionContentRepositoryError.staleCheckpoint
         }
-        let currentRecords: [SessionRecord]
+        let currentRecords: [SessionRecord], currentParts: [UUID?]
         if let manifest, manifest.revision == currentRevision {
-            currentRecords = manifest.records
+            (currentRecords, currentParts) = (manifest.records, savedParts)
+        } else if let saved = try loadList() {
+            (currentRecords, currentParts) = (saved.manifest.records, saved.parts)
         } else {
-            currentRecords = try manifestRepository.loadExistingPreservingSource()?.records ?? []
+            (currentRecords, currentParts) = ([], [])
+        }
+        // The plan left unchanged parts where they are, so they must be the ones on disk.
+        guard currentParts == prepared.baseParts else {
+            throw SessionContentRepositoryError.staleCheckpoint
         }
         let candidate = plan.manifest
         try validate(candidate)
@@ -422,13 +507,18 @@ final class SessionContentRepository: SessionCatalogRepository {
             try contentRepository(write.revision).savePreparedEncoding(write.data)
             contentWriteCount += 1
         }
-        try manifestRepository.savePreparedEncoding(prepared.manifest)
+        for write in prepared.list.writes {
+            try partRepository(write.revision).savePreparedEncoding(write.data)
+        }
+        try rootRepository.savePreparedEncoding(prepared.list.root)
         // Publish the new base only after durable adoption. A thrown write must
         // not poison change detection or a retry's original revision guard.
         manifest = candidate
+        savedParts = prepared.list.parts
         preparedCheckpoint = nil
         savedContent = plan.loaded
-        lastSaveByteCount = prepared.writes.reduce(prepared.manifest.byteCount) { $0 + $1.data.byteCount }
+        lastSaveByteCount = (prepared.writes + prepared.list.writes)
+            .reduce(prepared.list.root.byteCount) { $0 + $1.data.byteCount }
         let encodedByteCounts = Dictionary(uniqueKeysWithValues: prepared.writes.map {
             ($0.revision, $0.data.byteCount)
         })
@@ -447,6 +537,10 @@ final class SessionContentRepository: SessionCatalogRepository {
         for retired in currentRevisions.subtracting(retained) {
             try? contentRepository(retired).removeExistingFile()
         }
+        for retired in Set(currentParts.compactMap { $0 }).subtracting(prepared.list.parts.compactMap { $0 }) {
+            try? partRepository(retired).removeExistingFile()
+        }
+        retireOneFileList()
     }
 
     private func selectScope() throws {
@@ -459,9 +553,18 @@ final class SessionContentRepository: SessionCatalogRepository {
     private func ensureManifest() throws {
         try selectScope()
         guard manifest == nil else { return }
-        if let saved = try manifestRepository.loadExistingPreservingSource() {
+        if let saved = try loadList() {
+            try validate(saved.manifest)
+            manifest = saved.manifest
+            savedParts = saved.parts
+            retireOneFileList()
+            return
+        }
+        // A list from a build before parts. With no root, a retired one-file list throws here:
+        // the list is then unreadable, and nothing older stands in for it.
+        if let saved = try oneFileListRepository.loadExistingPreservingSource() {
             try validate(saved)
-            manifest = saved
+            try moveIntoParts(saved)
             return
         }
         // The sole whole-history read is first-use migration. Preserve even an
@@ -479,6 +582,80 @@ final class SessionContentRepository: SessionCatalogRepository {
             forgetLoadedContent()
             throw error
         }
+    }
+
+    /// The rows as the root and its parts hold them, or nil when there is no root.
+    private func loadList() throws -> (manifest: Manifest, parts: [UUID?])? {
+        guard let root = try rootRepository.loadExistingPreservingSource() else { return nil }
+        return (Manifest(revision: root.revision, records: try rows(of: root)), root.parts)
+    }
+
+    /// The rows a root names, read from its part files and put back in the list's order.
+    private func rows(of root: Root) throws -> [SessionRecord] {
+        let count = root.parts.count
+        // The number of parts only ever doubles from one.
+        guard count <= SessionListParts.maximumCount, count & (count - 1) == 0 else {
+            throw SessionContentRepositoryError.invalidManifest
+        }
+        let parts = try root.parts.enumerated().map { index, part -> [SessionRecord] in
+            guard let part else { return [] }
+            guard let rows = try partRepository(part).loadExistingPreservingSource(),
+                  rows.allSatisfy({ SessionListParts.part(of: $0.id, among: count) == index }) else {
+                throw SessionContentRepositoryError.invalidManifest
+            }
+            return rows
+        }
+        var taken = [Int](repeating: 0, count: count)
+        var records: [SessionRecord] = []
+        records.reserveCapacity(root.order.count)
+        for byte in root.order {
+            let part = Int(byte)
+            guard part < count, taken[part] < parts[part].count else {
+                throw SessionContentRepositoryError.invalidManifest
+            }
+            records.append(parts[part][taken[part]])
+            taken[part] += 1
+        }
+        guard zip(taken, parts).allSatisfy({ $0 == $1.count }) else {
+            throw SessionContentRepositoryError.invalidManifest
+        }
+        return records
+    }
+
+    /// Takes the one-file list of a build before parts: the same rows and revision, as parts and
+    /// a root. Content files stay as they are, so every draft and transcript is where its row
+    /// says. Stopped before the root is written, the one file is still the list and the next
+    /// launch does this again. The parts are read back first: the root is written, and the one
+    /// file retired, only for parts that give the same rows in the same order.
+    private func moveIntoParts(_ saved: Manifest) throws {
+        let list = try EncodedList(rows: saved.records, revision: saved.revision, baseRows: [], baseParts: [],
+                                   schemaVersion: legacy.currentSchemaVersion)
+        for write in list.writes {
+            try partRepository(write.revision).savePreparedEncoding(write.data)
+        }
+        guard try rows(of: list.rootValue) == saved.records else {
+            throw SessionContentRepositoryError.invalidManifest
+        }
+        try rootRepository.savePreparedEncoding(list.root)
+        manifest = saved
+        savedParts = list.parts
+        retireOneFileList(knownToHoldRows: true)
+    }
+
+    /// Puts the marker where builds before parts kept the list, once the root holds the rows. A
+    /// build from before then refuses the file: it reads the computer's own list and saves nothing
+    /// here. Without the marker it would start from whatever it finds, an older copy or nothing,
+    /// and clear this list's files away. Best effort, and tried once a launch for each computer:
+    /// a marker that isn't written is tried again at the next launch, and the root is the list
+    /// either way.
+    private func retireOneFileList(knownToHoldRows: Bool = false) {
+        guard let scope, retiredListScopes.insert(scope).inserted else { return }
+        if !knownToHoldRows {
+            // A read that throws found the marker, or a file that is no list: nothing to retire.
+            // No file at all (a list that began in parts) gets the marker like a list does.
+            do { _ = try oneFileListRepository.loadExistingPreservingSource() } catch { return }
+        }
+        try? retiredListRepository.save(RetiredList())
     }
 
     private func forgetLoadedContent() {
@@ -541,7 +718,8 @@ final class SessionContentRepository: SessionCatalogRepository {
             return row
         }
         return Plan(schemaVersion: legacy.currentSchemaVersion, scope: scope, epoch: epoch, baseRevision: manifest.revision,
-                    manifest: Manifest(revision: UUID(), records: metadata), content: content, loaded: loaded)
+                    manifest: Manifest(revision: UUID(), records: metadata), baseRecords: manifest.records,
+                    baseParts: savedParts, content: content, loaded: loaded)
     }
 
     /// Whether `revision` already holds exactly this content for the chat.
@@ -563,6 +741,10 @@ final class SessionContentRepository: SessionCatalogRepository {
         legacy.child(name: "\(name)-content-\(revision.uuidString.lowercased())", seed: Content(
             SessionRecord(id: "", kind: .direct, agentIDs: [], title: "")
         ))
+    }
+
+    private func partRepository(_ part: UUID) -> DemoRepository<[SessionRecord]> {
+        legacy.child(name: "\(name)-catalog-part-\(part.uuidString.lowercased())", seed: [])
     }
 
     private func residentContent(_ revision: UUID) -> Content? {
@@ -601,4 +783,40 @@ final class SessionContentRepository: SessionCatalogRepository {
         contentCacheOrder.removeAll { $0 == revision }
     }
 
+}
+
+/// How the list's rows divide into part files. A chat's part comes from its ID alone, so a
+/// change to one row changes one part. The number of parts only grows, by doubling, and a
+/// list that fits one part has one: most people's lists are two files, the root and a part.
+enum SessionListParts {
+    /// A part holds about this many rows before the parts double.
+    static let rowsInAPart = 128
+    /// The root names a row's part in one byte.
+    static let maximumCount = 256
+
+    static func count(for rows: Int, current: Int) -> Int {
+        var count = min(max(current, 1), maximumCount)
+        while rows > count * rowsInAPart, count < maximumCount { count = min(count * 2, maximumCount) }
+        return count
+    }
+
+    /// FNV-1a over the ID's bytes: the same on every launch and device, which `Hasher` is not.
+    /// Saved lists depend on it, so it must never change.
+    static func part(of id: String, among count: Int) -> Int {
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        for byte in id.utf8 { hash = (hash ^ UInt64(byte)) &* 0x0000_0100_0000_01b3 }
+        return Int((hash ^ (hash >> 32)) % UInt64(count))
+    }
+
+    /// Each part's rows in the list's order, and for each row of the list the part it went to.
+    static func divide(_ rows: [SessionRecord], into count: Int) -> (parts: [[SessionRecord]], order: Data) {
+        var parts = [[SessionRecord]](repeating: [], count: count)
+        var order = Data(capacity: rows.count)
+        for row in rows {
+            let part = part(of: row.id, among: count)
+            parts[part].append(row)
+            order.append(UInt8(part))
+        }
+        return (parts, order)
+    }
 }

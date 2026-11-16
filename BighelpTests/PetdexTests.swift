@@ -167,7 +167,34 @@ struct PetdexTests {
 
         store.remove("agent")
         #expect(store.frames(for: "agent", move: .idle) == nil)
-        #expect((try? FileManager.default.contentsOfDirectory(atPath: directory.path()))?.isEmpty ?? true)
+        #expect((try? FileManager.default.contentsOfDirectory(atPath: directory.path(percentEncoded: false)))?.isEmpty ?? true)
+    }
+
+    /// A pet whose moves are saved is not fetched again, also where the folder's path has a space or
+    /// a letter that a URL writes as percent codes (a Mac home folder can). The check for the saved
+    /// moves used the URL's own spelling of the path, found no file there, and fetched the sheet at
+    /// every pick.
+    @Test func savedMovesAreFoundWhereThePathHasASpace() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "Pets of José \(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let pip = PetdexFixtures.pets[0]
+        let first = PetAvatarStore(defaults: isolatedDefaults(), directory: directory)
+        first.assign(pip, to: "agent") {
+            guard let sheet = PetdexFixtures.sheet(slug: pip.slug) else { throw PetdexError.unsupported }
+            return sheet
+        }
+        for _ in 0..<400 where first.slug(for: "agent") == nil { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(first.slug(for: "agent") == pip.slug)
+
+        var fetches = 0
+        let again = PetAvatarStore(defaults: isolatedDefaults(), directory: directory)
+        again.assign(pip, to: "other") {
+            fetches += 1
+            throw PetdexError.unsupported
+        }
+        for _ in 0..<400 where again.slug(for: "other") == nil { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(again.slug(for: "other") == pip.slug, "The saved moves go on the second agent")
+        #expect(fetches == 0, "Nothing is fetched for moves that are saved")
     }
 
     @Test func demoPetsAreDrawnLocallyAtPetThumbSize() throws {

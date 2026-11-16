@@ -1,4 +1,6 @@
-import { aggregateActivityRows, NATIVE_ROW_ID, type ActivityGroupRow } from "./activity-group.js";
+import {
+  activityMoment, aggregateActivityRows, NATIVE_ROW_ID, type ActivityGroupRow, type ActivityMoment,
+} from "./activity-group.js";
 import { LoopdyLinkError } from "./contracts.js";
 import type { NotificationActivity, NotificationAsset, NotificationEgressSnapshot } from "./notification-grants.js";
 import type { UserLinkAccount } from "./user-link-account.js";
@@ -27,6 +29,14 @@ const NOTIFICATION_ASSET_TYPES: string[] = ["image/png", "image/jpeg", "image/we
 // A lease that just ran out can still get its final update, so its record
 // stays an hour longer.
 export const ACTIVITY_RECORD_GRACE_SECONDS = 3_600;
+
+/** What the deferred end of a finished group needs to send: ids and revisions, never chat text. */
+export interface PendingActivityEnd {
+  ownerCoordinate: string;
+  activityId: string;
+  authority: NotificationEgressSnapshot;
+  externalId: string;
+}
 
 export class UserLinkNotificationStore {
   constructor(
@@ -209,7 +219,8 @@ export class UserLinkNotificationStore {
     } : {}) };
   }
 
-  updateActivityGroup(activityId: string, state: ActivityGroupRow, credentialId: string): void {
+  /** Stores the row's new state and reports the moment its phase change is, if any. */
+  updateActivityGroup(activityId: string, state: ActivityGroupRow, credentialId: string): ActivityMoment | null {
     const group = this.groupRow(activityId);
     if (!group || group.row_id !== state.id || group.credential_id !== credentialId) {
       throw new LoopdyLinkError("notification_activity_conflict", "Activity row ownership changed");
@@ -224,9 +235,11 @@ export class UserLinkNotificationStore {
     }
     this.storage.sql.exec("UPDATE managed_activity_rows SET state_json=?,last_state_timestamp=? WHERE activity_id=?",
       JSON.stringify(state), state.timestamp, activityId);
+    return activityMoment(old, state);
   }
 
-  activityGroup(activityId: string, now: number, authority: NotificationEgressSnapshot) {
+  /** `moment` leads the aggregate only while its row is still in the phase it was a moment for. */
+  activityGroup(activityId: string, now: number, authority: NotificationEgressSnapshot, moment?: ActivityMoment | null) {
     // This runs at the final egress boundary. Revocations are mirrored into this
     // owner before directory cleanup, so all included grants share that fence.
     this.authorizeNotificationEgress(authority);
@@ -246,7 +259,8 @@ export class UserLinkNotificationStore {
         a.updated_at DESC, a.activity_id DESC LIMIT 69`,
       group.group_id, group.credential_id, authority.authorizationEpoch, authorizationNow, authorizationNow,
     ).toArray().map((row) => JSON.parse(row.state_json) as ActivityGroupRow);
-    return { ...aggregateActivityRows(rows, now), groupId: group.group_id };
+    const lead = moment && rows.some((row) => row.id === moment.row && row.phase === moment.kind) ? moment.row : undefined;
+    return { ...aggregateActivityRows(rows, now, lead), groupId: group.group_id };
   }
 
   activityGroupGrants(activityId: string): NonNullable<NotificationEgressSnapshot["grant"]>[] {
@@ -276,6 +290,46 @@ export class UserLinkNotificationStore {
     if (!group) throw new LoopdyLinkError("notification_activity_invalid", "No activity group");
     this.storage.sql.exec(`UPDATE managed_activity_groups SET last_timestamp=?,ended=MAX(ended,?)
       WHERE group_id=?`, timestamp, terminal ? 1 : 0, group.group_id);
+  }
+
+  activityGroupEnded(activityId: string): boolean {
+    const group = this.groupRow(activityId);
+    if (!group) throw new LoopdyLinkError("notification_activity_invalid", "No activity group");
+    return this.storage.sql.exec<{ ended: number }>(
+      "SELECT ended FROM managed_activity_groups WHERE group_id=?", group.group_id,
+    ).one().ended !== 0;
+  }
+
+  /** Keeps a finished group's end for `dueAt` (Unix seconds); a newer finish moves it. */
+  putPendingActivityEnd(groupId: string, dueAt: number, end: PendingActivityEnd): void {
+    this.storage.sql.exec(`INSERT INTO managed_activity_pending_ends(group_id,due_at,end_json) VALUES(?,?,?)
+      ON CONFLICT(group_id) DO UPDATE SET due_at=excluded.due_at,end_json=excluded.end_json`,
+      groupId, dueAt, JSON.stringify(end));
+  }
+
+  hasPendingActivityEnd(groupId: string): boolean {
+    return this.storage.sql.exec<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM managed_activity_pending_ends WHERE group_id=?", groupId,
+    ).one().count > 0;
+  }
+
+  clearPendingActivityEnd(groupId: string): void {
+    this.storage.sql.exec("DELETE FROM managed_activity_pending_ends WHERE group_id=?", groupId);
+  }
+
+  /** Takes every end that is due out of the table: a failed end never repeats. */
+  takeDueActivityEnds(now: number): PendingActivityEnd[] {
+    const due = this.storage.sql.exec<{ group_id: string; end_json: string }>(
+      "SELECT group_id,end_json FROM managed_activity_pending_ends WHERE due_at<=? ORDER BY due_at,group_id", now,
+    ).toArray();
+    if (due.length > 0) this.storage.sql.exec("DELETE FROM managed_activity_pending_ends WHERE due_at<=?", now);
+    return due.map((row) => JSON.parse(row.end_json) as PendingActivityEnd);
+  }
+
+  nextPendingActivityEnd(): number | null {
+    return this.storage.sql.exec<{ next: number | null }>(
+      "SELECT MIN(due_at) AS next FROM managed_activity_pending_ends",
+    ).one().next;
   }
 
   notificationActivity(input: {
@@ -428,6 +482,7 @@ export class UserLinkNotificationStore {
       this.storage.sql.exec("DELETE FROM managed_activity_rows");
       this.storage.sql.exec("DELETE FROM managed_activity_groups");
       this.storage.sql.exec("DELETE FROM managed_activity_row_generations");
+      this.storage.sql.exec("DELETE FROM managed_activity_pending_ends");
     });
   }
 
@@ -572,6 +627,7 @@ export class UserLinkNotificationStore {
     this.storage.sql.exec("DELETE FROM managed_activity_rows WHERE activity_id NOT IN (SELECT activity_id FROM managed_notification_activities)");
     this.storage.sql.exec("DELETE FROM managed_activity_groups WHERE group_id NOT IN (SELECT group_id FROM managed_activity_rows)");
     this.storage.sql.exec("DELETE FROM managed_activity_row_generations WHERE group_id NOT IN (SELECT group_id FROM managed_activity_groups)");
+    this.storage.sql.exec("DELETE FROM managed_activity_pending_ends WHERE group_id NOT IN (SELECT group_id FROM managed_activity_groups)");
     const asset = this.storage.sql.exec<{ next: number | null }>(
       "SELECT MIN(expires_at) AS next FROM notification_assets",
     ).one().next;

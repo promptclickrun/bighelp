@@ -1,3 +1,4 @@
+import { ACTIVITY_END_DELAY_SECONDS, activityMomentAlert, type ActivityMoment } from "./activity-group.js";
 import { requireNotificationGroupGrantEgressActive } from "./notification-grants.js";
 import { UserLinkAccount } from "./user-link-account.js";
 import { ACTIVITY_RECORD_GRACE_SECONDS, UserLinkNotificationStore } from "./user-link-notifications.js";
@@ -234,43 +235,91 @@ export class UserLink extends DurableObject<LinkEnv> {
 
   private activityDeliveryTail: Promise<void> = Promise.resolve();
 
-  async sendNotificationActivityGroup(input: {
-    ownerCoordinate: string; activityId: string; state: import("./activity-group.js").ActivityGroupRow;
-    authority: import("./notification-grants.js").NotificationEgressSnapshot; externalId: string; quiet?: boolean;
-  }) {
-    this.notificationState.authorizeNotificationEgress(input.authority);
-    this.notificationState.updateActivityGroup(input.activityId, input.state, input.authority.credentialId);
+  /** Runs one physical send after the ones queued before it. The queue slot is taken before the first await. */
+  private async inActivityDeliveryTail<T>(run: () => Promise<T>): Promise<T> {
     const before = this.activityDeliveryTail;
     let release!: () => void;
     this.activityDeliveryTail = new Promise<void>((resolve) => { release = resolve; });
     try {
       await before;
-      // APNs timestamps are whole seconds. Serialize sends and read the newest
-      // aggregate after waiting so reordered rows cannot overwrite newer work.
-      const delay = (this.notificationState.activityDeliveryTimestamp(input.activityId) + 1) * 1_000 - Date.now();
-      if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
-      this.notificationState.authorizeNotificationEgress(input.authority);
-      const now = Math.max(Math.floor(Date.now() / 1_000),
-        this.notificationState.activityDeliveryTimestamp(input.activityId) + 1);
-      const content = this.notificationState.activityGroup(input.activityId, now, input.authority);
-      const terminal = content.activeCount === 0;
-      const authorize = async () => {
-        const grants = this.notificationState.activityGroupGrants(input.activityId);
-        await requireNotificationGroupGrantEgressActive(this.env, input.ownerCoordinate, input.authority, grants);
-        const freshGrants = this.notificationState.activityGroupGrants(input.activityId);
-        const fresh = this.notificationState.activityGroup(input.activityId, now, input.authority);
-        // No asynchronous work separates rebuilding the aggregate from reserving
-        // the physical send. A newly registered row must also prevent an end.
-        if (JSON.stringify(fresh) !== JSON.stringify(content) || JSON.stringify(freshGrants) !== JSON.stringify(grants)) {
-          throw new LoopdyLinkError("notification_activity_conflict", "Activity group changed before delivery");
-        }
-        this.notificationState.reserveActivityDelivery(input.activityId, now, terminal);
-      };
-      const event = terminal ? "end" : "update";
-      // The physical card is addressed by its group ID, so that is the ID whose push token the
-      // phone registers for direct delivery too. The aggregate is rebuilt for every send, so a
-      // failed direct push is never queued for later: it goes through BuzzKit at once.
-      const receipt = await deliverLiveActivity({
+      return await run();
+    } finally { release(); }
+  }
+
+  async sendNotificationActivityGroup(input: {
+    ownerCoordinate: string; activityId: string; state: import("./activity-group.js").ActivityGroupRow;
+    authority: import("./notification-grants.js").NotificationEgressSnapshot; externalId: string; quiet?: boolean;
+  }) {
+    this.notificationState.authorizeNotificationEgress(input.authority);
+    const moment = this.notificationState.updateActivityGroup(input.activityId, input.state, input.authority.credentialId);
+    const receipt = await this.inActivityDeliveryTail(() => this.deliverActivityGroup({ ...input, moment, kind: "update" }));
+    // Only the deferred end can decide there is nothing to send.
+    if (!receipt) throw new LoopdyLinkError("notification_activity_conflict", "Activity group changed before delivery");
+    return receipt;
+  }
+
+  /** Sends the deferred end of every group whose wait is over. A failed end is dropped, never repeated. */
+  private async sendDueActivityEnds(nowSeconds: number): Promise<void> {
+    for (const end of this.notificationState.takeDueActivityEnds(nowSeconds)) {
+      try {
+        await this.inActivityDeliveryTail(() => this.deliverActivityGroup({ ...end, kind: "end" }));
+      } catch { /* Authorization lost or the push failed: the card ends with its lease. */ }
+    }
+  }
+
+  /**
+   * One push of the group's aggregate. `kind: "update"` is a host's row update; `kind: "end"` is the
+   * deferred end, which sends nothing unless the group is still finished and has not ended.
+   */
+  private async deliverActivityGroup(input: {
+    ownerCoordinate: string; activityId: string;
+    authority: import("./notification-grants.js").NotificationEgressSnapshot; externalId: string;
+    kind: "update" | "end"; quiet?: boolean; moment?: ActivityMoment | null;
+  }) {
+    const store = this.notificationState;
+    // APNs timestamps are whole seconds. Serialize sends and read the newest
+    // aggregate after waiting so reordered rows cannot overwrite newer work.
+    const delay = (store.activityDeliveryTimestamp(input.activityId) + 1) * 1_000 - Date.now();
+    if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+    store.authorizeNotificationEgress(input.authority);
+    const now = Math.max(Math.floor(Date.now() / 1_000), store.activityDeliveryTimestamp(input.activityId) + 1);
+    const content = store.activityGroup(input.activityId, now, input.authority, input.moment);
+    const finished = content.activeCount === 0;
+    if (input.kind === "end" && (!finished || store.activityGroupEnded(input.activityId))) return null;
+    // A moment push carries an alert, and the row it is about leads the card.
+    const moment = input.moment && content.lead === input.moment.row ? input.moment : null;
+    // The last chat finishing is a moment too: the card stays in the island for a while, then ends.
+    const deferEnd = input.kind === "update" && finished && moment !== null;
+    const terminal = input.kind === "end"
+      || (finished && moment === null && !store.hasPendingActivityEnd(content.groupId));
+    const authorize = async () => {
+      const grants = store.activityGroupGrants(input.activityId);
+      await requireNotificationGroupGrantEgressActive(this.env, input.ownerCoordinate, input.authority, grants);
+      const freshGrants = store.activityGroupGrants(input.activityId);
+      const fresh = store.activityGroup(input.activityId, now, input.authority, input.moment);
+      // No asynchronous work separates rebuilding the aggregate from reserving
+      // the physical send. A newly registered row must also prevent an end.
+      if (JSON.stringify(fresh) !== JSON.stringify(content) || JSON.stringify(freshGrants) !== JSON.stringify(grants)) {
+        throw new LoopdyLinkError("notification_activity_conflict", "Activity group changed before delivery");
+      }
+      store.reserveActivityDelivery(input.activityId, now, terminal);
+      // The end waits only while the group is finished: work that starts again, or the end itself, clears it.
+      if (deferEnd) {
+        store.putPendingActivityEnd(content.groupId, now + ACTIVITY_END_DELAY_SECONDS, {
+          ownerCoordinate: input.ownerCoordinate, activityId: input.activityId,
+          authority: input.authority, externalId: input.externalId,
+        });
+      } else if (!finished || terminal) store.clearPendingActivityEnd(content.groupId);
+    };
+    const event = terminal ? "end" : "update";
+    // The end of the deferred wait leaves at once; an end with no wait before it leaves 30 s later.
+    const dismissalDate = input.kind === "end" ? now : now + 30;
+    const alert = moment ? activityMomentAlert(moment.kind) : undefined;
+    // The physical card is addressed by its group ID, so that is the ID whose push token the
+    // phone registers for direct delivery too. The aggregate is rebuilt for every send, so a
+    // failed direct push is never queued for later: it goes through BuzzKit at once.
+    try {
+      return await deliverLiveActivity({
         env: this.env as unknown as DeliveryEnv, ctx: this.ctx,
         owner: {
           kind: input.authority.ownerKind, coordinate: input.ownerCoordinate,
@@ -279,20 +328,26 @@ export class UserLink extends DurableObject<LinkEnv> {
         grantId: input.authority.grant?.grantId ?? "", updateId: String(now), queueable: false,
         live: {
           event, activityId: content.groupId, contentState: content, timestamp: now, staleDate: now + 120,
-          ...(terminal ? { dismissalDate: now + 30 } : {}),
+          ...(terminal ? { dismissalDate } : {}),
+          ...(alert ? { alert } : {}),
           // A new step alone: Apple limits high-priority card updates, so these go at low priority.
-          ...(input.quiet === true && !terminal ? { priority: 5 as const } : {}),
+          // A moment is never one of them.
+          ...(input.quiet === true && !terminal && !moment ? { priority: 5 as const } : {}),
         },
         authorize,
         sendViaBuzzKit: () => sendBuzzKitLiveActivity(this.env, {
           externalId: input.externalId, activityId: content.groupId,
           event, contentState: content, timestamp: now,
           staleDate: new Date((now + 120) * 1_000).toISOString(),
-          ...(terminal ? { dismissalDate: new Date((now + 30) * 1_000).toISOString() } : {}),
+          ...(terminal ? { dismissalDate: new Date(dismissalDate * 1_000).toISOString() } : {}),
         }, authorize),
       });
-      return receipt;
-    } finally { release(); }
+    } finally {
+      // Stored when the send was reserved, even if the push then failed: the end still has to come.
+      if (deferEnd && store.hasPendingActivityEnd(content.groupId)) {
+        await this.scheduleNotificationPurge(now + ACTIVITY_END_DELAY_SECONDS);
+      }
+    }
   }
 
   registerNotificationActivity(input: Parameters<UserLinkNotificationStore["registerNotificationActivity"]>[0]) {
@@ -680,6 +735,8 @@ export class UserLink extends DurableObject<LinkEnv> {
       )
       .toArray();
     await this.coalescedBuzzKitWakeDrain();
+    // Before the purge: an end needs its group's rows.
+    await this.sendDueActivityEnds(Math.floor(Date.now() / 1_000));
     const purge = this.notificationState.purgeExpiredNotificationState(Math.floor(Date.now() / 1_000));
     const recent = this.ctx.storage.sql.exec<{ next: number | null }>(
       "SELECT MIN(last_seen_bucket)+? AS next FROM devices WHERE lifecycle='active' AND connection_state='recent'", RECENT_SECONDS,
@@ -687,7 +744,8 @@ export class UserLink extends DurableObject<LinkEnv> {
     const wake = this.ctx.storage.sql.exec<{ next: number | null }>(
       "SELECT MIN(next_attempt) AS next FROM buzzkit_wake_outbox",
     ).one().next;
-    const nextSeconds = [recent, wake, purge].filter((value): value is number => value !== null)
+    const end = this.notificationState.nextPendingActivityEnd();
+    const nextSeconds = [recent, wake, purge, end].filter((value): value is number => value !== null)
       .reduce<number | null>((selected, value) => selected === null ? value : Math.min(selected, value), null);
     if (nextSeconds !== null) {
       await this.ctx.storage.setAlarm(Math.max(Date.now() + 1_000, nextSeconds * 1_000));

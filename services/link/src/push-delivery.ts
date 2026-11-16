@@ -61,6 +61,8 @@ export interface LiveActivityMessage {
   dismissalDate?: number;
   /** 10 when left out. 5 for an update that changes only a card's sealed detail. */
   priority?: 5 | 10;
+  /** Makes the push open the Dynamic Island on its own. Fixed text; with no `sound`, it is silent. */
+  alert?: { title: string; body: string };
 }
 
 export interface ApnsRetryMessage {
@@ -286,6 +288,7 @@ export function liveActivitySpec(live: LiveActivityMessage, nowSeconds: number):
         event: live.event,
         "content-state": live.contentState,
         "stale-date": live.staleDate,
+        ...(live.alert ? { alert: { title: live.alert.title, body: live.alert.body } } : {}),
         ...(live.event === "end" && live.dismissalDate !== undefined
           ? { "dismissal-date": live.dismissalDate } : {}),
       },

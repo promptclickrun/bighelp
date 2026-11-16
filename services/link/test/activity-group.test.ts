@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregateActivityRows, NATIVE_ROW_ID } from "../src/activity-group.js";
+import { activityMoment, activityMomentAlert, aggregateActivityRows, NATIVE_ROW_ID } from "../src/activity-group.js";
 
 describe("one Live Activity for several chats", () => {
   const row = (id: string, phase: string) => ({ id, phase, timestamp: 100, activeSubagentCount: 0 });
@@ -72,5 +72,60 @@ describe("one Live Activity for several chats", () => {
 
   it("ends only after every row is terminal", () => {
     expect(aggregateActivityRows([row("a", "completed"), row("b", "failed")], 101).phase).toBe("failed");
+  });
+
+  it("leaves the output as it was when no row leads", () => {
+    const result = aggregateActivityRows([row("a", "thinking")], 101);
+    const expected = {
+      phase: "thinking", currentAction: "", progress: 0, completedSteps: 0, activeSubagentCount: 0,
+      latestTool: null, timestamp: 101, activeCount: 1, activeRows: ["a"],
+      sessions: [{ id: "a", phase: "thinking", timestamp: 100, activeSubagentCount: 0 }],
+    };
+    expect(JSON.stringify(result)).toBe(JSON.stringify(expected));
+    expect(result).not.toHaveProperty("lead");
+    // A lead that is not in the group changes nothing either.
+    expect(aggregateActivityRows([row("a", "thinking")], 101, "missing")).toEqual(expected);
+  });
+
+  it("puts the leading row first, finished or not, and names it", () => {
+    const result = aggregateActivityRows([row("a", "thinking"), row("b", "waiting"), row("c", "completed")], 101, "c");
+    expect(result.lead).toBe("c");
+    expect(result.sessions.map((value) => value.id)).toEqual(["c", "b", "a"]);
+    // Which phase the card shows still comes from the work that is left.
+    expect(result.phase).toBe("waiting");
+    expect(result.activeCount).toBe(2);
+  });
+
+  it("keeps the leading row's sealed detail first when the push is tight", () => {
+    const appRow = (i: number) => `native-${i.toString(16).padStart(64, "0")}`;
+    const sealed = "s".repeat(1200);
+    const rows = Array.from({ length: 64 }, (_, i) => ({
+      ...row(appRow(i), i === 9 ? "waiting" : "using_tool"), timestamp: 1792854000, activeSubagentCount: 99, sealed,
+    }));
+    const result = aggregateActivityRows(rows, 1792854000, appRow(40));
+    expect(result.lead).toBe(appRow(40));
+    expect(result.sessions[0]).toMatchObject({ id: appRow(40), sealed });
+    expect(result.sessions[1]).toMatchObject({ id: appRow(9) });
+    expect(result.sessions.filter((value) => value.sealed).length).toBeLessThan(5);
+    const apns = { aps: { timestamp: 1792854000, event: "update", "stale-date": 1792854120,
+      alert: activityMomentAlert("waiting"), "content-state": { ...result, groupId: `activity_${"g".repeat(43)}` } } };
+    expect(new TextEncoder().encode(JSON.stringify(apns)).byteLength).toBeLessThanOrEqual(4000);
+  });
+
+  it("finds a moment only when a row changes into waiting, completed or failed", () => {
+    const state = (phase: string) => row("a", phase);
+    expect(activityMoment(state("thinking"), state("waiting"))).toEqual({ row: "a", kind: "waiting" });
+    expect(activityMoment(state("using_tool"), state("completed"))).toEqual({ row: "a", kind: "completed" });
+    expect(activityMoment(state("waiting"), state("failed"))).toEqual({ row: "a", kind: "failed" });
+    expect(activityMoment(state("waiting"), state("waiting"))).toBeNull();
+    expect(activityMoment(state("completed"), state("completed"))).toBeNull();
+    expect(activityMoment(state("waiting"), state("thinking"))).toBeNull();
+    expect(activityMoment(state("thinking"), state("responding"))).toBeNull();
+  });
+
+  it("words each alert the same, and never from a chat", () => {
+    expect(activityMomentAlert("waiting")).toEqual({ title: "Bighelp", body: "A chat needs you." });
+    expect(activityMomentAlert("completed")).toEqual({ title: "Bighelp", body: "A chat finished." });
+    expect(activityMomentAlert("failed")).toEqual({ title: "Bighelp", body: "A chat could not finish." });
   });
 });

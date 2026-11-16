@@ -9,7 +9,7 @@ struct LocalizationTests {
     }
 
     @Test func compiledCatalogContainsTheInitialLanguages() throws {
-        for (language, expected) in [("en", "Settings"), ("zh-Hans", "设置")] {
+        for (language, expected) in [("en", "Settings"), ("zh-Hans", "设置"), ("de", "Einstellungen")] {
             #expect(try bundle(language).localizedString(forKey: "Settings", value: nil, table: nil) == expected)
         }
         #expect(Bundle.main.developmentLocalization == "en")
@@ -127,5 +127,53 @@ struct LocalizationTests {
         #expect(LiveVoiceUnavailable.connecting.title == "Not connected yet")
         // A code is text, never a number with a thousands separator.
         #expect(GeminiLiveClose(ready: false, code: 1011).message == "Gemini didn't start the call (code 1011).")
+    }
+
+    // MARK: German (#1056)
+
+    @Test func germanHasItsOwnWordsAndFallsBackToEnglish() throws {
+        let german = try bundle("de")
+        let expected = [
+            ("Bots", "Bots"), ("Chats", "Chats"), ("Today", "Heute"), ("Work", "Arbeit"),
+            ("New chat", "Neuer Chat"), ("Try again", "Erneut versuchen"), ("Approvals", "Freigaben"),
+            ("Live voice", "Live-Sprachchat"), ("Agree and continue", "Zustimmen und fortfahren"),
+            ("Connect to your computer to use Workflows.", "Verbinde Dich mit Deinem Computer, um Workflows zu verwenden."),
+            ("Live voice isn't available", "Live-Sprachchat nicht verfügbar"),
+        ]
+        for (key, value) in expected {
+            #expect(german.localizedString(forKey: key, value: nil, table: nil) == value)
+        }
+        // Copy the catalog doesn't have yet reads in English, never as a blank or a key name.
+        #expect(german.localizedString(forKey: "A sentence nobody added yet.", value: nil, table: nil)
+                == "A sentence nobody added yet.")
+        let preferred = Bundle.preferredLocalizations(from: Bundle.main.localizations, forPreferences: ["de-AT", "fr"])
+        #expect(preferred.first == "de")
+    }
+
+    @Test func germanPluralsUseOneAndOther() throws {
+        let german = try bundle("de")
+        let de = Locale(identifier: "de_DE")
+        for count in [0, 1, 2, 12] {
+            let messages = String(localized: "\(count) messages with \("Mina")", bundle: german, locale: de)
+            #expect(messages == (count == 1 ? "1 Nachricht mit Mina" : "\(count) Nachrichten mit Mina"), "\(messages)")
+            let used = String(localized: "Used \(count) times", bundle: german, locale: de)
+            #expect(used.contains("\(count)"), "\(used)")
+            #expect((used == String(localized: "Used \(1) times", bundle: german, locale: de)) == (count == 1))
+            let hidden = String(localized: "\(count) saved templates couldn't be opened, so they're hidden.", bundle: german, locale: de)
+            #expect(hidden.contains("\(count)"), "\(hidden)")
+            #expect((hidden == String(localized: "\(1) saved templates couldn't be opened, so they're hidden.", bundle: german, locale: de)) == (count == 1))
+        }
+    }
+
+    @Test func germanKeepsNamesAndAHostsWordsAsWritten() throws {
+        let german = try bundle("de")
+        let de = Locale(identifier: "de_DE")
+        let name = "Settings / 海风 🐚"
+        #expect(String(localized: "Message \(name)", bundle: german, locale: de).contains(name))
+        #expect(!String(localized: "Message \(name)", bundle: german, locale: de).contains("Einstellungen"))
+        #expect(String(localized: "Couldn't reach \("Settings"). You're still on \("Desk").", bundle: german, locale: de)
+                == "Settings ist nicht erreichbar. Du bist weiterhin auf Desk.")
+        #expect(String(localized: "This chat couldn't be opened. \("Session busy.")", bundle: german, locale: de)
+                == "Dieser Chat konnte nicht geöffnet werden. Session busy.")
     }
 }

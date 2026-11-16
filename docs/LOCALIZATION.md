@@ -2,8 +2,8 @@
 
 bighelp uses Apple's String Catalog at `Bighelp/Resources/Localizable.xcstrings`.
 English (`en`) is the development language and the readable source key. Simplified
-Chinese (`zh-Hans`) is the first additional language. This is a staged foundation,
-not a claim that the whole app is translated.
+Chinese (`zh-Hans`) is the first additional language and German (`de`) the second. This is
+a staged foundation, not a claim that the whole app is translated.
 
 ## Initial coverage
 
@@ -57,6 +57,30 @@ Goals = 目标, host/computer = 电脑, Teamwork = 团队协作, primary bot = �
 gateway = 网关, template = 模板, routine = 例行任务, pin = 置顶, Quiet Hours = 勿扰时段,
 channel = 渠道, Live Activities = 实时活动, Dynamic Island = 灵动岛.
 
+## German
+
+German (#1056) is a contribution from [@jochenvoehringer](https://github.com/jochenvoehringer): an
+AI-assisted draft of every key the catalog had, with a human spot check and an approved word list.
+It has not had a complete language review or a review on every screen, so every German unit stays
+`needs_review`. Keys added after the draft got German in the same way and state.
+
+- Address: informal, with a capital "Du", "Dein", "Dir".
+- Names stay as they are: bighelp (lowercase in German text), Hermes, Dev Factory, Mixture of Agents,
+  and provider and model names.
+- Words: Bots, Chats, Today = Heute, Work = Arbeit, Space = Übersicht, Section = Bereich,
+  Stage = Vormerken, Settings = Einstellungen, Appearance = Darstellung, primary bot = Hauptbot,
+  template = Vorlage, blueprint = Bauplan, Teamwork = Zusammenarbeit, approval = Freigabe,
+  sign-off = Abschließende Freigabe, Needs you = Braucht Dich, notifications = Mitteilungen,
+  Voice = Stimme, live voice = Live-Sprachchat, take turns = Abwechselnd sprechen, Tools and
+  Toolsets stay, a bot's posts = Updates, saved logins = Anmeldedaten, save = Sichern,
+  pin = Anheften, computer = Computer.
+- Plurals use `one` and `other`.
+
+A key without German reads in English, as in every language. `Scripts/check-localization.py`
+checks that the screens it names keep their German. Add a German draft (`needs_review`) with new
+copy when you can. iOS picks German from the device's languages, or from the app's own language in
+the Settings app; there is no language setting inside bighelp.
+
 ## Adding copy
 
 Use a SwiftUI localized literal where the API accepts one:
@@ -104,7 +128,7 @@ badge's "New").
 `project.yml` sets `developmentLanguage: en`, disables unused Base
 internationalization, and enables `SWIFT_EMIT_LOC_STRINGS` plus
 `LOCALIZATION_PREFERS_STRING_CATALOGS` for the main app target. XcodeGen discovers
-`en` and `zh-Hans` from the catalog and writes the project's known regions. The
+`en`, `zh-Hans` and `de` from the catalog and writes the project's known regions. The
 main app resource is shared by iPhone, iPad, Mac Catalyst, and Vision Pro; it is
 not included in Watch, widget, notification-extension, or fixture Mac targets.
 
@@ -126,14 +150,15 @@ not included in Watch, widget, notification-extension, or fixture Mac targets.
 5. Run `LocalizationTests` and `LocalizationUITests` with the `Bighelp` scheme on
    an isolated iPhone simulator, plus affected tests. The UI suite launches with
    `-AppleLanguages (en)` / `-AppleLanguages (zh-Hans)` and `-AppleLocale en_US` /
-   `-AppleLocale zh_CN`, in light and dark mode, and attaches screenshots. Inspect
-   the screenshots for truncation, overlapping controls, and mixed-language gaps.
+   `-AppleLocale zh_CN`, in light and dark mode, and attaches screenshots. Its German test
+   (`-AppleLanguages (de)`, `-AppleLocale de_DE`) walks the first screens at a large text size.
+   Inspect the screenshots for truncation, overlapping controls, and mixed-language gaps.
 
 The system chooses the app language at launch. Use the device's app-language
 setting or Xcode's scheme language; there is no separate in-app language setting.
 Changing only SwiftUI's environment locale in a preview does not test Foundation
 `String(localized:)` model properties. Bundle tests explicitly load the compiled
-English and Chinese resources, test fallback and plurals, and preserve interpolated
+English, Chinese and German resources, test fallback and plurals, and preserve interpolated
 names that happen to match catalog keys.
 
 ## Follow-up scope

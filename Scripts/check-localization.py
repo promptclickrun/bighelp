@@ -157,10 +157,19 @@ class LocalizationCatalogChecks(unittest.TestCase):
                 self.assertTrue(values)
                 self.assertTrue(all(unit["value"].strip() for unit in values))
 
+    def test_the_checked_screens_have_german(self):
+        # German (#1056) came as a draft of every key. The screens this script names keep theirs;
+        # a key without German reads in English.
+        for key in REQUIRED | SIMPLE_BOTS_AND_TEAMWORK | ONE_HOME | ERRORS:
+            with self.subTest(key=key):
+                values = list(units(self.strings[key]["localizations"].get("de", {})))
+                self.assertTrue(values, f"{key!r} has no German")
+                self.assertTrue(all(unit["value"].strip() for unit in values))
+
     def test_counts_use_plural_variations(self):
         for key in PLURALS:
             with self.subTest(key=key):
-                for language in ("en", "zh-Hans"):
+                for language in ("en", "zh-Hans", "de"):
                     self.assertIn("plural", self.strings[key]["localizations"][language].get("variations", {}))
 
     def test_scoped_screens_resolve_copy_before_verbatim_helpers(self):
@@ -229,6 +238,8 @@ class LocalizationCatalogChecks(unittest.TestCase):
                         self.assertIn("one", plural)
                     if language == "zh-Hans":
                         self.assertEqual(set(plural), {"other"})
+                    if language == "de":
+                        self.assertEqual(set(plural), {"one", "other"})
 
     def test_catalog_contains_copy_not_storage_or_protocol_ids(self):
         for key in self.strings:

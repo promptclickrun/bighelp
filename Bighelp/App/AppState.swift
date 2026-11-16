@@ -63,11 +63,18 @@ final class AppState {
     /// (`PendingShareCenter`). Only that chat takes it, never another computer's.
     private(set) var pendingShare: PendingShareHandoff?
 
-    /// The Settings sheet. It lives here, not in the shell's view state, so code outside the
-    /// view (an agent's drive) can open it straight to a page: `openSettings(at:)`.
-    var isSettingsPresented = false
+    /// The Settings sheet. It is not in the shell's view state, so code outside the view (an agent's
+    /// drive) can open it straight to a page: `openSettings(at:)`. One for the whole app
+    /// (`HomeSelection`): it stays open while a computer added in it becomes the one in use.
+    var isSettingsPresented: Bool {
+        get { home.isSettingsPresented }
+        set { home.isSettingsPresented = newValue }
+    }
     /// What the Settings sheet's stack shows above its first page: `SettingsDestination` values.
-    var settingsPath = NavigationPath()
+    var settingsPath: NavigationPath {
+        get { home.settingsPath }
+        set { home.settingsPath = newValue }
+    }
     /// Set by `openNeedsYou()`, before the shell is on screen too; kept until the shell settles it
     /// (`RootShellView.settleNeedsYouRequest`). One for the whole app (`HomeSelection`), so the shell
     /// on screen sees a request whichever computer's `AppState` took it.

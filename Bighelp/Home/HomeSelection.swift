@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 
 /// Where the one home is and what it holds above any one computer: the bar's tab, the first tab's
 /// view (Bots or Chats), New chat's picks, and Today's panels and boards. Every computer has its own
@@ -23,6 +24,12 @@ final class HomeSelection {
     /// `AppState`: every computer has its own, and the one that got the tap isn't always the one
     /// the shell on screen reads.
     var isNeedsYouRequested = false
+
+    /// The Settings sheet and the pages on its stack. Here, not in an `AppState`: a computer added in
+    /// Settings becomes the one in use, and Settings has to stay open to say that it connected. Kept
+    /// per computer, the sheet closed there and a blank Add a computer sheet took its place.
+    var isSettingsPresented = false
+    var settingsPath = NavigationPath()
 
     @ObservationIgnored private(set) lazy var newChat = NewChatSession()
     @ObservationIgnored private(set) lazy var todayLayout = TodayPanelLayoutStore()

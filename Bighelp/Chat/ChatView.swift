@@ -1130,12 +1130,12 @@ struct ChatView: View {
         }
     }
 
-    /// A branch made for a refused message sends it once the branch is connected; if it
-    /// isn't soon, the message stays in the box for the person to send.
+    /// A branch made for a refused message, or a group chat New chat just made, sends its text once
+    /// it can; if that isn't soon, the message stays in the box for the person to send.
     private func sendDraftOnOpenIfAsked() async {
         guard consumesSendOnOpen?(model.conversationID) == true else { return }
         for _ in 0..<150 {
-            if model.directTransportIsReady, !model.draft.isEmpty {
+            if model.isReadyToSendOnOpen {
                 await model.send()
                 return
             }

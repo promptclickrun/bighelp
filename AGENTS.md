@@ -66,7 +66,9 @@ change in both repos.
     first tab takes the name of the person's default view (`settings.homeView`), and the header's Bots | Chats
     switch (`HomeViewSwitchPill`) changes the view for this run only. `HomeSelection` (`appState.home`, one for the
     whole app; `AppState()` in tests and previews makes its own) holds the tab, the view, New chat's picks
-    (`NewChatSession`) and Today's layout and boards, so they stay when the computer in use changes. A tab is a root: `AppState.select(_:)` closes whatever was pushed, and
+    (`NewChatSession`), Today's layout and boards and the Settings sheet (open or not, and its pages), so they
+    stay when the computer in use changes. A computer added in Settings becomes the one in use while its sheet
+    is open; any other change of computer closes Settings. A tab is a root: `AppState.select(_:)` closes whatever was pushed, and
     `select(_:thenOpen:)` shows a page over a tab for links, widgets and alerts (`showOverWork`, `showOverToday`).
   - The app opens on Settings › Chat › Opens on (Bots, Chats, Today or Work: `settings.homeLanding`, read once per
     launch as `launchHomeLanding` and applied by `HomeSelection.land`). With Today or Work, Chat › First tab shows

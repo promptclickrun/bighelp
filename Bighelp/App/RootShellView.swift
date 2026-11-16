@@ -232,7 +232,10 @@ struct RootShellView: View {
         }
         // With Settings open (Settings › System › Add Host), Settings presents it: one view shows one sheet.
         .modifier(HostSetupSheet(registry: hostRegistry, isActive: !isUnifiedSettingsPresented))
-        .onChange(of: hostRegistry?.selectedHostID) { _, _ in
+        .onChange(of: hostRegistry?.selectedHostID) { old, _ in
+            // Another computer's Settings pages are not this one's: Settings closes with the change,
+            // except while it adds a computer, when its sheet goes on to say that it connected.
+            if old != nil, hostRegistry?.isSetupPresented != true { appState.closeSettings() }
             chatDissolve.cancel()
             appState.resetForHostBoundary()
         }

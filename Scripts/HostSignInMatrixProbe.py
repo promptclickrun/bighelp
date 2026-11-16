@@ -25,9 +25,10 @@ HOME and HERMES_HOME, then runs the matching HostSignInMatrixUITests:
             updates to it (PluginReleaseUpdateHostUITests; needs the internet)
   fleet     two hosts with the bighelp plugin (--plugin) and different agents:
             Ask an agent on the gateway that isn't in use
-            (ShortcutGatewaySwitchHostUITests). The tests that opened another
-            computer's agent from the all-hosts view are gone with that view,
-            and none replaces them here
+            (ShortcutGatewaySwitchHostUITests), and secure input in a chat on the
+            computer that isn't in use, opened from the Bots view
+            (TwoComputersHostUITests). After that test the probe reads both hosts
+            and fails unless only the agent's own host saved the value
   media     no sign-in, with the bighelp plugin (--plugin) and the test-only
             Scripts/HostProbePlugin: a generated image stays in the chat after
             the turn ends, two pictures an agent saved outside its folder show
@@ -105,7 +106,8 @@ TESTS = {
                   "ReconnectedPagesHostUITests/testWorkflowsTakesANewWorkflowAfterAReconnect",
                   "ReconnectedPagesHostUITests/testUsageOpenedByItsLinkLoadsAndReadsAgainAfterAReconnect"],
     "update": ["PluginReleaseUpdateHostUITests/testUpdatesToTheLatestReleaseOnARealHost"],
-    "fleet": ["ShortcutGatewaySwitchHostUITests/testAskAnAgentSwitchesToItsGatewayAndGetsTheAnswer"],
+    "fleet": ["ShortcutGatewaySwitchHostUITests/testAskAnAgentSwitchesToItsGatewayAndGetsTheAnswer",
+              "TwoComputersHostUITests/testSecureInputInAChatOnTheOtherComputer"],
     "drafts": ["ImageDraftsHostUITests/testAContactDraftFromAPhotoSavesOnceAndTheAgentHearsIt",
                "ImageDraftsHostUITests/testAPhotoAloneGetsTheOfferAndTheAgentCantAddTheContactItself"],
     "apps": ["HTMLAppsHostUITests/testABigAppFromTheAgentOpensAndItsAnswerReachesTheAgent"],
@@ -671,6 +673,11 @@ def session_sources(home: Path) -> list[str]:
         return sorted({row[0] or "" for row in connection.execute("SELECT source FROM sessions")})
 
 
+def saved_secure_input(home: Path) -> bool:
+    """Whether this host saved the secure pop-up's value (the name only, never the value)."""
+    return any("SECURE_INPUT_FIXTURE=" in env.read_text(errors="replace") for env in home.rglob(".env"))
+
+
 def run_fleet(args, repo: Path) -> int:
     """Two open hosts with the plugin: "Desk agent" on one; "Lab agent" and "researcher" on the other.
     The scripted tool model answers plain messages like the synthetic one."""
@@ -749,8 +756,15 @@ def run_fleet(args, repo: Path) -> int:
                                         timeout=1500)
             for label, _, _, _, home, _ in hosts:
                 print(json.dumps({"host": label, "session_sources_on_host": session_sources(home)}), flush=True)
-            print(json.dumps({"mode": "fleet", "exit_code": result.returncode}), flush=True)
-            return result.returncode
+            code = result.returncode
+            if any("TwoComputers" in part for part in command):
+                # The value was typed in Desk agent's chat while Lab Hermes was the host in use.
+                saved = {label: saved_secure_input(home) for label, _, _, _, home, _ in hosts}
+                print(json.dumps({"secure_input_saved_on": saved}), flush=True)
+                if code == 0 and saved != {"desk": True, "lab": False}:
+                    code = 1
+            print(json.dumps({"mode": "fleet", "exit_code": code}), flush=True)
+            return code
         finally:
             for proxy in proxies:
                 proxy.close()

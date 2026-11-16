@@ -237,7 +237,7 @@ private struct BighelpSessionContentSheet: View {
                     pages = prepared.1
                 } catch is CancellationError {
                 } catch {
-                    errorMessage = "This saved content could not be verified. Reopen the conversation and try again."
+                    errorMessage = String(localized: "This saved content could not be verified. Reopen the conversation and try again.")
                 }
             }
         }

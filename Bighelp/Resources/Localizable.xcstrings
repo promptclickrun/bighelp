@@ -256,6 +256,23 @@
         }
       }
     },
+    "%@ is a sample computer in this demo.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is a sample computer in this demo."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "%@是这个演示中的示例电脑。"
+          }
+        }
+      }
+    },
     "%@ is active for this chat": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -1239,6 +1256,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "AI 服务商"
+          }
+        }
+      }
+    },
+    "API-key live voice needs an OpenAI key on your computer.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "API-key live voice needs an OpenAI key on your computer."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "使用 API 密钥的实时语音需要你的电脑上有 OpenAI 密钥。"
           }
         }
       }
@@ -2348,6 +2382,23 @@
         }
       }
     },
+    "Allow microphone access in Settings to start live voice.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow microphone access in Settings to start live voice."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请在“设置”中允许使用麦克风，以开始实时语音。"
+          }
+        }
+      }
+    },
     "Allowed": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -2412,6 +2463,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "琥珀色"
+          }
+        }
+      }
+    },
+    "Another live voice call is still open with your computer. End it, then try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Another live voice call is still open with your computer. End it, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的电脑上还有另一个实时语音通话未结束。请先结束它，然后重试。"
+          }
+        }
+      }
+    },
+    "Another native voice connection is using audio.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Another native voice connection is using audio."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "另一个原生语音连接正在使用音频。"
           }
         }
       }
@@ -2858,6 +2943,57 @@
         }
       }
     },
+    "Audio is unavailable. Check your audio route and try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio is unavailable. Check your audio route and try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "音频不可用。请检查音频输出路径，然后重试。"
+          }
+        }
+      }
+    },
+    "Audio stopped on this device. Computer cleanup is unconfirmed; tasks were not cancelled.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio stopped on this device. Computer cleanup is unconfirmed; tasks were not cancelled."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此设备上的音频已停止。电脑端的清理尚未确认；任务没有被取消。"
+          }
+        }
+      }
+    },
+    "Audio stopped on this device. Confirming computer cleanup…": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio stopped on this device. Confirming computer cleanup…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此设备上的音频已停止。正在确认电脑端的清理…"
+          }
+        }
+      }
+    },
     "Auto": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -3096,6 +3232,108 @@
         }
       }
     },
+    "Bighelp couldn't archive this chat. Try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bighelp couldn't archive this chat. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bighelp 无法归档这个聊天。请重试。"
+          }
+        }
+      }
+    },
+    "Bighelp couldn't reach the Bighelp plugin on your computer just now. Try again in a moment.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bighelp couldn't reach the Bighelp plugin on your computer just now. Try again in a moment."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bighelp 刚才无法连接到你电脑上的 Bighelp 插件。请稍后重试。"
+          }
+        }
+      }
+    },
+    "Bighelp couldn't read this bot's Codex sign-in on your computer. Update the Bighelp plugin and restart Hermes, then try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bighelp couldn't read this bot's Codex sign-in on your computer. Update the Bighelp plugin and restart Hermes, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bighelp 无法读取这个机器人在你电脑上的 Codex 登录。请更新 Bighelp 插件并重启 Hermes，然后重试。"
+          }
+        }
+      }
+    },
+    "Bighelp couldn't rename this chat. Try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bighelp couldn't rename this chat. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bighelp 无法重命名这个聊天。请重试。"
+          }
+        }
+      }
+    },
+    "Bighelp is still connecting to your computer. Try again in a moment.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bighelp is still connecting to your computer. Try again in a moment."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bighelp 仍在连接你的电脑。请稍后重试。"
+          }
+        }
+      }
+    },
+    "Bighelp is still opening this chat on your computer. Try again in a moment.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bighelp is still opening this chat on your computer. Try again in a moment."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bighelp 仍在你的电脑上打开这个聊天。请稍后重试。"
+          }
+        }
+      }
+    },
     "Black": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -3313,6 +3551,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "机器人可以更改和删除日程、提醒事项和联系人，无需每次询问。"
+          }
+        }
+      }
+    },
+    "Bots could not be loaded from Hermes. Check your Hermes connection and try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bots could not be loaded from Hermes. Check your Hermes connection and try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法从 Hermes 载入机器人。请检查与 Hermes 的连接，然后重试。"
           }
         }
       }
@@ -4774,6 +5029,108 @@
         }
       }
     },
+    "Codex and this Mac couldn't agree on audio settings. Try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex and this Mac couldn't agree on audio settings. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Codex 与这台 Mac 未能就音频设置达成一致。请重试。"
+          }
+        }
+      }
+    },
+    "Codex and this phone couldn't agree on audio settings. Try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex and this phone couldn't agree on audio settings. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Codex 与这部手机未能就音频设置达成一致。请重试。"
+          }
+        }
+      }
+    },
+    "Codex couldn't start the voice call. Try again, or take turns instead.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex couldn't start the voice call. Try again, or take turns instead."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Codex 无法开始语音通话。请重试，或改为轮流说话。"
+          }
+        }
+      }
+    },
+    "Codex is limiting voice calls right now. Wait a minute, then try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex is limiting voice calls right now. Wait a minute, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Codex 目前正在限制语音通话。请等一分钟，然后重试。"
+          }
+        }
+      }
+    },
+    "Codex sign-in on your computer didn't work. Run `hermes auth add openai-codex` there, then try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex sign-in on your computer didn't work. Run `hermes auth add openai-codex` there, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你电脑上的 Codex 登录没有成功。请在电脑上运行 `hermes auth add openai-codex`，然后重试。"
+          }
+        }
+      }
+    },
+    "Codex took too long to start the call. Try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex took too long to start the call. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Codex 开始通话耗时过长。请重试。"
+          }
+        }
+      }
+    },
     "Coding": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -5012,6 +5369,23 @@
         }
       }
     },
+    "Computer acknowledged closing voice. Accepted tasks continue independently.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Computer acknowledged closing voice. Accepted tasks continue independently."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "电脑已确认关闭语音。已接受的任务会独立继续。"
+          }
+        }
+      }
+    },
     "Computer voice test": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -5114,6 +5488,23 @@
         }
       }
     },
+    "Connect to a native Hermes computer before managing chats or profiles.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to a native Hermes computer before managing chats or profiles."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请先连接到原生 Hermes 电脑，再管理聊天或资料。"
+          }
+        }
+      }
+    },
     "Connect to them, then come back.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -5127,6 +5518,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "请先连接这些电脑，再回到这里。"
+          }
+        }
+      }
+    },
+    "Connect to this computer before editing its bot.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to this computer before editing its bot."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请先连接到这台电脑，再编辑它的机器人。"
+          }
+        }
+      }
+    },
+    "Connect to this computer to open the bot’s chat.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to this computer to open the bot’s chat."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请先连接到这台电脑，再打开这个机器人的聊天。"
           }
         }
       }
@@ -5212,6 +5637,74 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "连接到你的电脑后即可打开。"
+          }
+        }
+      }
+    },
+    "Connect to your computer to use Dev Factory.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to your computer to use Dev Factory."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请连接到你的电脑以使用开发工厂。"
+          }
+        }
+      }
+    },
+    "Connect to your computer to use Kanban.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to your computer to use Kanban."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请连接到你的电脑以使用看板。"
+          }
+        }
+      }
+    },
+    "Connect to your computer to use Projects.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to your computer to use Projects."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请连接到你的电脑以使用“项目”。"
+          }
+        }
+      }
+    },
+    "Connect to your computer to use Workflows.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to your computer to use Workflows."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请连接到你的电脑以使用工作流。"
           }
         }
       }
@@ -5550,6 +6043,23 @@
         }
       }
     },
+    "Could not refresh voice tasks. Existing task state has been kept.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not refresh voice tasks. Existing task state has been kept."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法刷新语音任务。已保留现有的任务状态。"
+          }
+        }
+      }
+    },
     "Could not update it. Try again.": {
       "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
@@ -5648,6 +6158,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "无法载入你的通知偏好设置。请重试。"
+          }
+        }
+      }
+    },
+    "Couldn't reach %@. Check that it's on, then try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't reach %@. Check that it's on, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法连接到%@。请确认它已开机，然后重试。"
+          }
+        }
+      }
+    },
+    "Couldn't reach %@. You're still on %@.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't reach %@. You're still on %@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法连接到%1$@。你仍在使用%2$@。"
           }
         }
       }
@@ -6243,6 +6787,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "正在删除此设备上的通知数据…"
+          }
+        }
+      }
+    },
+    "Demo mode has no computer for live voice.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demo mode has no computer for live voice."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "演示模式没有可用于实时语音的电脑。"
           }
         }
       }
@@ -7590,6 +8151,176 @@
         }
       }
     },
+    "Gemini Live couldn't connect. Try again, or take turns instead.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gemini Live couldn't connect. Try again, or take turns instead."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Gemini Live 无法连接。请重试，或改为轮流说话。"
+          }
+        }
+      }
+    },
+    "Gemini couldn't start the voice call. Try again, or take turns instead.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gemini couldn't start the voice call. Try again, or take turns instead."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Gemini 无法开始语音通话。请重试，或改为轮流说话。"
+          }
+        }
+      }
+    },
+    "Gemini didn't accept this bot's API key. Check the key on your computer, then try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gemini didn't accept this bot's API key. Check the key on your computer, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Gemini 没有接受这个机器人的 API 密钥。请检查你电脑上的密钥，然后重试。"
+          }
+        }
+      }
+    },
+    "Gemini didn't start the call (code %@).": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gemini didn't start the call (code %@)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Gemini 未能开始通话（代码 %@）。"
+          }
+        }
+      }
+    },
+    "Gemini didn't start the call. Gemini said: “%@”": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gemini didn't start the call. Gemini said: “%@”"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Gemini 未能开始通话。Gemini 表示：“%@”"
+          }
+        }
+      }
+    },
+    "Gemini ended the call. Gemini said: “%@” Work you started keeps going.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gemini ended the call. Gemini said: “%@” Work you started keeps going."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Gemini 结束了通话。Gemini 表示：“%@”你已开始的工作会继续进行。"
+          }
+        }
+      }
+    },
+    "Gemini ended the call. Work you started keeps going.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gemini ended the call. Work you started keeps going."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Gemini 结束了通话。你已开始的工作会继续进行。"
+          }
+        }
+      }
+    },
+    "Gemini is limiting voice calls right now. Wait a minute, then try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gemini is limiting voice calls right now. Wait a minute, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Gemini 目前正在限制语音通话。请等一分钟，然后重试。"
+          }
+        }
+      }
+    },
+    "Gemini refused the call (HTTP %@).": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gemini refused the call (HTTP %@)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Gemini 拒绝了通话（HTTP %@）。"
+          }
+        }
+      }
+    },
+    "Gemini took too long to start the call. Try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gemini took too long to start the call. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Gemini 开始通话耗时过长。请重试。"
+          }
+        }
+      }
+    },
     "Get Started": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -7828,6 +8559,23 @@
         }
       }
     },
+    "Group chats need a connected Hermes computer.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Group chats need a connected Hermes computer."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "群聊需要一台已连接的 Hermes 电脑。"
+          }
+        }
+      }
+    },
     "Group chats need a newer Hermes on this computer.": {
       "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
@@ -8062,6 +8810,74 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Hermes 会再次检查方案，然后为所有可共用的机器人运行一个消息服务。"
+          }
+        }
+      }
+    },
+    "Hermes confirmed the complete Mixture of Agents configuration.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hermes confirmed the complete Mixture of Agents configuration."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hermes 已确认完整的 Mixture of Agents 配置。"
+          }
+        }
+      }
+    },
+    "Hermes could not confirm this model operation. Refresh before trying it again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hermes could not confirm this model operation. Refresh before trying it again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hermes 无法确认这项模型操作。请先刷新，再重试。"
+          }
+        }
+      }
+    },
+    "Hermes could not open this group. %@": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hermes could not open this group. %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hermes 无法打开这个群聊。%@"
+          }
+        }
+      }
+    },
+    "Hermes could not open this group. Check the computer and try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hermes could not open this group. Check the computer and try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hermes 无法打开这个群聊。请检查电脑，然后重试。"
           }
         }
       }
@@ -9426,6 +10242,108 @@
         }
       }
     },
+    "Live voice couldn't connect. Try again, or take turns instead.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live voice couldn't connect. Try again, or take turns instead."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "实时语音无法连接。请重试，或改为轮流说话。"
+          }
+        }
+      }
+    },
+    "Live voice isn't available": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live voice isn't available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "实时语音不可用"
+          }
+        }
+      }
+    },
+    "Live voice isn't available on your computer right now. Try again, or take turns instead.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live voice isn't available on your computer right now. Try again, or take turns instead."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的电脑现在无法使用实时语音。请重试，或改为轮流说话。"
+          }
+        }
+      }
+    },
+    "Live voice isn't set up on your computer. Take turns instead.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live voice isn't set up on your computer. Take turns instead."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的电脑上尚未设置实时语音。请改为轮流说话。"
+          }
+        }
+      }
+    },
+    "Live voice needs the Bighelp plugin on your computer. Set it up in Settings › Voice, then try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live voice needs the Bighelp plugin on your computer. Set it up in Settings › Voice, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "实时语音需要你的电脑上装有 Bighelp 插件。请在“设置 › 语音”中完成设置，然后重试。"
+          }
+        }
+      }
+    },
+    "Live voice talks with one bot, and this chat has more than one.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live voice talks with one bot, and this chat has more than one."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "实时语音只能与一个机器人通话，而这个聊天有多个机器人。"
+          }
+        }
+      }
+    },
     "Loading": {
       "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
@@ -9779,6 +10697,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "管理工作树"
+          }
+        }
+      }
+    },
+    "Management updates could not be connected. Reopen this feature after refreshing the selected computer.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Management updates could not be connected. Reopen this feature after refreshing the selected computer."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法连接管理更新。请刷新所选电脑后重新打开此功能。"
           }
         }
       }
@@ -10497,6 +11432,40 @@
         }
       }
     },
+    "Move to Project…": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to Project…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "移到项目…"
+          }
+        }
+      }
+    },
+    "Move to Project…, now in %@": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to Project…, now in %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "移到项目…，当前在%@"
+          }
+        }
+      }
+    },
     "Move to Section": {
       "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
       "localizations": {
@@ -10968,6 +11937,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "新聊天"
+          }
+        }
+      }
+    },
+    "New chat could not be opened. Try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New chat could not be opened. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法打开新聊天。请重试。"
           }
         }
       }
@@ -11613,6 +12599,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "未连接到%@"
+          }
+        }
+      }
+    },
+    "Not connected yet": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not connected yet"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "尚未连接"
           }
         }
       }
@@ -14113,6 +15116,23 @@
         }
       }
     },
+    "Project changes could not be connected. Reopen Projects after refreshing this computer.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Project changes could not be connected. Reopen Projects after refreshing this computer."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法连接项目更改。请刷新这台电脑后重新打开“项目”。"
+          }
+        }
+      }
+    },
     "Project names": {
       "comment": "Simplified Chinese draft for Settings in named groups (#974); fluent-speaker review pending.",
       "localizations": {
@@ -14194,6 +15214,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "无法使用项目"
+          }
+        }
+      }
+    },
+    "Projects couldn't be opened. Check that your computer is connected, then try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Projects couldn't be opened. Check that your computer is connected, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法打开“项目”。请确认你的电脑已连接，然后重试。"
           }
         }
       }
@@ -15263,6 +16300,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "重启 Hermes"
+          }
+        }
+      }
+    },
+    "Restart Hermes to finish": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restart Hermes to finish"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "重启 Hermes 以完成"
           }
         }
       }
@@ -17187,6 +18241,23 @@
         }
       }
     },
+    "Sign in to your computer again, then try live voice.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in to your computer again, then try live voice."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请重新登录你的电脑，然后再试实时语音。"
+          }
+        }
+      }
+    },
     "Sign in with": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -18835,6 +19906,40 @@
         }
       }
     },
+    "That bot isn't on %@ anymore.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That bot isn't on %@ anymore."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "那个机器人已不在%@上。"
+          }
+        }
+      }
+    },
+    "That computer isn't in Bighelp anymore.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That computer isn't in Bighelp anymore."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "那台电脑已不在 Bighelp 中。"
+          }
+        }
+      }
+    },
     "That item could not be removed. Please try again.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -18852,6 +19957,57 @@
         }
       }
     },
+    "That voice isn't available for live voice. Pick another in Settings › Voice.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That voice isn't available for live voice. Pick another in Settings › Voice."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个声音不能用于实时语音。请在“设置 › 语音”中另选一个。"
+          }
+        }
+      }
+    },
+    "The Bighelp plugin is installed, but the Hermes dashboard on your computer hasn't loaded it yet. Restart the dashboard and the messaging gateway on your computer, then try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Bighelp plugin is installed, but the Hermes dashboard on your computer hasn't loaded it yet. Restart the dashboard and the messaging gateway on your computer, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bighelp 插件已安装，但你电脑上的 Hermes 控制面板尚未载入它。请重启电脑上的控制面板和消息网关，然后重试。"
+          }
+        }
+      }
+    },
+    "The Bighelp plugin is missing": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Bighelp plugin is missing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "缺少 Bighelp 插件"
+          }
+        }
+      }
+    },
     "The Bighelp plugin is on": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -18865,6 +20021,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Bighelp 插件已启用"
+          }
+        }
+      }
+    },
+    "The Hermes on your computer doesn't offer live voice. Update Hermes and the Bighelp plugin in Settings, on your computer's page, then try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Hermes on your computer doesn't offer live voice. Update Hermes and the Bighelp plugin in Settings, on your computer's page, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你电脑上的 Hermes 不提供实时语音。请在“设置”中你的电脑页面上更新 Hermes 和 Bighelp 插件，然后重试。"
           }
         }
       }
@@ -18971,6 +20144,57 @@
         }
       }
     },
+    "The chat and profile controls could not connect to this computer.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The chat and profile controls could not connect to this computer."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "聊天和资料控件无法连接到这台电脑。"
+          }
+        }
+      }
+    },
+    "The chat is in Hermes now, but it couldn't be opened. Find it in Chats.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The chat is in Hermes now, but it couldn't be opened. Find it in Chats."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个聊天已在 Hermes 中，但无法打开。请在“聊天”中查找。"
+          }
+        }
+      }
+    },
+    "The computer closed live voice. Accepted tasks were not cancelled.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The computer closed live voice. Accepted tasks were not cancelled."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "电脑关闭了实时语音。已接受的任务没有被取消。"
+          }
+        }
+      }
+    },
     "The computer didn't save it for %@. Try again.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -19056,6 +20280,23 @@
         }
       }
     },
+    "The computer returned an invalid audio connection.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The computer returned an invalid audio connection."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "电脑返回了无效的音频连接。"
+          }
+        }
+      }
+    },
     "The computer's own": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -19069,6 +20310,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "电脑自身的时区"
+          }
+        }
+      }
+    },
+    "The connection to Gemini dropped. Work you started keeps going.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The connection to Gemini dropped. Work you started keeps going."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "与 Gemini 的连接已断开。你已开始的工作会继续进行。"
           }
         }
       }
@@ -19124,6 +20382,74 @@
         }
       }
     },
+    "The fork was created, but could not be opened. Find it in Chats.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The fork was created, but could not be opened. Find it in Chats."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "分支已创建，但无法打开。请在“聊天”中查找。"
+          }
+        }
+      }
+    },
+    "The group chat couldn't be created. Check the computer, then try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The group chat couldn't be created. Check the computer, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法创建群聊。请检查电脑，然后重试。"
+          }
+        }
+      }
+    },
+    "The group could not be renamed. Check the computer and try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The group could not be renamed. Check the computer and try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法重命名这个群聊。请检查电脑，然后重试。"
+          }
+        }
+      }
+    },
+    "The group deletion was not confirmed. Refresh before trying again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The group deletion was not confirmed. Refresh before trying again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "群聊的删除未获确认。请先刷新，再重试。"
+          }
+        }
+      }
+    },
     "The key is sent once to the serving bot and is never read back into Bighelp.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -19175,6 +20501,40 @@
         }
       }
     },
+    "The native audio connection could not be negotiated.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The native audio connection could not be negotiated."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法协商原生音频连接。"
+          }
+        }
+      }
+    },
+    "The native audio connection timed out.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The native audio connection timed out."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "原生音频连接超时。"
+          }
+        }
+      }
+    },
     "The one in use": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -19192,6 +20552,23 @@
         }
       }
     },
+    "The task change was not confirmed. Refresh its status before trying again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The task change was not confirmed. Refresh its status before trying again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "任务更改未获确认。请先刷新它的状态，再重试。"
+          }
+        }
+      }
+    },
     "The voice": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -19205,6 +20582,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "声音"
+          }
+        }
+      }
+    },
+    "The voice connection has closed.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The voice connection has closed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "语音连接已关闭。"
           }
         }
       }
@@ -19294,6 +20688,57 @@
         }
       }
     },
+    "This Gemini key can't start live voice.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Gemini key can't start live voice."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个 Gemini 密钥无法开始实时语音。"
+          }
+        }
+      }
+    },
+    "This Hermes gateway cannot load bots. Update Hermes on the computer, restart the gateway, then reconnect Bighelp and try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Hermes gateway cannot load bots. Update Hermes on the computer, restart the gateway, then reconnect Bighelp and try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个 Hermes 网关无法载入机器人。请在电脑上更新 Hermes，重启网关，然后重新连接 Bighelp 并重试。"
+          }
+        }
+      }
+    },
+    "This Mac couldn't reach Gemini. Check its internet connection, then try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Mac couldn't reach Gemini. Check its internet connection, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这台 Mac 无法连接到 Gemini。请检查它的互联网连接，然后重试。"
+          }
+        }
+      }
+    },
     "This address asks for a username and password before Hermes.": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -19345,6 +20790,40 @@
         }
       }
     },
+    "This approval could not be loaded from Hermes. Try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This approval could not be loaded from Hermes. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法从 Hermes 载入这项审批。请重试。"
+          }
+        }
+      }
+    },
+    "This approval is no longer available.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This approval is no longer available."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这项审批已不可用。"
+          }
+        }
+      }
+    },
     "This batch isn't here anymore": {
       "comment": "Simplified Chinese draft for the one home (#977); fluent-speaker review pending.",
       "localizations": {
@@ -19379,6 +20858,40 @@
         }
       }
     },
+    "This bot has no Gemini API key on your computer. Add one as GEMINI_API_KEY, then try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This bot has no Gemini API key on your computer. Add one as GEMINI_API_KEY, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个机器人在你的电脑上没有 Gemini API 密钥。请以 GEMINI_API_KEY 添加一个，然后重试。"
+          }
+        }
+      }
+    },
+    "This bot is no longer on your computer.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This bot is no longer on your computer."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个机器人已不在你的电脑上。"
+          }
+        }
+      }
+    },
     "This bot isn't here anymore": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -19408,6 +20921,210 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "当前聊天"
+          }
+        }
+      }
+    },
+    "This chat can't be opened from here anymore. Find it in Bighelp instead.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat can't be opened from here anymore. Find it in Bighelp instead."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个聊天已无法从这里打开。请在 Bighelp 中查找。"
+          }
+        }
+      }
+    },
+    "This chat could not be loaded from Hermes. Try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat could not be loaded from Hermes. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法从 Hermes 载入这个聊天。请重试。"
+          }
+        }
+      }
+    },
+    "This chat could not be prepared. Try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat could not be prepared. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法准备这个聊天。请重试。"
+          }
+        }
+      }
+    },
+    "This chat could not be refreshed. Your saved conversation and draft are still available.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat could not be refreshed. Your saved conversation and draft are still available."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法刷新这个聊天。你已保存的对话和草稿仍然可用。"
+          }
+        }
+      }
+    },
+    "This chat couldn't be opened. %@": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat couldn't be opened. %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法打开这个聊天。%@"
+          }
+        }
+      }
+    },
+    "This chat couldn't be opened. Try again from Chats.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat couldn't be opened. Try again from Chats."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法打开这个聊天。请从“聊天”中重试。"
+          }
+        }
+      }
+    },
+    "This chat is no longer available.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat is no longer available."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个聊天已不可用。"
+          }
+        }
+      }
+    },
+    "This chat is still opening": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat is still opening"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个聊天仍在打开"
+          }
+        }
+      }
+    },
+    "This chat isn't available right now. Open it again from your chats.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat isn't available right now. Open it again from your chats."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个聊天现在不可用。请从你的聊天中重新打开。"
+          }
+        }
+      }
+    },
+    "This chat isn't on this computer anymore.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat isn't on this computer anymore."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个聊天已不在这台电脑上。"
+          }
+        }
+      }
+    },
+    "This chat went on in a new chat with the same history. Find it in Chats.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat went on in a new chat with the same history. Find it in Chats."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个聊天已在一个带有相同历史记录的新聊天中继续。请在“聊天”中查找。"
+          }
+        }
+      }
+    },
+    "This checkpoint could not be forked. Refresh the chat and try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This checkpoint could not be forked. Refresh the chat and try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法从这个检查点创建分支。请刷新聊天，然后重试。"
           }
         }
       }
@@ -19531,6 +21248,40 @@
         }
       }
     },
+    "This conversation could not be opened. Try again from Chats.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This conversation could not be opened. Try again from Chats."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法打开这个对话。请从“聊天”中重试。"
+          }
+        }
+      }
+    },
+    "This conversation is no longer on your computer.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This conversation is no longer on your computer."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这个对话已不在你的电脑上。"
+          }
+        }
+      }
+    },
     "This dashboard can't restart from Bighelp.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -19561,6 +21312,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "此设备"
+          }
+        }
+      }
+    },
+    "This device couldn't reach Gemini. Check its internet connection, then try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device couldn't reach Gemini. Check its internet connection, then try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "此设备无法连接到 Gemini。请检查它的互联网连接，然后重试。"
           }
         }
       }
@@ -19599,6 +21367,40 @@
         }
       }
     },
+    "This group is no longer available on the selected computer.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This group is no longer available on the selected computer."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "所选电脑上已没有这个群聊。"
+          }
+        }
+      }
+    },
+    "This legacy chat link cannot be opened. No computer was changed.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This legacy chat link cannot be opened. No computer was changed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法打开这个旧版聊天链接。没有更改任何电脑。"
+          }
+        }
+      }
+    },
     "This page opens once %@ answers.": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -19633,6 +21435,40 @@
         }
       }
     },
+    "This project couldn't be opened. Try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This project couldn't be opened. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法打开这个项目。请重试。"
+          }
+        }
+      }
+    },
+    "This saved content could not be verified. Reopen the conversation and try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This saved content could not be verified. Reopen the conversation and try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法验证这份已保存的内容。请重新打开对话，然后重试。"
+          }
+        }
+      }
+    },
     "This section's bots and group chats are on other computers.": {
       "comment": "Bots mode's sections and group chats (#858, #859); fluent-speaker review pending.",
       "localizations": {
@@ -19663,6 +21499,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "这个空间的脚本丢失了。请让机器人重新制作。"
+          }
+        }
+      }
+    },
+    "This voice call no longer belongs to this chat. Close voice and open it again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This voice call no longer belongs to this chat. Close voice and open it again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这次语音通话已不属于这个聊天。请关闭语音后重新打开。"
+          }
+        }
+      }
+    },
+    "Those bots aren't all on this computer anymore. Pick them again from New chat.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Those bots aren't all on this computer anymore. Pick them again from New chat."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这些机器人已不全在这台电脑上。请在“新聊天”中重新选择。"
           }
         }
       }
@@ -20364,6 +22234,23 @@
         }
       }
     },
+    "Update the Bighelp plugin on your computer to talk with Gemini Live.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update the Bighelp plugin on your computer to talk with Gemini Live."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请更新你电脑上的 Bighelp 插件，以便使用 Gemini Live 通话。"
+          }
+        }
+      }
+    },
     "Update the Bighelp plugin to see files": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -20858,6 +22745,23 @@
         }
       }
     },
+    "Voice chat could not end. Try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice chat could not end. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法结束语音聊天。请重试。"
+          }
+        }
+      }
+    },
     "Voice chats": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -20875,6 +22779,23 @@
         }
       }
     },
+    "Voice guidance could not be sent. Try speaking again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice guidance could not be sent. Try speaking again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法发送语音指示。请再说一次。"
+          }
+        }
+      }
+    },
     "Voice mode": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -20888,6 +22809,40 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "语音模式"
+          }
+        }
+      }
+    },
+    "Voice reported a temporary error. Your call is still connected.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice reported a temporary error. Your call is still connected."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "语音报告了一个临时错误。你的通话仍保持连接。"
+          }
+        }
+      }
+    },
+    "Voice response could not be completed. Try speaking again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice response could not be completed. Try speaking again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法完成语音回复。请再说一次。"
           }
         }
       }
@@ -21810,6 +23765,23 @@
         }
       }
     },
+    "Your Codex account can't start live voice right now.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your Codex account can't start live voice right now."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的 Codex 账户现在无法开始实时语音。"
+          }
+        }
+      }
+    },
     "Your October budget is ready.": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -22098,6 +24070,57 @@
         }
       }
     },
+    "Your computer couldn't start the Codex voice call. Try again, or take turns instead.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your computer couldn't start the Codex voice call. Try again, or take turns instead."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的电脑无法开始 Codex 语音通话。请重试，或改为轮流说话。"
+          }
+        }
+      }
+    },
+    "Your computer couldn't turn that into text. Try again, or switch Speech to text to This device in Voice settings.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your computer couldn't turn that into text. Try again, or switch Speech to text to This device in Voice settings."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的电脑无法把这段话转成文字。请重试，或在语音设置中将“语音转文字”切换为“此设备”。"
+          }
+        }
+      }
+    },
+    "Your computer didn't answer in time. Try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your computer didn't answer in time. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的电脑没有及时应答。请重试。"
+          }
+        }
+      }
+    },
     "Your computer isn't connected": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {
@@ -22128,6 +24151,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "你的电脑未连接。"
+          }
+        }
+      }
+    },
+    "Your computer sent back a voice answer the app couldn't use. Try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your computer sent back a voice answer the app couldn't use. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你的电脑返回了 App 无法使用的语音应答。请重试。"
           }
         }
       }
@@ -22196,6 +24236,23 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "你的电脑、Hermes 更新与重启"
+          }
+        }
+      }
+    },
+    "Your connection to your computer changed. Close voice and open it again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your connection to your computer changed. Close voice and open it again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你与电脑的连接已变更。请关闭语音后重新打开。"
           }
         }
       }

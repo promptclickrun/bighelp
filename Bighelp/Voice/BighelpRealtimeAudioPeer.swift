@@ -73,13 +73,13 @@ final class BighelpRealtimeAudioPeer: NSObject {
 
         var errorDescription: String? {
             switch self {
-            case .closed: "The voice connection has closed."
-            case .busy: "Another native voice connection is using audio."
-            case .microphoneDenied: "Allow microphone access in Settings to start live voice."
-            case .audioUnavailable: "Audio is unavailable. Check your audio route and try again."
-            case .negotiation: "The native audio connection could not be negotiated."
-            case .timeout: "The native audio connection timed out."
-            case .invalidSDP: "The computer returned an invalid audio connection."
+            case .closed: String(localized: "The voice connection has closed.")
+            case .busy: String(localized: "Another native voice connection is using audio.")
+            case .microphoneDenied: String(localized: "Allow microphone access in Settings to start live voice.")
+            case .audioUnavailable: String(localized: "Audio is unavailable. Check your audio route and try again.")
+            case .negotiation: String(localized: "The native audio connection could not be negotiated.")
+            case .timeout: String(localized: "The native audio connection timed out.")
+            case .invalidSDP: String(localized: "The computer returned an invalid audio connection.")
             }
         }
     }

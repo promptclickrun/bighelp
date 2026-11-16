@@ -43,32 +43,32 @@ enum LiveVoiceUnavailable: String, Error, Equatable, Sendable {
 
     var title: String {
         switch self {
-        case .connecting: "Not connected yet"
-        case .chatOpening: "This chat is still opening"
-        case .pluginNotInstalled: "The Bighelp plugin is missing"
-        case .pluginNotLoaded: "Restart Hermes to finish"
-        case .groupChat, .pluginUnreachable, .voiceNotOffered, .demo: "Live voice isn't available"
+        case .connecting: String(localized: "Not connected yet")
+        case .chatOpening: String(localized: "This chat is still opening")
+        case .pluginNotInstalled: String(localized: "The Bighelp plugin is missing")
+        case .pluginNotLoaded: String(localized: "Restart Hermes to finish")
+        case .groupChat, .pluginUnreachable, .voiceNotOffered, .demo: String(localized: "Live voice isn't available")
         }
     }
 
     var message: String {
         switch self {
         case .connecting:
-            "Bighelp is still connecting to your computer. Try again in a moment."
+            String(localized: "Bighelp is still connecting to your computer. Try again in a moment.")
         case .chatOpening:
-            "Bighelp is still opening this chat on your computer. Try again in a moment."
+            String(localized: "Bighelp is still opening this chat on your computer. Try again in a moment.")
         case .groupChat:
-            "Live voice talks with one bot, and this chat has more than one."
+            String(localized: "Live voice talks with one bot, and this chat has more than one.")
         case .pluginNotInstalled:
-            "Live voice needs the Bighelp plugin on your computer. Set it up in Settings › Voice, then try again."
+            String(localized: "Live voice needs the Bighelp plugin on your computer. Set it up in Settings › Voice, then try again.")
         case .pluginNotLoaded:
-            "The Bighelp plugin is installed, but the Hermes dashboard on your computer hasn't loaded it yet. Restart the dashboard and the messaging gateway on your computer, then try again."
+            String(localized: "The Bighelp plugin is installed, but the Hermes dashboard on your computer hasn't loaded it yet. Restart the dashboard and the messaging gateway on your computer, then try again.")
         case .pluginUnreachable:
-            "Bighelp couldn't reach the Bighelp plugin on your computer just now. Try again in a moment."
+            String(localized: "Bighelp couldn't reach the Bighelp plugin on your computer just now. Try again in a moment.")
         case .voiceNotOffered:
-            "The Hermes on your computer doesn't offer live voice. Update Hermes and the Bighelp plugin in Settings, on your computer's page, then try again."
+            String(localized: "The Hermes on your computer doesn't offer live voice. Update Hermes and the Bighelp plugin in Settings, on your computer's page, then try again.")
         case .demo:
-            "Demo mode has no computer for live voice."
+            String(localized: "Demo mode has no computer for live voice.")
         }
     }
 

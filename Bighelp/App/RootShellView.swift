@@ -786,7 +786,7 @@ struct RootShellView: View {
                 openSession(record.summary)
             } catch is CancellationError {
             } catch {
-                actionErrorMessage = "The chat is in Hermes now, but it couldn't be opened. Find it in Chats."
+                actionErrorMessage = String(localized: "The chat is in Hermes now, but it couldn't be opened. Find it in Chats.")
             }
         }
     }
@@ -1029,7 +1029,7 @@ struct RootShellView: View {
                     ? error.localizedDescription
                     : AgentDirectoryStore.isHermesCapabilityMissing(error)
                     ? AgentDirectoryStore.hermesCompatibilityRecovery
-                    : (agents.errorMessage ?? "New chat could not be opened. Try again.")
+                    : (agents.errorMessage ?? String(localized: "New chat could not be opened. Try again."))
             }
         }
     }
@@ -1055,12 +1055,12 @@ struct RootShellView: View {
         Task {
             do {
                 guard try await featureStore.prepareApproval(id: requestID) else {
-                    actionErrorMessage = "This approval is no longer available."
+                    actionErrorMessage = String(localized: "This approval is no longer available.")
                     return
                 }
                 appState.open(.approval(requestID: requestID))
             } catch {
-                actionErrorMessage = "This approval could not be loaded from Hermes. Try again."
+                actionErrorMessage = String(localized: "This approval could not be loaded from Hermes. Try again.")
             }
         }
     }
@@ -1192,7 +1192,7 @@ struct RootShellView: View {
             openApproval(requestID: id)
         case .group(let roomID):
             guard let owner = currentWorkspaceOwner else {
-                actionErrorMessage = "This group is no longer available on the selected computer."
+                actionErrorMessage = String(localized: "This group is no longer available on the selected computer.")
                 return
             }
             openHostedGroup(roomID, owner: owner, settings: false)
@@ -1219,12 +1219,12 @@ struct RootShellView: View {
     private func holdsLinkForItsComputer(_ url: URL) -> Bool {
         guard let hostID = BighelpIncomingURLRoute.hostID(in: url), let fleet else { return false }
         guard let host = fleet.reader.hosts.first(where: { $0.id == hostID }) else {
-            actionErrorMessage = "That computer isn't in Bighelp anymore."
+            actionErrorMessage = String(localized: "That computer isn't in Bighelp anymore.")
             return true
         }
         guard !host.isSelected else { return false }
         guard fleet.canOpen(hostID) else {
-            actionErrorMessage = "\(host.name) is a sample computer in this demo."
+            actionErrorMessage = String(localized: "\(host.name) is a sample computer in this demo.")
             return true
         }
         recordLiveFleet()
@@ -1239,7 +1239,7 @@ struct RootShellView: View {
             sessionRestoreTask?.cancel()
             // Only a card this phone no longer owns, or whose computer is gone, gets here.
             do { try managedNotifications.openActivity(opaqueSessionID: sessionID) }
-            catch { actionErrorMessage = "This chat can't be opened from here anymore. Find it in Bighelp instead." }
+            catch { actionErrorMessage = String(localized: "This chat can't be opened from here anymore. Find it in Bighelp instead.") }
             return
         }
         // Demo data opens links the way a real host does.
@@ -1248,7 +1248,7 @@ struct RootShellView: View {
             return
         }
         guard nativeWorkspaceStore == nil else {
-            actionErrorMessage = "This legacy chat link cannot be opened. No computer was changed."
+            actionErrorMessage = String(localized: "This legacy chat link cannot be opened. No computer was changed.")
             return
         }
         sessionRestoreTask?.cancel()
@@ -1283,7 +1283,7 @@ struct RootShellView: View {
                 )
                 let route = AppRoute.chat(conversationID: sessionID)
                 guard try featureStore.prepareForUserNavigation(route) else {
-                    actionErrorMessage = "This chat could not be prepared. Try again."
+                    actionErrorMessage = String(localized: "This chat could not be prepared. Try again.")
                     return
                 }
                 appState.activateConversation(id: sessionID, source: .quickSwitch)
@@ -1291,7 +1291,7 @@ struct RootShellView: View {
                 return
             } catch {
                 guard sessionRestoreRequest == restoreRequest else { return }
-                actionErrorMessage = "This chat could not be loaded from Hermes. Try again."
+                actionErrorMessage = String(localized: "This chat could not be loaded from Hermes. Try again.")
             }
         }
     }
@@ -1306,7 +1306,7 @@ struct RootShellView: View {
         Task { @MainActor in
             try? await sessionCatalog.load()
             guard let record = sessionCatalog.session(id: sessionID) else {
-                actionErrorMessage = "This chat is no longer available."
+                actionErrorMessage = String(localized: "This chat is no longer available.")
                 return
             }
             openSessionSelection(record.summary)
@@ -1360,7 +1360,7 @@ struct RootShellView: View {
             } catch is CancellationError {
                 return
             } catch {
-                actionErrorMessage = "This conversation could not be opened. Try again from Chats."
+                actionErrorMessage = String(localized: "This conversation could not be opened. Try again from Chats.")
             }
         }
     }
@@ -1435,7 +1435,7 @@ struct RootShellView: View {
             case .tasks(let agentID)?: openScheduledAlertTasks(agentID: agentID)
             // Tasks that couldn't load: their screen says why and offers to try again.
             case nil where isScheduledRun: openScheduledAlertTasks(agentID: profileID)
-            case nil: actionErrorMessage = "This conversation is no longer on your computer."
+            case nil: actionErrorMessage = String(localized: "This conversation is no longer on your computer.")
             }
         }
     }
@@ -1561,14 +1561,14 @@ struct RootShellView: View {
                     return
                 } catch {
                     guard !Task.isCancelled, sessionRestoreRequest == restoreRequest else { return }
-                    actionErrorMessage = "This chat could not be refreshed. Your saved conversation and draft are still available."
+                    actionErrorMessage = String(localized: "This chat could not be refreshed. Your saved conversation and draft are still available.")
                 }
             }
         } catch {
             // While the host is reconnecting, open the saved conversation; it
             // catches up once the connection returns instead of showing an error.
             if openCachedChatWhileReconnecting(route) { return }
-            actionErrorMessage = "This chat could not be prepared. Try again."
+            actionErrorMessage = String(localized: "This chat could not be prepared. Try again.")
         }
     }
 
@@ -1588,7 +1588,7 @@ struct RootShellView: View {
             openSession(session)
         case .hostedRoom(let roomID):
             guard let owner = currentWorkspaceOwner else {
-                actionErrorMessage = "This group is no longer available on the selected computer."
+                actionErrorMessage = String(localized: "This group is no longer available on the selected computer.")
                 return
             }
             openHostedGroup(roomID, owner: owner, settings: false)
@@ -1615,7 +1615,7 @@ struct RootShellView: View {
                 model.resolveBranchContinuation(continuation)
                 let route = AppRoute.chat(conversationID: branch.id)
                 guard try featureStore.prepareForUserNavigation(route) else {
-                    actionErrorMessage = "This chat went on in a new chat with the same history. Find it in Chats."
+                    actionErrorMessage = String(localized: "This chat went on in a new chat with the same history. Find it in Chats.")
                     return
                 }
                 appState.activateConversation(id: branch.id, source: .fork)
@@ -1635,12 +1635,12 @@ struct RootShellView: View {
                 )
                 let route = AppRoute.chat(conversationID: fork.id)
                 guard try featureStore.prepareForUserNavigation(route) else {
-                    actionErrorMessage = "The fork was created, but could not be opened. Find it in Chats."
+                    actionErrorMessage = String(localized: "The fork was created, but could not be opened. Find it in Chats.")
                     return
                 }
                 appState.activateConversation(id: fork.id, source: .fork)
             } catch {
-                actionErrorMessage = "This checkpoint could not be forked. Refresh the chat and try again."
+                actionErrorMessage = String(localized: "This checkpoint could not be forked. Refresh the chat and try again.")
             }
         }
     }
@@ -1651,7 +1651,7 @@ struct RootShellView: View {
             appState.open(route)
         } catch {
             if openCachedChatWhileReconnecting(route) { return }
-            actionErrorMessage = "This chat could not be prepared. Try again."
+            actionErrorMessage = String(localized: "This chat could not be prepared. Try again.")
         }
     }
 

@@ -16,6 +16,6 @@ enum FleetSwitchFallback {
     }
 
     static func message(unreachable: String, stillOn: String) -> String {
-        "Couldn't reach \(unreachable). You're still on \(stillOn)."
+        String(localized: "Couldn't reach \(unreachable). You're still on \(stillOn).")
     }
 }

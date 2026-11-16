@@ -136,7 +136,7 @@ extension RootShellView {
                       invalidationSource.servingProfileID.map({ Data($0.utf8) })
                         == servingProfileID.map({ Data($0.utf8) }) else {
                     if !reattaching {
-                        actionErrorMessage = "Management updates could not be connected. Reopen this feature after refreshing the selected computer."
+                        actionErrorMessage = String(localized: "Management updates could not be connected. Reopen this feature after refreshing the selected computer.")
                     }
                     return false
                 }
@@ -145,7 +145,7 @@ extension RootShellView {
                     do { stockGit = try runtime.stockGitPresentation(profileID: profileID) }
                     catch {
                         if !reattaching {
-                            actionErrorMessage = "Project changes could not be connected. Reopen Projects after refreshing this computer."
+                            actionErrorMessage = String(localized: "Project changes could not be connected. Reopen Projects after refreshing this computer.")
                         }
                         return false
                     }
@@ -218,7 +218,7 @@ extension RootShellView {
             guard let owner = currentWorkspaceOwner,
                   let profile = agents.resolvedAgent(explicitID: nil),
                   currentWorkspaceCapabilities.supports(.profilesEdit, owner: owner, profileID: profile.id) else {
-                actionErrorMessage = "Connect to this computer before editing its bot."
+                actionErrorMessage = String(localized: "Connect to this computer before editing its bot.")
                 return false
             }
             // Every door to a bot opens its page.
@@ -401,7 +401,7 @@ extension RootShellView {
             guard let coordinator = try makeLifecycleCoordinator(isShown: { lifecyclePresentationID == presentationID })
             else {
                 if !reattaching {
-                    actionErrorMessage = "Connect to a native Hermes computer before managing chats or profiles."
+                    actionErrorMessage = String(localized: "Connect to a native Hermes computer before managing chats or profiles.")
                 }
                 return false
             }
@@ -412,7 +412,7 @@ extension RootShellView {
             return true
         } catch {
             if !reattaching {
-                actionErrorMessage = "The chat and profile controls could not connect to this computer."
+                actionErrorMessage = String(localized: "The chat and profile controls could not connect to this computer.")
             }
             return false
         }
@@ -483,7 +483,7 @@ extension RootShellView {
                     try await botModeRooms.renameNativeRoom(roomID: id, name: name)
                 } catch {
                     guard currentWorkspaceOwner == request.owner else { return }
-                    actionErrorMessage = "The group could not be renamed. Check the computer and try again."
+                    actionErrorMessage = String(localized: "The group could not be renamed. Check the computer and try again.")
                 }
             }
         case .deleteGroup(let id):
@@ -496,7 +496,7 @@ extension RootShellView {
                 }
                 catch {
                     guard currentWorkspaceOwner == request.owner else { return }
-                    actionErrorMessage = "The group deletion was not confirmed. Refresh before trying again."
+                    actionErrorMessage = String(localized: "The group deletion was not confirmed. Refresh before trying again.")
                 }
             }
         case .createGroup(let seed):
@@ -548,8 +548,10 @@ extension RootShellView {
             } catch {
                 opened?(nil)
                 guard currentWorkspaceOwner == owner else { return }
-                actionErrorMessage = "Hermes could not open this group. "
-                    + (HermesRefusalMessage.sentence(in: error) ?? "Check the computer and try again.")
+                // Hermes' own sentence stays as Hermes wrote it.
+                actionErrorMessage = HermesRefusalMessage.sentence(in: error)
+                    .map { String(localized: "Hermes could not open this group. \($0)") }
+                    ?? String(localized: "Hermes could not open this group. Check the computer and try again.")
             }
         }
     }

@@ -32,6 +32,20 @@ The second stage (#527) adds:
   Chat (with the Advanced options sections), and Appearance with Chat layout.
 - Needs you and a blueprint's chips in the message box.
 
+App-written error messages (#1039):
+
+- The shell's alert (`actionErrorMessage` in `Bighelp/App`): a chat, group chat, project or page
+  that can't open, a computer that doesn't answer, and the like.
+- Voice errors: why live voice can't start (`LiveVoiceUnavailable`), what a call says when it
+  fails or ends, and the turn-taking errors.
+- Settings › Models › Mixture of Agents: its result line and its fallback.
+
+These are plain Strings, so each is made with `String(localized:)` where it is created. What a
+computer or a provider said goes into the sentence as an argument and stays as it came
+(`"This chat couldn't be opened. \(sentence)"`): never translate it, and never join it to
+translated words with `+`. A number that is a code goes in as text (`\(String(code))`), or a
+language's number format adds a thousands separator to it.
+
 The Chinese text is an AI-assisted draft and remains `needs_review` in
 the catalog. It has not received professional or fluent-speaker approval. Screenshots
 and automated checks establish rendering and lookup, not linguistic certification.
@@ -103,7 +117,10 @@ not included in Watch, widget, notification-extension, or fixture Mac targets.
    keys, source language, argument preservation, plural categories, and accidental
    protocol/storage IDs. For the second stage's screens it also fails when bare
    English reaches a plain-`String` helper (`SimpleBotsRow`, `settingLabel`, error and
-   status state, `?? "Fallback"`). It is not an exhaustive scanner of every screen.
+   status state, `?? "Fallback"`). For app-written errors it fails when the shell sets
+   `actionErrorMessage` from a bare English literal, and when an English sentence sits in a plain
+   String in the voice error files or the Mixture of Agents page. It is not an exhaustive scanner
+   of every screen.
 4. Run `xcodegen generate` whenever adding/removing resource or test files; commit
    the generated project. Never edit `project.pbxproj` by hand.
 5. Run `LocalizationTests` and `LocalizationUITests` with the `Bighelp` scheme on

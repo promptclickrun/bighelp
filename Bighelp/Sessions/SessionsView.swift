@@ -887,8 +887,8 @@ struct SessionsView: View {
                 }
                 Image(systemName: "folder")
             }
-            .accessibilityLabel(session.workspaceName.map { "Move to Project…, now in \($0)" }
-                ?? "Move to Project…")
+            .accessibilityLabel(session.workspaceName.map { String(localized: "Move to Project…, now in \($0)") }
+                ?? String(localized: "Move to Project…"))
             .accessibilityIdentifier("session.action.move-project.\(session.id)")
         }
     }

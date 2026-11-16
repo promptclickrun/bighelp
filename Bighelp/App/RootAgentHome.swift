@@ -121,7 +121,7 @@ extension RootShellView {
         }
         guard let owner = currentWorkspaceOwner else {
             simpleBotsChatOpening.endIfNothingOpened(opening)
-            actionErrorMessage = "Connect to this computer to open the bot’s chat."
+            actionErrorMessage = String(localized: "Connect to this computer to open the bot’s chat.")
             return
         }
         let originTab = appState.selectedTab
@@ -270,14 +270,14 @@ extension RootShellView {
     func createGroupChat(with profileIDs: [String], peers: [HermesBotModePeerCandidate] = [],
                          firstMessage: String? = nil, ended: (@MainActor (String?) -> Void)? = nil) {
         guard let owner = groupCreationReadyOwner else {
-            actionErrorMessage = "Group chats need a connected Hermes computer."
+            actionErrorMessage = String(localized: "Group chats need a connected Hermes computer.")
             ended?(nil)
             return
         }
         let profiles = profileIDs.compactMap { id in agents.profiles.first { $0.id == id } }
         guard profiles.count == profileIDs.count,
               (2...BotModeRoom.maximumMembers).contains(profiles.count + peers.count) else {
-            actionErrorMessage = "Those bots aren't all on this computer anymore. Pick them again from New chat."
+            actionErrorMessage = String(localized: "Those bots aren't all on this computer anymore. Pick them again from New chat.")
             ended?(nil)
             return
         }
@@ -305,7 +305,7 @@ extension RootShellView {
                 Logger(subsystem: "app.loopdy.mobile", category: "BotMode")
                     .error("Group chat create failed: \(String(reflecting: error), privacy: .public)")
                 guard isCurrentSignIn(owner) else { return }
-                actionErrorMessage = "The group chat couldn't be created. Check the computer, then try again."
+                actionErrorMessage = String(localized: "The group chat couldn't be created. Check the computer, then try again.")
             }
         }
     }
@@ -603,14 +603,14 @@ extension RootShellView {
         let source: any ProjectsSource
         if let runtime = nativeRuntime {
             guard let lifecycle = try? runtime.stockGitPresentation(profileID: workspaceAgentID).projects else {
-                actionErrorMessage = "Projects couldn't be opened. Check that your computer is connected, then try again."
+                actionErrorMessage = String(localized: "Projects couldn't be opened. Check that your computer is connected, then try again.")
                 return
             }
             source = LiveProjectsSource(lifecycle: lifecycle)
         } else if usesWorkspaceFixtures {
             source = DemoProjectsSource()
         } else {
-            actionErrorMessage = "Connect to your computer to use Projects."
+            actionErrorMessage = String(localized: "Connect to your computer to use Projects.")
             return
         }
         projectsStore = ProjectsStore(source: source, profileID: workspaceAgentID)
@@ -622,7 +622,7 @@ extension RootShellView {
     func startChat(inProject id: String) {
         Task { @MainActor in
             guard await hermesWorkspaces.select(id: id, agentID: workspaceAgentID) else {
-                actionErrorMessage = hermesWorkspaces.errorMessage ?? "This project couldn't be opened. Try again."
+                actionErrorMessage = hermesWorkspaces.errorMessage ?? String(localized: "This project couldn't be opened. Try again.")
                 return
             }
             startNewChat(explicitAgentID: workspaceAgentID)
@@ -652,7 +652,7 @@ extension RootShellView {
                 openSession(record.summary)
             } catch is CancellationError {
             } catch {
-                actionErrorMessage = "This chat couldn't be opened. Try again from Chats."
+                actionErrorMessage = String(localized: "This chat couldn't be opened. Try again from Chats.")
             }
         }
     }

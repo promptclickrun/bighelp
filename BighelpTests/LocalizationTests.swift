@@ -89,4 +89,43 @@ struct LocalizationTests {
         #expect(MidSessionChatBehavior.steer.rawValue == "steer")
         #expect(FirstRunHome.bots.rawValue == "bots")
     }
+
+    /// App-written errors are plain Strings, so each is translated where it is made (#1039): the
+    /// shell's alert, voice errors and the Mixture of Agents page.
+    @Test func appWrittenErrorsHaveChinese() throws {
+        let chinese = try bundle("zh-Hans")
+        let english = try bundle("en")
+        let expected = [
+            ("Connect to your computer to use Workflows.", "请连接到你的电脑以使用工作流。"),
+            ("This chat could not be prepared. Try again.", "无法准备这个聊天。请重试。"),
+            ("Live voice isn't available", "实时语音不可用"),
+            ("Your computer didn't answer in time. Try again.", "你的电脑没有及时应答。请重试。"),
+            ("Voice chat could not end. Try again.", "无法结束语音聊天。请重试。"),
+            ("Hermes could not confirm this model operation. Refresh before trying it again.", "Hermes 无法确认这项模型操作。请先刷新，再重试。"),
+        ]
+        for (key, value) in expected {
+            #expect(chinese.localizedString(forKey: key, value: nil, table: nil) == value)
+            #expect(english.localizedString(forKey: key, value: nil, table: nil) == key)
+        }
+    }
+
+    /// What a computer or a provider said goes into the translated sentence exactly as it came, and so
+    /// do names, even one that is a catalog key itself.
+    @Test func aHostsOwnWordsPassThroughTranslatedErrors() throws {
+        let chinese = try bundle("zh-Hans")
+        let zh = Locale(identifier: "zh-Hans")
+        let hostWords = "Session busy: Settings / 海风 🐚."
+        #expect(String(localized: "This chat couldn't be opened. \(hostWords)", bundle: chinese, locale: zh)
+                == "无法打开这个聊天。Session busy: Settings / 海风 🐚.")
+        #expect(String(localized: "Gemini didn't start the call. Gemini said: “\(hostWords)”", bundle: chinese, locale: zh)
+                == "Gemini 未能开始通话。Gemini 表示：“Session busy: Settings / 海风 🐚.”")
+        // Two names keep their places.
+        #expect(String(localized: "Couldn't reach \("Settings"). You're still on \("Desk").", bundle: chinese, locale: zh)
+                == "无法连接到Settings。你仍在使用Desk。")
+        // The app's own code makes these with the phone's language; here that is English.
+        #expect(FleetSwitchFallback.message(unreachable: "Studio", stillOn: "Desk") == "Couldn't reach Studio. You're still on Desk.")
+        #expect(LiveVoiceUnavailable.connecting.title == "Not connected yet")
+        // A code is text, never a number with a thousands separator.
+        #expect(GeminiLiveClose(ready: false, code: 1011).message == "Gemini didn't start the call (code 1011).")
+    }
 }

@@ -65,7 +65,7 @@ extension RootShellView {
             model = current
         } else {
             guard let service = makeKanbanService() else {
-                actionErrorMessage = "Connect to your computer to use Kanban."
+                actionErrorMessage = String(localized: "Connect to your computer to use Kanban.")
                 return
             }
             model = KanbanBoardModel(service: service, agents: kanbanAgents)

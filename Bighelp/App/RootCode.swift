@@ -66,7 +66,7 @@ extension RootShellView {
     /// Opens a coding session's chat over where the person is; Back returns there.
     func openCodeSession(_ session: CodeSessionRecord) {
         guard let record = sessionCatalog.session(id: session.id) else {
-            actionErrorMessage = "This chat isn't on this computer anymore."
+            actionErrorMessage = String(localized: "This chat isn't on this computer anymore.")
             return
         }
         openSession(record.summary)
@@ -147,12 +147,12 @@ extension RootShellView {
     /// made on first use.
     func openDevFactory() {
         guard let scope = currentWorkspaceOwner?.cacheScopeID ?? (usesWorkspaceFixtures ? "demo" : nil) else {
-            actionErrorMessage = "Connect to your computer to use Dev Factory."
+            actionErrorMessage = String(localized: "Connect to your computer to use Dev Factory.")
             return
         }
         if devFactory?.scopeID != scope {
             guard let client = makeWorkflowsClient() else {
-                actionErrorMessage = "Connect to your computer to use Dev Factory."
+                actionErrorMessage = String(localized: "Connect to your computer to use Dev Factory.")
                 return
             }
             devFactory = DevFactoryStore(scopeID: scope, client: client)

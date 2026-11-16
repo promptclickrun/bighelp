@@ -57,7 +57,7 @@ final class ModelAdministrationStore {
             let value = try await client.loadSnapshot(profileID: profileID)
             guard ownsScope else { return false }
             snapshot = value
-            successMessage = "Hermes confirmed the complete Mixture of Agents configuration."
+            successMessage = String(localized: "Hermes confirmed the complete Mixture of Agents configuration.")
             return true
         } catch is CancellationError {
             return false
@@ -70,7 +70,7 @@ final class ModelAdministrationStore {
 
     private static func message(_ error: any Error) -> String {
         (error as? LocalizedError)?.errorDescription
-            ?? "Hermes could not confirm this model operation. Refresh before trying it again."
+            ?? String(localized: "Hermes could not confirm this model operation. Refresh before trying it again.")
     }
 }
 
@@ -93,7 +93,7 @@ struct ModelsMixtureOfAgentsView: View {
     var body: some View {
         Form {
             if store.isLoading || store.operationTitle != nil {
-                Section { ProgressView(store.operationTitle ?? "Loading…") }
+                Section { ProgressView(store.operationTitle ?? String(localized: "Loading…")) }
             }
             if let error = store.errorMessage {
                 Section {

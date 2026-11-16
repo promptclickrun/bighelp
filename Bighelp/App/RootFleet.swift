@@ -19,7 +19,7 @@ extension RootShellView {
             // No agent named: the home agent. One that's gone is never swapped for another.
             let agent = agentID.map { id in agents.profiles.first { $0.id == id } } ?? homeAgent
             guard let agent else {
-                actionErrorMessage = "That bot isn't on \(place) anymore."
+                actionErrorMessage = String(localized: "That bot isn't on \(place) anymore.")
                 return
             }
             guard startsVoice else {
@@ -62,8 +62,8 @@ extension RootShellView {
             } catch is CancellationError {
             } catch {
                 actionErrorMessage = switch change {
-                case .rename: "Bighelp couldn't rename this chat. Try again."
-                case .archive: "Bighelp couldn't archive this chat. Try again."
+                case .rename: String(localized: "Bighelp couldn't rename this chat. Try again.")
+                case .archive: String(localized: "Bighelp couldn't archive this chat. Try again.")
                 }
             }
         }
@@ -79,7 +79,7 @@ extension RootShellView {
         }
         guard fleet.canOpen(hostID) else {
             _ = home.takeNewChatHandoff(after: .refused)
-            actionErrorMessage = "\(fleet.hostName(hostID)) is a sample computer in this demo."
+            actionErrorMessage = String(localized: "\(fleet.hostName(hostID)) is a sample computer in this demo.")
             return
         }
         recordLiveFleet()
@@ -218,8 +218,10 @@ extension RootShellView {
                         openSession(record.summary)
                     } catch is CancellationError {
                     } catch {
-                        actionErrorMessage = "This chat couldn't be opened. "
-                            + (HermesRefusalMessage.sentence(in: error) ?? "Try again from Chats.")
+                        // Hermes' own sentence stays as Hermes wrote it.
+                        actionErrorMessage = HermesRefusalMessage.sentence(in: error)
+                            .map { String(localized: "This chat couldn't be opened. \($0)") }
+                            ?? String(localized: "This chat couldn't be opened. Try again from Chats.")
                     }
                 }
             }

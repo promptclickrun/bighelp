@@ -337,7 +337,7 @@ final class LiveVoiceModel {
             jobs = snapshot
         } catch {
             guard generation == token, jobsRequest == requestID, client.hasCurrentOwner else { return }
-            errorMessage = "Could not refresh voice tasks. Existing task state has been kept."
+            errorMessage = String(localized: "Could not refresh voice tasks. Existing task state has been kept.")
         }
     }
 
@@ -357,7 +357,7 @@ final class LiveVoiceModel {
             await refreshJobs()
         } catch {
             guard generation == token, client.hasCurrentOwner else { return }
-            jobErrors[jobID] = "The task change was not confirmed. Refresh its status before trying again."
+            jobErrors[jobID] = String(localized: "The task change was not confirmed. Refresh its status before trying again.")
         }
     }
 
@@ -401,7 +401,7 @@ final class LiveVoiceModel {
             applyDelegationStatus(event)
         case "provider_error":
             if event["fatal"]?.boolean == false {
-                errorMessage = "Voice reported a temporary error. Your call is still connected."
+                errorMessage = String(localized: "Voice reported a temporary error. Your call is still connected.")
             } else {
                 fail(LiveVoiceControlError.unavailable, generation: generation)
             }
@@ -415,8 +415,8 @@ final class LiveVoiceModel {
             stopLocal()
             phase = .ended
             cleanupMessage = provider == .gemini
-                ? geminiClose?.message ?? "Gemini ended the call. Work you started keeps going."
-                : "The computer closed live voice. Accepted tasks were not cancelled."
+                ? geminiClose?.message ?? String(localized: "Gemini ended the call. Work you started keeps going.")
+                : String(localized: "The computer closed live voice. Accepted tasks were not cancelled.")
         default: break // Unknown events cannot execute/control tasks.
         }
     }
@@ -563,7 +563,7 @@ final class LiveVoiceModel {
 
     private func requestClose(_ id: String) {
         guard client.hasCurrentOwner else { return }
-        cleanupMessage = "Audio stopped on this device. Confirming computer cleanup…"
+        cleanupMessage = String(localized: "Audio stopped on this device. Confirming computer cleanup…")
         isClosing = true
         closingTask = Task { @MainActor [weak self, client] in
             defer {
@@ -573,10 +573,10 @@ final class LiveVoiceModel {
             do {
                 try await client.close(voiceID: id)
                 guard let self, self.voiceID == id, client.hasCurrentOwner else { return }
-                self.cleanupMessage = "Computer acknowledged closing voice. Accepted tasks continue independently."
+                self.cleanupMessage = String(localized: "Computer acknowledged closing voice. Accepted tasks continue independently.")
             } catch {
                 guard let self, self.voiceID == id, client.hasCurrentOwner else { return }
-                self.cleanupMessage = "Audio stopped on this device. Computer cleanup is unconfirmed; tasks were not cancelled."
+                self.cleanupMessage = String(localized: "Audio stopped on this device. Computer cleanup is unconfirmed; tasks were not cancelled.")
             }
         }
     }
@@ -591,21 +591,21 @@ final class LiveVoiceModel {
         // transport text, SDP or headers.
         switch error as? WorkspaceClientError {
         case .authenticationRequired?:
-            return "Sign in to your computer again, then try live voice."
+            return String(localized: "Sign in to your computer again, then try live voice.")
         case .unavailable?:
-            return "Live voice isn't set up on your computer. Take turns instead."
+            return String(localized: "Live voice isn't set up on your computer. Take turns instead.")
         case .rejected(let code, _)? where code == "voice_already_active":
-            return "Another live voice call is still open with your computer. End it, then try again."
+            return String(localized: "Another live voice call is still open with your computer. End it, then try again.")
         case .rejected(let code, _)? where code == "profile_not_found":
-            return "This bot is no longer on your computer."
+            return String(localized: "This bot is no longer on your computer.")
         case .rejected(let code?, _)? where code.hasPrefix("voice_provider_"):
             return providerMessage(String(code.dropFirst("voice_provider_".count)))
         case .ownerChanged?:
-            return "Your connection to your computer changed. Close voice and open it again."
+            return String(localized: "Your connection to your computer changed. Close voice and open it again.")
         case .some:
-            return "Your computer couldn't start the Codex voice call. Try again, or take turns instead."
+            return String(localized: "Your computer couldn't start the Codex voice call. Try again, or take turns instead.")
         case nil:
-            return "Live voice couldn't connect. Try again, or take turns instead."
+            return String(localized: "Live voice couldn't connect. Try again, or take turns instead.")
         }
     }
 
@@ -613,34 +613,34 @@ final class LiveVoiceModel {
     private static func geminiMessage(_ error: any Error) -> String {
         switch error as? WorkspaceClientError {
         case .authenticationRequired?:
-            return "Sign in to your computer again, then try live voice."
+            return String(localized: "Sign in to your computer again, then try live voice.")
         case .unavailable?:
-            return "Update the Bighelp plugin on your computer to talk with Gemini Live."
+            return String(localized: "Update the Bighelp plugin on your computer to talk with Gemini Live.")
         case .rejected(let code, _)? where code == "voice_already_active":
-            return "Another live voice call is still open with your computer. End it, then try again."
+            return String(localized: "Another live voice call is still open with your computer. End it, then try again.")
         case .rejected(let code, _)? where code == "profile_not_found":
-            return "This bot is no longer on your computer."
+            return String(localized: "This bot is no longer on your computer.")
         case .rejected(let code?, _)? where code.hasPrefix("voice_provider_"):
             switch String(code.dropFirst("voice_provider_".count)) {
             case "credentials_unavailable":
-                return "This bot has no Gemini API key on your computer. Add one as GEMINI_API_KEY, then try again."
+                return String(localized: "This bot has no Gemini API key on your computer. Add one as GEMINI_API_KEY, then try again.")
             case "authentication_failed":
-                return "Gemini didn't accept this bot's API key. Check the key on your computer, then try again."
+                return String(localized: "Gemini didn't accept this bot's API key. Check the key on your computer, then try again.")
             case "access_denied":
-                return "This Gemini key can't start live voice."
+                return String(localized: "This Gemini key can't start live voice.")
             case "rate_limited":
-                return "Gemini is limiting voice calls right now. Wait a minute, then try again."
+                return String(localized: "Gemini is limiting voice calls right now. Wait a minute, then try again.")
             case "setup_timeout":
-                return "Gemini took too long to start the call. Try again."
+                return String(localized: "Gemini took too long to start the call. Try again.")
             case "unsupported_voice":
-                return "That voice isn't available for live voice. Pick another in Settings › Voice."
+                return String(localized: "That voice isn't available for live voice. Pick another in Settings › Voice.")
             default:
-                return "Gemini couldn't start the voice call. Try again, or take turns instead."
+                return String(localized: "Gemini couldn't start the voice call. Try again, or take turns instead.")
             }
         case .ownerChanged?:
-            return "Your connection to your computer changed. Close voice and open it again."
+            return String(localized: "Your connection to your computer changed. Close voice and open it again.")
         case .some, nil:
-            return "Gemini Live couldn't connect. Try again, or take turns instead."
+            return String(localized: "Gemini Live couldn't connect. Try again, or take turns instead.")
         }
     }
 
@@ -648,23 +648,25 @@ final class LiveVoiceModel {
     private static func providerMessage(_ reason: String) -> String {
         switch reason {
         case "authentication_failed", "ambiguous_auth":
-            "Codex sign-in on your computer didn't work. Run `hermes auth add openai-codex` there, then try again."
+            String(localized: "Codex sign-in on your computer didn't work. Run `hermes auth add openai-codex` there, then try again.")
         case "credentials_unavailable":
-            "Bighelp couldn't read this bot's Codex sign-in on your computer. Update the Bighelp plugin and restart Hermes, then try again."
+            String(localized: "Bighelp couldn't read this bot's Codex sign-in on your computer. Update the Bighelp plugin and restart Hermes, then try again.")
         case "access_denied":
-            "Your Codex account can't start live voice right now."
+            String(localized: "Your Codex account can't start live voice right now.")
         case "rate_limited":
-            "Codex is limiting voice calls right now. Wait a minute, then try again."
+            String(localized: "Codex is limiting voice calls right now. Wait a minute, then try again.")
         case "setup_timeout", "startup_timeout", "session_not_started":
-            "Codex took too long to start the call. Try again."
+            String(localized: "Codex took too long to start the call. Try again.")
         case "invalid_sdp", "audio_only_required", "invalid_call_identity", "invalid_public_answer":
-            "Codex and this \(BighelpPlatform.isMac ? "Mac" : "phone") couldn't agree on audio settings. Try again."
+            BighelpPlatform.isMac
+                ? String(localized: "Codex and this Mac couldn't agree on audio settings. Try again.")
+                : String(localized: "Codex and this phone couldn't agree on audio settings. Try again.")
         case "unsupported_voice":
-            "That voice isn't available for live voice. Pick another in Settings › Voice."
+            String(localized: "That voice isn't available for live voice. Pick another in Settings › Voice.")
         case "explicit_api_key_mode_required":
-            "API-key live voice needs an OpenAI key on your computer."
+            String(localized: "API-key live voice needs an OpenAI key on your computer.")
         default:
-            "Codex couldn't start the voice call. Try again, or take turns instead."
+            String(localized: "Codex couldn't start the voice call. Try again, or take turns instead.")
         }
     }
 }

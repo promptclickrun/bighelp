@@ -84,6 +84,31 @@ VERBATIM = re.compile(
 SAVED_DATA = {("SimpleBotTemplates.swift", '?? "You '), ("SimpleBotTemplates.swift", '?? "Everyday '),
               ("NewChatView.swift", 'note("')}
 
+# App-written error messages (#1039): the shell's alert text, voice errors and the Mixture of Agents page.
+# They are plain Strings, so each is translated where it is made. A host's own words pass through as they came.
+SHELL_SOURCES = sorted((ROOT / "Bighelp/App").glob("*.swift"))
+ERROR_SOURCES = [
+    *(ROOT / "Bighelp/Voice" / f"{name}.swift" for name in (
+        "LiveVoiceUnavailable", "LiveVoiceModel", "LiveVoiceControlClient", "BighelpRealtimeAudioPeer",
+        "VoiceModel", "VoicePresentationContainer", "GeminiLiveWire")),
+    ROOT / "Bighelp/WorkspaceManagement/Providers/ModelsMixtureOfAgentsView.swift",
+    ROOT / "Bighelp/Fleet/FleetSwitchFallback.swift",
+]
+BARE_LITERAL = re.compile(r'(?<!localized: )"(?:[^"\\\n]|\\.)*"')
+# A sentence a person reads: a capital, more than one word, and a full stop or an ellipsis.
+SENTENCE = re.compile(r'^"(?:[A-Z]|\\\()[^"]* [^"]*[.…]"$')
+# SwiftUI translates a literal these take; a logger's line and an answer to the model are not app copy.
+NOT_PLAIN_STRINGS = re.compile(r'\b(?:Text|Label|Button|Section|Toggle|Picker|ProgressView|LabeledContent|'
+                               r'accessibility\w+|navigationTitle|alert|confirmationDialog|Logger|logger|log)\(\s*"'
+                               r'|\.(?:error|info|debug|notice|warning|fault)\("|\.string\("|assert\w*\(|precondition')
+ERRORS = {
+    "This chat couldn't be opened. Try again from Chats.", "Connect to your computer to use Workflows.",
+    "Couldn't reach %@. You're still on %@.", "This chat couldn't be opened. %@",
+    "Live voice isn't available", "Gemini ended the call. Gemini said: “%@” Work you started keeps going.",
+    "Your computer didn't answer in time. Try again.", "Voice chat could not end. Try again.",
+    "Hermes could not confirm this model operation. Refresh before trying it again.",
+}
+
 
 def units(node):
     if "stringUnit" in node:
@@ -148,6 +173,43 @@ class LocalizationCatalogChecks(unittest.TestCase):
                 line = text.count("\n", 0, match.start()) + 1
                 with self.subTest(source=source.name, line=line):
                     self.fail(f"{source.relative_to(ROOT)}:{line} passes English to a plain String: {match.group(0)!r}")
+
+    def test_error_messages_have_chinese(self):
+        for key in ERRORS:
+            with self.subTest(key=key):
+                self.assertTrue(key in self.strings, f"{key!r} is missing from the catalog")
+                values = list(units(self.strings[key]["localizations"]["zh-Hans"]))
+                self.assertTrue(values)
+                self.assertTrue(all(unit["value"].strip() for unit in values))
+
+    def test_the_shell_translates_each_error_where_it_is_made(self):
+        for source in SHELL_SOURCES:
+            lines = source.read_text().splitlines()
+            for number, line in enumerate(lines):
+                if not re.search(r"\bactionErrorMessage\s*=[^=]", line):
+                    continue
+                # The statement: its line and the lines indented under it.
+                indent = len(line) - len(line.lstrip())
+                end = number + 1
+                while end < len(lines) and lines[end].strip() and len(lines[end]) - len(lines[end].lstrip()) > indent:
+                    end += 1
+                for offset, part in enumerate(lines[number:end]):
+                    if part.lstrip().startswith("//"):
+                        continue
+                    for literal in BARE_LITERAL.findall(part):
+                        if re.match(r'"[A-Z]', literal):
+                            with self.subTest(source=source.name, line=number + offset + 1):
+                                self.fail(f"{source.relative_to(ROOT)}:{number + offset + 1} sets an English error: {literal}")
+
+    def test_voice_and_model_page_errors_are_translated_where_they_are_made(self):
+        for source in ERROR_SOURCES:
+            for number, line in enumerate(source.read_text().splitlines(), 1):
+                if line.lstrip().startswith("//") or NOT_PLAIN_STRINGS.search(line):
+                    continue
+                for literal in BARE_LITERAL.findall(line):
+                    if SENTENCE.match(literal):
+                        with self.subTest(source=source.name, line=number):
+                            self.fail(f"{source.relative_to(ROOT)}:{number} is an English sentence in a plain String: {literal}")
 
     def test_placeholders_and_review_state(self):
         for key, entry in self.strings.items():

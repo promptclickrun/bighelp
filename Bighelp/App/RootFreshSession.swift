@@ -41,7 +41,7 @@ extension RootShellView {
             if let record = sessionCatalog.session(id: id) {
                 openSession(record.summary)
             } else {
-                actionErrorMessage = "This chat isn't available right now. Open it again from your chats."
+                actionErrorMessage = String(localized: "This chat isn't available right now. Open it again from your chats.")
             }
         }
     }

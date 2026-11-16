@@ -144,6 +144,8 @@ final class BighelpNotificationProcessor: @unchecked Sendable {
            let attached = await display.apply(to: content, categories: services.categories, download: services.download) {
             picture = attached
         }
+        // After the push's own buttons: a reply or a question takes the person's words instead.
+        await BighelpAlertReply.add(to: content, categories: services.categories)
         // A different content: until it is built, the held one stays ready to show.
         if let message = BighelpPushDisplay.communication(content, picture: picture) {
             delivery.replace(content: message)

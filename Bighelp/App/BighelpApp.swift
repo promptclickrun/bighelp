@@ -310,6 +310,8 @@ struct BighelpApp: App {
             registry: hostRegistry
         )
         _notificationComposition = State(initialValue: notificationComposition)
+        Self.configureOutsideActions(composition.shortcutService, hostRegistry: hostRegistry,
+                                     notifications: notificationComposition)
 
         let priorNativeEvent = hostRegistry.onNativeEvent
         hostRegistry.onNativeEvent = { [weak nativeWorkspaces, weak notificationComposition] host, event in
@@ -348,6 +350,9 @@ struct BighelpApp: App {
         shortcutService = composition.shortcutService
         #if DEBUG
         BighelpShortcutAskProbe.runIfRequested(composition.shortcutService)
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        IslandMomentPreview.runIfRequested()
+        #endif
         #endif
         _reflectiveVisionCamera = State(initialValue: ReflectiveVisionCamera())
         usesDemoFixtures = composition.usesDemoFixtures
@@ -434,6 +439,24 @@ struct BighelpApp: App {
         )
     }
     #endif
+
+    /// A reply typed on an alert and the island's Approve and Deny reach the computer through the
+    /// same live host as Shortcuts, so they work with Bighelp closed.
+    private static func configureOutsideActions(_ shortcuts: BighelpShortcutService, hostRegistry: BighelpHostRegistry,
+                                                notifications: BighelpManagedNotificationComposition) {
+        var actions = ChatOutsideActions(
+            connect: { try await shortcuts.connectedWorkspace() },
+            selectedHostID: { [weak hostRegistry] in hostRegistry?.selectedHostID },
+            selectHost: { id in (try? shortcuts.useGateway(id)) != nil })
+        actions.alertTarget = { [weak notifications] in notifications?.service?.outsideTarget(for: $0) }
+        actions.rowTarget = { [weak notifications] in notifications?.service?.outsideTarget(opaqueSessionID: $0) }
+        ChatOutsideActions.shared = actions
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        BighelpActivityActions.decide = { rowID, approves in
+            await ChatOutsideActions.shared?.receiveDecision(rowID: rowID, approves: approves)
+        }
+        #endif
+    }
 
     #if os(iOS)
     /// CarPlay's voice chat talks through the same live host as Shortcuts;

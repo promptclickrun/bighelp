@@ -195,28 +195,11 @@ final class LiveDeviceGeofenceSender: DeviceGeofenceMessageSending {
             throw DeviceGeofenceDeliveryError.chatGone
         }
         let agentID = workspace.catalog.session(id: chatID)?.agentIDs.first ?? place.agentID
-        let (_, chat) = try await workspace.readyChat(agentID: agentID, reusing: chatID)
-
         // Its own message, not the composer's: what the person is typing and any attachments they
         // staged stay where they are. A running turn takes it as a steer.
-        guard chat.acceptsCardReply(message) else { throw DeviceGeofenceDeliveryError.notSent }
-        let known = Set(chat.items.map(\.id))
-        var finished = false
-        Task { @MainActor in await chat.sendCardReply(message); finished = true }
-        let accepted = ContinuousClock.now + .seconds(15)
-        while ContinuousClock.now < accepted {
-            if chat.failureMessage != nil { break }
-            if chat.items.contains(where: { !known.contains($0.id) && $0.role == .human }) { break }
-            try await Task.sleep(for: .milliseconds(150))
-        }
-        guard chat.failureMessage == nil,
-              chat.items.contains(where: { !known.contains($0.id) && $0.role == .human }) else {
+        guard try await workspace.sendFromOutside(message, chatID: chatID, agentID: agentID) else {
             throw DeviceGeofenceDeliveryError.notSent
         }
-        // The host answers on its own; stay connected a little for the reply to start.
-        let grace = ContinuousClock.now + .seconds(20)
-        while !finished, ContinuousClock.now < grace { try await Task.sleep(for: .milliseconds(150)) }
-        workspace.featureStore.flushChatPersistence()
     }
 }
 

@@ -59,8 +59,8 @@ channel = 渠道, Live Activities = 实时活动, Dynamic Island = 灵动岛.
 
 ## German
 
-German (#1056) is a contribution from [@jochenvoehringer](https://github.com/jochenvoehringer): an
-AI-assisted draft of every key the catalog had, with a human spot check and an approved word list.
+German (#1056) is a contribution: an AI-assisted draft of every key the catalog had, with the
+contributor's own spot check and approved word list.
 It has not had a complete language review or a review on every screen, so every German unit stays
 `needs_review`. Keys added after the draft got German in the same way and state.
 

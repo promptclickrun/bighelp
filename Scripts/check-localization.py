@@ -95,8 +95,14 @@ ERROR_SOURCES = [
     ROOT / "Bighelp/Fleet/FleetSwitchFallback.swift",
 ]
 BARE_LITERAL = re.compile(r'(?<!localized: )"(?:[^"\\\n]|\\.)*"')
-# A sentence a person reads: a capital, more than one word, and a full stop or an ellipsis.
-SENTENCE = re.compile(r'^"(?:[A-Z]|\\\()[^"]* [^"]*[.…]"$')
+# A sentence a person reads: a capital or a name first, more than one word, and an end mark.
+SENTENCE = re.compile(r'^"(?:[A-Z]|\\\()[^"]* [^"]*[.…?!”]"$')
+# Copy starts with a capital or with a name put in (`"\(host.name) is …"`).
+STARTS_LIKE_COPY = re.compile(r'"(?:[A-Z]|\\\()')
+# `String(localized: "…")` in a scoped file; its key is the literal with each `\(…)` as an argument.
+LOCALIZED_LITERAL = re.compile(r'String\(localized: "((?:[^"\\\n]|\\.)*)"')
+INTERPOLATION = re.compile(r'\\\((?:[^()]|\([^()]*\))*\)')
+ARGUMENT = re.compile(r'%(?:\d+\$)?(?:lld|ld|llu|lu|@|d|u|f)')
 # SwiftUI translates a literal these take; a logger's line and an answer to the model are not app copy.
 NOT_PLAIN_STRINGS = re.compile(r'\b(?:Text|Label|Button|Section|Toggle|Picker|ProgressView|LabeledContent|'
                                r'accessibility\w+|navigationTitle|alert|confirmationDialog|Logger|logger|log)\(\s*"'
@@ -206,7 +212,7 @@ class LocalizationCatalogChecks(unittest.TestCase):
                     if part.lstrip().startswith("//"):
                         continue
                     for literal in BARE_LITERAL.findall(part):
-                        if re.match(r'"[A-Z]', literal):
+                        if STARTS_LIKE_COPY.match(literal):
                             with self.subTest(source=source.name, line=number + offset + 1):
                                 self.fail(f"{source.relative_to(ROOT)}:{number + offset + 1} sets an English error: {literal}")
 
@@ -219,6 +225,17 @@ class LocalizationCatalogChecks(unittest.TestCase):
                     if SENTENCE.match(literal):
                         with self.subTest(source=source.name, line=number):
                             self.fail(f"{source.relative_to(ROOT)}:{number} is an English sentence in a plain String: {literal}")
+
+    def test_every_translated_error_literal_is_in_the_catalog(self):
+        # `String(localized:)` with no catalog row is English in every language, and nothing says so.
+        # An argument's type isn't known here, so `%@` and `%lld` both stand for an argument.
+        keys = {ARGUMENT.sub("\0", key) for key in self.strings}
+        for source in [*SHELL_SOURCES, *ERROR_SOURCES]:
+            for number, line in enumerate(source.read_text().splitlines(), 1):
+                for literal in LOCALIZED_LITERAL.findall(line):
+                    key = INTERPOLATION.sub("\0", literal).replace('\\"', '"')
+                    with self.subTest(source=source.name, line=number):
+                        self.assertTrue(key in keys, f"{source.relative_to(ROOT)}:{number} has no catalog row: {literal!r}")
 
     def test_placeholders_and_review_state(self):
         for key, entry in self.strings.items():

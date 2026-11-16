@@ -4407,6 +4407,52 @@
         }
       }
     },
+    "Bighelp couldn't change this chat. Try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bighelp konnte diesen Chat nicht ändern. Versuche es erneut."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bighelp couldn't change this chat. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bighelp 无法更改这个聊天。请重试。"
+          }
+        }
+      }
+    },
+    "Bighelp couldn't open this share. Try again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bighelp konnte diesen geteilten Inhalt nicht öffnen. Versuche es erneut."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bighelp couldn't open this share. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Bighelp 无法打开这项共享内容。请重试。"
+          }
+        }
+      }
+    },
     "Bighelp couldn't reach the Bighelp plugin on your computer just now. Try again in a moment.": {
       "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
       "localizations": {
@@ -7802,6 +7848,29 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "请先连接电脑，再从“工作”中打开“工作流”。"
+          }
+        }
+      }
+    },
+    "Connect to your computer, then open this again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Verbinde Dich mit Deinem Computer und öffne dies dann erneut."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to your computer, then open this again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "请先连接到你的电脑，然后重新打开。"
           }
         }
       }
@@ -15488,7 +15557,7 @@
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "In Projekt bewegen …"
+            "value": "In Projekt verschieben …"
           }
         },
         "en": {
@@ -15511,7 +15580,7 @@
         "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "In Projekt bewegen …, aktuell in %@"
+            "value": "In Projekt verschieben …, aktuell in %@"
           }
         },
         "en": {
@@ -26973,6 +27042,29 @@
         }
       }
     },
+    "That chat isn't available now. Your share is still saved.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Dieser Chat ist gerade nicht verfügbar. Dein geteilter Inhalt ist weiterhin gesichert."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That chat isn't available now. Your share is still saved."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "那个聊天现在不可用。你共享的内容仍已保存。"
+          }
+        }
+      }
+    },
     "That computer isn't in Bighelp anymore.": {
       "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
       "localizations": {
@@ -32177,6 +32269,29 @@
         }
       }
     },
+    "You switched computers. Pick where this share goes again.": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Du hast den Computer gewechselt. Wähle erneut aus, wohin dieser geteilte Inhalt gehen soll."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You switched computers. Pick where this share goes again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你已切换电脑。请重新选择这项共享内容的去处。"
+          }
+        }
+      }
+    },
     "Your Codex account can't start live voice right now.": {
       "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
       "localizations": {
@@ -33460,6 +33575,29 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "第 %lld 步，共 %lld 步"
+          }
+        }
+      }
+    },
+    "this computer": {
+      "comment": "Simplified Chinese draft for app-written error messages (#1039); fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "diesem Computer"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "this computer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "这台电脑"
           }
         }
       }

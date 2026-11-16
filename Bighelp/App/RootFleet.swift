@@ -12,7 +12,7 @@ extension RootShellView {
     /// its Bot Chat in voice. A link naming another computer switched there first
     /// (`holdsLinkForItsComputer`). The primary bot stays who it is.
     func openIncomingAgentChat(agentID: String?, hostID: UUID?, startsVoice: Bool = false) {
-        let place = hostID.flatMap { id in fleet?.hosts.first { $0.id == id }?.name } ?? "this computer"
+        let place = hostID.flatMap { id in fleet?.hosts.first { $0.id == id }?.name } ?? String(localized: "this computer")
         Task { @MainActor in
             // Opened as the app starts: the agent list may still be on its way.
             if agents.profiles.isEmpty { try? await agents.load() }

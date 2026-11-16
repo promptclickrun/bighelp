@@ -244,7 +244,9 @@ struct AgentDriveTests {
     /// not the first gateway's agent with the same id (`default` on both).
     @Test func aDriveAfterAGatewaySwitchMovesTheGatewayOnScreen() async throws {
         let navigator = DriveNavigator()
-        let mac = DriveGateway(agentName: "Gordie"), azure = DriveGateway(agentName: "Alfie")
+        // As in the app: every gateway has its own `AppState`, and they share one `HomeSelection`.
+        let home = HomeSelection()
+        let mac = DriveGateway(agentName: "Gordie", home: home), azure = DriveGateway(agentName: "Alfie", home: home)
         let source = DriveGatewaySource(gateway: mac)
         let controller = UIHostingController(rootView: DriveGatewayHarness(source: source, navigator: navigator))
         let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
@@ -269,7 +271,9 @@ struct AgentDriveTests {
         #expect(navigator.agent?.name == "Alfie")
         try await settle { azure.appState.isSettingsPresented }
         #expect(azure.appState.isSettingsPresented)
-        #expect(!mac.appState.isSettingsPresented)
+        // Settings is one for the whole app, so the first gateway's `AppState` reads it open too. What
+        // tells the gateways apart is whose agent the drive is for, checked above.
+        #expect(!azure.appState.settingsPath.isEmpty, "The drive went on to the page it was asked for")
     }
 
     private func waitUntil(_ condition: @MainActor () -> Bool) async throws {
@@ -319,11 +323,12 @@ private final class ToolFixture {
 /// One gateway's own navigation, chats and agents, as each `NativeWorkspaceRuntime` keeps them.
 @MainActor
 private final class DriveGateway {
-    let appState = AppState()
+    let appState: AppState
     let agents: AgentDirectoryStore
     let features: ShellFeatureStore
 
-    init(agentName: String) {
+    init(agentName: String, home: HomeSelection = HomeSelection()) {
+        appState = AppState(home: home)
         var agent = AgentProfile.defaultFixture
         agent.name = agentName
         agents = AgentDirectoryStore(client: AgentDirectoryFixtureClient(profiles: [agent]), defaults: isolatedDefaults(),

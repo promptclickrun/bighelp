@@ -218,62 +218,6 @@ struct DirectHermesWorkspaceFileScope: Equatable, Sendable {
         )
     }
 
-    private func artifactEntry(_ object: [String: BighelpJSONValue]) throws -> WorkspaceFileListing.Entry {
-        guard let rawPath = object["path"]?.string,
-              let rawName = object["name"]?.string,
-              let isDirectory = object["is_directory"]?.boolean else {
-            throw WorkspaceManagementError.invalidResponse
-        }
-        let entryPath = try require(rawPath)
-        let name = try Self.pathComponent(rawName)
-        let size: Int?
-        let mimeType: String?
-        if isDirectory {
-            guard object["size"] == nil || object["size"] == .null,
-                  object["mime_type"] == nil || object["mime_type"] == .null else {
-                throw WorkspaceManagementError.invalidResponse
-            }
-            size = nil
-            mimeType = nil
-        } else {
-            guard let returnedSize = object["size"]?.integer, returnedSize >= 0,
-                  let returnedMIME = object["mime_type"]?.string else {
-                throw WorkspaceManagementError.invalidResponse
-            }
-            size = returnedSize
-            mimeType = try Self.mimeType(returnedMIME)
-        }
-        let modifiedAt: Date?
-        if object["mtime"] == nil || object["mtime"] == .null {
-            modifiedAt = nil
-        } else {
-            guard let seconds = object["mtime"]?.number, seconds.isFinite,
-                  (-62_135_596_800.0...253_402_300_799.0).contains(seconds) else {
-                throw WorkspaceManagementError.invalidResponse
-            }
-            modifiedAt = Date(timeIntervalSince1970: seconds)
-        }
-        let createdAt: Date?
-        if object["created"] == nil || object["created"] == .null {
-            createdAt = nil
-        } else {
-            guard let seconds = object["created"]?.number, seconds.isFinite,
-                  (-62_135_596_800.0...253_402_300_799.0).contains(seconds) else {
-                throw WorkspaceManagementError.invalidResponse
-            }
-            createdAt = Date(timeIntervalSince1970: seconds)
-        }
-        return .init(
-            path: entryPath,
-            name: name,
-            isDirectory: isDirectory,
-            size: size,
-            modifiedAt: modifiedAt,
-            mimeType: mimeType,
-            createdAt: createdAt
-        )
-    }
-
     private static func managedPolicy(_ payload: [String: BighelpJSONValue]) throws -> ManagedPolicy {
         if payload["can_change_path"] == .boolean(true),
            payload["root"] == .null, payload["locked_root"] == .null {

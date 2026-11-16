@@ -56,4 +56,11 @@ struct SettingsDestinationTests {
         #expect(!first.isSettingsPresented)
         #expect(first.settingsPath.isEmpty)
     }
+
+    @Test func settingsClosesWhenTheComputerChangesButNotWhileItAddsOne() {
+        #expect(SettingsOnComputerChange.closes(hadComputer: true, isAddingComputer: false), "Use this computer, or one removed")
+        #expect(!SettingsOnComputerChange.closes(hadComputer: true, isAddingComputer: true),
+                "The added computer becomes the one in use under its own sheet")
+        #expect(!SettingsOnComputerChange.closes(hadComputer: false, isAddingComputer: false), "A launch")
+    }
 }

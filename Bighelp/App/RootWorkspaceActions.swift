@@ -527,15 +527,16 @@ extension RootShellView {
                                   title: room.title, remoteSource: "hermes-room", botModeRoomID: room.id),
                     ownerIsCurrent: { currentWorkspaceOwner == owner }
                 )
-                if let firstMessage, !firstMessage.isEmpty {
-                    sessionCatalog.updateDraft(firstMessage, for: record.id)
-                    appState.sendsDraftOnOpen.insert(record.id)
-                }
+                let sendsFirstMessage = firstMessage?.isEmpty == false
+                if let firstMessage, sendsFirstMessage { sessionCatalog.updateDraft(firstMessage, for: record.id) }
                 let route = AppRoute.chat(conversationID: record.id)
                 guard featureStore.prepare(route),
                       case .chat(let model)? = featureStore.preparedModel(for: route) else {
                     throw WorkspaceClientError.unavailable(.unsupportedOperation)
                 }
+                // Only once the chat can show: a group chat that didn't open keeps the text in its
+                // box, and must not send it by itself when the person opens it later.
+                if sendsFirstMessage { appState.sendsDraftOnOpen.insert(record.id) }
                 if settings {
                     appState.open(.groupSettings(roomID: room.id, conversationID: model.conversationID))
                     opened?(nil)

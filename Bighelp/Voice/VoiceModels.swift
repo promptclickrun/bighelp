@@ -81,7 +81,19 @@ enum VoiceViewPresentation {
     static let statusVerticalPadding: CGFloat = 8
     static let controlMinimumHeight: CGFloat = 64
     static let controlIconDiameter: CGFloat = 52
+    /// The words never get less than this: about two lines.
     static let transcriptMinimumHeight: CGFloat = 64
+
+    /// A stage that is wide and short (a phone on its side) puts the face beside the words. Under the
+    /// face, the bars, the step line and the Transcript button took all of it and the words had none.
+    static func stageIsSideways(_ stage: CGSize) -> Bool {
+        stage.width > stage.height && stage.height < 360
+    }
+
+    /// The face beside the words: as tall as the stage allows over its bars.
+    static func sidewaysAvatarSize(stageHeight: CGFloat) -> CGFloat {
+        min(140, max(56, stageHeight - 76))
+    }
 }
 
 struct VoiceInputLevelSmoother: Sendable {

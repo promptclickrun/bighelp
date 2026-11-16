@@ -130,18 +130,20 @@ struct VoiceView: View {
             GeometryReader { proxy in
                 // The face and its voice together, then the words: what the agent is
                 // doing, and what's being said, in full. Only the words scroll.
-                VStack(spacing: BighelpTokens.space16) {
-                    VStack(spacing: BighelpTokens.space16) {
-                        orb(size: stageAvatarSize(height: proxy.size.height))
-                        VoiceWaveformBars(level: waveformLevel, color: agentPersona.color)
+                Group {
+                    if VoiceViewPresentation.stageIsSideways(proxy.size) {
+                        // A phone on its side: under the face there was no room left for the words.
+                        HStack(spacing: BighelpTokens.space20) {
+                            face(size: VoiceViewPresentation.sidewaysAvatarSize(stageHeight: proxy.size.height))
+                            VStack(spacing: BighelpTokens.space8) { wordsAndTheirControls }
+                        }
+                    } else {
+                        VStack(spacing: BighelpTokens.space16) {
+                            face(size: stageAvatarSize(height: proxy.size.height))
+                                .padding(.top, BighelpTokens.space16)
+                            wordsAndTheirControls
+                        }
                     }
-                    .padding(.top, BighelpTokens.space16)
-                    VoiceStepLine(step: chatStep)
-                    words
-                    sendNowControl
-                    endFailure
-                    permissionRecovery
-                    transcriptToggle
                 }
                 .padding(.horizontal, BighelpTokens.space20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -156,6 +158,23 @@ struct VoiceView: View {
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("voice.controls")
         }
+    }
+
+    private func face(size: CGFloat) -> some View {
+        VStack(spacing: BighelpTokens.space16) {
+            orb(size: size)
+            VoiceWaveformBars(level: waveformLevel, color: agentPersona.color)
+        }
+    }
+
+    @ViewBuilder
+    private var wordsAndTheirControls: some View {
+        VoiceStepLine(step: chatStep)
+        words
+        sendNowControl
+        endFailure
+        permissionRecovery
+        transcriptToggle
     }
 
     /// The avatar owns the stage, but leaves the words room to read: a short screen
@@ -186,7 +205,7 @@ struct VoiceView: View {
                                        .init(color: .black, location: 0.93), .init(color: .clear, location: 1)],
                                startPoint: .top, endPoint: .bottom)
             }
-            .frame(maxHeight: .infinity)
+            .frame(minHeight: VoiceViewPresentation.transcriptMinimumHeight, maxHeight: .infinity)
             .onChange(of: model.liveAgentTranscript) { _, draft in
                 guard draft?.isEmpty == false, !isTranscriptExpanded else { return }
                 withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { reader.scrollTo(Self.wordsBottom, anchor: .bottom) }

@@ -130,7 +130,8 @@ struct VoiceModelTests {
         )
         let controller = UIHostingController(rootView: VoiceView(
             model: model,
-            transcriptRows: rows
+            transcriptRows: rows,
+            showsTranscript: true
         ).environment(\.dynamicTypeSize, .accessibility3))
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 844, height: 390))
         window.rootViewController = controller
@@ -149,6 +150,35 @@ struct VoiceModelTests {
         #expect(transcript.bounds.height >= VoiceViewPresentation.transcriptMinimumHeight)
         #expect(transcript.contentSize.height > transcript.bounds.height)
         #expect(transcriptFrame.maxY <= window.bounds.maxY - VoiceViewPresentation.controlMinimumHeight)
+    }
+
+    /// A phone on its side at the usual text size: the words had no room at all under the face.
+    @Test func theWordsHaveRoomBesideTheFaceOnAPhoneOnItsSide() async throws {
+        let model = VoiceModel(
+            conversationID: "voice-sideways-session",
+            client: VoiceFixtureClient(confirmationDelay: .zero),
+            inputLevelSource: ControlledVoiceInputLevelSource()
+        )
+        let controller = UIHostingController(rootView: VoiceView(model: model, transcriptRows: []))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 844, height: 390))
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+
+        controller.view.frame = window.bounds
+        controller.view.layoutIfNeeded()
+        await Task.yield()
+        controller.view.layoutIfNeeded()
+
+        let words = try #require(controller.view.descendants(of: UIScrollView.self).first)
+        let frame = words.convert(words.bounds, to: window)
+        #expect(words.bounds.height >= VoiceViewPresentation.transcriptMinimumHeight)
+        #expect(frame.maxY <= window.bounds.maxY - VoiceViewPresentation.controlMinimumHeight)
+        // Beside the face, not across the screen under it.
+        #expect(frame.minX > 120)
+        #expect(VoiceViewPresentation.stageIsSideways(CGSize(width: 844, height: 240)))
+        #expect(!VoiceViewPresentation.stageIsSideways(CGSize(width: 390, height: 640)), "Upright keeps the face over the words")
+        #expect(!VoiceViewPresentation.stageIsSideways(CGSize(width: 1_180, height: 600)), "So does an iPad on its side")
     }
 
     @Test func audioAndMicrophoneMuteIndependently() {

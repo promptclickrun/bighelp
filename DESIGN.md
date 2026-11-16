@@ -141,7 +141,7 @@ of its own. The root's edge-swipe zones start below that row, so its corner butt
 
 **Bots** is one row per bot and group chat (Bots view, below). **Chats** is every chat on every computer in one list,
 newest first, Pinned on top, then Today, Yesterday and Earlier, with search over it and one row of chips: All, Unread
-and, with two or more computers, one for each. Touch and hold a chat for Pin, Mark read or unread, Rename and
+and, with two or more computers, one for each. Touch and hold a chat for Pin, Mark read or unread, Rename, Move to Project… and
 Archive; only the computer in use's chats pin or mark read, while another computer's rename and archive. A chat with
 something new since it was last read has a bold title and a dot after its time, and a chat whose message box holds
 an unsent message shows Draft before its preview. Chats › This computer opens that computer's own Sessions page:
@@ -149,7 +149,9 @@ its projects, imports from other apps and one bot's chats. There, with Settings 
 (on by default, saved on each device), a chat in a project shows the project's name on a line of its own under the
 preview, never beside it, so the preview stays whole at large text; a list grouped by project leaves it out. The
 row's menu shows the chat's project beside Move to Project…, and the move sheet lists that project first, then the
-rest by name. Projects sorts by Recently used or Name, saved on the device. Where the computer keeps read state, the
+rest by name. The Chats view follows the same switch: a chat on the computer in use shows its project on a line of
+its own under the preview, and its hold menu has the same Move to Project…. Another computer's chat shows no
+project, because its copy on the phone carries none. Projects sorts by Recently used or Name, saved on the device. Where the computer keeps read state, the
 row's menu and leading swipe have Mark Read and Mark Unread.
 
 **Today** is a grid of panels under the header: Needs you on top while something waits (a card with the count and the
@@ -492,8 +494,9 @@ info), Agent (New Bot Chat, Bot page) and More (File changes, Usage and Advanced
 sizes, Advanced also groups its visibility switches under Display, and secondary summaries are left out and labels
 shortened.
 
-Move to Project… (`MoveChatToProjectSheet`) also sits in a chat's hold menu on a computer's Sessions page,
-wherever the computer can move chats (`sessionWorkspaceEdit`). It lists the agent's
+Move to Project… (`MoveChatToProjectSheet`) also sits in a chat's hold menu on the Chats view and on a
+computer's Sessions page, wherever the computer can move chats (`sessionWorkspaceEdit`). On the Chats view it is
+there for one bot's chat on the computer in use. It lists the agent's
 projects with a tick on the chat's own, and moves the chat only once Hermes confirms it; then Chats, the open
 chat and File changes show the new project. Chats have no backgrounds of their own: Settings › Appearance sets the
 look of every screen.

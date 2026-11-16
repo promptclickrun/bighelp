@@ -16,6 +16,10 @@ HOME and HERMES_HOME, then runs the matching HostSignInMatrixUITests:
   features  no sign-in, with the bighelp plugin (--plugin) and a seeded board:
             Feed/Ideas/Goals feedback and Projects (ProjectsAndBoardHostUITests),
             and the Apps tab's files with no terminal.cwd set
+  reconnect no sign-in, with the bighelp plugin (--plugin): Kanban, Workflows and Usage each
+            stay on screen while the app is away long enough for its connection to close,
+            and each takes a change after the app comes back. Usage opens by its link with the
+            app closed first (ReconnectedPagesHostUITests; about a minute of waiting a test)
   update    no sign-in, with an older plugin release installed by Hermes' own
             installer from GitHub: the app finds the latest GitHub Release and
             updates to it (PluginReleaseUpdateHostUITests; needs the internet)
@@ -97,6 +101,9 @@ TESTS = {
     "features": ["ProjectsAndBoardHostUITests/testBoardFeedbackAndProjectsOnARealHost",
                  "ProjectsAndBoardHostUITests/testAppsShowsTheAgentsFilesWithNoWorkingFolderSet",
                  "ProviderUsageHostUITests/testUsageLoadsFromTheChatTheAppOpensWith"],
+    "reconnect": ["ReconnectedPagesHostUITests/testKanbanTakesANewTaskAfterAReconnect",
+                  "ReconnectedPagesHostUITests/testWorkflowsTakesANewWorkflowAfterAReconnect",
+                  "ReconnectedPagesHostUITests/testUsageOpenedByItsLinkLoadsAndReadsAgainAfterAReconnect"],
     "update": ["PluginReleaseUpdateHostUITests/testUpdatesToTheLatestReleaseOnARealHost"],
     "fleet": ["ShortcutGatewaySwitchHostUITests/testAskAnAgentSwitchesToItsGatewayAndGetsTheAnswer"],
     "drafts": ["ImageDraftsHostUITests/testAContactDraftFromAPhotoSavesOnceAndTheAgentHearsIt",
@@ -922,14 +929,14 @@ def run_mode(mode: str, args, repo: Path) -> int:
         # app on that same name, since the sign-in cookie belongs to it.
         public = f"http://127.0.0.1:{proxy.port}" if proxy \
             else origin if mode in ("open", "tools", "widgets", "features", "update", "media", "drafts", "apps",
-                                    "bigfiles", "device") \
+                                    "bigfiles", "device", "reconnect") \
             else f"http://hermes.localhost:{port}"
         config = {"dashboard": {"public_url": public},
                   "model": {"default": "fixture-model", "provider": "custom",
                             "base_url": f"http://127.0.0.1:{model.server_port}/v1", "api_key": "local-synthetic-no-auth"},
                   "agent": {"max_turns": 3}, "terminal": {"backend": "local", "cwd": str(project)},
                   "memory": {"memory_enabled": False, "user_profile_enabled": False}}
-        if mode in ("tools", "features", "media", "drafts", "apps", "bigfiles", "device"):
+        if mode in ("tools", "features", "media", "drafts", "apps", "bigfiles", "device", "reconnect"):
             if not args.plugin:
                 raise SystemExit(f"{mode} mode needs --plugin <bighelp plugin folder>")
             shutil.copytree(args.plugin, home / "plugins" / "loopdy",

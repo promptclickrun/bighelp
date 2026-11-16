@@ -73,5 +73,25 @@ extension RootShellView {
     var usageDestination: some View {
         UsageView(store: usage, providerUsage: providerUsage.isAvailable ? providerUsage : nil,
                   selectedHostID: usageHostID, selectedHostName: workspaceHostName)
+            // The page sets up its own two stores, as the board pages do (#987, #1042). The root's
+            // tasks wait while a page covers the root, and Usage opens from its link before the
+            // sign-in is known (a Usage widget tapped with Bighelp closed). The root had then set the
+            // stores up with no sign-in, and Usage said "Connect to a computer" until you left it.
+            .task(id: usageReaderKey) { await setUpUsagePage(usageReaderKey) }
+            .task(id: providerUsageKey) { await setUpUsagePlans(providerUsageKey) }
+    }
+
+    /// The same setup the root does. A store that had nothing to read from until now is read at
+    /// once: the page's own first read came before it and found no computer.
+    private func setUpUsagePage(_ key: UsageReaderKey) async {
+        let couldRead = usage.isAvailable
+        configureUsage(key)
+        if !couldRead, usage.isAvailable { await usage.load(refresh: false) }
+    }
+
+    private func setUpUsagePlans(_ key: ProviderUsageKey) async {
+        let couldRead = providerUsage.isAvailable
+        configureProviderUsage(key)
+        if !couldRead, providerUsage.isAvailable, providerUsage.report == nil { await providerUsage.load(refresh: false) }
     }
 }

@@ -769,7 +769,12 @@ Code mode.
 - **Environment doesn't reach pushed screens:** values set on `RootShellView` or the NavigationStack root don't
   reach pushed screens (chats from `navigationDestination`, Settings `NavigationLink`s). Pass them at the push site.
 - **Root `.task(id:)` pauses:** it doesn't restart while a chat covers the root. Connection upkeep lives in
-  `WorkspaceConnectionKeeper`, injected per chat route.
+  `WorkspaceConnectionKeeper`, injected per chat route. A pushed page whose stores the root sets up needs one of
+  two things (#987, #1042). Its client takes the connection in use at each request (Kanban's
+  `LiveKanbanService`, Workflows' and Usage's `currentWorkspace` closures: `ReconnectedPagesTests`), so a
+  reconnect needs no setup. Or the page runs the setup itself: the board pages (`configureShellBoard`) and
+  Usage (`usageDestination`), which opens from its link before the sign-in is known and then said "Connect to
+  a computer" until you left it. `ReconnectedPagesHostUITests` checks all three pages on a real computer.
 - **`@ObservationIgnored` never refreshes views:** if a menu depends on something like "is a client configured",
   expose an observed flag.
 - **A `.sheet` on `EmptyView()` never presents:** hang sheets on

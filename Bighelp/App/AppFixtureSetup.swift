@@ -82,6 +82,8 @@ enum AppFixtureSetup {
         if usesFixtures, arguments.contains("-test-card-replies"),
            let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {
             initialSessions[index] = ConversationFixtures.cardRepliesPreview
+            // Each run starts with the cards unanswered: an answer sent in an earlier run would show them as Sent.
+            BighelpCardInteractionStore.eraseAll()
         }
         if usesFixtures, arguments.contains("-test-weather-cards"),
            let index = initialSessions.firstIndex(where: { $0.id == "demo-finance" }) {

@@ -984,6 +984,8 @@ struct ChatModelTests {
         #expect(generation.isCurrent(newestRequest))
     }
 
+    /// The box grows to four lines and then scrolls. Expand shows from three lines (#728), on every
+    /// width: this test still had the rule from before that, "only past the four lines".
     @Test func regularWidthDraftUsesTheSameFourLineViewportAndExpansionThreshold() {
         #expect(
             DraftFieldSizing.height(
@@ -991,20 +993,11 @@ struct ChatModelTests {
                 lineHeight: 20
             ) == 80
         )
-        #expect(
-            !DraftFieldSizing.shouldOfferExpandedEditor(
-                hasText: true,
-                measuredHeight: 80,
-                lineHeight: 20
-            )
-        )
-        #expect(
-            DraftFieldSizing.shouldOfferExpandedEditor(
-                hasText: true,
-                measuredHeight: 81,
-                lineHeight: 20
-            )
-        )
+        #expect(DraftFieldSizing.expandLines == 3)
+        #expect(!DraftFieldSizing.shouldOfferExpandedEditor(hasText: true, measuredHeight: 40, lineHeight: 20))
+        #expect(DraftFieldSizing.shouldOfferExpandedEditor(hasText: true, measuredHeight: 60, lineHeight: 20))
+        #expect(DraftFieldSizing.shouldOfferExpandedEditor(hasText: true, measuredHeight: 81, lineHeight: 20))
+        #expect(!DraftFieldSizing.shouldOfferExpandedEditor(hasText: false, measuredHeight: 81, lineHeight: 20))
     }
 
     @Test func draftCaretSelectionClampsSelectionRetainedFromAnOlderTextValue() {
@@ -3438,7 +3431,8 @@ struct ChatModelTests {
         #expect(rows == [
             "message:session_fixture_0001-human-1",
             "message:message_streaming_draft_0001",
-            "activity:tool_event_order_0001",
+            // The thinking and the tool call that follow the first words are one folder, in the order they came.
+            "activity:reasoning_event_order_0001,tool_event_order_0001",
             "message:message_streaming_final_0001",
         ])
     }

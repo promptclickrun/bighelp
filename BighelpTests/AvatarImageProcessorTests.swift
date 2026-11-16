@@ -135,7 +135,7 @@ struct AvatarImageProcessorTests {
         #expect(throws: BighelpLocalPersistenceError.protectedDataUnavailable) {
             try processor.store(avatar, in: directory)
         }
-        #expect(!FileManager.default.fileExists(atPath: directory.path()))
+        #expect(!FileManager.default.fileExists(atPath: directory.path(percentEncoded: false)))
     }
 }
 

@@ -12,7 +12,7 @@ CATALOG = ROOT / "Bighelp/Resources/Localizable.xcstrings"
 # Representative boundaries; this is intentionally not a whole-app coverage claim.
 REQUIRED = {
     "Your bots, right at home.", "Get Started", "Connect your computer",
-    "Add the bighelp plugin", "Use %@", "Chat", "Feed",
+    "Add the Bighelp plugin", "Use %@", "Chat", "Feed",
     "Ideas", "Goals", "Files", "Agents", "Settings", "New chat", "Send message",
     "Stop response", "Message %@", "Ask %@", "Appearance", "Your name", "Done",
     "Advanced options", "Default model", "AI providers", "Help & feedback",

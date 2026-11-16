@@ -200,7 +200,7 @@ Retrieved and re-verified 2026-08-31. Provider names and marks remain trademarks
 ## License notices
 
 - Bundled notices filename: `ProviderLogos-NOTICES.txt`
-- Bundled notices SHA-256: `2fb63da38899b340d442ec77135cc2e89ad156baf694bfa853a05c627ad0b17d`
+- Bundled notices SHA-256: `62ebeddb018667e4dc776ab96d12f433d42464623c4eef025826608148210162`
 - OpenRouter license source: `OpenRouterTeam/sign-in-with-openrouter/LICENSE` at commit `872aaa56b2df753b6ff3812f71a6964870e2ff30`
 - OpenRouter license SHA-256: `a9578921a6dc44cfe53b45131fe08ad522e1da416d7eb98ad92472c370da2ccf`
 - Notice content: the pinned OpenRouter MIT license file is reproduced verbatim in the bundled notices resource; the GitHub Invertocat is supplied under GitHub's trademark guidelines rather than the removed Primer Octicons MIT source.

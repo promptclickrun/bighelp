@@ -37,14 +37,16 @@ final class ProviderUsageHostUITests: BighelpUITestCase {
     @MainActor private func expectUsage(in app: XCUIApplication, _ name: String) throws {
         let options = app.buttons["chat.options"].firstMatch
         XCTAssertTrue(options.waitForExistence(timeout: 15))
-        let usage = app.buttons["chat.provider-usage"].firstMatch
+        // The entry the helper found is the one to tap: a menu item answers to its title, not its id.
+        var found: XCUIElement?
         let deadline = Date().addingTimeInterval(30)
         repeat {
-            if chatMenuItem("chat.provider-usage", in: app, timeout: 3).exists { break }
+            let item = chatMenuItem("chat.provider-usage", in: app, timeout: 3)
+            if item.exists { found = item; break }
             app.tap() // close the menu; the entry shows once the host connects
         } while Date() < deadline
         save("\(name)-menu", app)
-        XCTAssertTrue(usage.exists, "Usage is in the chat's ⋯ menu (\(name))")
+        let usage = try XCTUnwrap(found, "Usage is in the chat's ⋯ menu (\(name))")
         usage.tap()
         XCTAssertTrue(app.descendants(matching: .any)["usage"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["provider-usage"].waitForExistence(timeout: 10))

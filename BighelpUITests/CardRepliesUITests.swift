@@ -99,7 +99,17 @@ final class CardRepliesUITests: BighelpUITestCase {
         travelers("2").tap()
         travelers("2").typeText(XCUIKeyboardKey.delete.rawValue + "12")
         let sendForm = app.buttons["chat.generative-ui.form.send"]
-        for _ in 0..<4 where !(sendForm.exists && sendForm.isHittable) { app.swipeUp() }
+        // The number pad has no Return and stays up. Send is under it until the form scrolls: a
+        // few points of it showing below the keys count as hittable, and a tap there does nothing.
+        func revealSend() {
+            for _ in 0..<6 {
+                let keyboard = app.keyboards.firstMatch
+                let floor = keyboard.exists ? keyboard.frame.minY : app.frame.maxY
+                if sendForm.exists, sendForm.frame.maxY <= floor - 8 { return }
+                app.swipeUp()
+            }
+        }
+        revealSend()
         XCTAssertTrue(app.staticTexts["Up to 300 characters"].exists)
         sendForm.tap()
 
@@ -111,7 +121,7 @@ final class CardRepliesUITests: BighelpUITestCase {
         for _ in 0..<4 where !travelers("12").isHittable { app.swipeDown() }
         travelers("12").tap()
         travelers("12").typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 2) + "3")
-        for _ in 0..<4 where !(sendForm.exists && sendForm.isHittable) { app.swipeUp() }
+        revealSend()
         sendForm.tap()
 
         let answers = app.textViews.matching(NSPredicate(format: "value BEGINSWITH %@", "My answers to “Trip details”")).firstMatch

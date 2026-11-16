@@ -415,7 +415,7 @@ struct NewChatCoordinatorTests {
         #expect(outcome == .opened(sessionID: "session-1", agentID: "default"))
         #expect(workspaces.workspaceID(forSessionID: "session-1") == "loopdy")
         #expect(catalog.session(id: "session-1")?.workspaceID == "loopdy")
-        #expect(catalog.session(id: "session-1")?.workspaceName == "bighelp")
+        #expect(catalog.session(id: "session-1")?.workspaceName == "Bighelp")
     }
 
     @Test func newChatCreatesLocalCanvasBeforeLoadingAndBindingProjectCatalog() async throws {

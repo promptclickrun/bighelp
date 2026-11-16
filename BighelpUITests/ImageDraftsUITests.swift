@@ -105,6 +105,9 @@ final class ImageDraftsUITests: BighelpUITestCase {
         reveal(app.buttons["image-draft.card.review.business_card"].firstMatch, in: app).tap()
         let title = app.textFields["image-draft.field.job_title"].firstMatch
         XCTAssertTrue(title.waitForExistence(timeout: 5))
+        // The field starts under the bar with Discard and Save, where a tap reaches the bar.
+        let bar = app.buttons["image-draft.review.discard"].firstMatch
+        for _ in 0..<6 where title.frame.maxY > bar.frame.minY - 8 { app.swipeUp(velocity: .slow) }
         title.tap()
         title.typeText(" (kept)")
         dismissKeyboard(in: app)

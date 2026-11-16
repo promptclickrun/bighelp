@@ -325,6 +325,44 @@ describe("a chat's moment on the shared card", () => {
     await expect(f.register(2)).rejects.toThrow();
   });
 
+  it("still ends the card after the finished chat's own activity is closed, as the update route closes it", async () => {
+    const f = await fixture("on");
+    await f.addTarget(f.groupId);
+    const a = await f.register(1);
+    await f.send(a, "thinking");
+    await f.send(a, "completed");
+    // The route marks a finished chat's activity ended as soon as its update is sent.
+    await runInDurableObject<UserLink, void>(f.stub, (_instance, state) => {
+      state.storage.sql.exec("UPDATE managed_notification_activities SET status='ended' WHERE activity_id=?",
+        a.activity.activityId);
+    });
+    const before = sent.length;
+    await runAlarmAfterWait(f.stub);
+    expect(sent.length).toBe(before + 1);
+    expect(apsOf(before).event).toBe("end");
+  });
+
+  it("keeps the moment for a host's retry when the first try never reached a push", async () => {
+    const f = await fixture("on");
+    await f.addTarget(f.groupId);
+    const a = await f.register(1);
+    await f.send(a, "thinking");
+    const timestamp = now() + 5;
+    const state = { id: a.activity.rowId!, phase: "completed", timestamp, activeSubagentCount: 0 };
+    // The first try stored the row and then failed before any push was reserved.
+    await runInDurableObject<UserLink, void>(f.stub, (instance) => {
+      (instance as unknown as { notificationState: { updateActivityGroup(id: string, row: unknown, credential: string): unknown } })
+        .notificationState.updateActivityGroup(a.activity.activityId, state, f.credentialId);
+    });
+    const before = sent.length;
+    await f.send(a, "completed", { timestamp });
+    // The retry is still news: the island opens, and the card stays for the wait.
+    expect(apsOf(before).event).toBe("update");
+    expect(apsOf(before).alert).toEqual(activityMomentAlert("completed"));
+    await f.send(a, "completed", { timestamp });
+    expect(apsOf(before + 1)).not.toHaveProperty("alert");
+  });
+
   it("does not end the card when a chat started working before the wait was over", async () => {
     const f = await fixture("on");
     await f.addTarget(f.groupId);

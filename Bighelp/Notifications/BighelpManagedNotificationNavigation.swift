@@ -17,7 +17,11 @@ extension BighelpManagedNotificationService {
     @MainActor
     func outsideTarget(for open: BighelpProactiveNotificationOpen) -> ChatOutsideTarget? {
         guard let type = open.eventType, let reference = open.sessionReference, let profile = open.agentID,
-              let host = host(forEvent: open.eventID, eventType: type) else { return nil }
+              let host = host(forEvent: open.eventID, eventType: type),
+              // The agent is the one this phone set alerts up for, not only the one the push names.
+              ledger.enrollments.contains(where: {
+                  $0.enabled && !$0.revokePending && $0.grant?.grantId == open.hostGrantID && $0.profile == profile
+              }) else { return nil }
         return ChatOutsideTarget(hostID: host.id, profileID: profile, chat: .reference(reference))
     }
 

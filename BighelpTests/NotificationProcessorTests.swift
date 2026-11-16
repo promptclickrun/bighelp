@@ -174,11 +174,20 @@ import UserNotifications
         #expect(content.title == plaintext.title)
         #expect(content.body == plaintext.body)
         #expect(content.attachments.map(\.identifier) == ["bk.image"])
-        // A reply about one chat takes the person's words (#1051), in place of the buttons its push brought.
-        #expect(content.categoryIdentifier == BighelpAlertReply.replyCategory, "Its field is registered after the opening")
+        #expect(content.categoryIdentifier == "BIGHELP_UPDATE", "Its buttons are registered after the opening")
+        #expect(fakes.clearedEvents.count == 1)
+    }
+
+    /// A reply about one saved chat takes the person's words (#1051), in place of the buttons its push brought.
+    @Test func aSealedReplyAboutAChatGetsATextField() async throws {
+        let (info, plaintext) = try Self.sealedPush()
+        let fakes = Fakes()
+        fakes.opened = plaintext
+        let (_, delivered) = run(fakes, Self.request(info, thread: String(repeating: "A", count: 43)))
+        let content = try #require(await delivered.settled().first)
+        #expect(content.categoryIdentifier == BighelpAlertReply.replyCategory)
         let registered = await fakes.categories.categories()
         #expect(registered.contains { $0.identifier == BighelpAlertReply.replyCategory })
-        #expect(fakes.clearedEvents.count == 1)
     }
 
     @Test func aSealedAlertShownLiveByTheAppIsQuiet() async throws {

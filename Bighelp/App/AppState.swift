@@ -329,6 +329,6 @@ enum ChatReplyRequest {
     static func take(at date: Date = .now) -> Bool {
         defer { notedAt = nil }
         guard let notedAt else { return false }
-        return date.timeIntervalSince(notedAt) >= 0 && date.timeIntervalSince(notedAt) < 20
+        return date.timeIntervalSince(notedAt) >= 0 && date.timeIntervalSince(notedAt) < 10
     }
 }

@@ -16,7 +16,7 @@ struct AlertReplyCategoryTests {
     private let reference = String(repeating: "r", count: 43)
 
     private func userInfo(_ eventType: String, reference: String? = nil) -> [AnyHashable: Any] {
-        var loopdy: [String: Any] = ["version": 2, "eventType": eventType]
+        var loopdy: [String: Any] = ["version": 2, "eventType": eventType, "grantId": "grant-1", "eventId": "grant-1:event"]
         if let reference { loopdy["sessionReference"] = reference }
         return ["loopdy": loopdy]
     }
@@ -26,8 +26,11 @@ struct AlertReplyCategoryTests {
         #expect(BighelpAlertReply.categoryID(for: userInfo("clarification.required", reference: reference)) == "BIGHELP_ANSWER")
         #expect(BighelpAlertReply.categoryID(for: userInfo("approval.required", reference: reference)) == nil)
         #expect(BighelpAlertReply.categoryID(for: userInfo("scheduled.completed", reference: reference)) == nil)
-        // An alert that names no chat has nowhere to send words.
+        // An alert that names no chat has nowhere to send words, and a name that is no chat reference
+        // (an alert's stack) is not one the app could find.
         #expect(BighelpAlertReply.categoryID(for: userInfo("session.completed")) == nil)
+        #expect(BighelpAlertReply.categoryID(for: userInfo("session.completed", reference: "scout")) == nil)
+        #expect(BighelpAlertReply.categoryID(for: ["loopdy": ["eventType": "session.completed", "sessionReference": reference]]) == nil)
         #expect(BighelpAlertReply.categoryID(for: [:]) == nil)
     }
 
@@ -85,21 +88,31 @@ struct AlertReplyTests {
 
     @Test func aYesGoesOnlyToTheOneShortCommandThatWaitsInTheChat() throws {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let shown = "rm -rf build/cache"
         let mine = approval("a1", chat: "chat-1")
         let elsewhere = approval("a2", chat: "chat-2")
-        #expect(try ChatOutsidePrompt.approval(in: [elsewhere, mine], chatID: "chat-1", decision: .once, now: now).get().id == "a1")
-        #expect(ChatOutsidePrompt.approval(in: [elsewhere], chatID: "chat-1", decision: .once, now: now) == .failure(.nothingWaits))
-        #expect(ChatOutsidePrompt.approval(in: [approval("old", chat: "chat-1", expires: now)], chatID: "chat-1", decision: .once, now: now)
-                == .failure(.nothingWaits))
+        func pick(_ items: [DashboardAttentionItem], _ decision: ApprovalDecision = .once, shown: String = shown)
+            -> Result<DashboardAttentionItem, ChatOutsideFailure> {
+            ChatOutsidePrompt.approval(in: items, chatID: "chat-1", decision: decision, shown: shown, now: now)
+        }
+        #expect(try pick([elsewhere, mine]).get().id == "a1")
+        #expect(try pick([approval("a0", chat: "chat-1", command: "  rm -rf build/cache\n")]).get().id == "a0")
+        #expect(pick([elsewhere]) == .failure(.nothingWaits))
+        #expect(pick([approval("old", chat: "chat-1", expires: now)]) == .failure(.nothingWaits))
         // Two requests: a yes on the island could be for either.
-        #expect(ChatOutsidePrompt.approval(in: [mine, approval("a3", chat: "chat-1")], chatID: "chat-1", decision: .once, now: now)
-                == .failure(.mustReview))
-        // A command longer than the island shows whole is read in the app; a no needs no reading.
-        let long = approval("a4", chat: "chat-1", command: String(repeating: "x", count: BighelpIslandMoment.wholeCommandCharacters + 1))
-        #expect(ChatOutsidePrompt.approval(in: [long], chatID: "chat-1", decision: .once, now: now) == .failure(.mustReview))
-        #expect(try ChatOutsidePrompt.approval(in: [long], chatID: "chat-1", decision: .deny, now: now).get().id == "a4")
-        #expect(ChatOutsidePrompt.approval(in: [approval("a5", chat: "chat-1", allowed: [.deny])], chatID: "chat-1", decision: .once, now: now)
-                == .failure(.mustReview))
+        #expect(pick([mine, approval("a3", chat: "chat-1")]) == .failure(.mustReview))
+        #expect(pick([approval("a5", chat: "chat-1", allowed: [.deny])]) == .failure(.mustReview))
+        // The island can stay up for minutes. If the bot asks for something else by then, a tap on the
+        // old buttons answers nothing: not a yes, and not a no either.
+        let next = approval("a6", chat: "chat-1", command: "git push --force")
+        #expect(pick([next]) == .failure(.mustReview))
+        #expect(pick([next], .deny) == .failure(.mustReview))
+        #expect(pick([approval("a7", chat: "chat-1", command: "Approval requested")]) == .failure(.mustReview))
+        #expect(pick([mine], shown: "") == .failure(.mustReview))
+        // A command longer than the island shows whole is read in the app, whatever the island said.
+        let long = String(repeating: "x", count: BighelpIslandMoment.wholeCommandCharacters + 1)
+        #expect(pick([approval("a4", chat: "chat-1", command: long)], shown: long) == .failure(.mustReview))
+        #expect(try pick([mine], .deny).get().id == "a1")
     }
 
     @Test func typedWordsAnswerAQuestionOnlyWhenWordsCanAnswerIt() throws {
@@ -123,6 +136,7 @@ struct AlertReplyTests {
         actions.appIsActive = { appIsActive }
         actions.alertTarget = { _ in target }
         actions.rowTarget = { _ in target }
+        actions.limit = .seconds(5)
         actions.notify = { failure, text, _, _ in log.notices.append((failure, text)) }
         return actions
     }
@@ -156,12 +170,25 @@ struct AlertReplyTests {
         #expect(log.notices.first?.1 == "On my way")
     }
 
+    @Test func workThatOutlastsTheTimeIosGivesIsStoppedAndSaid() async {
+        let here = UUID(), log = Log()
+        var slow = actions(selected: here, appIsActive: false,
+                           target: ChatOutsideTarget(hostID: here, profileID: "scout", chat: .reference(reference)), log: log)
+        slow.connect = { try await Task.sleep(for: .seconds(30)); throw BighelpShortcutServiceError.connectionUnavailable }
+        slow.limit = .milliseconds(200)
+        let started = ContinuousClock.now
+        await slow.receiveReply("Hello", alert: alert, agentName: "Scout", thread: "scout")
+        #expect(ContinuousClock.now - started < .seconds(5))
+        #expect(log.notices.map(\.0) == [.notSent])
+        #expect(log.notices.first?.1 == "Hello")
+    }
+
     @Test func anAlertThatNamesNoChatAndEmptyWordsSendNothing() async {
         let here = UUID(), log = Log()
         let none = actions(selected: here, appIsActive: false, target: nil, log: log)
         await none.receiveReply("Hello", alert: alert, agentName: nil, thread: "scout")
         await none.receiveReply("   ", alert: alert, agentName: nil, thread: "scout")
-        await none.receiveDecision(rowID: "native-row", approves: true)
+        await none.receiveDecision(rowID: "native-row", approves: true, command: "rm -rf build/cache")
         #expect(log.connects == 0)
         #expect(log.notices.map(\.0) == [.chatGone, .chatGone])
         #expect(ChatOutsideNotice.body(for: .notSent, text: "Hello").contains("“Hello”"))

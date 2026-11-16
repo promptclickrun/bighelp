@@ -16,8 +16,12 @@ enum BighelpAlertReply {
 
     /// The category for an alert of this kind about one saved chat, or nil when it takes no words.
     static func categoryID(for userInfo: [AnyHashable: Any]) -> String? {
+        // As the app reads an alert's chat (`BighelpProactiveNotificationOpen`): a grant, an event and a
+        // chat reference. Without them the app could not find the chat, and the field would only fail.
         guard let loopdy = userInfo["loopdy"] as? [String: Any],
-              let reference = loopdy["sessionReference"] as? String, !reference.isEmpty else { return nil }
+              loopdy["grantId"] is String, loopdy["eventId"] is String,
+              let reference = loopdy["sessionReference"] as? String,
+              reference.range(of: "^[A-Za-z0-9_-]{43}$", options: .regularExpression) != nil else { return nil }
         switch loopdy["eventType"] as? String {
         case replyEvent: return replyCategory
         case questionEvent: return answerCategory

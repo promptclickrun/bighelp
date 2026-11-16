@@ -60,6 +60,8 @@ An ordinary step never opens it.
 
 - **The moment.** The notification service keeps each row's last state. When a row's phase changes into `waiting`,
   `completed` or `failed`, that one update is a moment. A host that sends the same state again makes no moment.
+  A moment stays with its row until a push for it is reserved, so a host's retry of an update that failed still
+  opens the island.
 - **The alert.** The push for a moment carries `aps.alert` with fixed words and no sound: the title "Bighelp" and
   "A chat needs you.", "A chat finished." or "A chat could not finish." The words never come from a chat. iOS
   opens the island for a few seconds, or shows the card as a banner on a phone that has no island.
@@ -69,7 +71,8 @@ An ordinary step never opens it.
   finishes, the service sends an update with the alert and keeps a pending end for the group. Its alarm sends the
   end 30 seconds later, with a dismissal date of that time, so the card leaves at once. The end goes through the
   same send queue and the same authorization checks as every send, and a pending end holds only IDs and
-  revisions. No end is sent if a row became active again, if the group already ended or if the authority is
+  revisions. It names no single row's activity: the row that finished is closed by then, and the group's grants
+  are checked again as the end is sent. No end is sent if a row became active again, if the group already ended or if the authority is
   gone. A host that sends a finished row again during the wait gets a plain update. An end that fails is not
   sent again: the card then ends with its lease or when the app opens. A group whose last row finished without
   a moment has no pending end and ends as before, with a dismissal date 30 seconds ahead.
@@ -79,8 +82,8 @@ An ordinary step never opens it.
   Reply for a finished reply, Open chat for a failure. A chat that only works keeps the plain rows.
 - **A yes needs the whole command.** The computer marks a waiting row's detail with what kind of answer waits. Only
   a command it sent whole (one printable line of at most 90 characters) gets Approve, and only while the card may
-  show text. The app checks again before it answers the computer: one request waits in that chat, it is not
-  expired, the choice is allowed and the command is short. The buttons need the unlocked phone.
+  show text. The button carries the command the island showed. The app answers the computer only when that same
+  command is the one request that waits in the chat, is not expired, and the choice is allowed. The buttons need the unlocked phone.
 - **Older builds.** `lead` and the detail's new field are optional. An older app shows the same rows as before
   when the island opens.
 

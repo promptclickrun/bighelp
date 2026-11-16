@@ -1263,8 +1263,10 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   that the card may show as text gets Deny and Approve (`BighelpActivityDecisionIntent`, a `LiveActivityIntent`
   that runs in the app and needs the unlocked phone). Every other approval gets Review, a question Answer, a
   finished reply Open chat and Reply (`chatURL(reply:)`, `ChatReplyRequest`: the chat opens with the keyboard up).
-  The intent checks again against what the computer says waits (`ChatOutsidePrompt.approval`): one request in
-  that chat, not expired, the choice allowed, the command short.
+  The intent carries the command the island showed, and the app answers only when that same command is the one
+  request that waits in the chat (`ChatOutsidePrompt.approval`: not expired, the choice allowed, the command
+  short). The island can stay on screen for minutes; a tap after the bot asked for something else answers
+  nothing and says so.
 - Words typed on an alert go to its chat with the app closed (#1051, `BighelpAlertReply`): a reply's alert takes
   the person's next message, a question's alert its answer. The notification service extension adds the field
   from the alert's kind, never from the push, so an older build shows no field whose words it would drop. The
@@ -1272,7 +1274,8 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
 - Everything a person does to a chat from outside the app goes through `ChatOutsideActions`, on the Shortcuts
   host path: the alert's words, the island's Approve and Deny. It never starts a chat, never moves a person who
   is using the app to another computer, and says a failure in an alert on the phone with the words in it
-  (`ChatOutsideNotice`). `BighelpShortcutWorkspace.sendFromOutside` is the one send, shared with Arriving and
+  (`ChatOutsideNotice`). Actions run one at a time and stop after 24 s, inside the time iOS gives one, so a
+  failure is always said. `BighelpShortcutWorkspace.sendFromOutside` is the one send, shared with Arriving and
   leaving.
 - The card starts when the person taps Send (T3 Code's playbook, `BighelpManagedNativeActivityRuntime.arm`, a
   "Sending your message" row under the chat's own opaque ID): iOS starts a Live Activity only for an app in front,

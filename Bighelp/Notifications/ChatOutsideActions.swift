@@ -31,18 +31,22 @@ enum ChatOutsideFailure: Error, Equatable {
 
 /// Picks the one request an answer from outside the app is for.
 enum ChatOutsidePrompt {
-    /// The approval that waits in `chatID`. A yes needs one request whose command the island could show
-    /// whole: with two waiting, or a longer command, the person decides in the app.
+    /// The approval that waits in `chatID`, when it is the command the island showed (`shown`). The
+    /// island can stay on screen for minutes, and the bot can ask for something else meanwhile: an
+    /// answer is for the characters the person read, or for nothing. A yes also needs one request
+    /// only and a command the island shows whole. Anything else is decided in the app.
     static func approval(in items: [DashboardAttentionItem], chatID: String, decision: ApprovalDecision,
-                         now: Date) -> Result<DashboardAttentionItem, ChatOutsideFailure> {
+                         shown: String, now: Date) -> Result<DashboardAttentionItem, ChatOutsideFailure> {
         let waiting = items.filter { item in
             guard item.sessionID == chatID, case .approval(let request) = item.interaction else { return false }
             return !request.isExpired(at: now)
         }
         guard let item = waiting.first else { return .failure(.nothingWaits) }
+        let command = item.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard waiting.count == 1, case .approval(let request) = item.interaction,
-              request.allowedDecisions.contains(decision) else { return .failure(.mustReview) }
-        if decision != .deny, item.title.count > BighelpIslandMoment.wholeCommandCharacters { return .failure(.mustReview) }
+              request.allowedDecisions.contains(decision),
+              !shown.isEmpty, command == shown,
+              command.count <= BighelpIslandMoment.wholeCommandCharacters else { return .failure(.mustReview) }
         return .success(item)
     }
 
@@ -76,37 +80,39 @@ struct ChatOutsideActions {
     var appIsActive: @MainActor () -> Bool = { UIApplication.shared.applicationState == .active }
     var now: @MainActor () -> Date = { .now }
     /// The chat an alert or a Live Activity row is about, from the phone's own notification setup.
-    var alertTarget: @MainActor (BighelpProactiveNotificationOpen) -> ChatOutsideTarget? = { _ in nil }
-    var rowTarget: @MainActor (String) -> ChatOutsideTarget? = { _ in nil }
+    /// They wait a little for that setup: an action can be the reason the app was started.
+    var alertTarget: @MainActor (BighelpProactiveNotificationOpen) async -> ChatOutsideTarget? = { _ in nil }
+    var rowTarget: @MainActor (String) async -> ChatOutsideTarget? = { _ in nil }
     var notify: @MainActor (ChatOutsideFailure, _ text: String?, _ agentName: String?, _ thread: String) async -> Void = {
         await ChatOutsideNotice.post($0, text: $1, agentName: $2, thread: $3)
     }
+    /// iOS gives an action from outside the app about half a minute. The work stops before that, so
+    /// the person is told what didn't go instead of the app being ended with nothing said.
+    var limit: Duration = .seconds(24)
 
     /// Words typed on an alert: an answer to its question, or the person's next message in its chat.
     /// Anything that doesn't go is said on the phone, with the words.
     func receiveReply(_ text: String, alert: BighelpProactiveNotificationOpen?, agentName: String?, thread: String) async {
         let words = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !words.isEmpty else { return }
-        do {
-            guard let alert, let target = alertTarget(alert) else { throw ChatOutsideFailure.chatGone }
+        let failure = await Self.inTurn(limit: limit) {
+            guard let alert, let target = await alertTarget(alert) else { throw ChatOutsideFailure.chatGone }
             if alert.eventType == BighelpAlertReply.questionEvent {
                 try await answer(words, to: target)
             } else {
                 try await reply(words, to: target)
             }
-        } catch {
-            await notify(error as? ChatOutsideFailure ?? .notSent, words, agentName, thread)
         }
+        if let failure { await notify(failure, words, agentName, thread) }
     }
 
-    /// Approve or Deny on the island.
-    func receiveDecision(rowID: String, approves: Bool) async {
-        do {
-            guard let target = rowTarget(rowID) else { throw ChatOutsideFailure.chatGone }
-            try await decide(approves: approves, in: target)
-        } catch {
-            await notify(error as? ChatOutsideFailure ?? .notSent, nil, nil, rowID)
+    /// Approve or Deny on the island, for the command it showed.
+    func receiveDecision(rowID: String, approves: Bool, command: String) async {
+        let failure = await Self.inTurn(limit: limit) {
+            guard let target = await rowTarget(rowID) else { throw ChatOutsideFailure.chatGone }
+            try await decide(approves: approves, command: command, in: target)
         }
+        if let failure { await notify(failure, nil, nil, rowID) }
     }
 
     /// iOS gives an alert's action about half a minute in all, so the wait for the reply to start is short.
@@ -150,15 +156,15 @@ struct ChatOutsideActions {
         }
     }
 
-    /// Approves once, or denies, the command that waits in the chat.
-    func decide(approves: Bool, in target: ChatOutsideTarget) async throws {
+    /// Approves once, or denies, the command that waits in the chat, when it is the one `command` names.
+    func decide(approves: Bool, command: String, in target: ChatOutsideTarget) async throws {
         try await holdingConnection {
             let (workspace, chatID) = try await chat(target)
             let dashboard = workspace.featureStore.dashboardModel
             await dashboard.refreshAfterExternalChange()
             let decision: ApprovalDecision = approves ? .once : .deny
             let item = try ChatOutsidePrompt.approval(in: dashboard.snapshot?.attentionItems ?? [], chatID: chatID,
-                                                      decision: decision, now: now()).get()
+                                                      decision: decision, shown: command, now: now()).get()
             await dashboard.respondToApproval(itemID: item.id, decision: decision)
             guard dashboard.snapshot?.attentionItems.contains(where: { $0.id == item.id }) != true else {
                 throw ChatOutsideFailure.notSent
@@ -166,15 +172,56 @@ struct ChatOutsideActions {
         }
     }
 
-    private func holdingConnection(_ work: @MainActor () async throws -> Void) async throws {
-        // The answer may use another computer than the one in use. With the app closed it does, and the
-        // person's own computer is put back after, so the app opens where they left it.
-        let before = selectedHostID()
-        defer {
-            if let before, selectedHostID() != before, !appIsActive() { _ = selectHost(before) }
+    // MARK: One at a time, and not for ever
+
+    private static var last: Task<Void, Never>?
+
+    /// The first answer wins: the work's own, or the time limit's.
+    private final class Once {
+        private var continuation: CheckedContinuation<ChatOutsideFailure?, Never>?
+        init(_ continuation: CheckedContinuation<ChatOutsideFailure?, Never>) { self.continuation = continuation }
+        func finish(_ failure: ChatOutsideFailure?) {
+            continuation?.resume(returning: failure)
+            continuation = nil
         }
+    }
+
+    /// Runs `work` after the action before it, and for `limit` at most. Two actions at once could each
+    /// change the computer in use under the other. Returns what went wrong, or nil.
+    private static func inTurn(limit: Duration, _ work: @escaping @MainActor () async throws -> Void) async -> ChatOutsideFailure? {
+        let before = last
+        let run = Task { @MainActor () -> ChatOutsideFailure? in
+            await before?.value
+            let job = Task { @MainActor () -> ChatOutsideFailure? in
+                do { try await work(); return nil } catch { return error as? ChatOutsideFailure ?? .notSent }
+            }
+            let outcome = await withCheckedContinuation { (continuation: CheckedContinuation<ChatOutsideFailure?, Never>) in
+                let once = Once(continuation)
+                Task { @MainActor in once.finish(await job.value) }
+                Task { @MainActor in
+                    try? await Task.sleep(for: limit)
+                    // Out of time: stop the work where it can stop, and say it didn't go.
+                    job.cancel()
+                    once.finish(.notSent)
+                }
+            }
+            return outcome
+        }
+        last = Task { @MainActor in _ = await run.value }
+        return await run.value
+    }
+
+    private func holdingConnection(_ work: @MainActor () async throws -> Void) async throws {
         // The host connection stays open while the answer goes, with Bighelp in the background.
-        try await BighelpShortcutService.holdingHostConnection(named: "Bighelp answer", work)
+        try await BighelpShortcutService.holdingHostConnection(named: "Bighelp answer") {
+            // The answer may use another computer than the one in use. With the app closed it does, and
+            // the person's own computer is put back after, so the app opens where they left it.
+            let before = selectedHostID()
+            defer {
+                if let before, selectedHostID() != before, !appIsActive() { _ = selectHost(before) }
+            }
+            try await work()
+        }
     }
 
     /// The target's computer, connected, and the app's ID for its chat.
@@ -210,6 +257,8 @@ extension BighelpShortcutWorkspace {
     /// message is really in the chat and a little longer (`replyGrace`) for the reply to start.
     func sendFromOutside(_ message: String, chatID: String, agentID: String,
                          replyGrace: Duration = .seconds(20)) async throws -> Bool {
+        // `readyChat` makes a chat when it finds none. A message from outside is for this chat or for nothing.
+        guard catalog.session(id: chatID) != nil else { return false }
         let (_, chat) = try await readyChat(agentID: agentID, reusing: chatID)
         guard chat.acceptsCardReply(message) else { return false }
         let known = Set(chat.items.map(\.id))

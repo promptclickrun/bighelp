@@ -361,7 +361,12 @@ final class BighelpLinkApplicationDelegate: NSObject, UIApplicationDelegate,
             let alert = BighelpProactiveNotificationOpen(userInfo: content.userInfo)
             let agentName = content.title, thread = content.threadIdentifier
             Task { @MainActor in
-                await ChatOutsideActions.shared?.receiveReply(text, alert: alert, agentName: agentName, thread: thread)
+                if let actions = ChatOutsideActions.shared {
+                    await actions.receiveReply(text, alert: alert, agentName: agentName, thread: thread)
+                } else {
+                    // Never drop the words without a word.
+                    await ChatOutsideNotice.post(.unavailable, text: text, agentName: agentName, thread: thread)
+                }
                 completionHandler()
             }
             return

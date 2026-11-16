@@ -303,11 +303,14 @@ export class UserLink extends DurableObject<LinkEnv> {
         throw new LoopdyLinkError("notification_activity_conflict", "Activity group changed before delivery");
       }
       store.reserveActivityDelivery(input.activityId, now, terminal);
+      if (moment) store.clearActivityMoment(input.activityId);
       // The end waits only while the group is finished: work that starts again, or the end itself, clears it.
       if (deferEnd) {
+        // Without the finished row's own activity: it is closed before the end goes.
+        const { activity: _closed, ...authority } = input.authority;
         store.putPendingActivityEnd(content.groupId, now + ACTIVITY_END_DELAY_SECONDS, {
           ownerCoordinate: input.ownerCoordinate, activityId: input.activityId,
-          authority: input.authority, externalId: input.externalId,
+          authority, externalId: input.externalId,
         });
       } else if (!finished || terminal) store.clearPendingActivityEnd(content.groupId);
     };

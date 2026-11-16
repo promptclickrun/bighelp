@@ -152,9 +152,9 @@ struct BighelpIslandMomentBody: View {
         switch moment.buttons {
         case .decide:
             #if os(iOS) && !targetEnvironment(macCatalyst)
-            Button(intent: BighelpActivityDecisionIntent(rowID: moment.row.id, approves: false)) { label("Deny", filled: false) }
+            Button(intent: BighelpActivityDecisionIntent(rowID: moment.row.id, approves: false, command: moment.text ?? "")) { label("Deny", filled: false) }
                 .buttonStyle(.plain)
-            Button(intent: BighelpActivityDecisionIntent(rowID: moment.row.id, approves: true)) { label("Approve", filled: true) }
+            Button(intent: BighelpActivityDecisionIntent(rowID: moment.row.id, approves: true, command: moment.text ?? "")) { label("Approve", filled: true) }
                 .buttonStyle(.plain)
             #else
             link("Review", filled: true)

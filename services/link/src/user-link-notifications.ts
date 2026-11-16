@@ -1,5 +1,6 @@
 import {
   activityMoment, aggregateActivityRows, NATIVE_ROW_ID, type ActivityGroupRow, type ActivityMoment,
+  type ActivityMomentKind,
 } from "./activity-group.js";
 import { LoopdyLinkError } from "./contracts.js";
 import type { NotificationActivity, NotificationAsset, NotificationEgressSnapshot } from "./notification-grants.js";
@@ -30,11 +31,16 @@ const NOTIFICATION_ASSET_TYPES: string[] = ["image/png", "image/jpeg", "image/we
 // stays an hour longer.
 export const ACTIVITY_RECORD_GRACE_SECONDS = 3_600;
 
-/** What the deferred end of a finished group needs to send: ids and revisions, never chat text. */
+/**
+ * What the deferred end of a finished group needs to send: ids and revisions, never chat text.
+ * The authority names no single activity: the row that finished is closed by the time the end goes
+ * (`completeNotificationActivityUpdate`), and the end speaks for the whole group, whose grants are
+ * checked again when it is sent.
+ */
 export interface PendingActivityEnd {
   ownerCoordinate: string;
   activityId: string;
-  authority: NotificationEgressSnapshot;
+  authority: Omit<NotificationEgressSnapshot, "activity">;
   externalId: string;
 }
 
@@ -235,7 +241,22 @@ export class UserLinkNotificationStore {
     }
     this.storage.sql.exec("UPDATE managed_activity_rows SET state_json=?,last_state_timestamp=? WHERE activity_id=?",
       JSON.stringify(state), state.timestamp, activityId);
-    return activityMoment(old, state);
+    // A moment stays with its row until a push for it is reserved. A host sends a failed update
+    // again with the same state: that retry must still open the island, and wait before the end.
+    const moment = activityMoment(old, state);
+    if (moment) {
+      this.storage.sql.exec(`INSERT INTO managed_activity_moments(activity_id,kind) VALUES(?,?)
+        ON CONFLICT(activity_id) DO UPDATE SET kind=excluded.kind`, activityId, moment.kind);
+    } else if (old.phase !== state.phase) this.clearActivityMoment(activityId);
+    const kept = this.storage.sql.exec<{ kind: string }>(
+      "SELECT kind FROM managed_activity_moments WHERE activity_id=?", activityId,
+    ).toArray()[0];
+    return kept && kept.kind === state.phase ? { row: state.id, kind: kept.kind as ActivityMomentKind } : null;
+  }
+
+  /** The moment's push is reserved: the same state sent again is no longer news. */
+  clearActivityMoment(activityId: string): void {
+    this.storage.sql.exec("DELETE FROM managed_activity_moments WHERE activity_id=?", activityId);
   }
 
   /** `moment` leads the aggregate only while its row is still in the phase it was a moment for. */
@@ -483,6 +504,7 @@ export class UserLinkNotificationStore {
       this.storage.sql.exec("DELETE FROM managed_activity_groups");
       this.storage.sql.exec("DELETE FROM managed_activity_row_generations");
       this.storage.sql.exec("DELETE FROM managed_activity_pending_ends");
+      this.storage.sql.exec("DELETE FROM managed_activity_moments");
     });
   }
 
@@ -628,6 +650,7 @@ export class UserLinkNotificationStore {
     this.storage.sql.exec("DELETE FROM managed_activity_groups WHERE group_id NOT IN (SELECT group_id FROM managed_activity_rows)");
     this.storage.sql.exec("DELETE FROM managed_activity_row_generations WHERE group_id NOT IN (SELECT group_id FROM managed_activity_groups)");
     this.storage.sql.exec("DELETE FROM managed_activity_pending_ends WHERE group_id NOT IN (SELECT group_id FROM managed_activity_groups)");
+    this.storage.sql.exec("DELETE FROM managed_activity_moments WHERE activity_id NOT IN (SELECT activity_id FROM managed_activity_rows)");
     const asset = this.storage.sql.exec<{ next: number | null }>(
       "SELECT MIN(expires_at) AS next FROM notification_assets",
     ).one().next;

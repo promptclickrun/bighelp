@@ -448,12 +448,20 @@ struct BighelpApp: App {
             connect: { try await shortcuts.connectedWorkspace() },
             selectedHostID: { [weak hostRegistry] in hostRegistry?.selectedHostID },
             selectHost: { id in (try? shortcuts.useGateway(id)) != nil })
-        actions.alertTarget = { [weak notifications] in notifications?.service?.outsideTarget(for: $0) }
-        actions.rowTarget = { [weak notifications] in notifications?.service?.outsideTarget(opaqueSessionID: $0) }
+        // An action can be what started the app: the saved notification setup may load a moment later.
+        @MainActor func service() async -> BighelpManagedNotificationService? {
+            for _ in 0..<20 {
+                if let service = notifications.service { return service }
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+            return notifications.service
+        }
+        actions.alertTarget = { open in await service()?.outsideTarget(for: open) }
+        actions.rowTarget = { rowID in await service()?.outsideTarget(opaqueSessionID: rowID) }
         ChatOutsideActions.shared = actions
         #if os(iOS) && !targetEnvironment(macCatalyst)
-        BighelpActivityActions.decide = { rowID, approves in
-            await ChatOutsideActions.shared?.receiveDecision(rowID: rowID, approves: approves)
+        BighelpActivityActions.decide = { rowID, approves, command in
+            await ChatOutsideActions.shared?.receiveDecision(rowID: rowID, approves: approves, command: command)
         }
         #endif
     }

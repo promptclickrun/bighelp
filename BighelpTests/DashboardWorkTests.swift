@@ -83,13 +83,10 @@ struct DashboardWorkTests {
         #expect(model.workInFlightItems.map(\.sessionID) == ["one"])
     }
 
-    @Test func aSessionAppearsInOnlyItsCurrentHomeSectionEvenWithDifferentWireTurnIDs() async {
+    @Test func aSessionThatNeedsThePersonIsNotAlsoInFlight() async {
         let source = WorkDashboardSource(attention: [attention("ask", sessionID: "one")])
         var record = session("one", title: "Current work")
         record.activityEvents = [activity(sessionID: "one", kind: .reasoning)]
-        source.completed = [DashboardCompletion(id: "completion", title: "Current work", detail: "Finished",
-            status: "session.completed", completedAt: Date(timeIntervalSince1970: 940), completedLabel: "Just now",
-            sessionID: "one", agentID: "default", turnID: "raw-host-turn")]
         let model = DashboardModel(source: source, now: { Date(timeIntervalSince1970: 1_000) })
         model.configureWorkSessions { [record] }
         await model.load()
@@ -116,19 +113,6 @@ struct DashboardWorkTests {
         model.configureWorkSessions { [record] }
         await model.load()
         #expect(model.workInFlightItems.first?.subtitle == "Drafting a reply")
-    }
-
-    @Test func primaryCompletionTitlesPreferNamesOverSummaries() {
-        for (event, details, title) in [
-            ("session.completed", ["title": "Home improvements", "summary": "Finished a substantial set of changes"], "Home improvements"),
-            ("job.completed", ["job_title": "Morning briefing", "summary": "Today's news is ready"], "Morning briefing"),
-            ("delegation.completed", ["title": "Review accessibility", "summary": "Everything passed"], "Review accessibility"),
-        ] {
-            let item = DashboardCompletionProjection.make(id: event, eventType: event, detail: details,
-                agentName: "Test agent", createdAt: .now, completedLabel: "Just now",
-                fallbackTitle: "Generic completion", fallbackDetail: "Finished")
-            #expect(item.title == title)
-        }
     }
 
     private func session(_ id: String, title: String, storedID: String? = nil) -> SessionRecord {
@@ -158,11 +142,10 @@ struct DashboardWorkTests {
 @MainActor
 private final class WorkDashboardSource: DashboardDataSource, DashboardClarificationClient {
     var attention: [DashboardAttentionItem]
-    var completed: [DashboardCompletion] = []
     var responses: [String] = []
     init(attention: [DashboardAttentionItem] = []) { self.attention = attention }
     func loadDashboard() async throws -> DashboardSnapshot {
-        DashboardSnapshot(attentionItems: attention, completedItems: completed, agents: [])
+        DashboardSnapshot(attentionItems: attention, agents: [])
     }
     func dismissDashboardEvent(id: String) async throws { attention.removeAll { $0.id == id } }
     func respond(to request: DashboardClarificationRequest, response: String) async throws -> DashboardClarificationReceipt {

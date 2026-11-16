@@ -120,12 +120,4 @@ extension HostConnectionStatus {
         else if hasFailed { self.init(.disconnected, "Not connected") }
         else { self.init(.reconnecting, "Reconnecting") }
     }
-
-    /// A plugin update waiting for Hermes to come back after its restart; nil
-    /// for the update's other steps.
-    @MainActor
-    init?(pluginUpdate store: PluginUpdateStore) {
-        guard store.isReconnecting else { return nil }
-        self.init(.reconnecting, store.title)
-    }
 }

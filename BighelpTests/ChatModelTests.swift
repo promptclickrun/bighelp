@@ -3598,7 +3598,6 @@ struct ChatModelTests {
                     sessionID: currentRequest.sessionID
                 ),
             ],
-            completedItems: [],
             agents: []
         )
 

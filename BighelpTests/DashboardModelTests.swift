@@ -99,7 +99,6 @@ struct DashboardModelTests {
                 detail: "Should not be restored",
                 urgency: .important
             )],
-            completedItems: [],
             agents: []
         ))
         await loading.value
@@ -365,7 +364,6 @@ private final class ClarificationDashboardSource: DashboardDataSource, Dashboard
                 interaction: .clarification(request),
                 createdAt: Date(timeIntervalSince1970: 900)
             )],
-            completedItems: [],
             agents: []
         )
     }
@@ -418,7 +416,6 @@ private final class DashboardApprovalResponseSource:
                 )),
                 createdAt: Date(timeIntervalSince1970: 90)
             )],
-            completedItems: [],
             agents: []
         )
     }
@@ -450,7 +447,6 @@ private final class ChangingDashboardSource: DashboardDataSource {
                 detail: "Current Hermes event data",
                 urgency: .important
             )],
-            completedItems: [],
             agents: []
         )
     }
@@ -472,7 +468,6 @@ private final class FlakyDashboardSource: DashboardDataSource {
                 urgency: .important,
                 createdAt: Date()
             )],
-            completedItems: [],
             agents: []
         )
     }
@@ -500,7 +495,6 @@ private final class RetentionDashboardSource: DashboardDataSource {
                     createdAt: Date()
                 ),
             ],
-            completedItems: [],
             agents: []
         )
     }
@@ -535,7 +529,6 @@ private final class ClosedSessionDashboardSource: DashboardDataSource {
                     createdAt: Date()
                 ),
             ],
-            completedItems: [],
             agents: []
         )
     }
@@ -559,7 +552,6 @@ private final class TerminalSessionDashboardSource: DashboardDataSource {
                 sessionID: "terminal-session",
                 createdAt: Date()
             )],
-            completedItems: [],
             agents: []
         )
     }
@@ -621,7 +613,6 @@ private final class InterleavedDashboardSource: DashboardDataSource {
                 detail: title,
                 urgency: .important
             )],
-            completedItems: [],
             agents: []
         )
     }
@@ -645,7 +636,6 @@ private final class InterleavedCleanupDashboardSource: DashboardDataSource {
                     isSessionClosed: true,
                     createdAt: Date()
                 )],
-                completedItems: [],
                 agents: []
             )
         }
@@ -657,7 +647,6 @@ private final class InterleavedCleanupDashboardSource: DashboardDataSource {
                 urgency: .important,
                 createdAt: Date()
             )],
-            completedItems: [],
             agents: []
         )
     }
@@ -699,7 +688,6 @@ private final class RemovableDashboardSource: DashboardDataSource {
                         urgency: .important, createdAt: Date()
                     )
                 },
-            completedItems: [],
             agents: []
         )
     }
@@ -741,7 +729,6 @@ private final class SuspendedExternalRefreshDashboardSource: DashboardDataSource
                 urgency: .important,
                 createdAt: Date()
             )] : [],
-            completedItems: [],
             agents: []
         )
     }

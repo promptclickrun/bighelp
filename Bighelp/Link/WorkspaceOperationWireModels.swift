@@ -57,8 +57,6 @@ enum BighelpLinkWorkspaceOperation: String, Codable, CaseIterable, Equatable, Se
     case cardsTemplatesList = "cards.templates.list"
     case cardsTemplatesInstall = "cards.templates.install"
     case cardsTemplatesRemove = "cards.templates.remove"
-    case pluginUpdateStart = "plugin_update.start"
-    case pluginUpdateStatus = "plugin_update.status"
     case wikiRoots = "wiki.roots"
     case wikiConnect = "wiki.connect"
     case wikiResolve = "wiki.resolve"
@@ -91,7 +89,7 @@ enum BighelpLinkWorkspaceOperation: String, Codable, CaseIterable, Equatable, Se
              .skillsToolsGet, .skillsToolsCreate, .skillsToolsUpdate, .skillsToolsImport,
              .cardsTemplatesList, .cardsTemplatesInstall, .cardsTemplatesRemove,
              .sessionUpdate, .sessionDelete, .generatedMediaResolve,
-             .pluginUpdateStart, .pluginUpdateStatus, .hostRuntimeStatus,
+             .hostRuntimeStatus,
              .wikiRoots, .wikiConnect, .wikiResolve, .wikiList, .wikiRead, .wikiSearch, .wikiImage,
              .wikiSaveBegin, .wikiSaveChunk, .wikiSaveCommit, .wikiSaveStatus,
              .groupsCapabilities, .groupsList, .groupsCreate, .groupsState, .groupsSend,

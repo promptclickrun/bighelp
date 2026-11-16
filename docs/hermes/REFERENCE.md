@@ -287,7 +287,7 @@ TreeNode fields: `{id,label,path?,color?,icon?,isAuto:boolean,isNoProject:boolea
 
 Host folder strings are not Android-local paths. Project folders permit POSIX absolute paths, Windows drive absolute paths and UNC paths as returned by Hermes. Drive-relative/device paths, `.`/`..`, empty segments and controls are refused. File browsing below uses the separate POSIX confinement contract.
 
-Sources: [project catalog](../../Bighelp/DirectHermes/DirectHermesProjectClient.swift), [lifecycle/tree](../../Bighelp/DirectHermes/DirectHermesProjectLifecycleClient.swift), [decoder](../../Bighelp/WorkspaceManagement/WorkspaceManagementDecoder.swift). Tests: [projects](../../BighelpTests/DirectHermesProjectClientTests.swift), [folder chooser](../../BighelpTests/WorkspaceFolderChooserTests.swift).
+Sources: [project catalog](../../Bighelp/DirectHermes/DirectHermesProjectClient.swift), [lifecycle/tree](../../Bighelp/DirectHermes/DirectHermesProjectLifecycleClient.swift), [decoder](../../Bighelp/WorkspaceManagement/WorkspaceManagementDecoder.swift). Tests: [projects](../../BighelpTests/DirectHermesProjectClientTests.swift).
 
 ### Stock Git
 

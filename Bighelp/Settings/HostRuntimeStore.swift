@@ -83,7 +83,11 @@ struct HostRuntimeStatus: Decodable, Equatable, Sendable {
             }
         }
         func version(_ text: String?) -> Bool { text.map { token($0) } ?? true }
-        func revision(_ text: String?) -> Bool { text == nil || PluginUpdateStatus.validRevision(text) }
+        // A git commit: 40 lowercase hex characters.
+        func revision(_ text: String?) -> Bool {
+            guard let text else { return true }
+            return text.count == 40 && text.allSatisfy { $0.isASCII && ($0.isNumber || ("a"..."f").contains(String($0))) }
+        }
         guard value.schemaVersion == 1, value.observedAt > 0,
               token(value.runtimeId), version(value.hermes.runningVersion), version(value.hermes.cliVersion),
               token(value.plugin.runningVersion), revision(value.plugin.installedRevision), revision(value.plugin.activeRevision),

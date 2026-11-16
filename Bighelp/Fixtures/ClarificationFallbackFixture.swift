@@ -28,7 +28,7 @@ final class ClarificationFallbackFixture: DashboardDataSource, DashboardClarific
             DashboardAttentionItem(id: request.eventID, title: "Clarification needed", detail: request.question,
                                    urgency: .important, sessionID: request.sessionID,
                                    interaction: .clarification(request), createdAt: .now)
-        ], completedItems: [], agents: [])
+        ], agents: [])
     }
 
     func respond(to request: DashboardClarificationRequest, response: String) async throws -> DashboardClarificationReceipt {

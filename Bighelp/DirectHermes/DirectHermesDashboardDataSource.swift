@@ -254,7 +254,6 @@ final class DirectHermesDashboardDataSource: DashboardDataSource,
             attentionItems: attention
                 .filter { !presentation.dismissedIDs.contains($0.id) }
                 .sorted(by: sortAttention),
-            completedItems: [],
             agents: Array(agents().prefix(8).map { agent in
                 DashboardAgent(
                     id: agent.id,

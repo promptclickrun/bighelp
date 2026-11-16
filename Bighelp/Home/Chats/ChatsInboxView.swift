@@ -8,6 +8,8 @@ struct ChatsInboxContext {
     let agents: AgentDirectoryStore
     /// Every computer's all-hosts copies; nil leaves only the computer in use.
     var fleet: FleetStore? = nil
+    /// Move to Project… in a row's hold menu; nil while this computer can't move chats.
+    var projectMove: ChatProjectMove? = nil
     /// Settings' Show every computer: the other computers' chats join the list.
     var showsEveryComputer = false
     /// The computer in use's group chats (`BotModeRoomStore.catalogRooms`): one with no message yet
@@ -46,7 +48,13 @@ struct ChatsInboxView: View {
     @State private var filter: ChatsInboxFilter = .all
     @State private var renaming: ChatsInboxRow?
     @State private var renameDraft = ""
+    /// The chat whose Move to Project… sheet is open.
+    @State private var projectMoveTarget: ChatsInboxRow?
     @State private var cache = ChatsInboxCache()
+    /// Settings › Chat › Project names, the switch the Sessions list reads too.
+    @AppStorage(ChatLayoutPreferences.showsChatProjectKey)
+    private var showsProject = ChatLayoutPreferences.showsChatProjectByDefault
+    @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.scenePhase) private var scenePhase
     @BighelpThemeReader private var theme
 
@@ -94,6 +102,16 @@ struct ChatsInboxView: View {
             Text(row.isBotChat
                  ? "Renamed, this becomes a regular chat, and tapping the bot starts a new Bot Chat."
                  : "Enter a name up to \(SessionTitleRules.maximumLength) characters.")
+        }
+        // One sheet for the list, as the Sessions page has: a tap moves the chat, and the sheet
+        // closes only once Hermes confirms it. The moved project shows here without waiting for
+        // the next load (`ShellFeatureStore.recordMovedProject`).
+        .sheet(item: $projectMoveTarget) { row in
+            if let move = context.projectMove, case .session(let summary) = row.source,
+               let agentID = summary.agentIDs.first {
+                MoveChatToProjectSheet(move: move, chatTitle: row.title, agentID: agentID,
+                                       sessionID: summary.id, currentProjectID: row.projectID)
+            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("chats.inbox")
@@ -199,7 +217,7 @@ struct ChatsInboxView: View {
     private func rowButton(_ row: ChatsInboxRow, faces: ChatsInboxFaces) -> some View {
         Button { context.onOpen(row.target) } label: {
             ChatsInboxRowLabel(row: row, face: faces.face(for: row, activity: context.activity),
-                               activity: context.activity)
+                               activity: context.activity, showsProject: showsProject)
         }
         .buttonStyle(.plain)
         // One menu for each row of the list, so a hold always acts on the row held. Right-click on the Mac.
@@ -232,10 +250,30 @@ struct ChatsInboxView: View {
                 }
                 .accessibilityIdentifier("chats.action.rename.\(row.id)")
             }
+            moveToProjectButton(row)
             if row.canArchive {
                 Button("Archive", systemImage: "archivebox") { onChange(row, .archive) }
                     .accessibilityIdentifier("chats.action.archive.\(row.id)")
             }
+        }
+    }
+
+    /// Move to Project…, showing the project the chat is in now, as the chat's ⋯ menu does, so
+    /// nobody has to open the sheet to find out where the chat lives.
+    @ViewBuilder
+    private func moveToProjectButton(_ row: ChatsInboxRow) -> some View {
+        if context.projectMove != nil, row.canMoveToProject {
+            Button {
+                projectMoveTarget = row
+            } label: {
+                Text(typeSize.isAccessibilitySize ? "Move…" : "Move to Project…")
+                if !typeSize.isAccessibilitySize, let name = row.projectName {
+                    Text(name)
+                }
+                Image(systemName: "folder")
+            }
+            .accessibilityLabel(row.projectName.map { "Move to Project…, now in \($0)" } ?? "Move to Project…")
+            .accessibilityIdentifier("chats.action.move-project.\(row.id)")
         }
     }
 

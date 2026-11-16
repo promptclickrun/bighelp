@@ -59,6 +59,46 @@ final class MoveChatToProjectUITests: BighelpUITestCase {
         evidence("list-moved")
     }
 
+    /// The new Chats list has the two things the Sessions page has: a row names the project its chat
+    /// is in, and a hold on the row moves the chat without opening it.
+    @MainActor
+    func testAChatsRowNamesItsProjectAndMovesFromItsHoldMenu() throws {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.landing", "chats",
+                               "-bighelp.hosts.all-hosts", "NO"]
+        app.launch()
+        let finance = chatRow("demo-finance", in: app)
+        XCTAssertTrue(finance.waitForExistence(timeout: 20))
+        XCTAssertTrue(finance.label.contains("In project Bighelp"), finance.label)
+        evidence("row-project")
+
+        finance.press(forDuration: 1.2)
+        let move = app.buttons["chats.action.move-project.here/demo-finance"].firstMatch
+        XCTAssertTrue(move.waitForExistence(timeout: 5), "A Chats row's hold menu has Move to Project…")
+        XCTAssertTrue(move.label.contains("now in Bighelp"), move.label)
+        evidence("hold-menu")
+        move.tap()
+        let home = app.buttons["chat.move-project.home"].firstMatch
+        XCTAssertTrue(home.waitForExistence(timeout: 8), "The sheet lists the computer's projects")
+        home.tap()
+        XCTAssertTrue(home.waitForNonExistence(timeout: 8), "The sheet closes once the move is confirmed")
+
+        XCTAssertTrue(waitForLabel(of: finance, containing: "In project Home", true), finance.label)
+        evidence("moved")
+    }
+
+    /// True once the element's label holds (or stops holding) the text: the row redraws off the
+    /// catalog's revision, so it is a moment behind the tap that moved the chat.
+    @MainActor
+    private func waitForLabel(of element: XCUIElement, containing text: String, _ expected: Bool) -> Bool {
+        let deadline = Date.now.addingTimeInterval(8)
+        while Date.now < deadline {
+            if element.exists, element.label.contains(text) == expected { return true }
+            RunLoop.current.run(until: Date.now.addingTimeInterval(0.2))
+        }
+        return false
+    }
+
     @MainActor
     private func evidence(_ name: String) {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())

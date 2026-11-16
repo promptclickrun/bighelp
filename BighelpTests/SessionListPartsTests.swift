@@ -104,9 +104,36 @@ struct SessionListPartsTests {
         #expect(throws: DemoRepositoryError.unsupportedSchemaVersion(found: 1_000_000, current: 1)) {
             try Self.oneFileList(in: directory).loadExistingPreservingSource()
         }
-        #expect(throws: (any Error).self, "And it can't write its own list over the marker.") {
+        #expect(throws: DemoRepositoryError.unsupportedSchemaVersion(found: 1_000_000, current: 1),
+                "And it can't write its own list over the marker.") {
             try Self.oneFileList(in: directory).save(OneFileList(revision: UUID(), records: []))
         }
+    }
+
+    /// Two copies of the list in memory, as a second process would hold: the one that didn't
+    /// see the other's save must not write its parts over it.
+    @Test func aSaveFromACopyOfTheListThatIsNoLongerCurrentIsRefused() throws {
+        let directory = Self.folder()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var rows = Self.rows(300)
+        try SessionContentRepository(directory: directory).save(rows)
+        let first = SessionContentRepository(directory: directory)
+        let second = SessionContentRepository(directory: directory)
+        var stale = try first.load()
+        var current = try second.load()
+
+        current[10].title = "Renamed by the second"
+        try second.save(current)
+        stale[200].title = "Renamed by the first"
+        #expect(throws: SessionContentRepositoryError.staleCheckpoint) { try first.save(stale) }
+
+        rows[10].title = "Renamed by the second"
+        #expect(try SessionContentRepository(directory: directory).load().map(\.title) == rows.map(\.title))
+        // Having read the list again, the first can save.
+        var reread = try first.load()
+        reread[200].title = "Renamed by the first"
+        try first.save(reread)
+        #expect(try SessionContentRepository(directory: directory).load()[200].title == "Renamed by the first")
     }
 
     @Test func aMoveStoppedBeforeTheRootKeepsTheOneFileList() throws {
@@ -118,6 +145,27 @@ struct SessionListPartsTests {
         // The part is written, the root is not.
         let stopped = SessionContentRepository(directory: directory, fileProtection: FailingWrites(failing: 2))
         #expect(throws: (any Error).self) { try stopped.load() }
+        #expect(try Self.oneFileList(in: directory).loadExistingPreservingSource()?.records.count == chats.count,
+                "The one file is still the list.")
+
+        let repository = SessionContentRepository(directory: directory)
+        #expect(try repository.load().map(\.id) == chats.map(\.id))
+        for chat in chats { #expect(try repository.loadSession(id: chat.id) == chat) }
+    }
+
+    /// A part that doesn't hold what was written to it (a bad write, a fault in this code): the
+    /// move reads its parts back, so it stops with the one file still the list.
+    @Test func aMoveWhosePartsDoNotReadBackKeepsTheOneFileList() throws {
+        let directory = Self.folder()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let chats = Self.chatsWithDrafts
+        try Self.keepAsOneFile(chats, in: directory)
+
+        let emptyPart = Data(#"{"schemaVersion":1,"value":[]}"#.utf8)
+        let faulty = SessionContentRepository(directory: directory, fileProtection: FailingWrites(replacing: 1, with: emptyPart))
+        #expect(throws: SessionContentRepositoryError.invalidManifest) { try faulty.load() }
+        #expect(!FileManager.default.fileExists(
+            atPath: directory.appending(path: "sessions-catalog-root-v1.json").path(percentEncoded: false)))
         #expect(try Self.oneFileList(in: directory).loadExistingPreservingSource()?.records.count == chats.count,
                 "The one file is still the list.")
 
@@ -184,6 +232,7 @@ struct SessionListPartsTests {
         #expect(SessionListParts.count(for: 7_000, current: 1) == 64)
         #expect(SessionListParts.count(for: 5, current: 64) == 64, "Parts never get fewer.")
         #expect(SessionListParts.count(for: 1_000_000, current: 1) == SessionListParts.maximumCount)
+        #expect(SessionListParts.count(for: 1_000_000, current: 200) == SessionListParts.maximumCount)
     }
 
     // MARK: Helpers
@@ -229,12 +278,22 @@ struct SessionListPartsTests {
     }
 }
 
-/// Writes as the app does, but one write fails: the save or the move stops there.
+/// Writes as the app does, but one write fails (the save or the move stops there), or one write
+/// puts other bytes in the file.
 private final class FailingWrites: BighelpLocalFileProtecting, @unchecked Sendable {
-    private let failing: Int
+    private let failing: Int?
+    private let replaced: (write: Int, data: Data)?
     private var writes = 0
 
-    init(failing: Int) { self.failing = failing }
+    init(failing: Int) {
+        self.failing = failing
+        replaced = nil
+    }
+
+    init(replacing write: Int, with data: Data) {
+        failing = nil
+        replaced = (write, data)
+    }
 
     func prepareDirectory(_ directory: URL, protection: BighelpLocalProtectionClass, fileManager: FileManager) throws {
         try BighelpLocalFileProtector().prepareDirectory(directory, protection: protection, fileManager: fileManager)
@@ -243,7 +302,8 @@ private final class FailingWrites: BighelpLocalFileProtecting, @unchecked Sendab
     func write(_ data: Data, to file: URL, protection: BighelpLocalProtectionClass) throws {
         writes += 1
         if writes == failing { throw CocoaError(.fileWriteOutOfSpace) }
-        try BighelpLocalFileProtector().write(data, to: file, protection: protection)
+        let written = replaced.flatMap { $0.write == writes ? $0.data : nil } ?? data
+        try BighelpLocalFileProtector().write(written, to: file, protection: protection)
     }
 
     func apply(_ protection: BighelpLocalProtectionClass, to file: URL, fileManager: FileManager) throws {

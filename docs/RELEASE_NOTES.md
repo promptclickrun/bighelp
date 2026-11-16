@@ -3,6 +3,25 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.92
+
+### New
+
+- **The Dynamic Island tells you the news:** on an iPhone with a Dynamic Island, the island now opens by itself when a chat needs you, when a reply is ready or when a task cannot finish. It shows the bot and the words. It also has buttons: Open chat and Reply for a reply, Answer for a question and Review for an approval. Beside a short command it shows Deny and Approve. Deny and Approve need bighelp plugin 3.56.0 on your computer.
+- **Reply from a notification:** touch and hold the notification of a reply, tap Reply and type. Your message goes to that chat, and Bighelp stays closed. On the notification of a question, Answer sends your answer. Your iPhone must be unlocked. If your message cannot go, a notification tells you and shows your words.
+- **Work in a different chat on iPhone Duo:** when a bot works in a chat that is not open, the top of the side column shows it. Tap it to go to that chat.
+- **Result of Refresh model catalogs:** in Settings, Models, the result of Refresh model catalogs now shows below the button.
+
+### Changed
+
+- **Links on a bot's app page:** a web link on a bot's app page now opens only when you tap it. The page cannot open a link by itself.
+
+### Fixed
+
+- **Computers with thousands of chats:** Bighelp now saves only the part of the chat list that changed. Before, each change saved the full list.
+- **Photos on iPhone Duo:** a photo now opens over the full display.
+- **Side column on iPhone Duo:** the side column of a chat now stays below the status area.
+
 ## 2.6.91
 
 ### New

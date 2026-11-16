@@ -160,7 +160,10 @@ change in both repos.
     by day. Once two or more computers show, one row of chips (All, each computer, Unread) sits under search. The
     computer in use is read live from its catalog; the others come from their all-hosts copies (`FleetStore`) and
     open through `openFleet`. Pin and Mark Read or Unread change only the computer in use's chats; another
-    computer's rows rename and archive. "This computer" pushes that computer's own Sessions page (projects,
+    computer's rows rename and archive. A row names its chat's project on a line of its own (Settings › Chat ›
+    Project names, the switch the Sessions list reads), and a hold offers Move to Project… for one bot's chat
+    on the computer in use (`ChatsInboxRow.canMoveToProject`, `MoveChatToProjectSheet`); an all-hosts copy
+    carries no project. "This computer" pushes that computer's own Sessions page (projects,
     imports from other apps, one bot's chats). The list is a pure function of the stores (`ChatsInboxProjection`),
     kept until an input changes (`ChatsInboxCache`), so a computer's events don't redo it.
   - Today (`Bighelp/Today/`) is a grid of panels under the header (`TodayPanelGrid`; Small, Wide or Tall), with the

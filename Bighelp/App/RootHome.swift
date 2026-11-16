@@ -81,7 +81,8 @@ extension RootShellView {
         let catalog = sessionCatalog
         let features = featureStore
         return ChatsInboxContext(
-            catalog: catalog, agents: agents, fleet: fleet, showsEveryComputer: showsEveryHost,
+            catalog: catalog, agents: agents, fleet: fleet, projectMove: chatProjectMove,
+            showsEveryComputer: showsEveryHost,
             rooms: botModeRooms.catalogRooms,
             codeSessionIDs: Set(codeHome?.sessions.map(\.id) ?? []),
             activity: botChatActivity, activitySource: botChatActivitySource,

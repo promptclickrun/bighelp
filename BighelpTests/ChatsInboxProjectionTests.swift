@@ -11,10 +11,12 @@ struct ChatsInboxProjectionTests {
     private static let now = Date(timeIntervalSince1970: 1_800_000_000)
 
     private func session(_ id: String, at minutesAgo: Double, pinned: Bool = false, unread: Bool = false,
-                         title: String? = nil, preview: String = "") -> SessionSummary {
+                         title: String? = nil, preview: String = "",
+                         project: (id: String, name: String)? = nil) -> SessionSummary {
         SessionSummary(id: id, kind: .direct, agentIDs: ["mina"], title: title ?? id.capitalized, preview: preview,
                        updatedAt: Self.now.addingTimeInterval(-minutesAgo * 60), isPinned: pinned,
-                       isUnread: unread, tracksUnread: true)
+                       isUnread: unread, tracksUnread: true,
+                       workspaceID: project?.id, workspaceName: project?.name)
     }
 
     private func fleetChat(_ id: String, on hostID: UUID, at minutesAgo: Double, title: String? = nil) -> FleetChat {
@@ -195,5 +197,61 @@ struct ChatsInboxProjectionTests {
         #expect(builds == 2)
         _ = cache.rows(for: key(catalog, revision: 1), build: build)
         #expect(builds == 3)
+    }
+
+    /// The project a row names, and the one the move sheet ticks, come from the computer in use.
+    @Test func aRowShowsTheProjectItsChatIsIn() {
+        let rows = ChatsInboxProjection.rows(ChatsInboxInput(
+            sessions: [session("filed", at: 10, project: ("home", "Home")), session("loose", at: 20)],
+            selectedHostID: Self.home,
+            computers: computers(studio: [fleetChat("away", on: Self.studio, at: 5)]), showsComputerTags: true))
+
+        let filed = rows.first { $0.title == "Filed" }
+        #expect(filed?.projectName == "Home")
+        #expect(filed?.projectID == "home")
+        #expect(filed?.canMoveToProject == true)
+        let loose = rows.first { $0.title == "Loose" }
+        #expect(loose?.projectName == nil, "A chat in no project names none")
+        #expect(loose?.canMoveToProject == true, "A chat in no project can still be moved into one")
+    }
+
+    /// Move to Project… is for one bot's own chat on the computer in use: an all-hosts copy carries
+    /// no project, and a group chat is managed in its own settings.
+    @Test func onlyAOneBotChatHereCanMove() {
+        let rows = ChatsInboxProjection.rows(ChatsInboxInput(
+            sessions: [session("here", at: 20)], rooms: [room("crew")], selectedHostID: Self.home,
+            computers: computers(studio: [fleetChat("away", on: Self.studio, at: 5)]), showsComputerTags: true))
+
+        let away = rows.first { $0.title == "Away" }
+        #expect(away?.projectName == nil, "An all-hosts copy carries no project")
+        #expect(away?.canMoveToProject == false)
+        let group = rows.first { $0.isGroup }
+        #expect(group?.canMoveToProject == false)
+    }
+
+    /// The Chats list stays on screen while the computer's connection closes or another computer comes
+    /// into use, so the list's own mover changes under an open sheet. The sheet keeps the mover of the
+    /// computer its chat was held on, and a row that can't move opens no sheet.
+    @Test func aMoveSheetKeepsTheMoverItWasOpenedWith() throws {
+        let rows = ChatsInboxProjection.rows(ChatsInboxInput(
+            sessions: [session("here", at: 20, project: ("home", "Home"))], rooms: [room("crew")],
+            selectedHostID: Self.home,
+            computers: computers(studio: [fleetChat("away", on: Self.studio, at: 5)]), showsComputerTags: true))
+        let here = try #require(rows.first { $0.title == "Here" })
+        let store = HermesWorkspaceStore(client: FixtureHermesWorkspaceClient())
+        let move = ChatProjectMove(store: store) { _, _ in }
+
+        let target = try #require(ChatsProjectMoveTarget(row: here, move: move))
+        #expect(target.move.store === store)
+        #expect(target.sessionID == "here")
+        #expect(target.agentID == "mina")
+        #expect(target.row.projectID == "home")
+        #expect(target.id == here.id)
+
+        #expect(ChatsProjectMoveTarget(row: here, move: nil) == nil, "A computer that can't move chats opens no sheet")
+        let away = try #require(rows.first { $0.title == "Away" })
+        #expect(ChatsProjectMoveTarget(row: away, move: move) == nil, "Another computer's chat is not moved from here")
+        let group = try #require(rows.first { $0.isGroup })
+        #expect(ChatsProjectMoveTarget(row: group, move: move) == nil)
     }
 }

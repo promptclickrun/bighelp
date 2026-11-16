@@ -59,11 +59,101 @@ final class MoveChatToProjectUITests: BighelpUITestCase {
         evidence("list-moved")
     }
 
+    /// The new Chats list has the two things the Sessions page has: a row names the project its chat
+    /// is in, and a hold on the row moves the chat without opening it.
+    @MainActor
+    func testAChatsRowNamesItsProjectAndMovesFromItsHoldMenu() throws {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.landing", "chats",
+                               "-bighelp.hosts.all-hosts", "NO"]
+        app.launch()
+        let finance = chatRow("demo-finance", in: app)
+        XCTAssertTrue(finance.waitForExistence(timeout: 20))
+        XCTAssertTrue(finance.label.contains("In project Bighelp"), finance.label)
+        evidence("chats-row-project")
+
+        finance.press(forDuration: 1.2)
+        let move = app.buttons["chats.action.move-project.here/demo-finance"].firstMatch
+        XCTAssertTrue(move.waitForExistence(timeout: 5), "A Chats row's hold menu has Move to Project…")
+        XCTAssertTrue(move.label.contains("now in Bighelp"), move.label)
+        evidence("chats-hold-menu")
+        move.tap()
+        let home = app.buttons["chat.move-project.home"].firstMatch
+        XCTAssertTrue(home.waitForExistence(timeout: 8), "The sheet lists the computer's projects")
+        home.tap()
+        XCTAssertTrue(home.waitForNonExistence(timeout: 8), "The sheet closes once the move is confirmed")
+
+        XCTAssertTrue(waitForLabel(of: finance, containing: "In project Home", true), finance.label)
+        evidence("chats-row-moved")
+    }
+
+    /// Settings › Chat › Project names off: the row names no project, and the hold menu still moves the chat.
+    @MainActor
+    func testTheProjectNamesSwitchTakesTheLineOffTheChatsRow() throws {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.landing", "chats",
+                               "-bighelp.hosts.all-hosts", "NO", "-bighelp.chat-list.shows-project", "NO"]
+        app.launch()
+        let finance = chatRow("demo-finance", in: app)
+        XCTAssertTrue(finance.waitForExistence(timeout: 20))
+        XCTAssertFalse(finance.label.contains("In project"), finance.label)
+        evidence("chats-switch-off")
+
+        finance.press(forDuration: 1.2)
+        let move = app.buttons["chats.action.move-project.here/demo-finance"].firstMatch
+        XCTAssertTrue(move.waitForExistence(timeout: 5), "The move doesn't depend on the switch")
+        XCTAssertTrue(move.label.contains("now in Bighelp"), move.label)
+    }
+
+    /// The project line and the hold menu at the default text size and a large one, in light and dark.
+    /// The checks read what VoiceOver reads: the row names its project at every size, and the menu keeps
+    /// its way to move the chat. The pictures show the line itself.
+    @MainActor
+    func testAChatsRowKeepsItsProjectAndItsMoveAtLargeTextInLightAndDark() throws {
+        defer { XCUIDevice.shared.appearance = .light }
+        for (appearance, look) in [(XCUIDevice.Appearance.light, "light"), (.dark, "dark")] {
+            XCUIDevice.shared.appearance = appearance
+            for (size, name) in [("UICTContentSizeCategoryL", "default"), ("UICTContentSizeCategoryAccessibilityL", "large")] {
+                let app = makeApp()
+                app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.landing", "chats",
+                                       "-bighelp.hosts.all-hosts", "NO", "-UIPreferredContentSizeCategoryName", size]
+                app.launch()
+                let finance = chatRow("demo-finance", in: app)
+                XCTAssertTrue(finance.waitForExistence(timeout: 20), "\(name) \(look)")
+                XCTAssertTrue(finance.label.contains("In project Bighelp"), "\(name) \(look): \(finance.label)")
+                evidence("chats-\(name)-\(look)")
+
+                finance.press(forDuration: 1.2)
+                let move = app.buttons["chats.action.move-project.here/demo-finance"].firstMatch
+                XCTAssertTrue(move.waitForExistence(timeout: 5), "\(name) \(look): the hold menu has its move item")
+                evidence("chats-menu-\(name)-\(look)")
+                app.terminate()
+            }
+        }
+    }
+
+    /// True once the element's label holds (or stops holding) the text: the row redraws off the
+    /// catalog's revision, so it is a moment behind the tap that moved the chat.
+    @MainActor
+    private func waitForLabel(of element: XCUIElement, containing text: String, _ expected: Bool) -> Bool {
+        let deadline = Date.now.addingTimeInterval(8)
+        while Date.now < deadline {
+            if element.exists, element.label.contains(text) == expected { return true }
+            RunLoop.current.run(until: Date.now.addingTimeInterval(0.2))
+        }
+        return false
+    }
+
     @MainActor
     private func evidence(_ name: String) {
-        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        let screenshot = XCUIScreen.main.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
         attachment.name = "move-chat-\(name)"
         attachment.lifetime = .keepAlways
         add(attachment)
+        // BIGHELP_EVIDENCE=<folder> (TEST_RUNNER_BIGHELP_EVIDENCE through xcodebuild) also saves it as a PNG.
+        guard let folder = ProcessInfo.processInfo.environment["BIGHELP_EVIDENCE"] else { return }
+        try? screenshot.pngRepresentation
+            .write(to: URL(fileURLWithPath: folder).appendingPathComponent("move-chat-\(name).png"))
     }
 }

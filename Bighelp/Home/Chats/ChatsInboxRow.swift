@@ -40,6 +40,11 @@ struct ChatsInboxRow: Identifiable, Equatable {
     /// Its bot's Bot Chat state in `BotChatActivityStore`; nil for any other chat, whose state the
     /// store doesn't know.
     let activityKey: String?
+    /// The project it's in, as the catalog names it. Nil for no project, and for a chat on another
+    /// computer, whose all-hosts copy carries no project.
+    var projectName: String? = nil
+    /// What the move sheet ticks as the chat's project now.
+    var projectID: String? = nil
 
     /// Pin, Mark read and Rename work through the computer in use's catalog; group chats are
     /// managed in their own settings, as on the Sessions list.
@@ -59,6 +64,8 @@ struct ChatsInboxRow: Identifiable, Equatable {
     var canRename: Bool { isManagedHere || isFleetChat }
     var canArchive: Bool { isManagedHere || isFleetChat }
     var isBotChat: Bool { !isGroup && title == "Bot Chat" }
+    /// Move to Project… is for one bot's own chat, on a computer that can move chats.
+    var canMoveToProject: Bool { isManagedHere && !isGroup && memberIDs.count == 1 }
 
     var target: ChatsInboxTarget {
         switch source {
@@ -79,7 +86,9 @@ extension ChatsInboxRow {
             isPinned: session.isPinned, isUnread: session.isUnread, tracksUnread: session.tracksUnread,
             hasDraft: session.hasDraft, isActive: session.isActive, isGroup: isGroup, isCode: isCode,
             memberIDs: session.agentIDs, origin: session.origin, computerTag: nil,
-            activityKey: isBotChat ? session.agentIDs.first.map(BotChatActivityStore.liveKey) : nil
+            activityKey: isBotChat ? session.agentIDs.first.map(BotChatActivityStore.liveKey) : nil,
+            projectName: session.workspaceName?.isEmpty == false ? session.workspaceName : nil,
+            projectID: session.workspaceID
         )
     }
 
@@ -129,6 +138,9 @@ struct ChatsInboxRowLabel: View {
     let row: ChatsInboxRow
     let face: AnyView
     let activity: BotChatActivityStore?
+    /// Settings › Chat › Project names: the chat's project under the preview. On by default, and
+    /// the same switch the Sessions list reads.
+    var showsProject = false
     @Environment(\.dynamicTypeSize) private var typeSize
     @BighelpThemeReader private var theme
 
@@ -168,6 +180,7 @@ struct ChatsInboxRowLabel: View {
                     }
                 }
                 secondLine
+                projectLine
             }
         }
         .padding(.vertical, BighelpTokens.space8)
@@ -226,6 +239,27 @@ struct ChatsInboxRowLabel: View {
                         .truncationMode(.tail)
                 }
             }
+        }
+    }
+
+    /// Settings › Chat › Project names: the chat's project on a line of its own under the preview,
+    /// as a Sessions row draws it, so at large text sizes neither the project nor the preview is
+    /// cut to a few letters.
+    @ViewBuilder
+    private var projectLine: some View {
+        if showsProject, let project = row.projectName {
+            HStack(spacing: BighelpTokens.space4) {
+                Image(systemName: "folder")
+                    .font(.bighelp(.caption2))
+                    .accessibilityHidden(true)
+                Text(project)
+                    .font(.bighelp(.footnote, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .foregroundStyle(theme.secondaryText)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("In project \(project)")
         }
     }
 

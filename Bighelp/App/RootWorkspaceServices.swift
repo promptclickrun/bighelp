@@ -216,7 +216,7 @@ extension RootShellView {
         }
         #if DEBUG
         if usesDemoFixtures, ProcessInfo.processInfo.arguments.contains("-voice-settings-fixture") {
-            return "fixture-voice-settings"
+            return VoiceSettingsView.fixtureScope
         }
         #endif
         return nil
@@ -241,7 +241,7 @@ extension RootShellView {
         }
         #if DEBUG
         if usesDemoFixtures, ProcessInfo.processInfo.arguments.contains("-voice-settings-fixture") {
-            return Self.withOnDeviceVoices(voiceSettingsPreview, computer: "fixture-voice-settings")
+            return Self.withOnDeviceVoices(voiceSettingsPreview, computer: VoiceSettingsView.fixtureScope)
         }
         #endif
         return nil

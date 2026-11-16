@@ -65,7 +65,19 @@ struct VoiceSettingsView: View {
     }
 
     /// The computer agents' own voice choices are kept under (`AgentVoiceChoices`).
-    private var computer: String? { workspaceConnections?.owner?.cacheScopeID }
+    private var computer: String? {
+        if let computer = workspaceConnections?.owner?.cacheScopeID { return computer }
+        #if DEBUG
+        // The demo's voice settings (`-voice-settings-fixture`) have no computer. Without one the page
+        // said "Connect to your computer", except on a simulator that had a real computer saved.
+        if scope == Self.fixtureScope { return scope }
+        #endif
+        return nil
+    }
+
+    /// `RootShellView.voiceSettingsScope` for the demo's voice settings, and the computer its on-device
+    /// voices are kept under.
+    static let fixtureScope = "fixture-voice-settings"
 
     /// The For picker's entry for the default every agent without its own choice uses. No Hermes
     /// profile is named this; "" stays "no agent yet", which the first agents to load replace.

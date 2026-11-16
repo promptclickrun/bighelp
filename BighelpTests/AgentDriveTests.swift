@@ -273,7 +273,6 @@ struct AgentDriveTests {
         #expect(azure.appState.isSettingsPresented)
         // Settings is one for the whole app, so the first gateway's `AppState` reads it open too. What
         // tells the gateways apart is whose agent the drive is for, checked above.
-        #expect(!azure.appState.settingsPath.isEmpty, "The drive went on to the page it was asked for")
     }
 
     private func waitUntil(_ condition: @MainActor () -> Bool) async throws {

@@ -87,8 +87,27 @@ final class MoveChatToProjectUITests: BighelpUITestCase {
         evidence("chats-row-moved")
     }
 
-    /// The project line and the hold menu at the default text size and a large one, in light and dark:
-    /// the row names its project at every size, and the menu keeps its way to move the chat.
+    /// Settings › Chat › Project names off: the row names no project, and the hold menu still moves the chat.
+    @MainActor
+    func testTheProjectNamesSwitchTakesTheLineOffTheChatsRow() throws {
+        let app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-loopdy.home.landing", "chats",
+                               "-bighelp.hosts.all-hosts", "NO", "-bighelp.chat-list.shows-project", "NO"]
+        app.launch()
+        let finance = chatRow("demo-finance", in: app)
+        XCTAssertTrue(finance.waitForExistence(timeout: 20))
+        XCTAssertFalse(finance.label.contains("In project"), finance.label)
+        evidence("chats-switch-off")
+
+        finance.press(forDuration: 1.2)
+        let move = app.buttons["chats.action.move-project.here/demo-finance"].firstMatch
+        XCTAssertTrue(move.waitForExistence(timeout: 5), "The move doesn't depend on the switch")
+        XCTAssertTrue(move.label.contains("now in Bighelp"), move.label)
+    }
+
+    /// The project line and the hold menu at the default text size and a large one, in light and dark.
+    /// The checks read what VoiceOver reads: the row names its project at every size, and the menu keeps
+    /// its way to move the chat. The pictures show the line itself.
     @MainActor
     func testAChatsRowKeepsItsProjectAndItsMoveAtLargeTextInLightAndDark() throws {
         defer { XCUIDevice.shared.appearance = .light }

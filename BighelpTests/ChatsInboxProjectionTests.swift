@@ -228,4 +228,30 @@ struct ChatsInboxProjectionTests {
         let group = rows.first { $0.isGroup }
         #expect(group?.canMoveToProject == false)
     }
+
+    /// The Chats list stays on screen while the computer's connection closes or another computer comes
+    /// into use, so the list's own mover changes under an open sheet. The sheet keeps the mover of the
+    /// computer its chat was held on, and a row that can't move opens no sheet.
+    @Test func aMoveSheetKeepsTheMoverItWasOpenedWith() throws {
+        let rows = ChatsInboxProjection.rows(ChatsInboxInput(
+            sessions: [session("here", at: 20, project: ("home", "Home"))], rooms: [room("crew")],
+            selectedHostID: Self.home,
+            computers: computers(studio: [fleetChat("away", on: Self.studio, at: 5)]), showsComputerTags: true))
+        let here = try #require(rows.first { $0.title == "Here" })
+        let store = HermesWorkspaceStore(client: FixtureHermesWorkspaceClient())
+        let move = ChatProjectMove(store: store) { _, _ in }
+
+        let target = try #require(ChatsProjectMoveTarget(row: here, move: move))
+        #expect(target.move.store === store)
+        #expect(target.sessionID == "here")
+        #expect(target.agentID == "mina")
+        #expect(target.row.projectID == "home")
+        #expect(target.id == here.id)
+
+        #expect(ChatsProjectMoveTarget(row: here, move: nil) == nil, "A computer that can't move chats opens no sheet")
+        let away = try #require(rows.first { $0.title == "Away" })
+        #expect(ChatsProjectMoveTarget(row: away, move: move) == nil, "Another computer's chat is not moved from here")
+        let group = try #require(rows.first { $0.isGroup })
+        #expect(ChatsProjectMoveTarget(row: group, move: move) == nil)
+    }
 }

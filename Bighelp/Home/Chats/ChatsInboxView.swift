@@ -41,6 +41,28 @@ struct ChatsInboxContext {
 
 /// The first tab's Chats view: every chat on every computer in one list, Pinned on top, then the
 /// newest. Search and one row of chips (All, each computer, Unread) sit over it.
+/// The chat a Move to Project… sheet is open for, with the mover of the computer it was held on.
+/// The Chats list stays on screen while that computer's connection closes, or while another computer
+/// comes into use, and the list's own mover is then nil or the other computer's. A sheet that read
+/// the list's mover went empty, with no Cancel, or showed another computer's projects for this chat.
+struct ChatsProjectMoveTarget: Identifiable {
+    let row: ChatsInboxRow
+    let move: ChatProjectMove
+    let agentID: String
+    let sessionID: String
+    var id: String { row.id }
+
+    /// Nil for a row that can't move, and while this computer can't move chats.
+    init?(row: ChatsInboxRow, move: ChatProjectMove?) {
+        guard let move, row.canMoveToProject, case .session(let summary) = row.source,
+              let agentID = summary.agentIDs.first else { return nil }
+        self.row = row
+        self.move = move
+        self.agentID = agentID
+        sessionID = summary.id
+    }
+}
+
 struct ChatsInboxView: View {
     let context: ChatsInboxContext
 
@@ -48,8 +70,8 @@ struct ChatsInboxView: View {
     @State private var filter: ChatsInboxFilter = .all
     @State private var renaming: ChatsInboxRow?
     @State private var renameDraft = ""
-    /// The chat whose Move to Project… sheet is open.
-    @State private var projectMoveTarget: ChatsInboxRow?
+    /// The chat whose Move to Project… sheet is open, with the mover it was opened with.
+    @State private var projectMoveTarget: ChatsProjectMoveTarget?
     @State private var cache = ChatsInboxCache()
     /// Settings › Chat › Project names, the switch the Sessions list reads too.
     @AppStorage(ChatLayoutPreferences.showsChatProjectKey)
@@ -106,12 +128,9 @@ struct ChatsInboxView: View {
         // One sheet for the list, as the Sessions page has: a tap moves the chat, and the sheet
         // closes only once Hermes confirms it. The moved project shows here without waiting for
         // the next load (`ShellFeatureStore.recordMovedProject`).
-        .bighelpSheet(item: $projectMoveTarget) { row in
-            if let move = context.projectMove, case .session(let summary) = row.source,
-               let agentID = summary.agentIDs.first {
-                MoveChatToProjectSheet(move: move, chatTitle: row.title, agentID: agentID,
-                                       sessionID: summary.id, currentProjectID: row.projectID)
-            }
+        .bighelpSheet(item: $projectMoveTarget) { target in
+            MoveChatToProjectSheet(move: target.move, chatTitle: target.row.title, agentID: target.agentID,
+                                   sessionID: target.sessionID, currentProjectID: target.row.projectID)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("chats.inbox")
@@ -262,9 +281,9 @@ struct ChatsInboxView: View {
     /// nobody has to open the sheet to find out where the chat lives.
     @ViewBuilder
     private func moveToProjectButton(_ row: ChatsInboxRow) -> some View {
-        if context.projectMove != nil, row.canMoveToProject {
+        if let target = ChatsProjectMoveTarget(row: row, move: context.projectMove) {
             Button {
-                projectMoveTarget = row
+                projectMoveTarget = target
             } label: {
                 Text(typeSize.isAccessibilitySize ? "Move…" : "Move to Project…")
                 if !typeSize.isAccessibilitySize, let name = row.projectName {

@@ -362,6 +362,27 @@ struct SettingsStoreTests {
         #expect(BotChatExperience.allCases == [.botChat, .lastChat, .newChat])
     }
 
+    /// Where the share sheet's Send goes (#1071): a new chat until someone picks the bot's ongoing
+    /// chat, kept in the app group's defaults, where the share sheet reads it.
+    @Test func shareTargetDefaultsToANewChatAndIsKeptWhereTheShareSheetReadsIt() {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let shared = UserDefaults(suiteName: suiteName + ".group")!
+        defaults.removePersistentDomain(forName: suiteName)
+        shared.removePersistentDomain(forName: suiteName + ".group")
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            shared.removePersistentDomain(forName: suiteName + ".group")
+        }
+
+        #expect(SettingsStore(defaults: defaults, shareDefaults: shared).shareTarget == .newChat)
+        SettingsStore(defaults: defaults, shareDefaults: shared).shareTarget = .botChat
+        #expect(PendingShareTarget.read(from: shared) == .botChat)
+        #expect(defaults.string(forKey: PendingShareTarget.key) == nil)
+        #expect(SettingsStore(defaults: defaults, shareDefaults: shared).shareTarget == .botChat)
+        #expect(PendingShareTarget.allCases == [.newChat, .botChat])
+    }
+
     @Test func midSessionChatBehaviorDefaultsToSteerAndOffersEveryHermesMode() {
         let suiteName = #function
         let defaults = UserDefaults(suiteName: suiteName)!

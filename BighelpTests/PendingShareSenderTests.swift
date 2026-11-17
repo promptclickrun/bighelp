@@ -45,16 +45,35 @@ struct PendingShareSenderTests {
         var notSent: [String?] = []
         var isActive = true
         var backgroundTime: TimeInterval = 30
+        /// What Settings › Chat › From other apps says, and what each try asked for.
+        var choice: PendingShareTarget = .newChat
+        var into: [PendingShareTarget] = []
+        /// A computer that gives the bot no ongoing chat.
+        var givesNoOngoingChat = false
         /// What happens while the chat is being made.
         var whileAsked: () throws -> Void = {}
     }
 
+    /// A working bot's chat that remembers how each message during the turn went to Hermes.
+    private final class TurnClient: ConversationFixtureClient, MidSessionConversationClient {
+        var behaviors: [MidSessionChatBehavior] = []
+
+        func sendMidSession(message: String, attachments: [ChatAttachment], conversationID: String,
+                            behavior: MidSessionChatBehavior,
+                            onDraft: @escaping (TimelineItem) -> Void) async throws -> MidSessionSubmissionOutcome {
+            behaviors.append(behavior)
+            return .accepted
+        }
+    }
+
     private func sender(_ center: PendingShareCenter, _ computer: Computer) -> PendingShareSender {
         let destination = destination
-        let sender = PendingShareSender(center: center) { earlier in
+        let sender = PendingShareSender(center: center) { earlier, into in
             computer.asked.append(earlier)
+            computer.into.append(into)
             try computer.whileAsked()
             if let failure = computer.failure { throw failure }
+            if into == .botChat, computer.givesNoOngoingChat { throw PendingShareSender.Failure.noOngoingChat }
             return PendingShareSender.Target(chat: computer.chats.removeFirst(), destination: destination,
                                              agentName: "Juno")
         }
@@ -63,7 +82,16 @@ struct PendingShareSenderTests {
         sender.backgroundTimeLeft = { computer.backgroundTime }
         sender.settleLimit = .seconds(2)
         sender.retryGap = .zero
+        sender.target = { computer.choice }
+        sender.busyRecheck = nil
         return sender
+    }
+
+    private func sentTexts(_ chat: ChatModel) -> [String] {
+        chat.items.compactMap { item in
+            guard item.role == .human, case .message(let text) = item.content else { return nil }
+            return text
+        }
     }
 
     private func chat(_ client: any ConversationClient = ConversationFixtureClient()) -> ChatModel {
@@ -257,6 +285,177 @@ struct PendingShareSenderTests {
         for _ in 0..<3 { await sender.run() }
         #expect(center.next()?.id == share.id)
         #expect(placement(share.id)?.isAutomatic == true)
+    }
+
+    // MARK: - The bot's ongoing chat (#1071)
+
+    @Test(.timeLimit(.minutes(1))) func inTheOngoingChatTheShareGoesAfterWhatIsThere() async throws {
+        let share = try save()
+        let center = PendingShareCenter(inbox: inbox)
+        let computer = Computer()
+        computer.choice = .botChat
+        let ongoing = chat()
+        ongoing.draft = "An earlier made-up message"
+        await ongoing.send()
+        #expect(!PendingShareSender.isBlank(ongoing), "A new chat would never take a chat like this one")
+        computer.chats = [ongoing]
+
+        await sender(center, computer).run()
+
+        #expect(computer.into == [.botChat])
+        #expect(savedIDs.isEmpty, "Hermes took it")
+        let texts = sentTexts(ongoing)
+        #expect(texts.count == 2 && texts.first == "An earlier made-up message")
+        #expect(texts.last?.contains("A made-up article") == true)
+        #expect(placement(share.id) == nil)
+    }
+
+    @Test(.timeLimit(.minutes(1))) func whileThePersonTypesThereTheShareWaitsWithoutTakingTheirWords() async throws {
+        let share = try save()
+        let center = PendingShareCenter(inbox: inbox)
+        let computer = Computer()
+        computer.choice = .botChat
+        let ongoing = chat()
+        ongoing.draft = "Half a made-up thought"
+        computer.chats = Array(repeating: ongoing, count: 5)
+        let sender = sender(center, computer)
+
+        for _ in 0..<4 { await sender.run() }
+        #expect(ongoing.draft == "Half a made-up thought" && ongoing.items.isEmpty, "Nothing of theirs moved")
+        #expect(savedIDs == [share.id] && center.next() == nil, "Waiting is not a try: still bighelp's to send")
+        #expect(placement(share.id) == nil, "Not placed while it waits")
+
+        // They send their own message or clear the box: the share goes.
+        ongoing.draft = ""
+        await sender.run()
+        #expect(savedIDs.isEmpty)
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aChatThatStaysBusyHandsTheShareToTheReview() async throws {
+        let share = try save()
+        let center = PendingShareCenter(inbox: inbox)
+        let computer = Computer()
+        computer.choice = .botChat
+        let ongoing = chat()
+        ongoing.draft = "Never sent"
+        computer.chats = [ongoing]
+        let sender = sender(center, computer)
+        sender.busyLimit = .zero
+        await sender.run()
+        #expect(center.next()?.id == share.id)
+        #expect(ongoing.draft == "Never sent")
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aBusyChatIsLookedAtAgainWhileBighelpIsOpen() async throws {
+        _ = try save()
+        let center = PendingShareCenter(inbox: inbox)
+        let computer = Computer()
+        computer.choice = .botChat
+        let ongoing = chat()
+        ongoing.draft = "Typing"
+        computer.chats = [ongoing, ongoing]
+        let sender = sender(center, computer)
+        sender.busyRecheck = .milliseconds(200)
+        await sender.run()
+        ongoing.draft = ""
+        for _ in 0..<40 where !savedIDs.isEmpty { try await Task.sleep(for: .milliseconds(100)) }
+        #expect(savedIDs.isEmpty, "Sent on the next look, with no new trigger")
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aWorkingBotGetsTheShareInItsQueueNeverAsASteer() async throws {
+        _ = try save()
+        let center = PendingShareCenter(inbox: inbox)
+        let computer = Computer()
+        computer.choice = .botChat
+        let client = TurnClient()
+        let ongoing = chat(client)
+        ongoing.isSending = true
+        #expect(ongoing.isMidSessionTurnLive && ongoing.midSessionBehavior() == .steer,
+                "The person's own Send would steer")
+        computer.chats = [ongoing]
+
+        await sender(center, computer).run()
+
+        #expect(client.behaviors == [.queued])
+        #expect(savedIDs.isEmpty)
+    }
+
+    @Test(.timeLimit(.minutes(1))) func whatThePersonTypesWhileTheShareGoesInStopsTheSend() async throws {
+        let share = try save()
+        let center = PendingShareCenter(inbox: inbox)
+        let ongoing = chat()
+        #expect(await ongoing.placeShare(share, from: inbox, tracker: center) == .placed)
+        #expect(PendingShareSender.boxHoldsOnly(share, ongoing), "Its words alone: Send may take the box")
+        ongoing.draft += " and a typed word"
+        #expect(!PendingShareSender.boxHoldsOnly(share, ongoing), "Their words would go with it: nothing goes")
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aComputerWithNoOngoingChatGetsTheShareInANewChatOnTheLastTry() async throws {
+        _ = try save()
+        let center = PendingShareCenter(inbox: inbox)
+        let computer = Computer()
+        computer.choice = .botChat
+        computer.givesNoOngoingChat = true
+        computer.chats = [chat()]
+        let sender = sender(center, computer)
+        await sender.run()
+        await sender.run()
+        #expect(savedIDs.count == 1 && center.next() == nil, "A busy computer may give one next time")
+        await sender.run()
+        #expect(computer.into == [.botChat, .botChat, .botChat, .newChat])
+        #expect(savedIDs.isEmpty, "Sent rather than left for the review")
+    }
+
+    @Test func aShareSentWithoutAnAnswerDoesNotHoldUpTheNextButOneOnItsWayDoes() throws {
+        let earlier = try save(text: "An earlier made-up share")
+        let ongoing = chat()
+        var ledger = PendingShareLedger(conversationID: "chat-9")
+        _ = ledger.beginPlacing(earlier)
+        _ = ledger.finishPlacing(earlier.id)
+        _ = ledger.leaveBox(as: "m1", text: earlier.composerText, attachmentIDs: [], now: .now)
+        _ = ledger.dispatch("m1", now: .now)
+        ongoing.shareLedger = ledger
+        #expect(PendingShareSender.whyBusy(ongoing) == "another share", "On its way: wait for it")
+        _ = ledger.unknown(row: "m1", now: .now)
+        ongoing.shareLedger = ledger
+        #expect(PendingShareSender.whyBusy(ongoing) == nil, "No answer came: it waits for a receipt, not the next share")
+    }
+
+    @Test func aChatStillReadingItsHistoryWaits() {
+        let ongoing = chat()
+        ongoing.isHydratingHistory = true
+        #expect(PendingShareSender.whyBusy(ongoing) == "opening")
+    }
+
+    @Test(.timeLimit(.minutes(1))) func wordsATryLeftInTheOngoingChatAreTakenBackNotWaitedOn() async throws {
+        let share = try save()
+        try inbox.place(share.id, PendingSharePlacement(destination: destination, agentName: "Juno", placedAt: .now,
+                                                       isAutomatic: true))
+        let center = PendingShareCenter(inbox: inbox)
+        let computer = Computer()
+        computer.choice = .botChat
+        // bighelp ended after the share went in the box and before it was sent; the box was saved.
+        let ongoing = chat()
+        ongoing.draft = share.composerText
+        computer.chats = [ongoing]
+
+        await sender(center, computer).run()
+
+        #expect(savedIDs.isEmpty)
+        #expect(sentTexts(ongoing) == [share.composerText], "Sent once, not twice")
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aNewChatStaysTheDefaultAndSettingsDecidesEachTry() async throws {
+        _ = try save()
+        let center = PendingShareCenter(inbox: inbox)
+        let computer = Computer()
+        computer.failure = .unreachable
+        let sender = sender(center, computer)
+        await sender.run()
+        computer.choice = .botChat
+        await sender.run()
+        #expect(computer.into == [.newChat, .botChat])
+        #expect(PendingShareTarget.read(from: nil) == .newChat)
     }
 
     // MARK: - What the share sheet and the app agree on

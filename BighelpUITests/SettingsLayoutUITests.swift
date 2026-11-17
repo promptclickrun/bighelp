@@ -59,6 +59,12 @@ final class SettingsLayoutUITests: BighelpUITestCase {
             reach(header("In a chat", in: app), in: app)
             let title = reach(app.switches["settings.chat.session-title"].firstMatch, in: app)
             XCTAssertEqual(title.label, "Chat title", "A switch says what it is, with no sentence under it")
+            // Where the share sheet's Send goes (#1071): its value is the second line.
+            reach(header("From other apps", in: app), in: app)
+            let shares = reach(app.buttons["settings.chat.share-target"].firstMatch, in: app)
+            // Its value is kept in the app group, which a simulator keeps between runs: not checked here.
+            XCTAssertTrue(shares.label.contains("Shares go to"), shares.label)
+            save("06a-chat-from-other-apps-\(appearance)", app)
             reach(header("Advanced · A bot's work", in: app), in: app)
             reach(app.switches["settings.chat.fold-completed-turns"].firstMatch, in: app)
             save("06-chat-advanced-\(appearance)", app)

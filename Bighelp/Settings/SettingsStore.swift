@@ -230,6 +230,12 @@ final class SettingsStore {
         didSet { defaults.set(botChatExperience.rawValue, forKey: Keys.botChatExperience) }
     }
 
+    /// Where the share sheet's Send goes (Settings › Chat › From other apps). Kept in the app group, not
+    /// `defaults`: the share sheet reads it too.
+    var shareTarget: PendingShareTarget {
+        didSet { shareDefaults?.set(shareTarget.rawValue, forKey: PendingShareTarget.key) }
+    }
+
     var foldCompletedTurns: Bool {
         didSet { defaults.set(foldCompletedTurns, forKey: Keys.foldCompletedTurns) }
     }
@@ -333,12 +339,16 @@ final class SettingsStore {
     }
 
     private let defaults: UserDefaults
+    /// The app group's defaults, which the share sheet reads.
+    private let shareDefaults: UserDefaults?
 
     init(
         defaults: UserDefaults = .standard,
+        shareDefaults: UserDefaults? = UserDefaults(suiteName: PendingShareInbox.appGroup),
         legacyThemeLogoDirectory: URL? = nil
     ) {
         self.defaults = defaults
+        self.shareDefaults = shareDefaults
         Self.removeRetiredThemes(defaults: defaults,
                                  logoDirectory: legacyThemeLogoDirectory ?? Self.defaultLegacyThemeLogoDirectory)
         // Before anything below reads the keys it may write.
@@ -430,6 +440,7 @@ final class SettingsStore {
         botChatExperience = BotChatExperience(
             rawValue: defaults.string(forKey: Keys.botChatExperience) ?? ""
         ) ?? .botChat
+        shareTarget = PendingShareTarget.read(from: shareDefaults)
         foldCompletedTurns = defaults.bool(forKey: Keys.foldCompletedTurns, default: true)
         reactionsReachAgent = defaults.bool(forKey: Keys.reactionsReachAgent, default: true)
         lightBackground = defaults.string(forKey: Keys.lightBackground).flatMap(BighelpLightBackground.init(rawValue:)) ?? .paper

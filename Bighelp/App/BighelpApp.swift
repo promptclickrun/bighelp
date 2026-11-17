@@ -473,7 +473,11 @@ struct BighelpApp: App {
                                                connections: WorkspaceConnectionStore, usesDemoWorkspace: Bool) {
         let shortcuts = composition.shortcutService
         let live = PendingShareSender.live({ try await shortcuts.connectedWorkspace(needs: .chats) },
-                                           scope: { connections.owner?.cacheScopeID })
+                                           scope: { connections.owner?.cacheScopeID },
+                                           botChat: { agentID in
+            guard let owner = connections.owner else { throw WorkspaceClientError.ownerChanged }
+            return try await connections.openCanonicalSession(agentID, owner)
+        })
         let demoHosts = composition.demoHosts
         let demoWorkspace = BighelpShortcutWorkspace(
             appState: composition.appState, agents: composition.agentDirectory,
@@ -481,10 +485,12 @@ struct BighelpApp: App {
             featureStore: composition.featureStore, newChatCoordinator: composition.newChatCoordinator)
         let demo = PendingShareSender.live({ demoWorkspace }, scope: {
             (try? WorkspaceAuthority.fixture(id: demoHosts.selectedHostID ?? "demo"))?.cacheScopeID
+        }, botChat: { agentID in
+            try DemoSessionCatalogClient.canonicalID(profileID: agentID, records: composition.sessionCatalog.records)
         })
-        PendingShareSender.shared.bind { earlier in
-            if usesDemoWorkspace, !connections.isDirectSelected { return try await demo(earlier) }
-            return try await live(earlier)
+        PendingShareSender.shared.bind { earlier, into in
+            if usesDemoWorkspace, !connections.isDirectSelected { return try await demo(earlier, into) }
+            return try await live(earlier, into)
         }
         PendingShareWakeReceiver.shared.listen()
     }

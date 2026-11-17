@@ -48,6 +48,25 @@ enum PendingShareWake {
     }
 }
 
+/// Where bighelp sends a share the sheet's Send saved (#1071): a new chat with the default bot, or
+/// that bot's ongoing chat (its Bot Chat). Settings › Chat › From other apps picks it. It lives in the
+/// app group, so the sheet says where the share goes before Send.
+enum PendingShareTarget: String, CaseIterable, Identifiable, Sendable {
+    case newChat
+    case botChat
+
+    var id: Self { self }
+
+    static let key = "bighelp.share.target"
+
+    /// A new chat until someone picks the ongoing chat.
+    static func read(from defaults: UserDefaults?) -> PendingShareTarget {
+        defaults?.string(forKey: key).flatMap(Self.init(rawValue:)) ?? .newChat
+    }
+
+    static var current: PendingShareTarget { read(from: UserDefaults(suiteName: PendingShareInbox.appGroup)) }
+}
+
 /// The default bot's name, for the share sheet to say who gets a share. The app writes it for its
 /// widgets (`BighelpWidgetSnapshot`, in the app group); the sheet reads only this one field.
 enum PendingShareDefaultBot {

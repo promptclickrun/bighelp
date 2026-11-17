@@ -11089,6 +11089,29 @@
         }
       }
     },
+    "From other apps": {
+      "comment": "Settings › Chat › From other apps: where the share sheet's Send goes (#1071). Drafts; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Aus anderen Apps"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From other apps"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "来自其他应用"
+          }
+        }
+      }
+    },
     "GPT Live 1 · a live conversation": {
       "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
       "localizations": {
@@ -24237,6 +24260,29 @@
         }
       }
     },
+    "Shares go to": {
+      "comment": "Settings › Chat › From other apps: where the share sheet's Send goes (#1071). Drafts; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Geteiltes geht an"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shares go to"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "分享内容发送到"
+          }
+        }
+      }
+    },
     "Shell hooks": {
       "comment": "Simplified Chinese draft for one Settings (#976); fluent-speaker review pending.",
       "localizations": {
@@ -27268,6 +27314,29 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "无法创建机器人。请检查电脑，然后重试。"
+          }
+        }
+      }
+    },
+    "The bot's ongoing chat": {
+      "comment": "Settings › Chat › From other apps: where the share sheet's Send goes (#1071). Drafts; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Der laufende Chat des Bots"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The bot's ongoing chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "机器人的持续聊天"
           }
         }
       }
@@ -31391,6 +31460,29 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "需要改什么？"
+          }
+        }
+      }
+    },
+    "What you share with Bighelp goes to your default bot.": {
+      "comment": "Settings › Chat › From other apps: where the share sheet's Send goes (#1071). Drafts; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Was du mit Bighelp teilst, geht an deinen Standard-Bot."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What you share with Bighelp goes to your default bot."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "你分享给 Bighelp 的内容会发送给你的默认机器人。"
           }
         }
       }

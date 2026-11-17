@@ -36,6 +36,11 @@ final class PendingShareCenter: ChatShareTracking {
     /// cover the chat the person just picked.
     private var isPaused = false
     @ObservationIgnored private var holders: [String: WeakHolder] = [:]
+    /// Shares meant for the default bot that `PendingShareSender` couldn't send: offered for review
+    /// like any other from then on.
+    private var givenUp: Set<String> = []
+    /// Shares `PendingShareSender` is sending right now. Held, so nothing else opens one meanwhile.
+    private var beingSent: Set<String> = []
     /// Hermes took these; their saved copies are on their way out and never listed again.
     @ObservationIgnored private var spent: Set<String> = []
 
@@ -48,9 +53,10 @@ final class PendingShareCenter: ChatShareTracking {
     }
 
     /// Reads the inbox again, off the main thread, each time bighelp comes to the front. A new share
-    /// brings back the ones put off.
-    func refresh() async {
-        isPaused = false
+    /// brings back the ones put off. `PendingShareSender` reads too, and shows nothing: its read
+    /// leaves the reviews paused after Open as they are.
+    func refresh(resumesReview: Bool = true) async {
+        if resumesReview { isPaused = false }
         guard let inbox else { return }
         let spent = spent
         let (listed, left) = await Task.detached(priority: .utility) { () -> ([PendingShareInbox.Entry], [String]) in
@@ -72,22 +78,48 @@ final class PendingShareCenter: ChatShareTracking {
         deferred.formIntersection(ids)
         handedOff = handedOff.filter { ids.contains($0.key) }
         holders = holders.filter { ids.contains($0.key) }
+        givenUp.formIntersection(ids)
         if read != entries { entries = read }
     }
 
-    /// The share to review on its own now: not put off, not in a chat, not on its way to one.
+    /// The share to review on its own now: not put off, not in a chat, not on its way to one, and
+    /// not one bighelp sends to the default bot itself.
     func next(now: Date = .now) -> PendingShareInbox.Entry? {
         guard !isPaused else { return nil }
         return entries.first { entry in
-            !deferred.contains(entry.id) && !isHeld(entry.id)
+            !deferred.contains(entry.id) && !isHeld(entry.id) && !sendsItself(entry)
                 && !(handedOff[entry.id].map { now.timeIntervalSince($0) < Self.handOffLifetime } ?? false)
         }
     }
 
+    /// Meant for the default bot and still `PendingShareSender`'s: not given up, not put in a chat
+    /// by the person, and not in a message that may have reached Hermes. Those are the person's to
+    /// look at, as they were before the sheet had Send.
+    func sendsItself(_ entry: PendingShareInbox.Entry) -> Bool {
+        guard case .share(let share, let placement) = entry, share.sendsItself == true,
+              !givenUp.contains(share.id) else { return false }
+        guard let placement else { return true }
+        return placement.isAutomatic == true && placement.recovery == .notSent
+    }
+
+    func isBeingSent(_ id: String) -> Bool { beingSent.contains(id) }
+
+    func beginSending(_ id: String) { beingSent.insert(id) }
+
+    func endSending(_ id: String) { beingSent.remove(id) }
+
+    /// `PendingShareSender` stops trying: the person picks where it goes, in a review on its own
+    /// even when a refused send had put it off.
+    func giveUp(_ id: String) {
+        givenUp.insert(id)
+        deferred.remove(id)
+    }
+
     var waitingCount: Int { entries.count }
 
-    /// In a chat's message box, or on its way in a message from there. Asks the chat itself.
-    func isHeld(_ id: String) -> Bool { holders[id]?.model?.holdsShare(id) == true }
+    /// In a chat's message box, or on its way in a message from there (asks the chat itself), or
+    /// with `PendingShareSender` right now.
+    func isHeld(_ id: String) -> Bool { beingSent.contains(id) || holders[id]?.model?.holdsShare(id) == true }
 
     func isDeferred(_ id: String) -> Bool { deferred.contains(id) }
 
@@ -96,16 +128,23 @@ final class PendingShareCenter: ChatShareTracking {
     func showList() { isListShown = true }
 
     /// Records where the person put the share, before any chat opens: a share they leave there
-    /// unsent says so after a relaunch.
+    /// unsent says so after a relaunch. `automatic` is `PendingShareSender`'s own choice of chat,
+    /// which opens nothing, so the other reviews go on.
     func place(_ share: PendingShare, at destination: PendingShareDestination, agentName: String,
-               now: Date = .now) async throws {
+               automatic: Bool = false, now: Date = .now) async throws {
         guard let inbox else { throw PendingShareError.storageUnavailable }
-        let placement = PendingSharePlacement(destination: destination, agentName: agentName, placedAt: now)
+        let placement = PendingSharePlacement(destination: destination, agentName: agentName, placedAt: now,
+                                              isAutomatic: automatic ? true : nil)
         let id = share.id
-        try await Task.detached(priority: .userInitiated) { try inbox.place(id, placement) }.value
+        // The sender's own choice never replaces one the person made, or one a message already took.
+        try await Task.detached(priority: .userInitiated) {
+            try inbox.place(id, placement, onlyUnsent: automatic)
+        }.value
         handedOff[id] = now
-        deferred.remove(id)
-        isPaused = true
+        if !automatic {
+            deferred.remove(id)
+            isPaused = true
+        }
         update(id) { _ in placement }
     }
 
@@ -122,11 +161,12 @@ final class PendingShareCenter: ChatShareTracking {
         update(id) { _ in saved }
     }
 
-    /// No chat took it after all; it's offered again.
-    func release(_ id: String) {
+    /// No chat took it after all; it's offered again. `PendingShareSender` opened nothing, so its
+    /// release leaves the other reviews as they are.
+    func release(_ id: String, resumesReview: Bool = true) {
         holders[id] = nil
         handedOff[id] = nil
-        isPaused = false
+        if resumesReview { isPaused = false }
     }
 
     /// The person deleted it.
@@ -225,6 +265,7 @@ final class PendingShareCenter: ChatShareTracking {
         entries.removeAll { $0.id == id }
         deferred.remove(id)
         handedOff[id] = nil
+        givenUp.remove(id)
     }
 
     #if DEBUG

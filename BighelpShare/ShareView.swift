@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// What was shared, a note, and Save. It says plainly what happens next: nothing is sent from
-/// here, and bighelp has to be opened to choose who gets it and send it, because iOS doesn't let a
-/// share sheet open its app.
+/// What was shared, a note, and Send. It says who gets it: the default bot, in a new chat. Send saves
+/// the share for bighelp and closes the sheet; bighelp does the sending (#1069).
 struct ShareView: View {
     @ObservedObject var model: ShareModel
     var cancel: () -> Void
@@ -10,30 +9,40 @@ struct ShareView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if model.phase == .saved { saved } else { form }
-            }
-            .navigationTitle("Save for Bighelp")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if model.phase != .saved {
+            form
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         // Saving takes a moment and can't be undone halfway.
                         Button("Cancel", action: cancel)
-                            .disabled(model.phase == .saving)
+                            .disabled(model.phase == .saving || model.phase == .saved)
                     }
                     ToolbarItem(placement: .confirmationAction) {
-                        if model.phase == .saving {
+                        if model.phase == .saving || model.phase == .saved {
                             ProgressView()
                         } else {
-                            Button("Save") { Task { await model.save() } }
-                                .bold()
-                                .disabled(!model.canSave)
+                            Button("Send") {
+                                Task { if await model.send() { done() } }
+                            }
+                            .bold()
+                            .disabled(!model.canSave)
+                            .accessibilityIdentifier("share.send")
                         }
                     }
                 }
-            }
         }
+    }
+
+    private var title: String {
+        model.botName.map { String(localized: "Send to \($0)") } ?? String(localized: "Send to Bighelp")
+    }
+
+    private var whatHappens: String {
+        if let name = model.botName {
+            return String(localized: "Bighelp sends this to \(name) in a new chat.")
+        }
+        return String(localized: "Bighelp sends this to your default bot in a new chat.")
     }
 
     private var form: some View {
@@ -46,41 +55,21 @@ struct ShareView: View {
                 if case .failed(let message) = model.phase {
                     Text(message).foregroundStyle(.red)
                 } else if !model.problems.isEmpty {
-                    Text("Nothing is saved while an item can't be. Cancel, then share again without it.")
+                    Text("Nothing is sent while an item can't be. Cancel, then share again without it.")
                 }
             }
             Section {
                 TextField("Add a note (optional)", text: $model.note, axis: .vertical)
                     .lineLimit(1...6)
-                    .disabled(model.phase == .saving)
+                    .disabled(model.phase == .saving || model.phase == .saved)
             } footer: {
                 if model.noteIsTooLong {
                     Text("Your note is too long.").foregroundStyle(.red)
                 } else {
-                    Text("Nothing is sent yet. In Bighelp you choose the bot and chat, look it over, and send it yourself.")
+                    Text(whatHappens)
                 }
             }
         }
-    }
-
-    private var saved: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "tray.and.arrow.down.fill")
-                .font(.system(size: 40))
-                .foregroundStyle(.tint)
-                .accessibilityHidden(true)
-            Text("Saved for Bighelp")
-                .font(.headline)
-            Text("Open Bighelp to choose the bot and chat, then send it. It stays on this device until you send it or delete it.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Button("Done", action: done)
-                .buttonStyle(.borderedProminent)
-                .padding(.top, 6)
-        }
-        .padding(28)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

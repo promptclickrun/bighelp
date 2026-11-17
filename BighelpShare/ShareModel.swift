@@ -1,9 +1,10 @@
 import Foundation
 import SwiftUI
 
-/// The share sheet: read what was shared onto the device, let the person add a note, save it for
-/// bighelp. It sends nothing and signs in to nothing; bighelp sends it, from the chat the person
-/// picks there, once they tap Send.
+/// The share sheet: read what was shared onto the device, let the person add a note, and on Send
+/// save it for bighelp, marked for the default bot. It signs in to nothing and sends nothing to a
+/// computer: it asks iOS to wake bighelp (`PendingShareWake`), and bighelp sends the share in a new
+/// chat with the default bot (`PendingShareSender`), now or when it next opens.
 @MainActor
 final class ShareModel: ObservableObject {
     struct Row: Identifiable, Equatable {
@@ -19,6 +20,7 @@ final class ShareModel: ObservableObject {
         case reading
         case ready
         case saving
+        /// Saved for bighelp to send; the sheet closes.
         case saved
         /// Nothing was saved; why.
         case failed(String)
@@ -27,14 +29,24 @@ final class ShareModel: ObservableObject {
     @Published private(set) var rows: [Row] = []
     @Published private(set) var phase: Phase = .reading
     @Published var note = ""
+    /// The default bot, as bighelp last wrote it for its widgets; nil before bighelp knew one.
+    let botName: String?
+
+    /// One per process: iOS refuses a second background session with the same identifier.
+    private static let wakeSession = URLSession(configuration: PendingShareWake.configuration())
 
     private let inbox: PendingShareInbox?
     private var draft: PendingShareDraft?
     private let cancellation = PendingShareCancellation()
     private var reading: Task<Void, Never>?
 
-    init(inbox: PendingShareInbox? = PendingShareInbox.shared()) {
+    private let wake: @MainActor () -> Void
+
+    init(inbox: PendingShareInbox? = PendingShareInbox.shared(), botName: String? = PendingShareDefaultBot.name(),
+         wake: @escaping @MainActor () -> Void = { PendingShareWake.signal(on: ShareModel.wakeSession) }) {
         self.inbox = inbox
+        self.botName = botName
+        self.wake = wake
     }
 
     var problems: [String] { rows.compactMap(\.problem) }
@@ -78,19 +90,27 @@ final class ShareModel: ObservableObject {
         }
     }
 
-    /// Saves the share in one step. Afterwards it waits in bighelp until it's sent or deleted.
-    func save() async {
-        guard canSave, let draft else { return }
+    /// Saves the share in one step, marked for the default bot, and asks iOS to wake bighelp. True
+    /// once it's saved: bighelp sends it, or keeps it until the person sends or deletes it.
+    @discardableResult
+    func send() async -> Bool {
+        guard canSave, let draft else { return false }
         phase = .saving
         let note = note
         do {
-            _ = try await Task.detached(priority: .userInitiated) { try draft.commit(note: note) }.value
+            _ = try await Task.detached(priority: .userInitiated) {
+                try draft.commit(note: note, sendsItself: true)
+            }.value
             phase = .saved
+            wake()
+            return true
         } catch let error as PendingShareError {
             // A full inbox, or the device's storage: nothing was saved, and the person can still cancel.
             phase = .failed(Self.message(for: .share(error)))
+            return false
         } catch {
             phase = .failed(Self.message(for: .share(.storageUnavailable)))
+            return false
         }
     }
 
@@ -130,7 +150,7 @@ final class ShareModel: ObservableObject {
             case .emptyFile:
                 return String(localized: "This file is empty.")
             case .inboxFull(let shares):
-                return String(localized: "Bighelp is holding \(shares) shares you haven't sent. Open Bighelp, send or delete some, then share this again.")
+                return String(localized: "Bighelp is holding \(shares) shares it hasn't sent. Open Bighelp, send or delete some, then share this again.")
             case .storageUnavailable, .gone, .finished:
                 return String(localized: "Bighelp couldn't save this. Nothing was saved.")
             case .cancelled:

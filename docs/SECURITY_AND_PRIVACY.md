@@ -408,18 +408,27 @@ content.
 
 ### Share sheet
 
-bighelp's share sheet only saves. It has no sign-in, no Keychain group and no
-network code: what someone shares (text, links, photos, videos, files and an
-optional note) is copied into the app group container bighelp and its
+bighelp's share sheet saves, and bighelp sends. The sheet has no sign-in and no
+Keychain group, and it sends nothing to a computer: what someone shares (text,
+links, photos, videos, files and an optional note) is copied into the app group
+container bighelp and its
 extensions already share (`PendingShareInbox`), at most 10 files and 512 MB per
 share and 16 shares or 1 GB in all. Its files can be read only while the device
 is unlocked (complete-unless-open protection, so a copy under way can finish),
 only by bighelp and its extensions, and are excluded from backups. A share is saved whole or not at all; anything that
 can't be read or is over a limit is named and nothing is saved.
 
-Nothing leaves the device until the person opens bighelp, picks the agent and
-chat, and taps Send there: the share goes into that chat's message box, and the
-usual AI data agreement, computer and attachment checks apply. bighelp deletes a
+The sheet's Send marks the share for the default bot, and bighelp, not the sheet,
+sends it: in a new chat with the default bot on the computer in use, through that
+chat's message box, so the usual AI data agreement, computer and attachment checks
+apply. To have iOS start bighelp for it, the sheet makes one request of its own: a
+HEAD for the provider logo list on bighelp's own site, which the app reads anyway.
+The request carries nothing about the share or the person, and its answer isn't
+read. iOS decides when it starts bighelp; if it doesn't, the share goes when
+bighelp next opens. A share that can't be sent stays on the device, and the person
+then picks the agent and chat for it in bighelp. So does a share whose words start
+with "/", which a chat would run as a command, and one with a file over 8 MB:
+bighelp sends neither by itself. bighelp deletes a
 share from the device only once Hermes takes the message that carries it, or when
 the person deletes it (Today's Shared with bighelp card, the first screen of Settings and the
 sidebar's More open the list of every waiting share). Before a message carrying a share goes, bighelp saves that

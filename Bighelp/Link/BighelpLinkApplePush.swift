@@ -320,9 +320,13 @@ final class BighelpLinkApplicationDelegate: NSObject, UIApplicationDelegate,
         return true
     }
 
-    /// The pieces of a big file finished while bighelp was suspended (`BigFilePieceSession.background`).
+    /// The pieces of a big file finished while bighelp was suspended (`BigFilePieceSession.background`),
+    /// or the share sheet asked iOS to start bighelp for a share (`PendingShareWake`).
     func application(_ application: UIApplication, handleEventsForBackgroundURLSession identifier: String,
                      completionHandler: @escaping @Sendable () -> Void) {
+        if identifier == PendingShareWake.sessionIdentifier {
+            return PendingShareWakeReceiver.shared.handleEvents(completion: completionHandler)
+        }
         guard identifier == BigFilePieceSession.backgroundIdentifier else { return completionHandler() }
         BigFilePieceSession.background.handleEvents(completion: completionHandler)
     }

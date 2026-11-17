@@ -3,16 +3,18 @@ import SwiftUI
 /// Goals: what the agent is tracking (the latest one in a block of its category's color, the
 /// rest by category in a card), then done ones, then Create a goal by category. Every goal is
 /// a List row of its own (`BoardScroll`), so goals swipe left to remove. Goals have no progress
-/// number, so nothing here draws one.
+/// number, so nothing here draws one. The categories are the computer's own
+/// (`AgentBoardStore.goalCategories`); Edit categories under the list changes them.
 struct AgentGoalsView: View {
     let context: AgentBoardContext
     @State private var showsDone = false
     @State private var showsBlueprints = false
+    @State private var showsCategories = false
 
     /// One row of the Tracking or Done card: a category's heading or a goal.
     private struct CardEntry: Identifiable {
         let id: String
-        var category: GoalCategory?
+        var category: GoalCategoryInfo?
         var goal: AgentBoardItem?
     }
 
@@ -23,9 +25,10 @@ struct AgentGoalsView: View {
         let isLoaded = store.state == .loaded
         // The one the agent touched last leads.
         let hero = active.max { $0.updatedAt < $1.updatedAt }
-        let groups = GoalCategory.grouped(active.filter { $0.id != hero?.id })
+        let categories = store.goalCategories
+        let groups = GoalCategoryInfo.grouped(active.filter { $0.id != hero?.id }, in: categories)
         let tracking: [CardEntry] = groups.flatMap { group -> [CardEntry] in
-            [CardEntry(id: "category.\(group.category.rawValue)", category: group.category)]
+            [CardEntry(id: "category.\(group.category.id)", category: group.category)]
                 + group.items.map { CardEntry(id: $0.id, goal: $0) }
         }
         BoardScroll(context: context, title: "Goals", identifier: "board.goals", seen: goals,
@@ -43,12 +46,12 @@ struct AgentGoalsView: View {
                         .boardRow()
                 }
                 if let hero {
-                    let category = hero.goalCategory ?? .other
+                    let category = shown(hero, in: categories)
                     // The category's heading carries its name for tests and VoiceOver; with no
                     // other goals in it, the block's pill does.
-                    GoalHeroBlock(goal: hero, context: context,
-                                  categoryIdentifier: groups.contains { $0.category == category }
-                                      ? "board.goals.hero.category" : "board.goals.category.\(category.rawValue)")
+                    GoalHeroBlock(goal: hero, category: category, context: context,
+                                  categoryIdentifier: groups.contains { $0.category.id == category.id }
+                                      ? "board.goals.hero.category" : "board.goals.category.\(category.id)")
                         .boardRow()
                         .boardItemSwipe(hero, store: store)
                 }
@@ -60,6 +63,10 @@ struct AgentGoalsView: View {
                     .boardRow(top: BighelpTokens.space16, bottom: BighelpTokens.space4)
                 createList
                     .boardRow()
+                if store.canEditGoalCategories {
+                    editCategories
+                        .boardRow(top: 0)
+                }
                 if !store.supportsGoalCategories {
                     categoriesNeedUpdate
                         .boardRow()
@@ -67,6 +74,29 @@ struct AgentGoalsView: View {
             }
         }
         .boardBlueprints(isPresented: $showsBlueprints, kind: .goal, context: context)
+        .bighelpSheet(isPresented: $showsCategories) { GoalCategoriesSheet(context: context) }
+    }
+
+    /// The goal's category as the computer lists it now; one that left the list is Other.
+    private func shown(_ goal: AgentBoardItem, in categories: [GoalCategoryInfo]) -> GoalCategoryInfo {
+        let id = goal.goalCategoryInfo.id
+        return categories.first { $0.id == id } ?? categories.first(where: \.isOther) ?? .other
+    }
+
+    /// Under the Create a goal list: opens the computer's categories to add, rename and delete.
+    private var editCategories: some View {
+        Button {
+            showsCategories = true
+        } label: {
+            // The whole row takes the tap, not only its words.
+            Label("Edit categories", systemImage: "slider.horizontal.3")
+                .font(.bighelp(.subheadline).weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: BighelpTokens.hitTarget, alignment: .leading)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.borderless)
+        .tint(theme.action)
+        .accessibilityIdentifier("board.goals.categories.edit")
     }
 
     /// A bordered card a row at a time: headings and goals, each goal swiping on its own.
@@ -87,15 +117,15 @@ struct AgentGoalsView: View {
         }
     }
 
-    private func categoryHeader(_ category: GoalCategory) -> some View {
-        Text(category.groupTitle)
+    private func categoryHeader(_ category: GoalCategoryInfo) -> some View {
+        Text(category.name)
             .font(.bighelp(.footnote, weight: .bold))
             .foregroundStyle(theme.secondaryText)
             .padding(.horizontal, BighelpTokens.space16)
             .padding(.top, BighelpTokens.space12)
             .padding(.bottom, BighelpTokens.space4)
             .accessibilityAddTraits(.isHeader)
-            .accessibilityIdentifier("board.goals.category.\(category.rawValue)")
+            .accessibilityIdentifier("board.goals.category.\(category.id)")
     }
 
     @ViewBuilder
@@ -148,7 +178,7 @@ struct AgentGoalsView: View {
     /// message box; touch and hold starts from one of its blueprints instead.
     private var createList: some View {
         VStack(spacing: 0) {
-            ForEach(Array(GoalCategory.allCases.enumerated()), id: \.element) { index, category in
+            ForEach(Array(context.store.goalCategories.enumerated()), id: \.element.id) { index, category in
                 if index > 0 {
                     Rectangle()
                         .fill(theme.separator)
@@ -167,9 +197,10 @@ struct AgentGoalsView: View {
     }
 
     @ViewBuilder
-    private func createRow(_ category: GoalCategory) -> some View {
-        let blueprints = BoardBlueprintCatalog.shared.blueprints(for: category)
-        // Seven rows share one List row, and a List row shows only its first context menu:
+    private func createRow(_ category: GoalCategoryInfo) -> some View {
+        // Blueprints are filed by the built-in categories.
+        let blueprints = category.builtInCategory.map(BoardBlueprintCatalog.shared.blueprints(for:)) ?? []
+        // The rows share one List row, and a List row shows only its first context menu:
         // each row carries its own Menu instead.
         Group {
             if blueprints.isEmpty {
@@ -192,11 +223,11 @@ struct AgentGoalsView: View {
                 }
             }
         }
-        .accessibilityLabel(category == .other ? "Create a goal: something else" : "Create a \(category.title) goal")
-        .accessibilityIdentifier("board.goals.create.\(category.rawValue)")
+        .accessibilityLabel(category.isOther ? "Create a goal: something else" : "Create a \(category.title) goal")
+        .accessibilityIdentifier("board.goals.create.\(category.id)")
     }
 
-    private func createLabel(_ category: GoalCategory) -> some View {
+    private func createLabel(_ category: GoalCategoryInfo) -> some View {
         HStack(spacing: BighelpTokens.space12) {
             CategoryBadge(category: category, size: 34)
             Text(category.title)
@@ -242,7 +273,7 @@ struct AgentGoalsView: View {
     /// A goal in the card: its category's tile, title and the agent's note, then done and ⋯.
     private func goalRow(_ goal: AgentBoardItem) -> some View {
         HStack(alignment: .center, spacing: BighelpTokens.space12) {
-            CategoryBadge(category: goal.goalCategory ?? .other, size: 36)
+            CategoryBadge(category: shown(goal, in: context.store.goalCategories), size: 36)
             VStack(alignment: .leading, spacing: 2) {
                 Text(goal.title)
                     .font(.bighelp(.subheadline, weight: .semibold))
@@ -280,15 +311,15 @@ struct AgentGoalsView: View {
 /// title and the agent's latest note, with Mark done.
 private struct GoalHeroBlock: View {
     let goal: AgentBoardItem
+    let category: GoalCategoryInfo
     let context: AgentBoardContext
     let categoryIdentifier: String
 
     var body: some View {
-        let category = goal.goalCategory ?? .other
         let block = BighelpBlockColor.goal(category)
         VStack(alignment: .leading, spacing: BighelpTokens.space12) {
             HStack(alignment: .center, spacing: BighelpTokens.space8) {
-                BoardOutlinePill(title: category.groupTitle, systemImage: category.systemImage, ink: block.ink)
+                BoardOutlinePill(title: category.pillTitle, systemImage: category.pillSystemImage, ink: block.ink)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier(categoryIdentifier)
                 Spacer(minLength: 0)
@@ -381,10 +412,11 @@ private struct GoalMoreMenu: View {
 
 /// A category's symbol on a small square of its block color: content, not a control.
 private struct CategoryBadge: View {
-    let category: GoalCategory
+    let category: GoalCategoryInfo
     let size: CGFloat
 
     var body: some View {
-        BoardIconTile(icon: "", fallback: category.systemImage, color: BighelpBlockColor.goal(category), size: size)
+        BoardIconTile(icon: category.icon, fallback: category.systemImage, color: BighelpBlockColor.goal(category),
+                      size: size)
     }
 }

@@ -180,6 +180,8 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case boardPromote = "board.promote"
     /// Let's do it on an idea, by its ID (plugin `native-agent-board-answers-v1`).
     case boardAccept = "board.accept"
+    /// Adds, renames or removes one of the computer's goal categories (plugin `native-goal-categories-v1`).
+    case boardCategories = "board.categories"
     case usageList = "usage.list"
     /// Hours of the day, messages and models per day for the Usage page (plugin, `native-usage-activity-v1`).
     case usageActivity = "usage.activity"

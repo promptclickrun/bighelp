@@ -118,7 +118,7 @@ extension AgentBoardItem {
             ChatBoardCard(kind: .feedPost, title: title, detail: source, body: body)
         case .goal:
             ChatBoardCard(kind: .goal, title: title,
-                          detail: goalCategory.map { $0 == .other ? "" : $0.groupTitle } ?? "",
+                          detail: goalCategoryInfo.isOther ? "" : goalCategoryInfo.name,
                           body: [body, note.isEmpty ? "" : "Latest: \(note)"].filter { !$0.isEmpty }.joined(separator: "\n\n"))
         }
     }

@@ -347,6 +347,11 @@ Productivity, Other; "Nothing is being tracked yet" when empty), Done, then **Cr
 category with a +, which starts a chat asking the agent to plan a goal in that category (touch and hold for that
 category's blueprints). Goals carry the category in the plugin (`native-agent-board-goal-categories-v1`); without
 it every goal shows under Other and the page says to update the plugin.
+The categories are the computer's own (`native-goal-categories-v1`): those seven until someone changes them.
+**Edit categories**, under the Create a goal list, opens a sheet that lists them. A row opens its name and emoji,
+a swipe or the editor deletes it (after a question, since its goals move to Other), and Add category makes a new
+one. Other is listed, always last, and can't be changed. A category with no emoji shows its built-in symbol, or a
+tag.
 
 **Projects** (Work › Projects) are Hermes projects shown the way Claude shows them: cards with the project's emoji
 and color, description and recent use; a project page with **New chat in this project**, its chats and its

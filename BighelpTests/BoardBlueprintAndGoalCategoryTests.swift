@@ -160,11 +160,11 @@ struct BoardBlueprintAndGoalCategoryTests {
         #expect(GoalCategory.inferred(from: "Inbox under 20 every Friday") == .productivity)
         #expect(GoalCategory.inferred(from: "Something nice") == nil)
         #expect(GoalCategory.inferred(from: "Workout budget") == nil, "A tie is no category")
-        let groups = GoalCategory.grouped([
+        let groups = GoalCategoryInfo.grouped([
             AgentBoardItem(id: "a", kind: .goal, title: "Health goal", body: "Walk 8,000 steps a day"),
             AgentBoardItem(id: "b", kind: .goal, title: "Something nice"),
-        ])
-        #expect(groups.map(\.category) == [.health, .other])
+        ], in: GoalCategoryInfo.builtIn)
+        #expect(groups.map(\.category.id) == ["health", "other"])
     }
 
     @Test func goalsGroupByCategoryInTheListsOrderWithUncategorizedUnderOther() {
@@ -176,14 +176,116 @@ struct BoardBlueprintAndGoalCategoryTests {
             AgentBoardItem(id: "e", kind: .goal, title: "Walk", category: "health"),
             AgentBoardItem(id: "f", kind: .goal, title: "Else", category: "other"),
         ]
-        let groups = GoalCategory.grouped(goals)
-        #expect(groups.map(\.category) == [.health, .finance, .other])
+        let groups = GoalCategoryInfo.grouped(goals, in: GoalCategoryInfo.builtIn)
+        #expect(groups.map(\.category.id) == ["health", "finance", "other"])
         #expect(groups.map { $0.items.map(\.id) } == [["c", "e"], ["a"], ["b", "d", "f"]])
-        #expect(GoalCategory.grouped([]).isEmpty)
+        #expect(GoalCategoryInfo.grouped([], in: GoalCategoryInfo.builtIn).isEmpty)
         // An older plugin: goals go where their words point, the rest under Other; nothing is lost.
-        let legacy = GoalCategory.grouped([AgentBoardItem(id: "x", kind: .goal, title: "Sleep"),
-                                           AgentBoardItem(id: "y", kind: .goal, title: "Old goal")])
-        #expect(legacy.map(\.category) == [.health, .other] && legacy.allSatisfy { $0.items.count == 1 })
+        let legacy = GoalCategoryInfo.grouped([AgentBoardItem(id: "x", kind: .goal, title: "Sleep"),
+                                               AgentBoardItem(id: "y", kind: .goal, title: "Old goal")],
+                                              in: GoalCategoryInfo.builtIn)
+        #expect(legacy.map(\.category.id) == ["health", "other"] && legacy.allSatisfy { $0.items.count == 1 })
+    }
+
+    // MARK: A computer's own categories
+
+    private static let homeLab = GoalCategoryInfo(id: "home-lab", name: "Home lab", icon: "🖥️")
+
+    @Test func aGoalShowsInItsComputersCategoryByItsNameAndEmoji() throws {
+        let goal = try AgentBoardItem(json: .object([
+            "id": .string("keys"), "kind": .string("goal"), "title": .string("Audit the SSH keys"),
+            "category": .string("home-lab"), "categoryName": .string("Home lab"), "categoryIcon": .string("🖥️"),
+        ]))
+        #expect(goal.goalCategoryInfo == Self.homeLab)
+        #expect(goal.goalCategoryInfo.pillTitle == "🖥️ Home lab" && goal.goalCategoryInfo.pillSystemImage == nil)
+        #expect(goal.chatCard.detail == "Home lab")
+        // A built-in category someone renamed keeps its symbol and takes the new name.
+        let renamed = AgentBoardItem(id: "m", kind: .goal, title: "Save", category: "finance", categoryName: "Money")
+        #expect(renamed.goalCategoryInfo.name == "Money" && renamed.goalCategoryInfo.systemImage == "dollarsign")
+        #expect(renamed.goalCategoryInfo.prompt.contains("under Money"))
+        #expect(GoalCategoryInfo(.finance).prompt == GoalCategory.finance.prompt)
+        // A plugin from before the list sends only the built-in name.
+        #expect(AgentBoardItem(id: "o", kind: .goal, title: "Save", category: "finance").goalCategoryInfo
+            == GoalCategoryInfo(.finance))
+    }
+
+    @Test func goalsGroupInTheComputersOrderAndOnesOffTheListGoUnderOther() {
+        let list = [GoalCategoryInfo(.health), Self.homeLab, .other]
+        let goals = [
+            AgentBoardItem(id: "a", kind: .goal, title: "Audit", category: "home-lab", categoryName: "Home lab"),
+            AgentBoardItem(id: "b", kind: .goal, title: "Save", category: "finance", categoryName: "Finance"),
+            AgentBoardItem(id: "c", kind: .goal, title: "Run", category: "health", categoryName: "Health"),
+        ]
+        let groups = GoalCategoryInfo.grouped(goals, in: list)
+        #expect(groups.map(\.category.id) == ["health", "home-lab", "other"])
+        #expect(groups.map { $0.items.map(\.id) } == [["c"], ["a"], ["b"]], "Finance left the list")
+    }
+
+    @Test func theComputersListIsReadLeniently() {
+        let rows: [BighelpJSONValue] = [
+            .object(["id": .string("health"), "name": .string("Health"), "icon": .string("")]),
+            .object(["id": .string("home-lab"), "name": .string(" Home lab "), "icon": .string("🖥️"),
+                     "later": .boolean(true)]),
+            .object(["id": .string("home-lab"), "name": .string("Twice")]),
+            .object(["name": .string("No ID")]),
+            .string("nonsense"),
+            .object(["id": .string("other"), "name": .string("Other")]),
+        ]
+        #expect(GoalCategoryInfo.list(json: .array(rows))?.map(\.id) == ["health", "home-lab", "other"])
+        #expect(GoalCategoryInfo.list(json: .array(rows))?[1] == Self.homeLab)
+        #expect(GoalCategoryInfo.list(json: nil) == nil, "A plugin from before the list")
+        #expect(GoalCategoryInfo.list(json: .array([])) == nil)
+    }
+
+    @Test func theGoalsPageChangesTheComputersCategories() async throws {
+        let client = DemoAgentBoardClient()
+        let store = AgentBoardStore()
+        store.configure(client: client)
+        #expect(store.goalCategories == GoalCategoryInfo.builtIn && !store.canEditGoalCategories)
+        await store.load(agentID: "nova")
+        #expect(store.canEditGoalCategories)
+
+        #expect(await store.changeGoalCategories(.add(name: "Home lab", icon: "🖥️")) == nil)
+        #expect(store.goalCategories.map(\.id).suffix(2) == ["home-lab", "other"], "Other stays last")
+        #expect(await store.changeGoalCategories(.add(name: "home LAB", icon: ""))
+            == GoalCategoryChange.refusal("category_exists"))
+        #expect(await store.changeGoalCategories(.update(id: "health", name: "Fitness", icon: "")) == nil)
+        let health = try #require(store.goals.first { $0.category == "health" })
+        #expect(health.goalCategoryInfo.name == "Fitness", "Its goals are read again under the new name")
+        #expect(await store.changeGoalCategories(.delete(id: "health")) == nil)
+        #expect(!store.goalCategories.contains { $0.id == "health" })
+        #expect(store.goals.first { $0.id == health.id }?.goalCategoryInfo.isOther == true)
+        #expect(await store.changeGoalCategories(.delete(id: "other")) == GoalCategoryChange.refusal("category_fixed"))
+    }
+
+    @Test func theComputerSendsItsCategoriesWithTheBoardAndTakesChanges() async throws {
+        let owner = WorkspaceOwner(authority: try .fixture(id: "categories"), authenticationGeneration: UUID(),
+                                   connectionGeneration: UUID())
+        let performer = CategoryPerformer(owner: owner)
+        let listed: BighelpJSONValue = .array([
+            .object(["id": .string("home-lab"), "name": .string("Home lab"), "icon": .string("🖥️")]),
+            .object(["id": .string("other"), "name": .string("Other"), "icon": .string("")]),
+        ])
+        let client = DirectHermesAgentBoardClient(workspace: performer, owner: owner, supportsFeedback: true,
+                                                  supportsGoalCategories: true)
+        // A plugin from before the list: nothing to edit.
+        _ = try await client.items(agentID: "nova")
+        #expect(client.goalCategories == nil)
+        await #expect(throws: WorkspaceClientError.unavailable(.unsupportedOperation)) {
+            _ = try await client.changeGoalCategories(agentID: "nova", .delete(id: "home-lab"))
+        }
+        performer.results[.boardList] = ["items": .array([]), "goalCategories": listed]
+        performer.results[.boardCategories] = ["goalCategories": .array([
+            .object(["id": .string("other"), "name": .string("Other"), "icon": .string("")]),
+        ])]
+        _ = try await client.items(agentID: "nova")
+        #expect(client.goalCategories == [Self.homeLab, .other])
+        let after = try await client.changeGoalCategories(agentID: "nova", .delete(id: "home-lab"))
+        #expect(after == [.other])
+        #expect(performer.calls.last?.operation == .boardCategories)
+        #expect(performer.calls.last?.payload == ["agentId": .string("nova"), "action": .string("delete"),
+                                                  "id": .string("home-lab")])
+        #expect(DirectHermesNativePluginClient.supports(.boardCategories))
     }
 
     @Test func everyCategoryStartsAChatThatNamesIt() {
@@ -247,8 +349,14 @@ private final class CategoryPerformer: WorkspaceOperationPerforming {
     var owner: WorkspaceOwner?
     var capabilities: WorkspaceCapabilities { .init(owner: owner) }
 
+    var results: [WorkspaceOperation: [String: BighelpJSONValue]] = [:]
+    private(set) var calls: [(operation: WorkspaceOperation, payload: [String: BighelpJSONValue])] = []
+
     init(owner: WorkspaceOwner) { self.owner = owner }
 
     func perform(_ operation: WorkspaceOperation, payload: [String: BighelpJSONValue], owner: WorkspaceOwner) async throws
-        -> [String: BighelpJSONValue] { [:] }
+        -> [String: BighelpJSONValue] {
+        calls.append((operation, payload))
+        return results[operation] ?? [:]
+    }
 }

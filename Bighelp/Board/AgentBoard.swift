@@ -174,6 +174,10 @@ struct AgentBoardItem: Identifiable, Equatable, Sendable {
     var dismissed: Bool
     /// A goal's category as the plugin stored it; empty for none (plugins before 3.5).
     var category: String
+    /// The category's name and emoji on its computer (`native-goal-categories-v1`); empty from
+    /// plugins before that. Read them through `goalCategoryInfo`.
+    var categoryName: String
+    var categoryIcon: String
     /// How the person answered an idea: "yes" for Let's do it, "goal", or "none".
     var answer: String
     /// When they answered; nil for plugins that don't say.
@@ -201,12 +205,13 @@ struct AgentBoardItem: Identifiable, Equatable, Sendable {
     init(id: String, kind: Kind, title: String, body: String = "", icon: String = "", section: String = "",
          status: String = "", note: String = "", links: [Link] = [], pictures: [Picture] = [],
          files: [File] = [], source: String = "", rating: Rating = .none, reason: String = "", read: Bool = true,
-         dismissed: Bool = false, category: String = "", answer: String = "none", answeredAt: Date? = nil,
-         createdAt: Date = .now, updatedAt: Date? = nil) {
+         dismissed: Bool = false, category: String = "", categoryName: String = "", categoryIcon: String = "",
+         answer: String = "none", answeredAt: Date? = nil, createdAt: Date = .now, updatedAt: Date? = nil) {
         self.id = id; self.kind = kind; self.title = title; self.body = body; self.icon = icon
         self.section = section; self.status = status; self.note = note; self.links = links
         self.pictures = pictures; self.files = files; self.source = source; self.rating = rating; self.reason = reason
         self.read = read; self.dismissed = dismissed; self.category = category
+        self.categoryName = categoryName; self.categoryIcon = categoryIcon
         self.answer = answer; self.answeredAt = answeredAt
         self.createdAt = createdAt; self.updatedAt = updatedAt ?? createdAt
     }
@@ -245,14 +250,17 @@ struct AgentBoardItem: Identifiable, Equatable, Sendable {
                   reason: object["reason"]?.string ?? "", read: object["read"]?.boolean ?? true,
                   dismissed: object["dismissed"]?.boolean ?? false,
                   category: object["category"]?.string ?? "",
+                  categoryName: String((object["categoryName"]?.string ?? "").prefix(GoalCategoryInfo.maximumNameLength)),
+                  categoryIcon: String((object["categoryIcon"]?.string ?? "").prefix(GoalCategoryInfo.maximumIconLength)),
                   answer: object["answer"]?.string ?? "none",
                   answeredAt: (object["answeredAt"]?.integer).flatMap { $0 > 0 ? date("answeredAt") : nil },
                   createdAt: date("createdAt"), updatedAt: date("updatedAt"))
     }
 }
 
-/// What a goal is about. The plugin keeps the same fixed list
-/// (`native-agent-board-goal-categories-v1`); "Something else" is stored as `other`.
+/// The built-in goal categories (`native-agent-board-goal-categories-v1`): what every computer starts
+/// with, and what blueprints are filed by. "Something else" is stored as `other`. A computer's own
+/// list, which can rename, drop and add to these, is `GoalCategoryInfo`.
 enum GoalCategory: String, CaseIterable, Identifiable, Sendable {
     case health, relationships, finance, career, interests, productivity, other
 
@@ -353,15 +361,6 @@ enum GoalCategory: String, CaseIterable, Identifiable, Sendable {
         }
         let place = self == .other ? "my Goals" : "my Goals under \(groupTitle)"
         return "I'd like to set \(goal). \(ask) and add it to \(place)."
-    }
-
-    /// Goals by category in the list's order, keeping their order within each. Goals without a
-    /// category (or with one this build doesn't know) go under Other.
-    static func grouped(_ goals: [AgentBoardItem]) -> [(category: GoalCategory, items: [AgentBoardItem])] {
-        let byCategory = Dictionary(grouping: goals) { $0.goalCategory ?? .other }
-        return allCases.compactMap { category in
-            byCategory[category].map { (category, $0) }
-        }
     }
 }
 
@@ -517,6 +516,11 @@ protocol AgentBoardClient: AnyObject {
     var supportsFeedback: Bool { get }
     /// Goals carry a category (`native-agent-board-goal-categories-v1`).
     var supportsGoalCategories: Bool { get }
+    /// The computer's own goal categories as its last `items` read gave them
+    /// (`native-goal-categories-v1`); nil before a read, and from a plugin that keeps only the built-in ones.
+    var goalCategories: [GoalCategoryInfo]? { get }
+    /// Adds, renames or removes one of the computer's goal categories, and returns the list as it is now.
+    func changeGoalCategories(agentID: String, _ change: GoalCategoryChange) async throws -> [GoalCategoryInfo]
     func items(agentID: String) async throws -> [AgentBoardItem]
     func update(agentID: String, itemID: String, change: AgentBoardChange) async throws -> AgentBoardItem
     func markRead(agentID: String, itemIDs: [String]) async throws
@@ -544,6 +548,7 @@ protocol AgentBoardClient: AnyObject {
 
 extension AgentBoardClient {
     var supportsGoalCategories: Bool { false }
+    var goalCategories: [GoalCategoryInfo]? { nil }
     var supportsFiles: Bool { false }
     var supportsAnswers: Bool { false }
     var supportsToday: Bool { false }
@@ -558,6 +563,10 @@ extension AgentBoardClient {
     }
 
     func accept(agentID: String, itemID: String) async throws {
+        throw WorkspaceClientError.unavailable(.unsupportedOperation)
+    }
+
+    func changeGoalCategories(agentID: String, _ change: GoalCategoryChange) async throws -> [GoalCategoryInfo] {
         throw WorkspaceClientError.unavailable(.unsupportedOperation)
     }
 
@@ -579,6 +588,7 @@ final class DirectHermesAgentBoardClient: AgentBoardClient {
     /// Chat's attachment client: the same chunked download, checks and cache. Only
     /// given when the plugin serves posts' files.
     private let files: DirectHermesGeneratedMediaClient?
+    private(set) var goalCategories: [GoalCategoryInfo]?
 
     init(workspace: any WorkspaceOperationPerforming, owner: WorkspaceOwner, supportsFeedback: Bool,
          supportsGoalCategories: Bool = false, supportsAnswers: Bool = false, supportsToday: Bool = false,
@@ -615,12 +625,26 @@ final class DirectHermesAgentBoardClient: AgentBoardClient {
         }
     }
 
-    /// The plugin can answer 412 after making these: a second try could make a second goal.
-    private static let notRepeatable: Set<WorkspaceOperation> = [.boardPromote, .boardAccept]
+    /// The plugin can answer 412 after making these: a second try could make a second goal, or
+    /// add a category twice under two names.
+    private static let notRepeatable: Set<WorkspaceOperation> = [.boardPromote, .boardAccept, .boardCategories]
 
     func items(agentID: String) async throws -> [AgentBoardItem] {
         let result = try await perform(.boardList, ["agentId": .string(agentID), "limit": .integer(200)])
-        return try (result["items"]?.array ?? []).map(AgentBoardItem.init(json:))
+        let items = try (result["items"]?.array ?? []).map(AgentBoardItem.init(json:))
+        // The list is the computer's, the same for every bot on it.
+        goalCategories = GoalCategoryInfo.list(json: result["goalCategories"])
+        return items
+    }
+
+    func changeGoalCategories(agentID: String, _ change: GoalCategoryChange) async throws -> [GoalCategoryInfo] {
+        guard goalCategories != nil else { throw WorkspaceClientError.unavailable(.unsupportedOperation) }
+        let result = try await perform(.boardCategories, change.payload.merging(["agentId": .string(agentID)]) { $1 })
+        guard let categories = GoalCategoryInfo.list(json: result["goalCategories"]) else {
+            throw WorkspaceClientError.invalidResponse
+        }
+        goalCategories = categories
+        return categories
     }
 
     func update(agentID: String, itemID: String, change: AgentBoardChange) async throws -> AgentBoardItem {
@@ -778,6 +802,10 @@ final class AgentBoardStore {
     var supportsFiles: Bool { client?.supportsFiles ?? false }
     /// Without it goals have no category and the page says to update the plugin.
     var supportsGoalCategories: Bool { client?.supportsGoalCategories ?? false }
+    /// The computer's goal categories, in its order: the built-in ones until a read says otherwise.
+    private(set) var goalCategories = GoalCategoryInfo.builtIn
+    /// The computer keeps a list of its own that Goals › Categories can change.
+    private(set) var canEditGoalCategories = false
     /// Just deleted, for Undo.
     private(set) var recentlyHidden: AgentBoardItem?
     var feed: [AgentBoardItem] { items.filter { $0.kind == .feed && !$0.dismissed } }
@@ -799,6 +827,7 @@ final class AgentBoardStore {
         generation &+= 1
         pendingReads = [:]
         items = []; activity = []; approvals = []; pictures = [:]; identity = nil; recentlyHidden = nil
+        goalCategories = GoalCategoryInfo.builtIn; canEditGoalCategories = false
         fileStates = [:]; fileThumbnails = [:]; pendingThumbnails = []; openingFile = nil
         state = client == nil ? .unavailable : .idle
         logState = state
@@ -865,6 +894,7 @@ final class AgentBoardStore {
                 for index in loaded.indices where pending.contains(loaded[index].id) { loaded[index].read = true }
             }
             items = loaded
+            takeGoalCategories(client.goalCategories)
             state = .loaded
             await sendPendingReads(agentID: agentID)
         } catch is CancellationError {
@@ -1026,6 +1056,38 @@ final class AgentBoardStore {
         guard let index = items.firstIndex(where: { $0.id == id && $0.kind == .idea }) else { return }
         items[index].answer = "yes"
         items[index].answeredAt = now
+    }
+
+    private func takeGoalCategories(_ categories: [GoalCategoryInfo]?) {
+        let next = categories ?? GoalCategoryInfo.builtIn
+        if goalCategories != next { goalCategories = next }
+        if canEditGoalCategories != (categories != nil) { canEditGoalCategories = categories != nil }
+    }
+
+    /// Goals › Categories: add, rename or remove one of the computer's categories. Nil when the
+    /// computer took it, else why not, in words for the person. The goals are read again, because a
+    /// change moves them: a renamed category's goals take its new name, a removed one's go to Other.
+    func changeGoalCategories(_ change: GoalCategoryChange) async -> String? {
+        guard let client, let agentID, canEditGoalCategories else {
+            return String(localized: "This computer isn't connected. Try again in a moment.")
+        }
+        let generation = generation
+        do {
+            let categories = try await client.changeGoalCategories(agentID: agentID, change)
+            guard generation == self.generation else { return nil }
+            takeGoalCategories(categories)
+            await load(agentID: agentID)
+            return nil
+        } catch let WorkspaceClientError.rejected(code, _) {
+            if code == "category_not_found" { await load(agentID: agentID) }
+            return GoalCategoryChange.refusal(code)
+        } catch {
+            // No answer, or the page that asked went away: the computer may have made the change, so
+            // read what it has now.
+            // In a task of its own: the one that asked may be cancelled already.
+            if generation == self.generation { Task { [weak self] in await self?.load(agentID: agentID) } }
+            return GoalCategoryChange.refusal(nil)
+        }
     }
 
     func setDone(_ item: AgentBoardItem, _ done: Bool) async {

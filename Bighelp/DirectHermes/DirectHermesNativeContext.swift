@@ -590,6 +590,9 @@ final class DirectHermesNativePluginClient {
         case .boardAccept:
             return Route(path: "board/accept", feature: "native-agent-board-answers-v1", isMutation: true,
                          maximumResponseBytes: 196_608)
+        case .boardCategories:
+            return Route(path: "board/categories", feature: "native-goal-categories-v1", isMutation: true,
+                         maximumResponseBytes: 65_536)
         case .workflowsStatus, .workflowsList, .workflowsGet, .workflowsDraftSave, .workflowsValidate,
              .workflowsPublish, .workflowsBind, .workflowsArchive, .workflowsRunsStart, .workflowsRunsList,
              .workflowsRunsGet, .workflowsRunsEvents, .workflowsRunsControl, .workflowsRunsSignoff,

@@ -131,6 +131,14 @@ change in both repos.
     Discuss puts it in the message box (`ChatModel.boardCardDraft`). Let's do it sends "Let's do it!"
     with the idea at once (`leaveComposerText(sendsAtOnce:)`, `ChatModel.sendFromOutside`), never
     touching the box, and the idea moves to Ideas › Completed (the plugin's `answer`, `answeredAt`).
+  - Goal categories belong to the computer, not the app (plugin `native-goal-categories-v1`,
+    `GoalCategoryInfo`): one list for every bot on it, the built-in seven until someone changes it.
+    `board/list` sends it with the goals, and each goal says where it shows now (`categoryName`,
+    `categoryIcon`), so Today and a chat card need no list. Goals › Edit categories
+    (`GoalCategoriesSheet`) adds, renames and deletes through `board/categories`; the bot does the same
+    with its board tool. A category's `id` never changes, so a rename keeps its goals. A deleted
+    category's goals show under Other, which is always last and never changes. `GoalCategory` is only
+    the built-in seven (symbols, blueprints, the words for a goal with no category).
   - New chat is the new chat's own screen, drawn by the ordinary chat (`ChatNewChatSlot`, handed only to the chat
     whose ID is `NewChatSession.conversationID`, never decided from its messages; from the first message on, staged,
     sending or sent, it's an ordinary chat). Under Back and ⋯ a To row (`NewChatToRow`) holds the picked bots as
@@ -427,7 +435,10 @@ change in both repos.
   `voice/transcript` (`LiveVoiceSpokenTurns`), which runs nothing and saves each line once. The plugin writes
   only while no turn runs (`voice_chat_busy`), so the journal sends the same lines again until the chat takes
   them, over whatever connection to that computer is current. One journal per computer, agent and chat: a new
-  call's offer waits for an earlier call's lines, and the lines before a request go before its turn.
+  call's offer waits for an earlier call's lines (2 s at most), and a request waits for the lines before it
+  (1.5 s at most), so they usually go in first. A cut-off marks only a reply whose words were coming in. On
+  Gemini a hang-up saves what was still being said (`GeminiLiveTranslator.hangUp`); GPT-Live's last words can
+  be lost if their event hasn't come when the call closes.
 - **On-device voices** (`Bighelp/Voice/OnDevice/`): Phonon speaks on the iPhone or iPad instead of the
   computer. It's chosen per agent in Voice settings and kept on the device (`OnDeviceVoiceChoices`, by computer
   and agent); the agent's `tts.*` on the computer never changes. `OnDeviceVoiceSettingsClient` adds it to the

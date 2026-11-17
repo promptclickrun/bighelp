@@ -69,7 +69,7 @@ final class TelemetryLifecycle {
 
     nonisolated static func drain(_ receipts: BighelpDeliveryReceipts, into client: TelemetryClient?, now: Date) async {
         while true {
-            let batch = receipts.drain(limit: BighelpDeliveryReceipts.limit)
+            let batch = await receipts.drainWhileAwake(limit: BighelpDeliveryReceipts.limit)
             guard !batch.isEmpty else { return }
             guard let client, await client.enabled else { continue }
             await client.record(batch.map(Self.record))

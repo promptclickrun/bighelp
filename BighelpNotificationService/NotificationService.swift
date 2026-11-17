@@ -14,7 +14,8 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
 
     override func didReceive(_ request: UNNotificationRequest,
                              withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void) {
-        // Delivery timing for usage and diagnostics. It writes off this thread and never waits.
+        // Delivery timing for usage and diagnostics. It writes off this thread, while iOS keeps the
+        // extension awake, and never waits.
         BighelpDeliveryReceipts.record(userInfo: request.content.userInfo, receivedAt: Date())
         processor.didReceive(request, withContentHandler: contentHandler)
     }

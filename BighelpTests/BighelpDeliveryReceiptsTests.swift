@@ -7,9 +7,12 @@ struct BighelpDeliveryReceiptsTests {
     private static let sent: Int64 = 1_800_000_000_000
     private let directory = FileManager.default.temporaryDirectory.appending(path: "receipts-\(UUID().uuidString)")
 
-    private func receipts(defaults: UserDefaults? = nil) throws -> BighelpDeliveryReceipts {
+    private func receipts(defaults: UserDefaults? = nil,
+                          awake: @escaping BighelpDeliveryReceipts.Awake = BighelpDeliveryReceipts.whileAwake)
+        throws -> BighelpDeliveryReceipts {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return BighelpDeliveryReceipts(fileURL: directory.appending(path: "receipts.json"), defaults: defaults)
+        return BighelpDeliveryReceipts(fileURL: directory.appending(path: "receipts.json"), defaults: defaults,
+                                       awake: awake)
     }
 
     private func push(path: Any = "direct", sentAt: Any? = BighelpDeliveryReceiptsTests.sent,
@@ -229,6 +232,58 @@ struct BighelpDeliveryReceiptsTests {
         let saved = store.drain(limit: 1_000)
         #expect(!saved.isEmpty && saved.count <= 120)
         #expect(Set(saved.map(\.receivedAt)).count == saved.count)
+    }
+
+    // MARK: - Only while iOS keeps the process awake (#1067)
+
+    /// Stands in for iOS: keeps the work until the test lets it run, with time or without.
+    private final class HeldWork: @unchecked Sendable {
+        private let lock = NSLock()
+        private var held: [@Sendable (Bool) -> Void] = []
+
+        var awake: BighelpDeliveryReceipts.Awake {
+            { work in self.lock.withLock { self.held.append(work) } }
+        }
+
+        func run(hasTime: Bool) {
+            let work = lock.withLock {
+                defer { held = [] }
+                return held
+            }
+            work.forEach { $0(hasTime) }
+        }
+    }
+
+    /// iOS ends a process it suspends with the lock held, so the lock waits for iOS to keep the process awake.
+    @Test func aReceiptTakesTheLockOnlyOnceIOSKeepsTheProcessAwake() throws {
+        let iOS = HeldWork()
+        let store = try receipts(awake: iOS.awake)
+        let lockPath = try #require(store.lockURL).path
+
+        store.recordWhileAwake(userInfo: push(), receivedAt: arrival(afterSent: 1))
+        #expect(!FileManager.default.fileExists(atPath: lockPath), "nothing touches the lock before iOS answers")
+        iOS.run(hasTime: false)
+        #expect(!FileManager.default.fileExists(atPath: lockPath), "no time: the receipt is skipped without the lock")
+
+        store.recordWhileAwake(userInfo: push(), receivedAt: arrival(afterSent: 2))
+        iOS.run(hasTime: true)
+        #expect(store.drain(limit: 10).map(\.delayMilliseconds) == [2])
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aReadIOSGivesNoTimeForLeavesTheReceiptsForTheNextRead() async throws {
+        let store = try receipts(awake: { work in work(false) })
+        store.record(userInfo: push(), receivedAt: arrival(afterSent: 1))
+        #expect(await store.drainWhileAwake(limit: 10).isEmpty)
+        #expect(store.count == 1)
+        // The next read, with iOS' own answer (a test runs in an app in front, so there is time).
+        #expect(await (try receipts()).drainWhileAwake(limit: 10).count == 1)
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aReceiptIsWrittenThroughIOSOwnWaitForTime() async throws {
+        let store = try receipts()
+        store.recordWhileAwake(userInfo: push(), receivedAt: arrival(afterSent: 1))
+        for _ in 0..<300 where store.count == 0 { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(store.count == 1)
     }
 
     // MARK: - The app's side

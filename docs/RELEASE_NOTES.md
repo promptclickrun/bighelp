@@ -3,6 +3,13 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.94
+
+### New
+
+- **Live voice continues your chat:** when you start a voice chat in a chat, the bot now knows what the chat said. It knows the newest messages, the summary of the older part and the request that still runs. The words of the call are also saved into the chat as messages, yours and the bot's. Thus the bot knows them when you type again. A reply that you cut off is saved as far as the bot said it. This works with each live voice provider. It needs bighelp plugin 3.57.0 on your computer.
+- **Your own goal categories:** in Goals, tap Edit categories below the Create a goal list. You can add a category, change its name and emoji, or delete it. The list belongs to the computer, and each bot on that computer uses it. When you delete a category, its goals move to Other. When you change the name of a category, its goals stay in it. You can also ask a bot to change the categories. This needs bighelp plugin 3.57.0.
+
 ## 2.6.93
 
 ### New

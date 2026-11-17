@@ -3,6 +3,22 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.93
+
+### New
+
+- **German:** Bighelp now has German text. iOS shows it when German is the language of your device, or the language that you set for Bighelp in the Settings app. The German text is a first draft from a contributor. Tell us about words that are wrong or too long.
+- **Projects in the Chats list:** a chat that is in a project now shows the name of the project on a line of its own. Touch and hold a chat with one bot and tap Move to Project… to put it in a different project. Go to Settings › Chat › Project names to hide the names.
+- **Error messages in your language:** the messages that Bighelp shows when a chat, a group chat or a page cannot open are now in Simplified Chinese and German too. The messages of voice chats are too. Words that your computer or a provider sends stay as they are.
+
+### Fixed
+
+- **Add a computer in Settings:** when the new computer connects, the page now says that your bots are ready. Before, an empty page for a new computer came back, although the connection was good.
+- **New chat with two or more bots:** your message now goes to the new group chat. Before, the group chat opened with your message still in the message box.
+- **Usage from a widget:** when a Usage widget or a link opens Bighelp, the Usage page now loads. Before, it said to connect to a computer until you closed the page.
+- **Voice chat on an iPhone on its side:** the words are now beside the face of the bot. Before, there was no room for them, and the Transcript button was below the call buttons.
+- **Pet avatars:** Bighelp now keeps the moves of a pet on the device after the first download. Before, it downloaded them again each time.
+
 ## 2.6.92
 
 ### New

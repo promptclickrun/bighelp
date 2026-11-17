@@ -251,6 +251,28 @@ extension SettingsView {
         .listRowBackground(theme.surface)
     }
 
+    #if os(iOS) && !targetEnvironment(macCatalyst)
+    /// Where the share sheet's Send goes (#1071). Only iPhone and iPad have the share sheet.
+    private var fromOtherApps: some View {
+        Section {
+            Picker(selection: $settings.shareTarget) {
+                ForEach(PendingShareTarget.allCases) { target in
+                    Text(target.title).tag(target)
+                }
+            } label: {
+                settingTitle(String(localized: "Shares go to"))
+            }
+            .accessibilityIdentifier("settings.chat.share-target")
+        } header: {
+            Text("From other apps")
+        } footer: {
+            Text("What you share with Bighelp goes to your default bot.")
+                .bighelpFont(.metadata)
+        }
+        .listRowBackground(theme.surface)
+    }
+    #endif
+
     private var inChat: some View {
         Section("In a chat") {
             SessionTitleToggle {
@@ -319,13 +341,17 @@ extension SettingsView {
         .listRowBackground(theme.surface)
     }
 
-    /// Settings › Chat: four named groups, then the Advanced groups (what chats show, sending,
-    /// edge swipes, and the chat list with Clean up chats). Everyday controls are never only in those.
+    /// Settings › Chat: the named groups (From other apps only where the share sheet is), then the
+    /// Advanced groups (what chats show, sending, edge swipes, and the chat list with Clean up chats).
+    /// Everyday controls are never only in those.
     var chatPage: some View {
         Form {
             BighelpDeferredSection { opening }
             BighelpDeferredSection { botWork }
             BighelpDeferredSection { inChat }
+            #if os(iOS) && !targetEnvironment(macCatalyst)
+            BighelpDeferredSection { fromOtherApps }
+            #endif
             BighelpDeferredSection { chatList }
             if settings.nerdModeEnabled {
                 BighelpDeferredSection { chatDetailDefaults }

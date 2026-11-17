@@ -31,6 +31,8 @@ final class ShareModel: ObservableObject {
     @Published var note = ""
     /// The default bot, as bighelp last wrote it for its widgets; nil before bighelp knew one.
     let botName: String?
+    /// A new chat or the bot's ongoing chat, as Settings in bighelp says.
+    let target: PendingShareTarget
 
     /// One per process: iOS refuses a second background session with the same identifier.
     private static let wakeSession = URLSession(configuration: PendingShareWake.configuration())
@@ -43,9 +45,11 @@ final class ShareModel: ObservableObject {
     private let wake: @MainActor () -> Void
 
     init(inbox: PendingShareInbox? = PendingShareInbox.shared(), botName: String? = PendingShareDefaultBot.name(),
+         target: PendingShareTarget = .current,
          wake: @escaping @MainActor () -> Void = { PendingShareWake.signal(on: ShareModel.wakeSession) }) {
         self.inbox = inbox
         self.botName = botName
+        self.target = target
         self.wake = wake
     }
 

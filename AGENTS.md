@@ -545,9 +545,17 @@ change in both repos.
   iMessage extensions, so the share sheet can't open bighelp, and it holds no sign-in. Its Send copies the share
   into the app group whole or not at all (`PendingShareDraft`: a staging folder under a lock file, moved into place
   in one rename), marked for the default bot (`PendingShare.sendsItself`), and the sheet closes. `PendingShareSender`
-  then sends it with no review: a new chat with the default bot on the computer in use (the Shortcuts host path,
-  `readyChat`), the share into that chat's message box, then `send`, so the ledger below owns it as it owns every
-  share. The sender runs when bighelp comes to the front, on the sheet's Darwin notification while bighelp runs,
+  then sends it with no review: to the default bot on the computer in use (the Shortcuts host path, `readyChat`),
+  in a new chat or in the bot's ongoing chat as Settings › Chat › From other apps › Shares go to says
+  (`PendingShareTarget`, #1071; kept in the app group so the sheet's line names it, a new chat until changed),
+  the share into that chat's message box, then `send`, so the ledger below owns it as it owns every share. The
+  ongoing chat is found as a bot tap finds it: the saved Bot Chat, else `openCanonicalSession` (which makes one
+  when the bot has none). A computer that refuses one (its gateway can't store it) gets the share in a new chat,
+  as the tap then opens the latest chat or a new one; only a lost connection makes it wait.
+  It is the person's own chat, so the share goes in only while its message box is empty (`isFree`: Send takes
+  the whole box) and waits otherwise (`Failure.busy`: not a try, looked at again every 30 s while the app is
+  open, then the review after ten minutes); while the bot works there it goes to Hermes' queue
+  (`sendMidSession(using: .queued)`), never as a steer. The sender runs when bighelp comes to the front, on the sheet's Darwin notification while bighelp runs,
   and when iOS starts bighelp for the sheet's background `URLSession` (`PendingShareWake`: one HEAD request that
   carries nothing, begun two seconds late; `PendingShareWakeReceiver`). iOS starts the app only when nothing of
   the sheet is still connected to take the request's result, and it keeps a finished sheet's process for a minute

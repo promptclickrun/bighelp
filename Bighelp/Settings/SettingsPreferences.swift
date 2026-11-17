@@ -260,6 +260,16 @@ enum BotChatExperience: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+extension PendingShareTarget {
+    /// Settings › Chat › From other apps › Shares go to.
+    var title: String {
+        switch self {
+        case .newChat: String(localized: "A new chat")
+        case .botChat: String(localized: "The bot's ongoing chat")
+        }
+    }
+}
+
 /// How a one-to-one chat shows its agent's work (Settings › Chat › A bot's work › Shows as). Show thinking and
 /// Show tool calls decide what's in it; Fold finished turns, whether a finished turn's work starts closed.
 /// Group chats keep their own folders.

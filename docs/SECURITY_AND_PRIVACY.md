@@ -419,9 +419,11 @@ only by bighelp and its extensions, and are excluded from backups. A share is sa
 can't be read or is over a limit is named and nothing is saved.
 
 The sheet's Send marks the share for the default bot, and bighelp, not the sheet,
-sends it: in a new chat with the default bot on the computer in use, through that
-chat's message box, so the usual AI data agreement, computer and attachment checks
-apply. To have iOS start bighelp for it, the sheet makes one request of its own: a
+sends it: to the default bot on the computer in use, in a new chat or in the bot's
+ongoing chat as Settings › Chat says, through that chat's message box, so the usual
+AI data agreement, computer and attachment checks apply. In the ongoing chat it
+goes only while that chat's message box is empty, so nothing the person typed there
+goes with it. To have iOS start bighelp for it, the sheet makes one request of its own: a
 HEAD for the provider logo list on bighelp's own site, which the app reads anyway.
 The request carries nothing about the share or the person, and its answer isn't
 read. iOS decides when it starts bighelp; if it doesn't, the share goes when

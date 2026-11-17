@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// What was shared, a note, and Send. It says who gets it: the default bot, in a new chat. Send saves
-/// the share for bighelp and closes the sheet; bighelp does the sending (#1069).
+/// What was shared, a note, and Send. It says who gets it: the default bot, in a new chat or its
+/// ongoing chat as Settings says (#1071). Send saves the share for bighelp and closes the sheet;
+/// bighelp does the sending (#1069).
 struct ShareView: View {
     @ObservedObject var model: ShareModel
     var cancel: () -> Void
@@ -39,10 +40,16 @@ struct ShareView: View {
     }
 
     private var whatHappens: String {
-        if let name = model.botName {
+        switch (model.target, model.botName) {
+        case (.newChat, let name?):
             return String(localized: "Bighelp sends this to \(name) in a new chat.")
+        case (.newChat, nil):
+            return String(localized: "Bighelp sends this to your default bot in a new chat.")
+        case (.botChat, let name?):
+            return String(localized: "Bighelp sends this to \(name) in its ongoing chat.")
+        case (.botChat, nil):
+            return String(localized: "Bighelp sends this to your default bot in its ongoing chat.")
         }
-        return String(localized: "Bighelp sends this to your default bot in a new chat.")
     }
 
     private var form: some View {

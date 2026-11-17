@@ -1364,6 +1364,10 @@ Helpful, never a pile to clear (`BighelpNotificationGrouping`):
   The app sends `{"enabled": true}` only when someone turns sharing back on, never when it connects.
 - The notification extension only writes receipts (`BighelpDeliveryReceipts`, in the shared app group) and makes no
   network calls. The app sends them.
+- iOS ends a process it suspends while the process holds a file lock in the app group (`0xdead10cc`, #1067). The
+  receipts take their `flock` only while iOS keeps the process awake (`recordWhileAwake`, `drainWhileAwake`, over
+  `ProcessInfo.performExpiringActivity`); with no time, the receipt is skipped or the list waits for the next read.
+  New work under a lock in the app group needs the same.
 
 ### Names that must stay "loopdy"
 

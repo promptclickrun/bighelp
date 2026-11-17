@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import os
 
 /// One push, as the notification service extension (or the app, for a wake) saw it.
 /// Only times and fixed labels: nothing from the message, no event ID, no token.
@@ -35,7 +36,15 @@ struct BighelpDeliveryReceipt: Codable, Equatable, Sendable {
 /// Both processes take a lock file (`flock`) without waiting, and the list is replaced by renaming a temporary
 /// file, so a push arriving while the app drains neither repeats nor garbles a receipt. A receipt that can't get
 /// the lock in about 50 ms is skipped: the extension never waits on this file.
+///
+/// iOS ends a process that is suspended while it holds a file lock in a shared container (`0xdead10cc`, #1067).
+/// So the app and the extension reach the file only through `recordWhileAwake` and `drainWhileAwake`, which
+/// take the lock while iOS keeps the process awake, or not at all.
 struct BighelpDeliveryReceipts: @unchecked Sendable {
+    /// Runs `work` once: with true while iOS keeps this process from being suspended, or with false when iOS
+    /// gives no time.
+    typealias Awake = @Sendable (_ work: @escaping @Sendable (_ hasTime: Bool) -> Void) -> Void
+
     /// The group the extension's entitlements and `BighelpRecentAlerts` already use.
     static let appGroup = "group.app.loopdy.mobile.buzzkit"
     static let limit = 200
@@ -50,10 +59,27 @@ struct BighelpDeliveryReceipts: @unchecked Sendable {
 
     let fileURL: URL?
     let defaults: UserDefaults?
+    private let awake: Awake
 
-    init(fileURL: URL?, defaults: UserDefaults? = nil) {
+    init(fileURL: URL?, defaults: UserDefaults? = nil, awake: @escaping Awake = BighelpDeliveryReceipts.whileAwake) {
         self.fileURL = fileURL
         self.defaults = defaults
+        self.awake = awake
+    }
+
+    /// `ProcessInfo.performExpiringActivity`, which works in the app and in an extension. It queues the work
+    /// and holds off suspension until the work returns.
+    static let whileAwake: Awake = { work in
+        let isFirstCall = OSAllocatedUnfairLock(initialState: true)
+        ProcessInfo.processInfo.performExpiringActivity(withReason: "Bighelp delivery receipts") { expired in
+            // iOS calls a second time, with `expired`, if the time runs out while the first call still works.
+            // The work is a few milliseconds of file access with nothing to cancel, so only the first call counts.
+            let isFirst = isFirstCall.withLock { first in
+                defer { first = false }
+                return first
+            }
+            if isFirst { work(!expired) }
+        }
     }
 
     static var shared: BighelpDeliveryReceipts {
@@ -67,19 +93,30 @@ struct BighelpDeliveryReceipts: @unchecked Sendable {
 
     func setRecording(_ recording: Bool) { defaults?.set(recording, forKey: Self.recordingKey) }
 
-    /// Called by the notification service extension once per push, and by the app for a wake. It returns
-    /// at once: the file work runs on a utility queue, so it never delays the alert (or the main thread).
+    /// Called by the notification service extension once per push, and by the app for a wake.
     static func record(userInfo: [AnyHashable: Any], receivedAt: Date) {
-        // The receipt is made here, from what the push carries, and only that crosses to the queue.
-        let receipt = receipt(userInfo: userInfo, receivedAt: receivedAt)
-        let store = shared
-        guard store.isRecording else { return }
-        DispatchQueue.global(qos: .utility).async { store.append(receipt) }
+        shared.recordWhileAwake(userInfo: userInfo, receivedAt: receivedAt)
     }
 
-    /// The oldest `limit` receipts, removed from the file.
-    static func drain(limit: Int) -> [BighelpDeliveryReceipt] {
-        shared.drain(limit: limit)
+    /// Returns at once: the file work runs on a queue of its own, so it never delays the alert (or the main
+    /// thread), and only while iOS keeps the process awake. A receipt iOS gives no time for is skipped.
+    func recordWhileAwake(userInfo: [AnyHashable: Any], receivedAt: Date) {
+        guard isRecording else { return }
+        // The receipt is made here, from what the push carries, and only that crosses to the queue.
+        let receipt = Self.receipt(userInfo: userInfo, receivedAt: receivedAt)
+        awake { hasTime in
+            if hasTime { append(receipt) }
+        }
+    }
+
+    /// The oldest `limit` receipts, removed from the file while iOS keeps the process awake. Empty when iOS
+    /// gives no time: the receipts stay for the next read.
+    func drainWhileAwake(limit: Int) async -> [BighelpDeliveryReceipt] {
+        await withCheckedContinuation { continuation in
+            awake { hasTime in
+                continuation.resume(returning: hasTime ? drain(limit: limit) : [])
+            }
+        }
     }
 
     func record(userInfo: [AnyHashable: Any], receivedAt: Date) {

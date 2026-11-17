@@ -90,8 +90,10 @@ struct PluginListReadTests {
         let saved = CapabilitiesSavedLists(folder: folder)
         let host = PluginHost()
         await PluginLifecycleManagementModel(client: host.client(), keptCopies: CapabilitiesKeptCopies(saved: saved)).load()
-        // The copy is written off the main actor.
-        while (try? FileManager.default.contentsOfDirectory(atPath: folder.path(percentEncoded: false)))?.isEmpty != false {
+        // The copy is written off the main actor. Wait until it reads back: an atomic write puts a
+        // temporary file in the folder first, so "the folder isn't empty" came true before the copy was there.
+        let key = "plugins\n\(host.client().owner.cacheScopeID)"
+        while await saved.read(PluginSnapshot.self, key: key) == nil {
             try await Task.sleep(for: .milliseconds(10))
         }
 

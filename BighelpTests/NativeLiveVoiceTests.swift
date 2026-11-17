@@ -427,9 +427,91 @@ struct NativeLiveVoiceTests {
         return (model, peer)
     }
 
+    // A call continues its chat: what was said goes back into it, in order.
+
+    private final class Order {
+        var steps: [String] = []
+    }
+
+    private func spokenSession(_ order: Order, journal: LiveVoiceSpokenTurns) -> NativeLiveVoiceSession {
+        NativeLiveVoiceSession(owner: .init(hostID: "native", authorizationID: "auth", agentID: "default", sessionID: "stored"),
+            operation: { operation, payload in
+                switch operation {
+                case .nativeVoiceOffer:
+                    order.steps.append("offer")
+                    return ["voiceId": payload["voiceId"]!, "sdp": .string(NativeVoicePeer.sdp)]
+                case .nativeVoicePoll:
+                    return ["voiceId": payload["voiceId"]!, "events": .array([]), "next": payload["after"]!, "closed": .boolean(false)]
+                case .nativeVoiceResult: return ["appended": .boolean(true)]
+                case .nativeVoiceClose: return ["closed": .boolean(true)]
+                default: throw LiveVoiceControlError.unavailable
+                }
+            }, isCurrent: { true }, submit: { text in
+                order.steps.append("submit: " + text)
+                return "Tomorrow is clear."
+            }, spoken: journal)
+    }
+
+    private func line(_ role: String, _ text: String) -> [String: BighelpJSONValue] {
+        ["kind": .string("transcript_done"), "role": .string(role), "text": .string(text)]
+    }
+
+    @Test func theWordsBeforeARequestReachTheChatBeforeItsTurn() async throws {
+        let order = Order()
+        var interrupted: [Bool] = []
+        let journal = LiveVoiceSpokenTurns(retryWaits: [.milliseconds(5)])
+        journal.send = { _, lines in
+            for line in lines.compactMap(\.object) {
+                order.steps.append("saved: " + (line["text"]?.string ?? ""))
+                interrupted.append(line["interrupted"]?.boolean ?? false)
+            }
+            return .saved
+        }
+        let voice = spokenSession(order, journal: journal)
+        _ = try await voice.perform("voice.live.offer", fields: ["voiceId": .string("voice-one")])
+        voice.receiveEvent(line("assistant", "Hi, picking up where we"), voiceID: "voice-one")
+        voice.receiveEvent(["kind": .string("transcript_delta"), "role": .string("assistant"), "text": .string("Hi, ")],
+                           voiceID: "voice-one")
+        voice.receiveEvent(["kind": .string("audio_cleared")], voiceID: "voice-one")
+        voice.receiveEvent(line("assistant", "Hi, picking up where we"), voiceID: "voice-one")
+        // Cut off before any word of the reply came in: there is no line to mark, and the next
+        // whole reply must not take the mark.
+        voice.receiveEvent(["kind": .string("audio_cleared")], voiceID: "voice-one")
+        voice.receiveEvent(line("user", "Check my calendar for tomorrow."), voiceID: "voice-one")
+        voice.receiveEvent(line("assistant", "On it."), voiceID: "voice-one")
+        voice.receiveEvent(["kind": .string("delegation"), "id": .string("call-1"),
+                            "text": .string("Check the calendar for tomorrow")], voiceID: "voice-one")
+        for _ in 0..<500 where !order.steps.contains(where: { $0.hasPrefix("submit") }) { await Task.yield() }
+        #expect(order.steps == ["offer", "saved: Hi, picking up where we", "saved: Hi, picking up where we",
+                                "saved: Check my calendar for tomorrow.", "saved: On it.",
+                                "submit: Check the calendar for tomorrow"])
+        #expect(interrupted == [false, true, false, false], "Only the reply the person cut off ends early")
+        _ = try await voice.perform("voice.live.close", fields: ["voiceId": .string("voice-one")])
+    }
+
+    @Test func aNewCallSavesWhatTheLastOneLeftBeforeItReadsTheChat() async throws {
+        let order = Order()
+        var answers: [LiveVoiceSpokenTurns.Outcome] = [.wait]
+        // The retry is far off: only the new call's offer sends the line again.
+        let journal = LiveVoiceSpokenTurns(retryWaits: [.seconds(60)])
+        journal.send = { _, lines in
+            let outcome = answers.isEmpty ? .saved : answers.removeFirst()
+            if outcome == .saved { order.steps += lines.compactMap { "saved: " + ($0.object?["text"]?.string ?? "") } }
+            return outcome
+        }
+        journal.add(voiceID: "voice-one", role: "user", text: "My locker is 4417.")
+        await journal.flush()
+        #expect(order.steps.isEmpty, "The chat was busy")
+        let voice = spokenSession(order, journal: journal)
+        _ = try await voice.perform("voice.live.offer", fields: ["voiceId": .string("voice-two")])
+        #expect(order.steps == ["saved: My locker is 4417.", "offer"])
+        _ = try await voice.perform("voice.live.close", fields: ["voiceId": .string("voice-two")])
+    }
+
     @Test func nativeVoiceOperationsHaveNativePluginRoutes() {
         for operation in [WorkspaceOperation.nativeVoiceStatus, .nativeVoiceOffer, .nativeVoicePoll,
-                          .nativeVoiceResult, .nativeVoiceClose, .nativeVoiceGeminiStatus, .nativeVoiceGeminiOffer] {
+                          .nativeVoiceResult, .nativeVoiceClose, .nativeVoiceGeminiStatus, .nativeVoiceGeminiOffer,
+                          .nativeVoiceTranscript] {
             #expect(DirectHermesNativePluginClient.supports(operation))
         }
     }

@@ -505,7 +505,7 @@ private struct DashboardSection: View {
         // What's new gets the Feed's deep green, as its "new today" block does.
         case .feed: context.store.supportsFeedback && !item.read ? .forest : .feed(item)
         case .idea: .idea(item)
-        case .goal: .goal(item.goalCategory ?? .other)
+        case .goal: .goal(item.goalCategoryInfo)
         }
     }
 
@@ -750,7 +750,7 @@ private struct DashboardItemFace: View, Equatable {
             let section = item.section.trimmingCharacters(in: .whitespaces)
             return section.isEmpty ? String(localized: "Idea") : section
         case .goal:
-            return (item.goalCategory ?? .other).groupTitle
+            return item.goalCategoryInfo.pillTitle
         }
     }
 
@@ -758,7 +758,7 @@ private struct DashboardItemFace: View, Equatable {
         switch item.kind {
         case .feed: isNew ? "circle.fill" : nil
         case .idea: nil
-        case .goal: (item.goalCategory ?? .other).systemImage
+        case .goal: item.goalCategoryInfo.pillSystemImage
         }
     }
 

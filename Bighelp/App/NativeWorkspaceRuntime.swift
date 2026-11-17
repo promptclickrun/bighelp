@@ -466,6 +466,8 @@ final class NativeWorkspaceRuntime {
             let context = LiveVoiceCallContext.offerContext(
                 features: workspace.nativeContext?.features ?? [], agentName: agent?.name,
                 personName: { [weak userIdentity] in userIdentity?.identity.name }, place: .shared)
+            let spoken = Self.spokenTurns(for: voiceOwner, features: workspace.nativeContext?.features ?? [],
+                                          connections: connections, authority: authority, chat: chat)
             let voice = NativeLiveVoiceSession(owner: voiceOwner, operation: { operation, payload in
                 try await workspace.perform(operation, payload: payload, owner: owner)
             }, isCurrent: { [weak connections] in connections?.owner == owner },
@@ -476,7 +478,7 @@ final class NativeWorkspaceRuntime {
             }, submit: { [weak chat] text in
                 guard let chat else { throw LiveVoiceControlError.wrongOwner }
                 return try await chat.runNativeVoiceRequest(text)
-            }, context: context)
+            }, context: context, spoken: spoken)
             return .success(voice.makeModel(agentName: agent?.name ?? "Hermes"))
         }
         // Native creation already captures the verified selected cwd before
@@ -1083,5 +1085,39 @@ private final class ReplyVoiceCache {
         let output = make()
         voices[chat] = (owner, profile, output)
         return output
+    }
+}
+
+extension NativeWorkspaceRuntime {
+    /// The journal of what calls say in this chat, for a computer whose plugin saves it there. Each send takes
+    /// the connection to this computer that is current then, so lines a call left still go in after a
+    /// reconnect; the chat reads what was saved, so the lines show in it.
+    static func spokenTurns(for owner: LiveVoiceOwner, features: Set<String>, connections: WorkspaceConnectionStore,
+                            authority: WorkspaceAuthority, chat: ChatModel) -> LiveVoiceSpokenTurns? {
+        guard features.contains(LiveVoiceSpokenTurns.feature) else { return nil }
+        let journal = LiveVoiceSpokenTurns.shared(hostID: owner.hostID, agentID: owner.agentID, sessionID: owner.sessionID)
+        journal.send = { [weak connections] voiceID, lines in
+            guard let connections, let current = connections.owner, current.authority == authority,
+                  let workspace = connections.workspace,
+                  workspace.nativeContext?.features.contains(LiveVoiceSpokenTurns.feature) == true else { return .wait }
+            do {
+                _ = try await workspace.perform(.nativeVoiceTranscript, payload: [
+                    "agentId": .string(owner.agentID), "sessionId": .string(owner.sessionID),
+                    "voiceId": .string(voiceID), "items": .array(lines),
+                ], owner: current)
+                return .saved
+            } catch WorkspaceClientError.rejected(let code, _) {
+                // A running turn holds the chat; anything else it refused, it will refuse again.
+                return code == "voice_chat_busy" || code == "context_changed" ? .wait : .refused
+            } catch WorkspaceClientError.capacityExceeded {
+                return .refused
+            } catch {
+                // Also "unavailable": right after a reconnect the features can be unknown for a moment,
+                // and that is never "this computer can't save them".
+                return .wait
+            }
+        }
+        journal.onSaved = { [weak chat] in chat?.refreshFromHostSoon() }
+        return journal
     }
 }

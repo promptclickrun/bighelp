@@ -26,15 +26,63 @@ final class DemoAgentBoardClient: AgentBoardClient {
         agentID == "home" || UUID(uuidString: agentID) != nil
     }
 
+    /// The demo computer's own categories, changed in Goals › Categories as on a real one.
+    private var categories = GoalCategoryInfo.builtIn
+    var goalCategories: [GoalCategoryInfo]? { categories }
+
     func items(agentID: String) async throws -> [AgentBoardItem] {
+        try await stored(agentID: agentID).map(shown)
+    }
+
+    /// The items as kept: a goal keeps its category's ID through any change to the list.
+    private func stored(agentID: String) async throws -> [AgentBoardItem] {
         if let items = itemsByAgent[agentID] { return items }
         let items = Self.startsEmpty(agentID) ? [] : seed()
         itemsByAgent[agentID] = items
         return items
     }
 
+    /// As the plugin does: each goal says where it shows now.
+    private func shown(_ item: AgentBoardItem) -> AgentBoardItem {
+        guard item.kind == .goal else { return item }
+        var item = item
+        let category = categories.first { $0.id == item.category } ?? .other
+        (item.category, item.categoryName, item.categoryIcon) = (category.id, category.name, category.icon)
+        return item
+    }
+
+    func changeGoalCategories(agentID: String, _ change: GoalCategoryChange) async throws -> [GoalCategoryInfo] {
+        func isTaken(_ name: String, except id: String? = nil) -> Bool {
+            categories.contains { $0.id != id && $0.name.caseInsensitiveCompare(name) == .orderedSame }
+        }
+        switch change {
+        case let .add(name, icon):
+            guard !isTaken(name) else { throw WorkspaceClientError.rejected(code: "category_exists") }
+            guard categories.count < GoalCategoryInfo.maximumCount else {
+                throw WorkspaceClientError.rejected(code: "too_many_categories")
+            }
+            let id = name.lowercased().split { !($0.isLetter || $0.isNumber) }.joined(separator: "-")
+            categories.insert(GoalCategoryInfo(id: id.isEmpty ? UUID().uuidString.lowercased() : id, name: name, icon: icon),
+                              at: max(categories.count - 1, 0))
+        case let .update(id, name, icon):
+            guard let index = categories.firstIndex(where: { $0.id == id }) else {
+                throw WorkspaceClientError.rejected(code: "category_not_found")
+            }
+            guard !isTaken(name, except: id) else { throw WorkspaceClientError.rejected(code: "category_exists") }
+            guard !categories[index].isOther || name == categories[index].name else {
+                throw WorkspaceClientError.rejected(code: "category_fixed")
+            }
+            categories[index].name = name
+            categories[index].icon = icon
+        case let .delete(id):
+            guard id != GoalCategory.other.rawValue else { throw WorkspaceClientError.rejected(code: "category_fixed") }
+            categories.removeAll { $0.id == id }
+        }
+        return categories
+    }
+
     func update(agentID: String, itemID: String, change: AgentBoardChange) async throws -> AgentBoardItem {
-        var items = try await self.items(agentID: agentID)
+        var items = try await stored(agentID: agentID)
         guard let index = items.firstIndex(where: { $0.id == itemID }) else { throw WorkspaceClientError.invalidRequest }
         if let rating = change.rating {
             items[index].rating = rating
@@ -44,17 +92,17 @@ final class DemoAgentBoardClient: AgentBoardClient {
         if let dismissed = change.dismissed { items[index].dismissed = dismissed }
         if let status = change.status { items[index].status = status }
         itemsByAgent[agentID] = items
-        return items[index]
+        return shown(items[index])
     }
 
     func markRead(agentID: String, itemIDs: [String]) async throws {
-        var items = try await self.items(agentID: agentID)
+        var items = try await stored(agentID: agentID)
         for index in items.indices where itemIDs.contains(items[index].id) { items[index].read = true }
         itemsByAgent[agentID] = items
     }
 
     func promote(agentID: String, itemID: String) async throws -> AgentBoardItem {
-        var items = try await self.items(agentID: agentID)
+        var items = try await stored(agentID: agentID)
         guard let index = items.firstIndex(where: { $0.id == itemID && $0.kind == .idea }) else {
             throw WorkspaceClientError.invalidRequest
         }

@@ -191,6 +191,83 @@ final class BoardSwipeBlueprintsUITests: BighelpUITestCase {
         }
     }
 
+    /// Goals › Edit categories: the computer's own list (the demo board stands in for it). A new
+    /// category joins the Create a goal list, a new name shows over its goals, and a deleted
+    /// category's goals move to Other.
+    @MainActor
+    func testEditCategoriesAddsRenamesAndDeletes() throws {
+        for appearance in ["light", "dark"] {
+            let app = launch(appearance: appearance)
+            openBoard("tab.goals", in: app)
+            let edit = app.buttons["board.goals.categories.edit"]
+            scroll(app, until: edit)
+            edit.tap()
+            let add = app.buttons["board.goals.categories.add"]
+            XCTAssertTrue(app.buttons["board.goals.categories.row.health"].waitForExistence(timeout: 10))
+            XCTAssertFalse(app.buttons["board.goals.categories.row.other"].exists, "Other can't be opened")
+            save("board-goals-category-list-\(appearance)", app)
+            scroll(app, until: add)
+            add.tap()
+            let name = app.textFields["board.goals.categories.name"]
+            XCTAssertTrue(name.waitForExistence(timeout: 5))
+            name.tap()
+            name.typeText("Garden")
+            save("board-goals-category-new-\(appearance)", app)
+            app.buttons["board.goals.categories.save"].tap()
+            XCTAssertTrue(app.buttons["board.goals.categories.row.garden"].waitForExistence(timeout: 10),
+                          "The new category is on the list")
+
+            // A name that is taken stays in the editor with the reason.
+            for _ in 0..<3 where !(add.exists && add.isHittable) { app.swipeUp() }
+            add.tap()
+            XCTAssertTrue(name.waitForExistence(timeout: 5))
+            name.tap()
+            name.typeText("garden")
+            app.buttons["board.goals.categories.save"].tap()
+            XCTAssertTrue(app.staticTexts["board.goals.categories.error"].waitForExistence(timeout: 10))
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+
+            // Health gets a new name, and its goals take it.
+            let health = app.buttons["board.goals.categories.row.health"]
+            for _ in 0..<3 where !(health.exists && health.isHittable) { app.swipeDown() }
+            health.tap()
+            XCTAssertTrue(name.waitForExistence(timeout: 5))
+            name.tap()
+            name.typeText(" and fitness")
+            app.buttons["board.goals.categories.save"].tap()
+            XCTAssertTrue(health.waitForExistence(timeout: 10))
+            XCTAssertTrue(health.label.contains("Health and fitness"), health.label)
+
+            // Finance goes: its goals move to Other.
+            app.buttons["board.goals.categories.row.finance"].tap()
+            let delete = app.buttons["board.goals.categories.delete"]
+            XCTAssertTrue(delete.waitForExistence(timeout: 5))
+            delete.tap()
+            // The question's button has the same words as the page's; it is the later one.
+            let confirm = app.buttons.matching(NSPredicate(format: "label == %@", "Delete category"))
+            let asked = Date().addingTimeInterval(5)
+            while confirm.count < 2, Date() < asked { Thread.sleep(forTimeInterval: 0.2) }
+            XCTAssertEqual(confirm.count, 2, "Deleting asks first")
+            confirm.element(boundBy: 1).tap()
+            XCTAssertTrue(app.buttons["board.goals.categories.row.finance"].waitForNonExistence(timeout: 10))
+            app.buttons["board.goals.categories.done"].tap()
+
+            // The page read its goals again, so the list may stand anywhere.
+            let created = app.buttons["board.goals.create.garden"]
+            scroll(app, until: created)
+            XCTAssertTrue(created.waitForExistence(timeout: 10), "Create a goal offers the new category")
+            XCTAssertFalse(app.buttons["board.goals.create.finance"].exists)
+            for _ in 0..<6 { app.swipeDown() }
+            let renamed = app.descendants(matching: .any)["board.goals.category.health"]
+            scroll(app, until: renamed)
+            XCTAssertTrue(renamed.label.contains("Health and fitness"), renamed.label)
+            XCTAssertFalse(app.descendants(matching: .any)["board.goals.category.finance"].exists,
+                           "Its goals are under Other now")
+            save("board-goals-category-after-\(appearance)", app)
+            app.terminate()
+        }
+    }
+
     /// Let's do it records the idea by its ID (the demo board stands in for the host) and opens
     /// the bot's chat to send the idea as a card: the ID never reaches the message box.
     @MainActor

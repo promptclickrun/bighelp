@@ -147,6 +147,8 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case nativeVoicePoll = "native.voice.poll"
     case nativeVoiceResult = "native.voice.result"
     case nativeVoiceClose = "native.voice.close"
+    /// A call's finished lines, saved into its chat: only on plugins that list `native-voice-history-v1`.
+    case nativeVoiceTranscript = "native.voice.transcript"
     /// The same routes, for Gemini Live: only on plugins that list `native-voice-gemini-v1`.
     case nativeVoiceGeminiStatus = "native.voice.gemini.status"
     case nativeVoiceGeminiOffer = "native.voice.gemini.offer"
@@ -178,6 +180,8 @@ enum WorkspaceOperation: String, CaseIterable, Sendable {
     case boardPromote = "board.promote"
     /// Let's do it on an idea, by its ID (plugin `native-agent-board-answers-v1`).
     case boardAccept = "board.accept"
+    /// Adds, renames or removes one of the computer's goal categories (plugin `native-goal-categories-v1`).
+    case boardCategories = "board.categories"
     case usageList = "usage.list"
     /// Hours of the day, messages and models per day for the Usage page (plugin, `native-usage-activity-v1`).
     case usageActivity = "usage.activity"

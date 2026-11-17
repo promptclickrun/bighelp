@@ -8,6 +8,11 @@ import Foundation
 /// GPT-Live's events come from the host's feed (`poll`) and its results go back
 /// through the host. A Gemini call's events come from the phone's own connection
 /// (`LiveVoiceLocalSession`), and its results go back to it as `UPDATE` text.
+///
+/// A call continues its chat both ways: the plugin reads the chat into the offer, and
+/// each finished line of the call goes back into it (`spoken`). Lines an earlier call in
+/// the chat still holds go first, before the offer reads the chat, and the lines before a
+/// request go before the request's own turn, so the chat keeps the order they were said in.
 @MainActor
 final class NativeLiveVoiceSession {
     typealias Operation = @MainActor (WorkspaceOperation, [String: BighelpJSONValue]) async throws -> [String: BighelpJSONValue]
@@ -30,6 +35,10 @@ final class NativeLiveVoiceSession {
         var seen: [String: String] = [:]
         var pending: [String: Task<Outcome, Never>] = [:]
         var transcripts: [(Int, String)] = []
+        /// The provider dropped the reply's audio: the person cut it off, and its line ends there.
+        var audioCleared = false
+        /// Words of the reply being said have come in since the last finished reply.
+        var replyHasWords = false
         var contextOffset = -1
         var contextIncomplete = false
         var closeCleanup: (@MainActor () async -> Void)?
@@ -47,6 +56,8 @@ final class NativeLiveVoiceSession {
     private let closeCleanupFactory: CloseCleanupFactory?
     private let submit: Submit
     private let context: Context?
+    /// The chat's journal of spoken lines, on a computer that lists `native-voice-history-v1`.
+    private let spoken: LiveVoiceSpokenTurns?
     private var call: Call?
     private var pollTask: Task<Void, Never>?
     private weak var model: LiveVoiceModel?
@@ -57,13 +68,15 @@ final class NativeLiveVoiceSession {
          isCurrent: @escaping @MainActor () -> Bool,
          closeCleanupFactory: CloseCleanupFactory? = nil,
          submit: @escaping Submit,
-         context: Context? = nil) {
+         context: Context? = nil,
+         spoken: LiveVoiceSpokenTurns? = nil) {
         self.owner = owner
         self.operation = operation
         self.isCurrent = isCurrent
         self.closeCleanupFactory = closeCleanupFactory
         self.submit = submit
         self.context = context
+        self.spoken = spoken
     }
 
     func makeModel(
@@ -105,6 +118,8 @@ final class NativeLiveVoiceSession {
                 // The phone's context rides in the offer; the offer's own fields win.
                 var fields = fields
                 if let context { fields.merge(await context()) { own, _ in own } }
+                // What an earlier call said here goes in first, so the chat the offer reads has it.
+                await spoken?.flush(waitingAtMost: 2)
                 guard call === next else { throw LiveVoiceControlError.wrongOwner }
                 let result = try await request(local ? .nativeVoiceGeminiOffer : .nativeVoiceOffer, fields)
                 guard call === next else { throw LiveVoiceControlError.wrongOwner }
@@ -182,6 +197,15 @@ final class NativeLiveVoiceSession {
                 if removed.0 > call.contextOffset { call.contextIncomplete = true }
             }
         }
+        // A cut-off marks only the reply whose words were coming in: cleared audio with no words yet
+        // has no line to mark, and must not mark the next whole reply.
+        if kind == "transcript_delta", event["role"]?.string == "assistant" { call.replyHasWords = true }
+        if kind == "audio_cleared" { call.audioCleared = call.replyHasWords }
+        if kind == "transcript_done", let role = event["role"]?.string, let text = event["text"]?.string {
+            let interrupted = role == "assistant" && call.audioCleared
+            if role == "assistant" { (call.audioCleared, call.replyHasWords) = (false, false) }
+            spoken?.add(voiceID: call.id, role: role, text: text, interrupted: interrupted)
+        }
         guard kind == "delegation" || kind == "delegation_context_required" else {
             emit(event, voiceID: voiceID)
             return
@@ -209,6 +233,8 @@ final class NativeLiveVoiceSession {
                 guard !retired, isCurrent() else {
                     return Outcome(text: "The host connection changed. Check the chat before resending.", confirmed: false)
                 }
+                // The words that led here go into the chat before the request's own turn does.
+                await spoken?.flush(waitingAtMost: 1.5)
                 do { return Outcome(text: Self.boundedResult(try await submit(text))) }
                 catch {
                     return Outcome(text: "This request was not confirmed. Check the chat and its pending approvals before requesting it again.",

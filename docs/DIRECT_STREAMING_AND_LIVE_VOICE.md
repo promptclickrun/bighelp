@@ -30,6 +30,19 @@ edits the defaults. The voice button starts the call at once, in both voice type
 The voice model is the agent itself: the plugin builds its brief from the agent's name and `SOUL.md`, so it speaks
 in the first person and never says "your agent" or "Hermes".
 
+A call continues the chat it opens in, both ways (plugin `native-voice-history-v1`). The plugin reads that chat
+before the voice model listens: its newest messages with their roles, the summary of its compacted part and the
+request a turn still works on, the same for Gemini and both GPT-Live options. The model answers from it and
+doesn't greet or repeat as if the conversation were new. What is said on the call comes back into the chat:
+each finished line, the person's or the voice model's, goes to the plugin's `voice/transcript` route
+(`LiveVoiceSpokenTurns`) and becomes an ordinary message, so typing afterwards knows it. A reply the person cut
+off ends where they cut in. Saving runs nothing, and requests the model handed over are already turns in the
+chat. The plugin writes only while no turn runs in the chat, so the app sends the same lines again until the
+chat takes them, and each line is saved once. Lines stay with their computer, agent and chat: a call opened
+again in the chat saves what the last one left before the plugin reads the chat, and they go over whatever
+connection to that computer is current, so a reconnect doesn't lose them. They wait in memory only: lines
+the chat hasn't taken after 30 minutes, or when the app quits, are lost.
+
 ### GPT-Live
 
 GPT-Live defaults to **Codex subscription** (`gpt-live-1-codex`). The plugin uses Hermes-managed subscription credentials; the phone receives no bearer token. The phone's WebRTC peer (`BighelpRealtimeAudioPeer`) carries audio directly to the provider. Setup, captions and job controls go through the plugin's `voice/status`, `voice/offer`, `voice/poll`, `voice/result` and `voice/close` routes (feature `native-voice-v1`) on the signed-in host connection. The provider sideband is connected before the answer SDP is returned.

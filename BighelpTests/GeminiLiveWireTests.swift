@@ -93,6 +93,21 @@ struct GeminiLiveWireTests {
             "kind": .string("transcript_done"), "role": .string("assistant"), "text": .string("I need your approval.")])])
     }
 
+    /// The chat keeps a call's last words: what the person said and the reply the hang-up cut off.
+    @Test func aHangUpEndsWhatWasStillBeingSaid() {
+        var translator = GeminiLiveTranslator()
+        _ = translator.outputs(for: .userText("My bike is teal."))
+        #expect(translator.hangUp() == [.event([
+            "kind": .string("transcript_done"), "role": .string("user"), "text": .string("My bike is teal.")])])
+        // The reply's first words already ended the person's line.
+        _ = translator.outputs(for: .userText("And it has a bell."))
+        _ = translator.outputs(for: .assistantText("A teal bike with"))
+        #expect(translator.hangUp() == [
+            .event(["kind": .string("audio_cleared")]),
+            .event(["kind": .string("transcript_done"), "role": .string("assistant"), "text": .string("A teal bike with")])])
+        #expect(translator.hangUp().isEmpty, "Nothing is said twice")
+    }
+
     @Test func startWorkIsAnsweredAtOnceAndBecomesADelegation() {
         var translator = GeminiLiveTranslator()
         let call = GeminiLiveWire.FunctionCall(id: "c1", name: "start_work", arguments: ["request": .string(" Tidy Downloads ")])

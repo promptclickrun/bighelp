@@ -420,6 +420,14 @@ change in both repos.
   the chat when it's free; one made while the chat works runs at once as a Hermes background task for it
   (`ChatModel.runNativeVoiceRequest`, `prompt.background`) and answers the call on its own. Background tasks
   can't reach the phone's tools.
+- **A call continues its chat, both ways** (plugin `native-voice-history-v1`): the plugin reads the chat the
+  offer names (its newest messages with their roles, its compaction summary, the request still running) into
+  every provider's instructions before the voice model listens. Each finished line of the call (person or
+  voice model, a cut-off reply marked `interrupted`) goes back into the chat as an ordinary message through
+  `voice/transcript` (`LiveVoiceSpokenTurns`), which runs nothing and saves each line once. The plugin writes
+  only while no turn runs (`voice_chat_busy`), so the journal sends the same lines again until the chat takes
+  them, over whatever connection to that computer is current. One journal per computer, agent and chat: a new
+  call's offer waits for an earlier call's lines, and the lines before a request go before its turn.
 - **On-device voices** (`Bighelp/Voice/OnDevice/`): Phonon speaks on the iPhone or iPad instead of the
   computer. It's chosen per agent in Voice settings and kept on the device (`OnDeviceVoiceChoices`, by computer
   and agent); the agent's `tts.*` on the computer never changes. `OnDeviceVoiceSettingsClient` adds it to the

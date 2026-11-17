@@ -1,14 +1,17 @@
 import Foundation
 
-/// Something another app shared with bighelp (#922), kept on the device until the person sends it
-/// from a chat's message box or deletes it.
+/// Something another app shared with bighelp (#922), kept on the device until bighelp sends it
+/// or the person deletes it.
 ///
-/// The share sheet only saves. It has no sign-in and no network: iOS doesn't let a share extension
-/// open its app (`NSExtensionContext.open` works only for Today and iMessage extensions), so the
-/// person opens bighelp, picks the agent and chat there, and the shared things go into that chat's
-/// message box. Send then works as for anything typed or attached there: the AI data agreement,
-/// the chat's own computer and agent, and the usual attachment limits all apply. Foundation only,
-/// so the app, the extension and the Linux test run share it.
+/// The share sheet only saves. It has no sign-in and sends nothing to a computer: iOS doesn't let a
+/// share extension open its app (`NSExtensionContext.open` works only for Today and iMessage
+/// extensions). A share marked `sendsItself` (#1069) goes to the default bot in a new chat as soon as
+/// bighelp runs (`PendingShareSender`; the sheet asks iOS to wake it, `PendingShareWake`). Any other
+/// share, and one that couldn't be sent, waits for the person to pick the agent and chat in bighelp.
+/// Either way the shared things go through a chat's message box, so Send works as for anything typed
+/// or attached there: the AI data agreement, the chat's own computer and agent, and the usual
+/// attachment limits all apply. Foundation only, so the app, the extension and the Linux test run
+/// share it.
 struct PendingShare: Codable, Equatable, Identifiable, Sendable {
     struct File: Codable, Equatable, Sendable {
         enum Kind: String, Codable, Sendable { case image, file }
@@ -36,6 +39,9 @@ struct PendingShare: Codable, Equatable, Identifiable, Sendable {
     /// What the person typed in the share sheet, if anything.
     let note: String
     let files: [File]
+    /// True when the share sheet's Send saved it: bighelp sends it to the default bot by itself.
+    /// Missing in a share saved before #1069, which waits for the person as it always did.
+    var sendsItself: Bool? = nil
 
     var byteCount: Int { files.reduce(0) { $0 + $1.byteCount } }
 
@@ -97,6 +103,9 @@ struct PendingSharePlacement: Codable, Equatable, Sendable {
     let placedAt: Date
     /// The message it left its message box in, until Hermes takes that message.
     var submission: PendingShareSubmission? = nil
+    /// True when bighelp chose this chat itself, for a share meant for the default bot
+    /// (`PendingShareSender`). Only such a placement, never one the person made, is tried again.
+    var isAutomatic: Bool? = nil
 
     var recovery: Recovery {
         switch submission?.state {

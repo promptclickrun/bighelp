@@ -16,7 +16,8 @@ struct PendingShareReviewContext {
 
 /// Offers a share another app saved for bighelp each time bighelp comes to the front, so the person
 /// picks the agent and chat it goes to, and shows every waiting share when asked (Shared with
-/// bighelp). It waits for whatever has to come first: the AI data agreement, first setup, adding a
+/// bighelp). A share the share sheet's Send saved goes to the default bot by itself first
+/// (`PendingShareSender`), and is offered here only if that gave up. It waits for whatever has to come first: the AI data agreement, first setup, adding a
 /// computer, Settings, or, for a review on its own, no computer at all.
 @MainActor
 struct PendingShareReview: ViewModifier {
@@ -25,6 +26,7 @@ struct PendingShareReview: ViewModifier {
     let isBlocked: Bool
     let usesDemoData: Bool
     let context: PendingShareReviewContext
+    var sender: PendingShareSender = .shared
     @AppStorage(AIDataConsent.key) private var agreed = false
     @Environment(\.scenePhase) private var scenePhase
 
@@ -72,6 +74,13 @@ struct PendingShareReview: ViewModifier {
             .task(id: scenePhase) {
                 guard scenePhase == .active else { return }
                 await center.refresh()
+                await sender.run()
+            }
+            // Again when the agreement is given or a computer comes into use: a share for the default
+            // bot waited for that.
+            .task(id: "\(hasAgreed)|\(context.scope ?? "")") {
+                guard scenePhase == .active else { return }
+                await sender.run()
             }
     }
 
@@ -190,10 +199,13 @@ struct PendingShareListView: View {
 
     private func status(_ entry: PendingShareInbox.Entry) -> String {
         guard case .share(let share, let placement) = entry else { return String(localized: "It can be deleted.") }
+        if center.isBeingSent(share.id) { return String(localized: "Bighelp is sending this now") }
         if center.isHeld(share.id) { return String(localized: "In a chat's message box now") }
         let saved = share.createdAt.formatted(.relative(presentation: .named))
         guard let placement else { return String(localized: "Saved \(saved). Not sent.") }
         switch placement.recovery {
+        case .notSent where placement.isAutomatic == true:
+            return String(localized: "Saved \(saved). Not sent to \(placement.agentName).")
         case .notSent:
             return String(localized: "Saved \(saved). Put in a chat with \(placement.agentName), not sent.")
         case .maybeSent:
@@ -365,6 +377,8 @@ struct PendingShareReviewView: View {
         } footer: {
             if let placement {
                 switch placement.recovery {
+                case .notSent where placement.isAutomatic == true:
+                    Text("Bighelp couldn't send this to \(placement.agentName). Pick where it goes.")
                 case .notSent:
                     Text("You put this in a chat with \(placement.agentName) before, and it wasn't sent.")
                 case .maybeSent:

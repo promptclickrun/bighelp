@@ -312,6 +312,7 @@ struct BighelpApp: App {
         _notificationComposition = State(initialValue: notificationComposition)
         Self.configureOutsideActions(composition.shortcutService, hostRegistry: hostRegistry,
                                      notifications: notificationComposition)
+        Self.configurePendingShares(composition, connections: connections, usesDemoWorkspace: usesDemoWorkspace)
 
         let priorNativeEvent = hostRegistry.onNativeEvent
         hostRegistry.onNativeEvent = { [weak nativeWorkspaces, weak notificationComposition] host, event in
@@ -464,6 +465,28 @@ struct BighelpApp: App {
             await ChatOutsideActions.shared?.receiveDecision(rowID: rowID, approves: approves, command: command)
         }
         #endif
+    }
+
+    /// A share the share sheet's Send saved goes to the default bot through the same live host as
+    /// Shortcuts (#1069), so it goes with Bighelp in the background too. Demo runs use the local fixtures.
+    private static func configurePendingShares(_ composition: BighelpAppComposition,
+                                               connections: WorkspaceConnectionStore, usesDemoWorkspace: Bool) {
+        let shortcuts = composition.shortcutService
+        let live = PendingShareSender.live({ try await shortcuts.connectedWorkspace(needs: .chats) },
+                                           scope: { connections.owner?.cacheScopeID })
+        let demoHosts = composition.demoHosts
+        let demoWorkspace = BighelpShortcutWorkspace(
+            appState: composition.appState, agents: composition.agentDirectory,
+            runtimeDefaults: composition.agentRuntimeDefaults, catalog: composition.sessionCatalog,
+            featureStore: composition.featureStore, newChatCoordinator: composition.newChatCoordinator)
+        let demo = PendingShareSender.live({ demoWorkspace }, scope: {
+            (try? WorkspaceAuthority.fixture(id: demoHosts.selectedHostID ?? "demo"))?.cacheScopeID
+        })
+        PendingShareSender.shared.bind { earlier in
+            if usesDemoWorkspace, !connections.isDirectSelected { return try await demo(earlier) }
+            return try await live(earlier)
+        }
+        PendingShareWakeReceiver.shared.listen()
     }
 
     #if os(iOS)

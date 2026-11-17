@@ -175,8 +175,9 @@ targets:
         APPLICATION_EXTENSION_API_ONLY: YES
         SKIP_INSTALL: YES
   # Saves a link, text, photos or files shared from another app into the app group
-  # (Bighelp/ShareShared, PendingShareInbox). It has no sign-in, Keychain group or
-  # network: bighelp sends the share from the chat the person picks there (#922).
+  # (Bighelp/ShareShared, PendingShareInbox). It has no sign-in or Keychain group and
+  # sends nothing to a computer: bighelp sends the share (#922). Its one request asks
+  # iOS to wake bighelp for a share meant for the default bot (PendingShareWake, #1069).
   BighelpShare:
     type: app-extension
     platform: iOS

@@ -274,7 +274,7 @@ change in both repos.
 | `Bighelp/Agents/`, `Board/`, `Companion/` | The bot directory and its editors, Feed/Ideas/Goals boards, the avatar kit renderer |
 | `Bighelp/Kanban/` | Kanban on Hermes' Kanban plugin: board model, lanes, cards, Vision Pro window and pinch-drag |
 | `Bighelp/Code/` | Coding sessions, started from New chat's choices row (project, new worktree or local, branch, mode, Stage) and listed on Work: `CodeHomeStore`, `CodeLauncher`, the pickers, Changes and Ship |
-| `BighelpShare/`, `Bighelp/ShareShared/`, `Bighelp/Share/` | The share sheet (#922): the extension saves what's shared into the app group (`PendingShareInbox`, Foundation only and shared with the app), and the app's review puts it in the message box of the chat the person picks (`PendingShareCenter`, `ChatModel.placeShare`) |
+| `BighelpShare/`, `Bighelp/ShareShared/`, `Bighelp/Share/` | The share sheet (#922): the extension saves what's shared into the app group (`PendingShareInbox`, Foundation only and shared with the app) and asks iOS to wake the app (`PendingShareWake`); the app sends it to the default bot in a new chat (`PendingShareSender`, #1069), and its review puts a share that didn't go in the message box of the chat the person picks (`PendingShareCenter`, `ChatModel.placeShare`) |
 | `Bighelp/Connectors/` | Settings › Apps & skills (`AppsHubView`; a bot's profile has its own Connections): Hermes' connectors as Native App Connections (the inline connect cards in chat, `connection.request`, `ConnectorCardStore`; `ConnectorAppsModel`) and Composio Apps (`Composio/`, [docs/COMPOSIO_APPS.md](docs/COMPOSIO_APPS.md)) |
 | `Bighelp/HTMLApps/` | Agents' HTML apps: the `html_app` card, the full-screen page and its `window.bighelp` bridge, the plugin's `html-apps` routes, the demo's sample apps |
 | `Bighelp/BotScreen/` | Bot Screen: an agent's Linux screen (Hermes `display.*`) and the computer's own desktop (`ComputerScreen.swift`, the plugin's VNC bridge) in its profile's Computer tab, a native RFB client (`RFB/`, with VNC passwords) and the full-screen viewer with take control and hand back |
@@ -541,10 +541,31 @@ change in both repos.
   item's read-out from `agents/today/detail` (`native-agents-today-detail-v1`, `AgentTodayDetail`). In a chat, a
   helper's late `subagent.*` events update the row of the turn that started it (`subagentTurnIDs`), and a helper
   left running doesn't hold its finished turn open: the turn folds as Settings › Chat › Shows as says.
-- **The share sheet only saves:** iOS supports `NSExtensionContext.open` only in Today and iMessage extensions,
-  so the share sheet can't open bighelp, and it holds no sign-in. It copies the share into the app group whole or
-  not at all (`PendingShareDraft`: a staging folder under a lock file, moved into place in one rename) and says to
-  open bighelp. There `PendingShareReview` offers it, the person picks an agent and chat on the computer in use,
+- **The share sheet saves, and bighelp sends** (#1069): iOS supports `NSExtensionContext.open` only in Today and
+  iMessage extensions, so the share sheet can't open bighelp, and it holds no sign-in. Its Send copies the share
+  into the app group whole or not at all (`PendingShareDraft`: a staging folder under a lock file, moved into place
+  in one rename), marked for the default bot (`PendingShare.sendsItself`), and the sheet closes. `PendingShareSender`
+  then sends it with no review: a new chat with the default bot on the computer in use (the Shortcuts host path,
+  `readyChat`), the share into that chat's message box, then `send`, so the ledger below owns it as it owns every
+  share. The sender runs when bighelp comes to the front, on the sheet's Darwin notification while bighelp runs,
+  and when iOS starts bighelp for the sheet's background `URLSession` (`PendingShareWake`: one HEAD request that
+  carries nothing, begun two seconds late; `PendingShareWakeReceiver`). iOS starts the app only when nothing of
+  the sheet is still connected to take the request's result, and it keeps a finished sheet's process for a minute
+  or more, so the sheet ends its own process after Send (`ShareViewController.finish`). Without that the request
+  ended, the sheet's idle process took the result and bighelp was never started (seen in the system log, #1069). iOS decides when that happens, so nothing may promise "sent": a share
+  bighelp wasn't started for goes when bighelp next opens. A share that doesn't go stays saved, is tried again on
+  the next run (three times in one run of the app) and is then offered in the review; nobody sees the sender's
+  chat, so a share left in its message box is taken out again (`takeBack`). Only a placement the sender made
+  (`PendingSharePlacement.isAutomatic`) that was never handed to Hermes is tried again: never a chat the person
+  picked, never a message that may have arrived (`PendingShareCenter.sendsItself`; on disk,
+  `PendingShareInbox.place(onlyUnsent:)` refuses to write over either). While the sender has a share it counts
+  as held (`isBeingSent`), so the list can't open it too. The sender only types into a chat that is empty
+  (`isBlank`). Two kinds of share go straight to the review (`goesAlone`): words that start with "/", which the
+  message box would run as a command nobody looked at, and a file over 8 MB, which goes up in pieces behind a
+  progress tile. In the background the sender starts nothing with under ten seconds left, hands its background
+  task back when iOS runs out, and says a failure once in an alert. The sheet names the default bot from the widgets' file
+  (`PendingShareDefaultBot`). A share saved without the mark, or given up, goes the old way: `PendingShareReview`
+  offers it, the person picks an agent and chat on the computer in use,
   and the chat takes it into its message box through the drop path (`ComposerAttachmentDrop.draftAttachment`);
   a new chat's share waits for the chat Hermes makes, never its local canvas (`PendingShareDestination.isTaken`).
   Send works as for anything typed there. From the box on, each chat's `PendingShareLedger` owns its shares: a
@@ -563,7 +584,8 @@ change in both repos.
   taking a share's last file or words out of the box lets it go, kept and listed. The saved copy goes only when
   Hermes takes the message carrying it, or when the person deletes it in the list of waiting shares (Today's Shared with bighelp card, Settings' first
   screen or the sidebar's More), never by itself. `PendingShareInboxTests`, `PendingShareLedgerTests`
-  and `PendingShareWaitTests` run under any Swift (no UIKit); `PendingShareComposerTests` drive the chat.
+  and `PendingShareWaitTests` run under any Swift (no UIKit); `PendingShareComposerTests` and
+  `PendingShareSenderTests` drive the chat.
 - **Plugin routes:**
   - Each route is a `WorkspaceOperation` case plus a `Route(path:feature:isMutation:maximumResponseBytes:)` in
     `DirectHermesNativeContext.swift`.

@@ -121,11 +121,18 @@ struct PendingShareInbox: Sendable {
     // MARK: - Changing
 
     /// Records where the person put a share. Throws `gone` when it was sent or deleted meanwhile.
-    func place(_ id: String, _ placement: PendingSharePlacement) throws {
+    /// `onlyUnsent` is for a placement bighelp makes by itself: it also throws `gone` when the share
+    /// has a placement the person made, or one whose message may have reached Hermes, so neither is
+    /// ever written over.
+    func place(_ id: String, _ placement: PendingSharePlacement, onlyUnsent: Bool = false) throws {
         guard PendingShare.isValidID(id) else { throw PendingShareError.gone }
         let data = try JSONEncoder().encode(placement)
         try withInboxLock {
             guard FileManager.default.fileExists(atPath: folder(id).appendingPathComponent("share.json").path) else {
+                throw PendingShareError.gone
+            }
+            if onlyUnsent, let existing = readPlacement(id),
+               existing.isAutomatic != true || existing.recovery != .notSent {
                 throw PendingShareError.gone
             }
             try Self.write(data, to: folder(id).appendingPathComponent("placement.json"))
@@ -467,7 +474,8 @@ final class PendingShareDraft: @unchecked Sendable {
     }
 
     /// Saves the share with the person's note and hands it to the inbox. Afterwards the draft is done.
-    func commit(note: String) throws -> PendingShare {
+    /// `sendsItself` marks it for the default bot (`PendingShare.sendsItself`).
+    func commit(note: String, sendsItself: Bool = false) throws -> PendingShare {
         let share: PendingShare = try state.withLock {
             guard !isFinished else { throw PendingShareError.finished }
             guard note.utf8.count <= inbox.limits.noteBytes else {
@@ -497,7 +505,7 @@ final class PendingShareDraft: @unchecked Sendable {
             }
             let share = PendingShare(version: PendingShare.currentVersion, id: id, createdAt: inbox.now(),
                                      text: text, links: links, note: PendingShare.hasWords(note) ? note : "",
-                                     files: files)
+                                     files: files, sendsItself: sendsItself ? true : nil)
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys]
             let manifest = try encoder.encode(share)

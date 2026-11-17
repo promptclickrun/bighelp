@@ -190,6 +190,18 @@ struct GeminiLiveTranslator {
     /// Muted, Gemini hears nothing more and may never send the end of the person's speech.
     mutating func personStoppedSpeaking() { isUserSpeaking = false }
 
+    /// The call ends: what the person said last and the reply cut off by the hang-up end here, so
+    /// they still reach the chat.
+    mutating func hangUp() -> [Output] {
+        var outputs = finishUser()
+        if !assistant.isEmpty {
+            outputs += [.event(["kind": .string("audio_cleared")]), transcript("transcript_done", role: "assistant", assistant)]
+        }
+        assistant = ""
+        turnHasOutput = false
+        return outputs
+    }
+
     private mutating func finishUser() -> [Output] {
         guard !user.isEmpty else { return [] }
         defer { user = "" }

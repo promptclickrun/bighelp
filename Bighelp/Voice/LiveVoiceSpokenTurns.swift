@@ -44,7 +44,10 @@ final class LiveVoiceSpokenTurns {
     static let feature = "native-voice-history-v1"
     static let maximumLines = 256
     static let maximumBatch = 32
+    /// In Unicode scalars, as the plugin counts a line's length.
     static let maximumTextLength = 4_000
+    /// One send's lines together, in UTF-8 bytes: under the plugin's limit for a request.
+    static let maximumBatchBytes = 120_000
     /// Waits between tries while the chat is busy or the computer is away; the last repeats until `giveUpAfter`.
     static let retryWaits: [Duration] = [.seconds(1), .seconds(2), .seconds(4), .seconds(8), .seconds(15), .seconds(30)]
     /// A delegated turn can run a long time. Lines that waited this long without a save are let go.
@@ -90,7 +93,8 @@ final class LiveVoiceSpokenTurns {
         guard role == "user" || role == "assistant", !text.isEmpty, pending.count < Self.maximumLines else { return }
         lineCount += 1
         pending.append(Line(voiceID: voiceID, id: "\(role.prefix(1))\(lineCount)", role: role,
-                            text: String(text.prefix(Self.maximumTextLength)), interrupted: interrupted, at: now()))
+                            text: String(String.UnicodeScalarView(text.unicodeScalars.prefix(Self.maximumTextLength))),
+                            interrupted: interrupted, at: now()))
         startRound()
     }
 
@@ -121,7 +125,11 @@ final class LiveVoiceSpokenTurns {
     private func sendPending() async {
         while let first = pending.first {
             guard let send else { return scheduleRetry() }
-            let batch = Array(pending.prefix(Self.maximumBatch).prefix { $0.voiceID == first.voiceID })
+            var bytes = 0
+            let batch = Array(pending.prefix(Self.maximumBatch).prefix { line in
+                bytes += line.text.utf8.count
+                return line.voiceID == first.voiceID && (bytes <= Self.maximumBatchBytes || line == first)
+            })
             switch await send(first.voiceID, batch.map(\.wire)) {
             case .saved:
                 pending.removeFirst(batch.count)

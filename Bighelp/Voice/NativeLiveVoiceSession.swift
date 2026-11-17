@@ -37,6 +37,8 @@ final class NativeLiveVoiceSession {
         var transcripts: [(Int, String)] = []
         /// The provider dropped the reply's audio: the person cut it off, and its line ends there.
         var audioCleared = false
+        /// Words of the reply being said have come in since the last finished reply.
+        var replyHasWords = false
         var contextOffset = -1
         var contextIncomplete = false
         var closeCleanup: (@MainActor () async -> Void)?
@@ -195,10 +197,13 @@ final class NativeLiveVoiceSession {
                 if removed.0 > call.contextOffset { call.contextIncomplete = true }
             }
         }
-        if kind == "audio_cleared" { call.audioCleared = true }
+        // A cut-off marks only the reply whose words were coming in: cleared audio with no words yet
+        // has no line to mark, and must not mark the next whole reply.
+        if kind == "transcript_delta", event["role"]?.string == "assistant" { call.replyHasWords = true }
+        if kind == "audio_cleared" { call.audioCleared = call.replyHasWords }
         if kind == "transcript_done", let role = event["role"]?.string, let text = event["text"]?.string {
             let interrupted = role == "assistant" && call.audioCleared
-            if role == "assistant" { call.audioCleared = false }
+            if role == "assistant" { (call.audioCleared, call.replyHasWords) = (false, false) }
             spoken?.add(voiceID: call.id, role: role, text: text, interrupted: interrupted)
         }
         guard kind == "delegation" || kind == "delegation_context_required" else {

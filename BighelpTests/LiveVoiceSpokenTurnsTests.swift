@@ -90,6 +90,22 @@ struct LiveVoiceSpokenTurnsTests {
         #expect(chat.saved.isEmpty)
     }
 
+    @Test func longLinesGoInSendsTheComputerTakes() async {
+        let chat = Chat()
+        let journal = journal(chat)
+        // Four bytes a character, 16,000 a line: nine lines are over one send's size.
+        let long = String(repeating: "🌱", count: LiveVoiceSpokenTurns.maximumTextLength + 50)
+        for _ in 0..<9 { journal.add(voiceID: "voice-one", role: "user", text: long) }
+        await settle(journal)
+        #expect(chat.saved.count == 9)
+        #expect(chat.saved.allSatisfy { $0.unicodeScalars.count == LiveVoiceSpokenTurns.maximumTextLength })
+        #expect(chat.sends.count >= 2, "No send is over the computer's limit")
+        #expect(chat.sends.allSatisfy { send in
+            send.lines.count == 1 || send.lines.compactMap { $0.object?["text"]?.string?.utf8.count }.reduce(0, +)
+                <= LiveVoiceSpokenTurns.maximumBatchBytes
+        })
+    }
+
     @Test func emptyLinesAndOtherRolesAreLeftOut() {
         let journal = LiveVoiceSpokenTurns()
         journal.add(voiceID: "voice-one", role: "user", text: "   ")

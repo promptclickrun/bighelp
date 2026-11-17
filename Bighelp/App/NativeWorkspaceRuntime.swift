@@ -1109,9 +1109,11 @@ extension NativeWorkspaceRuntime {
             } catch WorkspaceClientError.rejected(let code, _) {
                 // A running turn holds the chat; anything else it refused, it will refuse again.
                 return code == "voice_chat_busy" || code == "context_changed" ? .wait : .refused
-            } catch WorkspaceClientError.unavailable {
+            } catch WorkspaceClientError.capacityExceeded {
                 return .refused
             } catch {
+                // Also "unavailable": right after a reconnect the features can be unknown for a moment,
+                // and that is never "this computer can't save them".
                 return .wait
             }
         }

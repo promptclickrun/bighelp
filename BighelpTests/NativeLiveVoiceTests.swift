@@ -470,8 +470,13 @@ struct NativeLiveVoiceTests {
         let voice = spokenSession(order, journal: journal)
         _ = try await voice.perform("voice.live.offer", fields: ["voiceId": .string("voice-one")])
         voice.receiveEvent(line("assistant", "Hi, picking up where we"), voiceID: "voice-one")
+        voice.receiveEvent(["kind": .string("transcript_delta"), "role": .string("assistant"), "text": .string("Hi, ")],
+                           voiceID: "voice-one")
         voice.receiveEvent(["kind": .string("audio_cleared")], voiceID: "voice-one")
         voice.receiveEvent(line("assistant", "Hi, picking up where we"), voiceID: "voice-one")
+        // Cut off before any word of the reply came in: there is no line to mark, and the next
+        // whole reply must not take the mark.
+        voice.receiveEvent(["kind": .string("audio_cleared")], voiceID: "voice-one")
         voice.receiveEvent(line("user", "Check my calendar for tomorrow."), voiceID: "voice-one")
         voice.receiveEvent(line("assistant", "On it."), voiceID: "voice-one")
         voice.receiveEvent(["kind": .string("delegation"), "id": .string("call-1"),

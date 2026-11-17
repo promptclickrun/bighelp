@@ -257,6 +257,8 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
 
     func close() {
         guard !closed else { return }
+        // The words still coming in when the call ends go to the chat as far as they got.
+        for case .event(let event) in translator.hangUp() { onEvent?(event) }
         closed = true
         diagnostics.event("call closed")
         reportLog?.cancel()

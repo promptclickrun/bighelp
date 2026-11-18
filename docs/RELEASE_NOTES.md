@@ -3,6 +3,17 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.95
+
+### New
+
+- **The share sheet sends to your bot:** in another app, tap Share, then Bighelp, then Send. Bighelp sends what you shared, with your note, to your default bot. You do not open Bighelp. If the share cannot go, Bighelp keeps it and tries again when it opens. After three tries, Bighelp shows the share to you so that you can send it yourself. Words that start with "/" and files over 8 MB still open in Bighelp for you to look at first.
+- **Where shares go:** go to Settings › Chat › From other apps › Shares go to. Select "A new chat" or "The bot's ongoing chat". When you select the ongoing chat, a share waits while you type in that chat, and it waits for the bot to finish its work. This is on iPhone and iPad.
+
+### Fixed
+
+- **Bighelp in the background:** iOS no longer stops Bighelp in the background when Bighelp records a notification. Before, Bighelp sometimes showed a "crashed" message when you opened it again.
+
 ## 2.6.94
 
 ### New

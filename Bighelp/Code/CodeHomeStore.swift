@@ -76,6 +76,13 @@ final class CodeHomeStore {
         sessions = saved?.sessions ?? []
         staged = saved?.staged ?? []
         batches = saved?.batches ?? []
+        // A send that was still starting belongs to the process that's gone. It's failed now, not
+        // starting, so its card says so and its message can go again.
+        launches = (saved?.launches ?? []).map { saved in
+            var launch = saved
+            if !launch.step.isFailed { launch.step = .failed(CodeLaunch.interruptedReason) }
+            return launch
+        }
     }
 
     var project: CodeProject? { projects.first { $0.id == projectID } }
@@ -314,11 +321,12 @@ final class CodeHomeStore {
         let request = CodeLaunchRequest(message: job.message, agentID: job.agentID, project: project,
                                         placement: job.placement, branch: job.branch, newBranch: job.newBranch,
                                         runtime: job.runtime, mode: job.mode)
-        let launch = CodeLaunch(id: UUID(), title: job.title, projectID: project.id, placement: job.placement,
-                                branch: job.placement == .local ? (job.branch ?? branchTitle) : nil,
+        let launch = CodeLaunch(id: UUID(), title: job.title, projectID: project.id, job: job,
                                 step: job.placement == .newWorktree ? .makingWorktree : .startingSession,
-                                batchID: batchID)
+                                batchID: batchID,
+                                branchLabel: job.placement == .local ? (job.branch ?? branchTitle) : nil)
         launches.insert(launch, at: 0)
+        save()
         let launcher = CodeLauncher(git: git, sessions: starter)
         let previous = setupTail
         let setup = Task { @MainActor [weak self] () throws -> CodeSessionRecord in
@@ -336,18 +344,32 @@ final class CodeHomeStore {
                 try await starter.apply(request.mode, toSession: record.id, agentID: request.agentID)
                 try await starter.send(request.firstMessage, toSession: record.id)
                 self?.launches.removeAll { $0.id == launch.id }
+                self?.save()
             } catch {
                 let reason = (error as? LocalizedError)?.errorDescription ?? "Hermes couldn't start this session."
                 self?.update(launch.id) { $0.step = .failed(reason) }
+                // The card keeps the message. It's saved, so it's still here after a relaunch.
+                self?.save()
             }
             if request.placement == .newWorktree { await self?.loadGit() }
         }
         return true
     }
 
-    /// Hides a send that failed.
+    /// Hides a send that failed. Its message goes with it: the card is the only copy kept here.
     func dismiss(_ launch: CodeLaunch) {
         launches.removeAll { $0.id == launch.id }
+        save()
+    }
+
+    /// Sends a failed launch's own message again, with the chips it was sent with.
+    func retry(_ failed: CodeLaunch) {
+        guard failed.step.isFailed else { return }
+        launches.removeAll { $0.id == failed.id }
+        // A project that went away, or a computer with no git, can't start it either: the card
+        // stays failed rather than taking the message with it.
+        if !launch(failed.job, batchID: failed.batchID) { launches.insert(failed, at: 0) }
+        save()
     }
 
     /// Forgets a session's card. The session stays on the computer.
@@ -387,6 +409,8 @@ final class CodeHomeStore {
         var sessions: [CodeSessionRecord]
         var staged: [CodeStagedJob]?
         var batches: [CodeBatch]?
+        /// Sends that haven't finished, or failed. Older saves have none.
+        var launches: [CodeLaunch]?
     }
 
     static let savedKey = "bighelp.code.by-scope"
@@ -403,7 +427,8 @@ final class CodeHomeStore {
         var all: [String: Saved] = (defaults.data(forKey: Self.savedKey))
             .flatMap { try? JSONDecoder().decode([String: Saved].self, from: $0) } ?? [:]
         all[scopeID] = Saved(agentID: agentID, projectID: projectID, placement: placement, branch: branch,
-                             runtime: runtime, mode: mode, sessions: sessions, staged: staged, batches: batches)
+                             runtime: runtime, mode: mode, sessions: sessions, staged: staged, batches: batches,
+                             launches: launches)
         // A handful of computers at most; drop the oldest beyond that.
         if all.count > 16, let stale = all.keys.first(where: { $0 != scopeID }) { all[stale] = nil }
         if let data = try? JSONEncoder().encode(all) { defaults.set(data, forKey: Self.savedKey) }

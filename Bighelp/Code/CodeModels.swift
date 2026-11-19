@@ -110,9 +110,11 @@ struct CodeSessionRecord: Codable, Identifiable, Equatable, Sendable {
     var batchID: UUID?
 }
 
-/// A send that hasn't become a session yet, or couldn't.
-struct CodeLaunch: Identifiable, Equatable, Sendable {
-    enum Step: Equatable, Sendable {
+/// A send that hasn't become a session yet, or couldn't. Kept on this device, so a send that
+/// failed is still here after the app reopens: the card says why, and the message goes again on
+/// Try again. A launch's message is the person's own text, so losing the card means losing it.
+struct CodeLaunch: Codable, Identifiable, Equatable, Sendable {
+    enum Step: Codable, Equatable, Sendable {
         case makingWorktree
         case switchingBranch
         case startingSession
@@ -128,13 +130,23 @@ struct CodeLaunch: Identifiable, Equatable, Sendable {
     let id: UUID
     let title: String
     let projectID: String
-    let placement: CodePlacement
-    let branch: String?
+    /// What Send asked for, kept whole so Try again sends exactly the same thing.
+    let job: CodeStagedJob
     var step: Step
     /// Set once Hermes has the session, so a failed send still opens it.
     var sessionID: String?
     /// The batch it belongs to (Send all), if any.
     var batchID: UUID?
+
+    /// The branch the card shows: Local's, as the checkout had it when Send went.
+    var branchLabel: String?
+
+    /// A send that was under way when the app closed can never finish on its own: the step it
+    /// waited for was a request in a process that's gone.
+    static let interruptedReason = String(localized: "The app closed before this send finished.")
+
+    var placement: CodePlacement { job.placement }
+    var branch: String? { branchLabel }
 }
 
 /// What a card says about its session, from the live chat (never guessed).

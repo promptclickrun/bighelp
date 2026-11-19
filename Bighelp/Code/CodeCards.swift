@@ -155,9 +155,11 @@ struct CodeSessionCard: View {
     @BighelpThemeReader private var theme
 }
 
-/// A send that's still making its worktree or session, or couldn't.
+/// A send that's still making its worktree or session, or couldn't. A failed one keeps its
+/// message and can go again, after a relaunch too.
 struct CodeLaunchCard: View {
     let launch: CodeLaunch
+    let onRetry: () -> Void
     let onDismiss: () -> Void
 
     var body: some View {
@@ -174,6 +176,9 @@ struct CodeLaunchCard: View {
                         Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(theme.danger)
                         Text(reason).foregroundStyle(theme.secondaryText)
                         Spacer(minLength: 0)
+                        Button("Try again", action: onRetry)
+                            .font(.bighelp(.subheadline).weight(.semibold))
+                            .accessibilityIdentifier("code.launch.retry")
                         Button("Dismiss", action: onDismiss)
                             .font(.bighelp(.subheadline).weight(.semibold))
                             .accessibilityIdentifier("code.launch.dismiss")

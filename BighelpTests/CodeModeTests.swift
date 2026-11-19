@@ -299,6 +299,65 @@ struct CodeModeTests {
         #expect(!reopened.stage("   "), "Nothing to stage.")
     }
 
+    /// A coding send that fails keeps its message. A card was the only place it lived, and a
+    /// relaunch dropped it, so a message the person wrote was gone with it.
+    @Test func aFailedCodingSendKeepsItsMessageAfterARelaunch() async throws {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let sessions = RecordingCodeSessions()
+        sessions.startError = DirectHermesError.notConnected
+        let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        await store.load()
+        let message = "Rebuild the settings page\n\nand its tests"
+        #expect(store.send(message))
+        for _ in 0..<200 where store.launches.first?.step.isFailed != true {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let notConnected = try #require(DirectHermesError.notConnected.errorDescription)
+        #expect(store.launches.count == 1)
+        #expect(store.launches.first?.step == .failed(notConnected))
+        #expect(sessions.started.isEmpty, "Nothing reached the computer.")
+
+        let reopened = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                     git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        await reopened.load()
+        let kept = try #require(reopened.launches.first, "The card, and the message with it, survived the relaunch.")
+        #expect(kept.job.message == message)
+        #expect(kept.step.isFailed)
+
+        // The computer comes back: Try again sends the same message, and the card goes when it lands.
+        sessions.startError = nil
+        reopened.retry(kept)
+        for _ in 0..<200 where !reopened.launches.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(reopened.launches.isEmpty)
+        #expect(sessions.sent == ["\(message)@session-1"])
+    }
+
+    /// A send still starting when the app closed can never finish. It comes back failed, with its
+    /// message, instead of sitting on "Starting" forever or disappearing.
+    @Test func aSendInterruptedByTheAppClosingComesBackFailed() async throws {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let sessions = RecordingCodeSessions()
+        sessions.startDelay = .seconds(5)
+        let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        await store.load()
+        #expect(store.send("Long one"))
+        #expect(store.launches.first.map { !$0.step.isFailed } == true, "It's saved while it starts.")
+
+        let reopened = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                     git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        let kept = try #require(reopened.launches.first)
+        #expect(kept.step == .failed(CodeLaunch.interruptedReason))
+        #expect(kept.job.message == "Long one")
+    }
+
     /// Under each message, a session's answer is its last one before the next message it got;
     /// status and questions show only under the newest one.
     @Test func eachSessionsAnswerShowsUnderTheRightMessage() async throws {
@@ -412,6 +471,8 @@ private final class RecordingCodeSessions: CodeSessionStarting {
     private var underWay = 0
     var startDelay: Duration?
     var sendError: Error?
+    /// Thrown by `startSession`, as a computer that isn't connected does.
+    var startError: Error?
 
     func startSession(agentID: String, folder: String, title: String,
                       runtime: CodeRuntimeChoice) async throws -> String {
@@ -419,6 +480,7 @@ private final class RecordingCodeSessions: CodeSessionStarting {
         mostAtOnce = max(mostAtOnce, underWay)
         defer { underWay -= 1 }
         if let startDelay { try await Task.sleep(for: startDelay) }
+        if let startError { throw startError }
         let id = "session-\(started.count + 1)"
         started.append((id, folder, title))
         runtimes.append(runtime)

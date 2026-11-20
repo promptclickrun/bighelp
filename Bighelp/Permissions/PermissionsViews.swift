@@ -3,6 +3,7 @@ import SwiftUI
 @MainActor
 struct PermissionsSettingsView: View {
     let center: PermissionCenter
+    @Environment(\.scenePhase) private var scenePhase
     /// The page's one info sheet: whichever row's info button was tapped last.
     @State private var about: DeviceAccessAbout?
 
@@ -54,7 +55,8 @@ struct PermissionsSettingsView: View {
         .navigationTitle("Device access")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("settings.permissions")
-        .task {
+        .task(id: scenePhase == .active) {
+            guard scenePhase == .active else { return }
             // Device tools first: their switches depend on it; system rows can follow.
             await center.deviceTools.refresh()
             await center.refresh()
@@ -204,19 +206,41 @@ private struct DeviceToolPermissionRow: View {
 
             if permissions.requestInFlight == kind {
                 ProgressView(BighelpPlatform.isMac ? "Waiting for macOS…" : "Waiting for iOS…").bighelpFont(.metadata)
-            } else if permissions.status(for: kind) == .denied {
-                Button(BighelpPlatform.isMac ? "Allow access in System Settings" : "Allow access in iOS Settings") {
-                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+            } else {
+                switch permissions.recovery(for: kind) {
+                case .none:
+                    if permissions.scope != nil, permissions.status(for: kind) == .unavailable {
+                        Text("Unavailable on this device.").bighelpFont(.metadata).foregroundStyle(.secondary)
+                    }
+                case .requestAccess:
+                    Text("Bighelp is on, but \(kind.title) hasn't been allowed yet.")
+                        .bighelpFont(.metadata).foregroundStyle(.secondary)
+                    Button("Allow \(kind.title) access") {
+                        Task { await permissions.requestEnabledAccess(for: kind) }
+                    }
+                    .accessibilityIdentifier("permissions.device-tools.\(kind.rawValue).allow")
+                case .openSystemSettings:
+                    Button(BighelpPlatform.isMac ? "Allow access in System Settings" : "Allow access in iOS Settings") {
+                        if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                    }
+                    .accessibilityIdentifier("permissions.device-tools.\(kind.rawValue).settings")
+                case .checkAgain:
+                    Text(permissions.status(for: kind) == .unavailable
+                         ? "\(kind.title) access is unavailable right now."
+                         : "Bighelp hasn't finished checking \(kind.title) access.")
+                        .bighelpFont(.metadata).foregroundStyle(.secondary)
+                    Button("Check again") {
+                        Task { await permissions.refresh(kind) }
+                    }
+                    .accessibilityIdentifier("permissions.device-tools.\(kind.rawValue).check-again")
                 }
-                .accessibilityIdentifier("permissions.device-tools.\(kind.rawValue).settings")
-            } else if kind == .health, permissions.isEnabled(kind) {
+            }
+            if kind == .health, permissions.isEnabled(kind), permissions.status(for: kind) == .available {
                 Text("Choose which kinds Bighelp can read in the Health app under Sharing; an empty answer can mean no data or no access.")
                     .bighelpFont(.metadata).foregroundStyle(.secondary)
-            } else if kind == .location, permissions.isEnabled(kind) {
+            } else if kind == .location, permissions.isEnabled(kind), permissions.status(for: kind) == .available {
                 Text("Only while Bighelp is open, and only a rough area if you keep your location approximate.")
                     .bighelpFont(.metadata).foregroundStyle(.secondary)
-            } else if permissions.scope != nil, permissions.status(for: kind) == .unavailable {
-                Text("Unavailable on this device.").bighelpFont(.metadata).foregroundStyle(.secondary)
             }
             DeviceToolPermissionExtras(kind: kind, permissions: permissions)
         }

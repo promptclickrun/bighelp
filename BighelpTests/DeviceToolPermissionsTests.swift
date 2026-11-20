@@ -113,6 +113,109 @@ struct DeviceToolPermissionsTests {
         stuck.resolve(.available)
     }
 
+    @Test(.timeLimit(.minutes(1))) func aTimedOutGrantedRemindersStatusIsReadvertisedWhenItBecomesUsable() async {
+        let stuck = PendingDevicePermission()
+        var remindersReads = 0
+        let store = DeviceToolPermissions(
+            status: { kind in
+                guard kind == .reminders else { return .available }
+                remindersReads += 1
+                if remindersReads == 1 { return await stuck.value() }
+                return .available
+            },
+            request: { _ in .available },
+            isForeground: { true },
+            readGrants: {
+                $0 == DeviceToolPermissions.grantsKey ? ["reminders"] : nil
+            },
+            writeGrants: { _, _ in },
+            statusDeadline: 0.01
+        )
+        store.bind(scope)
+        let lifetime = NativeDeviceToolLifetime()
+        var advertisements: [Set<DeviceToolCapability>] = []
+        var lifetimeRuns = 1
+
+        func advertise() async {
+            lifetime.update(String(store.revision)) {
+                advertisements.append(
+                    Set(DeviceToolCapability.allCases.filter {
+                        $0.sharesPersonalData && store.isUsable($0)
+                    })
+                )
+            }
+            for _ in 0..<100 where advertisements.count < lifetimeRuns {
+                await Task.yield()
+            }
+        }
+
+        await store.refresh()
+        #expect(!store.isUsable(.reminders))
+        #expect(store.recovery(for: .reminders) == .checkAgain)
+        await advertise()
+        #expect(advertisements == [[]])
+
+        await store.refresh()
+        #expect(store.isUsable(.reminders))
+        #expect(store.recovery(for: .reminders) == .none)
+        lifetimeRuns = 2
+        await advertise()
+        #expect(advertisements == [[], [.reminders]],
+                "The new usable state must replace the channel that omitted Reminders")
+        stuck.resolve(.available)
+    }
+
+    @Test func eachEnabledSystemStatusOffersTheMatchingRecovery() async {
+        let statuses: [DeviceToolCapability: DeviceToolSystemAccess] = [
+            .calendar: .available,
+            .reminders: .notRequested,
+            .contacts: .denied,
+            .photos: .unavailable,
+        ]
+        let grants = ["calendar", "reminders", "contacts", "photos"]
+        let store = DeviceToolPermissions(
+            status: { statuses[$0] ?? .available },
+            request: { _ in .available },
+            isForeground: { true },
+            readGrants: { $0 == DeviceToolPermissions.grantsKey ? grants : nil },
+            writeGrants: { _, _ in }
+        )
+        store.bind(scope)
+
+        await store.refresh()
+
+        #expect(store.recovery(for: .calendar) == .none)
+        #expect(store.recovery(for: .reminders) == .requestAccess)
+        #expect(store.recovery(for: .contacts) == .openSystemSettings)
+        #expect(store.recovery(for: .photos) == .checkAgain)
+    }
+
+    @Test func anEnabledButNotRequestedGrantStillRequiresAnActualSystemYes() async {
+        var requests: [DeviceToolCapability] = []
+        var systemStatus = DeviceToolSystemAccess.notRequested
+        let store = DeviceToolPermissions(
+            status: { _ in systemStatus },
+            request: { requests.append($0); return .denied },
+            isForeground: { true },
+            readGrants: { $0 == DeviceToolPermissions.grantsKey ? ["reminders"] : nil },
+            writeGrants: { _, _ in }
+        )
+        store.bind(scope)
+        await store.refresh()
+
+        let revision = store.revision
+        await store.requestEnabledAccess(for: .reminders)
+        #expect(requests == [.reminders])
+        #expect(!store.isUsable(.reminders))
+        #expect(store.recovery(for: .reminders) == .openSystemSettings)
+        #expect(store.revision != revision)
+
+        systemStatus = .available
+        await store.refresh()
+        #expect(requests == [.reminders], "A changed system setting needs no second prompt")
+        #expect(store.isUsable(.reminders))
+    }
+
     @Test func deniedPermissionCannotEnableAgentAccess() async {
         let fixture = DevicePermissionFixture()
         fixture.result = .denied

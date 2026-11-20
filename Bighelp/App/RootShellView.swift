@@ -264,6 +264,13 @@ struct RootShellView: View {
                     guard scenePhase == .active else { return }
                     await nativeWorkspaceStore?.reconnect()
                 }
+                Task { @MainActor in
+                    guard scenePhase == .active else { return }
+                    await permissionCenter.deviceTools.refresh()
+                    permissionCenter.nativeDeviceToolLifetime.update(nativeDeviceToolTrigger) {
+                        await runNativeDeviceTools()
+                    }
+                }
             }
         }
         .overlay {

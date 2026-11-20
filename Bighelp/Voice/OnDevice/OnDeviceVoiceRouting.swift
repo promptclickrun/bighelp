@@ -69,15 +69,34 @@ final class OnDeviceVoiceSettingsClient: VoiceSettingsClient {
     func update(agentID: String, settings: VoiceSettingsUpdate) async throws -> VoiceSettingsConfiguration {
         guard let hostRevision = hostRevisions[settings.expectedRevision] else { throw VoiceSettingsError.conflict }
         if let model = models.first(where: { $0.providerID == settings.providerID }) {
-            let current = merged(try await host.load(agentID: agentID), agentID: agentID)
+            let hostConfiguration = try await host.load(agentID: agentID)
+            let current = merged(hostConfiguration, agentID: agentID)
             guard current.revision == settings.expectedRevision else { throw VoiceSettingsError.conflict }
             let voice = settings.voiceID.isEmpty ? model.defaultVoice : settings.voiceID
+            if settings.transcription == nil {
+                choices.set(.init(modelID: model.id, voice: voice), computer: computer, agentID: agentID)
+                return merged(try await host.load(agentID: agentID), agentID: agentID)
+            }
+            guard let hostProvider = hostConfiguration.providers.first(
+                where: { $0.id == hostConfiguration.providerID }
+            ) else {
+                throw VoiceSettingsError.invalidResponse
+            }
+            let forwarded = VoiceSettingsUpdate(
+                expectedRevision: hostRevision,
+                providerID: hostProvider.id,
+                voiceID: hostProvider.takesVoice ? hostProvider.voiceID : "",
+                apiKey: nil,
+                transcription: settings.transcription
+            )
+            let saved = try await host.update(agentID: agentID, settings: forwarded)
             choices.set(.init(modelID: model.id, voice: voice), computer: computer, agentID: agentID)
-            return merged(try await host.load(agentID: agentID), agentID: agentID)
+            return merged(saved, agentID: agentID)
         }
         let forwarded = VoiceSettingsUpdate(expectedRevision: hostRevision, providerID: settings.providerID,
                                             voiceID: settings.voiceID, apiKey: settings.apiKey,
-                                            model: settings.model, serverURL: settings.serverURL)
+                                            model: settings.model, serverURL: settings.serverURL,
+                                            transcription: settings.transcription)
         let saved = try await host.update(agentID: agentID, settings: forwarded)
         choices.set(nil, computer: computer, agentID: agentID)
         return merged(saved, agentID: agentID)
@@ -90,6 +109,10 @@ final class OnDeviceVoiceSettingsClient: VoiceSettingsClient {
         }
         try await engine.speak(OnDeviceSpeechEngine.sampleText, model: model, voice: choice.voice, rate: 1,
                                use: .playback, owner: self)
+    }
+
+    func transcriptionCatalog(agentID: String) async throws -> VoiceTranscriptionHostCatalog {
+        try await host.transcriptionCatalog(agentID: agentID)
     }
 
     /// The computer's providers after this device's, and this device's voice selected when the
@@ -106,6 +129,8 @@ final class OnDeviceVoiceSettingsClient: VoiceSettingsClient {
         let revision = base.revision + "|" + (choice.map { "\($0.modelID)/\($0.voice)" } ?? "")
         hostRevisions[revision] = base.revision
         return VoiceSettingsConfiguration(revision: revision, providerID: chosen?.providerID ?? base.providerID,
-                                          providers: local + base.providers)
+                                          providers: local + base.providers,
+                                          transcriptionProviderID: base.transcriptionProviderID,
+                                          transcriptionProviders: base.transcriptionProviders)
     }
 }

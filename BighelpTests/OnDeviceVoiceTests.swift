@@ -138,6 +138,29 @@ struct OnDeviceVoiceSettingsTests {
         #expect(try await host.load(agentID: "finance").providerID == "edge")
     }
 
+    @Test func aScribeSaveLeavesTheOnDeviceSpeechChoiceAlone() async throws {
+        let (client, host, choices) = try make()
+        choices.set(
+            .init(modelID: "phonon-31m-en", voice: "Zoey"),
+            computer: "computer-a",
+            agentID: "finance"
+        )
+        let loaded = try await client.load(agentID: "finance")
+
+        let saved = try await client.update(agentID: "finance", settings: VoiceSettingsUpdate(
+            expectedRevision: loaded.revision,
+            providerID: phonon,
+            voiceID: "Zoey",
+            apiKey: nil,
+            transcription: .init(providerID: "elevenlabs", apiKey: nil, model: nil)
+        ))
+
+        #expect(saved.providerID == phonon)
+        #expect(saved.transcriptionProviderID == "elevenlabs")
+        #expect(try await host.load(agentID: "finance").providerID == "openai")
+        #expect(choices.choice(computer: "computer-a", agentID: "finance")?.voice == "Zoey")
+    }
+
     @Test func aChoiceMadeElsewhereSinceLoadingIsAConflict() async throws {
         let (client, _, choices) = try make()
         let loaded = try await client.load(agentID: "finance")

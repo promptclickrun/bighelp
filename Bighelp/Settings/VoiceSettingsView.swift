@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum VoiceSettingsField { case server, key }
+enum VoiceSettingsField { case server, key, transcriptionKey }
 
 enum CodexLiveVoicePluginAvailability: Equatable, Sendable {
     case unknown
@@ -107,7 +107,8 @@ struct VoiceSettingsView: View {
                 }
             }
             VoicePreferenceSections(settings: settings, confirmAPIBilling: $confirmAPIBilling,
-                                    computer: computer, agentID: editedAgentID)
+                                    computer: computer, agentID: editedAgentID, store: store,
+                                    page: $page, focusedField: $focusedField)
             speechProvider
             #if os(iOS) && !targetEnvironment(macCatalyst)
             // Only an iPhone connects to CarPlay, and the car is a voice chat.
@@ -189,6 +190,9 @@ private struct VoicePreferenceSections: View {
     /// The agent these choices are for, on `computer`; nil edits the default for every agent.
     let computer: String?
     let agentID: String?
+    let store: VoiceSettingsStore?
+    @Binding var page: VoiceSettingsPage?
+    @FocusState.Binding var focusedField: VoiceSettingsField?
 
     private var preference: AgentVoicePreference {
         settings.voicePreference(computer: computer, agentID: agentID)
@@ -273,6 +277,11 @@ private struct VoicePreferenceSections: View {
             }
         }
         .accessibilityIdentifier("voice.settings.transcription")
+        if settings.voiceTranscription == .hermes, let store {
+            VoiceSettingsTranscriptionRows(
+                store: store, page: $page, focusedField: $focusedField
+            )
+        }
         Picker("Speed", selection: $settings.voiceSpeed) {
             ForEach(VoiceSpeed.allCases) { option in
                 Text(option.title).tag(option)
@@ -280,6 +289,63 @@ private struct VoicePreferenceSections: View {
         }
         Toggle("Hold music", isOn: $settings.voiceHoldMusicEnabled)
             .accessibilityIdentifier("voice.settings.hold-music")
+    }
+}
+
+@MainActor
+private struct VoiceSettingsTranscriptionRows: View {
+    @Bindable var store: VoiceSettingsStore
+    @Binding var page: VoiceSettingsPage?
+    @FocusState.Binding var focusedField: VoiceSettingsField?
+
+    var body: some View {
+        let provider = store.selectedTranscriptionProvider
+        VoiceSettingsChoiceRow(
+            title: "Computer listens with",
+            value: provider?.title ?? String(localized: "Loading…")
+        ) {
+            focusedField = nil
+            page = .transcriptionProvider
+        }
+        .accessibilityIdentifier("voice.settings.transcription-provider")
+        .disabled(store.isLoading || store.isSaving)
+        if let provider, provider.hasModel {
+            VoiceSettingsChoiceRow(
+                title: "Model",
+                value: store.transcriptionModelName
+            ) {
+                focusedField = nil
+                page = .transcriptionModel
+            }
+            .accessibilityIdentifier("voice.settings.transcription-model")
+            .disabled(store.isLoading || store.isSaving)
+        }
+        if let provider, provider.needsAPIKey {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("API key")
+                SecureField(
+                    provider.apiKeyConfigured ? "Saved — enter a replacement" : "Enter API key",
+                    text: $store.transcriptionAPIKey
+                )
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .privacySensitive()
+                .focused($focusedField, equals: .transcriptionKey)
+                .accessibilityIdentifier("voice.settings.transcription-api-key")
+            }
+            Text(provider.apiKeyConfigured
+                 ? "API key saved on your computer"
+                 : "API key required")
+                .bighelpFont(.metadata)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("voice.settings.transcription-key-status")
+        }
+        if let error = store.transcriptionCatalogError {
+            Text(error)
+                .bighelpFont(.metadata)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("voice.settings.transcription-catalog-error")
+        }
     }
 }
 
@@ -530,6 +596,153 @@ struct VoiceProviderList: View {
 
 }
 
+/// Hermes' host-supported speech-to-text providers for one bot.
+@MainActor
+private struct VoiceTranscriptionProviderList: View {
+    @Bindable var store: VoiceSettingsStore
+    @Environment(\.dismiss) private var dismiss
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        List {
+            if store.isLoadingTranscriptionCatalog {
+                Section {
+                    HStack(spacing: BighelpTokens.space8) {
+                        ProgressView()
+                        Text("Getting speech-to-text providers from your computer…")
+                            .bighelpFont(.metadata)
+                            .foregroundStyle(theme.secondaryText)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+                .listRowBackground(theme.surface)
+            }
+            let providers = store.selectableTranscriptionProviders
+            if let automatic = providers.first(where: { $0.id.isEmpty }) {
+                Section { row(automatic) }
+                    .listRowBackground(theme.surface)
+            }
+            ForEach(VoiceProviderSpec.Kind.allCases, id: \.self) { kind in
+                let items = providers.filter { !$0.id.isEmpty && $0.kind == kind }
+                if !items.isEmpty {
+                    Section {
+                        ForEach(items) { row($0) }
+                    } header: {
+                        Text(kind.title)
+                    }
+                    .listRowBackground(theme.surface)
+                }
+            }
+            if let error = store.transcriptionCatalogError {
+                Section {
+                    Text(error)
+                        .bighelpFont(.metadata)
+                        .foregroundStyle(theme.secondaryText)
+                    Button("Try again") { Task { await store.loadTranscriptionCatalog() } }
+                }
+                .listRowBackground(theme.surface)
+            }
+        }
+        .bighelpFormSurface()
+        .scrollContentBackground(.hidden)
+        .background(theme.canvas.ignoresSafeArea())
+        .foregroundStyle(theme.primaryText)
+        .tint(theme.action)
+        .navigationTitle("Computer listens with")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await store.loadTranscriptionCatalog() }
+    }
+
+    private func row(_ provider: VoiceTranscriptionProviderConfiguration) -> some View {
+        let selected = provider.id == store.transcriptionProviderID
+        return Button {
+            store.selectTranscriptionProvider(provider.id)
+            dismiss()
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(provider.title).foregroundStyle(theme.primaryText)
+                    Text(detail(provider))
+                        .bighelpFont(.metadata)
+                        .foregroundStyle(theme.secondaryText)
+                }
+                Spacer()
+                if selected {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(theme.action)
+                        .accessibilityHidden(true)
+                }
+            }
+            .frame(minHeight: BighelpTokens.hitTarget)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(provider.title)
+        .accessibilityValue(detail(provider))
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier(
+            "voice.transcription-provider." + (provider.id.isEmpty ? "automatic" : provider.id)
+        )
+    }
+
+    private func detail(_ provider: VoiceTranscriptionProviderConfiguration) -> String {
+        if provider.id.isEmpty { return String(localized: "Hermes chooses from what's available") }
+        switch provider.kind {
+        case .onYourComputer: return String(localized: "No account or key")
+        case .custom: return String(localized: "Set up on your computer")
+        case .cloud:
+            if !provider.needsAPIKey { return String(localized: "Set up on your computer") }
+            return provider.apiKeyConfigured
+                ? String(localized: "API key saved")
+                : String(localized: "Needs an API key")
+        case .onThisDevice, .free: return String(localized: "No account or key")
+        }
+    }
+}
+
+@MainActor
+private struct VoiceTranscriptionModelPicker: View {
+    @Bindable var store: VoiceSettingsStore
+    @Environment(\.dismiss) private var dismiss
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        List {
+            ForEach(store.selectedTranscriptionProvider?.modelOptions ?? []) { option in
+                let selected = option.id == store.transcriptionModel
+                Button {
+                    store.chooseTranscriptionModel(option.id)
+                    dismiss()
+                } label: {
+                    HStack {
+                        Text(option.name)
+                        Spacer()
+                        if selected {
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(theme.action)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .frame(minHeight: BighelpTokens.hitTarget)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+                .accessibilityIdentifier("voice.transcription-model." + option.id)
+            }
+            .listRowBackground(theme.surface)
+        }
+        .bighelpFormSurface()
+        .scrollContentBackground(.hidden)
+        .background(theme.canvas.ignoresSafeArea())
+        .foregroundStyle(theme.primaryText)
+        .tint(theme.action)
+        .navigationTitle("Model")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await store.loadTranscriptionCatalog() }
+    }
+}
+
 /// A row that opens a picker page: its title, what's chosen, and a chevron.
 @MainActor
 struct VoiceSettingsChoiceRow: View {
@@ -555,7 +768,7 @@ struct VoiceSettingsChoiceRow: View {
 
 /// The pages Voice settings pushes from an agent's speech provider.
 enum VoiceSettingsPage: Hashable, Identifiable {
-    case provider, onDeviceVoice, voice, model
+    case provider, onDeviceVoice, voice, model, transcriptionProvider, transcriptionModel
     var id: Self { self }
 }
 
@@ -583,6 +796,10 @@ struct VoiceSettingsPages: ViewModifier {
                     VoiceOptionPicker(store: store, kind: .voice)
                 case .model:
                     VoiceOptionPicker(store: store, kind: .model)
+                case .transcriptionProvider:
+                    VoiceTranscriptionProviderList(store: store)
+                case .transcriptionModel:
+                    VoiceTranscriptionModelPicker(store: store)
                 }
             }
         }

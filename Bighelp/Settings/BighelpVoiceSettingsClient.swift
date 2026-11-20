@@ -15,6 +15,7 @@ final class BighelpVoiceSettingsClient: VoiceSettingsClient {
     }
 
     func update(agentID: String, settings: VoiceSettingsUpdate) async throws -> VoiceSettingsConfiguration {
+        guard settings.transcription == nil else { throw VoiceSettingsError.unsupported }
         guard ["openai", "elevenlabs"].contains(settings.providerID),
               Self.validText(settings.voiceID, maximum: 160),
               Self.validText(settings.expectedRevision, maximum: 256) else { throw VoiceSettingsError.invalidResponse }
@@ -88,7 +89,15 @@ final class VoiceSettingsPreviewClient: VoiceSettingsClient {
                 VoiceProviderConfiguration(spec: spec, voiceID: spec.voiceField == nil ? "" : spec.defaultVoice,
                                            apiKeyConfigured: spec.id == "openai", model: spec.defaultModel,
                                            serverURL: "")
-            })
+            },
+        transcriptionProviderID: "",
+        transcriptionProviders: VoiceTranscriptionProviderSpec.builtIn.map {
+            VoiceTranscriptionProviderConfiguration(
+                spec: $0,
+                model: $0.defaultModel,
+                apiKeyConfigured: $0.id == "elevenlabs"
+            )
+        })
 
     func load(agentID: String) async throws -> VoiceSettingsConfiguration {
         saved[agentID] ?? Self.initial
@@ -97,6 +106,29 @@ final class VoiceSettingsPreviewClient: VoiceSettingsClient {
     func update(agentID: String, settings: VoiceSettingsUpdate) async throws -> VoiceSettingsConfiguration {
         let old = try await load(agentID: agentID)
         guard old.revision == settings.expectedRevision else { throw VoiceSettingsError.conflict }
+        var transcriptionProviders = old.transcriptionProviders.map { provider in
+            guard provider.id == settings.transcription?.providerID else { return provider }
+            return VoiceTranscriptionProviderConfiguration(
+                id: provider.id,
+                title: provider.title,
+                model: settings.transcription?.model ?? provider.model,
+                apiKeyConfigured: provider.apiKeyConfigured || settings.transcription?.apiKey != nil,
+                modelOptions: provider.modelOptions,
+                needsAPIKey: provider.needsAPIKey,
+                kind: provider.kind,
+                hasModel: provider.hasModel
+            )
+        }
+        if let selected = settings.transcription?.providerID,
+           !transcriptionProviders.contains(where: { $0.id == selected }) {
+            let spec = VoiceTranscriptionProviderSpec.builtIn(selected)
+                ?? VoiceTranscriptionProviderSpec.custom(selected)
+            transcriptionProviders.append(.init(
+                spec: spec,
+                model: settings.transcription?.model ?? spec.defaultModel,
+                apiKeyConfigured: settings.transcription?.apiKey != nil
+            ))
+        }
         let updated = VoiceSettingsConfiguration(revision: UUID().uuidString, providerID: settings.providerID,
             providers: old.providers.map {
                 guard $0.id == settings.providerID else { return $0 }
@@ -109,9 +141,19 @@ final class VoiceSettingsPreviewClient: VoiceSettingsClient {
                 if provider.hasModel, provider.model.isEmpty,
                    let spec = VoiceProviderSpec.builtIn(provider.id) { provider.model = spec.defaultModel }
                 return provider
-            })
+            },
+            transcriptionProviderID: settings.transcription?.providerID ?? old.transcriptionProviderID,
+            transcriptionProviders: transcriptionProviders)
         saved[agentID] = updated
         return updated
+    }
+
+    func transcriptionCatalog(agentID: String) async throws -> VoiceTranscriptionHostCatalog {
+        VoiceTranscriptionHostCatalog(
+            providers: VoiceTranscriptionProviderSpec.builtIn.map {
+                .init(id: $0.id, models: $0.models)
+            } + [.init(id: "parakeet", models: [.init(id: "default", name: "Default")])]
+        )
     }
 
     func playSample(agentID: String) async throws {

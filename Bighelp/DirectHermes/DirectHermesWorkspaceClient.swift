@@ -484,6 +484,18 @@ final class DirectHermesWorkspaceClient: WorkspaceOperationPerforming {
             try fields(payload, allowed: ["profile", "config"], required: ["profile", "config"])
             guard payload["config"]?.object != nil else { throw WorkspaceClientError.invalidRequest }
             return .http(.init(path: "/api/config", method: .put, body: payload))
+        case .workspaceConfigSchema:
+            return try get("/api/config/schema", payload, allowed: ["profile"])
+        case .workspaceConfigRawGet:
+            return try get("/api/config/raw", payload, allowed: ["profile"])
+        case .workspaceConfigRawSet:
+            try fields(payload, allowed: ["profile", "yaml_text"], required: ["profile", "yaml_text"])
+            guard let text = payload["yaml_text"]?.string,
+                  !text.isEmpty, text.utf8.count <= DirectHermesHostOperationsClient.maximumRawConfigurationBytes,
+                  !text.unicodeScalars.contains(where: { $0.value == 0 }) else {
+                throw WorkspaceClientError.invalidRequest
+            }
+            return .http(.init(path: "/api/config/raw", method: .put, body: payload))
         case .personalitiesList:
             try fields(payload, allowed: ["profile", "action", "name", "config"], required: ["profile", "action"])
             if payload["action"] == .string("load") {

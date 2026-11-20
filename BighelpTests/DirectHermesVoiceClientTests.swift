@@ -181,12 +181,13 @@ struct DirectHermesVoiceClientTests {
         let selected = Self.configResponse(sttProviderID: "elevenlabs")
         let automatic = Self.configResponse()
         transport.sequences[WorkspaceOperation.workspaceConfigGet.rawValue] = [
-            selected, selected, selected, automatic,
+            selected, selected, automatic,
         ]
         transport.results[WorkspaceOperation.keysList.rawValue] =
             Self.keysResponse(openAI: true, elevenLabs: true)
         transport.results[WorkspaceOperation.workspaceConfigRawSet.rawValue] = ["ok": .boolean(true)]
         transport.sequences[WorkspaceOperation.workspaceConfigRawGet.rawValue] = [
+            Self.rawResponse(provider: "elevenlabs"),
             Self.rawResponse(provider: "elevenlabs"),
             Self.rawResponse(provider: "elevenlabs"),
             Self.rawResponse(provider: nil),
@@ -215,6 +216,31 @@ struct DirectHermesVoiceClientTests {
         #expect(yaml.contains("provider: openai"))
         #expect(yaml.contains("elevenlabs-stt-marker"))
         #expect(!yaml.contains("\n  provider: elevenlabs\n"))
+    }
+
+    @Test func automaticNeverReplacesTheProfileFromTheWebSettingsProjection() async throws {
+        let owner = try Self.owner()
+        let transport = DirectHermesVoiceTransportFixture(owner: owner)
+        transport.results[WorkspaceOperation.workspaceConfigGet.rawValue] =
+            Self.configResponse(sttProviderID: "elevenlabs")
+        transport.results[WorkspaceOperation.keysList.rawValue] = Self.keysResponse(openAI: true, elevenLabs: true)
+        var raw = Self.rawResponse(provider: nil)
+        raw["yaml"] = .string("""
+            model: {default: fixture-model, provider: fixture-provider, base_url: https://example.invalid}
+            stt: {provider: elevenlabs, language: en}
+            """)
+        transport.results[WorkspaceOperation.workspaceConfigRawGet.rawValue] = raw
+        let client = DirectHermesVoiceSettingsClient(workspace: transport, owner: owner, currentOwner: { owner })
+        let baseline = try await client.load(agentID: "finance")
+        transport.resetCalls()
+        await #expect(throws: VoiceSettingsError.unsupported) {
+            try await client.update(agentID: "finance", settings: .init(
+                expectedRevision: baseline.revision, providerID: baseline.providerID,
+                voiceID: baseline.providers.first(where: { $0.id == baseline.providerID })?.voiceID ?? "",
+                apiKey: nil, transcription: .init(providerID: "", apiKey: nil, model: nil)
+            ))
+        }
+        #expect(!transport.voiceCalls.contains { $0.operation == .workspaceConfigRawSet })
     }
 
     @Test func directSettingsCanChooseACustomProviderDiscoveredByHermes() async throws {

@@ -306,8 +306,16 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
             }
         }
 
-        if returnsToAutomatic, current.raw == nil {
-            throw VoiceSettingsError.unsupported
+        let automaticYAML: String?
+        if returnsToAutomatic {
+            // The web settings response flattens the model mapping. Only the original
+            // profile text can be used for a whole-document write.
+            guard let raw = current.raw, let updated = Self.removingSTTSelection(from: raw.yaml) else {
+                throw VoiceSettingsError.unsupported
+            }
+            automaticYAML = updated
+        } else {
+            automaticYAML = nil
         }
         for key in keys {
             let result = try await perform(.keysSet, profile: profile, payload: [
@@ -316,36 +324,15 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
             guard result["ok"]?.boolean == true else { throw VoiceSettingsError.invalidResponse }
         }
 
-        if returnsToAutomatic {
-            guard let raw = current.raw else { throw VoiceSettingsError.unsupported }
-            var rawConfig = try await perform(.workspaceConfigGet, profile: profile, payload: [
-                "profile": .string(profile), "include_defaults": .boolean(false)
-            ])
-            for (key, value) in configPatch {
-                if let object = rawConfig[key]?.object, let patch = value.object {
-                    rawConfig[key] = .object(Self.deepMerge(object, with: patch))
-                } else {
-                    rawConfig[key] = value
-                }
-            }
-            if var stt = rawConfig["stt"]?.object {
-                for name in ["provider", "backend", "cloud_provider", "use_gateway"] {
-                    stt.removeValue(forKey: name)
-                }
-                rawConfig["stt"] = .object(stt)
-            }
-            let yamlText: String
-            if configPatch.isEmpty,
-               let surgical = Self.removingSTTSelection(from: raw.yaml) {
-                yamlText = surgical
-            } else {
-                yamlText = try JSONEncoder.sorted.string(from: BighelpJSONValue.object(rawConfig))
-            }
+        if let automaticYAML, let raw = current.raw {
+            let latest = try await rawConfiguration(profile: profile)
+            guard raw.path == latest.path, raw.digest == latest.digest else { throw VoiceSettingsError.conflict }
             let result = try await perform(.workspaceConfigRawSet, profile: profile, payload: [
-                "profile": .string(profile), "yaml_text": .string(yamlText)
+                "profile": .string(profile), "yaml_text": .string(automaticYAML)
             ])
             guard result["ok"]?.boolean == true else { throw VoiceSettingsError.invalidResponse }
-        } else {
+        }
+        if !configPatch.isEmpty {
             let result = try await perform(.workspaceConfigSet, profile: profile, payload: [
                 "profile": .string(profile), "config": .object(configPatch)
             ])
@@ -623,25 +610,8 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
         spec.keyNames.contains { keys[$0]?.object?["is_set"]?.boolean == true }
     }
 
-    private static func deepMerge(
-        _ base: [String: BighelpJSONValue],
-        with patch: [String: BighelpJSONValue]
-    ) -> [String: BighelpJSONValue] {
-        var result = base
-        for (key, value) in patch {
-            if let current = result[key]?.object, let next = value.object {
-                result[key] = .object(deepMerge(current, with: next))
-            } else {
-                result[key] = value
-            }
-        }
-        return result
-    }
-
-    /// Hermes writes block-style YAML. Prefer a surgical removal for the
-    /// Automatic transition so comments and every unrelated value keep their
-    /// exact text. Inline/complex stt blocks fall back to a revision-checked
-    /// structured rewrite in `update`.
+    /// Hermes writes block-style YAML. Leave hand-written layouts intact if the keys
+    /// cannot be removed without rewriting the rest of the profile.
     private static func removingSTTSelection(from yaml: String) -> String? {
         let lines = yaml.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         let sttLines = lines.indices.filter { lines[$0].hasPrefix("stt:") }
@@ -672,7 +642,14 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
             }
             index = result.index(before: index)
         }
-        guard changed else { return yaml }
+        guard changed else { return nil }
+        let removedCount = lines.count - result.count
+        if !result[(start + 1)..<(end - removedCount)].contains(where: {
+            let text = $0.trimmingCharacters(in: .whitespaces)
+            return !text.isEmpty && !text.hasPrefix("#")
+        }) {
+            result[start] = "stt: {}"
+        }
         let trailingNewline = yaml.hasSuffix("\n")
         let updated = result.joined(separator: "\n")
         return trailingNewline && !updated.hasSuffix("\n") ? updated + "\n" : updated
@@ -804,12 +781,7 @@ private extension JSONEncoder {
         return encoder
     }
 
-    func string<T: Encodable>(from value: T) throws -> String {
-        guard let text = String(data: try encode(value), encoding: .utf8) else {
-            throw WorkspaceClientError.invalidResponse
-        }
-        return text
-    }
+
 }
 
 enum DirectHermesVoiceError: Error, Equatable, LocalizedError, Sendable {

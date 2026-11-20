@@ -9,7 +9,8 @@ extension ChatModel {
 
     func submitWithoutWaiting(
         message: String,
-        attachments: [ChatAttachment]
+        attachments: [ChatAttachment],
+        submissionID: UUID? = nil
     ) async throws {
         guard !referenceOwnerRetired, referenceSubmission == nil, !referenceSendInFlight,
               !ReferenceCodec.decode(message).hasValidAppendix else {
@@ -23,12 +24,24 @@ extension ChatModel {
 
         isSending = true
         defer { isSending = false }
-        try await queuedClient.submit(
-            message: message,
-            attachments: attachments,
-            conversationID: conversationID
+        if let submissionID {
+            try await queuedClient.submit(
+                message: message,
+                attachments: attachments,
+                conversationID: conversationID,
+                submissionID: submissionID
+            )
+        } else {
+            try await queuedClient.submit(
+                message: message,
+                attachments: attachments,
+                conversationID: conversationID
+            )
+        }
+        let human = humanItem(
+            content: message, attachments: attachments,
+            id: submissionID.map(ChatSubmissionIdentity.itemID)
         )
-        let human = humanItem(content: message, attachments: attachments)
         appendItem(human)
         appendProjectedMessage(human)
         persistSession()
@@ -933,7 +946,8 @@ extension ChatModel {
 
     func humanItem(
         content: String,
-        attachments: [ChatAttachment] = []
+        attachments: [ChatAttachment] = [],
+        id suppliedID: String? = nil
     ) -> TimelineItem {
         // A reload resets the count, so a message still waiting in the chat may hold the next ID.
         let existingIDs = Set(items.map(\.id) + stagedSends.map(\.id) + bigFileSends.map(\.id))
@@ -943,7 +957,7 @@ extension ChatModel {
 
         defer { nextHumanSequence += 1 }
         return TimelineItem(
-            id: "\(conversationID)-human-\(nextHumanSequence)",
+            id: suppliedID ?? "\(conversationID)-human-\(nextHumanSequence)",
             role: .human,
             sender: .user(snapshot: currentUserSnapshot),
             content: .message(content),

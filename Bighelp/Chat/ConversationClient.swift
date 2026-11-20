@@ -96,6 +96,27 @@ protocol QueuedConversationClient: ConversationClient {
         attachments: [ChatAttachment],
         conversationID: String
     ) async throws
+    func submit(
+        message: String,
+        attachments: [ChatAttachment],
+        conversationID: String,
+        submissionID: UUID
+    ) async throws
+}
+
+extension QueuedConversationClient {
+    func submit(
+        message: String,
+        attachments: [ChatAttachment],
+        conversationID: String,
+        submissionID: UUID
+    ) async throws {
+        try await submit(message: message, attachments: attachments, conversationID: conversationID)
+    }
+}
+
+enum ChatSubmissionIdentity {
+    static func itemID(_ id: UUID) -> String { "submission:\(id.uuidString.lowercased())" }
 }
 
 @MainActor

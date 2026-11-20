@@ -23,7 +23,7 @@ struct WorkItemCard: View {
             .accessibilityIdentifier("work.item.\(item.id)")
         case .launch(let launch):
             // A send still starting has nothing to open until Hermes has its session.
-            CodeLaunchCard(launch: launch) { code?.dismiss(launch) }
+            CodeLaunchCard(launch: launch, onRetry: { code?.retry(launch) }) { code?.dismiss(launch) }
                 .onTapGesture { if let target = item.target { onOpen(target) } }
                 .accessibilityIdentifier("work.item.\(item.id)")
         case .batch(let batch, let lines, let startedCount):

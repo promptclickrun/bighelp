@@ -299,6 +299,368 @@ struct CodeModeTests {
         #expect(!reopened.stage("   "), "Nothing to stage.")
     }
 
+    /// A coding send that fails keeps its message. A card was the only place it lived, and a
+    /// relaunch dropped it, so a message the person wrote was gone with it.
+    @Test func aFailedCodingSendKeepsItsMessageAfterARelaunch() async throws {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let sessions = RecordingCodeSessions()
+        sessions.startError = DirectHermesError.notConnected
+        let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        await store.load()
+        let message = "Rebuild the settings page\n\nand its tests"
+        #expect(store.send(message))
+        for _ in 0..<200 where store.launches.first?.step.isFailed != true {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let notConnected = try #require(DirectHermesError.notConnected.errorDescription)
+        #expect(store.launches.count == 1)
+        #expect(store.launches.first?.step == .failed(notConnected))
+        #expect(sessions.started.isEmpty, "Nothing reached the computer.")
+
+        let reopened = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                     git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        await reopened.load()
+        let kept = try #require(reopened.launches.first, "The card, and the message with it, survived the relaunch.")
+        #expect(kept.job.message == message)
+        #expect(kept.step.isFailed)
+
+        // The computer comes back: Try again sends the same message, and the card goes when it lands.
+        sessions.startError = nil
+        reopened.retry(kept)
+        for _ in 0..<200 where !reopened.launches.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(reopened.launches.isEmpty)
+        #expect(sessions.sent == ["\(message)@session-1"])
+    }
+
+    @Test func retryingAFailedSessionStartReusesTheConfirmedWorktree() async throws {
+        for explicit in [false, true] {
+            let suiteName = #function + (explicit ? "-explicit" : "-automatic")
+            let defaults = UserDefaults(suiteName: suiteName)!
+            defaults.removePersistentDomain(forName: suiteName)
+            defer { defaults.removePersistentDomain(forName: suiteName) }
+            let git = RecordingCodeGit()
+            let sessions = RecordingCodeSessions()
+            sessions.startError = DirectHermesError.notConnected
+            let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                      git: { git }, starter: sessions, defaults: defaults)
+            await store.load()
+            store.newBranchName = explicit ? "feat/code-mode-retry" : nil
+
+            #expect(store.send("Fix the widget tap"))
+            for _ in 0..<200 where store.launches.first?.step.isFailed != true {
+                try await Task.sleep(for: .milliseconds(20))
+            }
+            let failed = try #require(store.launches.first)
+
+            sessions.startError = nil
+            let reopened = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                         git: { git }, starter: sessions, defaults: defaults)
+            await reopened.load()
+            reopened.retry(try #require(reopened.launches.first))
+            for _ in 0..<200 where !reopened.launches.isEmpty {
+                try await Task.sleep(for: .milliseconds(20))
+            }
+
+            let expectedBranch = explicit ? "feat/code-mode-retry" : "code/fix-widget-tap"
+            #expect(git.actions.filter {
+                if case .addWorktree = $0 { return true }
+                return false
+            }.count == 1)
+            #expect(sessions.started.count == 1)
+            #expect(reopened.sessions.first?.branch == expectedBranch)
+            #expect(failed.branchLabel == expectedBranch, "The failed send keeps the branch it prepared.")
+        }
+    }
+
+    @Test func workKeepsRecoveryReachableAfterASessionExists() async throws {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let sessions = RecordingCodeSessions()
+        sessions.sendError = DirectHermesError.notConnected
+        let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        await store.load()
+        #expect(store.send("Fix the widget tap"))
+        for _ in 0..<200 where store.launches.first?.step.isFailed != true {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+
+        let sources = WorkSources(context: WorkContext(
+            header: nil, code: store, codeStatus: ReadyStatus(), onOpen: { _ in }, onRefresh: {}))
+        let recovery = try #require(WorkProjection.items(sources).first { item in
+            item.card != .row && item.target == .codeSession("session-1")
+        })
+
+        guard case .launch(let launch) = recovery.card else {
+            Issue.record("Work should show the launch recovery controls for an existing session.")
+            return
+        }
+        #expect(launch.sessionID == "session-1")
+    }
+
+    @Test func sendAllPersistsEveryJobBeforeClearingTheDrafts() async throws {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let git = RecordingCodeGit()
+        var clients = 0
+        let store = CodeHomeStore(
+            scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+            git: {
+                clients += 1
+                guard clients <= 2 else { throw DirectHermesError.notConnected }
+                return git
+            },
+            starter: RecordingCodeSessions(), defaults: defaults)
+        await store.load()
+        #expect(store.stage("First job"))
+        #expect(store.stage("Second job"))
+
+        let batch = try #require(store.sendAll())
+        #expect(store.projectStaged.isEmpty)
+
+        let reopened = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                     git: { git }, starter: RecordingCodeSessions(), defaults: defaults)
+        #expect(reopened.batches.map(\.id) == [batch.id])
+        #expect(Set(reopened.launches.map { $0.job.message }) == ["First job", "Second job"])
+    }
+
+    @Test func aBatchJobThatNeedsRecoveryKeepsItsOwnWorkCard() async throws {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let sessions = RecordingCodeSessions()
+        sessions.sendError = WorkspaceClientError.outcomeUnknown
+        sessions.sendErrorAfterAcceptance = true
+        let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        await store.load()
+        #expect(store.stage("Batch job"))
+        #expect(store.sendAll() != nil)
+        for _ in 0..<200 where store.launches.first?.step.needsRecovery != true {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+
+        let sources = WorkSources(context: WorkContext(
+            header: nil, code: store, codeStatus: ReadyStatus(), onOpen: { _ in }, onRefresh: {}))
+        let launches = WorkProjection.items(sources).filter {
+            if case .launch = $0.card { return true }
+            return false
+        }
+        #expect(launches.count == 1)
+        #expect(launches.first?.target == .codeSession("session-1"))
+    }
+
+    @Test func aLostSessionCreateIsReconciledBeforeRetry() async throws {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let git = RecordingCodeGit()
+        let sessions = RecordingCodeSessions()
+        sessions.startError = WorkspaceClientError.outcomeUnknown
+        sessions.startErrorAfterAcceptance = true
+        let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { git }, starter: sessions, defaults: defaults)
+        await store.load()
+        #expect(store.send("Fix the widget tap"))
+        for _ in 0..<200 where store.launches.first?.step.needsRecovery != true {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(sessions.started.count == 1)
+
+        let reopened = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                     git: { git }, starter: sessions, defaults: defaults)
+        await reopened.load()
+        for _ in 0..<200 where reopened.launches.first?.sessionID == nil {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let reconciled = try #require(reopened.launches.first)
+        #expect(reconciled.step.isFailed, "The exact session was found, so the message is now known unsent.")
+        reopened.retry(reconciled)
+        for _ in 0..<200 where !reopened.launches.isEmpty {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+
+        #expect(sessions.started.count == 1, "The reconciled create is never repeated.")
+        #expect(sessions.sent == ["Fix the widget tap@session-1"])
+    }
+
+    @Test func anAmbiguousSendIsReconciledAndNeverSubmittedTwice() async throws {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let git = RecordingCodeGit()
+        let sessions = RecordingCodeSessions()
+        sessions.sendError = WorkspaceClientError.outcomeUnknown
+        sessions.sendErrorAfterAcceptance = true
+        let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { git }, starter: sessions, defaults: defaults)
+        await store.load()
+        #expect(store.send("Fix the widget tap"))
+        for _ in 0..<200 where store.launches.first?.step.needsRecovery != true {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let original = try #require(store.launches.first)
+        let submissionID = try #require(original.submissionID)
+        #expect(store.status(of: try #require(store.sessions.first), reader: ReadyStatus()) == .ready,
+                "Live chat status stays visible while local delivery is unconfirmed.")
+        #expect(store.switcherSessions(reader: ReadyStatus()).first?.1 == .ready)
+
+        let reopened = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                     git: { git }, starter: sessions, defaults: defaults)
+        await reopened.load()
+        let unknown = try #require(reopened.launches.first)
+        reopened.retry(unknown)
+        try await Task.sleep(for: .milliseconds(50))
+        reopened.retry(try #require(reopened.launches.first))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(sessions.sent.count == 1, "Checking an uncertain send never submits it again.")
+
+        sessions.setDeliveryEvidence(.sent, for: submissionID)
+        reopened.retry(try #require(reopened.launches.first))
+        for _ in 0..<200 where !reopened.launches.isEmpty {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(reopened.launches.isEmpty, "Authoritative acknowledgement retires the retained launch.")
+        #expect(sessions.started.count == 1)
+        #expect(sessions.sent.count == 1)
+    }
+
+    @Test func aRetainedSessionIDNeverCreatesAReplacementSession() async throws {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let sessions = RecordingCodeSessions()
+        sessions.sendError = DirectHermesError.notConnected
+        let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        await store.load()
+        #expect(store.send("Keep the same session"))
+        for _ in 0..<200 where store.launches.first?.step.isFailed != true {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let data = try #require(defaults.data(forKey: CodeHomeStore.savedKey))
+        var all = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        var saved = try #require(all["computer"] as? [String: Any])
+        saved["sessions"] = [[String: Any]]()
+        all["computer"] = saved
+        defaults.set(try JSONSerialization.data(withJSONObject: all), forKey: CodeHomeStore.savedKey)
+
+        sessions.sendError = nil
+        let reopened = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                     git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        reopened.retry(try #require(reopened.launches.first))
+        for _ in 0..<200 where !reopened.launches.isEmpty {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+
+        #expect(sessions.started.count == 1)
+        #expect(sessions.sent == ["Keep the same session@session-1"])
+        #expect(reopened.sessions.first?.id == "session-1")
+    }
+
+    /// A send still starting when the app closed can never finish. It comes back recoverable, with its
+    /// message, instead of sitting on "Starting" forever or disappearing.
+    @Test func aSendInterruptedByTheAppClosingComesBackFailed() async throws {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let sessions = RecordingCodeSessions()
+        sessions.startDelay = .seconds(5)
+        let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        await store.load()
+        #expect(store.send("Long one"))
+        for _ in 0..<200 where store.launches.first?.step != .startingSession {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(store.launches.first?.step == .startingSession, "It's saved while it starts.")
+
+        let reopened = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                     git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        let kept = try #require(reopened.launches.first)
+        #expect(kept.step == .needsRecovery(CodeLaunch.interruptedReason))
+        #expect(kept.job.message == "Long one")
+    }
+
+    @Test func interruptionAfterSessionCreateRetriesOnlyTheUnsentMessage() async throws {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let sessions = RecordingCodeSessions()
+        sessions.applyDelay = .seconds(5)
+        let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        await store.load()
+        #expect(store.send("Long one"))
+        for _ in 0..<200 where store.launches.first?.step != .readyToSend {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let reopened = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                     git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        let kept = try #require(reopened.launches.first)
+        #expect(kept.step.isFailed, "A session is ready but no prompt admission has begun.")
+        #expect(kept.sessionID == "session-1")
+
+        sessions.applyDelay = nil
+        reopened.retry(kept)
+        for _ in 0..<200 where !reopened.launches.isEmpty {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(sessions.started.count == 1)
+        #expect(sessions.sent == ["Long one@session-1"])
+    }
+
+    @Test func aLaunchSavedByTheFirstRecoveryVersionStaysRecoverable() async throws {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let sessions = RecordingCodeSessions()
+        sessions.startDelay = .milliseconds(500)
+        let store = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                  git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        await store.load()
+        #expect(store.send("Legacy recovery text"))
+        for _ in 0..<200 where store.launches.first?.step != .startingSession {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let data = try #require(defaults.data(forKey: CodeHomeStore.savedKey))
+        var all = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        var saved = try #require(all["computer"] as? [String: Any])
+        var launches = try #require(saved["launches"] as? [[String: Any]])
+        var launch = launches[0]
+        for key in ["projectName", "projectFolder", "startedAt", "destination", "sessionID", "submissionID"] {
+            launch.removeValue(forKey: key)
+        }
+        launches[0] = launch
+        saved["launches"] = launches
+        all["computer"] = saved
+        defaults.set(try JSONSerialization.data(withJSONObject: all), forKey: CodeHomeStore.savedKey)
+
+        let reopened = CodeHomeStore(scopeID: "computer", agentID: "default", source: DemoCodeProjectSource(),
+                                     git: { RecordingCodeGit() }, starter: sessions, defaults: defaults)
+        let kept = try #require(reopened.launches.first)
+        #expect(kept.job.message == "Legacy recovery text")
+        #expect(kept.destination == nil)
+        #expect(kept.step.needsRecovery)
+    }
+
     /// Under each message, a session's answer is its last one before the next message it got;
     /// status and questions show only under the newest one.
     @Test func eachSessionsAnswerShowsUnderTheRightMessage() async throws {
@@ -410,31 +772,77 @@ private final class RecordingCodeSessions: CodeSessionStarting {
     /// The most session starts under way at the same moment.
     private(set) var mostAtOnce = 0
     private var underWay = 0
+    private var sessionsByCreationID: [UUID: (id: String, folder: String, title: String)] = [:]
+    private var deliveryBySubmission: [UUID: CodeLaunchDeliveryEvidence] = [:]
     var startDelay: Duration?
+    var applyDelay: Duration?
     var sendError: Error?
+    var startErrorAfterAcceptance = false
+    var sendErrorAfterAcceptance = false
+    /// Thrown by `startSession`, as a computer that isn't connected does.
+    var startError: Error?
 
     func startSession(agentID: String, folder: String, title: String,
-                      runtime: CodeRuntimeChoice) async throws -> String {
+                      runtime: CodeRuntimeChoice, creationID: UUID) async throws -> String {
         underWay += 1
         mostAtOnce = max(mostAtOnce, underWay)
         defer { underWay -= 1 }
+        if let existing = sessionsByCreationID[creationID] { return existing.id }
         if let startDelay { try await Task.sleep(for: startDelay) }
         let id = "session-\(started.count + 1)"
         started.append((id, folder, title))
+        sessionsByCreationID[creationID] = (id, folder, title)
+        if let startError {
+            if startErrorAfterAcceptance { throw startError }
+            started.removeLast()
+            sessionsByCreationID[creationID] = nil
+            throw startError
+        }
         runtimes.append(runtime)
         events.append("start")
         return id
     }
 
     func apply(_ mode: CodeSessionMode, toSession sessionID: String, agentID: String) async throws {
+        if let applyDelay { try await Task.sleep(for: applyDelay) }
         if let applyError { throw applyError }
         if mode != .standard { events.append("apply \(mode.rawValue)@\(sessionID)") }
     }
 
-    func send(_ message: String, toSession sessionID: String) async throws {
-        if let sendError { throw sendError }
+    func send(_ message: String, toSession sessionID: String, submissionID: UUID) async throws {
+        if let sendError, !sendErrorAfterAcceptance {
+            deliveryBySubmission[submissionID] = .unknown(sendError.localizedDescription)
+            throw sendError
+        }
         sent.append("\(message)@\(sessionID)")
         events.append("send \(message)@\(sessionID)")
+        if let sendError, sendErrorAfterAcceptance {
+            deliveryBySubmission[submissionID] = .unknown(sendError.localizedDescription)
+            throw sendError
+        }
+        deliveryBySubmission[submissionID] = .sent
+    }
+
+    func existingSession(for request: CodeLaunchRequest, at destination: CodeLaunchDestination,
+                         requestedAt: Date) async throws -> CodeSessionRecord? {
+        guard let found = sessionsByCreationID.values.first(where: {
+            $0.folder == destination.folder && $0.title == CodeSessionTitle.from(request.message)
+        }) else { return nil }
+        return CodeSessionRecord(
+            id: found.id, agentID: request.agentID, projectID: request.project.id,
+            projectName: request.project.name, title: found.title, folder: found.folder,
+            branch: destination.branch, placement: request.placement, startedAt: .now, mode: request.mode
+        )
+    }
+
+    func deliveryEvidence(for submissionID: UUID, message: String,
+                          sessionID: String) async throws -> CodeLaunchDeliveryEvidence {
+        deliveryBySubmission[submissionID]
+            ?? .unknown("The first message still has no authoritative outcome.")
+    }
+
+    func setDeliveryEvidence(_ evidence: CodeLaunchDeliveryEvidence, for submissionID: UUID) {
+        deliveryBySubmission[submissionID] = evidence
     }
 }
 

@@ -28,8 +28,16 @@ extension DirectHermesConversationClient {
 
     func send(message: String, conversationID: String,
               onDraft: @escaping (TimelineItem) -> Void) async throws -> ConversationResponse {
+        try await send(message: message, conversationID: conversationID, onDraft: onDraft,
+                       submissionID: nil)
+    }
+
+    func send(message: String, conversationID: String,
+              onDraft: @escaping (TimelineItem) -> Void,
+              submissionID: UUID?) async throws -> ConversationResponse {
         guard preparingAttachmentID == nil else { throw DirectHermesWorkspaceError.reviewRequired }
-        return try await submit(message: message, conversationID: conversationID, onDraft: onDraft)
+        return try await submit(message: message, conversationID: conversationID, onDraft: onDraft,
+                                submissionID: submissionID)
     }
 
     func sendCommand(message: String, selection: SlashCommandSelection, conversationID: String,
@@ -57,6 +65,7 @@ extension DirectHermesConversationClient {
     func submit(message: String, conversationID: String,
                         onDraft: @escaping (TimelineItem) -> Void,
                         preparedSubmission: DirectHermesDraftStore.Submission? = nil,
+                        submissionID: UUID? = nil,
                         commandSelection: SlashCommandSelection? = nil,
                         voiceReply: Bool = false) async throws -> ConversationResponse {
         try Task.checkCancellation()
@@ -76,7 +85,7 @@ extension DirectHermesConversationClient {
         guard !needsRecovery, waiter == nil else { throw DirectHermesWorkspaceError.reviewRequired }
         guard !isHydrating, connected else { throw DirectHermesError.notConnected }
         guard !projection.running || preparedSubmission != nil else { throw DirectHermesWorkspaceError.nativeTurnActive }
-        let submission = try preparedSubmission ?? recordSubmission(message, method: method)
+        let submission = try preparedSubmission ?? recordSubmission(message, method: method, id: submissionID)
         let owner = generation
         returnsVoiceReply = voiceReply
         voiceReplyItems = []
@@ -423,8 +432,9 @@ extension DirectHermesConversationClient {
     }
 
     func recordSubmission(_ text: String, method: String,
-                          attachments: [ChatAttachment] = []) throws -> DirectHermesDraftStore.Submission {
-        let entry = DirectHermesDraftStore.Submission(id: UUID(), text: text, method: method, createdAt: .now,
+                          attachments: [ChatAttachment] = [],
+                          id: UUID? = nil) throws -> DirectHermesDraftStore.Submission {
+        let entry = DirectHermesDraftStore.Submission(id: id ?? UUID(), text: text, method: method, createdAt: .now,
             composerText: text, attachments: attachments.isEmpty ? nil : attachments)
         var next = journal
         next.unresolved.append(entry)

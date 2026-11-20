@@ -6,13 +6,20 @@ import Foundation
 /// Hermes has definitely admitted the prompt, or throws if it did not.
 extension DirectHermesConversationClient: QueuedConversationClient {
     func submit(message: String, attachments: [ChatAttachment], conversationID: String) async throws {
+        try await submit(message: message, attachments: attachments, conversationID: conversationID,
+                         submissionID: UUID())
+    }
+
+    func submit(message: String, attachments: [ChatAttachment], conversationID: String,
+                submissionID: UUID) async throws {
         let owner = generation
         let outcome = QueuedSubmissionOutcome()
         let turn = Task { @MainActor in
             defer { outcome.finished = true }
             do {
                 _ = try await self.send(message: message, attachments: attachments,
-                                        conversationID: conversationID, onDraft: { _ in })
+                                        conversationID: conversationID, onDraft: { _ in },
+                                        submissionID: submissionID)
             } catch {
                 outcome.error = error
             }

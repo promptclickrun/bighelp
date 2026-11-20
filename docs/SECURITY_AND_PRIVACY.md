@@ -353,6 +353,13 @@ separate versioned cache and cannot imply a live or successful tool outcome.
 Native connection leases reject stale results without closing the shared host
 socket.
 
+Coding setup keeps each host's complete staged and first-session messages with
+the exact project, agent, branch, folder and local attempt IDs until the message
+is acknowledged or explicitly dismissed. The saved handoff is replaced
+atomically before New Chat clears its text. A lost create or send acknowledgement
+stays recoverable without another worktree or submission; it is reconciled from
+the exact session or chat journal before another mutation is offered.
+
 Ordinary native files stay local until Send. The complete batch is checked
 before upload, then files are staged serially through the exact live session.
 The app sends only the acknowledged `ref_text` references with the user's

@@ -96,6 +96,39 @@ struct NewChatSendTests {
         #expect(session.takeRequest() == .startGroup)
     }
 
+    @Test func codingEntryPointsKeepTheBoxAndStagedJobsWhenTheStoreCannotStart() async throws {
+        let suiteName = #function
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = CodeHomeStore(
+            scopeID: "computer", agentID: "mina", source: DemoCodeProjectSource(),
+            git: { throw DirectHermesError.notConnected },
+            starter: UnavailableCodeStarter(), defaults: defaults)
+        await store.load()
+        let session = NewChatSession()
+        session.start(with: [bot("mina")], conversationID: "blank")
+        session.project = try #require(store.projects.first)
+        let model = ChatModel(conversationID: "blank", client: ConversationFixtureClient(), agentID: "mina",
+                              initialItems: [])
+        let send = NewChatSendRelay(
+            session: session, model: model, store: store, hostInUse: { nil }, showProject: { _ in }
+        )
+
+        model.draft = "Normal coding send"
+        #expect(send.send(holdsReferences: false))
+        #expect(model.draft == "Normal coding send")
+        #expect(session.note == .codingUnavailable)
+
+        #expect(store.stage("Already staged"))
+        session.show(nil)
+        model.draft = "Staged coding send"
+        #expect(send.send(holdsReferences: false))
+        #expect(model.draft == "Staged coding send")
+        #expect(store.projectStaged.map(\.message) == ["Already staged"])
+        #expect(store.batches.isEmpty)
+    }
+
     @Test func aGroupSendWithReferencesAsksForNothingAndSaysWhy() {
         let session = NewChatSession()
         session.start(with: [bot("mina"), bot("otto")], conversationID: "blank")
@@ -187,5 +220,19 @@ struct NewChatSendTests {
         #expect(session.note == .codingUnavailable)
         #expect(model.draft == "Fix the widget tap")
         #expect(shown.isEmpty)
+    }
+}
+
+@MainActor
+private struct UnavailableCodeStarter: CodeSessionStarting {
+    func startSession(agentID: String, folder: String, title: String, runtime: CodeRuntimeChoice,
+                      creationID: UUID) async throws -> String {
+        throw DirectHermesError.notConnected
+    }
+
+    func apply(_ mode: CodeSessionMode, toSession sessionID: String, agentID: String) async throws {}
+
+    func send(_ message: String, toSession sessionID: String, submissionID: UUID) async throws {
+        throw DirectHermesError.notConnected
     }
 }

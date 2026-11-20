@@ -929,6 +929,31 @@ struct DirectHermesSessionCatalogClientTests {
         #expect(!workspace.calls.contains { $0.operation == .sessionTitle || $0.operation == .promptSubmit })
     }
 
+    @Test func codingCreateUsesThePersistedLaunchIntentAsItsIdempotencyKey() async throws {
+        let workspace = try SessionWorkspaceStub()
+        let creationID = UUID()
+        workspace.handler = { operation, payload in
+            switch operation {
+            case .profilesList: return Self.profiles()
+            case .sessionCreate:
+                #expect(payload["idempotency_key"] == .string(creationID.uuidString.lowercased()))
+                #expect(payload["cwd"] == .string("/approved/worktree"))
+                #expect(payload["cwd_explicit"] == .boolean(true))
+                #expect(payload["title"] == .string("Fix the widget"))
+                return Self.created(stored: "coding", cwd: "/approved/worktree")
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let client = Self.client(workspace, sink: { _ in })
+
+        let created = try await client.createSession(
+            agentID: "alpha", folder: "/approved/worktree", title: "Fix the widget",
+            runtime: SessionStartRuntime(), creationID: creationID
+        )
+
+        #expect(created.remoteStoredID == "coding")
+    }
+
     @Test func firstBirthPersistsBeforeCreateAndTitleThenRequiresRegistryReadback() async throws {
         let workspace = try SessionWorkspaceStub()
         var states: [DirectHermesSessionCreationState] = []

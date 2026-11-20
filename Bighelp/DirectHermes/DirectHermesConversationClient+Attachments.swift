@@ -11,8 +11,16 @@ extension DirectHermesConversationClient {
 
     func send(message: String, attachments: [ChatAttachment], conversationID: String,
               onDraft: @escaping (TimelineItem) -> Void) async throws -> ConversationResponse {
+        try await send(message: message, attachments: attachments, conversationID: conversationID,
+                       onDraft: onDraft, submissionID: nil)
+    }
+
+    func send(message: String, attachments: [ChatAttachment], conversationID: String,
+              onDraft: @escaping (TimelineItem) -> Void,
+              submissionID: UUID?) async throws -> ConversationResponse {
         if attachments.isEmpty {
-            return try await send(message: message, conversationID: conversationID, onDraft: onDraft)
+            return try await send(message: message, conversationID: conversationID, onDraft: onDraft,
+                                  submissionID: submissionID)
         }
         return try await sendFiles(message: message, attachments: attachments, conversationID: conversationID,
                                    queued: false, onDraft: onDraft)

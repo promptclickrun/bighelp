@@ -1005,7 +1005,6 @@ struct DirectHermesConversationTests {
             runtimeID: "runtime", storedID: "saved", title: "Chat", epoch: "epoch",
             drafts: DirectHermesDraftStore(root: root))
         defer { client.suspend() }
-        let queued: any QueuedConversationClient = client
         let source = SessionRecord(id: client.conversationID, kind: .direct, agentIDs: ["default"],
             title: "Chat", remoteStoredID: "saved")
         let model = ChatModel(conversationID: client.conversationID, client: client, initialItems: [], sourceSession: source)
@@ -1013,9 +1012,14 @@ struct DirectHermesConversationTests {
         try await client.recover(epoch: "epoch")
         // The turn is admitted ("streaming") but never finishes in this test.
         // A waited send would hang here; the queued path must return.
-        try await queued.submit(message: "Run the nightly report", attachments: [], conversationID: client.conversationID)
+        let submissionID = UUID()
+        try await model.submitWithoutWaiting(
+            message: "Run the nightly report", attachments: [], submissionID: submissionID
+        )
         #expect(rpc.requests.filter { $0.method == "prompt.submit" }.count == 1)
         #expect(client.admitted)
+        #expect(client.pendingID == submissionID)
+        #expect(model.items.last?.id == ChatSubmissionIdentity.itemID(submissionID))
     }
 
     @Test func queuedSubmitSurfacesARefusalInsteadOfClaimingItWasSent() async throws {

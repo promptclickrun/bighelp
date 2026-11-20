@@ -66,6 +66,11 @@ struct VoiceSettingsStoreTests {
     }
     @Test func lateLoadAndSaveCannotPublishAfterHostOwnershipChanges() async {
         let client = VoiceSettingsProbe()
+        client.configuration = Self.configuration(
+            providerID: "openai",
+            transcriptionProviderID: "",
+            elevenLabsKeyConfigured: false
+        )
         client.holdLoad = true
         let owner = VoiceSettingsOwner()
         let store = VoiceSettingsStore(agentID: "finance", client: client, isCurrent: { owner.current })
@@ -80,7 +85,9 @@ struct VoiceSettingsStoreTests {
         owner.current = true
         client.holdLoad = false
         await store.load()
-        store.voiceID = "nova"
+        store.selectTranscriptionProvider("elevenlabs")
+        store.transcriptionAPIKey = "fixture-switch-key"
+        store.chooseTranscriptionModel("scribe_v1")
         client.holdSave = true
         let saving = Task { await store.save() }
         while client.pendingSave == nil { await Task.yield() }
@@ -91,6 +98,8 @@ struct VoiceSettingsStoreTests {
         #expect(store.configuration == nil)
         #expect(store.confirmation == nil)
         #expect(store.apiKey.isEmpty)
+        #expect(store.transcriptionAPIKey.isEmpty)
+        #expect(store.transcriptionProviderID.isEmpty)
     }
 
     @Test func doubleSaveIsIgnoredAndLateSuccessPreservesNewerEdits() async {
@@ -138,6 +147,121 @@ struct VoiceSettingsStoreTests {
         #expect(store.selectedProvider?.apiKeyConfigured == true)
     }
 
+    @Test func scribeNeedsTheSharedKeyAndSavesOnlyAnExplicitlyPickedModel() async {
+        let client = VoiceSettingsProbe()
+        client.configuration = Self.configuration(
+            providerID: "openai",
+            transcriptionProviderID: "",
+            elevenLabsKeyConfigured: false
+        )
+        let store = VoiceSettingsStore(agentID: "finance", client: client)
+        await store.load()
+
+        #expect(store.transcriptionProviderID.isEmpty)
+        store.selectTranscriptionProvider("elevenlabs")
+        #expect(!store.canSave, "Scribe cannot be saved until its shared key exists")
+        store.transcriptionAPIKey = "fixture-elevenlabs-key"
+        #expect(store.canSave)
+        await store.save()
+
+        #expect(client.updates.last == VoiceSettingsUpdate(
+            expectedRevision: "revision-1",
+            providerID: "openai",
+            voiceID: "alloy",
+            apiKey: nil,
+            transcription: .init(
+                providerID: "elevenlabs",
+                apiKey: "fixture-elevenlabs-key",
+                model: nil
+            )
+        ))
+        #expect(store.transcriptionProviderID == "elevenlabs")
+        #expect(store.transcriptionModel == "scribe_v2")
+        #expect(store.transcriptionAPIKey.isEmpty)
+        #expect(store.configuration?.providerID == "openai", "The STT save must not change TTS")
+
+        store.chooseTranscriptionModel("scribe_v1")
+        await store.save()
+        #expect(client.updates.last?.transcription == .init(
+            providerID: "elevenlabs",
+            apiKey: nil,
+            model: "scribe_v1"
+        ))
+    }
+
+    @Test func anExistingMissingSTTKeyDoesNotBlockATalkingVoiceEdit() async {
+        let client = VoiceSettingsProbe()
+        client.configuration = Self.configuration(
+            providerID: "openai",
+            transcriptionProviderID: "elevenlabs",
+            elevenLabsKeyConfigured: false
+        )
+        let store = VoiceSettingsStore(agentID: "finance", client: client)
+        await store.load()
+
+        store.voiceID = "nova"
+        #expect(store.canSave)
+        await store.save()
+
+        #expect(client.updates.last?.transcription == nil)
+        #expect(client.updates.last?.voiceID == "nova")
+    }
+
+    @Test func transcriptionDraftsDoNotLeakAcrossBots() async {
+        let client = VoiceSettingsProbe()
+        client.configurations["finance"] = Self.configuration(
+            providerID: "openai",
+            transcriptionProviderID: "elevenlabs",
+            elevenLabsKeyConfigured: true
+        )
+        client.configurations["travel"] = Self.configuration(
+            providerID: "openai",
+            transcriptionProviderID: "local",
+            elevenLabsKeyConfigured: false
+        )
+
+        let finance = VoiceSettingsStore(agentID: "finance", client: client)
+        await finance.load()
+        finance.transcriptionAPIKey = "finance-only-replacement"
+        finance.chooseTranscriptionModel("scribe_v1")
+
+        let travel = VoiceSettingsStore(agentID: "travel", client: client)
+        await travel.load()
+
+        #expect(travel.transcriptionProviderID == "local")
+        #expect(travel.transcriptionAPIKey.isEmpty)
+        #expect(travel.transcriptionModel != finance.transcriptionModel)
+        #expect(finance.transcriptionModel == "scribe_v1")
+    }
+
+    private static func configuration(
+        providerID: String,
+        transcriptionProviderID: String,
+        elevenLabsKeyConfigured: Bool
+    ) -> VoiceSettingsConfiguration {
+        VoiceSettingsConfiguration(
+            revision: "revision-1",
+            providerID: providerID,
+            providers: [
+                .init(id: "openai", title: "OpenAI", voiceID: "alloy", apiKeyConfigured: true),
+                .init(id: "elevenlabs", title: "ElevenLabs", voiceID: "", apiKeyConfigured: elevenLabsKeyConfigured),
+            ],
+            transcriptionProviderID: transcriptionProviderID,
+            transcriptionProviders: [
+                .init(id: "", title: "Automatic", model: "", apiKeyConfigured: false,
+                      modelOptions: [], needsAPIKey: false),
+                .init(id: "local", title: "On your computer", model: "base", apiKeyConfigured: false,
+                      modelOptions: [.init(id: "base", name: "Base")], needsAPIKey: false),
+                .init(id: "elevenlabs", title: "ElevenLabs Scribe",
+                      model: "scribe_v2", apiKeyConfigured: elevenLabsKeyConfigured,
+                      modelOptions: [
+                          .init(id: "scribe_v2", name: "Scribe v2"),
+                          .init(id: "scribe_v1", name: "Scribe v1"),
+                      ],
+                      needsAPIKey: true),
+            ]
+        )
+    }
 
     @Test func localProviderSavesWithoutAKeyAndSamplesOnlySavedSettings() async {
         let client = VoiceSettingsProbe()
@@ -317,6 +441,7 @@ struct VoiceSettingsStoreTests {
 @MainActor
 private final class VoiceSettingsProbe: VoiceSettingsClient {
     var updates: [VoiceSettingsUpdate] = []
+    var configurations: [String: VoiceSettingsConfiguration] = [:]
     var saveError: (any Error)?
     var holdLoad = false
     var holdSave = false
@@ -335,14 +460,17 @@ private final class VoiceSettingsProbe: VoiceSettingsClient {
 
     func load(agentID: String) async throws -> VoiceSettingsConfiguration {
         if holdLoad { return await withCheckedContinuation { pendingLoad = $0 } }
-        return configuration
+        return configurations[agentID] ?? configuration
     }
     func update(agentID: String, settings: VoiceSettingsUpdate) async throws -> VoiceSettingsConfiguration {
         updates.append(settings)
         if holdSave { await withCheckedContinuation { pendingSave = $0 } }
         if let saveError { throw saveError }
-        configuration = VoiceSettingsConfiguration(revision: "revision-2", providerID: settings.providerID,
-            providers: configuration.providers.map { provider in
+        let current = configurations[agentID] ?? configuration
+        let savedTranscriptionProviderID = settings.transcription?.providerID
+            ?? current.transcriptionProviderID
+        let saved = VoiceSettingsConfiguration(revision: "revision-2", providerID: settings.providerID,
+            providers: current.providers.map { provider in
                 provider.id == settings.providerID
                     ? VoiceProviderConfiguration(id: provider.id, title: provider.title,
                         voiceID: settings.voiceID, apiKeyConfigured: settings.apiKey != nil || provider.apiKeyConfigured,
@@ -351,8 +479,22 @@ private final class VoiceSettingsProbe: VoiceSettingsClient {
                         needsAPIKey: provider.needsAPIKey, supportsServerURL: provider.supportsServerURL,
                         voiceLocation: provider.voiceLocation)
                     : provider
+            },
+            transcriptionProviderID: savedTranscriptionProviderID,
+            transcriptionProviders: current.transcriptionProviders.map { provider in
+                guard provider.id == settings.transcription?.providerID else { return provider }
+                return VoiceTranscriptionProviderConfiguration(
+                    id: provider.id,
+                    title: provider.title,
+                    model: settings.transcription?.model ?? provider.model,
+                    apiKeyConfigured: provider.apiKeyConfigured || settings.transcription?.apiKey != nil,
+                    modelOptions: provider.modelOptions,
+                    needsAPIKey: provider.needsAPIKey
+                )
             })
-        return configuration
+        configurations[agentID] = saved
+        configuration = saved
+        return saved
     }
 }
 

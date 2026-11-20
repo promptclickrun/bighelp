@@ -34,10 +34,10 @@ struct VoiceProviderSpec: Equatable, Sendable {
         @MainActor var title: String {
             switch self {
             case .onThisDevice: String(localized: "Runs on this \(OnDeviceVoiceModel.deviceName)")
-            case .onYourComputer: "Runs on your computer"
-            case .custom: "Custom (set up on your computer)"
-            case .free: "Free"
-            case .cloud: "Cloud (your API key)"
+            case .onYourComputer: String(localized: "Runs on your computer")
+            case .custom: String(localized: "Custom (set up on your computer)")
+            case .free: String(localized: "Free")
+            case .cloud: String(localized: "Cloud (your API key)")
             }
         }
 
@@ -156,6 +156,102 @@ extension VoiceProviderConfiguration {
                   hasModel: spec.modelField != nil,
                   needsAPIKey: !spec.keyNames.isEmpty, supportsServerURL: spec.supportsServerURL,
                   voiceLocation: spec.voiceLocation)
+    }
+}
+
+/// Hermes' speech-to-text providers. Provider discovery comes from the host's
+/// config schema; these are the key/model coordinates of its built-ins.
+struct VoiceTranscriptionProviderSpec: Equatable, Sendable {
+    let id: String
+    let title: String
+    let kind: VoiceProviderSpec.Kind
+    var modelField: String? = nil
+    var defaultModel = ""
+    var keyNames: [String] = []
+    var models: [VoiceOption] = []
+
+    static let automatic = VoiceTranscriptionProviderSpec(
+        id: "", title: String(localized: "Automatic"), kind: .free
+    )
+
+    static let builtIn: [VoiceTranscriptionProviderSpec] = [
+        automatic,
+        .init(id: "local", title: String(localized: "On your computer"), kind: .onYourComputer,
+              modelField: "model", defaultModel: "base",
+              models: [
+                  .init(id: "tiny", name: "Tiny"),
+                  .init(id: "base", name: "Base"),
+                  .init(id: "small", name: "Small"),
+                  .init(id: "medium", name: "Medium"),
+                  .init(id: "large-v3", name: "Large v3"),
+                  .init(id: "turbo", name: "Turbo"),
+              ]),
+        .init(id: "groq", title: "Groq Whisper", kind: .cloud,
+              modelField: "model", defaultModel: "whisper-large-v3-turbo",
+              keyNames: ["GROQ_API_KEY"],
+              models: [
+                  .init(id: "whisper-large-v3-turbo", name: "Whisper Large v3 Turbo"),
+                  .init(id: "whisper-large-v3", name: "Whisper Large v3"),
+              ]),
+        .init(id: "openai", title: "OpenAI", kind: .cloud,
+              modelField: "model", defaultModel: "whisper-1",
+              keyNames: ["VOICE_TOOLS_OPENAI_KEY", "OPENAI_API_KEY"],
+              models: [
+                  .init(id: "whisper-1", name: "Whisper 1"),
+                  .init(id: "gpt-4o-mini-transcribe", name: "GPT-4o mini Transcribe"),
+                  .init(id: "gpt-4o-transcribe", name: "GPT-4o Transcribe"),
+                  .init(id: "gpt-transcribe", name: "GPT Transcribe"),
+              ]),
+        .init(id: "mistral", title: "Mistral Voxtral", kind: .cloud,
+              modelField: "model", defaultModel: "voxtral-mini-latest",
+              keyNames: ["MISTRAL_API_KEY"],
+              models: [
+                  .init(id: "voxtral-mini-latest", name: "Voxtral Mini"),
+                  .init(id: "voxtral-mini-2602", name: "Voxtral Mini 2602"),
+              ]),
+        .init(id: "xai", title: "xAI", kind: .cloud,
+              modelField: "model", defaultModel: "grok-voice-transcribe-2.0",
+              keyNames: ["XAI_API_KEY"],
+              models: [
+                  .init(id: "grok-voice-transcribe-2.0", name: "Grok Voice Transcribe 2.0"),
+                  .init(id: "grok-voice-transcribe-1.0", name: "Grok Voice Transcribe 1.0"),
+              ]),
+        .init(id: "elevenlabs", title: "ElevenLabs Scribe", kind: .cloud,
+              modelField: "model_id", defaultModel: "scribe_v2",
+              keyNames: ["ELEVENLABS_API_KEY"],
+              models: [
+                  .init(id: "scribe_v2", name: "Scribe v2"),
+                  .init(id: "scribe_v1", name: "Scribe v1"),
+              ]),
+        .init(id: "deepinfra", title: "DeepInfra", kind: .cloud,
+              modelField: "model", keyNames: ["DEEPINFRA_API_KEY"]),
+    ]
+
+    static func builtIn(_ id: String) -> VoiceTranscriptionProviderSpec? {
+        builtIn.first { $0.id == id }
+    }
+
+    static func custom(_ id: String) -> VoiceTranscriptionProviderSpec {
+        VoiceTranscriptionProviderSpec(id: id, title: id, kind: .custom)
+    }
+}
+
+extension VoiceTranscriptionProviderConfiguration {
+    init(spec: VoiceTranscriptionProviderSpec, model: String, apiKeyConfigured: Bool) {
+        var models = spec.models
+        if !model.isEmpty, !models.contains(where: { $0.id == model }) {
+            models.insert(VoiceOption(id: model, name: model), at: 0)
+        }
+        self.init(
+            id: spec.id,
+            title: spec.title,
+            model: model,
+            apiKeyConfigured: apiKeyConfigured,
+            modelOptions: models,
+            needsAPIKey: !spec.keyNames.isEmpty,
+            kind: spec.kind,
+            hasModel: spec.modelField != nil && !models.isEmpty
+        )
     }
 }
 

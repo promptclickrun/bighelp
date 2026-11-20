@@ -33717,6 +33717,374 @@
         }
       }
     },
+    "API key saved": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "API-Schlüssel gespeichert"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "API key saved"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已保存 API 密钥"
+          }
+        }
+      }
+    },
+    "API key required": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "API-Schlüssel erforderlich"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "API key required"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "需要 API 密钥"
+          }
+        }
+      }
+    },
+    "API key saved on your computer": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "API-Schlüssel auf deinem Computer gespeichert"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "API key saved on your computer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "API 密钥已保存在你的电脑上"
+          }
+        }
+      }
+    },
+    "Computer listens with": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Computer hört mit"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Computer listens with"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "电脑使用"
+          }
+        }
+      }
+    },
+    "Cloud (your API key)": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Cloud (dein API-Schlüssel)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cloud (your API key)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "云端（你的 API 密钥）"
+          }
+        }
+      }
+    },
+    "Custom (set up on your computer)": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Benutzerdefiniert (auf deinem Computer eingerichtet)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom (set up on your computer)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "自定义（在电脑上设置）"
+          }
+        }
+      }
+    },
+    "Couldn't get speech-to-text providers from your computer. Try again.": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Die Sprach-in-Text-Anbieter konnten nicht vom Computer geladen werden. Versuche es erneut."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't get speech-to-text providers from your computer. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无法从电脑获取语音转文字服务。请重试。"
+          }
+        }
+      }
+    },
+    "Getting speech-to-text providers from your computer…": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Sprach-in-Text-Anbieter werden vom Computer geladen…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Getting speech-to-text providers from your computer…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "正在从电脑获取语音转文字服务…"
+          }
+        }
+      }
+    },
+    "Hermes chooses from what's available": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hermes wählt aus den verfügbaren Optionen"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hermes chooses from what's available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Hermes 从可用选项中选择"
+          }
+        }
+      }
+    },
+    "Needs an API key": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "API-Schlüssel erforderlich"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs an API key"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "需要 API 密钥"
+          }
+        }
+      }
+    },
+    "No account or key": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Kein Konto oder Schlüssel"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No account or key"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "无需账户或密钥"
+          }
+        }
+      }
+    },
+    "On your computer": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Auf deinem Computer"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On your computer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在电脑上"
+          }
+        }
+      }
+    },
+    "Runs on your computer": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Läuft auf deinem Computer"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runs on your computer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在电脑上运行"
+          }
+        }
+      }
+    },
+    "Enter API key": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "API-Schlüssel eingeben"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter API key"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "输入 API 密钥"
+          }
+        }
+      }
+    },
+    "Saved — enter a replacement": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Gespeichert — neuen Schlüssel eingeben"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved — enter a replacement"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "已保存 — 输入替代密钥"
+          }
+        }
+      }
+    },
+    "Set up on your computer": {
+      "comment": "Initial Simplified Chinese draft; fluent-speaker review pending.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Auf deinem Computer eingerichtet"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set up on your computer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "在电脑上设置"
+          }
+        }
+      }
+    },
     "“%@” is saved on your computer. Pick it from Templates when you make a new bot.": {
       "comment": "Simplified Chinese draft for Simple Bot mode, Teamwork and their Settings pages (#527); fluent-speaker review pending.",
       "localizations": {

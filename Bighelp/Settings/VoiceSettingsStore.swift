@@ -20,6 +20,19 @@ struct VoiceSettingsConfiguration: Equatable, Sendable {
     let revision: String
     let providerID: String
     let providers: [VoiceProviderConfiguration]
+    var transcriptionProviderID = ""
+    var transcriptionProviders: [VoiceTranscriptionProviderConfiguration] = []
+}
+
+struct VoiceTranscriptionProviderConfiguration: Equatable, Sendable, Identifiable {
+    let id: String
+    let title: String
+    let model: String
+    let apiKeyConfigured: Bool
+    var modelOptions: [VoiceOption] = []
+    var needsAPIKey: Bool = true
+    var kind: VoiceProviderSpec.Kind = .cloud
+    var hasModel: Bool = true
 }
 
 struct VoiceSettingsUpdate: Equatable, Sendable {
@@ -31,17 +44,39 @@ struct VoiceSettingsUpdate: Equatable, Sendable {
     var model: String? = nil
     /// nil leaves the host's value alone; "" goes back to the provider's own server.
     var serverURL: String? = nil
+    var transcription: VoiceTranscriptionSettingsUpdate? = nil
+}
+
+struct VoiceTranscriptionSettingsUpdate: Equatable, Sendable {
+    let providerID: String
+    let apiKey: String?
+    /// nil leaves the host's model alone.
+    var model: String? = nil
+}
+
+struct VoiceTranscriptionHostCatalog: Equatable, Sendable {
+    struct Provider: Equatable, Sendable, Identifiable {
+        let id: String
+        var models: [VoiceOption] = []
+    }
+
+    let providers: [Provider]
 }
 
 @MainActor
 protocol VoiceSettingsClient: AnyObject {
     func load(agentID: String) async throws -> VoiceSettingsConfiguration
     func update(agentID: String, settings: VoiceSettingsUpdate) async throws -> VoiceSettingsConfiguration
+    /// The STT providers Hermes currently exposes for this profile.
+    func transcriptionCatalog(agentID: String) async throws -> VoiceTranscriptionHostCatalog
     /// Speaks a short line with the agent's saved voice, through the host.
     func playSample(agentID: String) async throws
 }
 
 extension VoiceSettingsClient {
+    func transcriptionCatalog(agentID: String) async throws -> VoiceTranscriptionHostCatalog {
+        throw VoiceSettingsError.unsupported
+    }
     func playSample(agentID: String) async throws { throw VoiceSettingsError.unsupported }
 }
 
@@ -57,6 +92,9 @@ final class VoiceSettingsStore {
     var apiKey = "" { didSet { if apiKey != oldValue { edited() } } }
     var model = "" { didSet { if model != oldValue { edited() } } }
     var serverURL = "" { didSet { if serverURL != oldValue { edited() } } }
+    private(set) var transcriptionProviderID = ""
+    var transcriptionModel = "" { didSet { if transcriptionModel != oldValue { edited() } } }
+    var transcriptionAPIKey = "" { didSet { if transcriptionAPIKey != oldValue { edited() } } }
     private(set) var isPlayingSample = false
     private(set) var sampleError: String?
     private(set) var configuration: VoiceSettingsConfiguration?
@@ -66,6 +104,9 @@ final class VoiceSettingsStore {
     private(set) var confirmation: String?
     /// What providers that list their voices on the computer offer, by provider (ElevenLabs, speech plugins).
     private(set) var hostCatalogs: [String: VoiceHostCatalogState] = [:]
+    private(set) var transcriptionCatalog: VoiceTranscriptionHostCatalog?
+    private(set) var transcriptionCatalogError: String?
+    private(set) var isLoadingTranscriptionCatalog = false
     @ObservationIgnored private let client: any VoiceSettingsClient
     @ObservationIgnored private let options: (any VoiceOptionsClient)?
     @ObservationIgnored private let isCurrent: @MainActor () -> Bool
@@ -93,18 +134,68 @@ final class VoiceSettingsStore {
         configuration?.providers.first { $0.id == providerID }
     }
 
+    var selectedTranscriptionProvider: VoiceTranscriptionProviderConfiguration? {
+        transcriptionProviders.first { $0.id == transcriptionProviderID }
+            ?? configuration?.transcriptionProviders.first { $0.id == transcriptionProviderID }
+    }
+
+    var transcriptionProviders: [VoiceTranscriptionProviderConfiguration] {
+        guard let catalog = transcriptionCatalog else {
+            return configuration?.transcriptionProviders ?? []
+        }
+        var providers = catalog.providers.compactMap { option in
+            if let existing = configuration?.transcriptionProviders.first(where: { $0.id == option.id }) {
+                var value = existing
+                if !option.models.isEmpty { value.modelOptions = option.models }
+                return value
+            }
+            let spec = VoiceTranscriptionProviderSpec.builtIn(option.id)
+                ?? VoiceTranscriptionProviderSpec.custom(option.id)
+            return VoiceTranscriptionProviderConfiguration(
+                spec: spec,
+                model: spec.defaultModel,
+                apiKeyConfigured: false
+            ).withModelOptions(option.models)
+        }
+        if let selected = configuration?.transcriptionProviders.first(
+            where: { $0.id == transcriptionProviderID }),
+           !providers.contains(where: { $0.id == selected.id }) {
+            providers.append(selected)
+        }
+        return providers
+    }
+
+    var selectableTranscriptionProviders: [VoiceTranscriptionProviderConfiguration] {
+        guard transcriptionCatalog != nil else {
+            return selectedTranscriptionProvider.map { [$0] } ?? []
+        }
+        return transcriptionProviders
+    }
+
+    var transcriptionModelName: String {
+        guard let provider = selectedTranscriptionProvider else { return transcriptionModel }
+        return provider.modelOptions.first(where: { $0.id == transcriptionModel })?.name ?? transcriptionModel
+    }
+
     var canSave: Bool {
         guard isCurrent(), !isLoading, !isSaving, let configuration, let selectedProvider,
               !selectedProvider.hasVoice || !normalizedVoice.isEmpty,
               !selectedProvider.takesVoice || Self.validText(normalizedVoice, 160),
               Self.validText(normalizedModel, 160),
+              Self.validText(normalizedTranscriptionModel, 160),
               normalizedServerURL.isEmpty || Self.validServerURL(normalizedServerURL),
               Self.validText(normalizedKey, 4096),
+              Self.validText(normalizedTranscriptionKey, 4096),
               !selectedProvider.needsAPIKey || selectedProvider.apiKeyConfigured || !normalizedKey.isEmpty,
+              !changedTranscriptionConfiguration
+                  || !selectedTranscriptionProviderNeedsKey
+                  || selectedTranscriptionProvider?.apiKeyConfigured == true
+                  || !normalizedTranscriptionKey.isEmpty,
               selectedProvider.kind != .onThisDevice || isOnDeviceReady(selectedProvider.id)
         else { return false }
         return providerID != configuration.providerID || changedVoice || changedModel != nil
-            || changedServerURL != nil || !normalizedKey.isEmpty
+            || changedServerURL != nil || !normalizedKey.isEmpty || changedTranscriptionProvider
+            || changedTranscriptionModel != nil || !normalizedTranscriptionKey.isEmpty
     }
 
     /// Unsaved edits: a sample plays what the host has saved.
@@ -113,7 +204,8 @@ final class VoiceSettingsStore {
         return providerID != configuration.providerID || changedVoice
             || (selectedProvider.hasModel && normalizedModel != selectedProvider.model)
             || (selectedProvider.supportsServerURL && normalizedServerURL != selectedProvider.serverURL)
-            || !normalizedKey.isEmpty
+            || !normalizedKey.isEmpty || changedTranscriptionProvider
+            || changedTranscriptionModel != nil || !normalizedTranscriptionKey.isEmpty
     }
 
     var canPlaySample: Bool {
@@ -194,6 +286,25 @@ final class VoiceSettingsStore {
         return normalizedModel
     }
 
+    private var changedTranscriptionProvider: Bool {
+        transcriptionProviderID != configuration?.transcriptionProviderID
+    }
+
+    private var changedTranscriptionConfiguration: Bool {
+        changedTranscriptionProvider || changedTranscriptionModel != nil
+            || !normalizedTranscriptionKey.isEmpty
+    }
+
+    private var changedTranscriptionModel: String? {
+        guard let provider = selectedTranscriptionProvider, provider.hasModel,
+              normalizedTranscriptionModel != provider.model else { return nil }
+        return normalizedTranscriptionModel
+    }
+
+    private var selectedTranscriptionProviderNeedsKey: Bool {
+        selectedTranscriptionProvider?.needsAPIKey == true
+    }
+
     private var changedServerURL: String? {
         guard let selectedProvider, selectedProvider.supportsServerURL,
               normalizedServerURL != selectedProvider.serverURL else { return nil }
@@ -216,6 +327,8 @@ final class VoiceSettingsStore {
             if editRevision == edits {
                 providerID = value.providerID
                 fillFromSelectedProvider()
+                transcriptionProviderID = value.transcriptionProviderID
+                fillFromSelectedTranscriptionProvider()
             }
         } catch {
             guard generation == request, isCurrent(), !Task.isCancelled else { return }
@@ -230,6 +343,11 @@ final class VoiceSettingsStore {
         apiKey = ""
     }
 
+    private func fillFromSelectedTranscriptionProvider() {
+        transcriptionModel = selectedTranscriptionProvider?.model ?? ""
+        transcriptionAPIKey = ""
+    }
+
     func selectProvider(_ id: String) {
         guard id != providerID, !isSaving, configuration?.providers.contains(where: { $0.id == id }) == true else { return }
         providerID = id
@@ -238,11 +356,45 @@ final class VoiceSettingsStore {
         edited()
     }
 
+    func selectTranscriptionProvider(_ id: String) {
+        guard id != transcriptionProviderID, !isSaving,
+              transcriptionProviders.contains(where: { $0.id == id }) else { return }
+        transcriptionProviderID = id
+        fillFromSelectedTranscriptionProvider()
+        edited()
+    }
+
+    func chooseTranscriptionModel(_ id: String) {
+        guard !isSaving else { return }
+        transcriptionModel = id
+    }
+
+    func loadTranscriptionCatalog() async {
+        guard isCurrent(), transcriptionCatalog == nil,
+              !isLoadingTranscriptionCatalog else { return }
+        let request = catalogGeneration
+        isLoadingTranscriptionCatalog = true
+        transcriptionCatalogError = nil
+        defer { if request == catalogGeneration { isLoadingTranscriptionCatalog = false } }
+        do {
+            let value = try await client.transcriptionCatalog(agentID: agentID)
+            guard request == catalogGeneration, isCurrent() else { return }
+            transcriptionCatalog = value
+        } catch {
+            guard request == catalogGeneration, isCurrent(), !Task.isCancelled else { return }
+            transcriptionCatalogError = String(
+                localized: "Couldn't get speech-to-text providers from your computer. Try again."
+            )
+        }
+    }
+
     /// Puts every field back to what the host has saved, without loading again.
     func discardEdits() {
         guard let configuration, !isSaving else { return }
         providerID = configuration.providerID
         fillFromSelectedProvider()
+        transcriptionProviderID = configuration.transcriptionProviderID
+        fillFromSelectedTranscriptionProvider()
         sampleError = nil
         errorMessage = nil
     }
@@ -252,7 +404,14 @@ final class VoiceSettingsStore {
         let update = VoiceSettingsUpdate(expectedRevision: configuration.revision,
             providerID: providerID, voiceID: selectedProvider?.takesVoice == true ? normalizedVoice : "",
             apiKey: normalizedKey.isEmpty ? nil : normalizedKey,
-            model: changedModel, serverURL: changedServerURL)
+            model: changedModel, serverURL: changedServerURL,
+            transcription: changedTranscriptionConfiguration
+                ? VoiceTranscriptionSettingsUpdate(
+                    providerID: transcriptionProviderID,
+                    apiKey: normalizedTranscriptionKey.isEmpty ? nil : normalizedTranscriptionKey,
+                    model: changedTranscriptionModel
+                )
+                : nil)
         let request = generation
         let edits = editRevision
         isSaving = true
@@ -265,15 +424,31 @@ final class VoiceSettingsStore {
             guard value.providerID == update.providerID,
                   let saved = value.providers.first(where: { $0.id == update.providerID }),
                   !saved.takesVoice || saved.voiceID == update.voiceID,
-                  !saved.needsAPIKey || saved.apiKeyConfigured else {
+                  !saved.needsAPIKey || saved.apiKeyConfigured,
+                  update.transcription == nil
+                    || value.transcriptionProviderID == update.transcription?.providerID,
+                  update.transcription?.model == nil
+                    || value.transcriptionProviders.first(
+                        where: { $0.id == update.transcription?.providerID }
+                    )?.model == update.transcription?.model,
+                  update.transcription?.apiKey == nil
+                    || value.transcriptionProviders.first(
+                        where: { $0.id == update.transcription?.providerID }
+                    )?.apiKeyConfigured == true else {
                 throw VoiceSettingsError.invalidResponse
             }
             self.configuration = value
             // A new key can open the account's own voices.
             if update.apiKey != nil { hostCatalogs[update.providerID] = nil }
+            if update.transcription?.apiKey != nil,
+               let providerID = update.transcription?.providerID {
+                hostCatalogs[providerID] = nil
+            }
             if editRevision == edits {
                 providerID = value.providerID
                 fillFromSelectedProvider()
+                transcriptionProviderID = value.transcriptionProviderID
+                fillFromSelectedTranscriptionProvider()
                 confirmation = "Voice settings saved."
             }
         } catch {
@@ -303,11 +478,17 @@ final class VoiceSettingsStore {
         generation += 1
         catalogGeneration += 1
         hostCatalogs = [:]
+        transcriptionCatalog = nil
+        transcriptionCatalogError = nil
+        isLoadingTranscriptionCatalog = false
         configuration = nil
         providerID = ""
         voiceID = ""
         model = ""
         serverURL = ""
+        transcriptionProviderID = ""
+        transcriptionModel = ""
+        transcriptionAPIKey = ""
         isPlayingSample = false
         sampleError = nil
         apiKey = ""
@@ -322,12 +503,19 @@ final class VoiceSettingsStore {
         // still confirm its accepted provider/voice after the secret is erased.
         let revision = editRevision
         apiKey = ""
+        transcriptionAPIKey = ""
         editRevision = revision
     }
     private var normalizedVoice: String { voiceID.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var normalizedKey: String { apiKey.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var normalizedModel: String { model.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var normalizedServerURL: String { serverURL.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var normalizedTranscriptionModel: String {
+        transcriptionModel.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    private var normalizedTranscriptionKey: String {
+        transcriptionAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     private static func validText(_ value: String, _ maximum: Int) -> Bool {
         value.utf8.count <= maximum && !value.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
@@ -386,5 +574,17 @@ final class VoiceSettingsStore {
             saving ? "Voice settings could not be saved. Your edits are still here."
                 : "Voice settings could not be loaded. Try again when your computer is connected."
         }
+    }
+
+}
+
+private extension VoiceTranscriptionProviderConfiguration {
+    func withModelOptions(_ options: [VoiceOption]) -> Self {
+        var copy = self
+        if !options.isEmpty {
+            copy.modelOptions = options
+            copy.hasModel = true
+        }
+        return copy
     }
 }

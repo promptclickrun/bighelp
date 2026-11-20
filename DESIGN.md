@@ -460,6 +460,10 @@ switch); **This app** (Appearance, Chat, Notifications); on Vision Pro, In your 
 every computer); then Help & feedback and the Advanced options switch. Don't add sections that compete with these;
 add to the page a row already opens (Help & feedback also holds Share usage and diagnostics, on by default, and
 the Apple Watch's status).
+Settings › Voice keeps **Listens with** first. With **Computer** picked, the next row is **Computer listens
+with**, then **Model** when that provider has one. The picker lists what that computer exposes: Automatic,
+on-computer transcription and the cloud/custom providers Hermes supports. A missing provider key uses the
+same inline API-key field as the speaking voice, and both choices save for the bot with the page's one Save.
 Settings › Models is the AI providers first, then **Default model** with one row per bot (its face, its name and
 its model under it); a row opens that bot's own Default Model page, the one its profile opens. Advanced comes last.
 Settings › Chat reads in named groups: **Opening**, **A bot's work**, **In a chat** and **Chat list**, then the

@@ -117,6 +117,47 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
         return state.configuration
     }
 
+    func transcriptionCatalog(agentID: String) async throws -> VoiceTranscriptionHostCatalog {
+        let profile = try Self.profile(agentID)
+        let schema = try await perform(.workspaceConfigSchema, profile: profile, payload: [
+            "profile": .string(profile)
+        ])
+        let fields = schema["fields"]?.object ?? [:]
+        let providerField = fields["stt.provider"]?.object ?? [:]
+        let rows = providerField["options"]?.array ?? []
+        guard !rows.isEmpty else { throw VoiceSettingsError.invalidResponse }
+        var seen = Set<String>()
+        var providers = [VoiceTranscriptionHostCatalog.Provider(
+            id: "", models: []
+        )]
+        for value in rows.prefix(128) {
+            guard let rawID = value.string,
+                  Self.validName(rawID),
+                  seen.insert(rawID.lowercased()).inserted else {
+                continue
+            }
+            let id = rawID.lowercased()
+            let spec = VoiceTranscriptionProviderSpec.builtIn(id)
+                ?? VoiceTranscriptionProviderSpec.custom(id)
+            var models = spec.models
+            if let field = spec.modelField {
+                let fieldPath = "stt.\(id).\(field)"
+                let options = fields[fieldPath]?.object?["options"]?.array ?? []
+                var modelIDs = Set<String>()
+                let hostModels = options.prefix(100).compactMap { item -> VoiceOption? in
+                    guard let model = item.string, Self.validText(model, maximum: 160),
+                          modelIDs.insert(model).inserted else { return nil }
+                    return spec.models.first(where: { $0.id == model })
+                        ?? VoiceOption(id: model, name: model)
+                }
+                if !hostModels.isEmpty { models = hostModels }
+            }
+            providers.append(.init(id: id, models: models))
+        }
+        guard providers.count > 1 else { throw VoiceSettingsError.invalidResponse }
+        return .init(providers: providers)
+    }
+
     func playSample(agentID: String) async throws {
         let profile = try Self.profile(agentID)
         sampleOutput?.stop()
@@ -134,10 +175,12 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
               Self.validText(settings.voiceID, maximum: 160, allowEmpty: true),
               Self.validText(settings.expectedRevision, maximum: 256),
               Self.validText(settings.model ?? "", maximum: 160, allowEmpty: true),
+              Self.validText(settings.transcription?.providerID ?? "", maximum: 64, allowEmpty: true),
+              Self.validText(settings.transcription?.model ?? "", maximum: 160, allowEmpty: true),
               (settings.serverURL ?? "").isEmpty || VoiceSettingsStore.validServerURL(settings.serverURL ?? "") else {
             throw VoiceSettingsError.invalidResponse
         }
-        if let key = settings.apiKey {
+        for key in [settings.apiKey, settings.transcription?.apiKey].compactMap({ $0 }) {
             guard Self.validText(key, maximum: 4_096) else {
                 throw VoiceSettingsError.invalidResponse
             }
@@ -153,62 +196,174 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
         }
         let spec = VoiceProviderSpec.builtIn(settings.providerID)
         let voiceChanged = selected.takesVoice && selected.voiceID != settings.voiceID
-        if current.configuration.providerID == settings.providerID, !voiceChanged, settings.apiKey == nil,
-           settings.model == nil, settings.serverURL == nil {
+        let ttsChanged = current.configuration.providerID != settings.providerID || voiceChanged
+            || settings.apiKey != nil || settings.model != nil || settings.serverURL != nil
+        let transcriptionChanged = settings.transcription != nil
+        if !ttsChanged && !transcriptionChanged {
             return current.configuration
         }
 
+        var keys = [(name: String, value: String)]()
         if let key = settings.apiKey, let keyName = spec?.keyNames.first {
+            keys.append((keyName, key))
+        }
+
+        var configPatch: [String: BighelpJSONValue] = [:]
+        if ttsChanged {
+            // Hermes deep-merges this over the agent's config, so only the fields
+            // named here change.
+            var tts: [String: BighelpJSONValue] = ["provider": .string(settings.providerID)]
+            var section: [String: BighelpJSONValue] = [:]
+            if selected.takesVoice {
+                switch selected.voiceLocation {
+                case .section:
+                    if let field = spec?.voiceField { section[field] = .string(settings.voiceID) }
+                case .plugin:
+                    // Hermes hands a plugin only the top-level voice, and the plugin
+                    // falls back to its own section, so both stay in step.
+                    tts["voice"] = .string(settings.voiceID)
+                    section["voice"] = .string(settings.voiceID)
+                case .commandProvider:
+                    // The command's {voice} comes from its own provider entry; empty is the command's own.
+                    tts["providers"] = .object([settings.providerID: .object(["voice": .string(settings.voiceID)])])
+                }
+            }
+            if let model = settings.model, let spec, let field = spec.modelField {
+                // A merge can't delete a key, so clearing the model restores the default.
+                let value = model.isEmpty ? spec.defaultModel : model
+                if !value.isEmpty { section[field] = .string(value) }
+            }
+            if let serverURL = settings.serverURL, spec?.supportsServerURL == true {
+                // An empty base_url makes Hermes use the provider's own server.
+                section["base_url"] = .string(serverURL)
+            }
+            // Clearing an inline key is the canonical writer's required step
+            // before saving VOICE_TOOLS_OPENAI_KEY, otherwise config precedence
+            // can continue to select the stale value.
+            if settings.providerID == "openai", settings.apiKey != nil {
+                section["api_key"] = .string("")
+            }
+            if !section.isEmpty { tts[settings.providerID] = .object(section) }
+            configPatch["tts"] = .object(tts)
+        }
+
+        var returnsToAutomatic = false
+        if let transcription = settings.transcription {
+            let savedProvider = current.configuration.transcriptionProviders.first(
+                where: { $0.id == transcription.providerID }
+            )
+            let provider: VoiceTranscriptionProviderConfiguration
+            if let savedProvider {
+                provider = savedProvider
+            } else {
+                let host = try await transcriptionCatalog(agentID: profile)
+                guard let option = host.providers.first(where: { $0.id == transcription.providerID }) else {
+                    throw VoiceSettingsError.invalidResponse
+                }
+                let spec = VoiceTranscriptionProviderSpec.builtIn(option.id)
+                    ?? VoiceTranscriptionProviderSpec.custom(option.id)
+                var custom = VoiceTranscriptionProviderConfiguration(
+                    spec: spec,
+                    model: option.models.first?.id ?? spec.defaultModel,
+                    apiKeyConfigured: false
+                )
+                if !option.models.isEmpty {
+                    custom.modelOptions = option.models
+                    custom.hasModel = true
+                }
+                provider = custom
+            }
+            guard transcription.apiKey == nil || provider.needsAPIKey else {
+                throw VoiceSettingsError.invalidResponse
+            }
+            if let key = transcription.apiKey,
+               let keyName = VoiceTranscriptionProviderSpec.builtIn(provider.id)?.keyNames.first {
+                if let existing = keys.firstIndex(where: { $0.name == keyName }) {
+                    guard keys[existing].value == key else {
+                        throw VoiceSettingsError.invalidResponse
+                    }
+                } else {
+                    keys.append((keyName, key))
+                }
+            }
+            if provider.id.isEmpty {
+                returnsToAutomatic = true
+            } else {
+                var stt: [String: BighelpJSONValue] = [
+                    "provider": .string(provider.id),
+                    "use_gateway": .boolean(provider.id == "nous"),
+                ]
+                let transcriptionSpec = VoiceTranscriptionProviderSpec.builtIn(provider.id)
+                let modelField = transcriptionSpec?.modelField ?? (provider.hasModel ? "model" : nil)
+                if let model = transcription.model, let modelField {
+                    var section: [String: BighelpJSONValue] = [modelField: .string(model)]
+                    // Hermes' canonical relay key is model_id; older direct voice resolution reads
+                    // model. Write the same explicit pick to both so direct and relay stay in step.
+                    if provider.id == "elevenlabs" { section["model"] = .string(model) }
+                    stt[provider.id] = .object(section)
+                }
+                configPatch["stt"] = .object(stt)
+            }
+        }
+
+        let automaticYAML: String?
+        if returnsToAutomatic {
+            // The web settings response flattens the model mapping. Only the original
+            // profile text can be used for a whole-document write.
+            guard let raw = current.raw, let updated = Self.removingSTTSelection(from: raw.yaml) else {
+                throw VoiceSettingsError.unsupported
+            }
+            automaticYAML = updated
+        } else {
+            automaticYAML = nil
+        }
+        for key in keys {
             let result = try await perform(.keysSet, profile: profile, payload: [
-                "profile": .string(profile), "key": .string(keyName), "value": .string(key)
+                "profile": .string(profile), "key": .string(key.name), "value": .string(key.value)
             ])
             guard result["ok"]?.boolean == true else { throw VoiceSettingsError.invalidResponse }
         }
 
-        // Hermes deep-merges this over the agent's config, so only the fields
-        // named here change.
-        var tts: [String: BighelpJSONValue] = ["provider": .string(settings.providerID)]
-        var section: [String: BighelpJSONValue] = [:]
-        if selected.takesVoice {
-            switch selected.voiceLocation {
-            case .section:
-                if let field = spec?.voiceField { section[field] = .string(settings.voiceID) }
-            case .plugin:
-                // Hermes hands a plugin only the top-level voice, and the plugin
-                // falls back to its own section, so both stay in step.
-                tts["voice"] = .string(settings.voiceID)
-                section["voice"] = .string(settings.voiceID)
-            case .commandProvider:
-                // The command's {voice} comes from its own provider entry; empty is the command's own.
-                tts["providers"] = .object([settings.providerID: .object(["voice": .string(settings.voiceID)])])
-            }
+        if let automaticYAML, let raw = current.raw {
+            let latest = try await rawConfiguration(profile: profile)
+            guard raw.path == latest.path, raw.digest == latest.digest else { throw VoiceSettingsError.conflict }
+            let result = try await perform(.workspaceConfigRawSet, profile: profile, payload: [
+                "profile": .string(profile), "yaml_text": .string(automaticYAML)
+            ])
+            guard result["ok"]?.boolean == true else { throw VoiceSettingsError.invalidResponse }
         }
-        if let model = settings.model, let spec, let field = spec.modelField {
-            // A merge can't delete a key, so clearing the model restores the default.
-            let value = model.isEmpty ? spec.defaultModel : model
-            if !value.isEmpty { section[field] = .string(value) }
+        if !configPatch.isEmpty {
+            let result = try await perform(.workspaceConfigSet, profile: profile, payload: [
+                "profile": .string(profile), "config": .object(configPatch)
+            ])
+            guard result["ok"]?.boolean == true else { throw VoiceSettingsError.invalidResponse }
         }
-        if let serverURL = settings.serverURL, spec?.supportsServerURL == true {
-            // An empty base_url makes Hermes use the provider's own server.
-            section["base_url"] = .string(serverURL)
-        }
-        // Clearing an inline key is the canonical writer's required step
-        // before saving VOICE_TOOLS_OPENAI_KEY, otherwise config precedence
-        // can continue to select the stale value.
-        if settings.providerID == "openai", settings.apiKey != nil { section["api_key"] = .string("") }
-        if !section.isEmpty { tts[settings.providerID] = .object(section) }
-        let result = try await perform(.workspaceConfigSet, profile: profile, payload: [
-            "profile": .string(profile), "config": .object(["tts": .object(tts)])
-        ])
-        guard result["ok"]?.boolean == true else { throw VoiceSettingsError.invalidResponse }
 
         let verified = try await read(profile: profile)
+        if returnsToAutomatic,
+           verified.raw?.path != current.raw?.path {
+            throw VoiceSettingsError.invalidResponse
+        }
         guard verified.configuration.providerID == settings.providerID,
               let saved = verified.configuration.providers.first(where: { $0.id == settings.providerID }),
               !saved.takesVoice || saved.voiceID == settings.voiceID,
               settings.apiKey == nil || saved.apiKeyConfigured,
               settings.serverURL == nil || saved.serverURL == settings.serverURL else {
             throw VoiceSettingsError.invalidResponse
+        }
+        if let transcription = settings.transcription {
+            guard verified.configuration.transcriptionProviderID == transcription.providerID,
+                  let saved = verified.configuration.transcriptionProviders.first(
+                      where: { $0.id == transcription.providerID }
+                  ) else {
+                throw VoiceSettingsError.invalidResponse
+            }
+            if transcription.apiKey != nil, !saved.apiKeyConfigured {
+                throw VoiceSettingsError.invalidResponse
+            }
+            if let model = transcription.model, saved.model != model {
+                throw VoiceSettingsError.invalidResponse
+            }
         }
         return verified.configuration
     }
@@ -236,6 +391,13 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
 
     private struct ReadState {
         let configuration: VoiceSettingsConfiguration
+        let raw: RawConfiguration?
+    }
+
+    private struct RawConfiguration {
+        let yaml: String
+        let path: String
+        let digest: String
     }
 
     private func read(profile: String) async throws -> ReadState {
@@ -245,9 +407,32 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
         let keys = try await perform(.keysList, profile: profile, payload: [
             "profile": .string(profile)
         ])
-        return ReadState(configuration: try Self.configuration(
-            config: config, keys: keys, agentID: profile
-        ))
+        let raw: RawConfiguration?
+        do {
+            raw = try await rawConfiguration(profile: profile)
+        } catch VoiceSettingsError.unsupported {
+            raw = nil
+        }
+        return ReadState(
+            configuration: try Self.configuration(
+                config: config, keys: keys, agentID: profile, rawDigest: raw?.digest
+            ),
+            raw: raw
+        )
+    }
+
+    private func rawConfiguration(profile: String) async throws -> RawConfiguration {
+        let raw = try await perform(.workspaceConfigRawGet, profile: profile, payload: [
+            "profile": .string(profile)
+        ])
+        guard let yaml = raw["yaml"]?.string,
+              yaml.utf8.count <= DirectHermesHostOperationsClient.maximumRawConfigurationBytes,
+              let path = raw["path"]?.string, Self.validText(path, maximum: 4_096) else {
+            throw VoiceSettingsError.invalidResponse
+        }
+        let digest = SHA256.hash(data: Data((path + "\0" + yaml).utf8))
+            .map { String(format: "%02x", $0) }.joined()
+        return .init(yaml: yaml, path: path, digest: digest)
     }
 
     private static func profile(_ value: String) throws -> String {
@@ -262,7 +447,8 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
     private static func configuration(
         config: [String: BighelpJSONValue],
         keys: [String: BighelpJSONValue],
-        agentID: String
+        agentID: String,
+        rawDigest: String? = nil
     ) throws -> VoiceSettingsConfiguration {
         let tts = config["tts"]?.object ?? [:]
         let selected = normalizedProvider(tts["provider"]?.string)
@@ -288,9 +474,29 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
                 serverURL: spec.supportsServerURL ? try field("base_url", in: section, fallback: "") : ""
             )
         }
+        let stt = config["stt"]?.object ?? [:]
+        let transcriptionProviderID = try normalizedTranscriptionProvider(stt)
+        let transcriptionProviders = try transcriptionProviderSpecs(selected: transcriptionProviderID).map { spec in
+            let section = stt[spec.id]?.object ?? [:]
+            var model = ""
+            if let field = spec.modelField {
+                model = try Self.field(field, in: section, fallback: "")
+                if model.isEmpty, spec.id == "elevenlabs" {
+                    // Keep read compatibility with the direct resolver on older/current Hermes builds.
+                    model = try Self.field("model", in: section, fallback: "")
+                }
+                if model.isEmpty { model = spec.defaultModel }
+            }
+            return VoiceTranscriptionProviderConfiguration(
+                spec: spec,
+                model: model,
+                apiKeyConfigured: transcriptionKeyConfigured(spec, keys: keys)
+            )
+        }
         let revisionInput: [String: BighelpJSONValue] = [
             "agentId": .string(agentID),
             "providerId": .string(selected),
+            "rawConfigDigest": rawDigest.map(BighelpJSONValue.string) ?? .null,
             "providers": .array(providers.map { provider in
                 .object([
                     "providerId": .string(provider.id),
@@ -300,10 +506,24 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
                     "apiKeyConfigured": .boolean(provider.apiKeyConfigured),
                 ])
             }),
+            "transcriptionProviderId": .string(transcriptionProviderID),
+            "transcriptionProviders": .array(transcriptionProviders.map { provider in
+                .object([
+                    "providerId": .string(provider.id),
+                    "model": .string(provider.model),
+                    "apiKeyConfigured": .boolean(provider.apiKeyConfigured),
+                ])
+            }),
         ]
         let bytes = try JSONEncoder.sorted.encode(BighelpJSONValue.object(revisionInput))
         let revision = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
-        return VoiceSettingsConfiguration(revision: revision, providerID: selected, providers: providers)
+        return VoiceSettingsConfiguration(
+            revision: revision,
+            providerID: selected,
+            providers: providers,
+            transcriptionProviderID: transcriptionProviderID,
+            transcriptionProviders: transcriptionProviders
+        )
     }
 
     /// The selected provider first when the app doesn't know it (a speech plugin
@@ -326,6 +546,32 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
             result.insert(spec, at: 0)
         }
         return result
+    }
+
+    private static func transcriptionProviderSpecs(selected: String) -> [VoiceTranscriptionProviderSpec] {
+        var result = VoiceTranscriptionProviderSpec.builtIn
+        if !result.contains(where: { $0.id == selected }), !selected.isEmpty {
+            let spec = selected == "nous"
+                ? VoiceTranscriptionProviderSpec(id: "nous", title: "Nous subscription", kind: .cloud)
+                : VoiceTranscriptionProviderSpec.custom(selected)
+            result.append(spec)
+        }
+        return result
+    }
+
+    private static func normalizedTranscriptionProvider(
+        _ stt: [String: BighelpJSONValue]
+    ) throws -> String {
+        if stt["use_gateway"]?.boolean == true { return "nous" }
+        for key in ["provider", "backend", "cloud_provider"] {
+            guard let value = stt[key]?.string?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !value.isEmpty else {
+                continue
+            }
+            guard validName(value) else { throw VoiceSettingsError.invalidResponse }
+            return value.lowercased()
+        }
+        return ""
     }
 
     private static func validName(_ value: String) -> Bool {
@@ -355,6 +601,58 @@ final class DirectHermesVoiceSettingsClient: VoiceSettingsClient {
         if spec.id == "openai", let inline = section["api_key"]?.string,
            !inline.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
         return spec.keyNames.contains { keys[$0]?.object?["is_set"]?.boolean == true }
+    }
+
+    private static func transcriptionKeyConfigured(
+        _ spec: VoiceTranscriptionProviderSpec,
+        keys: [String: BighelpJSONValue]
+    ) -> Bool {
+        spec.keyNames.contains { keys[$0]?.object?["is_set"]?.boolean == true }
+    }
+
+    /// Hermes writes block-style YAML. Leave hand-written layouts intact if the keys
+    /// cannot be removed without rewriting the rest of the profile.
+    private static func removingSTTSelection(from yaml: String) -> String? {
+        let lines = yaml.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let sttLines = lines.indices.filter { lines[$0].hasPrefix("stt:") }
+        guard sttLines.count == 1, let start = sttLines.first, lines[start] == "stt:" else {
+            return nil
+        }
+        var end = lines.count
+        for index in lines.index(after: start)..<lines.endIndex {
+            let line = lines[index]
+            if line.isEmpty || line.hasPrefix("#") || line.first == " " { continue }
+            end = index
+            break
+        }
+        let selectionLines: Set<String> = ["provider", "backend", "cloud_provider", "use_gateway"]
+        var changed = false
+        var result = lines
+        var index = lines.index(before: end)
+        while index > start {
+            let line = lines[index]
+            let trimmed = line.drop { $0 == " " }
+            let indentation = line.count - trimmed.count
+            if indentation > 0, let colon = trimmed.firstIndex(of: ":") {
+                let name = String(trimmed[..<colon])
+                if indentation == 2, selectionLines.contains(name) {
+                    result.remove(at: index)
+                    changed = true
+                }
+            }
+            index = result.index(before: index)
+        }
+        guard changed else { return nil }
+        let removedCount = lines.count - result.count
+        if !result[(start + 1)..<(end - removedCount)].contains(where: {
+            let text = $0.trimmingCharacters(in: .whitespaces)
+            return !text.isEmpty && !text.hasPrefix("#")
+        }) {
+            result[start] = "stt: {}"
+        }
+        let trailingNewline = yaml.hasSuffix("\n")
+        let updated = result.joined(separator: "\n")
+        return trailingNewline && !updated.hasSuffix("\n") ? updated + "\n" : updated
     }
 
     private static func validText(_ value: String, maximum: Int, allowEmpty: Bool = false) -> Bool {
@@ -482,6 +780,8 @@ private extension JSONEncoder {
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         return encoder
     }
+
+
 }
 
 enum DirectHermesVoiceError: Error, Equatable, LocalizedError, Sendable {

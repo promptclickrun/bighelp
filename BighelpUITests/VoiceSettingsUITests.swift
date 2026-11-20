@@ -50,6 +50,72 @@ final class VoiceSettingsUITests: BighelpUITestCase {
         }
     }
 
+    /// The computer's speech-to-text row follows the settings hierarchy in every shipped reading size/language.
+    @MainActor
+    func testScribeProviderSettingsInLightDarkAndLargeText() {
+        let variants: [(language: String, appearance: String, size: String?)] = [
+            ("en", "light", nil),
+            ("en", "dark", nil),
+            ("de", "light", "XXL"),
+            ("zh-Hans", "dark", "AccessibilityXXXL"),
+        ]
+        for variant in variants {
+            var extra = [
+                "-bighelp.voice.transcription", "hermes",
+                "-loopdy.voice.conversation-mode", "turnBased",
+                "-AppleLanguages", "(\(variant.language))",
+                "-AppleLocale", locale(for: variant.language),
+            ]
+            if let size = variant.size {
+                extra += ["-UIPreferredContentSizeCategoryName",
+                          "UICTContentSizeCategory\(size)"]
+            }
+            let app = launch(variant.appearance, extra: extra)
+            XCTAssertTrue(app.buttons["chat.attachment"].waitForExistence(timeout: 15))
+            openVoiceSettings(app)
+            XCTAssertTrue(app.segmentedControls["voice.settings.conversation-mode"]
+                .waitForExistence(timeout: 5))
+
+            let provider = app.buttons["voice.settings.transcription-provider"]
+            for _ in 0..<12 where !(provider.exists && provider.isHittable) {
+                app.swipeUp(velocity: .slow)
+                _ = provider.waitForExistence(timeout: 2)
+            }
+            XCTAssertTrue(provider.waitForExistence(timeout: 10))
+            provider.tap()
+
+            let automatic = app.buttons["voice.transcription-provider.automatic"]
+            let scribe = app.buttons["voice.transcription-provider.elevenlabs"]
+            let hostCommand = app.buttons["voice.transcription-provider.parakeet"]
+            XCTAssertTrue(automatic.waitForExistence(timeout: 10))
+            for _ in 0..<12 where !scribe.exists { app.swipeUp(velocity: .slow) }
+            XCTAssertTrue(scribe.waitForExistence(timeout: 10))
+            let suffix = variant.size.map { "-\($0)" } ?? ""
+            save("voice-transcription-providers-\(variant.language)-\(variant.appearance)\(suffix)", app)
+            if variant.size == nil {
+                for _ in 0..<8 where !hostCommand.exists { app.swipeUp(velocity: .slow) }
+                XCTAssertTrue(hostCommand.waitForExistence(timeout: 10))
+            }
+            if variant.size == nil {
+                for _ in 0..<8 where !scribe.isHittable { app.swipeDown(velocity: .slow) }
+            }
+            scribe.tap()
+
+            let model = app.buttons["voice.settings.transcription-model"]
+            for _ in 0..<8 where !(model.exists && model.isHittable) {
+                app.swipeUp(velocity: .slow)
+                _ = model.waitForExistence(timeout: 2)
+            }
+            XCTAssertTrue(model.waitForExistence(timeout: 10))
+            XCTAssertTrue(app.secureTextFields["voice.settings.transcription-api-key"].exists,
+                          "The shared ElevenLabs key field stays available for replacement")
+            let screen = app.windows.firstMatch.frame
+            XCTAssertLessThanOrEqual(model.frame.maxX, screen.maxX)
+            save("voice-transcription-scribe-\(variant.language)-\(variant.appearance)\(suffix)", app)
+            app.terminate()
+        }
+    }
+
     /// Settings › Voice › Advanced shows only in Nerd Mode, with both switches off and Restart sound disabled
     /// while no call is in progress.
     @MainActor
@@ -232,5 +298,9 @@ final class VoiceSettingsUITests: BighelpUITestCase {
         guard let folder = ProcessInfo.processInfo.environment["BIGHELP_VOICE_EVIDENCE"] else { return }
         try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
         try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: folder).appendingPathComponent("\(name).png"))
+    }
+
+    private func locale(for language: String) -> String {
+        ["en": "en_US", "de": "de_DE", "zh-Hans": "zh_CN"][language] ?? language
     }
 }

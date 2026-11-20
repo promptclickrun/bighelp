@@ -41,6 +41,7 @@ struct DirectHermesVoiceClientTests {
         #expect(transport.voiceCalls == [
             .init(operation: .workspaceConfigGet, payload: ["profile": .string("finance")], owner: owner),
             .init(operation: .keysList, payload: ["profile": .string("finance")], owner: owner),
+            .init(operation: .workspaceConfigRawGet, payload: ["profile": .string("finance")], owner: owner),
         ])
     }
 
@@ -80,6 +81,7 @@ struct DirectHermesVoiceClientTests {
         #expect(transport.voiceCalls == [
             .init(operation: .workspaceConfigGet, payload: ["profile": .string("finance")], owner: owner),
             .init(operation: .keysList, payload: ["profile": .string("finance")], owner: owner),
+            .init(operation: .workspaceConfigRawGet, payload: ["profile": .string("finance")], owner: owner),
             .init(operation: .keysSet, payload: [
                 "profile": .string("finance"), "key": .string("ELEVENLABS_API_KEY"),
                 "value": .string("sk-test-secret"),
@@ -95,7 +97,193 @@ struct DirectHermesVoiceClientTests {
             ], owner: owner),
             .init(operation: .workspaceConfigGet, payload: ["profile": .string("finance")], owner: owner),
             .init(operation: .keysList, payload: ["profile": .string("finance")], owner: owner),
+            .init(operation: .workspaceConfigRawGet, payload: ["profile": .string("finance")], owner: owner),
         ])
+    }
+
+    @Test func directSettingsDiscoversAndSavesScribeWithoutWritingTTS() async throws {
+        let owner = try Self.owner()
+        let transport = DirectHermesVoiceTransportFixture(owner: owner)
+        transport.results[WorkspaceOperation.workspaceConfigGet.rawValue] = Self.configResponse()
+        transport.results[WorkspaceOperation.keysList.rawValue] = Self.keysResponse(openAI: true, elevenLabs: false)
+        transport.results[WorkspaceOperation.workspaceConfigSet.rawValue] = ["ok": .boolean(true)]
+        transport.results[WorkspaceOperation.keysSet.rawValue] = ["ok": .boolean(true)]
+        transport.results[WorkspaceOperation.workspaceConfigSchema.rawValue] = Self.schemaResponse()
+        let saved = Self.configResponse(
+            sttProviderID: "elevenlabs",
+            scribeModel: "scribe_v1"
+        )
+        transport.sequences[WorkspaceOperation.workspaceConfigGet.rawValue] = [
+            Self.configResponse(), Self.configResponse(), saved,
+        ]
+        transport.sequences[WorkspaceOperation.keysList.rawValue] = [
+            Self.keysResponse(openAI: true, elevenLabs: false),
+            Self.keysResponse(openAI: true, elevenLabs: false),
+            Self.keysResponse(openAI: true, elevenLabs: true),
+        ]
+        let client = DirectHermesVoiceSettingsClient(
+            workspace: transport, owner: owner, currentOwner: { owner }
+        )
+        let baseline = try await client.load(agentID: "finance")
+        let catalog = try await client.transcriptionCatalog(agentID: "finance")
+        #expect(catalog.providers.map(\.id).contains("elevenlabs"))
+        transport.resetCalls()
+
+        let result = try await client.update(agentID: "finance", settings: .init(
+            expectedRevision: baseline.revision,
+            providerID: baseline.providerID,
+            voiceID: baseline.providers.first(where: { $0.id == baseline.providerID })?.voiceID ?? "",
+            apiKey: nil,
+            transcription: .init(
+                providerID: "elevenlabs",
+                apiKey: "fixture-elevenlabs-key",
+                model: "scribe_v1"
+            )
+        ))
+
+        #expect(result.providerID == "openai")
+        #expect(result.transcriptionProviderID == "elevenlabs")
+        #expect(transport.voiceCalls.contains(.init(
+            operation: .keysSet,
+            payload: [
+                "profile": .string("finance"),
+                "key": .string("ELEVENLABS_API_KEY"),
+                "value": .string("fixture-elevenlabs-key"),
+            ],
+            owner: owner
+        )))
+        #expect(transport.voiceCalls.contains(.init(
+            operation: .workspaceConfigSet,
+            payload: [
+                "profile": .string("finance"),
+                "config": .object([
+                    "stt": .object([
+                        "provider": .string("elevenlabs"),
+                        "use_gateway": .boolean(false),
+                        "elevenlabs": .object([
+                            "model_id": .string("scribe_v1"),
+                            "model": .string("scribe_v1"),
+                        ]),
+                    ]),
+                ]),
+            ],
+            owner: owner
+        )))
+        #expect(!transport.voiceCalls.contains {
+            $0.operation == .workspaceConfigSet
+                && $0.payload["config"]?.object?["tts"] != nil
+        })
+    }
+
+    @Test func directSettingsCanReturnSTTToAutomaticWithARevisionGuardedProfileWrite() async throws {
+        let owner = try Self.owner()
+        let transport = DirectHermesVoiceTransportFixture(owner: owner)
+        let selected = Self.configResponse(sttProviderID: "elevenlabs")
+        let automatic = Self.configResponse()
+        transport.sequences[WorkspaceOperation.workspaceConfigGet.rawValue] = [
+            selected, selected, automatic,
+        ]
+        transport.results[WorkspaceOperation.keysList.rawValue] =
+            Self.keysResponse(openAI: true, elevenLabs: true)
+        transport.results[WorkspaceOperation.workspaceConfigRawSet.rawValue] = ["ok": .boolean(true)]
+        transport.sequences[WorkspaceOperation.workspaceConfigRawGet.rawValue] = [
+            Self.rawResponse(provider: "elevenlabs"),
+            Self.rawResponse(provider: "elevenlabs"),
+            Self.rawResponse(provider: "elevenlabs"),
+            Self.rawResponse(provider: nil),
+        ]
+        let client = DirectHermesVoiceSettingsClient(
+            workspace: transport, owner: owner, currentOwner: { owner }
+        )
+        let baseline = try await client.load(agentID: "finance")
+
+        transport.resetCalls()
+        let result = try await client.update(agentID: "finance", settings: .init(
+            expectedRevision: baseline.revision,
+            providerID: baseline.providerID,
+            voiceID: baseline.providers.first(where: { $0.id == baseline.providerID })?.voiceID ?? "",
+            apiKey: nil,
+            transcription: .init(providerID: "", apiKey: nil, model: nil)
+        ))
+
+        #expect(result.transcriptionProviderID.isEmpty)
+        let rawWrite = try #require(transport.voiceCalls.first {
+            $0.operation == .workspaceConfigRawSet
+        })
+        #expect(rawWrite.payload["profile"] == .string("finance"))
+        let yaml = try #require(rawWrite.payload["yaml_text"]?.string)
+        #expect(yaml.contains("tts:"))
+        #expect(yaml.contains("provider: openai"))
+        #expect(yaml.contains("elevenlabs-stt-marker"))
+        #expect(!yaml.contains("\n  provider: elevenlabs\n"))
+    }
+
+    @Test func automaticNeverReplacesTheProfileFromTheWebSettingsProjection() async throws {
+        let owner = try Self.owner()
+        let transport = DirectHermesVoiceTransportFixture(owner: owner)
+        transport.results[WorkspaceOperation.workspaceConfigGet.rawValue] =
+            Self.configResponse(sttProviderID: "elevenlabs")
+        transport.results[WorkspaceOperation.keysList.rawValue] = Self.keysResponse(openAI: true, elevenLabs: true)
+        var raw = Self.rawResponse(provider: nil)
+        raw["yaml"] = .string("""
+            model: {default: fixture-model, provider: fixture-provider, base_url: https://example.invalid}
+            stt: {provider: elevenlabs, language: en}
+            """)
+        transport.results[WorkspaceOperation.workspaceConfigRawGet.rawValue] = raw
+        let client = DirectHermesVoiceSettingsClient(workspace: transport, owner: owner, currentOwner: { owner })
+        let baseline = try await client.load(agentID: "finance")
+        transport.resetCalls()
+        await #expect(throws: VoiceSettingsError.unsupported) {
+            try await client.update(agentID: "finance", settings: .init(
+                expectedRevision: baseline.revision, providerID: baseline.providerID,
+                voiceID: baseline.providers.first(where: { $0.id == baseline.providerID })?.voiceID ?? "",
+                apiKey: nil, transcription: .init(providerID: "", apiKey: nil, model: nil)
+            ))
+        }
+        #expect(!transport.voiceCalls.contains { $0.operation == .workspaceConfigRawSet })
+    }
+
+    @Test func directSettingsCanChooseACustomProviderDiscoveredByHermes() async throws {
+        let owner = try Self.owner()
+        let transport = DirectHermesVoiceTransportFixture(owner: owner)
+        let baseline = Self.configResponse()
+        var saved = baseline
+        saved["stt"] = .object(["provider": .string("parakeet")])
+        transport.sequences[WorkspaceOperation.workspaceConfigGet.rawValue] = [
+            baseline, baseline, saved,
+        ]
+        transport.results[WorkspaceOperation.keysList.rawValue] =
+            Self.keysResponse(openAI: true, elevenLabs: false)
+        transport.results[WorkspaceOperation.workspaceConfigSchema.rawValue] = Self.schemaResponse()
+        transport.results[WorkspaceOperation.workspaceConfigSet.rawValue] = ["ok": .boolean(true)]
+        let client = DirectHermesVoiceSettingsClient(
+            workspace: transport, owner: owner, currentOwner: { owner }
+        )
+        let loaded = try await client.load(agentID: "finance")
+        transport.resetCalls()
+
+        let result = try await client.update(agentID: "finance", settings: .init(
+            expectedRevision: loaded.revision,
+            providerID: loaded.providerID,
+            voiceID: loaded.providers.first(where: { $0.id == loaded.providerID })?.voiceID ?? "",
+            apiKey: nil,
+            transcription: .init(providerID: "parakeet", apiKey: nil, model: nil)
+        ))
+
+        #expect(result.transcriptionProviderID == "parakeet")
+        #expect(transport.voiceCalls.contains(.init(
+            operation: .workspaceConfigSet,
+            payload: [
+                "profile": .string("finance"),
+                "config": .object([
+                    "stt": .object([
+                        "provider": .string("parakeet"),
+                        "use_gateway": .boolean(false),
+                    ]),
+                ]),
+            ],
+            owner: owner
+        )))
     }
 
     @Test func directSettingsDoesNotAcceptAResultAfterOwnerChanges() async throws {
@@ -705,9 +893,11 @@ private extension DirectHermesVoiceClientTests {
         providerID: String = "openai",
         openAIVoice: String = "alloy",
         elevenLabsVoice: String = "pNInz6obpgDQGcFmaJgB",
-        openAIInlineKey: String = ""
+        openAIInlineKey: String = "",
+        sttProviderID: String = "",
+        scribeModel: String = "scribe_v2"
     ) -> [String: BighelpJSONValue] {
-        [
+        var result: [String: BighelpJSONValue] = [
             "tts": .object([
                 "provider": .string(providerID),
                 "openai": .object([
@@ -716,6 +906,47 @@ private extension DirectHermesVoiceClientTests {
                 ]),
                 "elevenlabs": .object(["voice_id": .string(elevenLabsVoice)]),
             ]),
+        ]
+        if !sttProviderID.isEmpty {
+            result["stt"] = .object([
+                "provider": .string(sttProviderID),
+                sttProviderID: .object([
+                    "model_id": .string(scribeModel),
+                    "model": .string(scribeModel),
+                ]),
+            ])
+        }
+        return result
+    }
+
+    static func schemaResponse() -> [String: BighelpJSONValue] {
+        [
+            "fields": .object([
+                "stt.provider": .object([
+                    "type": .string("select"),
+                    "options": .array(["local", "openai", "elevenlabs", "parakeet"].map {
+                        BighelpJSONValue.string($0)
+                    }),
+                ]),
+                "stt.elevenlabs.model_id": .object([
+                    "type": .string("select"),
+                    "options": .array(["scribe_v2", "scribe_v1"].map(BighelpJSONValue.string)),
+                ]),
+            ]),
+            "category_order": .array([]),
+        ]
+    }
+
+    static func rawResponse(provider: String?) -> [String: BighelpJSONValue] {
+        let selection = provider.map { "  provider: \($0)\n  elevenlabs-stt-marker: true\n" } ?? ""
+        return [
+            "yaml": .string("""
+            tts:
+              provider: openai
+            stt:
+            \(selection)  language: en
+            """),
+            "path": .string("/fixture/Hermes/Profiles/finance/config.yaml"),
         ]
     }
 
@@ -771,7 +1002,9 @@ private final class DirectHermesVoiceTransportFixture: WorkspaceOperationPerform
         payload: [String: BighelpJSONValue],
         owner: WorkspaceOwner
     ) async throws -> [String: BighelpJSONValue] {
-        guard [.workspaceConfigGet, .workspaceConfigSet, .keysList, .keysSet, .voiceSpeak, .voiceWarm, .voiceCatalog]
+        guard [.workspaceConfigGet, .workspaceConfigSet, .workspaceConfigSchema,
+               .workspaceConfigRawGet, .workspaceConfigRawSet,
+               .keysList, .keysSet, .voiceSpeak, .voiceWarm, .voiceCatalog]
             .contains(operation) else {
             throw WorkspaceClientError.unavailable(.unsupportedOperation)
         }
@@ -782,6 +1015,9 @@ private final class DirectHermesVoiceTransportFixture: WorkspaceOperationPerform
             let value = sequence.removeFirst()
             sequences[operation.rawValue] = sequence
             return value
+        }
+        if operation == .workspaceConfigRawGet, results[operation.rawValue] == nil {
+            return DirectHermesVoiceClientTests.rawResponse(provider: nil)
         }
         return results[operation.rawValue] ?? [:]
     }

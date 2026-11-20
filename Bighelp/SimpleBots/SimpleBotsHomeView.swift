@@ -25,7 +25,7 @@ struct SimpleBotsContext {
     var activitySource: BotChatActivitySource? = nil
     /// The first tab's Bots | Chats switch; nil on a page that isn't the home (a section).
     var viewSwitch: HomeViewSwitch? = nil
-    /// Opens or closes the sidebar, where there is one (iPad at regular width, Mac, Vision Pro).
+    /// Opens or closes an in-content sidebar on iPad or Vision Pro. Mac uses its native title bar.
     var onToggleSidebar: (() -> Void)? = nil
     /// The sections, and group chats' pins and hides (`FleetStore`); nil leaves sections out.
     var fleet: FleetStore? = nil

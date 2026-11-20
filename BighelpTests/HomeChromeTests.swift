@@ -61,6 +61,28 @@ struct HomeChromeTests {
         #expect(HomeHeaderRowLayout.requiredWidth(leading: 44, middle: 120, trailing: 96, spacing: 8) == 328)
     }
 
+    @Test(arguments: HomeSidebarSurface.allCases)
+    func macKeepsOneNativeSidebarControlOnEverySurface(_ surface: HomeSidebarSurface) {
+        for isOpen in [false, true] {
+            #expect(!HomeSidebarControlPolicy.showsInContent(
+                on: surface, sidebarAvailable: true, isMac: true, sidebarOpen: isOpen
+            ))
+            #expect(HomeSidebarControlPolicy.showsNativeTitlebarControl(
+                sidebarAvailable: true, isMac: true, sidebarOpen: isOpen
+            ))
+        }
+    }
+
+    @Test(arguments: HomeSidebarSurface.allCases)
+    func iPadAndVisionKeepTheirContentSidebarControl(_ surface: HomeSidebarSurface) {
+        #expect(HomeSidebarControlPolicy.showsInContent(
+            on: surface, sidebarAvailable: surface != .chat, isMac: false, sidebarOpen: false
+        ) == (surface != .chat))
+        #expect(!HomeSidebarControlPolicy.showsNativeTitlebarControl(
+            sidebarAvailable: true, isMac: false, sidebarOpen: false
+        ))
+    }
+
     private func header() -> HomeHeaderContext {
         HomeHeaderContext(personName: "Sam", personImageURL: nil, onOpenSettings: {})
     }

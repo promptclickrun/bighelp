@@ -22,6 +22,34 @@ struct HomeHeaderComputer {
     var isShown: Bool { hosts.count >= 2 }
 }
 
+enum HomeSidebarSurface: CaseIterable, Sendable {
+    case bots, chats, today, work, chat
+}
+
+enum HomeSidebarControlPolicy {
+    /// A content control belongs on iPad and Vision Pro. Mac Catalyst already has the scene-level
+    /// native toolbar control, and a pushed chat has no home header control on any platform.
+    static func showsInContent(
+        on surface: HomeSidebarSurface,
+        sidebarAvailable: Bool,
+        isMac: Bool,
+        sidebarOpen: Bool
+    ) -> Bool {
+        _ = sidebarOpen
+        return sidebarAvailable && !isMac && surface != .chat
+    }
+
+    /// Open or closed, one Mac title-bar control owns the sidebar.
+    static func showsNativeTitlebarControl(
+        sidebarAvailable: Bool,
+        isMac: Bool,
+        sidebarOpen: Bool
+    ) -> Bool {
+        _ = sidebarOpen
+        return sidebarAvailable && isMac
+    }
+}
+
 /// What a home root's header draws. Each root hides the navigation bar and draws this on top.
 @MainActor
 struct HomeHeaderContext {
@@ -40,7 +68,8 @@ struct HomeHeaderContext {
     var trailing: AnyView? = nil
     /// Today and Work with two or more computers.
     var computer: HomeHeaderComputer? = nil
-    /// iPad at regular width, Mac and Vision Pro: opens or closes the sidebar.
+    /// iPad at regular width and Vision Pro: opens or closes an in-content sidebar.
+    /// Mac owns this action in its native title bar.
     var onToggleSidebar: (() -> Void)? = nil
 
     /// What sits beside the person's circle.

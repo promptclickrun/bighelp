@@ -93,7 +93,10 @@ extension RootShellView {
             activity: botChatActivity,
             activitySource: botChatActivitySource,
             viewSwitch: homeViewSwitch,
-            onToggleSidebar: sidebarIsAvailable ? { isHomeDrawerPresented.toggle() } : nil,
+            onToggleSidebar: HomeSidebarControlPolicy.showsInContent(
+                on: .bots, sidebarAvailable: sidebarIsAvailable, isMac: BighelpPlatform.isMac,
+                sidebarOpen: isHomeDrawerPresented
+            ) ? { isHomeDrawerPresented.toggle() } : nil,
             fleet: fleet,
             onNewGroupChat: newGroupChatAction,
             onGroupSettings: { roomID in

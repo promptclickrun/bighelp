@@ -622,6 +622,11 @@ protocol SessionCatalogClient {
     /// A coding session: a new direct chat in exactly `folder`, named `title`, on `runtime`'s model choices.
     func createSession(agentID: String, folder: String, title: String,
                        runtime: SessionStartRuntime) async throws -> SessionRecord
+    /// A coding launch retries create with the same persisted intent key.
+    func createSession(agentID: String, folder: String, title: String,
+                       runtime: SessionStartRuntime, creationID: UUID) async throws -> SessionRecord
+    /// The exact host folder a coding session's create receipt/catalog binding confirmed.
+    func folder(for sessionID: String) -> String?
     func hydrate(_ record: SessionRecord) async throws -> SessionRecord
     func hydrate(
         _ record: SessionRecord,
@@ -672,6 +677,13 @@ extension SessionCatalogClient {
                        runtime: SessionStartRuntime) async throws -> SessionRecord {
         throw WorkspaceClientError.unavailable(.unsupportedOperation)
     }
+
+    func createSession(agentID: String, folder: String, title: String,
+                       runtime: SessionStartRuntime, creationID: UUID) async throws -> SessionRecord {
+        try await createSession(agentID: agentID, folder: folder, title: title, runtime: runtime)
+    }
+
+    func folder(for sessionID: String) -> String? { nil }
 
     func rename(_ record: SessionRecord, title: String) async throws {
         throw SessionCatalogError.invalidSession

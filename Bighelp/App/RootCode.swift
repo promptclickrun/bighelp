@@ -37,7 +37,10 @@ extension RootShellView {
         let defaults = agentRuntimeDefaults
         let features = featureStore
         codeHome = CodeHomeStore(scopeID: scope, agentID: workspaceAgentID, source: source, git: git,
-                                 starter: CodeChatSessionStarter(catalog: sessionCatalog, features: features),
+                                 starter: CodeChatSessionStarter(
+                                    catalog: sessionCatalog,
+                                    features: features
+                                 ),
                                  loadModels: { try await defaults.loadModelProviders(agentID: $0) },
                                  loadCommands: { try await features.draftSlashCommands(agentID: $0, folder: $1) })
     }

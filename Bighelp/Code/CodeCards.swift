@@ -155,8 +155,8 @@ struct CodeSessionCard: View {
     @BighelpThemeReader private var theme
 }
 
-/// A send that's still making its worktree or session, or couldn't. A failed one keeps its
-/// message and can go again, after a relaunch too.
+/// A send that's still making its worktree or session, failed definitely, or needs its host
+/// outcome checked. The card keeps the complete message across relaunches.
 struct CodeLaunchCard: View {
     let launch: CodeLaunch
     let onRetry: () -> Void
@@ -164,7 +164,7 @@ struct CodeLaunchCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: BighelpTokens.space12) {
-            CodeStatusDot(status: isFailed ? .failed("") : .starting(""))
+            CodeStatusDot(status: status)
             VStack(alignment: .leading, spacing: BighelpTokens.space4) {
                 Text(launch.title)
                     .font(.bighelp(.headline))
@@ -182,6 +182,13 @@ struct CodeLaunchCard: View {
                         Button("Dismiss", action: onDismiss)
                             .font(.bighelp(.subheadline).weight(.semibold))
                             .accessibilityIdentifier("code.launch.dismiss")
+                    } else if case .needsRecovery(let reason) = launch.step {
+                        Image(systemName: "questionmark.circle.fill").foregroundStyle(theme.warning)
+                        Text(reason).foregroundStyle(theme.secondaryText)
+                        Spacer(minLength: 0)
+                        Button("Check again", action: onRetry)
+                            .font(.bighelp(.subheadline).weight(.semibold))
+                            .accessibilityIdentifier("code.launch.check")
                     } else {
                         CodePill(text: "Starting", tint: theme.action)
                         Text(stepText).foregroundStyle(theme.primaryText)
@@ -197,7 +204,8 @@ struct CodeLaunchCard: View {
         .background(theme.surface, in: .rect(cornerRadius: BighelpTokens.radius16))
         .overlay {
             RoundedRectangle(cornerRadius: BighelpTokens.radius16)
-                .stroke(isFailed ? theme.border : theme.action.opacity(0.5), lineWidth: isFailed ? BighelpTokens.hairline : 1.5)
+                .stroke(isFailed ? theme.border : (needsRecovery ? theme.warning.opacity(0.5) : theme.action.opacity(0.5)),
+                        lineWidth: isFailed ? BighelpTokens.hairline : 1.5)
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("code.launch")
@@ -208,12 +216,25 @@ struct CodeLaunchCard: View {
         return false
     }
 
+    private var needsRecovery: Bool {
+        if case .needsRecovery = launch.step { return true }
+        return false
+    }
+
+    private var status: CodeSessionStatus {
+        if isFailed { return .failed("") }
+        if needsRecovery { return .needsYou("") }
+        return .starting("")
+    }
+
     private var stepText: String {
         switch launch.step {
         case .makingWorktree: "Making the worktree…"
         case .switchingBranch: "Switching the branch…"
         case .startingSession: "Starting the session…"
+        case .readyToSend: "Preparing the session…"
         case .sending, .failed: "Sending your message…"
+        case .needsRecovery: "Checking the saved send…"
         }
     }
 

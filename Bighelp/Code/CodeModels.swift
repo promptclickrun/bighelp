@@ -110,19 +110,34 @@ struct CodeSessionRecord: Codable, Identifiable, Equatable, Sendable {
     var batchID: UUID?
 }
 
-/// A send that hasn't become a session yet, or couldn't. Kept on this device, so a send that
-/// failed is still here after the app reopens: the card says why, and the message goes again on
-/// Try again. A launch's message is the person's own text, so losing the card means losing it.
+/// The exact host folder and branch one launch owns. It is saved before git is changed, so a retry
+/// can validate and resume that destination instead of creating another one with a similar name.
+struct CodeLaunchDestination: Codable, Equatable, Sendable {
+    let folder: String
+    let branch: String?
+    let placement: CodePlacement
+}
+
+/// A send that hasn't become a session yet, or whose create/send outcome is still recoverable.
+/// Kept on this device, so a known failure can retry and an uncertain result can be checked without
+/// resubmitting. A launch's message is the person's own text, so losing the card means losing it.
 struct CodeLaunch: Codable, Identifiable, Equatable, Sendable {
     enum Step: Codable, Equatable, Sendable {
         case makingWorktree
         case switchingBranch
         case startingSession
+        case readyToSend
         case sending
         case failed(String)
+        case needsRecovery(String)
 
         var isFailed: Bool {
             if case .failed = self { return true }
+            return false
+        }
+
+        var needsRecovery: Bool {
+            if case .needsRecovery = self { return true }
             return false
         }
     }
@@ -130,23 +145,32 @@ struct CodeLaunch: Codable, Identifiable, Equatable, Sendable {
     let id: UUID
     let title: String
     let projectID: String
+    /// Optional for launches saved by 2.6.95; the selected project supplies these after that.
+    var projectName: String? = nil
+    var projectFolder: String? = nil
     /// What Send asked for, kept whole so Try again sends exactly the same thing.
     let job: CodeStagedJob
     var step: Step
+    /// The launch's exact requested time, when available. Used to bound idempotent create recovery.
+    var startedAt: Date? = nil
+    /// Persisted before the matching git action; worktree/session retries validate this destination.
+    var destination: CodeLaunchDestination? = nil
     /// Set once Hermes has the session, so a failed send still opens it.
-    var sessionID: String?
+    var sessionID: String? = nil
+    /// Correlates the local send with the chat's durable submission journal and optimistic row.
+    var submissionID: UUID? = nil
     /// The batch it belongs to (Send all), if any.
-    var batchID: UUID?
+    var batchID: UUID? = nil
 
     /// The branch the card shows: Local's, as the checkout had it when Send went.
-    var branchLabel: String?
+    var branchLabel: String? = nil
 
     /// A send that was under way when the app closed can never finish on its own: the step it
     /// waited for was a request in a process that's gone.
     static let interruptedReason = String(localized: "The app closed before this send finished.")
 
     var placement: CodePlacement { job.placement }
-    var branch: String? { branchLabel }
+    var branch: String? { destination?.branch ?? branchLabel }
 }
 
 /// What a card says about its session, from the live chat (never guessed).

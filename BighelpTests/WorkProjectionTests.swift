@@ -152,6 +152,34 @@ struct WorkProjectionTests {
         #expect(WorkProjection.items(sources).map(\.id) == ["coding:s1"])
     }
 
+    @Test func aSessionBackedLaunchRemainsReachableForRecovery() {
+        let job = CodeStagedJob(
+            id: UUID(), message: "Keep the full message", agentID: "a", projectID: "app",
+            placement: .newWorktree, branch: "main", newBranch: "code/keep-message",
+            runtime: CodeRuntimeChoice(), mode: .standard
+        )
+        let launch = CodeLaunch(
+            id: UUID(), title: job.title, projectID: "app", projectName: "app",
+            projectFolder: "/work/app", job: job, step: .needsRecovery("Delivery is unconfirmed"),
+            startedAt: now, destination: CodeLaunchDestination(
+                folder: "/work/app/.worktrees/keep-message", branch: "code/keep-message",
+                placement: .newWorktree
+            ), sessionID: "session-1", submissionID: UUID()
+        )
+        var sources = WorkSources(now: now)
+        sources.codeLaunches = [launch]
+        sources.chatWork = [
+            DashboardWorkItem(sessionID: "session-1", title: "Session 1", subtitle: "Working")
+        ]
+
+        let items = WorkProjection.items(sources)
+        let item = items.first
+        #expect(items.count == 1, "The launch and its live chat are one recovery item.")
+        #expect(item?.target == .codeSession("session-1"))
+        #expect(item?.bucket == .needsYou)
+        #expect(item?.card == .launch(launch))
+    }
+
     @Test func aBatchNeedsYouWhenAnyOfItsSessionsDoes() {
         let batch = CodeBatch(id: UUID(), projectID: "app", title: "Batch", createdAt: now, jobCount: 2,
                               sessionIDs: ["x", "y"], messages: [])

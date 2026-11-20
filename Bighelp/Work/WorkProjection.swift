@@ -48,6 +48,7 @@ enum WorkProjection {
         // A Code session's chat is also a chat with active work: its card already says so.
         let codeIDs = Set(sources.codeSessions.map(\.record.id))
             .union(sources.codeBatches.flatMap(\.batch.sessionIDs))
+            .union(sources.codeLaunches.compactMap(\.sessionID))
         items += sources.chatWork.filter { !codeIDs.contains($0.sessionID) }.map(chatItem)
         items += sources.background.map { backgroundItem(profileID: $0.key, work: $0.value, sources: sources) }
         items += workflowItems(sources)
@@ -118,7 +119,12 @@ enum WorkProjection {
     }
 
     private static func launchItem(_ launch: CodeLaunch) -> WorkItem {
-        let status: CodeSessionStatus = launch.step.isFailed ? .failed("") : .starting("")
+        let status: CodeSessionStatus
+        switch launch.step {
+        case .failed: status = .failed("")
+        case .needsRecovery: status = .needsYou("")
+        default: status = .starting("")
+        }
         return WorkItem(kind: .coding, id: "launch:" + launch.id.uuidString, title: launch.title, pill: nil,
                         line: "", lineSymbol: "arrow.triangle.branch", bot: nil, time: nil,
                         bucket: bucket(for: status), tone: tone(for: status), projectID: launch.projectID,
@@ -300,14 +306,19 @@ extension WorkSources {
     }
 
     private mutating func readCode(_ code: CodeHomeStore, reader: any CodeSessionStatusReading) {
-        codeSessions = code.sessions.filter { $0.batchID == nil }.map { record in
+        let recoverySessionIDs = Set(code.launches.filter { $0.batchID == nil }.compactMap(\.sessionID))
+        codeSessions = code.sessions.filter { $0.batchID == nil && !recoverySessionIDs.contains($0.id) }.map { record in
             // The store reads git for its selected project only.
             let pullRequest = record.projectID == code.projectID
                 ? record.branch.flatMap { branch in code.git?.pullRequests.first { $0.branch == branch } } : nil
             return WorkCodeSession(record: record, status: code.status(of: record, reader: reader),
                                    pullRequest: pullRequest)
         }
-        codeLaunches = code.launches.filter { $0.sessionID == nil && $0.batchID == nil }
+        // Batch jobs normally stay on their combined card. Once one needs a retry or a delivery
+        // check, keep its own recovery controls reachable from Work too.
+        codeLaunches = code.launches.filter {
+            $0.batchID == nil || $0.step.isFailed || $0.step.needsRecovery
+        }
         // As Code home's batch card: its sessions, then its jobs still starting.
         codeBatches = code.batches.map { batch in
             let members = CodeBatchMember.members(of: batch, sessions: code.sessions)
@@ -318,8 +329,11 @@ extension WorkSources {
                                   .map { code.status(of: $0, reader: reader) } ?? .ready)
             } + pending.enumerated().map { offset, launch in
                 WorkBatchLine(id: launch.id.uuidString, title: launch.title, index: members.count + offset,
-                              status: launch.step.isFailed ? .failed(String(localized: "Couldn't start"))
-                                  : .starting(String(localized: "Setting up")))
+                              status: launch.step.isFailed
+                                  ? .failed(String(localized: "Couldn't start"))
+                                  : launch.step.needsRecovery
+                                      ? .needsYou(String(localized: "Check this send"))
+                                      : .starting(String(localized: "Setting up")))
             }
             return WorkCodeBatch(batch: batch, lines: lines, startedCount: members.count)
         }

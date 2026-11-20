@@ -712,13 +712,28 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     /// another folder: work meant for a worktree must not land somewhere else.
     func createSession(agentID: String, folder: String, title: String,
                        runtime: SessionStartRuntime) async throws -> SessionRecord {
+        try await createCodingSession(agentID: agentID, folder: folder, title: title,
+                                      runtime: runtime, creationID: nil)
+    }
+
+    func createSession(agentID: String, folder: String, title: String,
+                       runtime: SessionStartRuntime, creationID: UUID) async throws -> SessionRecord {
+        try await createCodingSession(agentID: agentID, folder: folder, title: title,
+                                      runtime: runtime, creationID: creationID)
+    }
+
+    private func createCodingSession(agentID: String, folder: String, title: String,
+                                     runtime: SessionStartRuntime, creationID: UUID?) async throws -> SessionRecord {
         try DirectHermesSessionValidation.hostPath(folder)
         let title = try DirectHermesSessionValidation.text(title, maximum: 240, allowsEmpty: false)
-        return try await createOrdinarySession(profileID: agentID, folder: folder, title: title, runtime: runtime).record
+        return try await createOrdinarySession(
+            profileID: agentID, folder: folder, title: title, runtime: runtime, creationID: creationID
+        ).record
     }
 
     private func createOrdinarySession(profileID: String, folder: String?, title: String?,
-                                       runtime: SessionStartRuntime) async throws -> DirectHermesResolvedSession {
+                                       runtime: SessionStartRuntime,
+                                       creationID: UUID? = nil) async throws -> DirectHermesResolvedSession {
         try requireOwner()
         try DirectHermesSessionValidation.coordinate(profileID, maximum: 128)
         // The agent picker/catalog already loaded this owner-scoped profile.
@@ -748,7 +763,8 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             }
             try retain(pending)
         }
-        var state = try await newCreation(profile: profile, purpose: .ordinary, folder: folder)
+        var state = try await newCreation(profile: profile, purpose: .ordinary, folder: folder,
+                                          intentID: creationID)
         let binding: Binding
         do {
             binding = try await dispatchCreate(&state, profile: profile, title: title, startOn: runtime)
@@ -756,7 +772,8 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
             // Hermes starts a chat only in a folder that exists, else somewhere
             // else. A project whose folder is gone must not lock its agent out of
             // new chats: start it without the project, in the agent's own folder.
-            state = try await newCreation(profile: profile, purpose: .ordinary, inProjectFolder: false)
+            state = try await newCreation(profile: profile, purpose: .ordinary, inProjectFolder: false,
+                                          intentID: creationID)
             binding = try await dispatchCreate(&state, profile: profile)
         }
         state.phase = .complete
@@ -2437,13 +2454,14 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
 
     private func newCreation(profile: Profile, purpose: DirectHermesSessionCreationState.Purpose,
                              inProjectFolder: Bool = true,
-                             folder: String? = nil) async throws -> DirectHermesSessionCreationState {
+                             folder: String? = nil,
+                             intentID: UUID? = nil) async throws -> DirectHermesSessionCreationState {
         let cwd: String?
         if let folder { cwd = folder }
         else { cwd = inProjectFolder ? try await selectedFolderPath?(profile.id) : nil }
         try requireOwner()
         if let cwd { try DirectHermesSessionValidation.hostPath(cwd) }
-        return .init(schemaVersion: 1, intentID: UUID().uuidString, scopeID: owner.cacheScopeID,
+        return .init(schemaVersion: 1, intentID: (intentID ?? UUID()).uuidString, scopeID: owner.cacheScopeID,
                      profileID: profile.id, purpose: purpose, connectionGeneration: owner.connectionGeneration,
                      phase: .createRequested, requestedCWD: cwd,
                      canonicalRegistryID: canonicalIDs[DirectHermesSessionIdentity.key(profile.id)]?.id)

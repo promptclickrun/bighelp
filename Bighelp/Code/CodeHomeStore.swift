@@ -52,6 +52,7 @@ final class CodeHomeStore {
     @ObservationIgnored private var gitRequest: UUID?
     /// The last send still making its folder and session; the next one waits for it.
     @ObservationIgnored private var setupTail: Task<Void, Never>?
+    @ObservationIgnored private var reconcilingLaunches: Set<UUID> = []
 
     init(scopeID: String, agentID: String, source: any CodeProjectSource,
          git: @escaping @MainActor () throws -> any StockGitManaging,
@@ -76,11 +77,22 @@ final class CodeHomeStore {
         sessions = saved?.sessions ?? []
         staged = saved?.staged ?? []
         batches = saved?.batches ?? []
-        // A send that was still starting belongs to the process that's gone. It's failed now, not
-        // starting, so its card says so and its message can go again.
+        // A process-local request cannot continue after relaunch. Git destinations saved before
+        // mutation are safe to retry; a lost create/send receipt stays unconfirmed until read back.
         launches = (saved?.launches ?? []).map { saved in
             var launch = saved
-            if !launch.step.isFailed { launch.step = .failed(CodeLaunch.interruptedReason) }
+            if !launch.step.isFailed, !launch.step.needsRecovery {
+                switch launch.step {
+                case .makingWorktree, .switchingBranch where launch.destination != nil:
+                    launch.step = .failed(CodeLaunch.interruptedReason)
+                case .readyToSend:
+                    launch.step = .failed(
+                        "The app closed after the session started, before this message was sent."
+                    )
+                default:
+                    launch.step = .needsRecovery(CodeLaunch.interruptedReason)
+                }
+            }
             return launch
         }
     }
@@ -92,10 +104,10 @@ final class CodeHomeStore {
         sessions.filter { $0.projectID == projectID }
     }
 
-    /// Sends for the selected project that have no session yet (or never got one); a
-    /// batch's own show on its card.
+    /// Sends for the selected project, including a session-backed recovery card. A batch's own
+    /// sends stay on the batch.
     var projectLaunches: [CodeLaunch] {
-        launches.filter { $0.projectID == projectID && $0.sessionID == nil && $0.batchID == nil }
+        launches.filter { $0.projectID == projectID && $0.batchID == nil }
     }
 
     /// The selected project's sessions that aren't in a batch: each has its own card.
@@ -158,6 +170,7 @@ final class CodeHomeStore {
                 branch = nil
             }
             await loadGit()
+            await reconcileInterruptedLaunches()
         } catch is CancellationError {
         } catch {
             errorMessage = error.localizedDescription
@@ -251,7 +264,7 @@ final class CodeHomeStore {
     func stage(_ message: String) -> Bool {
         guard let job = job(for: message) else { return false }
         staged.append(job)
-        save()
+        if !save() { staged.removeAll { $0.id == job.id }; return false }
         return true
     }
 
@@ -273,11 +286,22 @@ final class CodeHomeStore {
         guard let project, !jobs.isEmpty, (try? gitClient()) != nil else { return nil }
         let batch = CodeBatch(id: UUID(), projectID: project.id, title: CodeBatch.title(for: jobs), createdAt: .now,
                               jobCount: jobs.count, sessionIDs: [], messages: [])
+        let transferred = jobs.compactMap { launch(for: $0, project: project, batchID: batch.id) }
+        guard transferred.count == jobs.count else { return nil }
+        let previousBatches = batches
         batches.insert(batch, at: 0)
         if batches.count > Self.maximumBatches { batches.removeLast(batches.count - Self.maximumBatches) }
+        launches.insert(contentsOf: transferred.reversed(), at: 0)
+        let previousStaged = staged
         staged.removeAll { job in jobs.contains { $0.id == job.id } }
-        save()
-        for job in jobs { launch(job, batchID: batch.id) }
+        // One atomic saved handoff: no staged job disappears unless every launch intent is durable too.
+        guard save() else {
+            staged = previousStaged
+            launches.removeAll { launch in transferred.contains { $0.id == launch.id } }
+            batches = previousBatches
+            return nil
+        }
+        for launch in transferred { run(launch) }
         return batch
     }
 
@@ -296,9 +320,11 @@ final class CodeHomeStore {
         save()
     }
 
-    /// Forgets a batch's card and its sessions' cards. The sessions stay on the computer.
+    /// Forgets a batch's card, its retained launches and its local session cards.
+    /// The sessions themselves stay on the computer.
     func forget(_ batch: CodeBatch) {
         batches.removeAll { $0.id == batch.id }
+        launches.removeAll { $0.batchID == batch.id }
         sessions.removeAll { $0.batchID == batch.id }
         save()
     }
@@ -315,45 +341,100 @@ final class CodeHomeStore {
 
     @discardableResult
     private func launch(_ job: CodeStagedJob, batchID: UUID?) -> Bool {
-        guard let project = projects.first(where: { $0.id == job.projectID }), let git = try? gitClient() else {
+        guard let project = projects.first(where: { $0.id == job.projectID }),
+              (try? gitClient()) != nil,
+              let launch = launch(for: job, project: project, batchID: batchID) else {
             return false
         }
-        let request = CodeLaunchRequest(message: job.message, agentID: job.agentID, project: project,
-                                        placement: job.placement, branch: job.branch, newBranch: job.newBranch,
-                                        runtime: job.runtime, mode: job.mode)
-        let launch = CodeLaunch(id: UUID(), title: job.title, projectID: project.id, job: job,
-                                step: job.placement == .newWorktree ? .makingWorktree : .startingSession,
-                                batchID: batchID,
-                                branchLabel: job.placement == .local ? (job.branch ?? branchTitle) : nil)
         launches.insert(launch, at: 0)
-        save()
-        let launcher = CodeLauncher(git: git, sessions: starter)
+        guard save() else {
+            launches.removeAll { $0.id == launch.id }
+            return false
+        }
+        run(launch)
+        return true
+    }
+
+    private func launch(for job: CodeStagedJob, project: CodeProject, batchID: UUID?) -> CodeLaunch? {
+        guard project.id == job.projectID else { return nil }
+        return CodeLaunch(id: UUID(), title: job.title, projectID: project.id, projectName: project.name,
+                          projectFolder: project.folder, job: job,
+                          step: job.placement == .newWorktree ? .makingWorktree : .startingSession,
+                          startedAt: .now, destination: nil, batchID: batchID,
+                          branchLabel: job.placement == .local ? (job.branch ?? branchTitle) : nil)
+    }
+
+    private func run(_ launch: CodeLaunch) {
         let previous = setupTail
         let setup = Task { @MainActor [weak self] () throws -> CodeSessionRecord in
             await previous?.value
-            return try await launcher.start(request) { step in self?.update(launch.id) { $0.step = step } }
+            guard let self else { throw CancellationError() }
+            if let sessionID = launch.sessionID {
+                if let record = self.sessions.first(where: { $0.id == sessionID }) { return record }
+                guard let request = self.request(for: launch), let destination = launch.destination else {
+                    throw WorkspaceClientError.invalidResponse
+                }
+                return CodeSessionRecord(
+                    id: sessionID, agentID: request.agentID, projectID: request.project.id,
+                    projectName: request.project.name, title: launch.title, folder: destination.folder,
+                    branch: destination.branch, placement: destination.placement,
+                    startedAt: launch.startedAt ?? .now, mode: request.mode, batchID: launch.batchID
+                )
+            }
+            guard let request = self.request(for: launch) else { throw WorkspaceClientError.invalidRequest }
+            let launcher = CodeLauncher(git: try self.gitClient(), sessions: self.starter)
+            return try await launcher.start(
+                request,
+                destination: launch.destination,
+                creationID: launch.id,
+                progress: { step in
+                    self.update(launch.id) { $0.step = step }
+                    self.save()
+                },
+                onDestination: { destination in
+                    self.update(launch.id) {
+                        $0.destination = destination
+                        $0.branchLabel = destination.branch
+                    }
+                    self.save()
+                }
+            )
         }
         setupTail = Task { _ = try? await setup.value }
         Task { @MainActor [weak self, starter] in
             do {
                 var record = try await setup.value
-                record.batchID = batchID
-                self?.update(launch.id) { $0.sessionID = record.id; $0.step = .sending }
+                record.batchID = launch.batchID
+                self?.update(launch.id) {
+                    $0.sessionID = record.id
+                    $0.step = .readyToSend
+                    $0.submissionID = nil
+                }
                 self?.remember(record)
-                if let batchID { self?.add(record.id, toBatch: batchID) }
+                if let batchID = launch.batchID { self?.add(record.id, toBatch: batchID) }
+                guard let request = self?.request(for: launch) else { throw WorkspaceClientError.invalidRequest }
                 try await starter.apply(request.mode, toSession: record.id, agentID: request.agentID)
-                try await starter.send(request.firstMessage, toSession: record.id)
+                let submissionID = UUID()
+                self?.update(launch.id) {
+                    $0.submissionID = submissionID
+                    $0.step = .sending
+                }
+                self?.save()
+                try await starter.send(request.firstMessage, toSession: record.id, submissionID: submissionID)
                 self?.launches.removeAll { $0.id == launch.id }
                 self?.save()
             } catch {
                 let reason = (error as? LocalizedError)?.errorDescription ?? "Hermes couldn't start this session."
-                self?.update(launch.id) { $0.step = .failed(reason) }
+                self?.update(launch.id) {
+                    $0.step = Self.outcomeIsUnknown(error)
+                        ? .needsRecovery(reason)
+                        : .failed(reason)
+                }
                 // The card keeps the message. It's saved, so it's still here after a relaunch.
                 self?.save()
             }
-            if request.placement == .newWorktree { await self?.loadGit() }
+            if launch.placement == .newWorktree { await self?.loadGit() }
         }
-        return true
     }
 
     /// Hides a send that failed. Its message goes with it: the card is the only copy kept here.
@@ -364,12 +445,20 @@ final class CodeHomeStore {
 
     /// Sends a failed launch's own message again, with the chips it was sent with.
     func retry(_ failed: CodeLaunch) {
-        guard failed.step.isFailed else { return }
-        launches.removeAll { $0.id == failed.id }
-        // A project that went away, or a computer with no git, can't start it either: the card
-        // stays failed rather than taking the message with it.
-        if !launch(failed.job, batchID: failed.batchID) { launches.insert(failed, at: 0) }
+        guard let current = launches.first(where: { $0.id == failed.id }) else { return }
+        if current.step.needsRecovery {
+            reconcile(current, retryAfterRead: true)
+            return
+        }
+        guard current.step.isFailed else { return }
+        update(current.id) {
+            $0.step = current.sessionID == nil
+                ? (current.placement == .newWorktree ? .makingWorktree : .startingSession)
+                : .readyToSend
+            $0.submissionID = nil
+        }
         save()
+        run(current)
     }
 
     /// Forgets a session's card. The session stays on the computer.
@@ -388,6 +477,115 @@ final class CodeHomeStore {
               !batches[index].sessionIDs.contains(sessionID) else { return }
         batches[index].sessionIDs.append(sessionID)
         save()
+    }
+
+    private func request(for launch: CodeLaunch) -> CodeLaunchRequest? {
+        let project: CodeProject?
+        if let loaded = projects.first(where: { $0.id == launch.projectID }) {
+            project = loaded
+        } else if let name = launch.projectName, let folder = launch.projectFolder {
+            project = CodeProject(id: launch.projectID, name: name, folder: folder)
+        } else {
+            project = nil
+        }
+        guard let project else { return nil }
+        return CodeLaunchRequest(
+            message: launch.job.message, agentID: launch.job.agentID, project: project,
+            placement: launch.job.placement, branch: launch.job.branch, newBranch: launch.job.newBranch,
+            runtime: launch.job.runtime, mode: launch.job.mode
+        )
+    }
+
+    private func reconcile(_ launch: CodeLaunch, retryAfterRead: Bool = false) {
+        guard reconcilingLaunches.insert(launch.id).inserted else { return }
+        Task { @MainActor [weak self, starter] in
+            defer { self?.reconcilingLaunches.remove(launch.id) }
+            do {
+                if let sessionID = launch.sessionID {
+                    if let submissionID = launch.submissionID {
+                        switch try await starter.deliveryEvidence(
+                            for: submissionID, message: launch.job.mode.firstMessage(launch.job.message),
+                            sessionID: sessionID
+                        ) {
+                        case .sent:
+                            self?.launches.removeAll { $0.id == launch.id }
+                        case .unsent(let reason):
+                            self?.update(launch.id) { $0.step = .failed(reason) }
+                        case .unknown(let reason):
+                            self?.update(launch.id) { $0.step = .needsRecovery(reason) }
+                        }
+                    } else {
+                        self?.update(launch.id) {
+                            $0.step = .needsRecovery(
+                                "The app cannot prove that this session's first message was sent. Open it before continuing."
+                            )
+                        }
+                    }
+                } else if let destination = launch.destination, let request = self?.request(for: launch) {
+                    let requestedAt = launch.startedAt ?? .distantPast
+                    if let record = try await starter.existingSession(
+                        for: request, at: destination, requestedAt: requestedAt
+                    ) {
+                        self?.remember(record)
+                        if let batchID = launch.batchID { self?.add(record.id, toBatch: batchID) }
+                        self?.update(launch.id) {
+                            $0.sessionID = record.id
+                            $0.step = .failed("Hermes made the session, but the first message was not confirmed. Try again to send it.")
+                        }
+                    } else if let startedAt = launch.startedAt,
+                              Date().timeIntervalSince(startedAt) <= Self.sessionCreateIdempotencyWindow {
+                        self?.update(launch.id) {
+                            $0.step = .needsRecovery(
+                                "Hermes did not show this session yet. Check the original request before continuing."
+                            )
+                        }
+                        if retryAfterRead, let current = self?.launches.first(where: { $0.id == launch.id }) {
+                            self?.update(launch.id) {
+                                $0.step = launch.placement == .newWorktree ? .makingWorktree : .startingSession
+                            }
+                            self?.run(current)
+                        }
+                    } else {
+                        self?.update(launch.id) {
+                            $0.step = .needsRecovery(
+                                "The session was not confirmed. Its message is retained; open Work to check the computer before continuing."
+                            )
+                        }
+                    }
+                } else {
+                    self?.update(launch.id) {
+                        $0.step = .needsRecovery(
+                            "The original worktree could not be verified. Its message is retained; check Worktrees before continuing."
+                        )
+                    }
+                }
+                self?.save()
+            } catch {
+                self?.update(launch.id) {
+                    $0.step = .needsRecovery(
+                        "The computer could not confirm this send. Its complete message is retained."
+                    )
+                }
+                self?.save()
+            }
+        }
+    }
+
+    private func reconcileInterruptedLaunches() async {
+        let interrupted = launches.filter(\.step.needsRecovery)
+        for launch in interrupted { reconcile(launch) }
+    }
+
+    private static func outcomeIsUnknown(_ error: any Error) -> Bool {
+        if error is CancellationError { return true }
+        if error as? WorkspaceClientError == .outcomeUnknown
+            || error as? WorkspaceClientError == .invalidResponse {
+            return true
+        }
+        if let direct = error as? DirectHermesError {
+            return direct.outcomeIsUnknown || direct == .invalidResponse
+        }
+        return false
     }
 
     private func remember(_ record: CodeSessionRecord) {
@@ -416,6 +614,7 @@ final class CodeHomeStore {
     static let savedKey = "bighelp.code.by-scope"
     private static let maximumSessions = 60
     private static let maximumBatches = 20
+    private static let sessionCreateIdempotencyWindow: TimeInterval = 5 * 60
 
     private static func saved(_ scopeID: String, in defaults: UserDefaults) -> Saved? {
         guard let data = defaults.data(forKey: savedKey),
@@ -423,7 +622,8 @@ final class CodeHomeStore {
         return all[scopeID]
     }
 
-    private func save() {
+    @discardableResult
+    private func save() -> Bool {
         var all: [String: Saved] = (defaults.data(forKey: Self.savedKey))
             .flatMap { try? JSONDecoder().decode([String: Saved].self, from: $0) } ?? [:]
         all[scopeID] = Saved(agentID: agentID, projectID: projectID, placement: placement, branch: branch,
@@ -431,6 +631,8 @@ final class CodeHomeStore {
                              launches: launches)
         // A handful of computers at most; drop the oldest beyond that.
         if all.count > 16, let stale = all.keys.first(where: { $0 != scopeID }) { all[stale] = nil }
-        if let data = try? JSONEncoder().encode(all) { defaults.set(data, forKey: Self.savedKey) }
+        guard let data = try? JSONEncoder().encode(all) else { return false }
+        defaults.set(data, forKey: Self.savedKey)
+        return true
     }
 }

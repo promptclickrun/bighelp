@@ -5,6 +5,7 @@ extension CodeHomeStore {
     func status(of session: CodeSessionRecord, reader: any CodeSessionStatusReading) -> CodeSessionStatus {
         if let launch = launch(for: session) {
             if case .failed(let reason) = launch.step { return .failed(reason) }
+            if launch.step.needsRecovery { return reader.status(of: session.id) }
             return .starting("Sending your message…")
         }
         return reader.status(of: session.id)

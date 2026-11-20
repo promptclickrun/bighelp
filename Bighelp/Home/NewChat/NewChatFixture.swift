@@ -90,13 +90,14 @@ private struct NewChatFixtureScreen: View {
 
 /// The fixture never starts a session.
 private struct NewChatFixtureStarter: CodeSessionStarting {
-    func startSession(agentID: String, folder: String, title: String, runtime: CodeRuntimeChoice) async throws -> String {
+    func startSession(agentID: String, folder: String, title: String, runtime: CodeRuntimeChoice,
+                      creationID: UUID) async throws -> String {
         throw CancellationError()
     }
 
     func apply(_ mode: CodeSessionMode, toSession sessionID: String, agentID: String) async throws {}
 
-    func send(_ message: String, toSession sessionID: String) async throws {
+    func send(_ message: String, toSession sessionID: String, submissionID: UUID) async throws {
         throw CancellationError()
     }
 }

@@ -22,14 +22,19 @@ extension RootShellView {
         BighelpPlatform.isMac || BighelpPlatform.usesTabOrnament || horizontalSizeClass == .regular
     }
 
-    /// What every root's header starts from: the person's circle, which opens Settings, and the
-    /// sidebar button where there's a sidebar.
-    func homeHeaderContext(title: String? = nil) -> HomeHeaderContext {
+    /// What every root's header starts from: the person's circle, which opens Settings, and an
+    /// in-content sidebar button where the platform has one.
+    func homeHeaderContext(_ surface: HomeSidebarSurface, title: String? = nil) -> HomeHeaderContext {
         var context = HomeHeaderContext(personName: userIdentity.identity.displayName,
                                         personImageURL: userIdentity.avatarURL(),
                                         onOpenSettings: { isUnifiedSettingsPresented = true })
         context.title = title
-        if sidebarIsAvailable { context.onToggleSidebar = { isHomeDrawerPresented.toggle() } }
+        if HomeSidebarControlPolicy.showsInContent(
+            on: surface, sidebarAvailable: sidebarIsAvailable, isMac: BighelpPlatform.isMac,
+            sidebarOpen: isHomeDrawerPresented
+        ) {
+            context.onToggleSidebar = { isHomeDrawerPresented.toggle() }
+        }
         return context
     }
 
@@ -72,7 +77,7 @@ extension RootShellView {
     }
 
     private var chatsInboxContext: ChatsInboxContext {
-        var header = homeHeaderContext()
+        var header = homeHeaderContext(.chats)
         header.viewSwitch = homeViewSwitch
         if let newGroupChatAction {
             header.newItems = [.groupChat]
@@ -184,7 +189,7 @@ extension RootShellView {
     }
 
     private func todayContext(_ bridge: SpacesTodayBridge) -> TodayContext {
-        var header = homeHeaderContext(title: String(localized: "Today"))
+        var header = homeHeaderContext(.today, title: String(localized: "Today"))
         header.computer = homeHeaderComputer
         header.trailing = AnyView(TodayEditButton(isEditing: $isEditingToday))
         let boards = todayBoardsContext
@@ -274,7 +279,7 @@ extension RootShellView {
     // MARK: Work
 
     var workRoot: some View {
-        var header = homeHeaderContext(title: String(localized: "Work"))
+        var header = homeHeaderContext(.work, title: String(localized: "Work"))
         header.computer = homeHeaderComputer
         return WorkView(context: workContext(header: AnyView(HomeHeaderBar(context: header)), projectID: nil))
     }

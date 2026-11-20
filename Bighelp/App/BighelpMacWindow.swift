@@ -117,8 +117,11 @@ private final class MacTitlebarItems: NSObject, NSToolbarDelegate {
     private func followAvailability() {
         withObservationTracking {
             // The bar button and the title bar item each keep their own state.
-            sidebarButton.isEnabled = sideMenu.canToggle
-            sidebarItem?.isEnabled = sideMenu.canToggle
+            let isAvailable = HomeSidebarControlPolicy.showsNativeTitlebarControl(
+                sidebarAvailable: sideMenu.canToggle, isMac: true, sidebarOpen: sideMenu.isOpen
+            )
+            sidebarButton.isEnabled = isAvailable
+            sidebarItem?.isEnabled = isAvailable
         } onChange: { [weak self] in
             Task { @MainActor in self?.followAvailability() }
         }
@@ -134,7 +137,9 @@ private final class MacTitlebarItems: NSObject, NSToolbarDelegate {
         let item = NSToolbarItem(itemIdentifier: itemIdentifier, barButtonItem: sidebarButton)
         item.label = "Sidebar"
         item.toolTip = "Show or hide the sidebar (⌃⌘S)"
-        item.isEnabled = sideMenu.canToggle
+        item.isEnabled = HomeSidebarControlPolicy.showsNativeTitlebarControl(
+            sidebarAvailable: sideMenu.canToggle, isMac: true, sidebarOpen: sideMenu.isOpen
+        )
         sidebarItem = item
         return item
     }

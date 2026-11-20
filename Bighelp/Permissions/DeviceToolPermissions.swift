@@ -178,6 +178,13 @@ enum DeviceToolSystemAccess: Equatable, Sendable {
     case notRequested, available, denied, unavailable
 }
 
+enum DeviceToolPermissionRecovery: Equatable, Sendable {
+    case none
+    case requestAccess
+    case openSystemSettings
+    case checkAgain
+}
+
 @MainActor @Observable
 final class DeviceToolPermissions {
     /// Where Device access's "Change how bighelp looks" is saved; missing means on.
@@ -204,6 +211,8 @@ final class DeviceToolPermissions {
     /// The person read where Health data goes (their computer and its AI provider) and agreed, once.
     private(set) var healthSharingAgreed: Bool
     private var statuses: [DeviceToolCapability: DeviceToolSystemAccess] = [:]
+    /// A timed-out read. With no cached answer, the timeout did not say what the OS allows.
+    private var unansweredStatusReads: Set<DeviceToolCapability> = []
     private let readStatus: (DeviceToolCapability) async -> DeviceToolSystemAccess
     private let requestAccess: (DeviceToolCapability) async -> DeviceToolSystemAccess
     private let isForeground: () -> Bool
@@ -273,6 +282,18 @@ final class DeviceToolPermissions {
         kind.sharesPersonalData ? statuses[kind] ?? .notRequested : .available
     }
 
+    func recovery(for kind: DeviceToolCapability) -> DeviceToolPermissionRecovery {
+        if status(for: kind) == .denied { return .openSystemSettings }
+        guard isEnabled(kind) else { return .none }
+        if statuses[kind] == nil, unansweredStatusReads.contains(kind) { return .checkAgain }
+        return switch status(for: kind) {
+        case .available: .none
+        case .notRequested: .requestAccess
+        case .denied: .openSystemSettings
+        case .unavailable: .checkAgain
+        }
+    }
+
     /// No iOS permission: the switch alone decides. Changing it retires work in flight and
     /// reopens the phone's channel with or without the tool.
     func setAppearanceAllowed(_ allowed: Bool) {
@@ -310,18 +331,26 @@ final class DeviceToolPermissions {
     /// started under the old answer and reopens the phone's channel with or without the tool.
     func refresh() async {
         for kind in DeviceToolCapability.allCases where kind.sharesPersonalData {
-            guard requestInFlight != kind else { continue }
-            let owner = revision
-            let read = readStatus
-            guard let value = try? await DeviceLocationDeadline.run(seconds: statusDeadline, { await read(kind) }) else {
-                // No answer in time: keep what was known, and ask again at the next refresh.
-                Self.log.notice("\(kind.rawValue, privacy: .public) status didn't answer in time")
-                continue
-            }
-            guard revision == owner, requestInFlight != kind else { continue }
-            let previous = statuses[kind]
-            statuses[kind] = value
-            if isEnabled(kind), let previous, previous != value { revision &+= 1 }
+            await refresh(kind)
+        }
+    }
+
+    func refresh(_ kind: DeviceToolCapability) async {
+        guard kind.sharesPersonalData, requestInFlight != kind else { return }
+        let owner = revision
+        let read = readStatus
+        guard let value = try? await DeviceLocationDeadline.run(seconds: statusDeadline, { await read(kind) }) else {
+            unansweredStatusReads.insert(kind)
+            Self.log.notice("\(kind.rawValue, privacy: .public) status didn't answer in time")
+            return
+        }
+        guard revision == owner, requestInFlight != kind else { return }
+        let previous = statuses[kind]
+        let hadNoAnswer = unansweredStatusReads.remove(kind) != nil
+        statuses[kind] = value
+        if isEnabled(kind),
+           (previous.map { $0 != value } ?? (hadNoAnswer && value == .available)) {
+            revision &+= 1
         }
     }
 
@@ -350,11 +379,28 @@ final class DeviceToolPermissions {
         // switch during the question doesn't.
         guard choices == choice else { return }
         statuses[kind] = value
+        unansweredStatusReads.remove(kind)
         guard value == .available else { return }
         self.enabled.insert(kind)
         if reopensChannel { revision &+= 1 }
         choices &+= 1
         persist()
+    }
+
+    /// Recovers a saved, enabled grant whose OS status is still not requested. This is only reached
+    /// from an explicit foreground action; merely having the switch on never displays a prompt.
+    func requestEnabledAccess(for kind: DeviceToolCapability) async {
+        guard recovery(for: kind) == .requestAccess,
+              isForeground(), requestInFlight == nil else { return }
+        let choice = choices
+        requestInFlight = kind
+        defer { requestInFlight = nil }
+        let value = await requestAccess(kind)
+        guard choices == choice else { return }
+        let previous = status(for: kind)
+        statuses[kind] = value
+        unansweredStatusReads.remove(kind)
+        if previous != value { revision &+= 1 }
     }
 
     /// Counts the person's own switch changes, so a late iOS answer can't undo one.

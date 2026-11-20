@@ -3,6 +3,18 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.96
+
+### New
+
+- **Voice recordings.** When a bot uses your computer for transcription, choose the service in Settings › Voice. You can select ElevenLabs Scribe and use the key already on your computer.
+
+### Fixed
+
+- **Coding messages.** If a coding chat cannot start, Work keeps your message and your choices after you close the app. You can try again when the computer reconnects. If delivery is uncertain, open the existing session to check it. Work also keeps messages sent together.
+- **Reminders.** When the system takes too long to report access, Bighelp checks again. Device access shows what to do when Reminders is unavailable.
+- **Mac sidebar.** Use the sidebar button in the window title bar on Bots, Chats, Today and Work.
+
 ## 2.6.95
 
 ### New

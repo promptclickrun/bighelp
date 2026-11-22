@@ -385,18 +385,26 @@ final class DuoLayoutUITests: BighelpUITestCase {
             let window = app.windows.firstMatch.frame
             XCTAssertGreaterThan(field.frame.minY, window.midY, "The message box sits under the fold")
             XCTAssertLessThan(field.frame.minY, window.midY + 120, "Just under it")
-            // The half under the fold is a desk: the bot and what it's doing, then New chat and Bot
-            // page, under the message box.
+            // The half under the fold is a desk: the chat's bot in the middle with what it's doing,
+            // and the computer's other bots either side, smaller, each with a New chat of its own.
             XCTAssertTrue(element("chat.laptop.desk", in: app).waitForExistence(timeout: 5),
                           "The half under the fold carries the desk")
             XCTAssertEqual(element("chat.laptop.status", in: app).label, "Avery Park, Here for you",
                            "It says who the bot is and what it's doing, once")
-            for id in ["chat.laptop.new-chat", "chat.laptop.bot-page"] {
-                let button = app.buttons[id]
-                XCTAssertTrue(button.waitForExistence(timeout: 5), "\(id) is in reach under the fold")
-                XCTAssertGreaterThan(button.frame.minY, field.frame.maxY, "\(id) sits under the message box")
-                XCTAssertLessThan(button.frame.maxY, window.maxY, "\(id) is on screen")
-            }
+            let face = app.buttons.matching(NSPredicate(
+                format: "identifier BEGINSWITH %@ AND NOT (identifier ENDSWITH %@)",
+                "chat.laptop.bot.", ".new-chat")).firstMatch
+            XCTAssertTrue(face.waitForExistence(timeout: 5), "The chat's bot has a face under the fold")
+            let newChat = app.buttons["chat.laptop.new-chat"]
+            XCTAssertTrue(newChat.waitForExistence(timeout: 5), "New chat is in reach under the fold")
+            XCTAssertGreaterThan(face.frame.minY, field.frame.maxY, "The face sits under the message box")
+            XCTAssertGreaterThan(newChat.frame.minY, field.frame.maxY, "New chat sits under it too")
+            XCTAssertLessThan(newChat.frame.maxY, window.maxY, "New chat is on screen")
+            // Another bot beside the chat's own, smaller, with the one button a face down here takes.
+            XCTAssertTrue(app.buttons.matching(NSPredicate(
+                format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
+                "chat.laptop.bot.", ".new-chat")).firstMatch.waitForExistence(timeout: 5),
+                          "The computer's other bots are here too")
             sleep(1)
             save("laptop-chat-\(appearance)", app)
             if appearance == "light" {
@@ -406,12 +414,40 @@ final class DuoLayoutUITests: BighelpUITestCase {
                 XCTAssertFalse(element("chat.laptop.desk", in: app).exists, "Typing, the desk gets out of the way")
                 save("laptop-typing-light", app)
             } else {
-                app.buttons["chat.laptop.bot-page"].tap()
+                face.tap()
                 XCTAssertTrue(app.buttons["simple-bots.profile.more"].waitForExistence(timeout: 10),
-                              "Bot page opens the bot's page")
+                              "A face opens the bot's page")
             }
             app.terminate()
         }
+    }
+
+    /// The desk's faces, on the Duo's own simulator: the chat's bot in the middle opens its page, and the
+    /// computer's other bots are beside it with a New chat each.
+    @MainActor
+    func testHalfFoldedTheDeskOffersTheComputersBots() throws {
+        let app = makeApp()
+        app.launchArguments = demo + ["-start-chat", "-loopdy.demo.appearance", "light",
+                                      "-bighelp.debug.screen-posture", "openUpright",
+                                      "-bighelp.debug.fold-halfway", "YES"]
+        app.launch()
+        XCTAssertTrue(element("chat.laptop.desk", in: app).waitForExistence(timeout: 20),
+                      "The half under the fold carries the desk")
+        let face = app.buttons.matching(NSPredicate(
+            format: "identifier BEGINSWITH %@ AND NOT (identifier ENDSWITH %@)",
+            "chat.laptop.bot.", ".new-chat")).firstMatch
+        XCTAssertTrue(face.waitForExistence(timeout: 5), "The chat's bot has a face")
+        XCTAssertTrue(app.buttons["chat.laptop.new-chat"].waitForExistence(timeout: 5),
+                      "The chat's bot has its New chat")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(
+            format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
+            "chat.laptop.bot.", ".new-chat")).firstMatch.waitForExistence(timeout: 5),
+                      "Another bot is beside it, with a New chat of its own")
+        save("laptop-desk-light", app)
+        face.tap()
+        XCTAssertTrue(app.buttons["simple-bots.profile.more"].waitForExistence(timeout: 10),
+                      "A face opens that bot's page")
+        app.terminate()
     }
 
     // MARK: Every screen

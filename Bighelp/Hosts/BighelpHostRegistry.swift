@@ -77,7 +77,11 @@ final class BighelpHostRegistry {
     }
     var activeHostConnectionID: String? { selectedHostID?.uuidString }
     private(set) var hosts: [BighelpConfiguredHost] = []
-    private(set) var selectedHostID: UUID?
+    private(set) var selectedHostID: UUID? {
+        didSet {
+            if selectedHostID != oldValue { ChatAttachmentPlayback.shared.stop() }
+        }
+    }
     private(set) var selectedWorkspace: DirectHermesWorkspaceStore?
     private(set) var errorMessage: String?
     private(set) var generation = UUID()
@@ -506,6 +510,10 @@ final class BighelpHostRegistry {
         let vault = makeVault(id: id)
         let drafts = DirectHermesDraftStore(root: draftRoot(id: id))
         let store = DirectHermesWorkspaceStore(vault: vault, drafts: drafts)
+        store.onPlaybackAuthorityLost = { [weak self, weak store] in
+            guard let self, let store, self.selectedWorkspace === store else { return }
+            ChatAttachmentPlayback.shared.stop()
+        }
         store.prepareChat = { [weak self] chat in
             guard let self, let host = self.hosts.first(where: { $0.id == id }) else { return }
             do { try await self.prepareChat?(host, chat) }

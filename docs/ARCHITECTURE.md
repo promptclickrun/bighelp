@@ -496,6 +496,19 @@ takes the staged pictures with the message. Unknown or cancelled upload attempts
 remain reviewable without automatic replay. A contact or event made from a
 picture is a reviewed draft, never a write ([Image drafts](IMAGE_DRAFTS.md)).
 
+Chat audio attachments keep their filenames and file actions, and play inline
+only on request. `ChatAttachmentPlayback` owns one bounded clip in memory,
+independent of the chat route or host connection. On iPhone and iPad it claims
+the shared audio session for non-mixing playback and publishes only a generic
+title and timing to Now Playing. Voice capture or a live call retires the clip;
+an audio interruption or removal of the output device pauses it without
+automatically resuming. A media-services reset or loss of the selected host’s
+sign-in clears the clip; a network disconnect alone does not. No new copy is
+written for playback. Hermes' adapter
+directive `[[audio_as_voice]]` is not a durable per-attachment hint on the
+current native live and history paths, so the app does not infer voice-note
+intent from it.
+
 The app processes avatar images on the device before it saves them to the
 agent's profile on the host (`profiles.set_asset`), and caches them locally.
 

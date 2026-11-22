@@ -1,9 +1,236 @@
 import AVKit
+#if os(iOS)
+import MediaPlayer
+#endif
+import Observation
 import Photos
 import QuickLook
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
+
+/// One process-wide owner for the bounded audio bytes, independent of chat and preview lifetimes.
+@MainActor
+@Observable
+final class ChatAttachmentPlayback: NSObject, AVAudioPlayerDelegate {
+    static let shared = ChatAttachmentPlayback()
+
+    private(set) var activeID: String?
+    private(set) var isPlaying = false
+    private(set) var failed = false
+    private var seekRevision = 0
+    @ObservationIgnored private var player: AVAudioPlayer?
+    @ObservationIgnored private var attachment: ChatAttachment?
+    @ObservationIgnored private var claim: VoiceAudioSessionClaim?
+    @ObservationIgnored private var observers: [any NSObjectProtocol] = []
+    @ObservationIgnored private var resetObserver: (any NSObjectProtocol)?
+    private let sessionCoordinator: VoiceAudioSessionCoordinator
+    private var run: UUID?
+    private var track: UUID?
+    #if os(iOS)
+    @ObservationIgnored private var remoteTargets: [(MPRemoteCommand, Any)] = []
+    #endif
+
+    init(sessionCoordinator: VoiceAudioSessionCoordinator = .shared) {
+        self.sessionCoordinator = sessionCoordinator
+    }
+
+    var duration: TimeInterval { player?.duration ?? 0 }
+    var elapsed: TimeInterval {
+        _ = seekRevision
+        return Self.clampedPosition(player?.currentTime ?? 0, duration: duration) ?? 0
+    }
+
+    func toggle(_ attachment: ChatAttachment) throws {
+        guard attachment.isAudio else { throw PlaybackError.unavailable }
+        if self.attachment == attachment, !failed {
+            if isPlaying { pause() } else { try resume() }
+            return
+        }
+
+        // Decode only on explicit play. Using data rather than a URL keeps playback local and
+        // avoids a staging file that might be deleted or become unreadable when the phone locks.
+        let next = try AVAudioPlayer(data: attachment.data)
+        guard next.duration.isFinite, next.duration > 0 else { throw PlaybackError.unavailable }
+        stop()
+        player = next
+        next.delegate = self
+        do {
+            try resume()
+        } catch {
+            stop()
+            throw error
+        }
+        self.attachment = attachment
+        activeID = attachment.id
+        let token = UUID()
+        track = token
+        resetObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: nil
+        ) { @Sendable [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.track == token else { return }
+                self.stop()
+            }
+        }
+        #if os(iOS)
+        installRemoteCommands(token: token)
+        #endif
+        publishNowPlaying()
+    }
+
+    private func resume() throws {
+        guard !isPlaying, !failed, let player else { return }
+        guard LiveVoiceCurrentCall.shared.call == nil else { throw VoiceAudioSessionError.heldByLiveCall }
+        claim = try sessionCoordinator.acquire(for: .attachmentPlayback)
+        observeAudioSession()
+        if player.currentTime >= player.duration { player.currentTime = 0 }
+        guard player.play() else {
+            pause()
+            throw PlaybackError.unavailable
+        }
+        isPlaying = true
+        publishNowPlaying()
+    }
+
+    func pause() {
+        guard claim != nil else { return }
+        player?.pause()
+        isPlaying = false
+        run = nil
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
+        observers.removeAll()
+        claim?.release()
+        claim = nil
+        publishNowPlaying()
+    }
+
+    func stop() {
+        pause()
+        #if os(iOS)
+        clearNowPlaying()
+        #endif
+        track = nil
+        if let resetObserver {
+            NotificationCenter.default.removeObserver(resetObserver)
+            self.resetObserver = nil
+        }
+        player?.stop()
+        player = nil
+        attachment = nil
+        activeID = nil
+        failed = false
+    }
+
+    func seek(to position: TimeInterval, id: String) {
+        guard activeID == id, let player,
+              let position = Self.clampedPosition(position, duration: player.duration) else { return }
+        player.currentTime = position
+        seekRevision &+= 1
+        publishNowPlaying()
+    }
+
+    static func clampedPosition(_ position: TimeInterval, duration: TimeInterval) -> TimeInterval? {
+        guard position.isFinite, duration.isFinite, duration > 0 else { return nil }
+        return min(max(0, position), duration)
+    }
+
+    private func observeAudioSession() {
+        let token = UUID()
+        run = token
+        for (name, key, reason) in [
+            (AVAudioSession.interruptionNotification, AVAudioSessionInterruptionTypeKey,
+             AVAudioSession.InterruptionType.began.rawValue),
+            (AVAudioSession.routeChangeNotification, AVAudioSessionRouteChangeReasonKey,
+             AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue),
+        ] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) {
+                @Sendable [weak self] notification in
+                guard notification.userInfo?[key] as? UInt == reason else { return }
+                Task { @MainActor in
+                    guard let self, self.run == token else { return }
+                    self.pause()
+                }
+            })
+        }
+    }
+
+    #if os(iOS)
+    private func installRemoteCommands(token: UUID) {
+        let commands = MPRemoteCommandCenter.shared()
+        addRemoteTarget(commands.playCommand, token: token, action: .play)
+        addRemoteTarget(commands.pauseCommand, token: token, action: .pause)
+        addRemoteTarget(commands.togglePlayPauseCommand, token: token, action: .toggle)
+        addRemoteTarget(commands.changePlaybackPositionCommand, token: token, action: .seek)
+    }
+
+    private enum RemoteAction: Sendable { case play, pause, toggle, seek }
+
+    private func addRemoteTarget(_ command: MPRemoteCommand, token: UUID, action: RemoteAction) {
+        command.isEnabled = true
+        let target = command.addTarget { @Sendable [weak self] event in
+            let position = (event as? MPChangePlaybackPositionCommandEvent)?.positionTime
+            if action == .seek, position?.isFinite != true { return .commandFailed }
+            Task { @MainActor in
+                guard let self, self.track == token else { return }
+                switch action {
+                case .play: try? self.resume()
+                case .pause: self.pause()
+                case .toggle:
+                    if self.isPlaying { self.pause() } else { try? self.resume() }
+                case .seek:
+                    if let position, let id = self.activeID { self.seek(to: position, id: id) }
+                }
+            }
+            return .success
+        }
+        remoteTargets.append((command, target))
+    }
+
+    private func clearNowPlaying() {
+        guard track != nil else { return }
+        for (command, target) in remoteTargets { command.removeTarget(target) }
+        remoteTargets.removeAll()
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+    }
+    #endif
+
+    private func publishNowPlaying() {
+        #if os(iOS)
+        guard track != nil else { return }
+        // The filename and chat identity stay inside the app, not on the lock screen.
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = [
+            MPMediaItemPropertyTitle: String(localized: "Chat audio"),
+            MPMediaItemPropertyPlaybackDuration: duration,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsed,
+            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
+            MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue,
+        ]
+        #endif
+    }
+
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        finish(ObjectIdentifier(player), succeeded: flag)
+    }
+
+    nonisolated func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: (any Error)?) {
+        finish(ObjectIdentifier(player), succeeded: false)
+    }
+
+    private nonisolated func finish(_ identity: ObjectIdentifier, succeeded: Bool) {
+        Task { @MainActor [weak self] in
+            guard let self, let player = self.player, ObjectIdentifier(player) == identity else { return }
+            let id = self.activeID
+            self.stop()
+            if !succeeded {
+                self.activeID = id
+                self.failed = true
+            }
+        }
+    }
+
+    private enum PlaybackError: Error { case unavailable }
+}
 
 struct ChatAttachmentGallery: View {
     let attachments: [ChatAttachment]
@@ -28,7 +255,7 @@ struct ChatAttachmentGallery: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("chat.message-attachments")
         .bighelpSheet(item: $previewAttachment) { attachment in
-            ChatAttachmentPreviewView(attachment: attachment)
+            ChatAttachmentPreviewView(attachment: attachment, audioFileOptionsOnly: attachment.isAudio)
                 .bighelpSheetSize(.large)
         }
         .bighelpMediaPresentation(item: $photoViewer) { start in
@@ -60,8 +287,8 @@ struct ChatAttachmentGallery: View {
                 ChatImageStackView(images: stacked)
             }
             ForEach(attachments.filter { !stackedIDs.contains($0.id) }) { attachment in
-                if uiV3Enabled, attachment.mimeType.hasPrefix("audio/") {
-                    BighelpV3MessageAudioView(attachment: attachment, theme: theme) {
+                if attachment.isAudio {
+                    ChatAttachmentAudioCard(attachment: attachment, theme: theme) {
                         previewAttachment = attachment
                     }
                 } else {
@@ -156,6 +383,7 @@ private struct PictureActionsIfImage: ViewModifier {
 
 struct ChatAttachmentPreviewView: View {
     let attachment: ChatAttachment
+    var audioFileOptionsOnly = false
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -192,6 +420,9 @@ struct ChatAttachmentPreviewView: View {
                         systemImage: "exclamationmark.triangle",
                         description: Text(error.message)
                     )
+                } else if audioFileOptionsOnly {
+                    ContentUnavailableView(attachment.fileName, systemImage: "waveform",
+                                           description: Text("Play this audio in the chat."))
                 } else if let previewURL {
                     ChatAttachmentQuickLookPreview(url: previewURL)
                 } else {

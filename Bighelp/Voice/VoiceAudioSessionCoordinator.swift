@@ -5,6 +5,8 @@ import Foundation
 enum VoiceAudioUse: Equatable, Sendable {
     /// Playing with nothing listening, like a voice sample in Settings.
     case playback
+    /// An explicitly played chat attachment, eligible for system media controls.
+    case attachmentPlayback
     /// A voice chat: the microphone, and the agent's replies around it.
     case conversation
 }
@@ -34,6 +36,8 @@ final class SystemVoiceAudioSession: VoiceAudioSessionControlling, @unchecked Se
         case .playback:
             // Nothing listens, so it plays at the phone's normal media volume.
             try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        case .attachmentPlayback:
+            try session.setCategory(.playback, mode: .default, options: [])
         case .conversation:
             // The call modes (voice chat, video chat) play everything at phone-call volume, so
             // replies and the hold music came in quiet on the speaker. The default mode plays at
@@ -91,6 +95,8 @@ final class SystemVoiceAudioSession: VoiceAudioSessionControlling, @unchecked Se
 enum VoiceAudioSessionError: Error, Equatable, Sendable {
     /// A live voice call runs its own audio and owns the session until it ends.
     case heldByLiveCall
+    case heldByAttachment
+    case heldByVoice
 }
 
 /// Microphone capture and agent playback share one `AVAudioSession`. Each takes
@@ -141,6 +147,8 @@ final class VoiceAudioSessionCoordinator: @unchecked Sendable {
         defer { lock.unlock() }
 
         guard liveCallLease == nil else { throw VoiceAudioSessionError.heldByLiveCall }
+        guard !activeClaims.values.contains(.attachmentPlayback) else { throw VoiceAudioSessionError.heldByAttachment }
+        guard use != .attachmentPlayback || activeClaims.isEmpty else { throw VoiceAudioSessionError.heldByVoice }
         if activeClaims.isEmpty {
             try session.configure(for: use)
             try session.setActive(true)

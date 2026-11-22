@@ -12,7 +12,12 @@ final class DirectHermesWorkspaceStore {
     private(set) var address = ""
     private(set) var isConnecting = false
     private(set) var isConnected = false
-    private(set) var requiresAuthentication = false
+    private(set) var requiresAuthentication = false {
+        didSet {
+            if requiresAuthentication, !oldValue { onPlaybackAuthorityLost?() }
+        }
+    }
+    @ObservationIgnored var onPlaybackAuthorityLost: (() -> Void)?
     private(set) var status = "Connect your Hermes computer."
     private(set) var profiles: [DirectHermesProfile] = []
     private(set) var sessions: [DirectHermesSessionSummary] = []
@@ -66,7 +71,13 @@ final class DirectHermesWorkspaceStore {
     }
     @ObservationIgnored private var client: DirectHermesClient?
     @ObservationIgnored private var promptConnection: DirectHermesPromptConnection?
-    @ObservationIgnored private var saved: DirectHermesSavedConnection?
+    @ObservationIgnored private var saved: DirectHermesSavedConnection? {
+        didSet {
+            if let previous = oldValue?.workspaceAuthority, previous != saved?.workspaceAuthority {
+                onPlaybackAuthorityLost?()
+            }
+        }
+    }
     @ObservationIgnored private var epoch = ""
     @ObservationIgnored private var generation = UUID()
     @ObservationIgnored private var catalogGeneration = UUID()

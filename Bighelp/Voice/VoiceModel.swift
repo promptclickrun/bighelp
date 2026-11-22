@@ -181,6 +181,7 @@ final class VoiceModel {
         }
         guard meterState != .monitoring, meterState != .starting else { return }
 
+        ChatAttachmentPlayback.shared.stop()
         monitoringGeneration &+= 1
         let generation = monitoringGeneration
         inputSmoother.reset()

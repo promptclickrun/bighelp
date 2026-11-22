@@ -170,38 +170,111 @@ extension View {
     }
 }
 
-/// A compact audio presentation using the existing attachment-preview route.
-/// Playback and saving remain owned by that preview, not a second audio player.
-struct BighelpV3MessageAudioView: View {
+struct ChatAttachmentAudioCard: View {
     let attachment: ChatAttachment
     let theme: BighelpTheme
-    let onPreview: () -> Void
+    let onFileOptions: () -> Void
+
+    @Environment(\.dynamicTypeSize) private var textSize
+    @State private var playbackError: String?
+    private let playback = ChatAttachmentPlayback.shared
+
+    private var isCurrent: Bool { playback.activeID == attachment.id }
+    private var isPlaying: Bool { isCurrent && playback.isPlaying }
 
     var body: some View {
-        Button(action: onPreview) {
+        VStack(alignment: .leading, spacing: BighelpTokens.space4) {
             HStack(spacing: BighelpTokens.space12) {
-                Image(systemName: "play.fill")
-                    .bighelpFont(.body, weight: .semibold)
-                    .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
-                    .background(theme.action.opacity(0.12), in: .circle)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: BighelpTokens.space4) {
-                    Text(attachment.fileName)
-                        .bighelpFont(.label, weight: .medium)
-                        .lineLimit(1)
-                    Text("Audio preview")
-                        .bighelpFont(.metadata)
-                        .foregroundStyle(.secondary)
+                Button {
+                    do {
+                        try playback.toggle(attachment)
+                        playbackError = nil
+                    } catch let failure as VoiceAudioSessionError {
+                        playbackError = failure == .heldByLiveCall || failure == .heldByVoice
+                            ? "Audio is in use. Try again when it’s free."
+                            : "This audio couldn’t play."
+                    } catch {
+                        playbackError = "This audio couldn’t play."
+                    }
+                } label: {
+                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                        .bighelpFont(.body, weight: .semibold)
+                        .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                        .background(theme.action.opacity(0.12), in: .circle)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .bighelpPlainButtonStyle(.circle)
+                .accessibilityLabel(isPlaying ? "Pause \(attachment.fileName)" : "Play \(attachment.fileName)")
+                .accessibilityIdentifier("chat.attachment.audio.play")
+
+                if textSize.isAccessibilitySize {
+                    Spacer(minLength: 0)
+                } else {
+                    filename
+                }
+
+                Button(action: onFileOptions) {
+                    Image(systemName: "ellipsis")
+                        .frame(width: BighelpTokens.hitTarget, height: BighelpTokens.hitTarget)
+                        .contentShape(.rect)
+                }
+                .bighelpPlainButtonStyle(.circle)
+                .accessibilityLabel("File options for \(attachment.fileName)")
+                .accessibilityHint("Opens Save and Share")
             }
-            .foregroundStyle(.primary)
-            .padding(BighelpTokens.space8)
-            .frame(width: 280)
-            .background(theme.incomingMessageBackground, in: .rect(cornerRadius: BighelpTokens.radius20))
+            if textSize.isAccessibilitySize { filename }
+            if isCurrent, playback.duration > 0 {
+                TimelineView(.animation(minimumInterval: 0.25, paused: !isPlaying)) { _ in
+                    scrubber
+                }
+            } else {
+                Slider(value: .constant(0.0)) { Text("Playback position") }
+                    .frame(minHeight: BighelpTokens.hitTarget)
+                    .disabled(true)
+                    .accessibilityHidden(true)
+                Text("0:00")
+                    .monospacedDigit()
+                    .bighelpFont(.metadata)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
+            if let message = playbackError ?? (isCurrent && playback.failed ? "This audio couldn’t play." : nil) {
+                Text(message)
+                    .bighelpFont(.metadata)
+                    .foregroundStyle(.secondary)
+            }
         }
-        .bighelpPlainButtonStyle(.rounded(BighelpTokens.radius20))
-        .accessibilityLabel("Preview \(attachment.fileName)")
-        .accessibilityHint("Opens the existing audio preview with playback and save options")
+        .foregroundStyle(.primary)
+        .padding(BighelpTokens.space8)
+        .frame(width: 264)
+        .background(theme.incomingMessageBackground, in: .rect(cornerRadius: BighelpTokens.radius20))
+    }
+
+    private var filename: some View {
+        Text(attachment.fileName)
+            .bighelpFont(.label, weight: .medium)
+            .lineLimit(2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var scrubber: some View {
+        let elapsed = Duration.seconds(playback.elapsed).formatted(.time(pattern: .minuteSecond))
+        let total = Duration.seconds(playback.duration).formatted(.time(pattern: .minuteSecond))
+        return VStack(spacing: 0) {
+            Slider(value: Binding(get: { playback.elapsed }, set: { playback.seek(to: $0, id: attachment.id) }),
+                   in: 0...max(playback.duration, 0.001), label: { Text("Playback position") })
+                .frame(minHeight: BighelpTokens.hitTarget)
+                .accessibilityLabel("Playback position")
+                .accessibilityValue("\(elapsed) of \(total)")
+                .accessibilityIdentifier("chat.attachment.audio.position")
+            HStack {
+                Text(elapsed)
+                Spacer()
+                Text(total)
+            }
+            .monospacedDigit()
+            .bighelpFont(.metadata)
+            .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
+        }
     }
 }

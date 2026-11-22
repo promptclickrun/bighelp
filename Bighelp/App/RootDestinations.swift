@@ -146,8 +146,11 @@ extension RootShellView {
             // New chat's Worktrees sheet presents from its own chat: the root is covered.
             .modifier(CodeSheetsIfShown(isShown: newChat != nil, root: self))
             .environment(\.chatCardInteractions, cardInteractions(for: model))
-            // Every chat is a pushed page: Back, the bot (its page) and ⋯.
-            .environment(\.agentHomeChrome, .pushedChat(onProfile: { openBotPage(fromChat: $0) }))
+            // Every chat is a pushed page: Back, the bot (its page, and a long press for a new chat or
+            // its chats) and ⋯.
+            .environment(\.agentHomeChrome, .pushedChat(onProfile: { openBotPage(fromChat: $0) },
+                                                        onNewChat: { startNewChat(explicitAgentID: $0) },
+                                                        onOpenChats: { openSessions(filteredTo: $0) }))
             .environment(\.chatDissolveTransition, chatDissolve)
             .environment(connectionKeeper)
             .bighelpSideColumn(screen, isShown: sideColumn != nil) { sideColumn }

@@ -231,6 +231,67 @@ final class BotDashboardUITests: BighelpUITestCase {
         }
     }
 
+    /// The pill in a chat's header opens the bot's page on a tap; a long press offers the bot page's
+    /// first two rows — a new chat with it, and its chats — without leaving the chat.
+    /// `BIGHELP_DASHBOARD_SHOTS` names a folder for the menu's screenshots.
+    @MainActor
+    func testALongPressOnThePillOffersANewChatAndTheBotsChats() throws {
+        let folder = ProcessInfo.processInfo.environment["BIGHELP_DASHBOARD_SHOTS"]
+        if let folder { try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true) }
+        func shot(_ name: String, _ app: XCUIApplication) {
+            guard let folder else { return }
+            try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: folder).appendingPathComponent("\(name).png"))
+        }
+
+        // New chat: the row the bot page's ⋯ holds, from the chat's own header.
+        var app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
+                               "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", "light"]
+        app.launch()
+        try openPillMenu(app)
+        shot("pill-menu-light", app)
+        let newChat = app.buttons["New chat"]
+        XCTAssertTrue(newChat.exists, "A long press offers a new chat with the bot")
+        newChat.tap()
+        // The bot page's ⋯ › New chat opens an ordinary chat with the bot, not New chat's own
+        // blank canvas: what proves it is the empty chat's welcome, not a title.
+        let welcome = app.tables["chat.timeline"].cells["chat.welcome"]
+        XCTAssertTrue(welcome.waitForExistence(timeout: 10), "New chat opens an empty chat with the bot")
+        shot("after-new-chat", app)
+        app.terminate()
+
+        // Chats with this bot: its chats, filtered to it, as its page's ⋯ opens them.
+        app = makeApp()
+        app.launchArguments = ["-use-demo-fixtures", "-disable-demo-delays", "-preview-ui-v3",
+                               "-loopdy.home.landing", "bots", "-loopdy.demo.appearance", "dark"]
+        app.launch()
+        defer { app.terminate() }
+        try openPillMenu(app)
+        shot("pill-menu-dark", app)
+        let chats = app.buttons["Chats with this bot"]
+        XCTAssertTrue(chats.exists, "A long press offers the bot's chats")
+        chats.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["sessions.screen"].waitForExistence(timeout: 8),
+                      "Chats with this bot opens its chats")
+    }
+
+    /// The primary bot's chat, with the pill's long-press menu open. The chat slides in under the
+    /// header, so a press that lands mid-slide misses: it waits for the pill, then presses once more.
+    @MainActor
+    private func openPillMenu(_ app: XCUIApplication) throws {
+        let primary = app.primaryBot
+        XCTAssertTrue(primary.waitForExistence(timeout: 15))
+        primary.tap()
+        let identity = app.buttons["chat.identity"]
+        XCTAssertTrue(identity.waitForExistence(timeout: 15))
+        identity.press(forDuration: 1.2)
+        if !app.buttons["New chat"].waitForExistence(timeout: 3) {
+            identity.press(forDuration: 1.2)
+        }
+        XCTAssertTrue(app.buttons["Chats with this bot"].waitForExistence(timeout: 5),
+                      "The pill's long press offers the bot page's rows")
+    }
+
     @MainActor
     private func openProfile(_ app: XCUIApplication, bot: String) {
         let button = bot == "simple-bots.primary" ? app.primaryBot : app.buttons[bot]

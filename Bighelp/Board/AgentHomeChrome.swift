@@ -1,15 +1,72 @@
 import SwiftUI
 
 /// What the shell gives a chat it pushed: `onProfile` opens the bot's page, from the header's pill and
-/// from ⋯ › Bot page. A chat drawn outside the shell (a fixture, a test) has neither, and no New chat
-/// parts.
+/// from ⋯ › Bot page. `onNewChat` and `onOpenChats` are the pill's long press, the bot page's first two
+/// rows without leaving the chat. A chat drawn outside the shell (a fixture, a test) has none of them,
+/// and no New chat parts.
 struct AgentHomeChrome {
     var isPushedChat = false
     var onProfile: @MainActor (String) -> Void = { _ in }
+    /// A new chat with this bot, as the bot page's ⋯ › New chat does. Nil hides the row.
+    var onNewChat: (@MainActor (String) -> Void)?
+    /// This bot's chats, as the bot page's ⋯ › Chats with this bot does. Nil hides the row.
+    var onOpenChats: (@MainActor (String) -> Void)?
 
     /// The chrome of every chat the shell pushes.
-    static func pushedChat(onProfile: @escaping @MainActor (String) -> Void) -> AgentHomeChrome {
-        AgentHomeChrome(isPushedChat: true, onProfile: onProfile)
+    static func pushedChat(onProfile: @escaping @MainActor (String) -> Void,
+                           onNewChat: (@MainActor (String) -> Void)? = nil,
+                           onOpenChats: (@MainActor (String) -> Void)? = nil) -> AgentHomeChrome {
+        AgentHomeChrome(isPushedChat: true, onProfile: onProfile,
+                        onNewChat: onNewChat, onOpenChats: onOpenChats)
+    }
+
+    /// What a long press on the pill offers, in the bot page's own words. Empty where the shell gave
+    /// the chat neither action, and then the pill has no menu rather than an empty one.
+    var pillActions: [ChatAgentPillAction] {
+        var actions: [ChatAgentPillAction] = []
+        if onNewChat != nil { actions.append(.newChat) }
+        if onOpenChats != nil { actions.append(.chats) }
+        return actions
+    }
+}
+
+/// One row of the chat header's pill menu. Both are the bot page's own rows
+/// (`BotProfileAction`), so the words and symbols can't drift apart.
+enum ChatAgentPillAction: String, CaseIterable, Identifiable, Sendable {
+    case newChat, chats
+
+    var id: String { rawValue }
+
+    var botAction: BotProfileAction { self == .newChat ? .newChat : .chats }
+    var title: String { botAction.title }
+    var systemImage: String { botAction.systemImage }
+
+    var identifier: String {
+        switch self {
+        case .newChat: "chat.identity.new-chat"
+        case .chats: "chat.identity.chats"
+        }
+    }
+}
+
+/// The pill's long press: the bot page's New chat and Chats with this bot, from the chat. A right-click
+/// reaches the same menu on the Mac. No actions means no menu at all: an empty `.contextMenu` still
+/// answers a long press with an empty list.
+struct ChatAgentPillMenu: ViewModifier {
+    let actions: [ChatAgentPillAction]
+    let perform: (ChatAgentPillAction) -> Void
+
+    func body(content: Content) -> some View {
+        if actions.isEmpty {
+            content
+        } else {
+            content.contextMenu {
+                ForEach(actions) { action in
+                    Button(action.title, systemImage: action.systemImage) { perform(action) }
+                        .accessibilityIdentifier(action.identifier)
+                }
+            }
+        }
     }
 }
 
@@ -17,7 +74,11 @@ struct AgentHomeChrome {
 /// live state when tapped). Compared as a whole, every shell update redrew the chat on screen, its
 /// header and its message box.
 extension AgentHomeChrome: Equatable {
-    static func == (lhs: Self, rhs: Self) -> Bool { lhs.isPushedChat == rhs.isPushedChat }
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.isPushedChat == rhs.isPushedChat
+            && (lhs.onNewChat == nil) == (rhs.onNewChat == nil)
+            && (lhs.onOpenChats == nil) == (rhs.onOpenChats == nil)
+    }
 }
 
 private struct AgentHomeChromeKey: EnvironmentKey {

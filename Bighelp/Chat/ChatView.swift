@@ -843,7 +843,8 @@ struct ChatView: View {
     }
     #endif
 
-    /// The bot's face and name in one pill; it opens the bot's page.
+    /// The bot's face and name in one pill; it opens the bot's page, and a long press offers the two
+    /// things its page offers first: a new chat with it, and its chats (`ChatAgentPillMenu`).
     private var simpleBotIdentityButton: some View {
         let participant = resolvedIdentityParticipants.first
         let agentID = model.memberIDs.first ?? participant?.stableID ?? agentName
@@ -855,6 +856,13 @@ struct ChatView: View {
                                   sessionTitle: shownSessionTitle)
         }
         .buttonStyle(.plain)
+        .modifier(ChatAgentPillMenu(actions: homeChrome.pillActions) { action in
+            dismissKeyboard()
+            switch action {
+            case .newChat: homeChrome.onNewChat?(agentID)
+            case .chats: homeChrome.onOpenChats?(agentID)
+            }
+        })
         .accessibilityLabel(agentName)
         .accessibilityValue(headerLiveActivityPresentation?.text ?? shownSessionTitle ?? headerLiveState.label)
         .accessibilityHint("Opens its profile")

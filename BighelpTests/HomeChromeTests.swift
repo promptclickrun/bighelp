@@ -83,6 +83,30 @@ struct HomeChromeTests {
         ))
     }
 
+    @Test func aPushedChatsPillOffersTheBotPagesFirstTwoRows() {
+        let chrome = AgentHomeChrome.pushedChat(onProfile: { _ in }, onNewChat: { _ in }, onOpenChats: { _ in })
+        #expect(chrome.pillActions == [.newChat, .chats])
+        // The bot page's own words and symbols, so the two can't drift apart.
+        #expect(chrome.pillActions.map(\.title) == [BotProfileAction.newChat.title, BotProfileAction.chats.title])
+        #expect(chrome.pillActions.map(\.systemImage) == [BotProfileAction.newChat.systemImage,
+                                                          BotProfileAction.chats.systemImage])
+        #expect(chrome.pillActions.map(\.identifier) == ["chat.identity.new-chat", "chat.identity.chats"])
+    }
+
+    @Test func aPillMenuOffersOnlyWhatTheShellCanDo() {
+        // A chat drawn without a shell (a fixture, a test): no menu at all, rather than an empty one.
+        #expect(AgentHomeChrome().pillActions.isEmpty)
+        #expect(AgentHomeChrome.pushedChat(onProfile: { _ in }, onOpenChats: { _ in }).pillActions == [.chats])
+    }
+
+    @Test func thePillMenuIsPartOfWhatTheHeaderCompares() {
+        let profile: @MainActor (String) -> Void = { _ in }
+        #expect(AgentHomeChrome.pushedChat(onProfile: profile, onNewChat: { _ in }, onOpenChats: { _ in })
+                == AgentHomeChrome.pushedChat(onProfile: profile, onNewChat: { _ in }, onOpenChats: { _ in }))
+        #expect(AgentHomeChrome.pushedChat(onProfile: profile, onNewChat: { _ in })
+                != AgentHomeChrome.pushedChat(onProfile: profile))
+    }
+
     private func header() -> HomeHeaderContext {
         HomeHeaderContext(personName: "Sam", personImageURL: nil, onOpenSettings: {})
     }

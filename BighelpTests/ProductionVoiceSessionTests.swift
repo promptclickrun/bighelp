@@ -573,6 +573,41 @@ struct ProductionVoiceSessionTests {
         _ = try coordinator.holdForLiveCall()
     }
 
+    @Test func attachmentPlaybackDoesNotShareTheSessionWithVoice() throws {
+        let session = VoiceAudioSessionFixture()
+        let coordinator = VoiceAudioSessionCoordinator(session: session)
+        let clip = try coordinator.acquire(for: .attachmentPlayback)
+        #expect(session.configurations == [.attachmentPlayback])
+        #expect(throws: VoiceAudioSessionError.heldByAttachment) { _ = try coordinator.acquire(for: .conversation) }
+        clip.release()
+
+        let call = try coordinator.holdForLiveCall()
+        #expect(throws: VoiceAudioSessionError.heldByLiveCall) { _ = try coordinator.acquire(for: .attachmentPlayback) }
+        call.release()
+
+        let microphone = try coordinator.acquire(for: .conversation)
+        #expect(throws: VoiceAudioSessionError.heldByVoice) { _ = try coordinator.acquire(for: .attachmentPlayback) }
+        microphone.release()
+    }
+
+    @Test func invalidAttachmentPlaybackDoesNotActivateAudio() throws {
+        let session = VoiceAudioSessionFixture()
+        let playback = ChatAttachmentPlayback(sessionCoordinator: VoiceAudioSessionCoordinator(session: session))
+        let attachment = try ChatAttachment(id: "test-invalid-audio", fileName: "clip.wav",
+                                            mimeType: "audio/wav", data: Data([0, 1, 2]))
+        #expect(throws: (any Error).self) { try playback.toggle(attachment) }
+        #expect(!playback.isPlaying && playback.activeID == nil)
+        #expect(session.activations == 0)
+    }
+
+    @Test func attachmentPlaybackSeekRejectsInvalidTimesAndClampsToTheClip() {
+        #expect(ChatAttachmentPlayback.clampedPosition(.nan, duration: 10) == nil)
+        #expect(ChatAttachmentPlayback.clampedPosition(0, duration: 0) == nil)
+        #expect(ChatAttachmentPlayback.clampedPosition(-3, duration: 10) == 0)
+        #expect(ChatAttachmentPlayback.clampedPosition(3, duration: 10) == 3)
+        #expect(ChatAttachmentPlayback.clampedPosition(11, duration: 10) == 10)
+    }
+
     @Test func aStaleCallLeaseCannotLiftANewerCallsHold() throws {
         let coordinator = VoiceAudioSessionCoordinator(session: VoiceAudioSessionFixture())
 

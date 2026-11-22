@@ -70,6 +70,7 @@ struct ChatAttachment: Identifiable, Codable, Equatable, Sendable {
     }
 
     var kind: Kind { mimeType.lowercased().hasPrefix("image/") ? .image : .file }
+    var isAudio: Bool { mimeType.hasPrefix("audio/") }
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)

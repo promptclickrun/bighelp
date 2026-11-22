@@ -77,7 +77,11 @@ final class BighelpHostRegistry {
     }
     var activeHostConnectionID: String? { selectedHostID?.uuidString }
     private(set) var hosts: [BighelpConfiguredHost] = []
-    private(set) var selectedHostID: UUID?
+    private(set) var selectedHostID: UUID? {
+        didSet {
+            if selectedHostID != oldValue { ChatAttachmentPlayback.shared.stop() }
+        }
+    }
     private(set) var selectedWorkspace: DirectHermesWorkspaceStore?
     private(set) var errorMessage: String?
     private(set) var generation = UUID()

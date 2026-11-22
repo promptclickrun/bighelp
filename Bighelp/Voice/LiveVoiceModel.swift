@@ -165,6 +165,7 @@ final class LiveVoiceModel {
     /// microphone/auth gate. Never started again by itself after it ends or fails.
     func start() {
         guard canStart else { return }
+        ChatAttachmentPlayback.shared.stop()
         Telemetry.featureUsed(.voiceLive)
         currentCall.began(self)
         generation = UUID()

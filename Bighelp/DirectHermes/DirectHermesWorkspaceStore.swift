@@ -519,6 +519,7 @@ final class DirectHermesWorkspaceStore {
         guard owner == generation else { return }
         do {
             try vault.delete()
+            ChatAttachmentPlayback.shared.stop()
             saved = nil
             hasSavedConnection = false
             requiresAuthentication = false

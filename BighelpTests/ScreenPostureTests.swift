@@ -45,6 +45,23 @@ struct ScreenPostureTests {
         #expect(BighelpScreenGeometry(posture: .open, size: CGSize(width: 951, height: 669)).splitColumnWidth == 340)
     }
 
+    @Test func theHalfUnderTheFoldIsAPagesFloor() {
+        let laptop = BighelpScreenGeometry(posture: .openUpright, size: CGSize(width: 669, height: 951),
+                                           fold: CGRect(x: 0, y: 470, width: 669, height: 12),
+                                           isFoldActive: true, bottomInset: 34)
+        // From the fold's near edge to the system's own inset: 951 − 470 − 34.
+        #expect(laptop.foldDeckHeight == 447)
+        // Lying flat there is no half to give up, and open wide the fold is down the middle.
+        var flat = laptop
+        flat.isFoldActive = false
+        #expect(flat.foldDeckHeight == 0)
+        let book = BighelpScreenGeometry(posture: .open, size: CGSize(width: 951, height: 669),
+                                         fold: CGRect(x: 470, y: 0, width: 12, height: 669))
+        #expect(book.foldDeckHeight == 0)
+        // An ordinary phone keeps every point of its screen.
+        #expect(BighelpScreenGeometry().foldDeckHeight == 0)
+    }
+
     @Test func theColumnStaysClearOfTheStatusWhenTheSystemReportsNoEndForIt() {
         // The system's report is taken as it is.
         #expect(BighelpScreenGeometry.columnFreeTop(reportedEnd: 174, systemColumnWidth: 84) == 174)

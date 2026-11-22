@@ -68,6 +68,8 @@ struct BighelpScreenGeometry: Equatable, Sendable {
     var fold: CGRect?
     /// Half-folded: the system asks that nothing sit across the fold.
     var isFoldActive = false
+    /// The system's own bottom inset (the home indicator), which the fold's half sits inside.
+    var bottomInset: CGFloat = 0
     /// Wider than tall: where iPad and Mac can show the switcher beside a chat.
     var isLandscape = false
 
@@ -87,6 +89,15 @@ struct BighelpScreenGeometry: Equatable, Sendable {
     var splitColumnWidth: CGFloat {
         guard let fold, fold.height > fold.width, size.width > 0 else { return 340 }
         return min(max(fold.minX, 300), max(300, size.width - 360))
+    }
+
+    /// The half under the fold while half-folded, clear of the system's own bottom inset. It's a
+    /// page's floor: half-folded, nothing may sit across the fold and the half under it faces away,
+    /// so every screen ends there and only a chat puts anything in it (its message box, then the
+    /// keyboard). Zero anywhere else.
+    var foldDeckHeight: CGFloat {
+        guard isLaptop, let fold else { return 0 }
+        return max(0, size.height - fold.minY - bottomInset)
     }
 
     /// The width the side bar and the switcher take. The system's column when it's wide
@@ -112,6 +123,34 @@ extension EnvironmentValues {
     @Entry var bighelpScreen = BighelpScreenGeometry()
 }
 
+/// Half-folded, the half under the fold belongs to no page: the screen's other half faces away, and
+/// the system asks that nothing sit across the fold. Without this, a list, a board or a bot's page
+/// drew its bottom half — and its bar — under the crease, where the person can't see or touch it.
+/// Every screen ends at the fold with the tab bar on it. A chat is the one page that uses that half,
+/// and says so: its message box rests on it, and the keyboard rises under the message box.
+struct BighelpFoldBoundary: ViewModifier {
+    /// True while the page on top is a chat, which fills the half under the fold itself
+    /// (`ChatView.laptopDeckHeight`, `ChatLaptopDesk`).
+    let pageUsesDeck: Bool
+    @Environment(\.bighelpScreen) private var screen
+
+    func body(content: Content) -> some View {
+        VStack(spacing: 0) {
+            // The page's own frame ends at the fold: a list, a board and a bar all lay out inside it,
+            // which a safe-area inset can't promise for the bar a root adds itself.
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if !pageUsesDeck, screen.foldDeckHeight > 0 {
+                Color.clear
+                    .frame(maxWidth: .infinity)
+                    .frame(height: screen.foldDeckHeight)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+}
+
 /// Works out the posture from the window's size, size classes and the fold, and hands it to every
 /// screen, pushed chats included. Apply it outside the navigation stack, around the whole window.
 struct BighelpScreenPostureReader: ViewModifier {
@@ -123,6 +162,7 @@ struct BighelpScreenPostureReader: ViewModifier {
     struct Measured: Equatable {
         var size: CGSize = .zero
         var trailingInset: CGFloat = 0
+        var bottomInset: CGFloat = 0
         var occlusion: CGRect?
         var fold: CGRect?
         var isFoldActive = false
@@ -180,6 +220,7 @@ struct BighelpScreenPostureReader: ViewModifier {
                 reportedEnd: measured.occlusion.map(\.maxY), systemColumnWidth: measured.trailingInset),
             fold: measured.fold,
             isFoldActive: measured.isFoldActive,
+            bottomInset: measured.bottomInset,
             isLandscape: isLandscape
         )
     }
@@ -191,7 +232,8 @@ struct BighelpScreenPostureReader: ViewModifier {
         var measured = Measured(
             size: CGSize(width: proxy.size.width + insets.leading + insets.trailing,
                          height: proxy.size.height + insets.top + insets.bottom),
-            trailingInset: insets.trailing)
+            trailingInset: insets.trailing,
+            bottomInset: insets.bottom)
         #if os(iOS) && !targetEnvironment(macCatalyst)
         if #available(iOS 27.1, *) {
             func inWindow(_ frame: CGRect) -> CGRect { frame.offsetBy(dx: insets.leading, dy: insets.top) }

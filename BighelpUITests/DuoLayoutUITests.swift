@@ -416,6 +416,33 @@ final class DuoLayoutUITests: BighelpUITestCase {
 
     // MARK: Every screen
 
+    /// Half-folded, every page but a chat ends at the fold: the bar rests on the crease, and the bots
+    /// stay above it, instead of the bottom half of both sitting in the half that faces away.
+    @MainActor
+    func testHalfFoldedThePagesEndAtTheFold() throws {
+        for appearance in appearances {
+            let app = makeApp()
+            app.launchArguments = demo + ["-loopdy.home.landing", "bots", "-loopdy.demo.appearance", appearance,
+                                          "-bighelp.debug.screen-posture", "openUpright",
+                                          "-bighelp.debug.fold-halfway", "YES"]
+            app.launch()
+            // No wide-screen skip: the posture and the fold are forced by the debug arguments, so this
+            // runs on the Duo's own simulator as well as the iPad stand-in.
+            let bots = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "simple-bots.primary."))
+                .firstMatch
+            XCTAssertTrue(bots.waitForExistence(timeout: 20), "The Bots view shows")
+            let window = app.windows.firstMatch.frame
+            let bar = element("primary-navigation", in: app)
+            XCTAssertTrue(bar.waitForExistence(timeout: 10), "A root has its bar")
+            XCTAssertLessThanOrEqual(bar.frame.maxY, window.midY + 2, "The bar rests on the fold")
+            XCTAssertGreaterThan(bar.frame.minY, window.midY - 120, "On the fold, not halfway up the page")
+            // No assertion about the bots under the bar: it floats over the list, which scrolls beneath it
+            // everywhere the app has a bar.
+            save("half-folded-bots-\(appearance)", app)
+            app.terminate()
+        }
+    }
+
     /// From iOS 27 a project's actions sit in the system's overflow menu, so its bar has one "⋯" and
     /// the Duo's column doesn't stack ours above the system's. Runs on any simulator.
     @MainActor

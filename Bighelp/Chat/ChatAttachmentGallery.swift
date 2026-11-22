@@ -23,11 +23,12 @@ final class ChatAttachmentPlayback: NSObject, AVAudioPlayerDelegate {
     @ObservationIgnored private var attachment: ChatAttachment?
     @ObservationIgnored private var claim: VoiceAudioSessionClaim?
     @ObservationIgnored private var observers: [any NSObjectProtocol] = []
+    @ObservationIgnored private var resetObserver: (any NSObjectProtocol)?
     private let sessionCoordinator: VoiceAudioSessionCoordinator
     private var run: UUID?
+    private var track: UUID?
     #if os(iOS)
     @ObservationIgnored private var remoteTargets: [(MPRemoteCommand, Any)] = []
-    private var track: UUID?
     #endif
 
     init(sessionCoordinator: VoiceAudioSessionCoordinator = .shared) {
@@ -62,8 +63,18 @@ final class ChatAttachmentPlayback: NSObject, AVAudioPlayerDelegate {
         }
         self.attachment = attachment
         activeID = attachment.id
+        let token = UUID()
+        track = token
+        resetObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: nil
+        ) { @Sendable [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.track == token else { return }
+                self.stop()
+            }
+        }
         #if os(iOS)
-        installRemoteCommands()
+        installRemoteCommands(token: token)
         #endif
         publishNowPlaying()
     }
@@ -99,6 +110,11 @@ final class ChatAttachmentPlayback: NSObject, AVAudioPlayerDelegate {
         #if os(iOS)
         clearNowPlaying()
         #endif
+        track = nil
+        if let resetObserver {
+            NotificationCenter.default.removeObserver(resetObserver)
+            self.resetObserver = nil
+        }
         player?.stop()
         player = nil
         attachment = nil
@@ -140,9 +156,7 @@ final class ChatAttachmentPlayback: NSObject, AVAudioPlayerDelegate {
     }
 
     #if os(iOS)
-    private func installRemoteCommands() {
-        let token = UUID()
-        track = token
+    private func installRemoteCommands(token: UUID) {
         let commands = MPRemoteCommandCenter.shared()
         addRemoteTarget(commands.playCommand, token: token, action: .play)
         addRemoteTarget(commands.pauseCommand, token: token, action: .pause)
@@ -175,7 +189,6 @@ final class ChatAttachmentPlayback: NSObject, AVAudioPlayerDelegate {
 
     private func clearNowPlaying() {
         guard track != nil else { return }
-        track = nil
         for (command, target) in remoteTargets { command.removeTarget(target) }
         remoteTargets.removeAll()
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil

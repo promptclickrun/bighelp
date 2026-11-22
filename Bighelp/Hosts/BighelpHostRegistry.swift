@@ -510,6 +510,10 @@ final class BighelpHostRegistry {
         let vault = makeVault(id: id)
         let drafts = DirectHermesDraftStore(root: draftRoot(id: id))
         let store = DirectHermesWorkspaceStore(vault: vault, drafts: drafts)
+        store.onPlaybackAuthorityLost = { [weak self, weak store] in
+            guard let self, let store, self.selectedWorkspace === store else { return }
+            ChatAttachmentPlayback.shared.stop()
+        }
         store.prepareChat = { [weak self] chat in
             guard let self, let host = self.hosts.first(where: { $0.id == id }) else { return }
             do { try await self.prepareChat?(host, chat) }

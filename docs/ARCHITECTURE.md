@@ -502,7 +502,9 @@ independent of the chat route or host connection. On iPhone and iPad it claims
 the shared audio session for non-mixing playback and publishes only a generic
 title and timing to Now Playing. Voice capture or a live call retires the clip;
 an audio interruption or removal of the output device pauses it without
-automatically resuming. No new copy is written for playback. Hermes' adapter
+automatically resuming. A media-services reset or loss of the selected host’s
+sign-in clears the clip; a network disconnect alone does not. No new copy is
+written for playback. Hermes' adapter
 directive `[[audio_as_voice]]` is not a durable per-attachment hint on the
 current native live and history paths, so the app does not infer voice-note
 intent from it.

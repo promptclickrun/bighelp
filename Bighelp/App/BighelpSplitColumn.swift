@@ -8,14 +8,20 @@ import SwiftUI
 @Observable
 final class BighelpSplitColumn {
     private(set) var content: AnyView?
+    /// The places down the list's leading edge: they switch the list, so they stay with it.
+    private(set) var rail: AnyView = AnyView(EmptyView())
+    /// The list is put away, so the page takes the whole screen. The rail stays to bring it back.
+    private(set) var isCollapsed = false
     @ObservationIgnored private var key: String?
 
     var isShown: Bool { content != nil }
 
-    /// Shows the list `key` names. The same key keeps the list that's there, scrolled where it was.
-    func show(_ key: String, _ view: () -> AnyView) {
+    /// Shows the list `key` names, under `rail`. The same key keeps the list that's there, scrolled
+    /// where it was.
+    func show(_ key: String, rail: AnyView, _ view: () -> AnyView) {
         guard self.key != key else { return }
         self.key = key
+        self.rail = rail
         content = view()
     }
 
@@ -23,6 +29,11 @@ final class BighelpSplitColumn {
         guard content != nil else { return }
         key = nil
         content = nil
+    }
+
+    func setCollapsed(_ collapsed: Bool) {
+        guard isCollapsed != collapsed else { return }
+        isCollapsed = collapsed
     }
 }
 
@@ -40,11 +51,20 @@ struct BighelpSplitColumnHost: ViewModifier {
     func body(content: Content) -> some View {
         HStack(spacing: 0) {
             if let list = column.content {
-                // Its own stack, beside the app's: the list's bar and buttons, apart from the page's.
-                NavigationStack { list }
-                    // Up to the fold, so nothing sits across it.
-                    .frame(width: screen.splitColumnWidth)
-                    .transition(.move(edge: .leading))
+                HStack(spacing: 0) {
+                    // The places that switch the list, down its leading edge where the list is.
+                    column.rail
+                    // Its own stack, beside the app's: the list's bar and buttons, apart from the page's.
+                    NavigationStack { list }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        // Put away, the list keeps its place and its scroll: it is only out of sight.
+                        .clipped()
+                }
+                // Up to the fold, so nothing sits across it; put away, only the rail's column is left.
+                .frame(width: column.isCollapsed ? HomePlacesRail.width : screen.splitColumnWidth,
+                       alignment: .leading)
+                .clipped()
+                .transition(.move(edge: .leading))
                 Rectangle()
                     .fill(theme.border)
                     .frame(width: BighelpTokens.hairline)
@@ -54,6 +74,7 @@ struct BighelpSplitColumnHost: ViewModifier {
             content
         }
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: column.isShown)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: column.isCollapsed)
         .environment(\.bighelpSplitColumn, column)
     }
 }

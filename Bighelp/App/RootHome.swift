@@ -468,10 +468,17 @@ struct HomeBars: ViewModifier {
     let tint: Color
 
     @Environment(\.bighelpScreen) private var screen
+    @Environment(\.bighelpSplitColumn) private var splitColumn
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var showsBar: Bool {
         isAtRoot && !isKeyboardVisible && !BighelpPlatform.usesTabOrnament && !screen.usesSideBar
+    }
+
+    /// Where the system's strip carries the places, or nothing when the list beside the page does.
+    private var showsStripTabs: Bool {
+        isAtRoot && !isKeyboardVisible && screen.usesSideBar
+            && !screen.placesGoWithTheList(listIsShown: splitColumn?.isShown == true)
     }
 
     func body(content: Content) -> some View {
@@ -492,7 +499,7 @@ struct HomeBars: ViewModifier {
             }
             // The iPhone Duo: the places go down the side strip with the screen's own buttons.
             .toolbar {
-                if isAtRoot && !isKeyboardVisible && screen.usesSideBar {
+                if showsStripTabs {
                     HomeStripTabs(selection: selection, items: items, onNewChat: onNewChat,
                                   selectedTint: selectedTint, tint: tint)
                 }

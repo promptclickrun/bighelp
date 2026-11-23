@@ -54,15 +54,16 @@ struct BighelpSplitColumnHost: ViewModifier {
                 HStack(spacing: 0) {
                     // The places that switch the list, down its leading edge where the list is.
                     column.rail
-                    // Its own stack, beside the app's: the list's bar and buttons, apart from the page's.
-                    // Hidden from accessibility inside the stack, where the bridge to its own UIKit
-                    // hierarchy lets it through, and out of hit testing outside it.
-                    NavigationStack { list.accessibilityHidden(column.isCollapsed) }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        // Put away, the list keeps its place and its scroll: it is only out of sight,
-                        // and it takes no taps from the page that has the room.
-                        .clipped()
-                        .allowsHitTesting(!column.isCollapsed)
+                    // Put away, the list leaves the hierarchy: the bridge into its own UIKit stack
+                    // keeps a merely-hidden one in the accessibility tree, where it would answer
+                    // VoiceOver and take taps the page has the room for.
+                    if !column.isCollapsed {
+                        // Its own stack, beside the app's: the list's bar and buttons, apart from the
+                        // page's.
+                        NavigationStack { list }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .clipped()
+                    }
                 }
                 // Up to the fold, so nothing sits across it; put away, only the rail's column is left.
                 .frame(width: column.isCollapsed ? HomePlacesRail.width : screen.splitColumnWidth,

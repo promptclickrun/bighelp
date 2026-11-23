@@ -57,8 +57,11 @@ struct BighelpSplitColumnHost: ViewModifier {
                     // Its own stack, beside the app's: the list's bar and buttons, apart from the page's.
                     NavigationStack { list }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        // Put away, the list keeps its place and its scroll: it is only out of sight.
+                        // Put away, the list keeps its place and its scroll: it is only out of sight,
+                        // and it takes no taps or VoiceOver elements from the page that has the room.
                         .clipped()
+                        .allowsHitTesting(!column.isCollapsed)
+                        .accessibilityHidden(column.isCollapsed)
                 }
                 // Up to the fold, so nothing sits across it; put away, only the rail's column is left.
                 .frame(width: column.isCollapsed ? HomePlacesRail.width : screen.splitColumnWidth,

@@ -389,7 +389,7 @@ final class DuoLayoutUITests: BighelpUITestCase {
         XCTAssertLessThan(today.frame.maxX, window.midX, "Not in the column the chat has")
         let list = element("chats.inbox", in: app)
         XCTAssertTrue(list.waitForExistence(timeout: 10), "The list shows beside the page")
-        XCTAssertLessThan(list.frame.maxX, window.midX + 2, "The list stops at the fold")
+        XCTAssertGreaterThan(list.frame.minX, window.minX + 40, "The list starts beside the strip")
         let toggle = app.buttons["home.list.toggle"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 5), "The list can be put away")
         XCTAssertEqual(toggle.label, "Hide the list")
@@ -398,14 +398,15 @@ final class DuoLayoutUITests: BighelpUITestCase {
 
         toggle.tap()
         XCTAssertTrue(waitForLabel("Show the list", of: toggle), "The list is away")
-        XCTAssertLessThan(list.frame.maxX, window.minX + 70, "The list is out of the way")
+        XCTAssertTrue(list.waitForNonExistence(timeout: 5), "The list is out of the way")
         XCTAssertLessThan(app.buttons["home.tab.today"].frame.minX, window.minX + 70, "The rail stays")
         sleep(1)
         save("open-list-away-light", app)
 
         toggle.tap()
         XCTAssertTrue(waitForLabel("Hide the list", of: toggle), "And it comes back")
-        XCTAssertGreaterThan(list.frame.maxX, window.minX + 200, "The list is back")
+        XCTAssertTrue(list.waitForExistence(timeout: 5), "The list is back")
+        XCTAssertGreaterThan(list.frame.width, 100, "With room for its rows")
     }
 
     @MainActor

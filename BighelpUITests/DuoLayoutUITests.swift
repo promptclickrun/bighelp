@@ -398,7 +398,8 @@ final class DuoLayoutUITests: BighelpUITestCase {
 
         toggle.tap()
         XCTAssertTrue(waitForLabel("Show the list", of: toggle), "The list is away")
-        XCTAssertTrue(list.waitForNonExistence(timeout: 5), "The list is out of the way")
+        XCTAssertTrue(list.waitForNonExistence(timeout: 5), "The list is out of the page's way")
+        XCTAssertFalse(list.isHittable, "And it takes none of the page's taps")
         XCTAssertLessThan(app.buttons["home.tab.today"].frame.minX, window.minX + 70, "The rail stays")
         sleep(1)
         save("open-list-away-light", app)

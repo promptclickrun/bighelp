@@ -74,6 +74,40 @@ final class DuoLayoutUITests: BighelpUITestCase {
         }
     }
 
+    /// Half of the inner screen in Split View, the app left of the divider: the camera and the status
+    /// are on its leading edge, so the chat's column goes there too — and the page gets the room instead
+    /// of being squeezed between the switcher and the camera. `-bighelp.debug.leading-column` stands in
+    /// for the Split View half, which no simulator arranges.
+    @MainActor
+    func testTheChatsColumnFollowsTheScreensOwnEdge() throws {
+        for leading in [false, true] {
+            let app = makeApp()
+            var arguments = demo + ["-loopdy.home.landing", "bots", "-loopdy.demo.appearance", "light"]
+            if leading { arguments += ["-bighelp.debug.leading-column", "84"] }
+            app.launchArguments = arguments
+            app.launch()
+            try requireCoverScreen(app)
+            let mina = app.buttons["simple-bots.bot.travel"]
+            XCTAssertTrue(mina.waitForExistence(timeout: 20))
+            mina.tap()
+            let switcher = element("chat-switcher", in: app)
+            XCTAssertTrue(switcher.waitForExistence(timeout: 10), "The chat has its column")
+            let window = app.windows.firstMatch.frame
+            if leading {
+                XCTAssertLessThan(switcher.frame.maxX, window.minX + 90, "On the leading edge, where the camera is")
+                // The chat reaches the middle of the half instead of stopping short of a column on the right.
+                let identity = app.buttons["chat.identity"].firstMatch
+                XCTAssertTrue(identity.waitForExistence(timeout: 10))
+                XCTAssertGreaterThanOrEqual(identity.frame.maxX, window.midX - 40,
+                                            "The chat fills the rest of the half")
+            } else {
+                XCTAssertGreaterThan(switcher.frame.minX, window.maxX - 90, "The cover screen keeps it trailing")
+            }
+            save(leading ? "column-leading-light" : "column-trailing-light", app)
+            app.terminate()
+        }
+    }
+
     /// The Duo has no island, so a chat's column says who works in another chat: a face and a
     /// line under the camera, above the chats' faces. A tap opens the chat where the work is.
     @MainActor

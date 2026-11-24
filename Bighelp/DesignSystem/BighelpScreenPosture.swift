@@ -54,16 +54,30 @@ enum BighelpScreenPosture: String, Equatable, Sendable {
     }
 }
 
+/// Which edge of the window the system's own column (camera and status) runs along. The Duo's cover
+/// screen keeps it on the trailing edge; an app on the LEFT of Split View on the inner screen has its
+/// controls — that column among them — along its own leading edge instead, and a layout that assumed
+/// "trailing" puts the chat switcher opposite the camera column, squeezing the page between two.
+enum BighelpSideColumnEdge: String, Equatable, Sendable {
+    case leading, trailing
+
+    /// For `.move(edge:)` and an overlay's alignment.
+    var edge: Edge { self == .leading ? .leading : .trailing }
+    /// For the safe-area APIs, which take a set of edges.
+    var edgeSet: Edge.Set { self == .leading ? .leading : .trailing }
+}
+
 /// The screen the window is on, as the layouts that differ on the Duo need it.
 struct BighelpScreenGeometry: Equatable, Sendable {
     var posture: BighelpScreenPosture = .standard
     /// The window's size, safe areas included.
     var size: CGSize = .zero
-    /// The system's column on the trailing edge (camera and status), measured from the window's
-    /// trailing edge. Zero where there is none.
-    var trailingColumnWidth: CGFloat = 0
-    /// Where the column's empty part starts, under the camera and the status (`columnFreeTop`).
-    var trailingColumnFreeTop: CGFloat = 0
+    /// Which edge of the window the system's own column runs along (camera and status).
+    var sideColumnEdge: BighelpSideColumnEdge = .trailing
+    /// The system's column: how much of the window it takes, and where its empty part starts, under
+    /// the camera and the status (`columnFreeTop`). Zero where there is none.
+    var sideColumnWidth: CGFloat = 0
+    var sideColumnFreeTop: CGFloat = 0
     /// The fold, in the window's coordinates, where the screen has one.
     var fold: CGRect?
     /// Half-folded: the system asks that nothing sit across the fold.
@@ -117,6 +131,23 @@ struct BighelpScreenGeometry: Equatable, Sendable {
         if let reportedEnd { return reportedEnd }
         return systemColumnWidth >= sideColumnWidth ? statusAreaHeight : 0
     }
+
+    /// The system's column, whichever edge it is on. Split View puts an app's controls along its own
+    /// outer edge, so the app left of the divider has the camera and the status along its leading
+    /// edge; the cover screen keeps them trailing. The wider side wins, and a screen that reports
+    /// neither keeps the trailing edge, which is where the Duo's own column is.
+    static func sideColumn(leading: CGRect?, trailing: CGRect?,
+                           leadingInset: CGFloat, trailingInset: CGFloat)
+        -> (edge: BighelpSideColumnEdge, width: CGFloat, freeTop: CGFloat) {
+        let leadingWidth = max(leadingInset, leading.map(\.width) ?? 0)
+        let trailingWidth = max(trailingInset, trailing.map(\.width) ?? 0)
+        let isLeading = leadingWidth > trailingWidth
+        let region = isLeading ? leading : trailing
+        let inset = isLeading ? leadingInset : trailingInset
+        return (isLeading ? .leading : .trailing,
+                isLeading ? leadingWidth : trailingWidth,
+                columnFreeTop(reportedEnd: region?.maxY, systemColumnWidth: inset))
+    }
 }
 
 extension EnvironmentValues {
@@ -161,8 +192,10 @@ struct BighelpScreenPostureReader: ViewModifier {
     /// What the window's geometry says, in the window's coordinates.
     struct Measured: Equatable {
         var size: CGSize = .zero
+        var leadingInset: CGFloat = 0
         var trailingInset: CGFloat = 0
         var bottomInset: CGFloat = 0
+        var leadingOcclusion: CGRect?
         var occlusion: CGRect?
         var fold: CGRect?
         var isFoldActive = false
@@ -211,13 +244,20 @@ struct BighelpScreenPostureReader: ViewModifier {
                 : CGRect(x: 0, y: size.height / 2 - 6, width: size.width, height: 12)
             measured.isFoldActive = true
         }
+        // Which edge the camera and the status sit on: trailing on the cover screen, leading for the
+        // app on the left of Split View. A debug column stands in for one no simulator arranges.
+        let column = BighelpScreenDebug.leadingColumnWidth.map {
+            (edge: BighelpSideColumnEdge.leading, width: $0,
+             freeTop: BighelpScreenGeometry.statusAreaHeight)
+        } ?? BighelpScreenGeometry.sideColumn(
+            leading: measured.leadingOcclusion, trailing: measured.occlusion,
+            leadingInset: measured.leadingInset, trailingInset: measured.trailingInset)
         return BighelpScreenGeometry(
             posture: posture,
             size: measured.size,
-            trailingColumnWidth: max(measured.trailingInset,
-                                     measured.occlusion.map { max(0, measured.size.width - $0.minX) } ?? 0),
-            trailingColumnFreeTop: BighelpScreenGeometry.columnFreeTop(
-                reportedEnd: measured.occlusion.map(\.maxY), systemColumnWidth: measured.trailingInset),
+            sideColumnEdge: column.edge,
+            sideColumnWidth: column.width,
+            sideColumnFreeTop: column.freeTop,
             fold: measured.fold,
             isFoldActive: measured.isFoldActive,
             bottomInset: measured.bottomInset,
@@ -232,16 +272,21 @@ struct BighelpScreenPostureReader: ViewModifier {
         var measured = Measured(
             size: CGSize(width: proxy.size.width + insets.leading + insets.trailing,
                          height: proxy.size.height + insets.top + insets.bottom),
+            leadingInset: insets.leading,
             trailingInset: insets.trailing,
             bottomInset: insets.bottom)
         #if os(iOS) && !targetEnvironment(macCatalyst)
         if #available(iOS 27.1, *) {
             func inWindow(_ frame: CGRect) -> CGRect { frame.offsetBy(dx: insets.leading, dy: insets.top) }
             let half = measured.size.width / 2
-            measured.occlusion = proxy.reservedRegions(kind: .occlusion)
-                .filter { $0.isActive && inWindow($0.frame).midX > half }
-                .map { inWindow($0.frame) }
-                .reduce(nil as CGRect?) { merged, frame in merged.map { $0.union(frame) } ?? frame }
+            // Both edges: Split View keeps an app's camera and status on its own outer edge, which is
+            // the leading one for the app on the left.
+            func merged(_ frames: [CGRect]) -> CGRect? {
+                frames.reduce(nil as CGRect?) { union, frame in union.map { $0.union(frame) } ?? frame }
+            }
+            let regions = proxy.reservedRegions(kind: .occlusion).filter(\.isActive).map { inWindow($0.frame) }
+            measured.leadingOcclusion = merged(regions.filter { $0.midX < half })
+            measured.occlusion = merged(regions.filter { $0.midX > half })
             // Where the fold is even while the screen lies flat, so the list can stop at it.
             let folds = proxy.reservedRegions(kind: .division, options: .includeInactive)
             if let fold = folds.first(where: \.isActive) ?? folds.first {
@@ -272,6 +317,17 @@ enum BighelpScreenDebug {
         UserDefaults.standard.bool(forKey: "bighelp.debug.no-occlusion")
         #else
         false
+        #endif
+    }
+
+    /// The system's column on the leading edge, as Split View gives the app left of the divider and no
+    /// simulator arranges. `-bighelp.debug.leading-column 84`.
+    static var leadingColumnWidth: CGFloat? {
+        #if DEBUG
+        let width = UserDefaults.standard.double(forKey: "bighelp.debug.leading-column")
+        return width > 0 ? width : nil
+        #else
+        nil
         #endif
     }
 

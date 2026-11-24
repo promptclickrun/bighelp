@@ -63,14 +63,14 @@ struct WorkingChatTests {
     @Test func thePillShowsOnlyWhereTheColumnIsThereAnyway() {
         var cover = BighelpScreenGeometry()
         cover.posture = .cover
-        cover.trailingColumnWidth = 84
+        cover.sideColumnWidth = 84
         // The Duo's cover screen has the system's column, with or without the switcher.
         #expect(WorkingChatPill.isShown(screen: cover, hasSwitcher: false))
         #expect(WorkingChatPill.isShown(screen: cover, hasSwitcher: true))
         // Half of the open screen in Split View has the cover layout and no column of the system's:
         // the pill shows in the room the switcher keeps, and never makes room of its own.
         var half = cover
-        half.trailingColumnWidth = 0
+        half.sideColumnWidth = 0
         #expect(WorkingChatPill.isShown(screen: half, hasSwitcher: true))
         #expect(!WorkingChatPill.isShown(screen: half, hasSwitcher: false))
         // Every other screen: the list beside the chat, a big phone, an iPhone with an island, iPad.

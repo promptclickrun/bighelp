@@ -69,15 +69,42 @@ struct ScreenPostureTests {
         }
         let reported = screen()
         #expect(reported.posture == .cover)
-        #expect(reported.trailingColumnWidth == 84)
-        #expect(reported.trailingColumnFreeTop == 174)
+        #expect(reported.sideColumnEdge == .trailing)
+        #expect(reported.sideColumnWidth == 84)
+        #expect(reported.sideColumnFreeTop == 174)
         // No report: the same screen, so nothing in the column moves.
         measured.occlusion = nil
         #expect(screen() == reported)
         // Split View's half: no column, as before.
         measured.trailingInset = 0
-        #expect(screen().trailingColumnWidth == 0)
-        #expect(screen().trailingColumnFreeTop == 0)
+        #expect(screen().sideColumnWidth == 0)
+        #expect(screen().sideColumnFreeTop == 0)
+    }
+
+    @Test func theColumnFollowsTheEdgeItIsOn() {
+        // The cover screen: the camera and the status trail, as the Duo reports them.
+        let trailing = BighelpScreenGeometry.sideColumn(
+            leading: nil, trailing: CGRect(x: 382, y: 0, width: 84, height: 174),
+            leadingInset: 0, trailingInset: 84)
+        #expect(trailing.edge == .trailing)
+        #expect(trailing.width == 84)
+        #expect(trailing.freeTop == 174)
+        // Split View, the app left of the divider: the same column, on its leading edge. This is the
+        // case that made the chat switcher sit opposite the camera and squeezed the page.
+        let leading = BighelpScreenGeometry.sideColumn(
+            leading: CGRect(x: 0, y: 0, width: 84, height: 174), trailing: nil,
+            leadingInset: 84, trailingInset: 0)
+        #expect(leading.edge == .leading)
+        #expect(leading.width == 84)
+        #expect(leading.freeTop == 174)
+        // An inset with no reported area still counts: the column is there before the API answers.
+        #expect(BighelpScreenGeometry.sideColumn(leading: nil, trailing: nil,
+                                                 leadingInset: 84, trailingInset: 0) == (leading.edge, 84, 174))
+        // Nothing anywhere: the trailing edge stays, so a screen that reports nothing doesn't move.
+        let none = BighelpScreenGeometry.sideColumn(leading: nil, trailing: nil, leadingInset: 0, trailingInset: 0)
+        #expect(none.edge == .trailing)
+        #expect(none.width == 0)
+        #expect(none.freeTop == 0)
     }
 
     @Test func theSideBarIsForScreensWithAStatusColumn() {

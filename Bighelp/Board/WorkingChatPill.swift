@@ -24,7 +24,7 @@ struct WorkingChatPill: View {
     /// chat switcher keeps. Work that starts and ends then never moves the page.
     static func isShown(screen: BighelpScreenGeometry, hasSwitcher: Bool) -> Bool {
         screen.posture == .cover
-            && (hasSwitcher || screen.trailingColumnWidth >= BighelpScreenGeometry.sideColumnWidth)
+            && (hasSwitcher || screen.sideColumnWidth >= BighelpScreenGeometry.sideColumnWidth)
     }
 
     var body: some View {

@@ -373,7 +373,10 @@ struct ChatDestinationView: View {
             foldCompletedTurns: settings.foldCompletedTurns,
             workStyle: settings.chatWorkStyle,
             onForceRefresh: forceRefreshAction,
-            newChat: newChat
+            newChat: newChat,
+            replyReader: replyReader,
+            makeHostReplySpeech: { featureStore.makeHostReplySpeech(for: model.conversationID) },
+            replySpeechRate: settings.voiceSpeed.hermesTTSSpeed
         )
         }
     }

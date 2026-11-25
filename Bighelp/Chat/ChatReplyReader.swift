@@ -1,10 +1,16 @@
+import Observation
 import SwiftUI
 
 /// Auto TTS (Settings › Voice, or a chat's + menu): reads each reply in the open chat aloud once,
 /// when its turn ends, in the agent's voice. What the chat held when it opened stays quiet, and a
 /// copy the host saves again (a new ID, the same words) isn't read twice. A new turn, voice mode
 /// or leaving the chat stops it.
+///
+/// The chat's Speak button reads on demand instead (`toggleSpeaking`): a reply is chosen after it
+/// landed, so Auto TTS never had to be on when the turn ended. Both paths share one output, so the
+/// button's second tap stops whatever is speaking.
 @MainActor
+@Observable
 final class ChatReplyReader {
     struct Reply: Equatable, Sendable {
         let id: String
@@ -17,6 +23,10 @@ final class ChatReplyReader {
     private var heardText: String?
     private var output: (any VoiceSpeechOutput)?
     private var reading: Task<Void, Never>?
+
+    /// True while a reply is being read, by Auto TTS or by the chat's Speak button. The button's
+    /// symbol follows it, so a tap that starts a reading becomes a tap that stops it.
+    private(set) var isReading = false
 
     /// The chat's newest reply: the agent's last message after the person's last one.
     static func latestReply(in items: [TimelineItem]) -> Reply? {
@@ -55,11 +65,25 @@ final class ChatReplyReader {
         read(reply.text, with: output, rate: rate)
     }
 
+    /// A tap on the chat's Speak button: the newest reply, read now. Auto TTS only ever reads a
+    /// reply that lands while its switch is on, so a reply that arrived before that is silent
+    /// there; here the reply is picked after it landed. A second tap stops it, and the words count
+    /// as heard, so Auto TTS doesn't say them again.
+    func toggleSpeaking(_ reply: Reply, with output: any VoiceSpeechOutput, rate: Float) {
+        if isReading {
+            stop()
+            return
+        }
+        heardText = reply.text
+        read(reply.text, with: output, rate: rate)
+    }
+
     func stop() {
         reading?.cancel()
         reading = nil
         output?.stop()
         output = nil
+        isReading = false
     }
 
     /// The chat left the screen: quiet now, and what it holds when it's back counts as heard.
@@ -72,12 +96,14 @@ final class ChatReplyReader {
     private func read(_ text: String, with output: any VoiceSpeechOutput, rate: Float) {
         stop()
         self.output = output
+        isReading = true
         let spoken = MarkdownDocument(text).visiblePlainText
         reading = Task { [weak self] in
             try? await output.speak(spoken, rate: rate)
             guard let self, self.output === output else { return }
             self.output = nil
             self.reading = nil
+            self.isReading = false
         }
     }
 }

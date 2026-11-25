@@ -62,6 +62,8 @@ final class ShellFeatureStore {
     private let voiceHoldMusicEnabled: @MainActor () -> Bool
     /// Auto TTS: the voice a chat's replies are read in, found when a reply lands.
     private let replySpeechFactory: (@MainActor (SessionRecord) -> (any VoiceSpeechOutput)?)?
+    /// The chat's Speak button: the computer's own voice, asked for a reply that already landed.
+    private let hostReplySpeechFactory: (@MainActor (SessionRecord) -> (any VoiceSpeechOutput)?)?
     private let approvalRequestLoader: (any ApprovalRequestLoading)?
     private let approvalClient: (any ApprovalClient)?
     private let approvalPublisher: @MainActor (LoadedApprovalRequest) -> Void
@@ -335,6 +337,7 @@ final class ShellFeatureStore {
         },
         voiceHoldMusicEnabled: @escaping @MainActor () -> Bool = { true },
         replySpeech: (@MainActor (SessionRecord) -> (any VoiceSpeechOutput)?)? = nil,
+        hostReplySpeech: (@MainActor (SessionRecord) -> (any VoiceSpeechOutput)?)? = nil,
         sessionControlMessaging: (any BighelpLinkSessionControlMessaging)? = nil,
         slashCommandCatalogClient: (any SlashCommandCatalogClient)? = nil,
         generatedMediaResolver: (any GeneratedMediaResolving)? = nil,
@@ -369,6 +372,7 @@ final class ShellFeatureStore {
         self.voiceHoldMusic = voiceHoldMusic
         self.voiceHoldMusicEnabled = voiceHoldMusicEnabled
         replySpeechFactory = replySpeech
+        hostReplySpeechFactory = hostReplySpeech
         self.sessionControlMessaging = sessionControlMessaging
         self.slashCommandCatalogClient = slashCommandCatalogClient
         self.generatedMediaResolver = generatedMediaResolver
@@ -1720,6 +1724,15 @@ final class ShellFeatureStore {
     func makeReplySpeech(for conversationID: String) -> (any VoiceSpeechOutput)? {
         guard let session = catalog.session(id: conversationID) else { return nil }
         return replySpeechFactory?(session)
+    }
+
+    /// The chat's Speak button: this chat's agent, in its own voice, saying something it already
+    /// said. The computer speaks it (`/api/audio/speak`, the same provider chain as Auto TTS), and
+    /// the phone's own voice takes over when that fails, so the button always says something.
+    func makeHostReplySpeech(for conversationID: String) -> (any VoiceSpeechOutput)? {
+        guard let session = catalog.session(id: conversationID),
+              let host = hostReplySpeechFactory?(session) else { return nil }
+        return HostReplySpeechOutput(host: host)
     }
 
     func makeVoicePresentation(

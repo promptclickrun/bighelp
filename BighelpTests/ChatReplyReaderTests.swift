@@ -110,6 +110,41 @@ struct ChatReplyReaderTests {
         #expect(ChatReplyReader.latestReply(in: waiting) == nil)
     }
 
+    /// The chat's Speak button: a reply that arrived while Auto TTS was off is still there to read,
+    /// and a second tap stops it.
+    @Test func aTapReadsTheReplyThatArrivedWhileAutoTTSWasOff() async {
+        let reader = ChatReplyReader()
+        let voice = ReplySpeechSpy()
+        reader.update(reply: nil, isTurnActive: true, isOn: false, rate: 1) { voice }
+        reader.update(reply: reply("r1", "**All done.** Nothing else."), isTurnActive: false, isOn: false,
+                      rate: 1) { voice }
+        await settle()
+        #expect(voice.spoken.isEmpty, "Auto TTS read a reply with its switch off")
+
+        reader.toggleSpeaking(reply("r1", "**All done.** Nothing else."), with: voice, rate: 1)
+        await settle()
+        #expect(voice.spoken == ["All done. Nothing else."])
+        #expect(!reader.isReading, "The button stayed on Stop after the reply ended")
+    }
+
+    @Test func aSecondTapStopsTheReading() async {
+        let reader = ChatReplyReader()
+        let voice = ReplySpeechSpy()
+        voice.holdsUntilStopped = true
+        reader.update(reply: nil, isTurnActive: true, isOn: false, rate: 1) { voice }
+        reader.update(reply: reply("r1", "A long answer."), isTurnActive: false, isOn: false, rate: 1) { voice }
+
+        reader.toggleSpeaking(reply("r1", "A long answer."), with: voice, rate: 1)
+        await settle()
+        #expect(reader.isReading)
+
+        reader.toggleSpeaking(reply("r1", "A long answer."), with: voice, rate: 1)
+        await settle()
+        #expect(!reader.isReading)
+        #expect(voice.stops == 1)
+        #expect(voice.spoken == ["A long answer."], "A second tap started the reply again")
+    }
+
     private func reply(_ id: String, _ text: String) -> ChatReplyReader.Reply {
         ChatReplyReader.Reply(id: id, text: text)
     }

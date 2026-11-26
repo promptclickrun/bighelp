@@ -405,6 +405,45 @@ final class DuoLayoutUITests: BighelpUITestCase {
         }
     }
 
+    /// The open screen's places are down its leading edge with the list — the window's trailing
+    /// column there is the chat's — and the last of them puts the list away so a page can take the
+    /// whole screen. The forced posture runs this on the Duo's own simulator, the only one here.
+    @MainActor
+    func testOpenScreenKeepsThePlacesWithTheListAndCanPutTheListAway() throws {
+        let app = makeApp()
+        app.launchArguments = demo + ["-loopdy.home.landing", "chats",
+                                      "-bighelp.debug.screen-posture", "open",
+                                      "-bighelp.debug.fold-halfway", "YES",
+                                      "-loopdy.demo.appearance", "light"]
+        app.launch()
+        let today = app.buttons["home.tab.today"].firstMatch
+        XCTAssertTrue(today.waitForExistence(timeout: 20), "The places show")
+        let window = app.windows.firstMatch.frame
+        XCTAssertLessThan(today.frame.minX, window.minX + 70, "Down the leading edge, with the list")
+        XCTAssertLessThan(today.frame.maxX, window.midX, "Not in the column the chat has")
+        let list = element("chats.inbox", in: app)
+        XCTAssertTrue(list.waitForExistence(timeout: 10), "The list shows beside the page")
+        XCTAssertGreaterThan(list.frame.minX, window.minX + 40, "The list starts beside the strip")
+        let toggle = app.buttons["home.list.toggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "The list can be put away")
+        XCTAssertEqual(toggle.label, "Hide the list")
+        sleep(1)
+        save("open-places-light", app)
+
+        toggle.tap()
+        XCTAssertTrue(waitForLabel("Show the list", of: toggle), "The list is away")
+        XCTAssertTrue(list.waitForNonExistence(timeout: 5), "The list is out of the page's way")
+        XCTAssertFalse(list.isHittable, "And it takes none of the page's taps")
+        XCTAssertLessThan(app.buttons["home.tab.today"].frame.minX, window.minX + 70, "The rail stays")
+        sleep(1)
+        save("open-list-away-light", app)
+
+        toggle.tap()
+        XCTAssertTrue(waitForLabel("Hide the list", of: toggle), "And it comes back")
+        XCTAssertTrue(list.waitForExistence(timeout: 5), "The list is back")
+        XCTAssertGreaterThan(list.frame.width, 100, "With room for its rows")
+    }
+
     @MainActor
     func testHalfFoldedLikeALaptopKeepsTheMessagesAboveTheFold() throws {
         for appearance in appearances {

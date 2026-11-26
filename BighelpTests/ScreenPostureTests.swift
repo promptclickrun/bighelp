@@ -131,6 +131,17 @@ struct ScreenPostureTests {
         #expect(!BighelpScreenGeometry(posture: .standard).usesSideBar)
     }
 
+    /// The system's strip is on the window's trailing edge, which in the open posture is the chat's
+    /// column: the places that switch the list go with the list instead.
+    @Test func thePlacesGoWithTheListBesideThePage() {
+        #expect(BighelpScreenGeometry(posture: .open).placesGoWithTheList(listIsShown: true))
+        // Nothing beside the page: the pane spans the screen and the system's strip has them.
+        #expect(!BighelpScreenGeometry(posture: .open).placesGoWithTheList(listIsShown: false))
+        for posture in [BighelpScreenPosture.cover, .openUpright, .standard] {
+            #expect(!BighelpScreenGeometry(posture: posture).placesGoWithTheList(listIsShown: true))
+        }
+    }
+
     @Test func everyOtherPhoneKeepsItsLayout() {
         #expect(posture(.compact, .regular, 402, 874) == .standard) // iPhone 17 Pro
         #expect(posture(.compact, .regular, 375, 667) == .standard) // iPhone SE

@@ -91,6 +91,11 @@ struct BighelpScreenGeometry: Equatable, Sendable {
     /// camera and the status: the bottom bar stands up in it.
     var usesSideBar: Bool { posture == .cover || posture == .open }
 
+    /// The open posture's list has places of its own, down its leading edge: the system's column on
+    /// the trailing edge belongs to the chat beside it. So the system's strip stands down there and
+    /// the list carries them; everywhere else the strip is where they go.
+    func placesGoWithTheList(listIsShown: Bool) -> Bool { posture == .open && listIsShown }
+
     /// Half-folded with the fold across the screen, like a small laptop: messages above it, the
     /// message box and the keyboard below.
     var isLaptop: Bool {

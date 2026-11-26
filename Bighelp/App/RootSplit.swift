@@ -45,9 +45,11 @@ extension RootShellView {
         case nil: "none"
         }
         // A new shell (another computer, a new runtime) brings its own stores, which don't tell
-        // the column when that happens, so the column is drawn again then.
+        // the column when that happens, so the column is drawn again then. Today's dot is in the
+        // rail, which the column holds, so a change there is a new rail.
         return [list, currentWorkspaceOwner?.cacheScopeID ?? "local", splitColumnShellID.uuidString,
-                nativeRuntime.map { "\(ObjectIdentifier($0).hashValue)" } ?? "-", fleet == nil ? "" : "fleet"]
+                nativeRuntime.map { "\(ObjectIdentifier($0).hashValue)" } ?? "-", fleet == nil ? "" : "fleet",
+                "\(needsYouEntries.count)"]
             .joined(separator: "|")
     }
 
@@ -62,7 +64,9 @@ extension RootShellView {
         case .work: .work
         case .page(let tab): tab
         }
-        splitColumn.show(splitColumnKey) {
+        let rail = HomePlacesRail(column: splitColumn, selection: tabSelection, items: homeTabItems,
+                                  onNewChat: { openNewChat() })
+        splitColumn.show(splitColumnKey, rail: AnyView(rail)) {
             // Every root draws its own header, so the column's bar stays hidden.
             AnyView(BighelpLiveColumn { homeRoot(tab) }
                 .toolbar(.hidden, for: .navigationBar)

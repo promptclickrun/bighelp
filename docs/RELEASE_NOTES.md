@@ -3,6 +3,18 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.97
+
+### New
+
+- **Audio in chat:** audio files that a bot sends now play in the chat message. Tap Play or Pause, or drag the bar to seek. On iPhone and iPad, playback continues in the background and shows controls on the Lock Screen. You can still save or share the file.
+- **Read the last reply aloud:** tap the speaker button in a chat's header to hear the newest reply from the bot. Tap it again to stop. It uses the bot's voice settings.
+- **iPhone Duo desk and side column:** when you fold an iPhone Duo halfway, the lower half shows your bots on that computer, so you can switch chats or start a new one. On the cover screen and in landscape, the side column follows the side of the screen that holds the camera.
+
+### Fixed
+
+- **iPhone Duo open layout:** in the open layout, the side list keeps its own top controls and can slide away while you read a chat. Sheets stay within the display on each posture.
+
 ## 2.6.96
 
 ### New

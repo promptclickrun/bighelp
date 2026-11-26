@@ -693,34 +693,19 @@ struct ChatView: View {
                              dismissKeyboard()
                              dismiss()
                          },
-                         actions: speakReplyButton)
+                         actions: toRow == nil ? speakReplyAction : nil)
     }
 
-    /// The header's Speak button: reads the chat's newest reply aloud in the agent's own voice, and
-    /// stops it on a second tap. Offered once there is a reply to read and the turn is over, so a
-    /// tap never asks the computer to say half an answer.
-    private var speakReplyButton: AnyView? {
-        guard let replyReader, let makeHostReplySpeech,
-              let reply = ChatReplyReader.latestReply(in: model.items) else { return nil }
-        let isSending = model.isSending
-        return AnyView(
-            Button {
-                guard !isSending, let output = makeHostReplySpeech() else { return }
-                replyReader.toggleSpeaking(reply, with: output, rate: replySpeechRate)
-            } label: {
-                Image(systemName: replyReader.isReading ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                    .font(.bighelp(.body).weight(.semibold))
-                    .foregroundStyle(theme.primaryText)
-                    .frame(width: HeaderButtonMetrics.glass, height: HeaderButtonMetrics.glass)
-                    .contentShape(.circle)
-            }
-            .buttonStyle(.plain)
-            .disabled(isSending)
-            .opacity(isSending ? 0.35 : 1)
-            .accessibilityIdentifier("chat.speak.reply")
-            .accessibilityLabel(replyReader.isReading ? "Stop reading the reply" : "Read the last reply")
-            .accessibilityHint(replyReader.isReading ? "Stops the voice." : "Reads it aloud in the bot's voice.")
-        )
+    /// Isolated subview for the header's Speak button so observing `model.items`, `model.isSending`,
+    /// and `replyReader.isReading` never redraws `ChatView.body`.
+    private var speakReplyAction: AnyView? {
+        guard let replyReader, let makeHostReplySpeech else { return nil }
+        return AnyView(ChatSpeakReplyButton(
+            model: model,
+            replyReader: replyReader,
+            makeHostReplySpeech: makeHostReplySpeech,
+            rate: replySpeechRate
+        ))
     }
 
     private var composer: some View {

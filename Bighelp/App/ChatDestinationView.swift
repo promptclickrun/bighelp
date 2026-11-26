@@ -167,7 +167,8 @@ struct ChatDestinationView: View {
             .accessibilityIdentifier("chat.canvas")
             .background {
                 ChatReplyReading(model: model, reader: replyReader,
-                                 isOn: settings.autoSpeakRepliesEnabled && voicePresentation == nil,
+                                 isOn: settings.autoSpeakRepliesEnabled,
+                                 isVoiceActive: voicePresentation != nil,
                                  rate: settings.voiceSpeed.hermesTTSSpeed,
                                  makeOutput: { featureStore.makeReplySpeech(for: model.conversationID) })
             }

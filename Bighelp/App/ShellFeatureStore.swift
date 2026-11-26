@@ -1728,10 +1728,10 @@ final class ShellFeatureStore {
 
     /// The chat's Speak button: this chat's agent, in its own voice, saying something it already
     /// said. The computer speaks it (`/api/audio/speak`, the same provider chain as Auto TTS), and
-    /// the phone's own voice takes over when that fails, so the button always says something.
+    /// the phone's own voice takes over when the computer is offline, unconfigured, or fails, so
+    /// the button always says something.
     func makeHostReplySpeech(for conversationID: String) -> (any VoiceSpeechOutput)? {
-        guard let session = catalog.session(id: conversationID),
-              let host = hostReplySpeechFactory?(session) else { return nil }
+        let host = catalog.session(id: conversationID).flatMap { hostReplySpeechFactory?($0) }
         return HostReplySpeechOutput(host: host)
     }
 

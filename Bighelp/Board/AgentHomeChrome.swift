@@ -41,6 +41,9 @@ struct ChatPushedHeader: View {
     var toRow: AnyView? = nil
     let options: AnyView
     let onBack: () -> Void
+    /// A control of the chat's own, right of the name and left of ⋯ (the Speak button). Nil leaves
+    /// the row as it was.
+    var actions: AnyView? = nil
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @BighelpThemeReader private var theme
 
@@ -50,13 +53,17 @@ struct ChatPushedHeader: View {
                 Group {
                     if toRow == nil { identity } else { newChatTitle }
                 }
-                // Clear of Back and ⋯ at every text size: the pill's name truncates instead.
-                .padding(.horizontal, HeaderButtonMetrics.glass + 2 * HeaderButtonMetrics.slop)
+                // Clear of Back on the leading edge and ⋯ (plus any chat action) on the trailing edge.
+                .padding(.leading, buttonSlotWidth)
+                .padding(.trailing, trailingControlWidth)
                 .padding(.top, HeaderButtonMetrics.slop)
                 .frame(maxWidth: .infinity)
-                HStack(alignment: .top) {
+                HStack(alignment: .top, spacing: 0) {
                     backButton
                     Spacer(minLength: 0)
+                    if let actions {
+                        actions
+                    }
                     options
                         .frame(width: HeaderButtonMetrics.glass, height: HeaderButtonMetrics.glass)
                         .bighelpNavigationGlass(in: Circle(), isInteractive: true)
@@ -73,6 +80,15 @@ struct ChatPushedHeader: View {
                     .frame(maxWidth: .infinity)
             }
         }
+    }
+
+    private var buttonSlotWidth: CGFloat {
+        HeaderButtonMetrics.glass + 2 * HeaderButtonMetrics.slop
+    }
+
+    /// How far the name stays clear of the trailing buttons: ⋯ alone, or ⋯ plus the chat's own control.
+    private var trailingControlWidth: CGFloat {
+        actions == nil ? buttonSlotWidth : 2 * buttonSlotWidth
     }
 
     private var backButton: some View {

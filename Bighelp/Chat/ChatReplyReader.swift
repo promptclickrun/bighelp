@@ -1,10 +1,16 @@
+import Observation
 import SwiftUI
 
 /// Auto TTS (Settings › Voice, or a chat's + menu): reads each reply in the open chat aloud once,
 /// when its turn ends, in the agent's voice. What the chat held when it opened stays quiet, and a
 /// copy the host saves again (a new ID, the same words) isn't read twice. A new turn, voice mode
 /// or leaving the chat stops it.
+///
+/// The chat's Speak button reads on demand instead (`toggleSpeaking`): a reply is chosen after it
+/// landed, so Auto TTS never had to be on when the turn ended. Both paths share one output, so the
+/// button's second tap stops whatever is speaking.
 @MainActor
+@Observable
 final class ChatReplyReader {
     struct Reply: Equatable, Sendable {
         let id: String
@@ -17,6 +23,10 @@ final class ChatReplyReader {
     private var heardText: String?
     private var output: (any VoiceSpeechOutput)?
     private var reading: Task<Void, Never>?
+
+    /// True while a reply is being read, by Auto TTS or by the chat's Speak button. The button's
+    /// symbol follows it, so a tap that starts a reading becomes a tap that stops it.
+    private(set) var isReading = false
 
     /// The chat's newest reply: the agent's last message after the person's last one.
     static func latestReply(in items: [TimelineItem]) -> Reply? {
@@ -55,11 +65,30 @@ final class ChatReplyReader {
         read(reply.text, with: output, rate: rate)
     }
 
+    /// A tap on the chat's Speak button: the newest reply, read now. Auto TTS only ever reads a
+    /// reply that lands while its switch is on, so a reply that arrived before that is silent
+    /// there; here the reply is picked after it landed. A second tap stops it even if the host has
+    /// disconnected since playback began, and the words count as heard so Auto TTS doesn't repeat.
+    func toggleSpeaking(_ reply: Reply, with output: any VoiceSpeechOutput, rate: Float) {
+        toggleSpeaking(reply, rate: rate) { output }
+    }
+
+    func toggleSpeaking(_ reply: Reply, rate: Float, makeOutput: () -> (any VoiceSpeechOutput)?) {
+        if isReading {
+            stop()
+            return
+        }
+        guard let output = makeOutput() else { return }
+        heardText = reply.text
+        read(reply.text, with: output, rate: rate)
+    }
+
     func stop() {
         reading?.cancel()
         reading = nil
         output?.stop()
         output = nil
+        isReading = false
     }
 
     /// The chat left the screen: quiet now, and what it holds when it's back counts as heard.
@@ -71,13 +100,16 @@ final class ChatReplyReader {
 
     private func read(_ text: String, with output: any VoiceSpeechOutput, rate: Float) {
         stop()
-        self.output = output
         let spoken = MarkdownDocument(text).visiblePlainText
+        guard !spoken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        self.output = output
+        isReading = true
         reading = Task { [weak self] in
             try? await output.speak(spoken, rate: rate)
             guard let self, self.output === output else { return }
             self.output = nil
             self.reading = nil
+            self.isReading = false
         }
     }
 }
@@ -88,6 +120,7 @@ struct ChatReplyReading: View {
     let model: ChatModel
     let reader: ChatReplyReader
     let isOn: Bool
+    var isVoiceActive = false
     let rate: Float
     let makeOutput: @MainActor () -> (any VoiceSpeechOutput)?
 
@@ -102,12 +135,56 @@ struct ChatReplyReading: View {
             .accessibilityHidden(true)
             .onChange(of: Moment(reply: ChatReplyReader.latestReply(in: model.items), isTurnActive: model.isSending),
                       initial: true) { _, moment in
-                reader.update(reply: moment.reply, isTurnActive: moment.isTurnActive, isOn: isOn, rate: rate,
-                              makeOutput: makeOutput)
+                reader.update(reply: moment.reply, isTurnActive: moment.isTurnActive, isOn: isOn && !isVoiceActive,
+                              rate: rate, makeOutput: makeOutput)
             }
             .onChange(of: isOn) { _, isOn in
                 if !isOn { reader.stop() }
             }
+            .onChange(of: isVoiceActive) { _, isVoiceActive in
+                // Stop on-demand Speak playback too when Live Voice or Push-to-Talk starts, even if Auto TTS is off.
+                if isVoiceActive { reader.stop() }
+            }
             .onDisappear { reader.reset() }
+    }
+}
+
+/// The chat header's Speak button in its own view so reading `model.items`, `model.isSending`,
+/// and `replyReader.isReading` never redraws `ChatView`.
+struct ChatSpeakReplyButton: View {
+    let model: ChatModel
+    let replyReader: ChatReplyReader
+    let makeHostReplySpeech: @MainActor () -> (any VoiceSpeechOutput)?
+    let rate: Float
+    @BighelpThemeReader private var theme
+
+    var body: some View {
+        let reply = ChatReplyReader.latestReply(in: model.items)
+        let isReading = replyReader.isReading
+        if isReading || reply != nil {
+            let isSending = model.isSending && !isReading
+            Button {
+                if isReading {
+                    replyReader.stop()
+                } else if !model.isSending, let reply {
+                    replyReader.toggleSpeaking(reply, rate: rate, makeOutput: makeHostReplySpeech)
+                }
+            } label: {
+                Image(systemName: isReading ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .font(.bighelp(.body).weight(.semibold))
+                    .foregroundStyle(theme.primaryText)
+                    .frame(width: HeaderButtonMetrics.glass, height: HeaderButtonMetrics.glass)
+                    .contentShape(Circle())
+                    .bighelpNavigationGlass(in: Circle(), isInteractive: true)
+                    .padding(HeaderButtonMetrics.slop)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .disabled(isSending)
+            .opacity(isSending ? 0.35 : 1)
+            .accessibilityIdentifier("chat.speak.reply")
+            .accessibilityLabel(isReading ? "Stop reading the reply" : "Read the newest reply")
+            .accessibilityHint(isReading ? "Stops the voice." : "Reads it aloud in the bot's voice.")
+        }
     }
 }

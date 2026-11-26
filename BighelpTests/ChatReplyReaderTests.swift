@@ -110,6 +110,99 @@ struct ChatReplyReaderTests {
         #expect(ChatReplyReader.latestReply(in: waiting) == nil)
     }
 
+    /// The chat's Speak button: a reply that arrived while Auto TTS was off is still there to read,
+    /// and a second tap stops it.
+    @Test func aTapReadsTheReplyThatArrivedWhileAutoTTSWasOff() async {
+        let reader = ChatReplyReader()
+        let voice = ReplySpeechSpy()
+        reader.update(reply: nil, isTurnActive: true, isOn: false, rate: 1) { voice }
+        reader.update(reply: reply("r1", "**All done.** Nothing else."), isTurnActive: false, isOn: false,
+                      rate: 1) { voice }
+        await settle()
+        #expect(voice.spoken.isEmpty, "Auto TTS read a reply with its switch off")
+
+        reader.toggleSpeaking(reply("r1", "**All done.** Nothing else."), with: voice, rate: 1)
+        await settle()
+        #expect(voice.spoken == ["All done. Nothing else."])
+        #expect(!reader.isReading, "The button stayed on Stop after the reply ended")
+    }
+
+    @Test func aSecondTapStopsTheReading() async {
+        let reader = ChatReplyReader()
+        let voice = ReplySpeechSpy()
+        voice.holdsUntilStopped = true
+        reader.update(reply: nil, isTurnActive: true, isOn: false, rate: 1) { voice }
+        reader.update(reply: reply("r1", "A long answer."), isTurnActive: false, isOn: false, rate: 1) { voice }
+
+        reader.toggleSpeaking(reply("r1", "A long answer."), with: voice, rate: 1)
+        await settle()
+        #expect(reader.isReading)
+
+        reader.toggleSpeaking(reply("r1", "A long answer."), with: voice, rate: 1)
+        await settle()
+        #expect(!reader.isReading)
+        #expect(voice.stops == 1)
+        #expect(voice.spoken == ["A long answer."], "A second tap started the reply again")
+    }
+
+    @Test func aSecondTapStopsEvenWhenHostOutputBecomesUnavailable() async {
+        let reader = ChatReplyReader()
+        let voice = ReplySpeechSpy()
+        voice.holdsUntilStopped = true
+        var available: (any VoiceSpeechOutput)? = voice
+
+        reader.toggleSpeaking(reply("r1", "A long answer."), rate: 1) { available }
+        await settle()
+        #expect(reader.isReading)
+
+        // Simulate disconnect before tapping Stop.
+        available = nil
+        reader.toggleSpeaking(reply("r1", "A long answer."), rate: 1) { available }
+        await settle()
+        #expect(!reader.isReading)
+        #expect(voice.stops == 1)
+    }
+
+    @Test func hostReplySpeechFallsBackToSystemWhenOfflineOrErrored() async throws {
+        let offlineSystem = ReplySpeechSpy()
+        let offline = HostReplySpeechOutput(host: nil, system: offlineSystem)
+        try await offline.speak("Offline reply.", rate: 1.1)
+        #expect(offlineSystem.spoken == ["Offline reply."])
+        #expect(offlineSystem.rates == [1.1])
+
+        let failingHost = ReplySpeechSpy()
+        failingHost.errorToThrow = VoiceSessionError.emptyResponse
+        let fallbackSystem = ReplySpeechSpy()
+        let output = HostReplySpeechOutput(host: failingHost, system: fallbackSystem)
+        try await output.speak("Errored reply.", rate: 1)
+        #expect(failingHost.spoken == ["Errored reply."])
+        #expect(fallbackSystem.spoken == ["Errored reply."])
+    }
+
+    @Test func hostReplySpeechDoesNotFallBackWhenCancelledOrStopped() async {
+        let urlCancelledHost = ReplySpeechSpy()
+        urlCancelledHost.errorToThrow = URLError(.cancelled)
+        let system1 = ReplySpeechSpy()
+        let output1 = HostReplySpeechOutput(host: urlCancelledHost, system: system1)
+        await #expect(throws: CancellationError.self) {
+            try await output1.speak("Cancelled request.", rate: 1)
+        }
+        #expect(system1.spoken.isEmpty, "URLError.cancelled must not fall back to system speech")
+
+        let slowHost = ReplySpeechSpy()
+        slowHost.holdsUntilStopped = true
+        slowHost.errorOnStop = VoiceSessionError.emptyResponse
+        let system2 = ReplySpeechSpy()
+        let output2 = HostReplySpeechOutput(host: slowHost, system: system2)
+        let task = Task { try await output2.speak("Stopped mid-flight.", rate: 1) }
+        await settle()
+        output2.stop()
+        await #expect(throws: CancellationError.self) {
+            try await task.value
+        }
+        #expect(system2.spoken.isEmpty, "Stopping while host synthesis fails must not fall back to system speech")
+    }
+
     private func reply(_ id: String, _ text: String) -> ChatReplyReader.Reply {
         ChatReplyReader.Reply(id: id, text: text)
     }
@@ -130,20 +223,30 @@ struct ChatReplyReaderTests {
 final class ReplySpeechSpy: VoiceSpeechOutput {
     /// Keeps speaking until stopped, like a long reply.
     var holdsUntilStopped = false
+    var errorToThrow: (any Error)?
+    var errorOnStop: (any Error)?
     private(set) var spoken: [String] = []
     private(set) var rates: [Float] = []
     private(set) var stops = 0
-    private var release: CheckedContinuation<Void, Never>?
+    private var release: CheckedContinuation<Void, any Error>?
 
     func speak(_ text: String, rate: Float) async throws {
         spoken.append(text)
         rates.append(rate)
-        if holdsUntilStopped { await withCheckedContinuation { release = $0 } }
+        if let errorToThrow { throw errorToThrow }
+        if holdsUntilStopped {
+            try await withCheckedThrowingContinuation { release = $0 }
+        }
     }
 
     func stop() {
         stops += 1
-        release?.resume()
+        let pending = release
         release = nil
+        if let errorOnStop {
+            pending?.resume(throwing: errorOnStop)
+        } else {
+            pending?.resume(returning: ())
+        }
     }
 }

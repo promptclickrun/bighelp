@@ -167,7 +167,8 @@ struct ChatDestinationView: View {
             .accessibilityIdentifier("chat.canvas")
             .background {
                 ChatReplyReading(model: model, reader: replyReader,
-                                 isOn: settings.autoSpeakRepliesEnabled && voicePresentation == nil,
+                                 isOn: settings.autoSpeakRepliesEnabled,
+                                 isVoiceActive: voicePresentation != nil,
                                  rate: settings.voiceSpeed.hermesTTSSpeed,
                                  makeOutput: { featureStore.makeReplySpeech(for: model.conversationID) })
             }
@@ -373,7 +374,10 @@ struct ChatDestinationView: View {
             foldCompletedTurns: settings.foldCompletedTurns,
             workStyle: settings.chatWorkStyle,
             onForceRefresh: forceRefreshAction,
-            newChat: newChat
+            newChat: newChat,
+            replyReader: replyReader,
+            makeHostReplySpeech: { featureStore.makeHostReplySpeech(for: model.conversationID) },
+            replySpeechRate: settings.voiceSpeed.hermesTTSSpeed
         )
         }
     }

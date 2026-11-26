@@ -359,3 +359,184 @@ final class AVAudioPlayerVoicePlayback: NSObject, VoiceAudioPlayback, AVAudioPla
         }
     }
 }
+
+/// The chat's Speak button: the agent's own voice from its computer, and this phone's system voice
+/// when the computer can't say it (no connection, no provider, a provider error). Auto TTS keeps
+/// `OnDeviceRoutedSpeechOutput`; this is asked for one reply at a time, after the person has already
+/// read it on screen, so a tap has to produce sound rather than an error nobody is looking at.
+@MainActor
+final class HostReplySpeechOutput: VoiceSpeechOutput {
+    private let host: (any VoiceSpeechOutput)?
+    private let system: any VoiceSpeechOutput
+    private var generation: UInt64 = 0
+
+    init(host: (any VoiceSpeechOutput)?, system: any VoiceSpeechOutput = SystemSpeechOutput()) {
+        self.host = host
+        self.system = system
+    }
+
+    func speak(_ text: String, rate: Float) async throws {
+        try await speak(text, rate: rate) { _ in }
+    }
+
+    func speak(
+        _ text: String,
+        rate: Float,
+        onPlayback: @escaping @MainActor (VoicePlaybackEvent) -> Void
+    ) async throws {
+        try Task.checkCancellation()
+        generation &+= 1
+        let ownedGeneration = generation
+
+        if let host {
+            do {
+                try await host.speak(text, rate: rate, onPlayback: onPlayback)
+                return
+            } catch is CancellationError {
+                // A second tap stopped it: the phone's voice must not pick the sentence up.
+                throw CancellationError()
+            } catch let urlError as URLError where urlError.code == .cancelled {
+                throw CancellationError()
+            } catch {
+                guard !Task.isCancelled, generation == ownedGeneration else {
+                    throw CancellationError()
+                }
+            }
+        }
+
+        try Task.checkCancellation()
+        guard generation == ownedGeneration else { throw CancellationError() }
+        try await system.speak(text, rate: rate, onPlayback: onPlayback)
+    }
+
+    func stop() {
+        generation &+= 1
+        host?.stop()
+        system.stop()
+    }
+}
+
+/// This phone's own voice, the one Siri reads with, for a reply the agent's computer can't say.
+/// Nothing to download and nothing sent anywhere: the words stay on the device.
+@MainActor
+final class SystemSpeechOutput: VoiceSpeechOutput {
+    /// The synthesizer answers on the thread that asked it to speak; every answer carries the
+    /// utterance's identity back to the main actor so a cancelled earlier utterance can never
+    /// settle a newer reading.
+    @MainActor
+    private final class Delegate: NSObject, AVSpeechSynthesizerDelegate {
+        var onEnd: (@MainActor (ObjectIdentifier, Bool) -> Void)?
+
+        nonisolated func speechSynthesizer(
+            _ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance
+        ) {
+            let identity = ObjectIdentifier(utterance)
+            Task { @MainActor [weak self] in
+                self?.onEnd?(identity, false)
+            }
+        }
+
+        nonisolated func speechSynthesizer(
+            _ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance
+        ) {
+            let identity = ObjectIdentifier(utterance)
+            Task { @MainActor [weak self] in
+                self?.onEnd?(identity, true)
+            }
+        }
+    }
+
+    private let synthesizer = AVSpeechSynthesizer()
+    private let delegate = Delegate()
+    private let sessionCoordinator: VoiceAudioSessionCoordinator
+    private var sessionClaim: VoiceAudioSessionClaim?
+    private var activeUtterance: ObjectIdentifier?
+    private var pending: CheckedContinuation<Void, any Error>?
+    private var playbackEvent: (@MainActor (VoicePlaybackEvent) -> Void)?
+
+    init(sessionCoordinator: VoiceAudioSessionCoordinator = .shared) {
+        self.sessionCoordinator = sessionCoordinator
+        synthesizer.delegate = delegate
+        delegate.onEnd = { [weak self] identity, cancelled in
+            self?.finish(for: identity, cancelled: cancelled)
+        }
+    }
+
+    func speak(_ text: String, rate: Float) async throws {
+        try await speak(text, rate: rate) { _ in }
+    }
+
+    func speak(
+        _ text: String,
+        rate: Float,
+        onPlayback: @escaping @MainActor (VoicePlaybackEvent) -> Void
+    ) async throws {
+        try Task.checkCancellation()
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        // Whatever was being said ends first, and its finish must not reach this reading.
+        stop()
+        sessionClaim = try sessionCoordinator.acquire(for: .playback)
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.rate = Self.rate(for: rate)
+        let identity = ObjectIdentifier(utterance)
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                if Task.isCancelled {
+                    releaseSession()
+                    onPlayback(.failed)
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                activeUtterance = identity
+                pending = continuation
+                playbackEvent = onPlayback
+                onPlayback(.started)
+                synthesizer.speak(utterance)
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.stop() }
+        }
+    }
+
+    func stop() {
+        activeUtterance = nil
+        let spoken = pending
+        pending = nil
+        let event = playbackEvent
+        playbackEvent = nil
+        if synthesizer.isSpeaking {
+            synthesizer.stopSpeaking(at: .immediate)
+        }
+        releaseSession()
+        event?(.failed)
+        spoken?.resume(throwing: CancellationError())
+    }
+
+    private func finish(for identity: ObjectIdentifier, cancelled: Bool) {
+        guard activeUtterance == identity else { return }
+        activeUtterance = nil
+        let spoken = pending
+        pending = nil
+        let event = playbackEvent
+        playbackEvent = nil
+        releaseSession()
+        event?(cancelled ? .failed : .finished)
+        if cancelled {
+            spoken?.resume(throwing: CancellationError())
+        } else {
+            spoken?.resume(returning: ())
+        }
+    }
+
+    /// Hermes speaks at a multiplier of its own rate; the system voice takes a 0–1 rate placed
+    /// around its default, so the two speeds mean the same thing.
+    static func rate(for multiplier: Float) -> Float {
+        min(max(AVSpeechUtteranceDefaultSpeechRate * multiplier,
+                AVSpeechUtteranceMinimumSpeechRate), AVSpeechUtteranceMaximumSpeechRate)
+    }
+
+    private func releaseSession() {
+        sessionClaim?.release()
+        sessionClaim = nil
+    }
+}

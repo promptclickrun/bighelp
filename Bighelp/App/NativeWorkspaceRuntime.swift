@@ -415,6 +415,19 @@ final class NativeWorkspaceRuntime {
                         choice: { OnDeviceVoiceChoices.shared.choice(computer: scope, agentID: profile) })
                 }
             },
+            // The chat's Speak button: the computer's voice with no on-device voice in front of
+            // it, because the point is the agent saying it again in the voice it was tuned with.
+            hostReplySpeech: { [weak connections, weak bridge] record in
+                guard let connections, let owner = connections.owner, owner.authority == authority,
+                      let workspace = connections.workspace,
+                      let coordinate = bridge?.currentCoordinate(for: record.id), coordinate.owner == owner else {
+                    return nil
+                }
+                let profile = coordinate.profileID
+                return DirectHermesVoiceSpeechOutput(workspace: workspace, owner: owner, profileID: profile,
+                    playback: AVAudioPlayerVoicePlayback(use: .playback),
+                    currentOwner: { [weak connections] in connections?.owner })
+            },
             sessionControlMessaging: sessionControls,
             slashCommandCatalogClient: WorkspaceSlashCommandCatalogProxy(box: slashCommandsBox),
             generatedMediaResolver: mediaResolver,

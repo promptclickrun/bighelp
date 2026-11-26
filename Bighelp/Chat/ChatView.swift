@@ -96,6 +96,13 @@ struct ChatView: View {
     let onReferenceSend: ((ReferenceFrozenDraft, MidSessionChatBehavior?) async -> Void)?
     /// One home: New chat's parts, given to its blank chat only. Read through `newChat`.
     let newChatSlot: ChatNewChatSlot?
+    /// The chat's Speak button reads its newest reply aloud, chosen after it landed, so Auto TTS
+    /// never had to be on when that turn ended. Nil leaves the button out.
+    var replyReader: ChatReplyReader? = nil
+    /// The agent's own voice from its computer, for one of those readings.
+    var makeHostReplySpeech: (@MainActor () -> (any VoiceSpeechOutput)?)? = nil
+    /// Settings › Voice › Speaking speed, for the phone's own voice when the computer can't say it.
+    var replySpeechRate: Float = 1
     @State private var fallbackReferenceHub = ReferenceHubStore(owner: nil, providers: [])
     @State private var isChatVisible = false
     /// Tells the app which chat this screen shows (`BighelpVisibleChats`, ...).
@@ -185,10 +192,16 @@ struct ChatView: View {
         showsHeader: Bool = true,
         sessionControlAccessory: ChatSessionControlAccessory? = nil,
         onForceRefresh: (@MainActor () async throws -> Void)? = nil,
-        newChat: ChatNewChatSlot? = nil
+        newChat: ChatNewChatSlot? = nil,
+        replyReader: ChatReplyReader? = nil,
+        makeHostReplySpeech: (@MainActor () -> (any VoiceSpeechOutput)?)? = nil,
+        replySpeechRate: Float = 1
     ) {
         self.model = model
         self.newChatSlot = newChat
+        self.replyReader = replyReader
+        self.makeHostReplySpeech = makeHostReplySpeech
+        self.replySpeechRate = replySpeechRate
         self.onForceRefresh = onForceRefresh
         self.foldCompletedTurns = foldCompletedTurns
         self.workStyle = workStyle
@@ -679,7 +692,20 @@ struct ChatView: View {
                          onBack: {
                              dismissKeyboard()
                              dismiss()
-                         })
+                         },
+                         actions: toRow == nil ? speakReplyAction : nil)
+    }
+
+    /// Isolated subview for the header's Speak button so observing `model.items`, `model.isSending`,
+    /// and `replyReader.isReading` never redraws `ChatView.body`.
+    private var speakReplyAction: AnyView? {
+        guard let replyReader, let makeHostReplySpeech else { return nil }
+        return AnyView(ChatSpeakReplyButton(
+            model: model,
+            replyReader: replyReader,
+            makeHostReplySpeech: makeHostReplySpeech,
+            rate: replySpeechRate
+        ))
     }
 
     private var composer: some View {

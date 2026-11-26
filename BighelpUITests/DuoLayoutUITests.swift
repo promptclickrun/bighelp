@@ -74,6 +74,40 @@ final class DuoLayoutUITests: BighelpUITestCase {
         }
     }
 
+    /// Half of the inner screen in Split View, the app left of the divider: the camera and the status
+    /// are on its leading edge, so the chat's column goes there too — and the page gets the room instead
+    /// of being squeezed between the switcher and the camera. `-bighelp.debug.leading-column` stands in
+    /// for the Split View half, which no simulator arranges.
+    @MainActor
+    func testTheChatsColumnFollowsTheScreensOwnEdge() throws {
+        for leading in [false, true] {
+            let app = makeApp()
+            var arguments = demo + ["-loopdy.home.landing", "bots", "-loopdy.demo.appearance", "light"]
+            if leading { arguments += ["-bighelp.debug.leading-column", "84"] }
+            app.launchArguments = arguments
+            app.launch()
+            try requireCoverScreen(app)
+            let mina = app.buttons["simple-bots.bot.travel"]
+            XCTAssertTrue(mina.waitForExistence(timeout: 20))
+            mina.tap()
+            let switcher = element("chat-switcher", in: app)
+            XCTAssertTrue(switcher.waitForExistence(timeout: 10), "The chat has its column")
+            let window = app.windows.firstMatch.frame
+            if leading {
+                XCTAssertLessThan(switcher.frame.maxX, window.minX + 90, "On the leading edge, where the camera is")
+                // The chat reaches the middle of the half instead of stopping short of a column on the right.
+                let identity = app.buttons["chat.identity"].firstMatch
+                XCTAssertTrue(identity.waitForExistence(timeout: 10))
+                XCTAssertGreaterThanOrEqual(identity.frame.maxX, window.midX - 40,
+                                            "The chat fills the rest of the half")
+            } else {
+                XCTAssertGreaterThan(switcher.frame.minX, window.maxX - 90, "The cover screen keeps it trailing")
+            }
+            save(leading ? "column-leading-light" : "column-trailing-light", app)
+            app.terminate()
+        }
+    }
+
     /// The Duo has no island, so a chat's column says who works in another chat: a face and a
     /// line under the camera, above the chats' faces. A tap opens the chat where the work is.
     @MainActor
@@ -371,6 +405,58 @@ final class DuoLayoutUITests: BighelpUITestCase {
         }
     }
 
+    /// The open screen's places are down its leading edge with the list — the window's trailing
+    /// column there is the chat's — and the last of them puts the list away so a page can take the
+    /// whole screen. The forced posture runs this on the Duo's own simulator, the only one here.
+    @MainActor
+    func testOpenScreenKeepsThePlacesWithTheListAndCanPutTheListAway() throws {
+        let app = makeApp()
+        app.launchArguments = demo + ["-loopdy.home.landing", "bots",
+                                      "-bighelp.debug.screen-posture", "open",
+                                      "-bighelp.debug.fold-halfway", "YES",
+                                      "-loopdy.demo.appearance", "light"]
+        app.launch()
+        let today = app.buttons["home.tab.today"].firstMatch
+        XCTAssertTrue(today.waitForExistence(timeout: 20), "The places show")
+        let window = app.windows.firstMatch.frame
+        XCTAssertLessThan(today.frame.minX, window.minX + 70, "Down the leading edge, with the list")
+        XCTAssertLessThan(today.frame.maxX, window.midX, "Not in the column the chat has")
+        let list = element("simple-bots.home", in: app)
+        XCTAssertTrue(list.waitForExistence(timeout: 10), "The list shows beside the page")
+        XCTAssertGreaterThan(list.frame.minX, window.minX + 40, "The list starts beside the strip")
+        // Open a chat beside the list so we can verify the chat widens when the list is hidden.
+        let mina = app.buttons["simple-bots.bot.travel"]
+        XCTAssertTrue(mina.waitForExistence(timeout: 10), "A bot is in the list")
+        mina.tap()
+        let composer = element("chat.composer.field", in: app)
+        XCTAssertTrue(composer.waitForExistence(timeout: 10), "The chat opens beside the list")
+        let splitComposerWidth = composer.frame.width
+        let toggle = app.buttons["home.list.toggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "The list can be put away")
+        XCTAssertEqual(toggle.label, "Hide the list")
+        sleep(1)
+        save("open-places-light", app)
+
+        toggle.tap()
+        XCTAssertTrue(waitForLabel("Show the list", of: toggle), "The list is away")
+        XCTAssertTrue(list.waitForNonExistence(timeout: 5), "The list is out of the page's way")
+        XCTAssertFalse(list.isHittable, "And it takes none of the page's taps")
+        XCTAssertLessThan(app.buttons["home.tab.today"].frame.minX, window.minX + 70, "The rail stays")
+        XCTAssertGreaterThan(composer.frame.width, splitComposerWidth + 40,
+                             "The open chat widens when the list is put away")
+        sleep(1)
+        save("open-list-away-light", app)
+
+        toggle.tap()
+        XCTAssertTrue(waitForLabel("Hide the list", of: toggle), "And it comes back")
+        XCTAssertTrue(list.waitForExistence(timeout: 5), "The list is back")
+        XCTAssertGreaterThan(list.frame.width, 100, "With room for its rows")
+        // Tapping the active place brings the list back and pops the pushed chat to root.
+        app.buttons["home.tab.conversations"].firstMatch.tap()
+        XCTAssertTrue(element("split.placeholder", in: app).waitForExistence(timeout: 5),
+                      "Re-tapping the active place pops back to the placeholder root")
+    }
+
     @MainActor
     func testHalfFoldedLikeALaptopKeepsTheMessagesAboveTheFold() throws {
         for appearance in appearances {
@@ -385,18 +471,26 @@ final class DuoLayoutUITests: BighelpUITestCase {
             let window = app.windows.firstMatch.frame
             XCTAssertGreaterThan(field.frame.minY, window.midY, "The message box sits under the fold")
             XCTAssertLessThan(field.frame.minY, window.midY + 120, "Just under it")
-            // The half under the fold is a desk: the bot and what it's doing, then New chat and Bot
-            // page, under the message box.
+            // The half under the fold is a desk: the chat's bot in the middle with what it's doing,
+            // and the computer's other bots either side, smaller, each with a New chat of its own.
             XCTAssertTrue(element("chat.laptop.desk", in: app).waitForExistence(timeout: 5),
                           "The half under the fold carries the desk")
             XCTAssertEqual(element("chat.laptop.status", in: app).label, "Avery Park, Here for you",
                            "It says who the bot is and what it's doing, once")
-            for id in ["chat.laptop.new-chat", "chat.laptop.bot-page"] {
-                let button = app.buttons[id]
-                XCTAssertTrue(button.waitForExistence(timeout: 5), "\(id) is in reach under the fold")
-                XCTAssertGreaterThan(button.frame.minY, field.frame.maxY, "\(id) sits under the message box")
-                XCTAssertLessThan(button.frame.maxY, window.maxY, "\(id) is on screen")
-            }
+            let face = app.buttons.matching(NSPredicate(
+                format: "identifier BEGINSWITH %@ AND NOT (identifier ENDSWITH %@)",
+                "chat.laptop.bot.", ".new-chat")).firstMatch
+            XCTAssertTrue(face.waitForExistence(timeout: 5), "The chat's bot has a face under the fold")
+            let newChat = app.buttons["chat.laptop.new-chat"]
+            XCTAssertTrue(newChat.waitForExistence(timeout: 5), "New chat is in reach under the fold")
+            XCTAssertGreaterThan(face.frame.minY, field.frame.maxY, "The face sits under the message box")
+            XCTAssertGreaterThan(newChat.frame.minY, field.frame.maxY, "New chat sits under it too")
+            XCTAssertLessThan(newChat.frame.maxY, window.maxY, "New chat is on screen")
+            // Another bot beside the chat's own, smaller, with the one button a face down here takes.
+            XCTAssertTrue(app.buttons.matching(NSPredicate(
+                format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
+                "chat.laptop.bot.", ".new-chat")).firstMatch.waitForExistence(timeout: 5),
+                          "The computer's other bots are here too")
             sleep(1)
             save("laptop-chat-\(appearance)", app)
             if appearance == "light" {
@@ -406,15 +500,90 @@ final class DuoLayoutUITests: BighelpUITestCase {
                 XCTAssertFalse(element("chat.laptop.desk", in: app).exists, "Typing, the desk gets out of the way")
                 save("laptop-typing-light", app)
             } else {
-                app.buttons["chat.laptop.bot-page"].tap()
+                face.tap()
                 XCTAssertTrue(app.buttons["simple-bots.profile.more"].waitForExistence(timeout: 10),
-                              "Bot page opens the bot's page")
+                              "A face opens the bot's page")
             }
             app.terminate()
         }
     }
 
+    /// The desk's faces, on the Duo's own simulator: the chat's bot in the middle opens its page, and the
+    /// computer's other bots are beside it with a New chat each.
+    @MainActor
+    func testHalfFoldedTheDeskOffersTheComputersBots() throws {
+        let app = makeApp()
+        app.launchArguments = demo + ["-start-chat", "-loopdy.demo.appearance", "light",
+                                      "-bighelp.debug.screen-posture", "openUpright",
+                                      "-bighelp.debug.fold-halfway", "YES"]
+        app.launch()
+        let desk = element("chat.laptop.desk", in: app)
+        XCTAssertTrue(desk.waitForExistence(timeout: 20), "The half under the fold carries the desk")
+        let currentFace = app.buttons.matching(NSPredicate(
+            format: "identifier BEGINSWITH %@ AND label == %@",
+            "chat.laptop.bot.", "Avery Park")).firstMatch
+        XCTAssertTrue(currentFace.waitForExistence(timeout: 5), "The chat's bot (Avery Park) has a face")
+        XCTAssertEqual(currentFace.frame.midX, desk.frame.midX, accuracy: 8,
+                       "The chat's own bot stays centered in the desk even with an odd number of peer bots")
+        XCTAssertTrue(app.buttons["chat.laptop.new-chat"].waitForExistence(timeout: 5),
+                      "The chat's bot has its New chat")
+        let peerFace = app.buttons.matching(NSPredicate(
+            format: "identifier BEGINSWITH %@ AND NOT (identifier ENDSWITH %@) AND label != %@",
+            "chat.laptop.bot.", ".new-chat", "Avery Park")).firstMatch
+        XCTAssertTrue(peerFace.waitForExistence(timeout: 5), "A peer bot is beside the chat's own")
+        let peerName = peerFace.label
+        let peerNewChat = app.buttons.matching(NSPredicate(
+            format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
+            "chat.laptop.bot.", ".new-chat")).firstMatch
+        XCTAssertTrue(peerNewChat.waitForExistence(timeout: 5),
+                      "Another bot is beside it, with a New chat of its own")
+        save("laptop-desk-light", app)
+        // Tapping a peer bot's face opens THAT peer's profile page.
+        peerFace.tap()
+        XCTAssertTrue(app.buttons["simple-bots.profile.more"].waitForExistence(timeout: 10),
+                      "A peer face opens that bot's page")
+        XCTAssertTrue(app.staticTexts[peerName].waitForExistence(timeout: 5),
+                      "The opened profile belongs to the peer bot tapped (\(peerName))")
+        app.terminate()
+    }
+
     // MARK: Every screen
+
+    /// Half-folded, every page but a chat ends at the fold: the bar rests on the crease, and the bots
+    /// stay above it, instead of the bottom half of both sitting in the half that faces away.
+    @MainActor
+    func testHalfFoldedThePagesEndAtTheFold() throws {
+        for appearance in appearances {
+            let app = makeApp()
+            app.launchArguments = demo + ["-loopdy.home.landing", "bots", "-loopdy.demo.appearance", appearance,
+                                          "-bighelp.debug.screen-posture", "openUpright",
+                                          "-bighelp.debug.fold-halfway", "YES"]
+            app.launch()
+            // No wide-screen skip: the posture and the fold are forced by the debug arguments, so this
+            // runs on the Duo's own simulator as well as the iPad stand-in.
+            let bots = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "simple-bots.primary."))
+                .firstMatch
+            XCTAssertTrue(bots.waitForExistence(timeout: 20), "The Bots view shows")
+            let window = app.windows.firstMatch.frame
+            let bar = element("primary-navigation", in: app)
+            XCTAssertTrue(bar.waitForExistence(timeout: 10), "A root has its bar")
+            XCTAssertLessThanOrEqual(bar.frame.maxY, window.midY + 2, "The bar rests on the fold")
+            XCTAssertGreaterThan(bar.frame.minY, window.midY - 120, "On the fold, not halfway up the page")
+            // No assertion about the bots under the bar: it floats over the list, which scrolls beneath it
+            // everywhere the app has a bar.
+            save("half-folded-bots-\(appearance)", app)
+            if appearance == "light" {
+                let todayTab = app.buttons["home.tab.today"].firstMatch
+                XCTAssertTrue(todayTab.waitForExistence(timeout: 5), "Today tab exists in the bar")
+                todayTab.tap()
+                let todayBar = element("primary-navigation", in: app)
+                XCTAssertTrue(todayBar.waitForExistence(timeout: 10), "Today keeps its bar")
+                XCTAssertLessThanOrEqual(todayBar.frame.maxY, window.midY + 2,
+                                         "Today ends at the fold too")
+            }
+            app.terminate()
+        }
+    }
 
     /// From iOS 27 a project's actions sit in the system's overflow menu, so its bar has one "⋯" and
     /// the Duo's column doesn't stack ours above the system's. Runs on any simulator.

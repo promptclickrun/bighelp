@@ -147,7 +147,8 @@ extension RootShellView {
             .modifier(CodeSheetsIfShown(isShown: newChat != nil, root: self))
             .environment(\.chatCardInteractions, cardInteractions(for: model))
             // Every chat is a pushed page: Back, the bot (its page) and ⋯.
-            .environment(\.agentHomeChrome, .pushedChat(onProfile: { openBotPage(fromChat: $0) }))
+            .environment(\.agentHomeChrome, .pushedChat(onProfile: { openBotPage(fromChat: $0) },
+                                                        onNewChat: { startNewChat(explicitAgentID: $0) }))
             .environment(\.chatDissolveTransition, chatDissolve)
             .environment(connectionKeeper)
             .bighelpSideColumn(screen, isShown: sideColumn != nil) { sideColumn }

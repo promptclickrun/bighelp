@@ -62,7 +62,9 @@ extension View {
         fullScreenCover(isPresented: isPresented, onDismiss: onDismiss) { content().bighelpPresentedAppearance() }
             .background { BighelpMacSheetCloser(token: isPresented.wrappedValue ? AnyHashable(true) : nil) }
         #else
-        fullScreenCover(isPresented: isPresented, onDismiss: onDismiss) { content().bighelpPresentedAppearance() }
+        fullScreenCover(isPresented: isPresented, onDismiss: onDismiss) {
+            content().bighelpPresentedAppearance().modifier(BighelpFoldBoundary(pageUsesDeck: false))
+        }
         #endif
     }
 
@@ -73,7 +75,9 @@ extension View {
         fullScreenCover(item: item, onDismiss: onDismiss) { content($0).bighelpPresentedAppearance() }
             .background { BighelpMacSheetCloser(token: item.wrappedValue.map { AnyHashable($0.id) }) }
         #else
-        fullScreenCover(item: item, onDismiss: onDismiss) { content($0).bighelpPresentedAppearance() }
+        fullScreenCover(item: item, onDismiss: onDismiss) {
+            content($0).bighelpPresentedAppearance().modifier(BighelpFoldBoundary(pageUsesDeck: false))
+        }
         #endif
     }
 

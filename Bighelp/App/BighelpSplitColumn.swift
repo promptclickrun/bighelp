@@ -8,12 +8,23 @@ import SwiftUI
 @Observable
 final class BighelpSplitColumn {
     private(set) var content: AnyView?
+    /// The places down the list's leading edge: they switch the list, so they stay with it.
+    private(set) var rail: AnyView = AnyView(EmptyView())
+    /// The list is put away, so the page takes the whole screen. The rail stays to bring it back.
+    private(set) var isCollapsed = false
     @ObservationIgnored private var key: String?
+    @ObservationIgnored private var railKey: String?
 
     var isShown: Bool { content != nil }
 
-    /// Shows the list `key` names. The same key keeps the list that's there, scrolled where it was.
-    func show(_ key: String, _ view: () -> AnyView) {
+    /// Shows the list `key` names, under `rail`. The same `key` keeps the list that's there,
+    /// scrolled where it was; `railKey` refreshes only the rail (for example Today's dot) without
+    /// rebuilding the list's stack.
+    func show(_ key: String, railKey: String, rail: () -> AnyView, _ view: () -> AnyView) {
+        if self.railKey != railKey {
+            self.railKey = railKey
+            self.rail = rail()
+        }
         guard self.key != key else { return }
         self.key = key
         content = view()
@@ -22,7 +33,15 @@ final class BighelpSplitColumn {
     func hide() {
         guard content != nil else { return }
         key = nil
+        railKey = nil
         content = nil
+        rail = AnyView(EmptyView())
+        isCollapsed = false
+    }
+
+    func setCollapsed(_ collapsed: Bool) {
+        guard isCollapsed != collapsed else { return }
+        isCollapsed = collapsed
     }
 }
 
@@ -40,11 +59,25 @@ struct BighelpSplitColumnHost: ViewModifier {
     func body(content: Content) -> some View {
         HStack(spacing: 0) {
             if let list = column.content {
-                // Its own stack, beside the app's: the list's bar and buttons, apart from the page's.
-                NavigationStack { list }
-                    // Up to the fold, so nothing sits across it.
-                    .frame(width: screen.splitColumnWidth)
-                    .transition(.move(edge: .leading))
+                HStack(spacing: 0) {
+                    // The places that switch the list, down its leading edge where the list is.
+                    column.rail
+                    // Put away, the list leaves the hierarchy: the bridge into its own UIKit stack
+                    // keeps a merely-hidden one in the accessibility tree, where it would answer
+                    // VoiceOver and take taps the page has the room for.
+                    if !column.isCollapsed {
+                        // Its own stack, beside the app's: the list's bar and buttons, apart from the
+                        // page's.
+                        NavigationStack { list }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .clipped()
+                    }
+                }
+                // Up to the fold, so nothing sits across it; put away, only the rail's column is left.
+                .frame(width: column.isCollapsed ? HomePlacesRail.width : screen.splitColumnWidth,
+                       alignment: .leading)
+                .clipped()
+                .transition(.move(edge: .leading))
                 Rectangle()
                     .fill(theme.border)
                     .frame(width: BighelpTokens.hairline)
@@ -54,6 +87,7 @@ struct BighelpSplitColumnHost: ViewModifier {
             content
         }
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: column.isShown)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: column.isCollapsed)
         .environment(\.bighelpSplitColumn, column)
     }
 }

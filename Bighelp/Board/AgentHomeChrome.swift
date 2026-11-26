@@ -1,15 +1,19 @@
 import SwiftUI
 
 /// What the shell gives a chat it pushed: `onProfile` opens the bot's page, from the header's pill and
-/// from ⋯ › Bot page. A chat drawn outside the shell (a fixture, a test) has neither, and no New chat
+/// from ⋯ › Bot page; `onNewChat` starts a chat with a bot the person picked in the chat itself (the
+/// laptop desk's rail). A chat drawn outside the shell (a fixture, a test) has neither, and no New chat
 /// parts.
 struct AgentHomeChrome {
     var isPushedChat = false
     var onProfile: @MainActor (String) -> Void = { _ in }
+    /// A new chat with this bot, as the bot page's ⋯ › New chat does. Nil hides what starts one.
+    var onNewChat: (@MainActor (String) -> Void)?
 
     /// The chrome of every chat the shell pushes.
-    static func pushedChat(onProfile: @escaping @MainActor (String) -> Void) -> AgentHomeChrome {
-        AgentHomeChrome(isPushedChat: true, onProfile: onProfile)
+    static func pushedChat(onProfile: @escaping @MainActor (String) -> Void,
+                           onNewChat: (@MainActor (String) -> Void)? = nil) -> AgentHomeChrome {
+        AgentHomeChrome(isPushedChat: true, onProfile: onProfile, onNewChat: onNewChat)
     }
 }
 
@@ -17,7 +21,9 @@ struct AgentHomeChrome {
 /// live state when tapped). Compared as a whole, every shell update redrew the chat on screen, its
 /// header and its message box.
 extension AgentHomeChrome: Equatable {
-    static func == (lhs: Self, rhs: Self) -> Bool { lhs.isPushedChat == rhs.isPushedChat }
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.isPushedChat == rhs.isPushedChat && (lhs.onNewChat != nil) == (rhs.onNewChat != nil)
+    }
 }
 
 private struct AgentHomeChromeKey: EnvironmentKey {

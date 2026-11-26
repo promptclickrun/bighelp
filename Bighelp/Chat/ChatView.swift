@@ -572,8 +572,7 @@ struct ChatView: View {
                             if showsLaptopDesk {
                                 ChatLaptopDesk(model: model, agentID: homeAgentID, name: agentName,
                                                imageURL: resolvedIdentityParticipants.first?.imageURL,
-                                               onNewChat: onNewChatTap,
-                                               onBotPage: { homeChrome.onProfile(homeAgentID) })
+                                               agents: agents, chrome: homeChrome)
                                     .frame(maxHeight: .infinity, alignment: .top)
                             } else {
                                 Spacer(minLength: 0)

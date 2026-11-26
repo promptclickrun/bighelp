@@ -51,6 +51,13 @@ extension RootShellView {
             .joined(separator: "|")
     }
 
+    /// Changes when the places rail beside the list needs new state (for example Today's Needs you
+    /// dot or the selected tab), without rebuilding the list's own stack.
+    var splitRailKey: String {
+        [splitColumnKey, appState.selectedTab.rawValue, home.view.rawValue, "\(needsYouEntries.count)"]
+            .joined(separator: "|")
+    }
+
     func updateSplitColumn() {
         guard let splitColumn else { return }
         guard let list = splitList else {
@@ -62,7 +69,10 @@ extension RootShellView {
         case .work: .work
         case .page(let tab): tab
         }
-        splitColumn.show(splitColumnKey) {
+        splitColumn.show(splitColumnKey, railKey: splitRailKey, rail: {
+            AnyView(HomePlacesRail(column: splitColumn, selection: tabSelection, items: homeTabItems,
+                                   onNewChat: { openNewChat() }))
+        }) {
             // Every root draws its own header, so the column's bar stays hidden.
             AnyView(BighelpLiveColumn { homeRoot(tab) }
                 .toolbar(.hidden, for: .navigationBar)

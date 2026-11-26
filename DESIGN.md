@@ -211,7 +211,10 @@ works in another chat (`WorkingChatPill`): the agent's face acting out the work 
 as the chats' faces. A tap opens the chat where the work is. Nothing is drawn while no other chat works, and the open
 chat's own work is never there: its header says that. It is a view in the column, never a toolbar item. The column starts under the camera and the status, which reach
 174 points down it, also while the system doesn't report where they end. Open and held wide, the first tab's list (the Bots view or the Chats view) sits left of the
-fold and what it opens sits right of it, like a book (`BighelpSplitColumn`); nothing crosses the fold. Held upright
+fold and what it opens sits right of it, like a book (`BighelpSplitColumn`); nothing crosses the fold. There the places
+switch the list, so they sit down its leading edge in a strip of their own (`HomePlacesRail`) rather than in the
+window's trailing column, which belongs to the chat; the last of them puts the list away, leaving the chat the whole
+width for a wide table, and the strip stays to bring it back. Held upright
 it's a big phone, never the cover screen's layout, and half-folded like a small laptop a chat keeps its messages
 above the fold and its message box and keyboard below it. Half of the open screen in iOS's Split View gets the cover
 screen's layout. On Vision Pro bighelp always starts in its own window. The three places sit in a strip beside the

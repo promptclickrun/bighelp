@@ -579,6 +579,13 @@ struct BighelpApp: App {
         #endif
     }
 
+    /// The page on top is a chat, which fills the half under the fold with its message box and
+    /// laptop desk instead of ending at the fold like every other screen.
+    private func topPageUsesFoldDeck(_ navigation: AppState) -> Bool {
+        if case .chat = navigation.path.last { return true }
+        return false
+    }
+
     /// The main screen for the current host (or the local fixtures).
     private func rootShell(native: NativeWorkspaceRuntime?, navigation: AppState) -> RootShellView {
         RootShellView(
@@ -755,6 +762,8 @@ struct BighelpApp: App {
                     NavigationStack(path: $navigation.path) {
                         rootShell(native: native, navigation: navigation)
                     }
+                    // Half-folded, whatever is on top ends at the fold; only a chat uses the half under it.
+                    .modifier(BighelpFoldBoundary(pageUsesDeck: topPageUsesFoldDeck(navigation)))
                     .modifier(BighelpSideMenuHost(menu: sideMenu))
                     // The iPhone Duo open: the list beside the page.
                     .modifier(BighelpSplitColumnHost(column: splitColumn))

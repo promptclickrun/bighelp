@@ -45,6 +45,23 @@ struct ScreenPostureTests {
         #expect(BighelpScreenGeometry(posture: .open, size: CGSize(width: 951, height: 669)).splitColumnWidth == 340)
     }
 
+    @Test func theHalfUnderTheFoldIsAPagesFloor() {
+        let laptop = BighelpScreenGeometry(posture: .openUpright, size: CGSize(width: 669, height: 951),
+                                           fold: CGRect(x: 0, y: 470, width: 669, height: 12),
+                                           isFoldActive: true, bottomInset: 34)
+        // From the fold's near edge to the system's own inset: 951 − 470 − 34.
+        #expect(laptop.foldDeckHeight == 447)
+        // Lying flat there is no half to give up, and open wide the fold is down the middle.
+        var flat = laptop
+        flat.isFoldActive = false
+        #expect(flat.foldDeckHeight == 0)
+        let book = BighelpScreenGeometry(posture: .open, size: CGSize(width: 951, height: 669),
+                                         fold: CGRect(x: 470, y: 0, width: 12, height: 669))
+        #expect(book.foldDeckHeight == 0)
+        // An ordinary phone keeps every point of its screen.
+        #expect(BighelpScreenGeometry().foldDeckHeight == 0)
+    }
+
     @Test func theColumnStaysClearOfTheStatusWhenTheSystemReportsNoEndForIt() {
         // The system's report is taken as it is.
         #expect(BighelpScreenGeometry.columnFreeTop(reportedEnd: 174, systemColumnWidth: 84) == 174)
@@ -69,15 +86,100 @@ struct ScreenPostureTests {
         }
         let reported = screen()
         #expect(reported.posture == .cover)
-        #expect(reported.trailingColumnWidth == 84)
-        #expect(reported.trailingColumnFreeTop == 174)
+        #expect(reported.sideColumnEdge == .trailing)
+        #expect(reported.sideColumnWidth == 84)
+        #expect(reported.sideColumnFreeTop == 174)
         // No report: the same screen, so nothing in the column moves.
         measured.occlusion = nil
         #expect(screen() == reported)
         // Split View's half: no column, as before.
         measured.trailingInset = 0
-        #expect(screen().trailingColumnWidth == 0)
-        #expect(screen().trailingColumnFreeTop == 0)
+        #expect(screen().sideColumnWidth == 0)
+        #expect(screen().sideColumnFreeTop == 0)
+    }
+
+    @Test func theColumnFollowsTheEdgeItIsOn() {
+        // The cover screen: the camera and the status trail, as the Duo reports them.
+        let trailing = BighelpScreenGeometry.sideColumn(
+            leading: nil, trailing: CGRect(x: 382, y: 0, width: 84, height: 174),
+            leadingInset: 0, trailingInset: 84)
+        #expect(trailing.edge == .trailing)
+        #expect(trailing.width == 84)
+        #expect(trailing.freeTop == 174)
+        // Split View, the app left of the divider: the same column, on its leading edge. This is the
+        // case that made the chat switcher sit opposite the camera and squeezed the page.
+        let leading = BighelpScreenGeometry.sideColumn(
+            leading: CGRect(x: 0, y: 0, width: 84, height: 174), trailing: nil,
+            leadingInset: 84, trailingInset: 0)
+        #expect(leading.edge == .leading)
+        #expect(leading.width == 84)
+        #expect(leading.freeTop == 174)
+        // An inset with no reported area still counts: the column is there before the API answers.
+        #expect(BighelpScreenGeometry.sideColumn(leading: nil, trailing: nil,
+                                                 leadingInset: 84, trailingInset: 0) == (leading.edge, 84, 174))
+        // Nothing anywhere: the trailing edge stays, so a screen that reports nothing doesn't move.
+        let none = BighelpScreenGeometry.sideColumn(leading: nil, trailing: nil, leadingInset: 0, trailingInset: 0)
+        #expect(none.edge == .trailing)
+        #expect(none.width == 0)
+        #expect(none.freeTop == 0)
+        // Off-edge occlusion rects measure from the window edge, not just rect.width.
+        let insetLeading = BighelpScreenGeometry.sideColumn(
+            leading: CGRect(x: 8, y: 0, width: 76, height: 174), trailing: nil,
+            leadingInset: 0, trailingInset: 0, windowWidth: 466)
+        #expect(insetLeading.edge == .leading)
+        #expect(insetLeading.width == 84)
+        let insetTrailing = BighelpScreenGeometry.sideColumn(
+            leading: nil, trailing: CGRect(x: 382, y: 0, width: 76, height: 174),
+            leadingInset: 0, trailingInset: 0, windowWidth: 466)
+        #expect(insetTrailing.edge == .trailing)
+        #expect(insetTrailing.width == 84)
+        // Equal widths tie-break to trailing.
+        let tied = BighelpScreenGeometry.sideColumn(
+            leading: CGRect(x: 0, y: 0, width: 84, height: 174),
+            trailing: CGRect(x: 382, y: 0, width: 84, height: 174),
+            leadingInset: 84, trailingInset: 84, windowWidth: 466)
+        #expect(tied.edge == .trailing)
+        // RTL mirrors physical left/right into semantic leading/trailing coordinates.
+        let physicalLeft = CGRect(x: 0, y: 0, width: 84, height: 174)
+        let rtlTrailing = BighelpScreenPostureReader.semanticRect(physicalLeft, windowWidth: 466, isRightToLeft: true)
+        #expect(rtlTrailing == CGRect(x: 382, y: 0, width: 84, height: 174))
+    }
+
+    @Test func splitColumnRefreshesRailWithoutRebuildingListAndResetsCollapseOnHide() {
+        let column = BighelpSplitColumn()
+        var listBuilds = 0
+        var railBuilds = 0
+        column.show("list-1", railKey: "rail-1", rail: {
+            railBuilds += 1
+            return AnyView(EmptyView())
+        }) {
+            listBuilds += 1
+            return AnyView(EmptyView())
+        }
+        #expect(listBuilds == 1)
+        #expect(railBuilds == 1)
+        // Changing only the rail key (e.g. Needs you dot) refreshes the rail without recreating the list.
+        column.show("list-1", railKey: "rail-2", rail: {
+            railBuilds += 1
+            return AnyView(EmptyView())
+        }) {
+            listBuilds += 1
+            return AnyView(EmptyView())
+        }
+        #expect(listBuilds == 1, "List stack must not rebuild when only the rail changes")
+        #expect(railBuilds == 2)
+        column.setCollapsed(true)
+        #expect(column.isCollapsed)
+        column.hide()
+        #expect(!column.isShown)
+        #expect(!column.isCollapsed, "Hiding the split column resets collapsed state")
+    }
+
+    @Test func agentHomeChromeEqualityTracksNewChatPresence() {
+        let withoutNewChat = AgentHomeChrome.pushedChat(onProfile: { _ in }, onNewChat: nil)
+        let withNewChat = AgentHomeChrome.pushedChat(onProfile: { _ in }, onNewChat: { _ in })
+        #expect(withoutNewChat != withNewChat)
+        #expect(withNewChat == AgentHomeChrome.pushedChat(onProfile: { _ in }, onNewChat: { _ in }))
     }
 
     @Test func theSideBarIsForScreensWithAStatusColumn() {
@@ -85,6 +187,17 @@ struct ScreenPostureTests {
         #expect(BighelpScreenGeometry(posture: .open).usesSideBar)
         #expect(!BighelpScreenGeometry(posture: .openUpright).usesSideBar)
         #expect(!BighelpScreenGeometry(posture: .standard).usesSideBar)
+    }
+
+    /// The system's strip is on the window's trailing edge, which in the open posture is the chat's
+    /// column: the places that switch the list go with the list instead.
+    @Test func thePlacesGoWithTheListBesideThePage() {
+        #expect(BighelpScreenGeometry(posture: .open).placesGoWithTheList(listIsShown: true))
+        // Nothing beside the page: the pane spans the screen and the system's strip has them.
+        #expect(!BighelpScreenGeometry(posture: .open).placesGoWithTheList(listIsShown: false))
+        for posture in [BighelpScreenPosture.cover, .openUpright, .standard] {
+            #expect(!BighelpScreenGeometry(posture: posture).placesGoWithTheList(listIsShown: true))
+        }
     }
 
     @Test func everyOtherPhoneKeepsItsLayout() {

@@ -411,7 +411,7 @@ final class DuoLayoutUITests: BighelpUITestCase {
     @MainActor
     func testOpenScreenKeepsThePlacesWithTheListAndCanPutTheListAway() throws {
         let app = makeApp()
-        app.launchArguments = demo + ["-loopdy.home.landing", "chats",
+        app.launchArguments = demo + ["-loopdy.home.landing", "bots",
                                       "-bighelp.debug.screen-posture", "open",
                                       "-bighelp.debug.fold-halfway", "YES",
                                       "-loopdy.demo.appearance", "light"]
@@ -421,9 +421,16 @@ final class DuoLayoutUITests: BighelpUITestCase {
         let window = app.windows.firstMatch.frame
         XCTAssertLessThan(today.frame.minX, window.minX + 70, "Down the leading edge, with the list")
         XCTAssertLessThan(today.frame.maxX, window.midX, "Not in the column the chat has")
-        let list = element("chats.inbox", in: app)
+        let list = element("simple-bots.home", in: app)
         XCTAssertTrue(list.waitForExistence(timeout: 10), "The list shows beside the page")
         XCTAssertGreaterThan(list.frame.minX, window.minX + 40, "The list starts beside the strip")
+        // Open a chat beside the list so we can verify the chat widens when the list is hidden.
+        let mina = app.buttons["simple-bots.bot.travel"]
+        XCTAssertTrue(mina.waitForExistence(timeout: 10), "A bot is in the list")
+        mina.tap()
+        let composer = element("chat.composer.field", in: app)
+        XCTAssertTrue(composer.waitForExistence(timeout: 10), "The chat opens beside the list")
+        let splitComposerWidth = composer.frame.width
         let toggle = app.buttons["home.list.toggle"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 5), "The list can be put away")
         XCTAssertEqual(toggle.label, "Hide the list")
@@ -435,6 +442,8 @@ final class DuoLayoutUITests: BighelpUITestCase {
         XCTAssertTrue(list.waitForNonExistence(timeout: 5), "The list is out of the page's way")
         XCTAssertFalse(list.isHittable, "And it takes none of the page's taps")
         XCTAssertLessThan(app.buttons["home.tab.today"].frame.minX, window.minX + 70, "The rail stays")
+        XCTAssertGreaterThan(composer.frame.width, splitComposerWidth + 40,
+                             "The open chat widens when the list is put away")
         sleep(1)
         save("open-list-away-light", app)
 
@@ -442,6 +451,10 @@ final class DuoLayoutUITests: BighelpUITestCase {
         XCTAssertTrue(waitForLabel("Hide the list", of: toggle), "And it comes back")
         XCTAssertTrue(list.waitForExistence(timeout: 5), "The list is back")
         XCTAssertGreaterThan(list.frame.width, 100, "With room for its rows")
+        // Tapping the active place brings the list back and pops the pushed chat to root.
+        app.buttons["home.tab.conversations"].firstMatch.tap()
+        XCTAssertTrue(element("split.placeholder", in: app).waitForExistence(timeout: 5),
+                      "Re-tapping the active place pops back to the placeholder root")
     }
 
     @MainActor
@@ -504,22 +517,33 @@ final class DuoLayoutUITests: BighelpUITestCase {
                                       "-bighelp.debug.screen-posture", "openUpright",
                                       "-bighelp.debug.fold-halfway", "YES"]
         app.launch()
-        XCTAssertTrue(element("chat.laptop.desk", in: app).waitForExistence(timeout: 20),
-                      "The half under the fold carries the desk")
-        let face = app.buttons.matching(NSPredicate(
-            format: "identifier BEGINSWITH %@ AND NOT (identifier ENDSWITH %@)",
-            "chat.laptop.bot.", ".new-chat")).firstMatch
-        XCTAssertTrue(face.waitForExistence(timeout: 5), "The chat's bot has a face")
+        let desk = element("chat.laptop.desk", in: app)
+        XCTAssertTrue(desk.waitForExistence(timeout: 20), "The half under the fold carries the desk")
+        let currentFace = app.buttons.matching(NSPredicate(
+            format: "identifier BEGINSWITH %@ AND label == %@",
+            "chat.laptop.bot.", "Avery Park")).firstMatch
+        XCTAssertTrue(currentFace.waitForExistence(timeout: 5), "The chat's bot (Avery Park) has a face")
+        XCTAssertEqual(currentFace.frame.midX, desk.frame.midX, accuracy: 8,
+                       "The chat's own bot stays centered in the desk even with an odd number of peer bots")
         XCTAssertTrue(app.buttons["chat.laptop.new-chat"].waitForExistence(timeout: 5),
                       "The chat's bot has its New chat")
-        XCTAssertTrue(app.buttons.matching(NSPredicate(
+        let peerFace = app.buttons.matching(NSPredicate(
+            format: "identifier BEGINSWITH %@ AND NOT (identifier ENDSWITH %@) AND label != %@",
+            "chat.laptop.bot.", ".new-chat", "Avery Park")).firstMatch
+        XCTAssertTrue(peerFace.waitForExistence(timeout: 5), "A peer bot is beside the chat's own")
+        let peerName = peerFace.label
+        let peerNewChat = app.buttons.matching(NSPredicate(
             format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
-            "chat.laptop.bot.", ".new-chat")).firstMatch.waitForExistence(timeout: 5),
+            "chat.laptop.bot.", ".new-chat")).firstMatch
+        XCTAssertTrue(peerNewChat.waitForExistence(timeout: 5),
                       "Another bot is beside it, with a New chat of its own")
         save("laptop-desk-light", app)
-        face.tap()
+        // Tapping a peer bot's face opens THAT peer's profile page.
+        peerFace.tap()
         XCTAssertTrue(app.buttons["simple-bots.profile.more"].waitForExistence(timeout: 10),
-                      "A face opens that bot's page")
+                      "A peer face opens that bot's page")
+        XCTAssertTrue(app.staticTexts[peerName].waitForExistence(timeout: 5),
+                      "The opened profile belongs to the peer bot tapped (\(peerName))")
         app.terminate()
     }
 
@@ -548,6 +572,15 @@ final class DuoLayoutUITests: BighelpUITestCase {
             // No assertion about the bots under the bar: it floats over the list, which scrolls beneath it
             // everywhere the app has a bar.
             save("half-folded-bots-\(appearance)", app)
+            if appearance == "light" {
+                let todayTab = app.buttons["home.tab.today"].firstMatch
+                XCTAssertTrue(todayTab.waitForExistence(timeout: 5), "Today tab exists in the bar")
+                todayTab.tap()
+                let todayBar = element("primary-navigation", in: app)
+                XCTAssertTrue(todayBar.waitForExistence(timeout: 10), "Today keeps its bar")
+                XCTAssertLessThanOrEqual(todayBar.frame.maxY, window.midY + 2,
+                                         "Today ends at the fold too")
+            }
             app.terminate()
         }
     }

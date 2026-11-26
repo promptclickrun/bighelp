@@ -45,11 +45,16 @@ extension RootShellView {
         case nil: "none"
         }
         // A new shell (another computer, a new runtime) brings its own stores, which don't tell
-        // the column when that happens, so the column is drawn again then. Today's dot is in the
-        // rail, which the column holds, so a change there is a new rail.
+        // the column when that happens, so the column is drawn again then.
         return [list, currentWorkspaceOwner?.cacheScopeID ?? "local", splitColumnShellID.uuidString,
-                nativeRuntime.map { "\(ObjectIdentifier($0).hashValue)" } ?? "-", fleet == nil ? "" : "fleet",
-                "\(needsYouEntries.count)"]
+                nativeRuntime.map { "\(ObjectIdentifier($0).hashValue)" } ?? "-", fleet == nil ? "" : "fleet"]
+            .joined(separator: "|")
+    }
+
+    /// Changes when the places rail beside the list needs new state (for example Today's Needs you
+    /// dot or the selected tab), without rebuilding the list's own stack.
+    var splitRailKey: String {
+        [splitColumnKey, appState.selectedTab.rawValue, home.view.rawValue, "\(needsYouEntries.count)"]
             .joined(separator: "|")
     }
 
@@ -64,9 +69,10 @@ extension RootShellView {
         case .work: .work
         case .page(let tab): tab
         }
-        let rail = HomePlacesRail(column: splitColumn, selection: tabSelection, items: homeTabItems,
-                                  onNewChat: { openNewChat() })
-        splitColumn.show(splitColumnKey, rail: AnyView(rail)) {
+        splitColumn.show(splitColumnKey, railKey: splitRailKey, rail: {
+            AnyView(HomePlacesRail(column: splitColumn, selection: tabSelection, items: homeTabItems,
+                                   onNewChat: { openNewChat() }))
+        }) {
             // Every root draws its own header, so the column's bar stays hidden.
             AnyView(BighelpLiveColumn { homeRoot(tab) }
                 .toolbar(.hidden, for: .navigationBar)

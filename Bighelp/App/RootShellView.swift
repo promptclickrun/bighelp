@@ -559,6 +559,7 @@ struct RootShellView: View {
         .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { rootBottomSafeArea = $0 }
         // The iPhone Duo open: the list beside the page.
         .onChange(of: splitColumnKey, initial: true) { updateSplitColumn() }
+        .onChange(of: splitRailKey) { updateSplitColumn() }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             isKeyboardVisible = true
         }

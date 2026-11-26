@@ -559,7 +559,7 @@ struct ChatView: View {
                             if showsLaptopDesk {
                                 ChatLaptopDesk(model: model, agentID: homeAgentID, name: agentName,
                                                imageURL: resolvedIdentityParticipants.first?.imageURL,
-                                               others: laptopDeskBots, chrome: homeChrome)
+                                               agents: agents, chrome: homeChrome)
                                     .frame(maxHeight: .infinity, alignment: .top)
                             } else {
                                 Spacer(minLength: 0)
@@ -669,16 +669,6 @@ struct ChatView: View {
     /// The agent this chat is with; a group chat has no one agent.
     private var homeAgentID: String {
         resolvedIdentityParticipants.first?.stableID ?? model.memberIDs.first ?? agentName
-    }
-
-    /// The computer's bots other than this chat's, for the laptop desk's rail: smaller faces either
-    /// side of the chat's own, each a tap from its page and a New chat from a chat with it.
-    private var laptopDeskBots: [ChatLaptopDeskBot] {
-        guard let agents else { return [] }
-        return agents.profiles
-            .filter { $0.id != homeAgentID && $0.placement?.isHidden != true }
-            .prefix(4)
-            .map { ChatLaptopDeskBot(id: $0.id, name: $0.name, imageURL: agents.avatarURL(for: $0)) }
     }
 
     /// One home: Back, who the chat is with (a bot's pill opens its page) and ⋯; a new chat with

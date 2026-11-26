@@ -84,7 +84,8 @@ struct HomePlacesRail: View {
             BighelpKeyboard.dismiss()
             // A place chosen while the list is away brings it back: the tap asked to see it.
             setCollapsed(false)
-            guard selection != item.id else { return }
+            // Always assign so tapping the active place pops pushed pages back to its root,
+            // matching `HomeTabBar`.
             selection = item.id
         } label: {
             glyph(item.symbol(selected: isSelected), isSelected: isSelected)

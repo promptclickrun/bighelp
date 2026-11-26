@@ -21,8 +21,10 @@ struct ChatLaptopDesk: View {
     let agentID: String
     let name: String
     let imageURL: URL?
-    /// The computer's bots other than this chat's: smaller, alternating either side of it.
-    var others: [ChatLaptopDeskBot] = []
+    /// Observed here instead of in `ChatView.body` so profile refreshes never redraw the whole chat.
+    var agents: AgentDirectoryStore?
+    /// Explicit peer bots (used by previews/tests when no directory store is passed).
+    var others: [ChatLaptopDeskBot]? = nil
     /// The bot's page and a new chat with it, from every face here (`AgentHomeChrome`).
     let chrome: AgentHomeChrome
     @BighelpThemeReader private var theme
@@ -31,27 +33,60 @@ struct ChatLaptopDesk: View {
     private static let currentFaceSize: CGFloat = 96
     private static let otherFaceSize: CGFloat = 48
 
+    private var peerBots: [ChatLaptopDeskBot] {
+        if let others { return others }
+        guard let agents else { return [] }
+        return agents.profiles
+            .filter { $0.id != agentID && $0.placement?.isHidden != true }
+            .prefix(4)
+            .map { ChatLaptopDeskBot(id: $0.id, name: $0.name, imageURL: agents.avatarURL(for: $0)) }
+    }
+
     var body: some View {
         let activity = model.liveActivityKind
+        let peers = peerBots
+        let leadingPeers = peers.enumerated().filter { $0.offset.isMultiple(of: 2) }.map(\.element)
+        let trailingPeers = peers.enumerated().filter { !$0.offset.isMultiple(of: 2) }.map(\.element)
         VStack(spacing: BighelpTokens.space12) {
             Spacer(minLength: 0)
-            HStack(alignment: .top, spacing: BighelpTokens.space16) {
-                ForEach(Array(others.enumerated()), id: \.element.id) { pair in
-                    if pair.offset.isMultiple(of: 2) { other(pair.element) }
-                }
-                current(activity)
-                ForEach(Array(others.enumerated()), id: \.element.id) { pair in
-                    if !pair.offset.isMultiple(of: 2) { other(pair.element) }
+            ViewThatFits(in: .horizontal) {
+                balancedRail(activity: activity, leading: leadingPeers, trailing: trailingPeers)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: BighelpTokens.space16) {
+                        ForEach(leadingPeers) { other($0) }
+                        current(activity)
+                        ForEach(trailingPeers) { other($0) }
+                    }
+                    .padding(.horizontal, BighelpTokens.space16)
                 }
             }
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, BighelpTokens.space16)
         .padding(.top, BighelpTokens.space12)
         // A container, so its id doesn't replace the faces' own.
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("chat.laptop.desk")
+    }
+
+    /// Flanking equal-width stacks keep the chat's own bot dead-center even with an odd peer count.
+    private func balancedRail(activity: AgentActivityKind, leading: [ChatLaptopDeskBot],
+                              trailing: [ChatLaptopDeskBot]) -> some View {
+        HStack(alignment: .top, spacing: BighelpTokens.space16) {
+            HStack(alignment: .top, spacing: BighelpTokens.space12) {
+                ForEach(leading) { other($0) }
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+
+            current(activity)
+                .layoutPriority(1)
+
+            HStack(alignment: .top, spacing: BighelpTokens.space12) {
+                ForEach(trailing) { other($0) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, BighelpTokens.space16)
     }
 
     private func current(_ activity: AgentActivityKind) -> some View {
@@ -63,10 +98,14 @@ struct ChatLaptopDesk: View {
                 Text(name)
                     .font(.bighelp(.title3, weight: .semibold))
                     .foregroundStyle(theme.primaryText)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
                 // The step it is on, in its own words, else the kind of work. Never a guess.
                 Text(model.liveStepPhrase ?? activity.label)
                     .bighelpFont(.label)
                     .foregroundStyle(theme.secondaryText)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
             }
             .multilineTextAlignment(.center)
             .accessibilityElement(children: .combine)
@@ -102,17 +141,20 @@ struct ChatLaptopDesk: View {
     }
 
     /// A face here has no room for words: the small ones wear the symbol alone, and carry the bot's
-    /// name in their label.
+    /// name in their label. Hidden when the chat has no New chat action (`AgentHomeChrome.onNewChat`).
+    @ViewBuilder
     private func newChat(for agentID: String, title: LocalizedStringKey, identifier: String,
                          compact: Bool) -> some View {
-        Button {
-            chrome.onNewChat?(agentID)
-        } label: {
-            newChatLabel(title, compact: compact)
+        if let onNewChat = chrome.onNewChat {
+            Button {
+                onNewChat(agentID)
+            } label: {
+                newChatLabel(title, compact: compact)
+            }
+            .buttonStyle(.bighelpTilePress)
+            .accessibilityLabel(title)
+            .accessibilityIdentifier(identifier)
         }
-        .buttonStyle(.bighelpTilePress)
-        .accessibilityLabel(title)
-        .accessibilityIdentifier(identifier)
     }
 
     @ViewBuilder

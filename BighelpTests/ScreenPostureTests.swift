@@ -122,6 +122,64 @@ struct ScreenPostureTests {
         #expect(none.edge == .trailing)
         #expect(none.width == 0)
         #expect(none.freeTop == 0)
+        // Off-edge occlusion rects measure from the window edge, not just rect.width.
+        let insetLeading = BighelpScreenGeometry.sideColumn(
+            leading: CGRect(x: 8, y: 0, width: 76, height: 174), trailing: nil,
+            leadingInset: 0, trailingInset: 0, windowWidth: 466)
+        #expect(insetLeading.edge == .leading)
+        #expect(insetLeading.width == 84)
+        let insetTrailing = BighelpScreenGeometry.sideColumn(
+            leading: nil, trailing: CGRect(x: 382, y: 0, width: 76, height: 174),
+            leadingInset: 0, trailingInset: 0, windowWidth: 466)
+        #expect(insetTrailing.edge == .trailing)
+        #expect(insetTrailing.width == 84)
+        // Equal widths tie-break to trailing.
+        let tied = BighelpScreenGeometry.sideColumn(
+            leading: CGRect(x: 0, y: 0, width: 84, height: 174),
+            trailing: CGRect(x: 382, y: 0, width: 84, height: 174),
+            leadingInset: 84, trailingInset: 84, windowWidth: 466)
+        #expect(tied.edge == .trailing)
+        // RTL mirrors physical left/right into semantic leading/trailing coordinates.
+        let physicalLeft = CGRect(x: 0, y: 0, width: 84, height: 174)
+        let rtlTrailing = BighelpScreenPostureReader.semanticRect(physicalLeft, windowWidth: 466, isRightToLeft: true)
+        #expect(rtlTrailing == CGRect(x: 382, y: 0, width: 84, height: 174))
+    }
+
+    @Test func splitColumnRefreshesRailWithoutRebuildingListAndResetsCollapseOnHide() {
+        let column = BighelpSplitColumn()
+        var listBuilds = 0
+        var railBuilds = 0
+        column.show("list-1", railKey: "rail-1", rail: {
+            railBuilds += 1
+            return AnyView(EmptyView())
+        }) {
+            listBuilds += 1
+            return AnyView(EmptyView())
+        }
+        #expect(listBuilds == 1)
+        #expect(railBuilds == 1)
+        // Changing only the rail key (e.g. Needs you dot) refreshes the rail without recreating the list.
+        column.show("list-1", railKey: "rail-2", rail: {
+            railBuilds += 1
+            return AnyView(EmptyView())
+        }) {
+            listBuilds += 1
+            return AnyView(EmptyView())
+        }
+        #expect(listBuilds == 1, "List stack must not rebuild when only the rail changes")
+        #expect(railBuilds == 2)
+        column.setCollapsed(true)
+        #expect(column.isCollapsed)
+        column.hide()
+        #expect(!column.isShown)
+        #expect(!column.isCollapsed, "Hiding the split column resets collapsed state")
+    }
+
+    @Test func agentHomeChromeEqualityTracksNewChatPresence() {
+        let withoutNewChat = AgentHomeChrome.pushedChat(onProfile: { _ in }, onNewChat: nil)
+        let withNewChat = AgentHomeChrome.pushedChat(onProfile: { _ in }, onNewChat: { _ in })
+        #expect(withoutNewChat != withNewChat)
+        #expect(withNewChat == AgentHomeChrome.pushedChat(onProfile: { _ in }, onNewChat: { _ in }))
     }
 
     @Test func theSideBarIsForScreensWithAStatusColumn() {

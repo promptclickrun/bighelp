@@ -139,13 +139,20 @@ struct BighelpScreenGeometry: Equatable, Sendable {
 
     /// The system's column, whichever edge it is on. Split View puts an app's controls along its own
     /// outer edge, so the app left of the divider has the camera and the status along its leading
-    /// edge; the cover screen keeps them trailing. The wider side wins, and a screen that reports
-    /// neither keeps the trailing edge, which is where the Duo's own column is.
+    /// edge; the cover screen keeps them trailing. Distance is measured from each window edge (so an
+    /// occlusion slightly inset from the edge still covers the full margin). The wider side wins, and
+    /// a screen that reports neither (or ties) keeps the trailing edge, which is where the Duo's own
+    /// column is.
     static func sideColumn(leading: CGRect?, trailing: CGRect?,
-                           leadingInset: CGFloat, trailingInset: CGFloat)
+                           leadingInset: CGFloat, trailingInset: CGFloat,
+                           windowWidth: CGFloat = 0)
         -> (edge: BighelpSideColumnEdge, width: CGFloat, freeTop: CGFloat) {
-        let leadingWidth = max(leadingInset, leading.map(\.width) ?? 0)
-        let trailingWidth = max(trailingInset, trailing.map(\.width) ?? 0)
+        let leadingOcclusionWidth = leading.map { max(0, $0.maxX) } ?? 0
+        let trailingOcclusionWidth = trailing.map {
+            windowWidth > 0 ? max(0, windowWidth - $0.minX) : $0.width
+        } ?? 0
+        let leadingWidth = max(leadingInset, leadingOcclusionWidth)
+        let trailingWidth = max(trailingInset, trailingOcclusionWidth)
         let isLeading = leadingWidth > trailingWidth
         let region = isLeading ? leading : trailing
         let inset = isLeading ? leadingInset : trailingInset
@@ -192,9 +199,11 @@ struct BighelpFoldBoundary: ViewModifier {
 struct BighelpScreenPostureReader: ViewModifier {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.layoutDirection) private var layoutDirection
     @State private var measured = Measured()
 
-    /// What the window's geometry says, in the window's coordinates.
+    /// What the window's geometry says, in the window's coordinates (mirrored horizontally in RTL
+    /// so `leadingOcclusion` always sits near `x == 0` and `occlusion` near `x == size.width`).
     struct Measured: Equatable {
         var size: CGSize = .zero
         var leadingInset: CGFloat = 0
@@ -207,9 +216,10 @@ struct BighelpScreenPostureReader: ViewModifier {
     }
 
     func body(content: Content) -> some View {
+        let isRightToLeft = layoutDirection == .rightToLeft
         content
             .onGeometryChange(for: Measured.self) { proxy in
-                Self.measure(proxy)
+                Self.measure(proxy, isRightToLeft: isRightToLeft)
             } action: { measured = $0 }
             .environment(\.bighelpScreen, Self.geometry(measured, horizontal: horizontalSizeClass,
                                                         vertical: verticalSizeClass))
@@ -231,10 +241,20 @@ struct BighelpScreenPostureReader: ViewModifier {
             #endif
     }
 
+    /// Maps a physical window-space rect into semantic leading-to-trailing X coordinates so
+    /// leading occlusions always sit near `0` and trailing occlusions near `windowWidth`.
+    nonisolated static func semanticRect(_ frame: CGRect, windowWidth: CGFloat, isRightToLeft: Bool) -> CGRect {
+        guard isRightToLeft else { return frame }
+        return CGRect(x: windowWidth - frame.maxX, y: frame.minY, width: frame.width, height: frame.height)
+    }
+
     static func geometry(_ measured: Measured, horizontal: UserInterfaceSizeClass?,
                          vertical: UserInterfaceSizeClass?) -> BighelpScreenGeometry {
         var measured = measured
-        if BighelpScreenDebug.withholdsOcclusion { measured.occlusion = nil }
+        if BighelpScreenDebug.withholdsOcclusion {
+            measured.leadingOcclusion = nil
+            measured.occlusion = nil
+        }
         let posture = BighelpScreenDebug.posture ?? BighelpScreenPosture.classify(
             isPhone: BighelpScreenPosture.isPhone, horizontal: horizontal, vertical: vertical, size: measured.size)
         let isLandscape = measured.size.width > measured.size.height
@@ -251,12 +271,15 @@ struct BighelpScreenPostureReader: ViewModifier {
         }
         // Which edge the camera and the status sit on: trailing on the cover screen, leading for the
         // app on the left of Split View. A debug column stands in for one no simulator arranges.
-        let column = BighelpScreenDebug.leadingColumnWidth.map {
-            (edge: BighelpSideColumnEdge.leading, width: $0,
-             freeTop: BighelpScreenGeometry.statusAreaHeight)
+        let column = BighelpScreenDebug.leadingColumnWidth.map { width in
+            (edge: BighelpSideColumnEdge.leading, width: width,
+             freeTop: BighelpScreenGeometry.columnFreeTop(
+                 reportedEnd: BighelpScreenDebug.withholdsOcclusion ? nil : BighelpScreenGeometry.statusAreaHeight,
+                 systemColumnWidth: width))
         } ?? BighelpScreenGeometry.sideColumn(
             leading: measured.leadingOcclusion, trailing: measured.occlusion,
-            leadingInset: measured.leadingInset, trailingInset: measured.trailingInset)
+            leadingInset: measured.leadingInset, trailingInset: measured.trailingInset,
+            windowWidth: measured.size.width)
         return BighelpScreenGeometry(
             posture: posture,
             size: measured.size,
@@ -272,8 +295,9 @@ struct BighelpScreenPostureReader: ViewModifier {
 
     /// The window's size, the camera's column and the fold. Reserved regions come in the proxy's
     /// own coordinates, which start inside the safe area; they're moved to the window's.
-    nonisolated private static func measure(_ proxy: GeometryProxy) -> Measured {
+    nonisolated private static func measure(_ proxy: GeometryProxy, isRightToLeft: Bool) -> Measured {
         let insets = proxy.safeAreaInsets
+        let leftInset = isRightToLeft ? insets.trailing : insets.leading
         var measured = Measured(
             size: CGSize(width: proxy.size.width + insets.leading + insets.trailing,
                          height: proxy.size.height + insets.top + insets.bottom),
@@ -282,14 +306,16 @@ struct BighelpScreenPostureReader: ViewModifier {
             bottomInset: insets.bottom)
         #if os(iOS) && !targetEnvironment(macCatalyst)
         if #available(iOS 27.1, *) {
-            func inWindow(_ frame: CGRect) -> CGRect { frame.offsetBy(dx: insets.leading, dy: insets.top) }
+            func inWindow(_ frame: CGRect) -> CGRect { frame.offsetBy(dx: leftInset, dy: insets.top) }
             let half = measured.size.width / 2
             // Both edges: Split View keeps an app's camera and status on its own outer edge, which is
             // the leading one for the app on the left.
             func merged(_ frames: [CGRect]) -> CGRect? {
                 frames.reduce(nil as CGRect?) { union, frame in union.map { $0.union(frame) } ?? frame }
             }
-            let regions = proxy.reservedRegions(kind: .occlusion).filter(\.isActive).map { inWindow($0.frame) }
+            let regions = proxy.reservedRegions(kind: .occlusion)
+                .filter(\.isActive)
+                .map { semanticRect(inWindow($0.frame), windowWidth: measured.size.width, isRightToLeft: isRightToLeft) }
             measured.leadingOcclusion = merged(regions.filter { $0.midX < half })
             measured.occlusion = merged(regions.filter { $0.midX > half })
             // Where the fold is even while the screen lies flat, so the list can stop at it.

@@ -579,13 +579,11 @@ struct BighelpApp: App {
         #endif
     }
 
-    /// The page on top is a chat (or Code's batch chat): the two pages that fill the half under the
-    /// fold with their message box, instead of ending at the fold like every other screen.
+    /// The page on top is a chat, which fills the half under the fold with its message box and
+    /// laptop desk instead of ending at the fold like every other screen.
     private func topPageUsesFoldDeck(_ navigation: AppState) -> Bool {
-        switch navigation.path.last {
-        case .chat?, .codeBatch?: true
-        default: false
-        }
+        if case .chat = navigation.path.last { return true }
+        return false
     }
 
     /// The main screen for the current host (or the local fixtures).

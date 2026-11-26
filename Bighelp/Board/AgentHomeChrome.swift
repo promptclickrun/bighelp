@@ -21,7 +21,9 @@ struct AgentHomeChrome {
 /// live state when tapped). Compared as a whole, every shell update redrew the chat on screen, its
 /// header and its message box.
 extension AgentHomeChrome: Equatable {
-    static func == (lhs: Self, rhs: Self) -> Bool { lhs.isPushedChat == rhs.isPushedChat }
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.isPushedChat == rhs.isPushedChat && (lhs.onNewChat != nil) == (rhs.onNewChat != nil)
+    }
 }
 
 private struct AgentHomeChromeKey: EnvironmentKey {

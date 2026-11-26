@@ -13,22 +13,30 @@ final class BighelpSplitColumn {
     /// The list is put away, so the page takes the whole screen. The rail stays to bring it back.
     private(set) var isCollapsed = false
     @ObservationIgnored private var key: String?
+    @ObservationIgnored private var railKey: String?
 
     var isShown: Bool { content != nil }
 
-    /// Shows the list `key` names, under `rail`. The same key keeps the list that's there, scrolled
-    /// where it was.
-    func show(_ key: String, rail: AnyView, _ view: () -> AnyView) {
+    /// Shows the list `key` names, under `rail`. The same `key` keeps the list that's there,
+    /// scrolled where it was; `railKey` refreshes only the rail (for example Today's dot) without
+    /// rebuilding the list's stack.
+    func show(_ key: String, railKey: String, rail: () -> AnyView, _ view: () -> AnyView) {
+        if self.railKey != railKey {
+            self.railKey = railKey
+            self.rail = rail()
+        }
         guard self.key != key else { return }
         self.key = key
-        self.rail = rail
         content = view()
     }
 
     func hide() {
         guard content != nil else { return }
         key = nil
+        railKey = nil
         content = nil
+        rail = AnyView(EmptyView())
+        isCollapsed = false
     }
 
     func setCollapsed(_ collapsed: Bool) {

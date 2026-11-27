@@ -3,6 +3,12 @@
 These notes tell people what is new in each bighelp release. They use ASD-STE100 Simplified Technical English:
 short sentences, one instruction in each step, and the active voice.
 
+## 2.6.98
+
+### Fixed
+
+- **Chats list order:** when you open the app again, Bot Chats keep the time of their last message. They no longer all move to the top with the time you opened the app. Bots that you did not chat with do not show in Chats.
+
 ## 2.6.97
 
 ### New

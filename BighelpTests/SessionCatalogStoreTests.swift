@@ -2626,4 +2626,43 @@ struct SessionRowTimestampTests {
         #expect(SessionRow.compactTimestamp(lastYear, now: now, calendar: calendar)
             == lastYear.formatted(date: .numeric, time: .omitted))
     }
+
+    @MainActor
+    @Test func reconcilingEmptyBotChatHealsCachedReopenTimeAndAcceptedFlag() {
+        let launchTime = Date(timeIntervalSince1970: 1_700_300_000)
+        let oldCreatedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let cached = SessionRecord(
+            id: "bot-empty", kind: .direct, agentIDs: ["beta"], title: "Bot Chat",
+            remoteStoredID: "beta-bot", createdAt: launchTime, updatedAt: launchTime,
+            hasAcceptedMessage: true
+        )
+        let incoming = SessionRecord(
+            id: "bot-empty", kind: .direct, agentIDs: ["beta"], title: "Bot Chat",
+            remoteStoredID: "beta-bot", createdAt: oldCreatedAt, updatedAt: oldCreatedAt,
+            hasAcceptedMessage: false
+        )
+        let merged = SessionCatalogReconciliation.reconciled(local: [cached], authoritativeIncoming: [incoming])
+        #expect(merged.count == 1)
+        #expect(merged[0].updatedAt == oldCreatedAt)
+        #expect(!merged[0].hasAcceptedMessage)
+
+        // Legacy Hermes hosts that omit Bot Chat timestamps must not clobber a known local timestamp or preview.
+        var hydratedLocal = SessionRecord(
+            id: "bot-legacy", kind: .direct, agentIDs: ["alpha"], title: "Bot Chat",
+            remoteStoredID: "alpha-bot", createdAt: oldCreatedAt, updatedAt: launchTime,
+            hasAcceptedMessage: true
+        )
+        hydratedLocal.catalogPreview = "Last real reply"
+        let legacyIncoming = SessionRecord(
+            id: "bot-legacy", kind: .direct, agentIDs: ["alpha"], title: "Bot Chat",
+            remoteStoredID: "alpha-bot", createdAt: .distantPast, updatedAt: .distantPast,
+            hasAcceptedMessage: false
+        )
+        let legacyMerged = SessionCatalogReconciliation.reconciled(
+            local: [hydratedLocal], authoritativeIncoming: [legacyIncoming]
+        )
+        #expect(legacyMerged.count == 1)
+        #expect(legacyMerged[0].updatedAt == launchTime)
+        #expect(legacyMerged[0].hasAcceptedMessage)
+    }
 }

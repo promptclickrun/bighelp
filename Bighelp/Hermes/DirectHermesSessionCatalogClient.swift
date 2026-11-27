@@ -88,6 +88,43 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
     private struct Registry {
         let id: String
         let resolvedID: String?
+        let startedAt: Date?
+        let lastActive: Date?
+        let preview: String
+        let messageCount: Int?
+        let liveMessageCount: Int?
+        let source: String?
+
+        init(
+            id: String,
+            resolvedID: String?,
+            startedAt: Date? = nil,
+            lastActive: Date? = nil,
+            preview: String = "",
+            messageCount: Int? = nil,
+            liveMessageCount: Int? = nil,
+            source: String? = nil
+        ) {
+            self.id = id
+            self.resolvedID = resolvedID
+            self.startedAt = startedAt
+            self.lastActive = lastActive
+            self.preview = preview
+            self.messageCount = messageCount
+            self.liveMessageCount = liveMessageCount
+            self.source = source
+        }
+
+        var visibleMessageCount: Int? {
+            switch (messageCount, liveMessageCount) {
+            case let (saved?, live?): max(saved, live)
+            case let (saved?, nil): saved
+            case let (nil, live?): live
+            case (nil, nil): nil
+            }
+        }
+
+        var effectiveUpdatedAt: Date? { lastActive ?? startedAt }
     }
     private struct Profile {
         let id: String
@@ -509,7 +546,15 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
                 rows.append((newerReceipt || discovered == nil) && hasOwnership(current) ? current : removingLiveBinding(current))
                 represented.insert(current.record.id)
             }
-            if let canonical = canonicalBotChat(profile, represented: represented) {
+            if let canonical = profile.canonical,
+               let appID = try? DirectHermesSessionIdentity.appID(owner: owner, profileID: profile.id,
+                                                                 anchorID: canonical.id),
+               let index = rows.firstIndex(where: { $0.record.id == appID }) {
+                if rows[index].catalog == nil,
+                   let refreshed = try? canonicalRecord(profile: profile, canonical: canonical, existing: rows[index].record) {
+                    rows[index].record = refreshed
+                }
+            } else if let canonical = canonicalBotChat(profile, represented: represented) {
                 rows.append(canonical)
                 represented.insert(canonical.record.id)
             }
@@ -1163,6 +1208,10 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         record.remoteStoredID = binding.coordinate.storedSessionID
         record.remoteSource = binding.record.remoteSource
         record.hasAcceptedMessage = record.hasAcceptedMessage || rows.contains { $0.role == "user" && $0.isVisible }
+        if record.updatedAt == .distantPast,
+           let latest = projection.messages.compactMap(\.metadata.timestamp).max() {
+            record.updatedAt = latest
+        }
         return (record, projection)
     }
 
@@ -1606,7 +1655,37 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         let id = try DirectHermesSessionValidation.string(row["id"])
         let resolved = try DirectHermesSessionValidation.optionalText(row["resolved_id"], maximum: 512)
         if let resolved { try DirectHermesSessionValidation.coordinate(resolved) }
-        return Registry(id: id, resolvedID: resolved)
+        let startedAt = try positiveDate(row["started_at"])
+        let lastActive = try positiveDate(row["last_active"] ?? row["last_activity_at"])
+        let preview = HermesUserMessageDisplay.preview(
+            try DirectHermesSessionValidation.optionalText(row["preview"], maximum: 64 * 1024) ?? ""
+        )
+        let messageCount = try optionalCount(row["message_count"])
+        let liveMessageCount = try optionalCount(row["live_message_count"])
+        let source = try DirectHermesSessionValidation.optionalText(row["source"], maximum: 128)
+        return Registry(
+            id: id,
+            resolvedID: resolved,
+            startedAt: startedAt,
+            lastActive: lastActive,
+            preview: preview,
+            messageCount: messageCount,
+            liveMessageCount: liveMessageCount,
+            source: source
+        )
+    }
+
+    private func positiveDate(_ value: BighelpJSONValue?) throws -> Date? {
+        guard let date = try DirectHermesSessionValidation.date(value), date.timeIntervalSince1970 > 0 else {
+            return nil
+        }
+        return date
+    }
+
+    private func optionalCount(_ value: BighelpJSONValue?) throws -> Int? {
+        guard let value, value != .null else { return nil }
+        guard let parsed = value.integer, parsed >= 0 else { throw WorkspaceClientError.invalidResponse }
+        return parsed
     }
 
     private func registry(profileID: String) async throws -> Registry? {
@@ -1684,7 +1763,7 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
         if resumed == nil, let current = bindings[appID], current.coordinate.runtimeSessionID != nil {
             return try await resolveSession(current.record)
         }
-        let record = try draftRecord(profile: profile, storedID: registry.id, title: "Bot Chat")
+        let record = try canonicalRecord(profile: profile, canonical: registry, existing: bindings[appID]?.record)
         let candidate = try Binding(
             coordinate: WorkspaceSessionCoordinate(owner: owner, profileID: profile.id, sessionID: appID,
                                                    storedSessionID: registry.resolvedID ?? registry.id, runtimeSessionID: nil),
@@ -2427,15 +2506,56 @@ final class DirectHermesSessionCatalogClient: SessionCatalogClient {
               let appID = try? DirectHermesSessionIdentity.appID(owner: owner, profileID: profile.id,
                                                                 anchorID: canonical.id),
               !represented.contains(appID) else { return nil }
-        if let current = bindings[appID] { return hasOwnership(current) ? current : removingLiveBinding(current) }
-        guard var record = try? draftRecord(profile: profile, storedID: canonical.id, title: "Bot Chat") else { return nil }
-        record.hasAcceptedMessage = true
+        if let current = bindings[appID] {
+            var updated = hasOwnership(current) ? current : removingLiveBinding(current)
+            if let record = try? canonicalRecord(profile: profile, canonical: canonical, existing: updated.record) {
+                updated.record = record
+            }
+            return updated
+        }
+        guard let record = try? canonicalRecord(profile: profile, canonical: canonical, existing: nil) else { return nil }
         return try? Binding(
             coordinate: WorkspaceSessionCoordinate(owner: owner, profileID: profile.id, sessionID: appID,
                                                    storedSessionID: canonical.resolvedID ?? canonical.id,
                                                    runtimeSessionID: nil),
             anchorID: canonical.id, record: record, durability: .persisted, cwd: nil,
             canonicalRegistryID: canonical.id)
+    }
+
+    private func canonicalRecord(profile: Profile, canonical: Registry, existing: SessionRecord?) throws -> SessionRecord {
+        let appID = try DirectHermesSessionIdentity.appID(owner: owner, profileID: profile.id, anchorID: canonical.id)
+        let storedID = canonical.resolvedID ?? canonical.id
+        let hasRemoteMessage = (canonical.visibleMessageCount.map { $0 > 0 } ?? false) || !canonical.preview.isEmpty
+        if var record = existing {
+            record.remoteStoredID = storedID
+            if let source = canonical.source { record.remoteSource = source }
+            if let updatedAt = canonical.effectiveUpdatedAt {
+                record.updatedAt = record.isActive ? max(record.updatedAt, updatedAt) : updatedAt
+            }
+            if !canonical.preview.isEmpty {
+                record.catalogPreview = canonical.preview
+            } else if canonical.visibleMessageCount == 0 && !record.isActive
+                        && !record.items.contains(where: { $0.role == .human }) {
+                record.catalogPreview = ""
+            }
+            if let count = canonical.visibleMessageCount {
+                record.hasAcceptedMessage = count > 0 || !canonical.preview.isEmpty
+                    || record.items.contains(where: { $0.role == .human })
+            } else if hasRemoteMessage {
+                record.hasAcceptedMessage = true
+            }
+            return record
+        }
+        let started = canonical.startedAt ?? canonical.lastActive ?? .distantPast
+        let updated = canonical.effectiveUpdatedAt ?? .distantPast
+        var record = SessionRecord(
+            id: appID, kind: .direct, agentIDs: [profile.id], title: "Bot Chat",
+            remoteStoredID: storedID, remoteSource: canonical.source,
+            createdAt: started, updatedAt: updated,
+            hasAcceptedMessage: hasRemoteMessage
+        )
+        record.catalogPreview = canonical.preview.isEmpty ? nil : canonical.preview
+        return record
     }
 
     private func draftRecord(profile: Profile, storedID: String, title: String) throws -> SessionRecord {

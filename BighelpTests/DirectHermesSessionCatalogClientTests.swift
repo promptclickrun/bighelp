@@ -1497,6 +1497,200 @@ struct DirectHermesSessionCatalogClientTests {
         }
     }
 
+    @Test func reopeningUsesBotChatLastMessageTimeAndExcludesUnchattedBots() async throws {
+        let launchTime = Date(timeIntervalSince1970: 1_700_300_000)
+        let startedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let chattedAt = Date(timeIntervalSince1970: 1_700_010_000)
+        let newerOtherChatAt = Date(timeIntervalSince1970: 1_700_020_000)
+        let followUpAt = Date(timeIntervalSince1970: 1_700_040_000)
+
+        @MainActor final class State {
+            var chattedLastActive: Double = 1_700_010_000
+            var chattedPreview = "See you tomorrow"
+            var chattedCount = 4
+        }
+        let state = State()
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, _ in
+            switch operation {
+            case .profilesList:
+                return ["profiles": .array([
+                    .object([
+                        "name": .string("alpha"), "display_name": .string("Alpha"),
+                        "canonical_session": .object([
+                            "id": .string("alpha-bot"), "resolved_id": .string("alpha-bot"),
+                            "title": .string("Bot Chat"),
+                            "preview": .string(state.chattedPreview),
+                            "started_at": .number(startedAt.timeIntervalSince1970),
+                            "last_active": .number(state.chattedLastActive),
+                            "message_count": .integer(state.chattedCount),
+                            "live_message_count": .integer(state.chattedCount),
+                        ]),
+                    ]),
+                    .object([
+                        "name": .string("beta"), "display_name": .string("Beta"),
+                        "canonical_session": .object([
+                            "id": .string("beta-bot"), "resolved_id": .string("beta-bot"),
+                            "title": .string("Bot Chat"),
+                            "preview": .string(""),
+                            "started_at": .number(startedAt.timeIntervalSince1970),
+                            "last_active": .number(startedAt.timeIntervalSince1970),
+                            "message_count": .integer(0),
+                            "live_message_count": .integer(0),
+                        ]),
+                    ]),
+                ])]
+            case .sessionsList:
+                var other = try #require(Self.session(id: "other").object)
+                other["started_at"] = .number(startedAt.timeIntervalSince1970)
+                other["last_active"] = .number(newerOtherChatAt.timeIntervalSince1970)
+                return Self.ownershipPage([.object(other)])
+            default: throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let client = DirectHermesSessionCatalogClient(
+            workspace: workspace, owner: workspace.owner!,
+            currentOwner: { workspace.owner }, now: { launchTime }
+        )
+
+        let first = try await client.list()
+        let alphaBot = try #require(first.first { $0.remoteStoredID == "alpha-bot" })
+        let betaBot = try #require(first.first { $0.remoteStoredID == "beta-bot" })
+        #expect(alphaBot.createdAt == startedAt)
+        #expect(alphaBot.updatedAt == chattedAt)
+        #expect(alphaBot.catalogPreview == "See you tomorrow")
+        #expect(alphaBot.hasAcceptedMessage)
+        #expect(betaBot.createdAt == startedAt)
+        #expect(betaBot.updatedAt == startedAt)
+        #expect(!betaBot.hasAcceptedMessage)
+
+        let store = SessionCatalogStore(client: DemoSessionCatalogClient(records: first), defaults: isolatedDefaults())
+        try await store.load()
+        #expect(store.recentSummaries.map(\.id) == [
+            try #require(first.first { $0.remoteStoredID == "other" }).id,
+            alphaBot.id,
+        ])
+        #expect(!store.recentSummaries.contains { $0.id == betaBot.id })
+
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        let inboxRows = store.recentSummaries.map { ChatsInboxRow(session: $0, hostID: nil, isCode: false) }
+        let sections = ChatsInboxProjection.sections(inboxRows, now: launchTime, calendar: utc)
+        #expect(sections.allSatisfy { $0.kind != .today })
+
+        // A later refresh while the app stays open reflects a real new remote message without bumping idle bots.
+        state.chattedLastActive = followUpAt.timeIntervalSince1970
+        state.chattedPreview = "New reply"
+        state.chattedCount = 6
+        let second = try await client.list()
+        let updatedAlpha = try #require(second.first { $0.remoteStoredID == "alpha-bot" })
+        let updatedBeta = try #require(second.first { $0.remoteStoredID == "beta-bot" })
+        #expect(updatedAlpha.updatedAt == followUpAt)
+        #expect(updatedAlpha.catalogPreview == "New reply")
+        #expect(updatedBeta.updatedAt == startedAt)
+        #expect(!updatedBeta.hasAcceptedMessage)
+    }
+
+    @Test func openingBotChatWithoutSendingDoesNotBumpItsTimestamp() async throws {
+        let launchTime = Date(timeIntervalSince1970: 1_700_300_000)
+        let startedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let lastRealMessageAt = Date(timeIntervalSince1970: 1_700_010_000)
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, payload in
+            switch operation {
+            case .profilesList:
+                return ["profiles": .array([
+                    .object([
+                        "name": .string("alpha"), "display_name": .string("Alpha"),
+                        "canonical_session": .object([
+                            "id": .string("alpha-bot"), "resolved_id": .string("alpha-bot"),
+                            "title": .string("Bot Chat"),
+                            "preview": .string("Earlier message"),
+                            "started_at": .number(startedAt.timeIntervalSince1970),
+                            "last_active": .number(lastRealMessageAt.timeIntervalSince1970),
+                            "message_count": .integer(2),
+                            "live_message_count": .integer(2),
+                        ]),
+                    ]),
+                    .object([
+                        "name": .string("beta"), "display_name": .string("Beta"),
+                        "canonical_session": .object([
+                            "id": .string("beta-bot"), "resolved_id": .string("beta-bot"),
+                            "title": .string("Bot Chat"),
+                            "preview": .string(""),
+                            "started_at": .number(startedAt.timeIntervalSince1970),
+                            "last_active": .number(startedAt.timeIntervalSince1970),
+                            "message_count": .integer(0),
+                            "live_message_count": .integer(0),
+                        ]),
+                    ]),
+                ])]
+            case .sessionsList:
+                return Self.ownershipPage([])
+            case .sessionResume:
+                let profile = payload["profile"]?.string ?? "alpha"
+                let stored = payload["session_id"]?.string ?? "alpha-bot"
+                return Self.attached(stored: stored, profile: profile)
+            default:
+                throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let client = DirectHermesSessionCatalogClient(
+            workspace: workspace, owner: workspace.owner!,
+            currentOwner: { workspace.owner }, now: { launchTime }
+        )
+
+        guard case .resolved(let openedAlpha) = try await client.resolveCanonicalChat(profileID: "alpha") else {
+            Issue.record("Expected alpha canonical chat to resolve")
+            return
+        }
+        #expect(openedAlpha.record.updatedAt == lastRealMessageAt)
+        #expect(openedAlpha.record.hasAcceptedMessage)
+
+        guard case .resolved(let openedBeta) = try await client.resolveCanonicalChat(profileID: "beta") else {
+            Issue.record("Expected beta canonical chat to resolve")
+            return
+        }
+        #expect(openedBeta.record.updatedAt == startedAt)
+        #expect(!openedBeta.record.hasAcceptedMessage)
+
+        let listed = try await client.list()
+        #expect(try #require(listed.first { $0.remoteStoredID == "alpha-bot" }).updatedAt == lastRealMessageAt)
+        #expect(try #require(listed.first { $0.remoteStoredID == "beta-bot" }).updatedAt == startedAt)
+        #expect(!(try #require(listed.first { $0.remoteStoredID == "beta-bot" }).hasAcceptedMessage))
+    }
+
+    @Test func legacyBotChatWithoutTimestampsDoesNotStampLaunchTime() async throws {
+        let launchTime = Date(timeIntervalSince1970: 1_700_300_000)
+        let workspace = try SessionWorkspaceStub()
+        workspace.handler = { operation, _ in
+            switch operation {
+            case .profilesList:
+                return ["profiles": .array([.object([
+                    "name": .string("alpha"), "display_name": .string("Alpha"),
+                    "canonical_session": .object([
+                        "id": .string("legacy-bot"), "resolved_id": .string("legacy-bot"),
+                        "title": .string("Bot Chat"),
+                        "started_at": .number(0),
+                        "last_active": .number(0),
+                    ]),
+                ])])]
+            case .sessionsList:
+                return Self.ownershipPage([])
+            default:
+                throw WorkspaceClientError.invalidRequest
+            }
+        }
+        let client = DirectHermesSessionCatalogClient(
+            workspace: workspace, owner: workspace.owner!,
+            currentOwner: { workspace.owner }, now: { launchTime }
+        )
+        let botChat = try #require(try await client.list().first { $0.remoteStoredID == "legacy-bot" })
+        #expect(botChat.updatedAt == .distantPast)
+        #expect(botChat.createdAt == .distantPast)
+        #expect(!botChat.hasAcceptedMessage)
+    }
+
     /// Hermes' idle sweep (`sessions.auto_archive`) archives chats nobody touched for days; they stay in the
     /// lists. A chat someone archived waits in Archived Chats, which restores it.
     @Test func idleSweptChatsStayListedAndArchivedOnesWaitInArchivedChats() async throws {

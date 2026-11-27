@@ -319,9 +319,23 @@ enum SessionCatalogReconciliation {
         // chat, a history page) keeps what the last row said.
         merged.isUnread = incoming.isUnread ?? local.isUnread
         // The host's saved last activity wins once nothing is in progress here. Keeping the newer
-        // of the two kept times Hermes had stamped on merely reopened chats forever.
-        merged.updatedAt = local.isActive ? max(local.updatedAt, incoming.updatedAt) : incoming.updatedAt
-        merged.hasAcceptedMessage = (hasSameTranscriptOwner && local.hasAcceptedMessage)
+        // of the two kept times Hermes had stamped on merely reopened chats forever. A legacy host
+        // that omits Bot Chat timestamps sends `.distantPast`; never clobber a known local timestamp.
+        if incoming.updatedAt != .distantPast {
+            merged.updatedAt = local.isActive ? max(local.updatedAt, incoming.updatedAt) : incoming.updatedAt
+        } else {
+            merged.updatedAt = local.updatedAt
+        }
+        // Prior builds unconditionally set `hasAcceptedMessage = true` on every Bot Chat and cached
+        // that to disk. When an authoritative host refresh confirms a Bot Chat has no messages,
+        // preview, or active work, clear the stale cached flag so unchatted bots leave Chats.
+        let clearStaleEmptyBotChat = incoming.isBotChat
+            && !local.isActive
+            && !incoming.hasAcceptedMessage
+            && merged.items.isEmpty
+            && (local.catalogPreview ?? "").isEmpty
+            && (incoming.catalogPreview ?? "").isEmpty
+        merged.hasAcceptedMessage = (!clearStaleEmptyBotChat && hasSameTranscriptOwner && local.hasAcceptedMessage)
             || incoming.hasAcceptedMessage
             || merged.items.contains(where: { $0.role == .human })
         if hasSameTranscriptOwner && !preferIncomingTranscript {

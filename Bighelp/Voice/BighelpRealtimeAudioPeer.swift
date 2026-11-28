@@ -143,6 +143,7 @@ final class BighelpRealtimeAudioPeer: NSObject {
     var onConnectionState: (@MainActor (ConnectionState) -> Void)?
     var onAudioRoute: (@MainActor (String) -> Void)?
     var onInterruption: (@MainActor (Bool) -> Void)?
+    var onInterruptionEndedWithoutResume: (@MainActor () -> Void)?
     var isMuted: Bool { recoveryState.isMuted }
     var isInterrupted: Bool { recoveryState.isInterrupted }
     private(set) var connectionState: ConnectionState = .idle
@@ -328,8 +329,15 @@ final class BighelpRealtimeAudioPeer: NSObject {
         guard recoveryState.explicitResume(hasValidInputRoute: hasValidInputRoute()) else {
             throw Failure.audioUnavailable
         }
-        RTCAudioSession.sharedInstance().isAudioEnabled = true
+        // The route may have dropped while the call was backgrounded: ensure the session
+        // is active before re-enabling capture.
+        let audio = RTCAudioSession.sharedInstance()
+        audio.lockForConfiguration()
+        try? audio.setActive(true)
+        audio.unlockForConfiguration()
+        audio.isAudioEnabled = true
         applyCaptureState()
+        try? reapplySpeakerOutputIfNeeded()
         onInterruption?(false)
     }
 
@@ -408,6 +416,7 @@ final class BighelpRealtimeAudioPeer: NSObject {
         onConnectionState = nil
         onAudioRoute = nil
         onInterruption = nil
+        onInterruptionEndedWithoutResume = nil
     }
 
     private func callback<Value: Sendable>(
@@ -537,23 +546,12 @@ extension BighelpRealtimeAudioPeer: RTCPeerConnectionDelegate, RTCAudioSessionDe
     }
     nonisolated func audioSessionDidBeginInterruption(_ session: RTCAudioSession) {
         Task { @MainActor [weak self] in
-            guard let self, !self.closed else { return }
-            self.recoveryState.beginInterruption()
-            self.applyCaptureState()
-            RTCAudioSession.sharedInstance().isAudioEnabled = false
-            self.onInterruption?(true)
+            self?.handleInterruptionBegan()
         }
     }
     nonisolated func audioSessionDidEndInterruption(_ session: RTCAudioSession, shouldResumeSession: Bool) {
         Task { @MainActor [weak self] in
-            guard let self, !self.closed else { return }
-            let resumed = self.recoveryState.endInterruption(
-                shouldResume: shouldResumeSession, hasValidInputRoute: self.hasValidInputRoute())
-            guard resumed else { return }
-            RTCAudioSession.sharedInstance().isAudioEnabled = true
-            self.applyCaptureState()
-            try? self.reapplySpeakerOutputIfNeeded()
-            self.onInterruption?(false)
+            self?.handleInterruptionEnded(shouldResume: shouldResumeSession)
         }
     }
     nonisolated func audioSessionDidChangeRoute(
@@ -561,29 +559,67 @@ extension BighelpRealtimeAudioPeer: RTCPeerConnectionDelegate, RTCAudioSessionDe
         previousRoute: AVAudioSessionRouteDescription
     ) {
         Task { @MainActor [weak self] in
-            guard let self, !self.closed else { return }
-            self.publishRoute()
-            if reason == .oldDeviceUnavailable {
-                self.recoveryState.routeLost()
-                self.applyCaptureState()
-                RTCAudioSession.sharedInstance().isAudioEnabled = false
-                if !self.recoveryState.routeBecameAvailable(hasValidInputRoute: self.hasValidInputRoute()) {
-                    self.onInterruption?(true)
-                } else {
-                    RTCAudioSession.sharedInstance().isAudioEnabled = true
-                    self.applyCaptureState()
-                    try? self.reapplySpeakerOutputIfNeeded()
-                    self.onInterruption?(false)
-                }
-            } else if self.recoveryState.routeBecameAvailable(
-                hasValidInputRoute: self.hasValidInputRoute()) {
-                RTCAudioSession.sharedInstance().isAudioEnabled = true
-                self.applyCaptureState()
-                try? self.reapplySpeakerOutputIfNeeded()
-                self.onInterruption?(false)
-            }
-            try? self.reapplySpeakerOutputIfNeeded()
+            self?.handleRouteChange(reason: reason)
         }
+    }
+
+    func handleInterruptionBegan() {
+        guard !closed else { return }
+        recoveryState.beginInterruption()
+        applyCaptureState()
+        RTCAudioSession.sharedInstance().isAudioEnabled = false
+        onInterruption?(true)
+    }
+
+    func handleInterruptionEnded(shouldResume: Bool) {
+        guard !closed else { return }
+        let resumed = recoveryState.endInterruption(
+            shouldResume: shouldResume, hasValidInputRoute: hasValidInputRoute())
+        if resumed {
+            let audio = RTCAudioSession.sharedInstance()
+            audio.lockForConfiguration()
+            try? audio.setActive(true)
+            audio.unlockForConfiguration()
+            audio.isAudioEnabled = true
+            applyCaptureState()
+            try? reapplySpeakerOutputIfNeeded()
+            onInterruption?(false)
+        } else if !shouldResume {
+            onInterruptionEndedWithoutResume?()
+        }
+    }
+
+    func handleRouteChange(reason: AVAudioSession.RouteChangeReason) {
+        guard !closed else { return }
+        publishRoute()
+        if reason == .oldDeviceUnavailable {
+            recoveryState.routeLost()
+            applyCaptureState()
+            RTCAudioSession.sharedInstance().isAudioEnabled = false
+            if !recoveryState.routeBecameAvailable(hasValidInputRoute: hasValidInputRoute()) {
+                onInterruption?(true)
+            } else {
+                let audio = RTCAudioSession.sharedInstance()
+                audio.lockForConfiguration()
+                try? audio.setActive(true)
+                audio.unlockForConfiguration()
+                audio.isAudioEnabled = true
+                applyCaptureState()
+                try? reapplySpeakerOutputIfNeeded()
+                onInterruption?(false)
+            }
+        } else if recoveryState.routeBecameAvailable(
+            hasValidInputRoute: hasValidInputRoute()) {
+            let audio = RTCAudioSession.sharedInstance()
+            audio.lockForConfiguration()
+            try? audio.setActive(true)
+            audio.unlockForConfiguration()
+            audio.isAudioEnabled = true
+            applyCaptureState()
+            try? reapplySpeakerOutputIfNeeded()
+            onInterruption?(false)
+        }
+        try? reapplySpeakerOutputIfNeeded()
     }
     nonisolated func audioSessionMediaServerTerminated(_ session: RTCAudioSession) {
         Task { @MainActor [weak self] in

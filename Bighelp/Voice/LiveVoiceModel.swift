@@ -6,6 +6,7 @@ protocol LiveVoiceAudioPeer: AnyObject {
     var onConnectionState: (@MainActor (BighelpRealtimeAudioPeer.ConnectionState) -> Void)? { get set }
     var onAudioRoute: (@MainActor (String) -> Void)? { get set }
     var onInterruption: (@MainActor (Bool) -> Void)? { get set }
+    var onInterruptionEndedWithoutResume: (@MainActor () -> Void)? { get set }
     func makeOffer() async throws -> String
     func applyAnswer(_ sdp: String) async throws
     /// What the plugin's offer returned. WebRTC peers take only an answer SDP.
@@ -20,6 +21,11 @@ protocol LiveVoiceAudioPeer: AnyObject {
 }
 
 extension LiveVoiceAudioPeer {
+    var onInterruptionEndedWithoutResume: (@MainActor () -> Void)? {
+        get { nil }
+        set {}
+    }
+
     func apply(_ answer: LiveVoiceAnswer) async throws {
         guard case .sdp(let sdp) = answer else { throw BighelpRealtimeAudioPeer.Failure.invalidSDP }
         try await applyAnswer(sdp)
@@ -114,7 +120,9 @@ final class LiveVoiceModel {
 
     @ObservationIgnored private let client: LiveVoiceControlClient
     @ObservationIgnored private let makePeer: @MainActor () -> any LiveVoiceAudioPeer
+    @ObservationIgnored private let holdHostConnection: @MainActor () -> (@MainActor () -> Void)
     @ObservationIgnored private var peer: (any LiveVoiceAudioPeer)?
+    @ObservationIgnored private var releaseHostConnection: (@MainActor () -> Void)?
     @ObservationIgnored private var startTask: Task<Void, Never>?
     @ObservationIgnored private var monitorTask: Task<Void, Never>?
     @ObservationIgnored private var closingTask: Task<Void, Never>?
@@ -139,7 +147,10 @@ final class LiveVoiceModel {
         provider: LiveVoiceProvider = .codexSubscription,
         voice: String? = nil,
         client: LiveVoiceControlClient,
-        makePeer: @escaping @MainActor () -> any LiveVoiceAudioPeer = { BighelpRealtimeAudioPeer() }
+        makePeer: @escaping @MainActor () -> any LiveVoiceAudioPeer = { BighelpRealtimeAudioPeer() },
+        holdHostConnection: @escaping @MainActor () -> (@MainActor () -> Void) = {
+            BighelpShortcutService.holdHostConnection()
+        }
     ) {
         self.agentName = agentName
         self.provider = provider
@@ -148,6 +159,7 @@ final class LiveVoiceModel {
         self.client = client
         owner = client.owner
         self.makePeer = makePeer
+        self.holdHostConnection = holdHostConnection
     }
 
     var isCallOpen: Bool { [.preparing, .connecting, .live, .interrupted].contains(phase) }
@@ -168,6 +180,10 @@ final class LiveVoiceModel {
         ChatAttachmentPlayback.shared.stop()
         Telemetry.featureUsed(.voiceLive)
         currentCall.began(self)
+        // Keep the host connection alive when the phone locks or Bighelp backgrounds,
+        // so the 25-second background grace does not tear down the open call.
+        releaseHostConnection?()
+        releaseHostConnection = holdHostConnection()
         generation = UUID()
         let token = generation
         let id = "voice_\(UUID().uuidString)"
@@ -471,9 +487,15 @@ final class LiveVoiceModel {
             guard let self, self.generation == token, self.isCallOpen else { return }
             if interrupted { self.phase = .interrupted }
             else if self.phase == .interrupted, self.nativeConnected {
+                // Restore only the user's explicit mute choice after interruption or route loss.
+                self.peer?.setMuted(self.isMuted)
                 self.phase = .connecting
                 self.reconcileReadiness()
             }
+        }
+        peer.onInterruptionEndedWithoutResume = { [weak self] in
+            guard let self, self.generation == token, self.isCallOpen else { return }
+            self.end()
         }
     }
 
@@ -543,9 +565,12 @@ final class LiveVoiceModel {
         peer?.onConnectionState = nil
         peer?.onAudioRoute = nil
         peer?.onInterruption = nil
+        peer?.onInterruptionEndedWithoutResume = nil
         if let reporting = peer as? LiveVoiceAudioReporting { endedCallReport = reporting.audioReport() }
         peer?.close()
         peer = nil
+        releaseHostConnection?()
+        releaseHostConnection = nil
         nativeConnected = false
         isSpeechControlPending = false
         controllingJobIDs = []

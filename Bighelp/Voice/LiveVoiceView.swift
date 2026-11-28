@@ -4,7 +4,6 @@ import SwiftUI
 /// the explicit media lifecycle and the two local audio mute controls.
 struct LiveVoiceView: View {
     @State private var model: LiveVoiceModel
-    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let agentID: String?
     let agentImageURL: URL?
@@ -121,11 +120,10 @@ struct LiveVoiceView: View {
         }
         // Tapping the voice button is the start: the call begins as the screen opens. Only the first
         // time: after a failure the screen offers Try again instead of retrying by itself.
+        // Locking the phone or backgrounding Bighelp keeps the live call running like a phone call;
+        // only dismissing the screen (onDisappear) or tapping End/Close ends it.
         .task { if model.phase == .idle { model.start() } }
         .onDisappear { model.end() }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .background { model.end() }
-        }
         // Contain, so the controls keep their own identifiers.
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("live-voice.screen")

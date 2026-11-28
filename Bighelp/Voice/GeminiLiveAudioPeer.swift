@@ -9,6 +9,7 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
     var onConnectionState: (@MainActor (BighelpRealtimeAudioPeer.ConnectionState) -> Void)?
     var onAudioRoute: (@MainActor (String) -> Void)?
     var onInterruption: (@MainActor (Bool) -> Void)?
+    var onInterruptionEndedWithoutResume: (@MainActor () -> Void)?
     var onEvent: (@MainActor ([String: BighelpJSONValue]) -> Void)?
 
     private let sessionCoordinator: VoiceAudioSessionCoordinator
@@ -269,6 +270,11 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
         uplink.detach()
         socket?.cancel(with: .normalClosure, reason: nil)
         socket = nil
+        onConnectionState = nil
+        onAudioRoute = nil
+        onInterruption = nil
+        onInterruptionEndedWithoutResume = nil
+        onEvent = nil
         stopAudio()
     }
 
@@ -468,19 +474,32 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
         let center = NotificationCenter.default
         observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil,
                                             queue: .main) { [weak self] note in
-            let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
-            let began = raw.flatMap(AVAudioSession.InterruptionType.init(rawValue:)) == .began
+            let type = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt)
+                .flatMap(AVAudioSession.InterruptionType.init(rawValue:))
+            let options = (note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt)
+                .map(AVAudioSession.InterruptionOptions.init(rawValue:)) ?? []
             MainActor.assumeIsolated {
-                guard let self, !self.closed else { return }
-                if began { self.diagnostics.count { $0.interruptions += 1 } }
-                self.diagnostics.event(began ? "interruption began" : "interruption ended")
-                if !began {
+                guard let self, !self.closed, let type else { return }
+                switch type {
+                case .began:
+                    self.diagnostics.count { $0.interruptions += 1 }
+                    self.diagnostics.event("interruption began")
+                    self.onInterruption?(true)
+                case .ended:
+                    let shouldResume = options.contains(.shouldResume)
+                    self.diagnostics.event("interruption ended (resume=\(shouldResume))")
+                    guard shouldResume else {
+                        self.onInterruptionEndedWithoutResume?()
+                        return
+                    }
                     do { try self.resumeAudio() } catch {
                         self.publish(.failed)
                         return
                     }
+                    self.onInterruption?(false)
+                @unknown default:
+                    break
                 }
-                self.onInterruption?(began)
             }
         })
         observers.append(center.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine,
@@ -498,6 +517,9 @@ final class GeminiLiveAudioPeer: LiveVoiceAudioPeer, LiveVoiceLocalSession, Live
                     .map { $0.portType.rawValue.replacingOccurrences(of: "AVAudioSessionPort", with: "") }
                 self.diagnostics.event("route change (\(Self.name(reason))): out \(outputs.joined(separator: "+"))")
                 try? self.reapplySpeakerOutputIfNeeded()
+                if reason == .oldDeviceUnavailable, !self.engine.isRunning {
+                    try? self.resumeAudio()
+                }
             }
         })
         observers.append(center.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil,

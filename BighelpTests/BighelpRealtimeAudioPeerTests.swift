@@ -178,6 +178,60 @@ struct BighelpRealtimeAudioPeerTests {
         claim.release()
         #expect(session.calls == ["configure", "activate", "deactivate"])
     }
+
+    @Test func realtimePeerHandlesInterruptionBeganEndedWithAndWithoutResume() async throws {
+        let session = CountingAudioSession()
+        let coordinator = VoiceAudioSessionCoordinator(session: session)
+        let peer = BighelpRealtimeAudioPeer(captureEnabled: false, sessionCoordinator: coordinator)
+        defer { peer.close() }
+        _ = try await peer.makeOffer()
+
+        var interruptionEvents: [Bool] = []
+        var endedWithoutResumeCount = 0
+        peer.onInterruption = { interruptionEvents.append($0) }
+        peer.onInterruptionEndedWithoutResume = { endedWithoutResumeCount += 1 }
+
+        peer.handleInterruptionBegan()
+        #expect(peer.isInterrupted)
+        #expect(interruptionEvents == [true])
+        #expect(endedWithoutResumeCount == 0)
+
+        // Ending with shouldResume == true resumes audio without ending the call.
+        peer.handleInterruptionEnded(shouldResume: true)
+        #expect(!peer.isInterrupted)
+        #expect(interruptionEvents == [true, false])
+        #expect(endedWithoutResumeCount == 0)
+
+        // Ending with shouldResume == false signals the model to end the call cleanly.
+        peer.handleInterruptionBegan()
+        #expect(peer.isInterrupted)
+        peer.handleInterruptionEnded(shouldResume: false)
+        #expect(peer.isInterrupted)
+        #expect(interruptionEvents == [true, false, true])
+        #expect(endedWithoutResumeCount == 1)
+    }
+
+    @Test func realtimePeerOldDeviceUnavailableKeepsCallAliveOnReplacementRoute() async throws {
+        let session = CountingAudioSession()
+        let coordinator = VoiceAudioSessionCoordinator(session: session)
+        let peer = BighelpRealtimeAudioPeer(captureEnabled: false, sessionCoordinator: coordinator)
+        defer { peer.close() }
+        _ = try await peer.makeOffer()
+
+        var interruptionEvents: [Bool] = []
+        var endedWithoutResumeCount = 0
+        var routes: [String] = []
+        peer.onInterruption = { interruptionEvents.append($0) }
+        peer.onInterruptionEndedWithoutResume = { endedWithoutResumeCount += 1 }
+        peer.onAudioRoute = { routes.append($0) }
+
+        peer.handleRouteChange(reason: .oldDeviceUnavailable)
+        #expect(!peer.isInterrupted)
+        #expect(interruptionEvents == [false])
+        #expect(endedWithoutResumeCount == 0)
+        #expect(!routes.isEmpty)
+        #expect(peer.connectionState != .failed && peer.connectionState != .closed)
+    }
 }
 
 private final class CountingAudioSession: VoiceAudioSessionControlling, @unchecked Sendable {
